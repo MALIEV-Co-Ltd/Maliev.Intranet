@@ -1,0 +1,124 @@
+openapi: 3.0.0
+info:
+  title: Maliev.Intranet BFF API
+  version: 1.0.0
+  description: Backend-for-Frontend API for the Maliev Intranet Portal
+
+paths:
+  /api/dashboard:
+    get:
+      summary: Get aggregated dashboard data
+      operationId: GetDashboard
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardViewModel'
+  
+  /api/customers:
+    get:
+      summary: Search customers
+      parameters:
+        - name: query
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseCustomerSummaryDto'
+
+  /api/orders:
+    get:
+      summary: List orders
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOrderSummaryDto'
+
+components:
+  schemas:
+    DashboardViewModel:
+      type: object
+      properties:
+        widgets:
+          type: array
+          items:
+            $ref: '#/components/schemas/WidgetData'
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SystemAlert'
+    
+    WidgetData:
+      type: object
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+        sourceService:
+          type: string
+    
+    SystemAlert:
+      type: object
+      properties:
+        message:
+          type: string
+        severity:
+          type: string
+    
+    PagedResponseCustomerSummaryDto:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerSummaryDto'
+        totalCount:
+          type: integer
+
+    CustomerSummaryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+
+    PagedResponseOrderSummaryDto:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSummaryDto'
+        totalCount:
+          type: integer
+
+    OrderSummaryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        amount:
+          type: number

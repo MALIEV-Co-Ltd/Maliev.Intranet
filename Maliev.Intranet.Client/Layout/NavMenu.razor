@@ -1,0 +1,17 @@
+<MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+    
+    <AuthorizeView>
+        <Authorized>
+            <MudNavGroup Title="Operations" Icon="@Icons.Material.Filled.Settings" Expanded="true">
+                <MudNavLink Href="customers" Icon="@Icons.Material.Filled.People">Customers</MudNavLink>
+                <MudNavLink Href="orders" Icon="@Icons.Material.Filled.ShoppingCart">Orders</MudNavLink>
+                <MudNavLink Href="quotations" Icon="@Icons.Material.Filled.Description">Quotations</MudNavLink>
+                <MudNavLink Href="suppliers" Icon="@Icons.Material.Filled.LocalShipping">Suppliers</MudNavLink>
+            </MudNavGroup>
+            <MudNavGroup Title="Finance" Icon="@Icons.Material.Filled.AttachMoney">
+                <MudNavLink Href="accounting" Icon="@Icons.Material.Filled.AccountBalance">Accounting</MudNavLink>
+            </MudNavGroup>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>
