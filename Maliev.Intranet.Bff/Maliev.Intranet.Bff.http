@@ -1,0 +1,6 @@
+@Maliev.Intranet.Bff_HostAddress = http://localhost:5071
+
+GET {{Maliev.Intranet.Bff_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

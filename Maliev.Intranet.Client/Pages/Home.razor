@@ -1,0 +1,137 @@
+@page "/"
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Dashboard - Maliev Intranet</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
+    <MudText Typo="Typo.h4" Class="mb-6">Welcome to Maliev Intranet</MudText>
+
+    @if (_userInfo == null)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else
+    {
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Your Profile</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText><strong>Name:</strong> @_userInfo.Name</MudText>
+                        <MudText><strong>Email:</strong> @_userInfo.Email</MudText>
+                        <MudText><strong>User ID:</strong> @_userInfo.UserId</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Your Roles</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (_userInfo.Roles.Any())
+                        {
+                            <MudChipSet T="string">
+                                @foreach (var role in _userInfo.Roles)
+                                {
+                                    <MudChip T="string" Color="Color.Primary">@role</MudChip>
+                                }
+                            </MudChipSet>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">No roles assigned</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Your Permissions</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (_userInfo.Permissions.Any())
+                        {
+                            <MudChipSet T="string">
+                                @foreach (var permission in _userInfo.Permissions)
+                                {
+                                    <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined">@permission</MudChip>
+                                }
+                            </MudChipSet>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">No permissions assigned</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudCardContent>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.Logout"
+                                   OnClick="HandleLogout">
+                            Logout
+                        </MudButton>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private UserInfo? _userInfo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _userInfo = new UserInfo
+            {
+                Name = user.FindFirst("name")?.Value ?? user.Identity.Name ?? "Unknown",
+                Email = user.FindFirst("email")?.Value ?? "No email",
+                UserId = user.FindFirst("sub")?.Value ?? "Unknown",
+                Roles = user.FindAll("roles").Select(c => c.Value).ToList(),
+                Permissions = user.FindAll("permissions").Select(c => c.Value).ToList()
+            };
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        await Http.GetAsync("api/auth/logout");
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    private class UserInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public List<string> Roles { get; set; } = new();
+        public List<string> Permissions { get; set; } = new();
+    }
+}
