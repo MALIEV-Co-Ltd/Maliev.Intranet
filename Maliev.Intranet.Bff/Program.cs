@@ -1,4 +1,3 @@
-#pragma warning disable CA1848 // For improved performance, use the LoggerMessage delegates
 using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -12,7 +11,7 @@ var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
 try
 {
-    bootstrapLogger.LogInformation("Starting Intranet BFF host");
+    Program.Log.StartingHost(bootstrapLogger, "Intranet BFF");
 
     var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +82,7 @@ try
         .AddInteractiveWebAssemblyComponents();
 
     var app = builder.Build();
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
@@ -116,14 +116,33 @@ try
 
     app.MapControllers();
 
+    Program.Log.ServiceStarted(logger, "Intranet BFF");
     app.Run();
 }
 catch (Exception ex)
 {
-    bootstrapLogger.LogCritical(ex, "Intranet BFF host terminated unexpectedly during startup");
+    Program.Log.HostTerminated(bootstrapLogger, ex, "Intranet BFF");
     throw;
 }
 finally
 {
     loggerFactory.Dispose();
+}
+
+/// <summary>
+/// Main program class for the Intranet BFF.
+/// </summary>
+public partial class Program
+{
+    internal static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
+        public static partial void StartingHost(ILogger logger, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
+        public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
+        public static partial void ServiceStarted(ILogger logger, string serviceName);
+    }
 }
