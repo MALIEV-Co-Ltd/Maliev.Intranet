@@ -1,3 +1,4 @@
+#pragma warning disable CA1848 // For improved performance, use the LoggerMessage delegates
 using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
 using Microsoft.AspNetCore.Authentication.Cookies;
