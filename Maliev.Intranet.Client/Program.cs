@@ -13,6 +13,7 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, BffAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
+builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<MockDataService>();
 builder.Services.AddMudServices();
 

@@ -1,59 +1,158 @@
+@using MudBlazor
 @using Maliev.Intranet.Client.Services
 @using Maliev.Intranet.Shared
+@inject NavigationManager Navigation
 
-<MudNavMenu Class="mud-width-full d-flex flex-column" Style="height: 100%;">
-    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-4 mb-2">MAIN MENU</MudText>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Dashboard">Dashboard</MudNavLink>
+<MudNavMenu Class="mud-width-full d-flex flex-column" Style="height: 100%; overflow: hidden;">
+    <div class="flex-grow-1 custom-scrollbar" style="overflow-y: auto;">
+        <MudTooltip Text="Dashboard" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Dashboard">Dashboard</MudNavLink>
+        </MudTooltip>
 
-    <!-- Sales & CRM -->
-    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">SALES & CRM</MudText>
-    <MudNavLink Href="sales/customers" Icon="@Icons.Material.Outlined.People">
-         <div class="d-flex justify-space-between align-center width-100">
-            Customers
-            <MudBadge Content="12" Color="Color.Primary" Overlap="false" Class="ml-auto my-auto mr-2" />
+        <!-- Sales & CRM -->
+        <MudNavGroup Title="Sales & CRM" Icon="@Icons.Material.Outlined.Business" Expanded="false">
+            <MudTooltip Text="Customers" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="sales/customers" Icon="@Icons.Material.Outlined.People">Customers</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Quotations" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="sales/quotations" Icon="@Icons.Material.Outlined.Description">Quotations</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Orders" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="sales/orders" Icon="@Icons.Material.Outlined.ShoppingCart">Orders</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Pricing AI" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="sales/pricing-ai" Icon="@Icons.Material.Outlined.AutoGraph">Pricing AI</MudNavLink>
+            </MudTooltip>
+        </MudNavGroup>
+
+        <!-- Manufacturing -->
+        <MudNavGroup Title="Manufacturing" Icon="@Icons.Material.Outlined.PrecisionManufacturing" Expanded="false">
+            <MudTooltip Text="3D Models" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="mfg/models" Icon="@Icons.Material.Outlined.ViewInAr">3D Models</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Materials" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="mfg/materials" Icon="@Icons.Material.Outlined.Inventory2">Materials</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Procurement" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="mfg/procurement" Icon="@Icons.Material.Outlined.ShoppingBag">Procurement</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Suppliers" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="mfg/suppliers" Icon="@Icons.Material.Outlined.LocalShipping">Suppliers</MudNavLink>
+            </MudTooltip>
+        </MudNavGroup>
+
+        <!-- Finance -->
+        <MudNavGroup Title="Finance" Icon="@Icons.Material.Outlined.AccountBalanceWallet" Expanded="false">
+            <MudTooltip Text="Invoices" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="finance/invoices" Icon="@Icons.Material.Outlined.Receipt">Invoices</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Payments" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="finance/payments" Icon="@Icons.Material.Outlined.Payments">Payments</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Receipts" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="finance/receipts" Icon="@Icons.Material.Outlined.RequestQuote">Receipts</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="General Ledger" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="finance/ledger" Icon="@Icons.Material.Outlined.AccountBalance">General Ledger</MudNavLink>
+            </MudTooltip>
+        </MudNavGroup>
+
+        <!-- HR & Organization -->
+        <MudNavGroup Title="HR & Org" Icon="@Icons.Material.Outlined.Groups" Expanded="false">
+            <MudTooltip Text="Employees" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/employees" Icon="@Icons.Material.Outlined.Badge">Employees</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Recruitment" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/recruitment" Icon="@Icons.Material.Outlined.WorkOutline">Recruitment</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Onboarding" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/onboarding" Icon="@Icons.Material.Outlined.AssignmentInd">Onboarding</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Time Off" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/time-off" Icon="@Icons.Material.Outlined.EventBusy">Time Off</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Compliance" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/compliance" Icon="@Icons.Material.Outlined.FactCheck">Compliance</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Performance" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/performance" Icon="@Icons.Material.Outlined.Speed">Performance</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Compensation" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/compensation" Icon="@Icons.Material.Outlined.MonetizationOn">Compensation</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Directory" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/directory" Icon="@Icons.Material.Outlined.ContactPage">Directory</MudNavLink>
+            </MudTooltip>
+        </MudNavGroup>
+
+        <!-- Admin -->
+        <MudNavGroup Title="Admin" Icon="@Icons.Material.Outlined.AdminPanelSettings" Expanded="false">
+            <MudTooltip Text="IAM Console" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="admin/iam" Icon="@Icons.Material.Outlined.AdminPanelSettings">IAM Console</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Notifications" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="admin/notifications" Icon="@Icons.Material.Outlined.Notifications">Notifications</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="System Health" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="admin/system-health" Icon="@Icons.Material.Outlined.HealthAndSafety">System Health</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Reference Data" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="admin/reference-data" Icon="@Icons.Material.Outlined.SettingsSuggest">Reference Data</MudNavLink>
+            </MudTooltip>
+        </MudNavGroup>
+    </div>
+
+    <div class="mt-auto sticky-bottom-logout">
+        <MudDivider />
+        <div class="pa-2">
+            <MudTooltip Text="Logout" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink OnClick="@HandleLogout" 
+                            Icon="@Icons.Material.Outlined.DoorBack" 
+                            IconColor="Color.Inherit"
+                            Class="rounded-lg logout-nav-link">
+                    Logout
+                </MudNavLink>
+            </MudTooltip>
         </div>
-    </MudNavLink>
-    <MudNavLink Href="sales/quotations" Icon="@Icons.Material.Outlined.Description">Quotations</MudNavLink>
-    <MudNavLink Href="sales/orders" Icon="@Icons.Material.Outlined.ShoppingCart">
-        <div class="d-flex justify-space-between align-center width-100">
-            Orders
-            <MudBadge Content="5" Color="Color.Error" Overlap="false" Class="ml-auto my-auto mr-2" />
-        </div>
-    </MudNavLink>
-    <MudNavLink Href="sales/pricing-ai" Icon="@Icons.Material.Outlined.AutoGraph">Pricing AI</MudNavLink>
-
-    <!-- Manufacturing -->
-    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">MANUFACTURING</MudText>
-    <MudNavLink Href="mfg/models" Icon="@Icons.Material.Outlined.ViewInAr">3D Models</MudNavLink>
-    <MudNavLink Href="mfg/materials" Icon="@Icons.Material.Outlined.Inventory2">Materials</MudNavLink>
-    <MudNavLink Href="mfg/procurement" Icon="@Icons.Material.Outlined.ShoppingBag">Procurement</MudNavLink>
-    <MudNavLink Href="mfg/suppliers" Icon="@Icons.Material.Outlined.LocalShipping">Suppliers</MudNavLink>
-
-    <!-- Finance -->
-    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">FINANCE</MudText>
-    <MudNavLink Href="finance/invoices" Icon="@Icons.Material.Outlined.Receipt">Invoices</MudNavLink>
-    <MudNavLink Href="finance/payments" Icon="@Icons.Material.Outlined.Payments">Payments</MudNavLink>
-    <MudNavLink Href="finance/receipts" Icon="@Icons.Material.Outlined.RequestQuote">Receipts</MudNavLink>
-    <MudNavLink Href="finance/ledger" Icon="@Icons.Material.Outlined.AccountBalance">General Ledger</MudNavLink>
-
-    <!-- HR & Organization -->
-    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">HR & ORG</MudText>
-    <MudNavLink Href="hr/employees" Icon="@Icons.Material.Outlined.Badge">Employees</MudNavLink>
-    <MudNavLink Href="hr/recruitment" Icon="@Icons.Material.Outlined.WorkOutline">Recruitment</MudNavLink>
-    <MudNavLink Href="hr/onboarding" Icon="@Icons.Material.Outlined.AssignmentInd">Onboarding</MudNavLink>
-    <MudNavLink Href="hr/time-off" Icon="@Icons.Material.Outlined.EventBusy">Time Off</MudNavLink>
-    <MudNavLink Href="hr/compliance" Icon="@Icons.Material.Outlined.FactCheck">Compliance</MudNavLink>
-    <MudNavLink Href="hr/performance" Icon="@Icons.Material.Outlined.Speed">Performance</MudNavLink>
-    <MudNavLink Href="hr/compensation" Icon="@Icons.Material.Outlined.MonetizationOn">Compensation</MudNavLink>
-    <MudNavLink Href="hr/directory" Icon="@Icons.Material.Outlined.ContactPage">Directory</MudNavLink>
-
-    <!-- Admin -->
-    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">ADMIN</MudText>
-    <MudNavLink Href="admin/iam" Icon="@Icons.Material.Outlined.AdminPanelSettings">IAM Console</MudNavLink>
-    <MudNavLink Href="admin/notifications" Icon="@Icons.Material.Outlined.Notifications">Notifications</MudNavLink>
-    <MudNavLink Href="admin/reference-data" Icon="@Icons.Material.Outlined.SettingsSuggest">Reference Data</MudNavLink>
-
-    <div class="mt-auto pb-4 px-2">
-         <MudNavLink Href="/api/auth/logout" Icon="@Icons.Material.Outlined.Logout">Logout</MudNavLink>
     </div>
 </MudNavMenu>
+
+<style>
+    .logout-nav-link {
+        background-color: var(--mud-palette-error) !important;
+        color: white !important;
+    }
+    
+    .logout-nav-link:hover {
+        background-color: var(--mud-palette-error-darken) !important;
+    }
+
+    .logout-nav-link .mud-nav-link-text {
+        font-weight: 500;
+    }
+
+    .sticky-bottom-logout {
+        background-color: var(--mud-palette-drawer-background);
+        z-index: 10;
+    }
+
+    /* Fix NavLink width issue caused by Tooltip wrapping */
+    .mud-tooltip-root {
+        width: 100%;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: var(--mud-palette-divider);
+        border-radius: 4px;
+    }
+</style>
+
+@code {
+    private void HandleLogout()
+    {
+        Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
+    }
+}

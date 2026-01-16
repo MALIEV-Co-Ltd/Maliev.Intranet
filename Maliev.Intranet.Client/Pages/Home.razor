@@ -16,7 +16,7 @@
     }
 </style>
 
-@if (_userInfo == null)
+@if (_loading)
 {
     <!-- Loading Skeletons State - Simplified for General Dashboard -->
     <MudGrid>
@@ -43,7 +43,7 @@ else
                         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@widget.Title</MudText>
                         <div class="d-flex align-center justify-space-between mt-2">
                             <MudText Typo="Typo.h4" Style="font-weight: 500;">
-                                @if(widget.Type == "Stat") { @widget.Data } else { <text>€24,400</text> }
+                                @if(widget.Type == "Stat") { @widget.Data } else { <text>฿0</text> }
                             </MudText>
                             
                             <!-- Mini Chart Visualization -->
@@ -58,50 +58,13 @@ else
                                 }
                                 else
                                 {
-                                    <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 10, 20, 15, 30 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
+                                    <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 0, 0, 0, 0 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
                                 }
                             </div>
                         </div>
                     </MudCard>
                 </MudItem>
             }
-        }
-        else
-        {
-             <!-- Fallback Static Widgets if no data from API -->
-             <MudItem xs="12" sm="4">
-                 <MudCard Elevation="0" Class="rounded-lg pa-4" Style="background-color: var(--mud-palette-surface);">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Total Sales</MudText>
-                    <div class="d-flex align-center justify-space-between mt-2">
-                        <MudText Typo="Typo.h4" Style="font-weight: 500;">€42,400</MudText>
-                        <div style="width: 120px; height: 50px;">
-                            <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 40, 20, 50, 30, 60 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
-                        </div>
-                    </div>
-                </MudCard>
-             </MudItem>
-             <MudItem xs="12" sm="4">
-                 <MudCard Elevation="0" Class="rounded-lg pa-4" Style="background-color: var(--mud-palette-surface);">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Active Orders</MudText>
-                    <div class="d-flex align-center justify-space-between mt-2">
-                        <MudText Typo="Typo.h4" Style="font-weight: 500;">24</MudText>
-                        <div style="width: 120px; height: 50px;">
-                            <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 10, 40, 20, 50, 30 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
-                        </div>
-                    </div>
-                </MudCard>
-             </MudItem>
-             <MudItem xs="12" sm="4">
-                 <MudCard Elevation="0" Class="rounded-lg pa-4" Style="background-color: var(--mud-palette-surface);">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Completed</MudText>
-                    <div class="d-flex align-center justify-space-between mt-2">
-                        <MudText Typo="Typo.h4" Style="font-weight: 500;">20</MudText>
-                         <div style="width: 120px; height: 50px;">
-                            <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 60, 50, 40, 50, 60 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
-                        </div>
-                    </div>
-                </MudCard>
-             </MudItem>
         }
         
         <!-- Orders Table Area -->
@@ -113,25 +76,27 @@ else
                     </CardHeaderContent>
                     <CardHeaderActions>
                         <MudTabs Rounded="true" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
-                            <MudTabPanel Text="All order (2.4k)" />
-                            <MudTabPanel Text="Processing (120)" />
-                            <MudTabPanel Text="Shipped (100)" />
+                            <MudTabPanel Text="All Orders" />
+                            <MudTabPanel Text="Processing" />
+                            <MudTabPanel Text="Shipped" />
                         </MudTabs>
                     </CardHeaderActions>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudTable Items="@(new List<string>())" Elevation="0" Hover="true">
+                    <MudTable Items="@(new List<string>())" Elevation="0" Hover="true" Loading="@_loading">
                         <HeaderContent>
                             <MudTh>Product</MudTh>
                             <MudTh>Price</MudTh>
                             <MudTh>Payment</MudTh>
                             <MudTh>Status</MudTh>
                         </HeaderContent>
+                        <LoadingContent>
+                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
+                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
+                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
+                        </LoadingContent>
                         <NoRecordsContent>
-                            <MudText Class="pa-4 text-center" Color="Color.Secondary">No orders found (This area uses a skeleton normally)</MudText>
-                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
-                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
-                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
+                            <MudText Class="pa-4 text-center" Color="Color.Secondary">No orders found</MudText>
                         </NoRecordsContent>
                     </MudTable>
                 </MudCardContent>
@@ -143,6 +108,7 @@ else
 @code {
     private UserInfo? _userInfo;
     private DashboardViewModel? _dashboard;
+    private bool _loading = true;
     
     // CSS class handles legend hiding
     private ChartOptions _chartOptions = new ChartOptions 
@@ -177,6 +143,10 @@ else
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching dashboard: {ex.Message}");
+            }
+            finally
+            {
+                _loading = false;
             }
         }
     }

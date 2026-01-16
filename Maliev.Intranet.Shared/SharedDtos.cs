@@ -600,6 +600,28 @@ public class PaymentDetailDto
 }
 
 /// <summary>
+/// Represents the health status of a single microservice.
+/// </summary>
+public class ServiceHealthStatus
+{
+    public string ServiceName { get; set; } = string.Empty;
+    public string Status { get; set; } = "Unknown"; // Healthy, Unhealthy, Degraded
+    public double ResponseTimeMs { get; set; }
+    public DateTime LastCheck { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+/// <summary>
+/// Represents the aggregated health status of the entire system.
+/// </summary>
+public class SystemHealthDto
+{
+    public List<ServiceHealthStatus> Services { get; set; } = new();
+    public DateTime OverallTimestamp { get; set; }
+    public string OverallStatus { get; set; } = "Healthy";
+}
+
+/// <summary>
 /// Represents a summary of a supplier record.
 /// </summary>
 public class SupplierSummaryDto

@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LayoutService LayoutService
+@inject ChatService ChatService
 @inject ILogger<MainLayout> Logger
 @implements IAsyncDisposable
 
@@ -15,56 +16,253 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
+<style>
+    /* Fix left/right padding issue by targeting the toolbar gutters */
+    .mud-toolbar-gutters {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    /* Enforce profile text stays on one line */
+    .profile-name-stack {
+        white-space: nowrap;
+    }
+
+    /* Account for bottom appbar on mobile */
+    @@media (max-width: 959.98px) {
+        .mud-main-content {
+            padding-bottom: 72px !important;
+            padding-top: 0 !important; /* Ensure no top gap on mobile */
+        }
+        
+        /* Ensure temporary drawer on mobile is full height and correctly positioned */
+        .mud-drawer-temporary {
+            height: 100% !important;
+            z-index: 1350 !important; /* Above content, below Bottom AppBar */
+        }
+
+        /* Give Sidebar higher priority than Chatbot on mobile */
+        .sidebar-drawer {
+            z-index: 1500 !important; 
+        }
+
+        .bottom-app-bar {
+            z-index: 1600 !important; /* Highest priority */
+        }
+
+        /* Ensure persistent drawer on mobile (like chatbot) also fills height and doesn't overlap header wrongly */
+        .mud-drawer-persistent {
+            height: 100% !important;
+            top: 0 !important;
+        }
+    }
+
+    .chatbot-integrated-card {
+        background-color: var(--mud-palette-surface) !important;
+        border: 1px solid var(--mud-palette-divider) !important;
+        height: calc(100vh - 110px) !important; /* Account for AppBar and spacing */
+        position: sticky !important;
+        top: 86px !important;
+    }
+
+    /* SVG Gradient for Auto Mode icon - Target the path for reliable fill */
+    .auto-mode-icon svg path {
+        fill: url(#auto-mode-gradient) !important;
+    }
+    
+    /* Fix NavLink width issue caused by Tooltip wrapping */
+    .sidebar-drawer .mud-tooltip-root, 
+    .sidebar-drawer .mud-tooltip-inline {
+        display: block !important;
+        width: 100%;
+    }
+
+    .mobile-appbar-grid {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        width: 100%;
+        align-items: center;
+    }
+</style>
+
+<!-- SVG Gradient Definition for AutoMode Icon -->
+<svg width="0" height="0" style="position: absolute;">
+    <defs>
+        <linearGradient id="auto-mode-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#2196F3;stop-opacity:1" />
+        </linearGradient>
+    </defs>
+</svg>
+
 <MudLayout>
-    <MudAppBar Elevation="0" Dense="true" Class="border-b border-solid mud-border-lines-default px-2 px-sm-3 px-md-4" Fixed="true" Style="height: 64px;">
-        <!-- Logo Area - Left aligned -->
-        <MudImage Src="@LogoUrl" Alt="Maliev Logo" Height="20" Class="mr-2 mr-sm-3" />
-        
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.False" OnClick="@((e) => DrawerToggle())" Class="mr-2" />
-
-        <!-- Search Bar - Hidden on mobile -->
-        <MudTextField @bind-Value="_searchString" Placeholder="Search" Variant="Variant.Outlined" 
-                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" 
-                      Class="rounded-lg d-none d-md-flex" Style="max-width: 300px; background-color: var(--mud-palette-surface);" Margin="Margin.Dense" />
-
-        <MudSpacer />
-        
-        <!-- Right Side Actions -->
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-            <!-- Date - Hidden on mobile/tablet -->
-            <MudText Typo="Typo.body2" Class="mr-2 d-none d-lg-flex" Color="Color.Secondary">@DateTime.Now.ToString("dddd dd, MMMM yyyy")</MudText>
+    @if (!_isMobile)
+    {
+        <MudAppBar Elevation="0" Class="border-b border-solid mud-border-lines-default" Fixed="true">
+            <!-- Sidebar Toggle & Logo Area -->
+            <div class="d-flex align-center pl-3">
+                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" Class="mr-2" />
+                <MudImage Src="@LogoUrl" Alt="Maliev Logo" Height="22" />
+            </div>
             
-            <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-lg-flex" />
+            <!-- Search Bar - Aligned with content area start -->
+            <MudTextField @bind-Value="_searchString" Placeholder="Search" Variant="Variant.Outlined" 
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          Class="rounded-lg d-none d-md-flex ml-6" Style="max-width: 320px; background-color: var(--mud-palette-surface);" Margin="Margin.Dense" />
 
-            <!-- Chat Toggle -->
-            <MudTooltip Text="AI Assistant">
-                <MudIconButton Icon="@Icons.Material.Outlined.Chat" 
-                               Color="@(_chatDrawerOpen ? Color.Primary : Color.Inherit)" 
-                               OnClick="@(() => _chatDrawerOpen = !_chatDrawerOpen)" 
-                               Size="Size.Medium" />
-            </MudTooltip>
+            <MudSpacer />
+            
+            <!-- Right Side Actions -->
+            <div class="pr-4 d-flex align-center">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <!-- Date - Desktop Only -->
+                    <MudText Typo="Typo.body2" Class="mr-2 d-none d-lg-flex" Style="white-space: nowrap;" Color="Color.Secondary">@DateTime.Now.ToString("dddd dd, MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</MudText>
+                    
+                    <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-lg-flex" />
 
-            <!-- Notification -->
-            <MudTooltip Text="Notifications">
-                <MudBadge Dot="true" Color="Color.Error" Overlap="true" Bordered="true">
-                    <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" Size="Size.Medium" />
-                </MudBadge>
-            </MudTooltip>
+                    <!-- Chat Toggle - Desktop Only -->
+                    <MudTooltip Text="AI Assistant" Class="d-none d-md-flex">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Chat" 
+                                       Color="@(_chatDrawerOpen ? Color.Primary : Color.Inherit)" 
+                                       OnClick="@(() => _chatDrawerOpen = !_chatDrawerOpen)" 
+                                       Size="Size.Medium"
+                                       Class="d-none d-md-inline-flex" />
+                    </MudTooltip>
 
-             <!-- Theme Toggle -->
-            <MudTooltip Text="@GetThemeTooltip()">
-                <MudIconButton Icon="@GetThemeIcon()" Color="@GetThemeColor()" OnClick="@ToggleThemeAsync" Size="Size.Medium" />
-            </MudTooltip>
+                    <!-- Notification - Desktop Only -->
+                    <MudTooltip Text="Notifications" Class="d-none d-md-flex">
+                        <MudBadge Visible="@_hasUnreadNotifications" Dot="true" Color="Color.Error" Overlap="true" Bordered="true" Class="d-none d-md-inline-flex">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" Size="Size.Medium" OnClick="@ClearNotifications" />
+                        </MudBadge>
+                    </MudTooltip>
 
-            <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-sm-flex" />
+                     <!-- Theme Toggle -->
+                    <MudTooltip Text="@GetThemeTooltip()">
+                        <MudIconButton Icon="@GetThemeIcon()" 
+                                       Style="@(LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "")"
+                                       Class="@(LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "")"
+                                       Color="@GetThemeColor()" 
+                                       OnClick="@ToggleThemeAsync" Size="Size.Medium" />
+                    </MudTooltip>
 
-            <!-- User Profile -->
-            <AuthorizeView Context="auth">
-                <Authorized>
-                    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" LockScroll="true">
-                        <ActivatorContent>
-                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="cursor-pointer">
-                                <MudAvatar Size="Size.Small">
+                    <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-sm-flex" />
+
+                    <!-- User Profile -->
+                    <AuthorizeView Context="auth">
+                        <Authorized>
+                            <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" LockScroll="true">
+                                <ActivatorContent>
+                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="cursor-pointer ml-1">
+                                        <MudAvatar Style="height:40px; width:40px; font-size:1.1rem;">
+                                            @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
+                                            {
+                                                <MudImage Src="@auth.User.FindFirst("picture")?.Value" Alt="User Avatar" />
+                                            }
+                                            else
+                                            {
+                                                @(auth.User.Identity?.Name?[0] ?? 'U')
+                                            }
+                                        </MudAvatar>
+                                         <MudStack Spacing="0" AlignItems="AlignItems.End" Class="d-none d-md-flex profile-name-stack pl-1">
+                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@auth.User.Identity?.Name</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Managing Director</MudText>
+                                         </MudStack>
+                                        <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" Color="Color.Secondary" Class="d-none d-md-flex" />
+                                    </MudStack>
+                                </ActivatorContent>
+                                <ChildContent>
+                                    <MudMenuItem Href="/hr/profile">My Profile</MudMenuItem>
+                                    <MudMenuItem OnClick="@HandleLogout">Logout</MudMenuItem>
+                                </ChildContent>
+                            </MudMenu>
+                        </Authorized>
+                    </AuthorizeView>
+                </MudStack>
+            </div>
+        </MudAppBar>
+    }
+
+    <!-- Sidebar -->
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="@(_isMobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" 
+               Variant="@GetDrawerVariant()" 
+               MiniWidth="72px"
+               OpenMiniOnHover="false"
+               Breakpoint="Breakpoint.Md"
+               Class="border-r border-solid mud-border-lines-default sidebar-drawer">
+        <NavMenu />
+    </MudDrawer>
+
+    <!-- Unified Chatbot Drawer (Overlay for mobile, Integrated for desktop) -->
+    @if (_isMobile)
+    {
+        <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End" ClipMode="DrawerClipMode.Never" Elevation="2" Variant="@DrawerVariant.Temporary" Width="100%">
+            <ChatDrawer IsMobile="true" />
+        </MudDrawer>
+    }
+
+    <MudMainContent Class="@(_isMobile ? "pt-0 px-2" : "pt-16 px-2 px-sm-4 px-md-6")">
+        <div class="d-flex flex-row gap-6">
+            <!-- Main Application Content Area -->
+            <div class="flex-grow-1">
+                <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="@(_isMobile ? "mt-0 mb-8" : "mt-4 mt-md-6 mb-8 mb-md-12")">
+                    <!-- Breadcrumbs -->
+                    <MudBreadcrumbs Items="_breadcrumbs" Class="px-0 mb-4" Separator=">">
+                         <ItemTemplate Context="item">
+                            <MudLink Href="@item.Href" Typo="Typo.body2" Color="Color.Secondary" Underline="Underline.None">@item.Text</MudLink>
+                        </ItemTemplate>
+                    </MudBreadcrumbs>
+                    
+                    @Body
+                </MudContainer>
+            </div>
+
+            <!-- Integrated Desktop/Tablet Chatbot Section -->
+            @if (!_isMobile && _chatDrawerOpen)
+            {
+                <div class="chatbot-integrated-section d-none d-md-flex flex-column py-6" style="width: 380px; min-width: 380px;">
+                    <MudPaper Elevation="0" Class="chatbot-integrated-card rounded-lg overflow-hidden d-flex flex-column">
+                        <ChatDrawer />
+                    </MudPaper>
+                </div>
+            }
+        </div>
+    </MudMainContent>
+
+    <!-- Mobile Bottom App Bar -->
+    @if (_isMobile)
+    {
+        <MudAppBar Bottom="true" Fixed="true" Elevation="4" Class="d-md-none border-t border-solid mud-border-lines-default px-2 bottom-app-bar" Style="height: 64px;">
+            <div class="mobile-appbar-grid">
+                <!-- Left Group: Hamburger, Search, Theme -->
+                <div class="d-flex align-center">
+                    <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="@((e) => DrawerToggle())" Size="Size.Medium" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" OnClick="@OpenSearchDialog" Size="Size.Medium" />
+                    <MudIconButton Icon="@GetThemeIcon()" 
+                                    Style="@(LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "")"
+                                    Class="@(LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "")"
+                                    Color="@GetThemeColor()" 
+                                    OnClick="@ToggleThemeAsync" Size="Size.Medium" />
+                </div>
+                
+                <!-- Center: Logo -->
+                <div class="d-flex justify-center">
+                    <MudImage Src="@LogoUrl" Alt="Maliev Logo" Height="18" />
+                </div>
+                
+                <!-- Right Group: Chatbot, Notification, Profile -->
+                <div class="d-flex align-center justify-end">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Chat" 
+                                   Color="@(_chatDrawerOpen ? Color.Primary : Color.Inherit)" 
+                                   OnClick="@(() => _chatDrawerOpen = !_chatDrawerOpen)" Size="Size.Medium" />
+                                   
+                    <MudBadge Visible="@_hasUnreadNotifications" Dot="true" Color="Color.Error" Overlap="true" Bordered="true">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" OnClick="@ClearNotifications" Size="Size.Medium" />
+                    </MudBadge>
+
+                    <AuthorizeView Context="auth">
+                        <Authorized>
+                            <div class="ml-1" @onclick="@(() => Navigation.NavigateTo("/hr/profile"))">
+                                <MudAvatar Style="height:32px; width:32px; font-size:0.9rem;" Class="cursor-pointer">
                                     @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
                                     {
                                         <MudImage Src="@auth.User.FindFirst("picture")?.Value" Alt="User Avatar" />
@@ -74,58 +272,82 @@
                                         @(auth.User.Identity?.Name?[0] ?? 'U')
                                     }
                                 </MudAvatar>
-                                <MudStack Spacing="0" AlignItems="AlignItems.End" Class="d-none d-md-flex">
-                                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@auth.User.Identity?.Name</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Managing Director</MudText>
-                                </MudStack>
-                                <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" Color="Color.Secondary" Class="d-none d-md-flex" />
-                            </MudStack>
-                        </ActivatorContent>
-                        <ChildContent>
-                            <MudMenuItem Href="/hr/profile">My Profile</MudMenuItem>
-                            <MudMenuItem Href="/api/auth/logout">Logout</MudMenuItem>
-                        </ChildContent>
-                    </MudMenu>
-                </Authorized>
-            </AuthorizeView>
-        </MudStack>
-    </MudAppBar>
-
-    <!-- Sidebar -->
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="0" 
-               Variant="@(_isMobile ? DrawerVariant.Temporary : DrawerVariant.Persistent)" 
-               Breakpoint="Breakpoint.Md"
-               Class="border-r border-solid mud-border-lines-default pt-4">
-        <NavMenu />
-    </MudDrawer>
-
-    <!-- Chatbot Right Drawer -->
-    <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End" ClipMode="DrawerClipMode.Always" Elevation="2" Variant="@DrawerVariant.Persistent" Width="350px">
-        <ChatDrawer Context="@Navigation.Uri" />
-    </MudDrawer>
-
-    <MudMainContent Class="pt-16 px-2 px-sm-4 px-md-6">
-        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4 mt-md-6 mb-8 mb-md-12">
-            <!-- Breadcrumbs -->
-            <MudBreadcrumbs Items="_breadcrumbs" Class="px-0 mb-4" Separator=">">
-                 <ItemTemplate Context="item">
-                    <MudLink Href="@item.Href" Typo="Typo.body2" Color="Color.Secondary" Underline="Underline.None">@item.Text</MudLink>
-                </ItemTemplate>
-            </MudBreadcrumbs>
-            
-            @Body
-        </MudContainer>
-    </MudMainContent>
+                            </div>
+                        </Authorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+        </MudAppBar>
+    }
 </MudLayout>
+
+<MudDialog @bind-Visible="_searchDialogOpen" Options="_searchDialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Search</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_searchString" Placeholder="Search anything..." Variant="Variant.Outlined" 
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" 
+                      FullWidth="true" AutoFocus="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _searchDialogOpen = false)">Close</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@(() => _searchDialogOpen = false)">Search</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
 @code {
     private bool _drawerOpen = true;
-    private bool _isMobile = false;
+    private Breakpoint _currentBreakpoint = Breakpoint.Lg;
+    private bool _isMobile => _currentBreakpoint <= Breakpoint.Sm;
     private bool _chatDrawerOpen = false;
+    private bool _hasUnreadNotifications = false;
+    private bool _searchDialogOpen = false;
     private HubConnection? _hubConnection;
     private MudThemeProvider _mudThemeProvider = null!;
     private string _searchString = "";
     private List<BreadcrumbItem> _breadcrumbs = new();
+
+    private DialogOptions _searchDialogOptions = new() { FullWidth = true, MaxWidth = MaxWidth.Small };
+
+    private void OpenSearchDialog() => _searchDialogOpen = true;
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        var oldBreakpoint = _currentBreakpoint;
+        _currentBreakpoint = breakpoint;
+
+        // Reset drawer state when switching major layout types
+        if (oldBreakpoint != breakpoint)
+        {
+            if (_isMobile)
+            {
+                _drawerOpen = false;
+            }
+            else if (_currentBreakpoint == Breakpoint.Md)
+            {
+                _drawerOpen = false; // Collapsed to Mini on Tablet
+            }
+            else if (_currentBreakpoint >= Breakpoint.Lg)
+            {
+                _drawerOpen = true; // Expanded on Desktop
+            }
+            StateHasChanged();
+        }
+    }
+
+    private DrawerVariant GetDrawerVariant()
+    {
+        if (_isMobile) return DrawerVariant.Temporary;
+        return DrawerVariant.Mini;
+    }
+
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
 
     private void UpdateBreadcrumbs()
     {
@@ -145,7 +367,6 @@
         {
             currentHref += $"/{segment}";
             
-            // Skip GUIDs (IDs) in breadcrumbs for cleaner look, or display them generically
             if (Guid.TryParse(segment, out _))
             {
                 _breadcrumbs.Add(new BreadcrumbItem("Details", href: null, disabled: true));
@@ -154,7 +375,6 @@
 
             var title = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(segment.Replace("-", " "));
             
-            // Special mappings
             if (segment.Equals("mfg", StringComparison.OrdinalIgnoreCase)) title = "Manufacturing";
             if (segment.Equals("hr", StringComparison.OrdinalIgnoreCase)) title = "HR";
             if (segment.Equals("iam", StringComparison.OrdinalIgnoreCase)) title = "IAM";
@@ -164,7 +384,6 @@
         }
     }
 
-    // Theme-aware logo URLs
     private string LogoUrl => LayoutService.IsDarkMode
         ? "https://storage.googleapis.com/maliev.com/web-contents/images/logo-white-20px.png"
         : "https://storage.googleapis.com/maliev.com/web-contents/images/logo-black-20px.png";
@@ -190,12 +409,14 @@
 
             _hubConnection.On<string>("ReceiveNotification", (message) =>
             {
+                _hasUnreadNotifications = true;
                 Snackbar.Add(message, Severity.Info, config =>
                 {
                     config.VisibleStateDuration = 10000;
                     config.HideTransitionDuration = 500;
                     config.ShowTransitionDuration = 500;
                 });
+                InvokeAsync(StateHasChanged);
             });
 
             await _hubConnection.StartAsync();
@@ -205,7 +426,7 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        // Force refresh of chat context when navigating
+        ChatService.CurrentContext = Navigation.Uri;
         UpdateBreadcrumbs();
         StateHasChanged();
     }
@@ -225,7 +446,7 @@
     {
         ThemeMode.Dark => Icons.Material.Filled.DarkMode,
         ThemeMode.Light => Icons.Material.Filled.LightMode,
-        _ => Icons.Material.Filled.BrightnessAuto
+        _ => Icons.Material.Filled.AutoMode
     };
 
     private Color GetThemeColor() => LayoutService.CurrentMode switch
@@ -242,9 +463,9 @@
         _ => "Auto Mode"
     };
 
-    private void DrawerToggle()
+    private void ClearNotifications()
     {
-        _drawerOpen = !_drawerOpen;
+        _hasUnreadNotifications = false;
     }
 
     private void OnLayoutUpdate(object? sender, EventArgs e)
@@ -252,10 +473,16 @@
         InvokeAsync(StateHasChanged);
     }
 
+    private void HandleLogout()
+    {
+        Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
+    }
+
     public async ValueTask DisposeAsync()
     {
         LayoutService.MajorUpdateOccurred -= OnLayoutUpdate;
         Navigation.LocationChanged -= OnLocationChanged;
+        
         if (_hubConnection is not null)
         {
             await _hubConnection.DisposeAsync();

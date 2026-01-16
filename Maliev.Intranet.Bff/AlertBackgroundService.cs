@@ -6,13 +6,9 @@ namespace Maliev.Intranet.Bff;
 /// <summary>
 /// Background service that periodically broadcasts system health alerts via SignalR.
 /// </summary>
-/// <param name="hubContext">The SignalR hub context for notifications.</param>
 /// <param name="lifetime">The application lifetime.</param>
-/// <param name="logger">The logger instance.</param>
 public class AlertBackgroundService(
-    IHubContext<NotificationHub> hubContext,
-    IHostApplicationLifetime lifetime,
-    ILogger<AlertBackgroundService> logger) : BackgroundService
+    IHostApplicationLifetime lifetime) : BackgroundService
 {
     /// <summary>
     /// Executes the background task logic.
@@ -28,13 +24,10 @@ public class AlertBackgroundService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            logger.LogInformation("Broadcasting system health status via SignalR");
-
-            await hubContext.Clients.All.SendAsync("ReceiveNotification",
-                $"System Update: All microservices operating within normal parameters at {DateTime.Now:HH:mm:ss}.",
-                stoppingToken);
-
-            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+            // System health status broadcast removed to prevent notification spam.
+            // Health status is now visible in the Admin -> System Health dashboard.
+            
+            await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
         }
     }
 }

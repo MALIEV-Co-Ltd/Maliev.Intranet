@@ -1,51 +1,99 @@
 @using MudBlazor
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ChatService ChatService
+@implements IDisposable
 
-<MudDrawerContainer>
-    <MudStack Class="pa-4 flex-grow-1" Style="height: calc(100vh - 120px); overflow-y: auto;">
-        <MudText Typo="Typo.h6">Maliev Assistant</MudText>
-        <MudText Typo="Typo.caption" Color="Color.Secondary">Context: @Context</MudText>
-        
-        <MudDivider Class="my-2" />
+<div class="d-flex flex-column" style="height: 100%; overflow: hidden;">
+    <!-- Header Area -->
+    <div class="pa-4 pb-0">
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.h6" Style="line-height: 1.1;">Assistant</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Context: @ChatService.CurrentContext</MudText>
+        </MudStack>
+        <MudDivider Class="mt-2" />
+    </div>
 
-        <div class="flex-grow-1">
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
-                Hello! I'm your Maliev AI assistant. I see you are currently viewing the <b>@GetPageName()</b> page. How can I help you?
-            </MudAlert>
-            
-            @foreach (var message in _messages)
-            {
-                <div class="@(message.IsUser ? "d-flex justify-end" : "d-flex justify-start") mb-2">
-                    <MudPaper Class="pa-3" 
-                              Elevation="1" 
-                              Style="@(message.IsUser ? "background-color: var(--mud-palette-primary-lighten); color: white; max-width: 80%;" : "max-width: 80%;")">
-                        <MudText Typo="Typo.body2">@message.Text</MudText>
-                    </MudPaper>
-                </div>
-            }
-        </div>
-    </MudStack>
+    <!-- Chat Messages Area -->
+    <div class="flex-grow-1 px-4 py-4" style="overflow-y: auto;">
+        <MudChat ChatPosition="ChatBubblePosition.Start">
+             <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
+                <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
+            </MudAvatar>
+            <MudChatBubble>
+                Hello! I'm your AI assistant. I see you are currently viewing the <b>@GetPageName()</b> page. How can I help you?
+            </MudChatBubble>
+        </MudChat>
 
-    <MudPaper Elevation="0" Class="pa-4 mt-auto">
+        @foreach (var message in ChatService.Messages)
+        {
+            <MudChat ChatPosition="@(message.IsUser ? ChatBubblePosition.End : ChatBubblePosition.Start)">
+                @if (message.IsUser)
+                {
+                    <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
+                        @if (!string.IsNullOrEmpty(_userPicture))
+                        {
+                            <MudImage Src="@_userPicture" />
+                        }
+                        else
+                        {
+                            @(_userName?[0] ?? 'U')
+                        }
+                    </MudAvatar>
+                }
+                else
+                {
+                    <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
+                        <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
+                    </MudAvatar>
+                }
+                <MudChatBubble>
+                    @message.Text
+                </MudChatBubble>
+            </MudChat>
+        }
+    </div>
+
+    <!-- Bottom Input Area -->
+    <div class="pa-4 mt-auto @(IsMobile ? "mb-16" : "")">
         <MudTextField @bind-Value="_currentInput" 
                       Placeholder="Ask a question..." 
                       Variant="Variant.Outlined" 
                       Margin="Margin.Dense"
                       Adornment="Adornment.End" 
                       AdornmentIcon="@Icons.Material.Filled.Send" 
-                      OnKeyDown="@HandleKeyDown" />
-    </MudPaper>
-</MudDrawerContainer>
+                      OnKeyDown="@HandleKeyDown"
+                      OnAdornmentClick="@SendMessage"
+                      Immediate="true"
+                      autocomplete="off" />
+    </div>
+</div>
 
 @code {
-    [Parameter] public string Context { get; set; } = "/";
+    [Parameter] public bool IsMobile { get; set; }
 
     private string _currentInput = "";
-    private List<ChatMessage> _messages = new();
+    private string? _userPicture;
+    private string? _userName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ChatService.OnChange += StateHasChanged;
+        
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _userPicture = user.FindFirst("picture")?.Value;
+            _userName = user.Identity.Name;
+        }
+    }
 
     private string GetPageName()
     {
-        return Context.Trim('/').Split('/').LastOrDefault() ?? "Home";
+        return ChatService.CurrentContext.Trim('/').Split('/').LastOrDefault() ?? "Home";
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -58,30 +106,26 @@
 
     private async Task SendMessage()
     {
-        if (string.IsNullOrWhiteSpace(_currentInput)) return;
-
-        _messages.Add(new ChatMessage { Text = _currentInput, IsUser = true });
         var input = _currentInput;
-        _currentInput = "";
+        if (string.IsNullOrWhiteSpace(input)) return;
 
+        _currentInput = ""; // Clear immediately
+        ChatService.AddMessage(input, true);
+        
         // Mock response
         _ = Task.Delay(500).ContinueWith(_ =>
         {
             InvokeAsync(() =>
             {
-                _messages.Add(new ChatMessage 
-                { 
-                    Text = $"I'm a mockup assistant. You asked about '{input}' while on the {GetPageName()} page. Integration with Maliev.Chatbot is coming soon!", 
-                    IsUser = false 
-                });
-                StateHasChanged();
+                ChatService.AddMessage($"I'm a mockup assistant. You asked about '{input}' while on the {GetPageName()} page. Integration with Maliev.Chatbot is coming soon!", false);
             });
         });
+        
+        await InvokeAsync(StateHasChanged);
     }
 
-    private class ChatMessage
+    public void Dispose()
     {
-        public string Text { get; set; } = "";
-        public bool IsUser { get; set; }
+        ChatService.OnChange -= StateHasChanged;
     }
 }

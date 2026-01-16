@@ -1,0 +1,134 @@
+@page "/admin/system-health"
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>System Health - MALIEV</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <div class="d-flex align-center justify-space-between mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Style="font-weight: 500;">System Health</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Real-time status of microservices and infrastructure</MudText>
+        </div>
+        <div class="d-flex align-center">
+            <MudChip T="string" Color="@GetOverallStatusColor()" Icon="@GetOverallStatusIcon()" Variant="Variant.Text" Class="mr-4">
+                Overall: @(_healthData?.OverallStatus ?? "Checking...")
+            </MudChip>
+            <MudButton StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadHealthData" Disabled="@_loading">
+                Refresh
+            </MudButton>
+        </div>
+    </div>
+
+    @if (_loading && _healthData == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    }
+
+    <MudGrid>
+        @if (_healthData != null)
+        {
+            @foreach (var service in _healthData.Services.OrderBy(s => s.ServiceName))
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="0" Class="rounded-lg border border-solid mud-border-lines-default pa-4" Style="height: 100%;">
+                        <div class="d-flex justify-space-between align-center mb-3">
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@FormatServiceName(service.ServiceName)</MudText>
+                            <MudIcon Icon="@GetServiceStatusIcon(service.Status)" Color="@GetServiceStatusColor(service.Status)" Size="Size.Small" />
+                        </div>
+                        
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                                <MudText Typo="Typo.caption" Style="@($"color: {GetServiceStatusColor(service.Status).ToDescriptionString()}; font-weight: 700;")">
+                                    @service.Status
+                                </MudText>
+                            </div>
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
+                                <MudText Typo="Typo.caption">@(service.Status == "Healthy" ? $"{service.ResponseTimeMs}ms" : "N/A")</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Last Check</MudText>
+                                <MudText Typo="Typo.caption">@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</MudText>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(service.ErrorMessage))
+                        {
+                            <MudDivider Class="my-3" />
+                            <MudTooltip Text="@service.ErrorMessage">
+                                <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block text-truncate">@service.ErrorMessage</MudText>
+                            </MudTooltip>
+                        }
+                    </MudCard>
+                </MudItem>
+            }
+        }
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private SystemHealthDto? _healthData;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHealthData();
+    }
+
+    private async Task LoadHealthData()
+    {
+        _loading = true;
+        try
+        {
+            _healthData = await Http.GetFromJsonAsync<SystemHealthDto>("api/system-health");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load system health: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string FormatServiceName(string name) => name.Replace("Service", "");
+
+    private Color GetServiceStatusColor(string status) => status switch
+    {
+        "Healthy" => Color.Success,
+        "Unhealthy" => Color.Error,
+        "Unreachable" => Color.Warning,
+        "Misconfigured" => Color.Info,
+        _ => Color.Default
+    };
+
+    private string GetServiceStatusIcon(string status) => status switch
+    {
+        "Healthy" => Icons.Material.Filled.CheckCircle,
+        "Unhealthy" => Icons.Material.Filled.Error,
+        "Unreachable" => Icons.Material.Filled.CloudOff,
+        "Misconfigured" => Icons.Material.Filled.Settings,
+        _ => Icons.Material.Filled.Help
+    };
+
+    private Color GetOverallStatusColor() => _healthData?.OverallStatus switch
+    {
+        "Healthy" => Color.Success,
+        "Degraded" => Color.Warning,
+        "Unhealthy" => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetOverallStatusIcon() => _healthData?.OverallStatus switch
+    {
+        "Healthy" => Icons.Material.Filled.CheckCircle,
+        "Degraded" => Icons.Material.Filled.Warning,
+        "Unhealthy" => Icons.Material.Filled.Error,
+        _ => Icons.Material.Filled.Help
+    };
+}

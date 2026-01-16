@@ -33,6 +33,12 @@
         color: var(--mud-palette-text-primary);
         border-right: 1px solid var(--mud-palette-divider);
     }
+
+    .auto-mode-icon i {
+        background: linear-gradient(135deg, #FFD700 0%, #2196F3 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
 </style>
 
 <div class="login-page">
@@ -43,7 +49,9 @@
             <!-- Theme Toggle -->
             <div style="position: absolute; top: 1rem; right: 1rem; z-index: 10;">
                 <MudIconButton Icon="@GetThemeIcon()"
-                               Color="Color.Inherit"
+                               Color="@GetThemeColor()"
+                               Style="@(LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "")"
+                               Class="@(LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "")"
                                OnClick="@ToggleThemeAsync"
                                title="Toggle Theme Mode" />
             </div>
@@ -278,8 +286,16 @@
     {
         ThemeMode.Dark => Icons.Material.Filled.DarkMode,
         ThemeMode.Light => Icons.Material.Filled.LightMode,
-        _ => Icons.Material.Filled.BrightnessAuto
+        _ => Icons.Material.Filled.AutoMode
     };
+
+    private Color GetThemeColor() => LayoutService.CurrentMode switch
+    {
+        ThemeMode.Dark => Color.Primary,
+        ThemeMode.Light => Color.Warning,
+        _ => Color.Inherit
+    };
+
 
     private void TogglePasswordVisibility()
     {

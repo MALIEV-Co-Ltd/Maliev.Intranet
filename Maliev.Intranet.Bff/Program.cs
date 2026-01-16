@@ -34,6 +34,7 @@ try
     builder.Services.AddSingleton<BffMetrics>();
     builder.Services.AddHostedService<AlertBackgroundService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddSignalR();
     builder.Services.AddMudServices();
 
