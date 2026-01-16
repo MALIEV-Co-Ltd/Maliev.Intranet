@@ -1,0 +1,106 @@
+@page "/mfg/procurement"
+
+<PageTitle>Procurement - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Purchase Orders</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudTextField @bind-Value="_searchString" 
+                      Placeholder="Search POs..." 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined" 
+                      Margin="Margin.Dense" 
+                      Style="max-width: 400px;" />
+        
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add">
+            Create PO
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-0" Class="border-b mud-border-lines-default">
+        <MudTabPanel Text="Active" Icon="@Icons.Material.Outlined.LocalShipping" BadgeData="8" BadgeColor="Color.Primary" />
+        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="3" BadgeColor="Color.Default" />
+        <MudTabPanel Text="History" Icon="@Icons.Material.Outlined.History" />
+    </MudTabs>
+
+    @if (_isLoading)
+    {
+        <div class="pa-4">
+            @for (int i = 0; i < 5; i++)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2 rounded" />
+            }
+        </div>
+    }
+    else
+    {
+        <MudDataGrid T="PurchaseOrderDto" Items="@_purchaseOrders" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.PoNumber" Title="PO #" />
+                <PropertyColumn Property="x => x.SupplierName" Title="Supplier" />
+                <PropertyColumn Property="x => x.ItemsCount" Title="Items" />
+                <PropertyColumn Property="x => x.TotalValue" Title="Total" Format="C2" />
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
+                            @context.Item.Status
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.CreatedDate" Title="Created" Format="dd MMM yyyy" />
+                <PropertyColumn Property="x => x.ExpectedDelivery" Title="Expected" Format="dd MMM yyyy" />
+                <TemplateColumn Title="Actions" Sortable="false">
+                    <CellTemplate>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Check" Size="Size.Small" Color="Color.Success" />
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    }
+</MudPaper>
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private List<PurchaseOrderDto> _purchaseOrders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _purchaseOrders = await Http.GetFromJsonAsync<List<PurchaseOrderDto>>("api/purchase-orders");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Draft" => Color.Default,
+        "Pending Approval" => Color.Warning,
+        "Approved" => Color.Info,
+        "Ordered" => Color.Primary,
+        "Partial" => Color.Warning,
+        "Received" => Color.Success,
+        _ => Color.Default
+    };
+
+    public class PurchaseOrderDto
+    {
+        public Guid Id { get; set; }
+        public string PoNumber { get; set; } = string.Empty;
+        public string SupplierName { get; set; } = string.Empty;
+        public int ItemsCount { get; set; }
+        public decimal TotalValue { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTime CreatedDate { get; set; }
+        public DateTime ExpectedDelivery { get; set; }
+    }
+}

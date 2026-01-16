@@ -1,0 +1,92 @@
+@page "/hr/directory"
+
+<PageTitle>Directory - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Organization Directory</MudText>
+
+<MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+    @if (_isLoading)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="500px" Class="rounded" />
+    }
+    else
+    {
+        <MudText Typo="Typo.h6" Class="mb-4">Organizational Structure</MudText>
+        
+        <MudStack Spacing="4">
+            <!-- CEO Level -->
+            <MudPaper Elevation="0" Class="pa-4 border border-primary rounded">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    <MudAvatar Size="Size.Large" Color="Color.Primary">CE</MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.h6">Chief Executive Officer</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Executive</MudText>
+                    </div>
+                </MudStack>
+            </MudPaper>
+
+            <MudGrid>
+                <!-- VP Engineering -->
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudAvatar Color="Color.Info">SJ</MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Sarah Johnson</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">VP Engineering</MudText>
+                                </div>
+                            </MudStack>
+                            <MudDivider />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">15 team members</MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- VP Sales -->
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudAvatar Color="Color.Success">MB</MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Michael Brown</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">VP Sales</MudText>
+                                </div>
+                            </MudStack>
+                            <MudDivider />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">12 team members</MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- VP Operations -->
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudAvatar Color="Color.Warning">LT</MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Lisa Taylor</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">VP Operations</MudText>
+                                </div>
+                            </MudStack>
+                            <MudDivider />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">18 team members</MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudStack>
+    }
+</MudPaper>
+
+@code {
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(600);
+        _isLoading = false;
+    }
+}

@@ -1,0 +1,82 @@
+@page "/finance/receipts"
+
+<PageTitle>Receipts - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Payment Receipts</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudTextField @bind-Value="_searchString" 
+                      Placeholder="Search receipts..." 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined" 
+                      Margin="Margin.Dense" 
+                      Style="max-width: 400px;" />
+        
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add">
+            Create Receipt
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <div class="pa-4">
+        @for (int i = 0; i < 6; i++)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2 rounded" />
+        }
+    </div>
+}
+else
+{
+    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+        <MudDataGrid T="ReceiptDto" Items="@_receipts" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.ReceiptNumber" Title="Receipt #" />
+                <PropertyColumn Property="x => x.InvoiceNumber" Title="Invoice #" />
+                <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
+                <PropertyColumn Property="x => x.Amount" Title="Amount" Format="C2" />
+                <PropertyColumn Property="x => x.PaymentMethod" Title="Method" />
+                <PropertyColumn Property="x => x.Date" Title="Date" Format="dd MMM yyyy" />
+                <TemplateColumn Title="Actions" Sortable="false">
+                    <CellTemplate>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIconButton Icon="@Icons.Material.Outlined.PictureAsPdf" Size="Size.Small" Color="Color.Error" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Print" Size="Size.Small" Color="Color.Default" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Block" Size="Size.Small" Color="Color.Error" />
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private List<ReceiptDto> _receipts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _receipts = await Http.GetFromJsonAsync<List<ReceiptDto>>("api/receipts");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    public class ReceiptDto
+    {
+        public Guid Id { get; set; }
+        public string ReceiptNumber { get; set; } = string.Empty;
+        public string InvoiceNumber { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+    }
+}

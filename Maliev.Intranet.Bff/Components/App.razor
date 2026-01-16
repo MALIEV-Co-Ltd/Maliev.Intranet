@@ -1,3 +1,8 @@
+@inject PersistentComponentState ApplicationState
+@inject IHttpContextAccessor HttpContextAccessor
+@using Maliev.Intranet.Client
+@implements IDisposable
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -5,25 +10,110 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+
+    <!-- CRITICAL: Blocking script BEFORE any CSS loads -->
+    <script>
+        (function() {
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+
+            function getThemePreference() {
+                // Priority: Cookie > localStorage > 'system'
+                const cookie = getCookie('maliev_theme');
+                if (cookie === 'dark' || cookie === 'light' || cookie === 'system') return cookie;
+
+                try {
+                    const local = localStorage.getItem('maliev_theme');
+                    if (local === 'dark' || local === 'light' || local === 'system') return local;
+                } catch (e) { /* localStorage blocked in Safari private mode */ }
+
+                return 'system'; // Default
+            }
+
+            function applyTheme() {
+                const pref = getThemePreference();
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                let effectiveTheme = 'light';
+
+                if (pref === 'dark') {
+                    effectiveTheme = 'dark';
+                } else if (pref === 'light') {
+                    effectiveTheme = 'light';
+                } else {
+                    if (systemDark) {
+                        effectiveTheme = 'dark';
+                    }
+                }
+
+                // Apply theme SYNCHRONOUSLY (blocks rendering)
+                document.documentElement.setAttribute('data-theme', effectiveTheme);
+                
+                // Set a short-lived hint cookie for the server to avoid flicker on refresh
+                document.cookie = `maliev_system_dark=${systemDark}; path=/; max-age=31536000; SameSite=Lax`;
+            }
+
+            applyTheme();
+        })();
+    </script>
+
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="Maliev.Intranet.Client.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="InteractiveAuto" />
 </head>
 
 <body>
 
-    <MudThemeProvider />
-    <MudPopoverProvider />
-    <MudDialogProvider />
-    <MudSnackbarProvider />
-
-    <Routes />
+    <Routes @rendermode="InteractiveAuto" />
 
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
 
 </html>
+
+@code {
+    private PersistingComponentStateSubscription _subscription;
+
+    protected override void OnInitialized()
+    {
+        _subscription = ApplicationState.RegisterOnPersisting(PersistThemeState);
+    }
+
+    private Task PersistThemeState()
+    {
+        // Read theme cookie
+        var context = HttpContextAccessor.HttpContext;
+        var cookieValue = context?.Request.Cookies["maliev_theme"];
+        var systemDarkHint = context?.Request.Cookies["maliev_system_dark"];
+
+        if (!string.IsNullOrEmpty(cookieValue) &&
+            (cookieValue == "dark" || cookieValue == "light" || cookieValue == "system"))
+        {
+            ApplicationState.PersistAsJson("maliev_theme", cookieValue);
+        }
+        else
+        {
+            ApplicationState.PersistAsJson("maliev_theme", "system");
+        }
+
+        // Persist the system dark mode hint from the cookie
+        if (bool.TryParse(systemDarkHint, out var isDark))
+        {
+            ApplicationState.PersistAsJson("maliev_system_dark", isDark);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _subscription.Dispose();
+    }
+}

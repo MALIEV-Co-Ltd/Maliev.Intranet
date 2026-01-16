@@ -1,0 +1,97 @@
+@page "/hr/compliance"
+
+<PageTitle>Compliance - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Work Authorization & Compliance</MudText>
+
+<MudGrid Class="mb-4">
+    @if (!_isLoading)
+    {
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="0" Class="pa-4 border border-error rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Error">Expiring in 30 days</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Error" Class="mt-2">3</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="0" Class="pa-4 border border-warning rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Warning">Expiring in 60 days</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Warning" Class="mt-2">5</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Active</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">42</MudText>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+@if (_isLoading)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded-lg" />
+}
+else
+{
+    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+        <MudDataGrid T="WorkAuthDto" Items="@_authorizations" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.EmployeeName" Title="Employee" />
+                <PropertyColumn Property="x => x.DocumentType" Title="Document Type" />
+                <PropertyColumn Property="x => x.IssueDate" Title="Issue Date" Format="dd MMM yyyy" />
+                <PropertyColumn Property="x => x.ExpiryDate" Title="Expiry Date" Format="dd MMM yyyy" />
+                <TemplateColumn Title="Days Remaining">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2" Color="@GetDaysColor(context.Item.DaysRemaining)">
+                            @context.Item.DaysRemaining days
+                        </MudText>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+}
+
+@code {
+    private bool _isLoading = true;
+    private List<WorkAuthDto> _authorizations = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _authorizations = await Http.GetFromJsonAsync<List<WorkAuthDto>>("api/compliance/work-authorizations");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    private Color GetDaysColor(int days)
+    {
+        if (days < 30) return Color.Error;
+        if (days < 60) return Color.Warning;
+        return Color.Success;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success,
+        "Expiring Soon" => Color.Warning,
+        "Expired" => Color.Error,
+        _ => Color.Default
+    };
+
+    public class WorkAuthDto
+    {
+        public string EmployeeName { get; set; } = "";
+        public string DocumentType { get; set; } = "";
+        public DateTime IssueDate { get; set; }
+        public DateTime ExpiryDate { get; set; }
+        public int DaysRemaining { get; set; }
+        public string Status { get; set; } = "";
+    }
+}

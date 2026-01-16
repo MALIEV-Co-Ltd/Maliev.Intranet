@@ -7,8 +7,12 @@ namespace Maliev.Intranet.Bff;
 /// Background service that periodically broadcasts system health alerts via SignalR.
 /// </summary>
 /// <param name="hubContext">The SignalR hub context for notifications.</param>
+/// <param name="lifetime">The application lifetime.</param>
 /// <param name="logger">The logger instance.</param>
-public class AlertBackgroundService(IHubContext<NotificationHub> hubContext, ILogger<AlertBackgroundService> logger) : BackgroundService
+public class AlertBackgroundService(
+    IHubContext<NotificationHub> hubContext,
+    IHostApplicationLifetime lifetime,
+    ILogger<AlertBackgroundService> logger) : BackgroundService
 {
     /// <summary>
     /// Executes the background task logic.
@@ -17,8 +21,10 @@ public class AlertBackgroundService(IHubContext<NotificationHub> hubContext, ILo
     /// <returns>A task that represents the background operation.</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Delay initial start to let server warm up
-        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+        // Wait until the application has fully started
+        var tcs = new TaskCompletionSource();
+        using var registration = lifetime.ApplicationStarted.Register(() => tcs.SetResult());
+        await tcs.Task;
 
         while (!stoppingToken.IsCancellationRequested)
         {

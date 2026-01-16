@@ -14,7 +14,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<AuthController> logger) : ControllerBase
+public class AuthController(IHttpClientFactory httpClientFactory, ILogger<AuthController> logger) : ControllerBase
 {
     /// <summary>
     /// Initiates the login process using Google Workspace.
@@ -22,6 +22,10 @@ public class AuthController(IConfiguration configuration, IHttpClientFactory htt
     [HttpGet("login")]
     public IActionResult Login([FromQuery] string returnUrl = "/")
     {
+        if (!Url.IsLocalUrl(returnUrl))
+        {
+            returnUrl = "/";
+        }
         return Challenge(new AuthenticationProperties { RedirectUri = returnUrl }, GoogleDefaults.AuthenticationScheme);
     }
 
@@ -31,8 +35,7 @@ public class AuthController(IConfiguration configuration, IHttpClientFactory htt
     [HttpPost("login")]
     public async Task<IActionResult> LoginStandard([FromBody] InternalLoginRequest request)
     {
-        var authClient = httpClientFactory.CreateClient();
-        authClient.BaseAddress = new Uri(configuration["Services:AuthService:BaseUrl"] ?? "http://maliev-authservice-api");
+        var authClient = httpClientFactory.CreateClient("AuthService");
 
         // Proxy request to the real AuthService (snake_case property names)
         var response = await authClient.PostAsJsonAsync("/auth/v1/login", new
@@ -57,7 +60,7 @@ public class AuthController(IConfiguration configuration, IHttpClientFactory htt
             PropertyNameCaseInsensitive = true
         });
 
-        if (authResult == null || string.IsNullOrEmpty(authResult.AccessToken))
+        if (authResult?.User == null || string.IsNullOrEmpty(authResult.AccessToken))
         {
             logger.LogWarning("Login failed for {Username}: Invalid response from AuthService", request.Username);
             return Unauthorized();
@@ -107,7 +110,8 @@ public class AuthController(IConfiguration configuration, IHttpClientFactory htt
     public async Task<IActionResult> Logout()
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return Redirect("/");
+        // Redirect to login page after signing out
+        return Redirect("/login");
     }
 
     /// <summary>
@@ -118,15 +122,39 @@ public class AuthController(IConfiguration configuration, IHttpClientFactory htt
     {
         if (User.Identity?.IsAuthenticated == true)
         {
+            // Try to find the user ID from various claims
+            // user_id is our platform GUID, NameIdentifier might be the source ID (string)
+            var userId = User.FindFirst("user_id")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
             return Ok(new UserContextDto
             {
-                UserId = Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : Guid.Empty,
-                DisplayName = User.Identity.Name ?? "Unknown",
-                Roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList()
+                UserId = userId,
+                DisplayName = User.Identity.Name ?? User.FindFirst("name")?.Value ?? "Unknown",
+                Email = User.FindFirst("email")?.Value ?? User.FindFirst(ClaimTypes.Email)?.Value ?? "No email",
+                Roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).Concat(User.FindAll("roles").Select(c => c.Value)).Distinct().ToList(),
+                Permissions = User.FindAll("permissions").Select(c => c.Value).ToList()
             });
         }
 
         return Unauthorized();
+    }
+
+
+    /// <summary>
+    /// Diagnostic endpoint to debug user claims and tokens.
+    /// </summary>
+    [Authorize]
+    [HttpGet("debug")]
+    public IActionResult DebugClaims()
+    {
+        return Ok(new
+        {
+            IsAuthenticated = User.Identity?.IsAuthenticated,
+            AuthenticationType = User.Identity?.AuthenticationType,
+            Claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList(),
+            // DO NOT include access_token in production logs, but for debugging we can check if it exists
+            HasAccessToken = User.HasClaim(c => c.Type == "access_token")
+        });
     }
 
     /// <summary>

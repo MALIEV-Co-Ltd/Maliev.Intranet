@@ -1,0 +1,82 @@
+@page "/hr/performance"
+
+<PageTitle>Performance - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Performance Management</MudText>
+
+<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-4">
+        <MudTabPanel Text="My Reviews" Icon="@Icons.Material.Outlined.Star">
+            @if (_isLoading)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="300px" Class="rounded" />
+            }
+            else
+            {
+                <MudDataGrid T="ReviewDto" Items="@_reviews" Dense="true" Hover="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Period" Title="Review Period" />
+                        <PropertyColumn Property="x => x.Reviewer" Title="Reviewer" />
+                        <TemplateColumn Title="Rating">
+                            <CellTemplate>
+                                <MudRating SelectedValue="@context.Item.Rating" Size="Size.Small" ReadOnly="true" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Status">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.CompletedDate" Title="Completed" Format="dd MMM yyyy" />
+                    </Columns>
+                </MudDataGrid>
+            }
+        </MudTabPanel>
+        
+        <MudTabPanel Text="Goals" Icon="@Icons.Material.Outlined.TrackChanges">
+            <MudText Typo="Typo.h6" Class="mb-3">My Goals (Q1 2026)</MudText>
+            <MudStack Spacing="3">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                    <MudText Typo="Typo.subtitle2">Improve code quality metrics</MudText>
+                    <MudProgressLinear Color="Color.Success" Value="75" Size="Size.Small" Class="my-2" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">75% complete</MudText>
+                </MudPaper>
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                    <MudText Typo="Typo.subtitle2">Lead 2 major projects</MudText>
+                    <MudProgressLinear Color="Color.Primary" Value="50" Size="Size.Small" Class="my-2" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">1 of 2 completed</MudText>
+                </MudPaper>
+            </MudStack>
+        </MudTabPanel>
+    </MudTabs>
+</MudPaper>
+
+@code {
+    private bool _isLoading = true;
+    private List<ReviewDto> _reviews = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _reviews = await Http.GetFromJsonAsync<List<ReviewDto>>("api/performance/reviews");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Pending" => Color.Warning,
+        "In Progress" => Color.Primary,
+        "Complete" => Color.Success,
+        _ => Color.Default
+    };
+
+    public class ReviewDto
+    {
+        public string Period { get; set; } = "";
+        public string Reviewer { get; set; } = "";
+        public int Rating { get; set; }
+        public string Status { get; set; } = "";
+        public DateTime CompletedDate { get; set; }
+    }
+}

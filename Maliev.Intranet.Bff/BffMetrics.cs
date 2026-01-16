@@ -7,7 +7,7 @@ namespace Maliev.Intranet.Bff;
 /// </summary>
 public class BffMetrics
 {
-    private readonly Counter<long> _activeSessionsCounter;
+    private readonly UpDownCounter<long> _activeSessionsCounter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BffMetrics"/> class.
@@ -16,7 +16,7 @@ public class BffMetrics
     public BffMetrics(IMeterFactory meterFactory)
     {
         var meter = meterFactory.Create("intranet-portal");
-        _activeSessionsCounter = meter.CreateCounter<long>("intranet_active_sessions", "Number of active user sessions");
+        _activeSessionsCounter = meter.CreateUpDownCounter<long>("intranet_active_sessions", "Number of active user sessions");
     }
 
     /// <summary>

@@ -1,9 +1,14 @@
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@using Maliev.Intranet.Client.Layout
 
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(Maliev.Intranet.Client._Imports).Assembly">
         <Found Context="routeData">
-            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Maliev.Intranet.Client.Layout.MainLayout)">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <Authorizing>
+                    <p>Authorizing...</p>
+                </Authorizing>
                 <NotAuthorized Context="authState">
                     @if (authState.User.Identity?.IsAuthenticated != true)
                     {
@@ -19,7 +24,7 @@
         </Found>
         <NotFound>
             <PageTitle>Not found</PageTitle>
-            <LayoutView Layout="@typeof(Maliev.Intranet.Client.Layout.MainLayout)">
+            <LayoutView Layout="@typeof(MainLayout)">
                 <p role="alert">Sorry, there's nothing at this address.</p>
             </LayoutView>
         </NotFound>

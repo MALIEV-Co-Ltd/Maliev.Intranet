@@ -1,17 +1,59 @@
-<MudNavMenu>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-    
-    <AuthorizeView>
-        <Authorized>
-            <MudNavGroup Title="Operations" Icon="@Icons.Material.Filled.Settings" Expanded="true">
-                <MudNavLink Href="customers" Icon="@Icons.Material.Filled.People">Customers</MudNavLink>
-                <MudNavLink Href="orders" Icon="@Icons.Material.Filled.ShoppingCart">Orders</MudNavLink>
-                <MudNavLink Href="quotations" Icon="@Icons.Material.Filled.Description">Quotations</MudNavLink>
-                <MudNavLink Href="suppliers" Icon="@Icons.Material.Filled.LocalShipping">Suppliers</MudNavLink>
-            </MudNavGroup>
-            <MudNavGroup Title="Finance" Icon="@Icons.Material.Filled.AttachMoney">
-                <MudNavLink Href="accounting" Icon="@Icons.Material.Filled.AccountBalance">Accounting</MudNavLink>
-            </MudNavGroup>
-        </Authorized>
-    </AuthorizeView>
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Shared
+
+<MudNavMenu Class="mud-width-full d-flex flex-column" Style="height: 100%;">
+    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-4 mb-2">MAIN MENU</MudText>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Dashboard">Dashboard</MudNavLink>
+
+    <!-- Sales & CRM -->
+    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">SALES & CRM</MudText>
+    <MudNavLink Href="sales/customers" Icon="@Icons.Material.Outlined.People">
+         <div class="d-flex justify-space-between align-center width-100">
+            Customers
+            <MudBadge Content="12" Color="Color.Primary" Overlap="false" Class="ml-auto my-auto mr-2" />
+        </div>
+    </MudNavLink>
+    <MudNavLink Href="sales/quotations" Icon="@Icons.Material.Outlined.Description">Quotations</MudNavLink>
+    <MudNavLink Href="sales/orders" Icon="@Icons.Material.Outlined.ShoppingCart">
+        <div class="d-flex justify-space-between align-center width-100">
+            Orders
+            <MudBadge Content="5" Color="Color.Error" Overlap="false" Class="ml-auto my-auto mr-2" />
+        </div>
+    </MudNavLink>
+    <MudNavLink Href="sales/pricing-ai" Icon="@Icons.Material.Outlined.AutoGraph">Pricing AI</MudNavLink>
+
+    <!-- Manufacturing -->
+    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">MANUFACTURING</MudText>
+    <MudNavLink Href="mfg/models" Icon="@Icons.Material.Outlined.ViewInAr">3D Models</MudNavLink>
+    <MudNavLink Href="mfg/materials" Icon="@Icons.Material.Outlined.Inventory2">Materials</MudNavLink>
+    <MudNavLink Href="mfg/procurement" Icon="@Icons.Material.Outlined.ShoppingBag">Procurement</MudNavLink>
+    <MudNavLink Href="mfg/suppliers" Icon="@Icons.Material.Outlined.LocalShipping">Suppliers</MudNavLink>
+
+    <!-- Finance -->
+    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">FINANCE</MudText>
+    <MudNavLink Href="finance/invoices" Icon="@Icons.Material.Outlined.Receipt">Invoices</MudNavLink>
+    <MudNavLink Href="finance/payments" Icon="@Icons.Material.Outlined.Payments">Payments</MudNavLink>
+    <MudNavLink Href="finance/receipts" Icon="@Icons.Material.Outlined.RequestQuote">Receipts</MudNavLink>
+    <MudNavLink Href="finance/ledger" Icon="@Icons.Material.Outlined.AccountBalance">General Ledger</MudNavLink>
+
+    <!-- HR & Organization -->
+    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">HR & ORG</MudText>
+    <MudNavLink Href="hr/employees" Icon="@Icons.Material.Outlined.Badge">Employees</MudNavLink>
+    <MudNavLink Href="hr/recruitment" Icon="@Icons.Material.Outlined.WorkOutline">Recruitment</MudNavLink>
+    <MudNavLink Href="hr/onboarding" Icon="@Icons.Material.Outlined.AssignmentInd">Onboarding</MudNavLink>
+    <MudNavLink Href="hr/time-off" Icon="@Icons.Material.Outlined.EventBusy">Time Off</MudNavLink>
+    <MudNavLink Href="hr/compliance" Icon="@Icons.Material.Outlined.FactCheck">Compliance</MudNavLink>
+    <MudNavLink Href="hr/performance" Icon="@Icons.Material.Outlined.Speed">Performance</MudNavLink>
+    <MudNavLink Href="hr/compensation" Icon="@Icons.Material.Outlined.MonetizationOn">Compensation</MudNavLink>
+    <MudNavLink Href="hr/directory" Icon="@Icons.Material.Outlined.ContactPage">Directory</MudNavLink>
+
+    <!-- Admin -->
+    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="px-4 mt-6 mb-2">ADMIN</MudText>
+    <MudNavLink Href="admin/iam" Icon="@Icons.Material.Outlined.AdminPanelSettings">IAM Console</MudNavLink>
+    <MudNavLink Href="admin/notifications" Icon="@Icons.Material.Outlined.Notifications">Notifications</MudNavLink>
+    <MudNavLink Href="admin/reference-data" Icon="@Icons.Material.Outlined.SettingsSuggest">Reference Data</MudNavLink>
+
+    <div class="mt-auto pb-4 px-2">
+         <MudNavLink Href="/api/auth/logout" Icon="@Icons.Material.Outlined.Logout">Logout</MudNavLink>
+    </div>
 </MudNavMenu>

@@ -1,0 +1,113 @@
+@page "/admin/notifications"
+
+<PageTitle>Notifications - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Notification Templates</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+        <MudTextField @bind-Value="_searchString" Placeholder="Search templates..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 400px;" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">New Template</MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudGrid>
+    <MudItem xs="12" md="5">
+        @if (_isLoading)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="500px" Class="rounded-lg" />
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+                <MudDataGrid T="TemplateDto" Items="@_templates" Dense="true" Hover="true" Elevation="0" SelectedItemChanged="@OnTemplateSelected">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Name" Title="Template Name" />
+                        <TemplateColumn Title="Channel">
+                            <CellTemplate>
+                                <MudIcon Icon="@GetChannelIcon(context.Item.Channel)" Size="Size.Small" Color="Color.Primary" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Status">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
+                                    @(context.Item.IsActive ? "Active" : "Inactive")
+                                </MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+            </MudPaper>
+        }
+    </MudItem>
+
+    <MudItem xs="12" md="7">
+        @if (_selectedTemplate != null)
+        {
+            <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.h6" Class="mb-4">Template Preview</MudText>
+                
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="_selectedTemplate.Name" Label="Template Name" Variant="Variant.Outlined" ReadOnly="true" />
+                    <MudSelect @bind-Value="_selectedTemplate.Channel" Label="Channel" Variant="Variant.Outlined" Disabled="true">
+                        <MudSelectItem Value="@("Email")">Email</MudSelectItem>
+                        <MudSelectItem Value="@("LINE")">LINE</MudSelectItem>
+                        <MudSelectItem Value="@("WhatsApp")">WhatsApp</MudSelectItem>
+                    </MudSelect>
+                    <MudTextField @bind-Value="_selectedTemplate.Subject" Label="Subject" Variant="Variant.Outlined" ReadOnly="true" />
+                    <MudTextField @bind-Value="_selectedTemplate.Body" Label="Body" Variant="Variant.Outlined" Lines="8" ReadOnly="true" />
+                    
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit">Edit</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Send">Test Send</MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
+                <MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Select a template to preview</MudText>
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private List<TemplateDto> _templates = new();
+    private TemplateDto? _selectedTemplate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _templates = await Http.GetFromJsonAsync<List<TemplateDto>>("api/notifications/templates");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    private void OnTemplateSelected(TemplateDto template)
+    {
+        _selectedTemplate = template;
+    }
+
+    private string GetChannelIcon(string channel) => channel switch
+    {
+        "Email" => Icons.Material.Outlined.Email,
+        "LINE" => Icons.Material.Outlined.Chat,
+        "WhatsApp" => Icons.Material.Outlined.ChatBubble,
+        _ => Icons.Material.Outlined.Notifications
+    };
+
+    public class TemplateDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Channel { get; set; } = "";
+        public string Subject { get; set; } = "";
+        public string Body { get; set; } = "";
+        public bool IsActive { get; set; }
+    }
+}

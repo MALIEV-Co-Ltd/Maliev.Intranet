@@ -23,4 +23,15 @@ public class CustomerServiceClient(HttpClient httpClient)
 
         return await httpClient.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(url, ct);
     }
+
+    /// <summary>
+    /// Retrieves detailed information for a single customer by ID.
+    /// </summary>
+    /// <param name="id">The customer ID.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The customer detail DTO.</returns>
+    public async Task<CustomerDetailDto?> GetCustomerByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<CustomerDetailDto>($"/customer/v1/customers/{id}", ct);
+    }
 }

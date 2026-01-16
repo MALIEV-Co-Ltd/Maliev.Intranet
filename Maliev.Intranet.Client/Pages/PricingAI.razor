@@ -1,0 +1,206 @@
+@page "/sales/pricing-ai"
+
+<PageTitle>Pricing AI - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Pricing AI</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+    AI-powered pricing predictions based on material, process, and historical data
+</MudText>
+
+<MudGrid>
+    <!-- Input Form (Left Panel) -->
+    <MudItem xs="12" md="5">
+        <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-4">Input Parameters</MudText>
+            
+            <MudStack Spacing="3">
+                <MudSelect @bind-Value="_selectedMaterial" Label="Material" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("PLA")">PLA (Polylactic Acid)</MudSelectItem>
+                    <MudSelectItem Value="@("ABS")">ABS (Acrylonitrile Butadiene Styrene)</MudSelectItem>
+                    <MudSelectItem Value="@("PETG")">PETG</MudSelectItem>
+                    <MudSelectItem Value="@("Nylon")">Nylon</MudSelectItem>
+                    <MudSelectItem Value="@("Aluminum")">Aluminum 6061</MudSelectItem>
+                    <MudSelectItem Value="@("Steel")">Stainless Steel 304</MudSelectItem>
+                </MudSelect>
+
+                <MudSelect @bind-Value="_selectedProcess" Label="Manufacturing Process" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("3D-FDM")">3D Printing (FDM)</MudSelectItem>
+                    <MudSelectItem Value="@("3D-SLA")">3D Printing (SLA)</MudSelectItem>
+                    <MudSelectItem Value="@("CNC")">CNC Machining</MudSelectItem>
+                    <MudSelectItem Value="@("SheetMetal")">Sheet Metal Fabrication</MudSelectItem>
+                    <MudSelectItem Value="@("Injection")">Injection Molding</MudSelectItem>
+                </MudSelect>
+
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Dimensions (mm)</MudText>
+                <MudNumericField @bind-Value="_length" Label="Length" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+                <MudNumericField @bind-Value="_width" Label="Width" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+                <MudNumericField @bind-Value="_height" Label="Height" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+
+                <MudNumericField @bind-Value="_quantity" Label="Quantity" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+
+                <MudSelect @bind-Value="_selectedFinish" Label="Finish" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("Standard")">Standard</MudSelectItem>
+                    <MudSelectItem Value="@("Polished")">Polished</MudSelectItem>
+                    <MudSelectItem Value="@("Anodized")">Anodized</MudSelectItem>
+                    <MudSelectItem Value="@("Powder Coated")">Powder Coated</MudSelectItem>
+                </MudSelect>
+
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Analytics"
+                           OnClick="@CalculatePricing"
+                           Disabled="@_isCalculating"
+                           Class="mt-4">
+                    @if (_isCalculating)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Calculating...</span>
+                    }
+                    else
+                    {
+                        <span>Calculate Pricing</span>
+                    }
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Results (Right Panel) -->
+    <MudItem xs="12" md="7">
+        @if (!_hasResults)
+        {
+            <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 500px;">
+                <MudIcon Icon="@Icons.Material.Outlined.AutoGraph" Size="Size.Large" Color="Color.Secondary" Class="mb-4" Style="font-size: 80px;" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Align="Align.Center">Enter parameters and click Calculate</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="mt-2">
+                    AI will analyze historical data and provide pricing recommendations
+                </MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudStack Spacing="3">
+                <!-- Predicted Price Card -->
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-4">Predicted Price</MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
+                        <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">${_predictedPrice:N2}</MudText>
+                        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="pb-1">USD per unit</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> 
+                        12% higher than last month's average
+                    </MudText>
+                </MudPaper>
+
+                <!-- Confidence Meter -->
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Confidence Level</MudText>
+                    <MudProgressLinear Color="Color.Success" Size="Size.Large" Value="@_confidence" Class="mb-2" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@_confidence% confidence based on @_similarOrders similar orders</MudText>
+                </MudPaper>
+
+                <!-- Price Breakdown -->
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Cost Breakdown</MudText>
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Material Cost</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">${(_predictedPrice * 0.35m):N2}</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Labor & Machine Time</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">${(_predictedPrice * 0.40m):N2}</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Overhead</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">${(_predictedPrice * 0.15m):N2}</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Margin</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">${(_predictedPrice * 0.10m):N2}</MudText>
+                        </MudStack>
+                        <MudDivider Class="my-2" />
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">Total (Qty: @_quantity)</MudText>
+                            <MudText Typo="Typo.subtitle1" Color="Color.Primary" Style="font-weight: 700;">${(_predictedPrice * _quantity):N2}</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Actions -->
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+                        Save to Quotation
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download">
+                        Export Analysis
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _selectedMaterial = "PLA";
+    private string _selectedProcess = "3D-FDM";
+    private string _selectedFinish = "Standard";
+    private double _length = 100;
+    private double _width = 50;
+    private double _height = 30;
+    private int _quantity = 10;
+    
+    private bool _isCalculating = false;
+    private bool _hasResults = false;
+    private decimal _predictedPrice = 0;
+    private int _confidence = 0;
+    private int _similarOrders = 0;
+
+    private async Task CalculatePricing()
+    {
+        _isCalculating = true;
+        _hasResults = false;
+        StateHasChanged();
+
+        await Task.Delay(1500); // Simulate AI processing
+
+        // Mock prediction - will be replaced with real PredictionService
+        var volume = _length * _width * _height / 1000000; // cm³
+        var basePrice = _selectedProcess switch
+        {
+            "3D-FDM" => 0.15m,
+            "3D-SLA" => 0.25m,
+            "CNC" => 0.50m,
+            "SheetMetal" => 0.30m,
+            _ => 0.20m
+        };
+
+        var materialMultiplier = _selectedMaterial switch
+        {
+            "PLA" => 1.0m,
+            "ABS" => 1.2m,
+            "PETG" => 1.3m,
+            "Nylon" => 1.5m,
+            "Aluminum" => 2.0m,
+            "Steel" => 2.5m,
+            _ => 1.0m
+        };
+
+        var finishMultiplier = _selectedFinish switch
+        {
+            "Standard" => 1.0m,
+            "Polished" => 1.3m,
+            "Anodized" => 1.5m,
+            "Powder Coated" => 1.4m,
+            _ => 1.0m
+        };
+
+        _predictedPrice = (decimal)volume * basePrice * materialMultiplier * finishMultiplier + 5.0m;
+        _confidence = new Random().Next(85, 96);
+        _similarOrders = new Random().Next(45, 120);
+        _hasResults = true;
+        _isCalculating = false;
+    }
+}

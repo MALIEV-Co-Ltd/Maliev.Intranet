@@ -9,7 +9,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for customer-related operations, proxying to the Customer Service.
 /// </summary>
 /// <param name="client">The customer service client.</param>
-[Authorize]
+[Authorize(Policy = MalievPermissions.Customer.Read)]
 [ApiController]
 [Route("api/[controller]")]
 public class CustomersController(CustomerServiceClient client) : ControllerBase
@@ -25,5 +25,17 @@ public class CustomersController(CustomerServiceClient client) : ControllerBase
     {
         var result = await client.GetCustomersAsync(query, page);
         return result != null ? Ok(result) : Ok(new PagedResponse<CustomerSummaryDto>());
+    }
+
+    /// <summary>
+    /// Retrieves detailed information for a single customer.
+    /// </summary>
+    /// <param name="id">The customer ID.</param>
+    /// <returns>The customer details.</returns>
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<CustomerDetailDto>> GetById(Guid id)
+    {
+        var result = await client.GetCustomerByIdAsync(id);
+        return result != null ? Ok(result) : NotFound();
     }
 }

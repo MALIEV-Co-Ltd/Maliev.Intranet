@@ -1,0 +1,169 @@
+@page "/finance/ledger"
+
+<PageTitle>General Ledger - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">General Ledger</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudSelect @bind-Value="_selectedPeriod" Label="Period" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 200px;">
+            <MudSelectItem Value="@("January 2026")">January 2026</MudSelectItem>
+            <MudSelectItem Value="@("December 2025")">December 2025</MudSelectItem>
+            <MudSelectItem Value="@("November 2025")">November 2025</MudSelectItem>
+        </MudSelect>
+        
+        <MudSpacer />
+        
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Calculate">
+            Trial Balance
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download">
+            Export to Excel
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+            New Entry
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-4">Chart of Accounts</MudText>
+            @if (_isLoading)
+            {
+                @for (int i = 0; i < 5; i++)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Class="mb-2 rounded" />
+                }
+            }
+            else
+            {
+                <MudList T="string" Dense="true">
+                    @foreach (var account in _accountsTree)
+                    {
+                        <MudListItem T="string">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">@account.Name</MudText>
+                                    @if (account.Children.Count > 0)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@account.Children.Count sub-accounts</MudText>
+                                    }
+                                </div>
+                                <MudText Typo="Typo.subtitle2">@account.Balance.ToString("C0")</MudText>
+                            </MudStack>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-4">Journal Entries</MudText>
+            
+            @if (_isLoading)
+            {
+                @for (int i = 0; i < 6; i++)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2 rounded" />
+                }
+            }
+            else
+            {
+                <MudDataGrid T="JournalEntryDto" Items="@_entries" Dense="true" Hover="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.EntryNumber" Title="Entry #" />
+                        <PropertyColumn Property="x => x.Date" Title="Date" Format="dd MMM yyyy" />
+                        <PropertyColumn Property="x => x.Description" Title="Description" />
+                        <PropertyColumn Property="x => x.Debit" Title="Debit" Format="C2" />
+                        <PropertyColumn Property="x => x.Credit" Title="Credit" Format="C2" />
+                        <TemplateColumn Title="Status">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
+                                    @context.Item.Status
+                                </MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Actions" Sortable="false">
+                            <CellTemplate>
+                                <MudStack Row="true" Spacing="1">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Default" />
+                                </MudStack>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _isLoading = true;
+    private string _selectedPeriod = "January 2026";
+    private List<AccountNode> _accountsTree = new();
+    private List<JournalEntryDto> _entries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(700);
+        
+        _accountsTree = new List<AccountNode>
+        {
+            new AccountNode { Name = "Assets", Balance = 450000, Children = new List<AccountNode>
+            {
+                new AccountNode { Name = "Current Assets", Balance = 250000 },
+                new AccountNode { Name = "Fixed Assets", Balance = 200000 }
+            }},
+            new AccountNode { Name = "Liabilities", Balance = 180000, Children = new List<AccountNode>
+            {
+                new AccountNode { Name = "Current Liabilities", Balance = 80000 },
+                new AccountNode { Name = "Long-term Liabilities", Balance = 100000 }
+            }},
+            new AccountNode { Name = "Equity", Balance = 270000, Children = new List<AccountNode>() },
+            new AccountNode { Name = "Revenue", Balance = 580000, Children = new List<AccountNode>() },
+            new AccountNode { Name = "Expenses", Balance = 320000, Children = new List<AccountNode>() }
+        };
+
+        _entries = new List<JournalEntryDto>
+        {
+            new() { Id = Guid.NewGuid(), EntryNumber = "JE-2026-0045", Date = DateTime.Now.AddDays(-2), Description = "Payment received from Acme Corporation", Debit = 15750.00m, Credit = 0m, Status = "Posted" },
+            new() { Id = Guid.NewGuid(), EntryNumber = "JE-2026-0044", Date = DateTime.Now.AddDays(-3), Description = "Inventory purchase", Debit = 0m, Credit = 8500.00m, Status = "Posted" },
+            new() { Id = Guid.NewGuid(), EntryNumber = "JE-2026-0043", Date = DateTime.Now.AddDays(-5), Description = "Equipment depreciation", Debit = 2200.00m, Credit = 2200.00m, Status = "Posted" },
+            new() { Id = Guid.NewGuid(), EntryNumber = "JE-2026-0042", Date = DateTime.Now, Description = "Utility bill payment", Debit = 1200.00m, Credit = 0m, Status = "Draft" },
+        };
+        
+        _isLoading = false;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Draft" => Color.Default,
+        "Posted" => Color.Success,
+        "Void" => Color.Error,
+        _ => Color.Default
+    };
+
+    public class AccountNode
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Balance { get; set; }
+        public List<AccountNode> Children { get; set; } = new();
+    }
+
+    public class JournalEntryDto
+    {
+        public Guid Id { get; set; }
+        public string EntryNumber { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public decimal Debit { get; set; }
+        public decimal Credit { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+}
