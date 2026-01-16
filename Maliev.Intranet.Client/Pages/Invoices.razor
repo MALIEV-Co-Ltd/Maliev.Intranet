@@ -1,0 +1,108 @@
+@page "/finance/invoices"
+
+<PageTitle>Invoices - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Invoices</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudTextField @bind-Value="_searchString" 
+                      Placeholder="Search invoices..." 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined" 
+                      Margin="Margin.Dense" 
+                      Style="max-width: 400px;" />
+        
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add">
+            Create Invoice
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-0" Class="border-b mud-border-lines-default">
+        <MudTabPanel Text="All" Icon="@Icons.Material.Outlined.List" />
+        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="2" BadgeColor="Color.Default" />
+        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" BadgeData="15" BadgeColor="Color.Primary" />
+        <MudTabPanel Text="Overdue" Icon="@Icons.Material.Outlined.Warning" BadgeData="3" BadgeColor="Color.Error" />
+        <MudTabPanel Text="Paid" Icon="@Icons.Material.Outlined.CheckCircle" />
+    </MudTabs>
+
+    @if (_isLoading)
+    {
+        <div class="pa-4">
+            @for (int i = 0; i < 6; i++)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2 rounded" />
+            }
+        </div>
+    }
+    else
+    {
+        <MudDataGrid T="InvoiceDto" Items="@_invoices" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.InvoiceNumber" Title="Invoice #" />
+                <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
+                <PropertyColumn Property="x => x.IssueDate" Title="Issue Date" Format="dd MMM yyyy" />
+                <PropertyColumn Property="x => x.DueDate" Title="Due Date" Format="dd MMM yyyy" />
+                <PropertyColumn Property="x => x.Amount" Title="Amount" Format="C2" />
+                <PropertyColumn Property="x => x.Balance" Title="Balance" Format="C2" />
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
+                            @context.Item.Status
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Actions" Sortable="false">
+                    <CellTemplate>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIconButton Icon="@Icons.Material.Outlined.PictureAsPdf" Size="Size.Small" Color="Color.Error" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Send" Size="Size.Small" Color="Color.Primary" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Payment" Size="Size.Small" Color="Color.Success" />
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    }
+</MudPaper>
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private List<InvoiceDto> _invoices = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _invoices = await Http.GetFromJsonAsync<List<InvoiceDto>>("api/invoices");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Draft" => Color.Default,
+        "Sent" => Color.Primary,
+        "Overdue" => Color.Error,
+        "Paid" => Color.Success,
+        "Partial" => Color.Warning,
+        _ => Color.Default
+    };
+
+    public class InvoiceDto
+    {
+        public Guid Id { get; set; }
+        public string InvoiceNumber { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public DateTime IssueDate { get; set; }
+        public DateTime DueDate { get; set; }
+        public decimal Amount { get; set; }
+        public decimal Balance { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+}

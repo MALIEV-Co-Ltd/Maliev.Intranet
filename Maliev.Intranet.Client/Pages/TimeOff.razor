@@ -1,0 +1,94 @@
+@page "/hr/time-off"
+
+<PageTitle>Time Off - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Time Off Management</MudText>
+
+<MudGrid Class="mb-4">
+    @if (!_isLoading)
+    {
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Annual Leave</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">12 days</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Available</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Sick Leave</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">8 days</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Available</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Pending</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">2</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Requests</MudText>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" Justify="Justify.SpaceBetween">
+        <MudText Typo="Typo.h6">My Leave Requests</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Request Leave</MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="300px" Class="rounded-lg" />
+}
+else
+{
+    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+        <MudDataGrid T="LeaveRequestDto" Items="@_requests" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.Type" Title="Type" />
+                <PropertyColumn Property="x => x.StartDate" Title="Start" Format="dd MMM yyyy" />
+                <PropertyColumn Property="x => x.EndDate" Title="End" Format="dd MMM yyyy" />
+                <PropertyColumn Property="x => x.Days" Title="Days" />
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.Approver" Title="Approver" />
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+}
+
+@code {
+    private bool _isLoading = true;
+    private List<LeaveRequestDto> _requests = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _requests = await Http.GetFromJsonAsync<List<LeaveRequestDto>>("api/leave/requests");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Pending" => Color.Warning,
+        "Approved" => Color.Success,
+        "Rejected" => Color.Error,
+        _ => Color.Default
+    };
+
+    public class LeaveRequestDto
+    {
+        public string Type { get; set; } = "";
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public int Days { get; set; }
+        public string Status { get; set; } = "";
+        public string Approver { get; set; } = "";
+    }
+}

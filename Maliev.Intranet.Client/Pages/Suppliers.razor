@@ -1,0 +1,167 @@
+@page "/mfg/suppliers"
+
+<PageTitle>Suppliers - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Supplier Management</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudTextField @bind-Value="_searchString" 
+                      Placeholder="Search suppliers..." 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined" 
+                      Margin="Margin.Dense" 
+                      Style="max-width: 400px;" />
+        
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add">
+            Add Supplier
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        @if (_isLoading)
+        {
+            @for (int i = 0; i < 5; i++)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" Class="mb-2 rounded" />
+            }
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg" Style="max-height: 600px; overflow-y: auto;">
+                <MudList T="SupplierDto" Dense="true" SelectedValue="_selectedSupplier">
+                    @foreach (var supplier in _suppliers)
+                    {
+                        <MudListItem T="SupplierDto" Value="supplier" OnClick="@(() => OnSupplierSelected(supplier))">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.subtitle2">@supplier.Name</MudText>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudRating SelectedValue="supplier.Rating" Size="Size.Small" ReadOnly="true" />
+                                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(supplier.Status)">@supplier.Status</MudChip>
+                                </MudStack>
+                            </MudStack>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            </MudPaper>
+        }
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        @if (_selectedSupplier != null)
+        {
+            <MudStack Spacing="3">
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-4">
+                        <div>
+                            <MudText Typo="Typo.h5">@_selectedSupplier.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@_selectedSupplier.Category</MudText>
+                        </div>
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Edit">Edit</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ShoppingCart">Create PO</MudButton>
+                        </MudStack>
+                    </MudStack>
+
+                    <MudDivider Class="my-4" />
+
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Contact Information</MudText>
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.body2"><strong>Email:</strong> @_selectedSupplier.Email</MudText>
+                                <MudText Typo="Typo.body2"><strong>Phone:</strong> @_selectedSupplier.Phone</MudText>
+                                <MudText Typo="Typo.body2"><strong>Address:</strong> @_selectedSupplier.Address</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Performance</MudText>
+                            <MudStack Spacing="2">
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Rating</MudText>
+                                    <MudRating SelectedValue="@_selectedSupplier.Rating" ReadOnly="true" />
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">On-Time Delivery</MudText>
+                                    <MudProgressLinear Color="Color.Success" Value="92" Size="Size.Small" />
+                                    <MudText Typo="Typo.caption">92%</MudText>
+                                </div>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Recent Purchase Orders</MudText>
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead>
+                            <tr>
+                                <th>PO Number</th>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>PO-2026-0015</td><td>12 Jan 2026</td><td>$12,500</td><td><MudChip T="string" Size="Size.Small" Color="Color.Primary">Ordered</MudChip></td></tr>
+                            <tr><td>PO-2025-0487</td><td>28 Dec 2025</td><td>$8,750</td><td><MudChip T="string" Size="Size.Small" Color="Color.Success">Received</MudChip></td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudPaper>
+            </MudStack>
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
+                <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Select a supplier to view details</MudText>
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private List<SupplierDto> _suppliers = new();
+    private SupplierDto? _selectedSupplier;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _suppliers = await Http.GetFromJsonAsync<List<SupplierDto>>("api/suppliers");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    private void OnSupplierSelected(SupplierDto supplier)
+    {
+        _selectedSupplier = supplier;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success,
+        "Inactive" => Color.Default,
+        "Pending" => Color.Warning,
+        _ => Color.Default
+    };
+
+    public class SupplierDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+    }
+}

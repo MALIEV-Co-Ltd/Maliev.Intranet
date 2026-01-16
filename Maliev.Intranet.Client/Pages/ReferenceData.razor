@@ -1,0 +1,111 @@
+@page "/admin/reference-data"
+
+<PageTitle>Reference Data - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Reference Data Management</MudText>
+
+<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-4">
+        <!-- Countries Tab -->
+        <MudTabPanel Text="Countries" Icon="@Icons.Material.Outlined.Public">
+            @if (_isLoading)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
+            }
+            else
+            {
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudTextField @bind-Value="_searchString" Placeholder="Search countries..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Upload">Import CSV</MudButton>
+                    </MudStack>
+                    
+                    <MudDataGrid T="CountryDto" Items="@_countries" Dense="true" Hover="true" Elevation="0">
+                        <Columns>
+                            <PropertyColumn Property="x => x.Code" Title="Code" />
+                            <PropertyColumn Property="x => x.Name" Title="Name" />
+                            <PropertyColumn Property="x => x.Region" Title="Region" />
+                            <TemplateColumn Title="Status">
+                                <CellTemplate>
+                                    <MudChip Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
+                                        @(context.Item.IsActive ? "Active" : "Inactive")
+                                    </MudChip>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="Actions" Sortable="false">
+                                <CellTemplate>
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                                </CellTemplate>
+                            </TemplateColumn>
+                        </Columns>
+                    </MudDataGrid>
+                </MudStack>
+            }
+        </MudTabPanel>
+
+        <!-- Currencies Tab -->
+        <MudTabPanel Text="Currencies" Icon="@Icons.Material.Outlined.AttachMoney">
+            @if (_isLoading)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
+            }
+            else
+            {
+                <MudStack Spacing="3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Add Currency</MudButton>
+                    
+                    <MudDataGrid T="CurrencyDto" Items="@_currencies" Dense="true" Hover="true" Elevation="0">
+                        <Columns>
+                            <PropertyColumn Property="x => x.Code" Title="Code" />
+                            <PropertyColumn Property="x => x.Name" Title="Name" />
+                            <PropertyColumn Property="x => x.Symbol" Title="Symbol" />
+                            <PropertyColumn Property="x => x.ExchangeRate" Title="Exchange Rate" Format="N4" />
+                            <TemplateColumn Title="Actions" Sortable="false">
+                                <CellTemplate>
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                                </CellTemplate>
+                            </TemplateColumn>
+                        </Columns>
+                    </MudDataGrid>
+                </MudStack>
+            }
+        </MudTabPanel>
+
+        <!-- Tax Codes Tab -->
+        <MudTabPanel Text="Tax Codes" Icon="@Icons.Material.Outlined.Receipt">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Tax code configuration will appear here</MudText>
+        </MudTabPanel>
+    </MudTabs>
+</MudPaper>
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private List<CountryDto> _countries = new();
+    private List<CurrencyDto> _currencies = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _countries = await Http.GetFromJsonAsync<List<CountryDto>>("api/countries");
+        // _currencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/currencies");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    public class CountryDto
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Region { get; set; } = "";
+        public bool IsActive { get; set; }
+    }
+
+    public class CurrencyDto
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Symbol { get; set; } = "";
+        public decimal ExchangeRate { get; set; }
+    }
+}

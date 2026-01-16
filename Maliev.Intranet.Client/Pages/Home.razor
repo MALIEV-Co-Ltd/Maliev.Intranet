@@ -1,6 +1,7 @@
 @page "/"
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
+@using Maliev.Intranet.Shared
 @attribute [Authorize]
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -8,99 +9,147 @@
 
 <PageTitle>Dashboard - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
-    <MudText Typo="Typo.h4" Class="mb-6">Welcome to Maliev Intranet</MudText>
-
-    @if (_userInfo == null)
-    {
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+<style>
+    /* Hide legend for mini charts as requested */
+    .mini-chart .mud-chart-legend {
+        display: none !important;
     }
-    else
-    {
-        <MudGrid>
-            <MudItem xs="12" md="6">
-                <MudCard Elevation="2">
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Your Profile</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        <MudText><strong>Name:</strong> @_userInfo.Name</MudText>
-                        <MudText><strong>Email:</strong> @_userInfo.Email</MudText>
-                        <MudText><strong>User ID:</strong> @_userInfo.UserId</MudText>
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
+</style>
 
-            <MudItem xs="12" md="6">
-                <MudCard Elevation="2">
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Your Roles</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @if (_userInfo.Roles.Any())
-                        {
-                            <MudChipSet T="string">
-                                @foreach (var role in _userInfo.Roles)
+@if (_userInfo == null)
+{
+    <!-- Loading Skeletons State - Simplified for General Dashboard -->
+    <MudGrid>
+        <!-- Stats Row Skeletons -->
+        <MudItem xs="12" md="4"><MudSkeleton Height="140px" Class="rounded-lg"/></MudItem>
+        <MudItem xs="12" md="4"><MudSkeleton Height="140px" Class="rounded-lg"/></MudItem>
+        <MudItem xs="12" md="4"><MudSkeleton Height="140px" Class="rounded-lg"/></MudItem>
+        
+        <!-- Table Skeleton -->
+        <MudItem xs="12" Class="mt-4"><MudSkeleton Height="400px" Class="rounded-lg"/></MudItem>
+    </MudGrid>
+}
+else
+{
+    <!-- General Dashboard View -->
+    <MudGrid>
+        <!-- Stats Widgets -->
+        @if (_dashboard?.Widgets.Any() == true)
+        {
+            @foreach (var widget in _dashboard.Widgets)
+            {
+                <MudItem xs="12" sm="4">
+                    <MudCard Elevation="0" Class="rounded-lg pa-4" Style="background-color: var(--mud-palette-surface);">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@widget.Title</MudText>
+                        <div class="d-flex align-center justify-space-between mt-2">
+                            <MudText Typo="Typo.h4" Style="font-weight: 500;">
+                                @if(widget.Type == "Stat") { @widget.Data } else { <text>€24,400</text> }
+                            </MudText>
+                            
+                            <!-- Mini Chart Visualization -->
+                            <div style="width: 120px; height: 50px;">
+                                @if(widget.Type == "Chart" || widget.Type == "Graph")
                                 {
-                                    <MudChip T="string" Color="Color.Primary">@role</MudChip>
+                                     var chartData = System.Text.Json.JsonSerializer.Deserialize<ChartData>(widget.Data.GetRawText());
+                                     if(chartData != null)
+                                     {
+                                        <MudChart Class="mini-chart" ChartType="ChartType.Line" XAxisLabels="@chartData.Labels" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = chartData.Values } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
+                                     }
                                 }
-                            </MudChipSet>
-                        }
-                        else
-                        {
-                            <MudText Color="Color.Secondary">No roles assigned</MudText>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-
-            <MudItem xs="12">
-                <MudCard Elevation="2">
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Your Permissions</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @if (_userInfo.Permissions.Any())
-                        {
-                            <MudChipSet T="string">
-                                @foreach (var permission in _userInfo.Permissions)
+                                else
                                 {
-                                    <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined">@permission</MudChip>
+                                    <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 10, 20, 15, 30 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
                                 }
-                            </MudChipSet>
-                        }
-                        else
-                        {
-                            <MudText Color="Color.Secondary">No permissions assigned</MudText>
-                        }
-                    </MudCardContent>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+            }
+        }
+        else
+        {
+             <!-- Fallback Static Widgets if no data from API -->
+             <MudItem xs="12" sm="4">
+                 <MudCard Elevation="0" Class="rounded-lg pa-4" Style="background-color: var(--mud-palette-surface);">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Total Sales</MudText>
+                    <div class="d-flex align-center justify-space-between mt-2">
+                        <MudText Typo="Typo.h4" Style="font-weight: 500;">€42,400</MudText>
+                        <div style="width: 120px; height: 50px;">
+                            <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 40, 20, 50, 30, 60 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
+                        </div>
+                    </div>
                 </MudCard>
-            </MudItem>
-
-            <MudItem xs="12">
-                <MudCard Elevation="2">
-                    <MudCardContent>
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Error"
-                                   StartIcon="@Icons.Material.Filled.Logout"
-                                   OnClick="HandleLogout">
-                            Logout
-                        </MudButton>
-                    </MudCardContent>
+             </MudItem>
+             <MudItem xs="12" sm="4">
+                 <MudCard Elevation="0" Class="rounded-lg pa-4" Style="background-color: var(--mud-palette-surface);">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Active Orders</MudText>
+                    <div class="d-flex align-center justify-space-between mt-2">
+                        <MudText Typo="Typo.h4" Style="font-weight: 500;">24</MudText>
+                        <div style="width: 120px; height: 50px;">
+                            <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 10, 40, 20, 50, 30 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
+                        </div>
+                    </div>
                 </MudCard>
-            </MudItem>
-        </MudGrid>
-    }
-</MudContainer>
+             </MudItem>
+             <MudItem xs="12" sm="4">
+                 <MudCard Elevation="0" Class="rounded-lg pa-4" Style="background-color: var(--mud-palette-surface);">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Completed</MudText>
+                    <div class="d-flex align-center justify-space-between mt-2">
+                        <MudText Typo="Typo.h4" Style="font-weight: 500;">20</MudText>
+                         <div style="width: 120px; height: 50px;">
+                            <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 60, 50, 40, 50, 60 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
+                        </div>
+                    </div>
+                </MudCard>
+             </MudItem>
+        }
+        
+        <!-- Orders Table Area -->
+        <MudItem xs="12">
+             <MudCard Elevation="0" Class="rounded-lg mt-4" Style="background-color: var(--mud-palette-surface);">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">All Orders</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudTabs Rounded="true" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
+                            <MudTabPanel Text="All order (2.4k)" />
+                            <MudTabPanel Text="Processing (120)" />
+                            <MudTabPanel Text="Shipped (100)" />
+                        </MudTabs>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudTable Items="@(new List<string>())" Elevation="0" Hover="true">
+                        <HeaderContent>
+                            <MudTh>Product</MudTh>
+                            <MudTh>Price</MudTh>
+                            <MudTh>Payment</MudTh>
+                            <MudTh>Status</MudTh>
+                        </HeaderContent>
+                        <NoRecordsContent>
+                            <MudText Class="pa-4 text-center" Color="Color.Secondary">No orders found (This area uses a skeleton normally)</MudText>
+                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
+                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
+                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudCardContent>
+             </MudCard>
+        </MudItem>
+    </MudGrid>
+}
 
 @code {
     private UserInfo? _userInfo;
+    private DashboardViewModel? _dashboard;
+    
+    // CSS class handles legend hiding
+    private ChartOptions _chartOptions = new ChartOptions 
+    { 
+        LineStrokeWidth = 2,
+        ChartPalette = new[] { "#3d7cf9", "#238636", "#a855f7" }
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -111,19 +160,25 @@
         {
             _userInfo = new UserInfo
             {
-                Name = user.FindFirst("name")?.Value ?? user.Identity.Name ?? "Unknown",
+                Name = user.Identity.Name ?? user.FindFirst("name")?.Value ?? "Unknown",
                 Email = user.FindFirst("email")?.Value ?? "No email",
-                UserId = user.FindFirst("sub")?.Value ?? "Unknown",
-                Roles = user.FindAll("roles").Select(c => c.Value).ToList(),
-                Permissions = user.FindAll("permissions").Select(c => c.Value).ToList()
+                UserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value ?? "Unknown",
+                // Check both standard and literal claim types
+                Roles = user.Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "roles").Select(c => c.Value).Distinct().ToList(),
+                Permissions = user.Claims.Where(c => c.Type == "permissions" || c.Type == "permission").Select(c => c.Value).Distinct().ToList()
             };
-        }
-    }
 
-    private async Task HandleLogout()
-    {
-        await Http.GetAsync("api/auth/logout");
-        Navigation.NavigateTo("/", forceLoad: true);
+            try
+            {
+                // Simulate delay for skeleton demo
+                await Task.Delay(1500);
+                _dashboard = await Http.GetFromJsonAsync<DashboardViewModel>("api/dashboard");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching dashboard: {ex.Message}");
+            }
+        }
     }
 
     private class UserInfo
@@ -133,5 +188,11 @@
         public string UserId { get; set; } = string.Empty;
         public List<string> Roles { get; set; } = new();
         public List<string> Permissions { get; set; } = new();
+    }
+
+    private class ChartData
+    {
+        public string[] Labels { get; set; } = Array.Empty<string>();
+        public double[] Values { get; set; } = Array.Empty<double>();
     }
 }

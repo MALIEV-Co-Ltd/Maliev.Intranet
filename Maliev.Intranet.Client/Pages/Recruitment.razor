@@ -1,0 +1,78 @@
+@page "/hr/recruitment"
+
+<PageTitle>Recruitment - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Recruitment & Job Postings</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="5">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg mb-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudText Typo="Typo.h6">Job Postings</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add">New Job</MudButton>
+            </MudStack>
+            @if (!_isLoading)
+            {
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Text="Senior Software Engineer" SecondaryText="Engineering • 5 applicants" Icon="@Icons.Material.Outlined.Code" />
+                    <MudDivider />
+                    <MudListItem T="string" Text="Sales Representative" SecondaryText="Sales • 12 applicants" Icon="@Icons.Material.Outlined.Handshake" />
+                    <MudDivider />
+                    <MudListItem T="string" Text="Operations Manager" SecondaryText="Operations • 8 applicants" Icon="@Icons.Material.Outlined.Engineering" />
+                </MudList>
+            }
+            else
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Class="rounded" />
+            }
+        </MudPaper>
+    </MudItem>
+    
+    <MudItem xs="12" md="7">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-3">Application Pipeline</MudText>
+            @if (_isLoading)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
+            }
+            else
+            {
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Elevation="0" Class="pa-3 border mud-border-lines-default rounded">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Applied</MudText>
+                            <MudText Typo="Typo.subtitle1">15</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Elevation="0" Class="pa-3 border mud-border-lines-default rounded">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Screening</MudText>
+                            <MudText Typo="Typo.subtitle1">8</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Elevation="0" Class="pa-3 border mud-border-lines-default rounded">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Interview</MudText>
+                            <MudText Typo="Typo.subtitle1">5</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Elevation="0" Class="pa-3 border mud-border-lines-default rounded">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Offer</MudText>
+                            <MudText Typo="Typo.subtitle1">2</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _isLoading = true;
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(600);
+        _isLoading = false;
+    }
+}

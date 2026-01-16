@@ -1,0 +1,221 @@
+@page "/sales/customers/{Id:guid}"
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Customer Details - Maliev Intranet</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-6 mb-12">
+    @if (_customer == null && !_loading)
+    {
+        <MudAlert Severity="Severity.Error">Customer not found.</MudAlert>
+    }
+    else if (_loading)
+    {
+        <!-- Loading Skeletons -->
+        <MudGrid>
+            <MudItem xs="12" lg="3">
+                <MudCard Elevation="0" Class="rounded-lg mb-4">
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" Class="rounded-t-lg" />
+                    <MudCardContent Class="text-center" Style="margin-top: -50px;">
+                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="100px" Height="100px" Class="mx-auto mb-3" />
+                        <MudSkeleton Width="60%" Height="32px" Class="mx-auto mb-2" />
+                        <MudSkeleton Width="30%" Height="24px" Class="mx-auto" />
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" lg="9">
+                <MudGrid>
+                    <MudItem xs="12" sm="4"><MudSkeleton Height="100px" Class="rounded-lg" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudSkeleton Height="100px" Class="rounded-lg" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudSkeleton Height="100px" Class="rounded-lg" /></MudItem>
+                    <MudItem xs="12"><MudSkeleton Height="400px" Class="rounded-lg mt-4" /></MudItem>
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+    }
+    else if (_customer != null)
+    {
+        <MudGrid>
+            <!-- Left Column: Profile Card -->
+            <MudItem xs="12" lg="3">
+                <MudCard Elevation="0" Class="rounded-lg mb-4" Style="background-color: var(--mud-palette-surface);">
+                    <div style="height: 120px; background: linear-gradient(135deg, #3d7cf9 0%, #2f81f7 100%); border-radius: 8px 8px 0 0;"></div>
+                    <MudCardContent Class="text-center" Style="margin-top: -50px;">
+                        <MudAvatar Style="height:100px; width:100px; border: 4px solid var(--mud-palette-surface);" Class="mb-3">
+                            @_customer.Name[0]
+                        </MudAvatar>
+                        <MudText Typo="Typo.h6" Style="font-weight: 600;">@_customer.Name</MudText>
+                        <MudChip T="string" Color="@GetStatusColor(_customer.Status)" Size="Size.Small" Class="mt-1">@_customer.Status</MudChip>
+                        
+                        <div class="d-flex justify-center gap-2 mt-4">
+                            <MudIconButton Icon="@Icons.Material.Filled.Call" Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Email" Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Chat" Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" />
+                        </div>
+                    </MudCardContent>
+                    <MudDivider />
+                    <MudCardContent>
+                        <MudStack Spacing="3">
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Email address</MudText>
+                                <MudText Typo="Typo.body2">@_customer.Email</MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Phone number</MudText>
+                                <MudText Typo="Typo.body2">@(_customer.Phone ?? "Not provided")</MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Segment / Tier</MudText>
+                                <MudText Typo="Typo.body2">@_customer.Segment / @_customer.Tier</MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Company</MudText>
+                                <MudText Typo="Typo.body2">@(_customer.CompanyName ?? "N/A")</MudText>
+                            </div>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+
+                <MudCard Elevation="0" Class="rounded-lg" Style="background-color: var(--mud-palette-surface);">
+                    <MudCardHeader>
+                        <CardHeaderContent><MudText Typo="Typo.h6">Manufacturing Status</MudText></CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                         <MudStack Spacing="2">
+                            <div class="d-flex justify-space-between align-center">
+                                <MudText Typo="Typo.body2">Active Jobs</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Primary" Style="font-weight: 700;">@_customer.ActiveOrdersCount</MudText>
+                            </div>
+                            <MudProgressLinear Color="Color.Primary" Value="75" Class="my-2" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Current production efficiency: 94%</MudText>
+                         </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- Right Column: Operations -->
+            <MudItem xs="12" lg="9">
+                <MudGrid>
+                    <!-- Quick Stats -->
+                    <MudItem xs="12" sm="4">
+                        <MudCard Elevation="0" Class="pa-4 rounded-lg" Style="background-color: var(--mud-palette-surface);">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Spent</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 600;">@_customer.TotalSpent.ToString("C0")</MudText>
+                        </MudCard>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudCard Elevation="0" Class="pa-4 rounded-lg" Style="background-color: var(--mud-palette-surface);">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Active Orders</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 600;">@_customer.ActiveOrdersCount</MudText>
+                        </MudCard>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudCard Elevation="0" Class="pa-4 rounded-lg" Style="background-color: var(--mud-palette-surface);">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Open Quotations</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 600;">@_customer.OpenQuotationsCount</MudText>
+                        </MudCard>
+                    </MudItem>
+
+                    <!-- Tabs -->
+                    <MudItem xs="12">
+                        <MudCard Elevation="0" Class="rounded-lg mt-4" Style="background-color: var(--mud-palette-surface);">
+                            <MudTabs Elevation="0" Outlined="false" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
+                                <MudTabPanel Text="Overview">
+                                    <MudCardContent>
+                                        <MudText Typo="Typo.h6" Class="mb-4">Recent Activity</MudText>
+                                        <MudStack Spacing="3">
+                                            @for (int i = 0; i < 3; i++)
+                                            {
+                                                <div class="d-flex gap-4">
+                                                    <MudAvatar Color="Color.Dark" Size="Size.Small" Variant="Variant.Filled"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small"/></MudAvatar>
+                                                    <div>
+                                                        <MudText Typo="Typo.body2">Order #@(1000 + i) status changed to 'In Production'</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(i + 1) hour(s) ago</MudText>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </MudStack>
+                                    </MudCardContent>
+                                </MudTabPanel>
+                                <MudTabPanel Text="Orders">
+                                    <MudCardContent>
+                                        <MudTable Items="@(new List<string>())" Elevation="0">
+                                            <HeaderContent>
+                                                <MudTh>Order ID</MudTh>
+                                                <MudTh>Date</MudTh>
+                                                <MudTh>Amount</MudTh>
+                                                <MudTh>Status</MudTh>
+                                            </HeaderContent>
+                                            <NoRecordsContent>
+                                                <MudText Class="pa-4">No active orders found.</MudText>
+                                                <MudSkeleton Height="40px" Class="my-2"/>
+                                                <MudSkeleton Height="40px" Class="my-2"/>
+                                            </NoRecordsContent>
+                                        </MudTable>
+                                    </MudCardContent>
+                                </MudTabPanel>
+                                <MudTabPanel Text="Quotations">
+                                    <MudCardContent>
+                                        <MudText>Quotation history will be displayed here.</MudText>
+                                        <MudSkeleton Height="200px" Class="mt-4" />
+                                    </MudCardContent>
+                                </MudTabPanel>
+                                <MudTabPanel Text="Files & CAD">
+                                    <MudCardContent>
+                                        <MudText>Technical drawings and NDA documents.</MudText>
+                                        <MudGrid Class="mt-4">
+                                            <MudItem xs="6" md="3">
+                                                <MudPaper Class="pa-4 d-flex flex-column align-center" Outlined="true">
+                                                    <MudIcon Icon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" Size="Size.Large" />
+                                                    <MudText Typo="Typo.caption" Class="mt-2">NDA_Signed.pdf</MudText>
+                                                </MudPaper>
+                                            </MudItem>
+                                            <MudItem xs="6" md="3">
+                                                <MudPaper Class="pa-4 d-flex flex-column align-center" Outlined="true">
+                                                    <MudIcon Icon="@Icons.Material.Filled.ModelTraining" Color="Color.Info" Size="Size.Large" />
+                                                    <MudText Typo="Typo.caption" Class="mt-2">Part_V2.step</MudText>
+                                                </MudPaper>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </MudCardContent>
+                                </MudTabPanel>
+                            </MudTabs>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private CustomerDetailDto? _customer;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _customer = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/customers/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading customer details: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success,
+        "Inactive" => Color.Warning,
+        "Blocked" => Color.Error,
+        _ => Color.Default
+    };
+}

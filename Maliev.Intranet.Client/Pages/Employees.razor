@@ -1,0 +1,131 @@
+@page "/hr/employees"
+
+<PageTitle>Employees - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Employee Directory</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudTextField @bind-Value="_searchString" 
+                      Placeholder="Search employees..." 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined" 
+                      Margin="Margin.Dense" 
+                      Style="max-width: 400px;" />
+        
+        <MudStack Row="true" Spacing="2">
+            <MudSelect @bind-Value="_filterDepartment" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 150px;">
+                <MudSelectItem Value="@("All")">All Departments</MudSelectItem>
+                <MudSelectItem Value="@("Engineering")">Engineering</MudSelectItem>
+                <MudSelectItem Value="@("Sales")">Sales</MudSelectItem>
+                <MudSelectItem Value="@("Operations")">Operations</MudSelectItem>
+            </MudSelect>
+            
+            <MudToggleIconButton @bind-Toggled="@_viewMode" 
+                                 Icon="@Icons.Material.Outlined.GridView" 
+                                 ToggledIcon="@Icons.Material.Outlined.TableChart"
+                                 Color="Color.Primary" />
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudGrid>
+        @for (int i = 0; i < 8; i++)
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Class="rounded-lg" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (_viewMode)
+{
+    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+        <MudDataGrid T="EmployeeDto" Items="@_employees" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <TemplateColumn Title="Name">
+                    <CellTemplate>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudAvatar Size="Size.Small" Color="Color.Primary">@context.Item.Name[0]</MudAvatar>
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.Item.Name</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.Title</MudText>
+                            </div>
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.Department" Title="Department" />
+                <PropertyColumn Property="x => x.Manager" Title="Manager" />
+                <PropertyColumn Property="x => x.HireDate" Title="Hire Date" Format="dd MMM yyyy" />
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip Size="Size.Small" Color="Color.Success">@context.Item.Status</MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Actions" Sortable="false">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+}
+else
+{
+    <MudGrid>
+        @foreach (var employee in _employees)
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudCard Elevation="0" Class="border mud-border-lines-default">
+                    <MudCardContent Class="pa-4 d-flex flex-column align-center">
+                        <MudAvatar Size="Size.Large" Color="Color.Primary" Class="mb-3">@employee.Name[0]</MudAvatar>
+                        <MudText Typo="Typo.subtitle1" Align="Align.Center" Style="font-weight: 600;">@employee.Name</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">@employee.Title</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mt-2">@employee.Department</MudChip>
+                        <MudDivider Class="my-3" />
+                        <MudStack Spacing="1" Class="width-100">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Small" /> @employee.Email</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Outlined.Phone" Size="Size.Small" /> @employee.Phone</MudText>
+                        </MudStack>
+                    </MudCardContent>
+                    <MudCardActions Class="pa-2">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true">View Profile</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private string _filterDepartment = "All";
+    private bool _viewMode = false;
+    private List<EmployeeDto> _employees = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _employees = await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    public class EmployeeDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Department { get; set; } = string.Empty;
+        public string Manager { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public DateTime HireDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+}

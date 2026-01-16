@@ -1,88 +1,104 @@
-@page "/customers"
-@using Microsoft.AspNetCore.Authorization
+@page "/sales/customers"
+@using MudBlazor
 @using Maliev.Intranet.Shared
-@attribute [Authorize]
 @inject HttpClient Http
+@inject NavigationManager Navigation
 
 <PageTitle>Customers - Maliev Intranet</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-6">
-    <MudText Typo="Typo.h4">Customer Management</MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Add Customer</MudButton>
-</div>
+<MudText Typo="Typo.h4" Class="mb-6">Customers</MudText>
 
-<MudCard Elevation="2" Class="mb-6 pa-4">
-    <MudTextField @bind-Value="_query" Placeholder="Search customers by name or email..." 
-                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
-                  OnKeyUp="HandleKeyUp" Immediate="true" />
-</MudCard>
-
-@if (_customers == null)
-{
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
-}
-else
-{
-    <MudTable Items="@_customers" Elevation="2" Hover="true" Breakpoint="Breakpoint.Sm" 
-              Loading="@(_customers == null)" LoadingProgressColor="Color.Info">
-        <HeaderContent>
-            <MudTh>Name</MudTh>
-            <MudTh>Email</MudTh>
-            <MudTh>Status</MudTh>
-            <MudTh Style="text-align:right">Balance</MudTh>
-            <MudTh Style="text-align:right">Actions</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Name">@context.Name</MudTd>
-            <MudTd DataLabel="Email">@context.Email</MudTd>
-            <MudTd DataLabel="Status">
-                <MudChip T="string" Color="@(context.Status == "Active" ? Color.Success : Color.Default)" Size="Size.Small">
-                    @context.Status
-                </MudChip>
-            </MudTd>
-            <MudTd DataLabel="Balance" Style="text-align:right">@context.OutstandingBalance.ToString("C")</MudTd>
-            <MudTd DataLabel="Actions" Style="text-align:right">
-                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" />
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Secondary" />
-            </MudTd>
-        </RowTemplate>
-        <NoRecordsContent>
-            <MudText>No matching customers found.</MudText>
-        </NoRecordsContent>
-        <PagerContent>
-            <MudTablePager />
-        </PagerContent>
-    </MudTable>
-}
+<MudDataGrid T="CustomerSummaryDto" ServerData="@LoadGridData" Filterable="true" SortMode="SortMode.Multiple" @ref="_grid">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Customer List</MudText>
+        <MudSpacer />
+        <MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Placeholder="Search" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <Columns>
+        <TemplateColumn Title="Company Name" SortBy="x => x.Name">
+            <CellTemplate>
+                <MudLink OnClick="@(() => ViewDetails(context.Item.Id))" Class="cursor-pointer" Underline="Underline.None">
+                    <div class="d-flex align-center">
+                        <MudAvatar Size="Size.Small" Color="Color.Primary" Class="mr-2">@context.Item.Name[0]</MudAvatar>
+                        @context.Item.Name
+                    </div>
+                </MudLink>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Email" />
+        <TemplateColumn Title="Status">
+            <CellTemplate>
+                <MudChip T="string" Color="@GetStatusColor(context.Item.Status)" Size="Size.Small">@context.Item.Status</MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.OutstandingBalance" Title="Balance" Format="C2" />
+        <TemplateColumn CellClass="d-flex justify-end">
+            <CellTemplate>
+                <MudTooltip Text="View Details">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewDetails(context.Item.Id))" />
+                </MudTooltip>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" />
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent>
+        <MudText>No customers found.</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Loading customers...</MudText>
+    </LoadingContent>
+    <PagerContent>
+        <MudDataGridPager T="CustomerSummaryDto" />
+    </PagerContent>
+</MudDataGrid>
 
 @code {
-    private string? _query;
-    private List<CustomerSummaryDto>? _customers;
+    private MudDataGrid<CustomerSummaryDto> _grid = null!;
+    private string? _searchString;
 
-    protected override async Task OnInitializedAsync()
+    private async Task<GridData<CustomerSummaryDto>> LoadGridData(GridState<CustomerSummaryDto> state)
     {
-        await LoadCustomers();
-    }
-
-    private async Task LoadCustomers()
-    {
-        try 
+        var page = state.Page + 1;
+        var url = $"api/customers?page={page}&query={_searchString}";
+        
+        try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>($"api/customers?query={Uri.EscapeDataString(_query ?? "")}");
-            _customers = response?.Data.ToList();
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(url);
+            if (response != null)
+            {
+                return new GridData<CustomerSummaryDto>
+                {
+                    TotalItems = response.Meta.TotalCount,
+                    Items = response.Data
+                };
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading customers: {ex.Message}");
-            _customers = new();
         }
+
+        return new GridData<CustomerSummaryDto> { TotalItems = 0, Items = Array.Empty<CustomerSummaryDto>() };
     }
 
-    private async Task HandleKeyUp(KeyboardEventArgs e)
+    private Task OnSearch(string text)
     {
-        if (e.Key == "Enter")
-        {
-            await LoadCustomers();
-        }
+        _searchString = text;
+        return _grid.ReloadServerData();
     }
+
+    private void ViewDetails(Guid id)
+    {
+        Navigation.NavigateTo($"/sales/customers/{id}");
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success,
+        "Inactive" => Color.Warning,
+        "Blocked" => Color.Error,
+        _ => Color.Default
+    };
 }

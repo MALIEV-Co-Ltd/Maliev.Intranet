@@ -1,0 +1,99 @@
+@page "/mfg/models"
+
+<PageTitle>3D Models - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">3D Models Library</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudTextField @bind-Value="_searchString" 
+                      Placeholder="Search models..." 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined" 
+                      Margin="Margin.Dense" 
+                      Style="max-width: 400px;" />
+        
+        <MudStack Row="true" Spacing="2">
+            <MudSelect @bind-Value="_filterProcess" Label="Process" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 150px;">
+                <MudSelectItem Value="@("All")">All Processes</MudSelectItem>
+                <MudSelectItem Value="@("3D Printing")">3D Printing</MudSelectItem>
+                <MudSelectItem Value="@("CNC")">CNC Machining</MudSelectItem>
+                <MudSelectItem Value="@("Sheet Metal")">Sheet Metal</MudSelectItem>
+            </MudSelect>
+            
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.CloudUpload">
+                Upload Model
+            </MudButton>
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudGrid>
+        @for (int i = 0; i < 8; i++)
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="250px" Class="rounded-lg" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+else
+{
+    <MudGrid>
+        @foreach (var model in _models)
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudCard Elevation="0" Class="border mud-border-lines-default">
+                    <MudCardMedia Image="@model.ThumbnailUrl" Height="180" />
+                    <MudCardContent Class="pa-3">
+                        <MudText Typo="Typo.subtitle2" Class="mud-text-truncate">@model.FileName</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@model.CustomerName</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-2">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">@model.ProcessType</MudChip>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@model.FileSize</MudText>
+                        </MudStack>
+                    </MudCardContent>
+                    <MudCardActions Class="pa-2">
+                        <MudStack Row="true" Spacing="1" Class="flex-grow-1">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Download" Size="Size.Small" Color="Color.Primary" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Default" />
+                        </MudStack>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@model.UploadedDate.ToString("dd MMM yyyy")</MudText>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private string _filterProcess = "All";
+    private List<Model3DDto> _models = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _models = await Http.GetFromJsonAsync<List<Model3DDto>>("api/models");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    public class Model3DDto
+    {
+        public Guid Id { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string ProcessType { get; set; } = string.Empty;
+        public string FileSize { get; set; } = string.Empty;
+        public DateTime UploadedDate { get; set; }
+        public string ThumbnailUrl { get; set; } = string.Empty;
+    }
+}

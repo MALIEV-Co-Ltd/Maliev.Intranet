@@ -1,0 +1,76 @@
+@page "/hr/compensation"
+
+<PageTitle>Compensation - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Compensation & Benefits</MudText>
+
+<MudGrid Class="mb-4">
+    @if (!_isLoading)
+    {
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Base Salary</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">$95,000</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Success">+5% from last year</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Annual Bonus</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">$12,000</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Last payout</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Compensation</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">$107,000</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">2025</MudText>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg mb-4">
+    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-4">
+        <MudTabPanel Text="Benefits" Icon="@Icons.Material.Outlined.HealthAndSafety">
+            @if (_isLoading)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Class="rounded" />
+            }
+            else
+            {
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Outlined.HealthAndSafety">
+                        <MudText Typo="Typo.subtitle2">Health Insurance</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Premium Plan - Family Coverage</MudText>
+                    </MudListItem>
+                    <MudDivider />
+                    <MudListItem T="string" Icon="@Icons.Material.Outlined.Savings">
+                        <MudText Typo="Typo.subtitle2">401(k) Retirement Plan</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">5% company match</MudText>
+                    </MudListItem>
+                    <MudDivider />
+                    <MudListItem T="string" Icon="@Icons.Material.Outlined.DirectionsCar">
+                        <MudText Typo="Typo.subtitle2">Transportation Allowance</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">$200/month</MudText>
+                    </MudListItem>
+                </MudList>
+            }
+        </MudTabPanel>
+        
+        <MudTabPanel Text="Salary History" Icon="@Icons.Material.Outlined.Timeline">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">This information is confidential</MudText>
+        </MudTabPanel>
+    </MudTabs>
+</MudPaper>
+
+@code {
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(600);
+        _isLoading = false;
+    }
+}

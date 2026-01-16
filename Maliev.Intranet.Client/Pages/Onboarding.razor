@@ -1,0 +1,72 @@
+@page "/hr/onboarding"
+
+<PageTitle>Onboarding - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Employee Onboarding</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+        <MudTextField @bind-Value="_searchString" Placeholder="Search..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd">New Onboarding</MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded-lg" />
+}
+else
+{
+    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+        <MudDataGrid T="OnboardingDto" Items="@_onboardings" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.EmployeeName" Title="Employee" />
+                <PropertyColumn Property="x => x.Department" Title="Department" />
+                <PropertyColumn Property="x => x.StartDate" Title="Start Date" Format="dd MMM yyyy" />
+                <TemplateColumn Title="Progress">
+                    <CellTemplate>
+                        <MudProgressLinear Color="Color.Primary" Value="@context.Item.Progress" Size="Size.Small" />
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.Buddy" Title="Buddy" />
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private List<OnboardingDto> _onboardings = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _onboardings = await Http.GetFromJsonAsync<List<OnboardingDto>>("api/onboarding");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Pre-Start" => Color.Info,
+        "In Progress" => Color.Primary,
+        "Complete" => Color.Success,
+        _ => Color.Default
+    };
+
+    public class OnboardingDto
+    {
+        public string EmployeeName { get; set; } = "";
+        public string Department { get; set; } = "";
+        public DateTime StartDate { get; set; }
+        public int Progress { get; set; }
+        public string Buddy { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+}

@@ -9,7 +9,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for order-related operations, proxying to the Order Service.
 /// </summary>
 /// <param name="client">The order service client.</param>
-[Authorize]
+[Authorize(Policy = MalievPermissions.Order.Read)]
 [ApiController]
 [Route("api/[controller]")]
 public class OrdersController(OrderServiceClient client) : ControllerBase

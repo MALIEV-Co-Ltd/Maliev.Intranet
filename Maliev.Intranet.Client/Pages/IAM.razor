@@ -1,0 +1,125 @@
+@page "/admin/iam"
+
+<PageTitle>IAM Console - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">IAM Console</MudText>
+
+<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-4">
+        <!-- Users Tab -->
+        <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.People">
+            @if (_isLoading)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
+            }
+            else
+            {
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudTextField @bind-Value="_searchString" Placeholder="Search users..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" />
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd">Add User</MudButton>
+                    </MudStack>
+                    
+                    <MudDataGrid T="UserDto" Items="@_users" Dense="true" Hover="true" Elevation="0">
+                        <Columns>
+                            <PropertyColumn Property="x => x.Name" Title="Name" />
+                            <PropertyColumn Property="x => x.Email" Title="Email" />
+                            <TemplateColumn Title="Roles">
+                                <CellTemplate>
+                                    <MudStack Row="true" Spacing="1">
+                                        @foreach (var role in context.Item.Roles)
+                                        {
+                                            <MudChip Size="Size.Small" Color="Color.Primary">@role</MudChip>
+                                        }
+                                    </MudStack>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="Status">
+                                <CellTemplate>
+                                    <MudChip Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
+                                        @(context.Item.IsActive ? "Active" : "Inactive")
+                                    </MudChip>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            <PropertyColumn Property="x => x.LastLogin" Title="Last Login" Format="dd MMM yyyy HH:mm" />
+                            <TemplateColumn Title="Actions" Sortable="false">
+                                <CellTemplate>
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" Color="Color.Default" />
+                                    </MudStack>
+                                </CellTemplate>
+                            </TemplateColumn>
+                        </Columns>
+                    </MudDataGrid>
+                </MudStack>
+            }
+        </MudTabPanel>
+
+        <!-- Roles Tab -->
+        <MudTabPanel Text="Roles" Icon="@Icons.Material.Outlined.Security">
+            @if (_isLoading)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
+            }
+            else
+            {
+                <MudStack Spacing="3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Create Role</MudButton>
+                    
+                    <MudList T="string" Dense="true">
+                        @foreach (var role in _roles)
+                        {
+                            <MudListItem T="string">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle2">@role.Name</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@role.PermissionCount permissions</MudText>
+                                    </div>
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                                </MudStack>
+                            </MudListItem>
+                            <MudDivider />
+                        }
+                    </MudList>
+                </MudStack>
+            }
+        </MudTabPanel>
+
+        <!-- Audit Log Tab -->
+        <MudTabPanel Text="Audit Log" Icon="@Icons.Material.Outlined.History">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Recent IAM activities will appear here</MudText>
+        </MudTabPanel>
+    </MudTabs>
+</MudPaper>
+
+@code {
+    private bool _isLoading = true;
+    private string _searchString = "";
+    private List<UserDto> _users = new();
+    private List<RoleDto> _roles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Replace with BFF API call
+        // _users = await Http.GetFromJsonAsync<List<UserDto>>("api/iam/users");
+        // _roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/iam/roles");
+        await Task.Delay(500);
+        _isLoading = false;
+    }
+
+    public class UserDto
+    {
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string[] Roles { get; set; } = Array.Empty<string>();
+        public bool IsActive { get; set; }
+        public DateTime LastLogin { get; set; }
+    }
+
+    public class RoleDto
+    {
+        public string Name { get; set; } = "";
+        public int PermissionCount { get; set; }
+    }
+}

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Maliev.Intranet.Shared;
+using System.Text.Json;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
@@ -23,9 +24,9 @@ public class DashboardController : ControllerBase
         {
             Widgets = new List<WidgetData>
             {
-                new() { Title = "Pending Orders", Type = "Stat", Data = 12, SourceService = "OrderService" },
-                new() { Title = "Active Quotations", Type = "Stat", Data = 5, SourceService = "QuotationService" },
-                new() { Title = "Customer Growth", Type = "Chart", Data = new { Labels = new[] {"Mon", "Tue", "Wed"}, Values = new[] {10, 15, 12} }, SourceService = "CustomerService" }
+                new() { Title = "Pending Orders", Type = "Stat", Data = JsonSerializer.SerializeToElement(12), SourceService = "OrderService" },
+                new() { Title = "Active Quotations", Type = "Stat", Data = JsonSerializer.SerializeToElement(5), SourceService = "QuotationService" },
+                new() { Title = "Customer Growth", Type = "Chart", Data = JsonSerializer.SerializeToElement(new { Labels = new[] {"Mon", "Tue", "Wed"}, Values = new[] {10, 15, 12} }), SourceService = "CustomerService" }
             },
             Alerts = new List<SystemAlert>
             {

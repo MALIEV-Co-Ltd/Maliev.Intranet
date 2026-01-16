@@ -1,0 +1,104 @@
+@page "/permissions"
+@using Microsoft.AspNetCore.Authorization
+@using Maliev.Intranet.Shared
+@attribute [Authorize(Policy = MalievPermissions.Iam.Manage)]
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject ILogger<Permissions> Logger
+
+<PageTitle>Permission Management - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6">Permission Management</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2" Class="pa-4 h-100">
+            <MudText Typo="Typo.h6" GutterBottom="true">Available Roles</MudText>
+            @if (_roles == null)
+            {
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            }
+            else
+            {
+                <MudList T="string">
+                    @foreach (var role in _roles)
+                    {
+                        <MudListItem Icon="@Icons.Material.Filled.Badge">
+                            <div class="d-flex flex-column">
+                                <MudText Typo="Typo.body1">@role.Name</MudText>
+                                <MudText Typo="Typo.caption">@role.Description</MudText>
+                                <div class="mt-1">
+                                    @foreach (var p in role.Permissions)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@p</MudChip>
+                                    }
+                                </div>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            }
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2" Class="pa-4 h-100">
+            <MudText Typo="Typo.h6" GutterBottom="true">System Permissions</MudText>
+            @if (_permissions == null)
+            {
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            }
+            else
+            {
+                <MudTable Items="@_permissions" Hover="true" Bordered="false" Striped="true" Dense="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Permission</MudTh>
+                        <MudTh>Description</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd><code>@context.Name</code></MudTd>
+                        <MudTd>@context.Description</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+            User assignment features will be available in the next update once the Employee Service is integrated.
+        </MudAlert>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<RoleDto>? _roles;
+    private List<PermissionDto>? _permissions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var rolesTask = Http.GetFromJsonAsync<List<RoleDto>>("api/permissions/roles");
+            var permissionsTask = Http.GetFromJsonAsync<List<PermissionDto>>("api/permissions/available");
+
+            await Task.WhenAll(rolesTask, permissionsTask);
+
+            _roles = await rolesTask;
+            _permissions = await permissionsTask;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading permission data");
+            Snackbar.Add("Failed to load permission data from IAM service.", Severity.Error);
+            _roles = new();
+            _permissions = new();
+        }
+    }
+}
