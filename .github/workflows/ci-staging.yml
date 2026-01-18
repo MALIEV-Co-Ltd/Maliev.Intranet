@@ -88,48 +88,7 @@ jobs:
       - name: Create Pull Request
         env:
           GH_TOKEN: ${{ secrets.GITOPS_PAT }}
-          PR_BODY: |
-            Automated GitOps Update
-
-            - **Service**: Intranet
-            - **Environment**: Staging
-            - **Release**: ${{ github.ref_name }}
-            - **Image Tag**: ${{ github.ref_name }}
-            - **Commit**: ${{ github.sha }}
-
-            Updates maliev-intranet image in staging overlay.
-            This PR was automatically created by GitHub Actions.
-            Once merged, ArgoCD will automatically sync the changes to the maliev-staging namespace.
-
-            Triggered by: ${{ github.actor }}
-            Workflow: ${{ github.workflow }}
-            Run: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
         run: |
-          cd maliev-gitops
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          chmod +x .github/scripts/create-gitops-pr.sh
+          .github/scripts/create-gitops-pr.sh "Intranet" "Staging" "${{ github.ref_name }}" "${{ github.ref_name }}" "${{ github.sha }}"
 
-          # Extract release version
-          export RELEASE_VERSION=$(echo ${{ github.ref }} | sed -e 's,.*/v,,g')
-
-          # Create a new branch for this update
-          BRANCH_NAME="intranet/staging-$RELEASE_VERSION"
-          git checkout -b $BRANCH_NAME
-
-          # Commit and push changes to the new branch
-          git add .
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          git commit -m "chore(staging): Update Intranet image to $RELEASE_VERSION"
-          git push origin $BRANCH_NAME
-
-          # Create pull request using GitHub CLI
-          gh pr create \
-            --title "chore(staging): Update intranet" \
-            --body "$PR_BODY" \
-            --base main \
-            --head $BRANCH_NAME \
-            --repo MALIEV-Co-Ltd/maliev-gitops
