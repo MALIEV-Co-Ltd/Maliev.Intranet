@@ -1,6 +1,6 @@
+using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Maliev.Intranet.Shared;
 using System.Diagnostics;
 
 namespace Maliev.Intranet.Bff.Controllers;
@@ -13,10 +13,10 @@ namespace Maliev.Intranet.Bff.Controllers;
 [Route("api/system-health")]
 public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfiguration configuration) : ControllerBase
 {
-    private static readonly string[] ServicesToCheck = 
+    private static readonly string[] ServicesToCheck =
     [
-        "AuthService", "IAMService", "CustomerService", "OrderService", 
-        "QuotationService", "AccountingService", "SupplierService", 
+        "AuthService", "IAMService", "CustomerService", "OrderService",
+        "QuotationService", "AccountingService", "SupplierService",
         "NotificationService", "EmployeeService", "CareerService",
         "CompensationService", "ComplianceService", "LeaveService",
         "LifecycleService", "PerformanceService", "ContactService",
@@ -78,7 +78,7 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         // Standard service prefix is usually the first part of the service name in lowercase
         // or we can just try /liveness or /readiness
         var servicePrefix = serviceName.Replace("Service", "").ToLower();
-        
+
         try
         {
             var client = httpClientFactory.CreateClient();

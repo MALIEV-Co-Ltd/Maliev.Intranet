@@ -20,7 +20,7 @@ public static class ThemeConfiguration
             Background = "#0d1117", // GitHub Main Background
             Surface = "#161b22", // GitHub Secondary Background (Cards)
             AppbarBackground = "#010409", // Darker Header
-            DrawerBackground = "#0d1117", // Sidebar match main
+            DrawerBackground = "#010409", // Sidebar match header
             TextPrimary = "#c9d1d9", // High Contrast Text
             TextSecondary = "#8b949e", // Muted Text
             Success = "#238636",

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Maliev.Intranet.Client.Services;
 
 public class ChatMessage
@@ -14,10 +11,10 @@ public class ChatMessage
 public class ChatService
 {
     public List<ChatMessage> Messages { get; } = new();
-    
+
     private string _currentContext = "/";
-    public string CurrentContext 
-    { 
+    public string CurrentContext
+    {
         get => _currentContext;
         set
         {
@@ -33,9 +30,9 @@ public class ChatService
 
     public void AddMessage(string text, bool isUser)
     {
-        Messages.Add(new ChatMessage 
-        { 
-            Text = text, 
+        Messages.Add(new ChatMessage
+        {
+            Text = text,
             IsUser = isUser,
             Context = _currentContext
         });

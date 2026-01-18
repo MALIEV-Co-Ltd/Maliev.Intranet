@@ -50,26 +50,87 @@
                     </MudAvatar>
                 }
                 <MudChatBubble>
-                    @message.Text
+                    <div style="white-space: pre-wrap;">@message.Text</div>
                 </MudChatBubble>
             </MudChat>
         }
     </div>
 
-    <!-- Bottom Input Area -->
+    <!-- Bottom Input Area (Redesigned) -->
     <div class="pa-4 mt-auto @(IsMobile ? "mb-16" : "")">
-        <MudTextField @bind-Value="_currentInput" 
-                      Placeholder="Ask a question..." 
-                      Variant="Variant.Outlined" 
-                      Margin="Margin.Dense"
-                      Adornment="Adornment.End" 
-                      AdornmentIcon="@Icons.Material.Filled.Send" 
-                      OnKeyDown="@HandleKeyDown"
-                      OnAdornmentClick="@SendMessage"
-                      Immediate="true"
-                      autocomplete="off" />
+        <MudPaper Elevation="0" Class="rounded-xl pa-2 chat-input-container border border-solid mud-border-lines-default" Style="background-color: var(--mud-palette-surface);">
+            <div class="px-2 pt-1">
+                <MudTextField @bind-Value="_currentInput" 
+                              Placeholder="Ask anything" 
+                              Variant="Variant.Text" 
+                              Underline="false"
+                              Lines="1"
+                              AutoGrow="true"
+                              MaxLines="8"
+                              OnKeyDown="@HandleKeyDown"
+                              Immediate="true"
+                              autocomplete="off"
+                              Class="mt-0"
+                              Style="font-size: 0.95rem;" />
+            </div>
+
+            <div class="d-flex align-center justify-space-between mt-1 px-1">
+                <div class="d-flex align-center gap-1">
+                    <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="UploadFiles" Hidden="true">
+                        <ActivatorContent>
+                            <MudIconButton Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" Class="action-icon" />
+                        </ActivatorContent>
+                    </MudFileUpload>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Public" Size="Size.Small" Class="action-icon" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Lightbulb" Size="Size.Small" Class="action-icon" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.MoreHoriz" Size="Size.Small" Class="action-icon" />
+                </div>
+
+                <div class="send-button-wrapper">
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" 
+                                   OnClick="@SendMessage" 
+                                   Class="send-button-square"
+                                   Size="Size.Small" />
+                </div>
+            </div>
+        </MudPaper>
+        
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="d-block mt-2" Style="font-size: 0.75rem;">
+            AI can make mistakes. Please double-check responses.
+        </MudText>
     </div>
 </div>
+
+<style>
+    .chat-input-container {
+        transition: box-shadow 0.2s;
+    }
+    
+    .chat-input-container:focus-within {
+        box-shadow: 0 0 0 1px var(--mud-palette-primary) !important;
+    }
+
+    .action-icon {
+        color: var(--mud-palette-text-secondary);
+        border: 1px solid var(--mud-palette-divider);
+        padding: 6px !important;
+    }
+
+    .send-button-square {
+        background-color: var(--mud-palette-text-primary) !important;
+        color: var(--mud-palette-surface) !important;
+        border-radius: 8px !important;
+        padding: 6px !important;
+    }
+
+    .send-button-square:hover {
+        opacity: 0.9;
+    }
+
+    .send-button-square:disabled {
+        background-color: var(--mud-palette-action-disabled-background) !important;
+    }
+</style>
 
 @code {
     [Parameter] public bool IsMobile { get; set; }
@@ -98,7 +159,8 @@
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
+        // Send on Enter, but allow Shift+Enter for new lines
+        if (e.Key == "Enter" && !e.ShiftKey)
         {
             await SendMessage();
         }
@@ -122,6 +184,14 @@
         });
         
         await InvokeAsync(StateHasChanged);
+    }
+
+    private void UploadFiles(IReadOnlyList<IBrowserFile> files)
+    {
+        foreach (var file in files)
+        {
+            ChatService.AddMessage($"[Attachment: {file.Name} ({file.Size} bytes)]", true);
+        }
     }
 
     public void Dispose()
