@@ -1,7 +1,7 @@
+using Maliev.Intranet.Shared;
+using Microsoft.AspNetCore.Components.Authorization;
 using System.Net.Http.Json;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Components.Authorization;
-using Maliev.Intranet.Shared;
 
 namespace Maliev.Intranet.Client.Services;
 

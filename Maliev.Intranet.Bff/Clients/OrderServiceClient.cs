@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using Maliev.Intranet.Shared;
 
 namespace Maliev.Intranet.Bff.Clients;

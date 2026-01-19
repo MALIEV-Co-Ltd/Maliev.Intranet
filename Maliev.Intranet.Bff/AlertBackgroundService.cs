@@ -1,6 +1,3 @@
-using Microsoft.AspNetCore.SignalR;
-using Maliev.Intranet.Bff.Hubs;
-
 namespace Maliev.Intranet.Bff;
 
 /// <summary>
@@ -26,7 +23,7 @@ public class AlertBackgroundService(
         {
             // System health status broadcast removed to prevent notification spam.
             // Health status is now visible in the Admin -> System Health dashboard.
-            
+
             await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
         }
     }

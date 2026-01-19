@@ -58,7 +58,7 @@
     }
 
     .chatbot-integrated-card {
-        background-color: var(--mud-palette-surface) !important;
+        background-color: var(--mud-palette-appbar-background) !important;
         border: 1px solid var(--mud-palette-divider) !important;
         height: calc(100vh - 110px) !important; /* Account for AppBar and spacing */
         position: sticky !important;
@@ -195,7 +195,7 @@
     <!-- Unified Chatbot Drawer (Overlay for mobile, Integrated for desktop) -->
     @if (_isMobile)
     {
-        <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End" ClipMode="DrawerClipMode.Never" Elevation="2" Variant="@DrawerVariant.Temporary" Width="100%">
+        <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End" ClipMode="DrawerClipMode.Never" Elevation="3" Variant="@DrawerVariant.Temporary" Width="100%">
             <ChatDrawer IsMobile="true" />
         </MudDrawer>
     }
@@ -220,7 +220,7 @@
             @if (!_isMobile && _chatDrawerOpen)
             {
                 <div class="chatbot-integrated-section d-none d-md-flex flex-column py-6" style="width: 380px; min-width: 380px;">
-                    <MudPaper Elevation="0" Class="chatbot-integrated-card rounded-lg overflow-hidden d-flex flex-column">
+                    <MudPaper Elevation="3" Class="chatbot-integrated-card rounded-lg overflow-hidden d-flex flex-column">
                         <ChatDrawer />
                     </MudPaper>
                 </div>

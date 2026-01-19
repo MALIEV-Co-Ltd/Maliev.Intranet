@@ -1,12 +1,7 @@
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Microsoft.AspNetCore.Components.Authorization;
-using Maliev.Intranet.Client;
 using Maliev.Intranet.Client.Services;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
-using OpenTelemetry;
-using OpenTelemetry.Logs;
-using OpenTelemetry.Resources;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 

@@ -1,6 +1,6 @@
+using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Maliev.Intranet.Shared;
 using System.Text.Json;
 
 namespace Maliev.Intranet.Bff.Controllers;

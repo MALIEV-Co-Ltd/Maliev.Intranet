@@ -1,7 +1,7 @@
+using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Maliev.Intranet.Shared;
-using Maliev.Intranet.Bff.Clients;
 
 namespace Maliev.Intranet.Bff.Controllers;
 

@@ -2,8 +2,6 @@ using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.Google;
-using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
 
 // Initialize bootstrap logging

@@ -1,5 +1,3 @@
-using System;
-
 namespace Maliev.Intranet.Client.Layout;
 
 public interface IThemeLayout
