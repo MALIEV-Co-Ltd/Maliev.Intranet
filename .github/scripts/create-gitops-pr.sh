@@ -24,11 +24,16 @@ if [[ "$ENVIRONMENT" == "Staging" ]]; then
     PR_TITLE="chore(staging): Update $SERVICE_NAME"
     PR_BODY_EXTRA="- **Release**: $SOURCE_BRANCH"
 else
-    BRANCH_NAME="${SERVICE_NAME,,}/${ENVIRONMENT,,}-$COMMIT_SHA"
-    COMMIT_MSG="chore(${ENVIRONMENT,,}): Update $SERVICE_NAME image to $IMAGE_TAG"
-    PR_TITLE="chore(${ENVIRONMENT,,}): Update $SERVICE_NAME"
+    # Use 'dev' instead of 'development' for compatibility with gitops auto-merge
+    ENV_SHORT=${ENVIRONMENT,,}
+    if [[ "$ENV_SHORT" == "development" ]]; then ENV_SHORT="dev"; fi
+    
+    BRANCH_NAME="${SERVICE_NAME,,}/$ENV_SHORT-$COMMIT_SHA"
+    COMMIT_MSG="chore($ENV_SHORT): Update $SERVICE_NAME image to $IMAGE_TAG"
+    PR_TITLE="chore($ENV_SHORT): Update $SERVICE_NAME"
     PR_BODY_EXTRA=""
 fi
+
 
 # Create a new branch for this update
 git checkout -b $BRANCH_NAME
