@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Maliev.Intranet.Bff.Middleware;
 
@@ -40,14 +41,33 @@ public class JwtClaimsEnrichmentMiddleware
             {
                 try
                 {
-                    // Get access token from authentication properties
+                    // Try to get access token from authentication properties first
                     var accessToken = await context.GetTokenAsync("access_token");
+                    
+                    // If not in auth properties, try to get from claims
+                    if (string.IsNullOrEmpty(accessToken))
+                    {
+                        accessToken = context.User.FindFirst("access_token")?.Value;
+                    }
 
                     if (!string.IsNullOrEmpty(accessToken))
                     {
                         // Parse JWT and extract claims
                         var handler = new JwtSecurityTokenHandler();
                         var jwtToken = handler.ReadJwtToken(accessToken);
+                        
+                        // Check if token is expired
+                        if (jwtToken.ValidTo < DateTime.UtcNow)
+                        {
+                            _logger.LogWarning("JWT token expired for user {UserId}. Forcing sign out.", 
+                                context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                            
+                            // Token expired - sign out user to force re-login
+                            await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                            context.Response.Redirect("/login");
+                            return;
+                        }
+                        
                         var identity = context.User.Identity as ClaimsIdentity;
 
                         if (identity != null)
@@ -70,10 +90,27 @@ public class JwtClaimsEnrichmentMiddleware
                             }
                         }
                     }
+                    else
+                    {
+                        // No access token found - this is a stale cookie scenario
+                        _logger.LogWarning("No access token found for authenticated user {UserId}. Forcing sign out.",
+                            context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                        
+                        // Sign out to force re-login
+                        await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        context.Response.Redirect("/login");
+                        return;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to enrich claims from JWT");
+                    _logger.LogError(ex, "Failed to enrich claims from JWT for user {UserId}. Forcing sign out.",
+                        context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                    
+                    // On error, force sign out for safety
+                    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    context.Response.Redirect("/login");
+                    return;
                 }
 
                 // Mark as processed to avoid re-parsing
