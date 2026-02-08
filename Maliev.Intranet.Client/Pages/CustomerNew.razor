@@ -50,10 +50,11 @@
                     <MudTextField T="string" 
                                   Label="Paste Customer Information" 
                                   Variant="Variant.Outlined"
-                                  @bind-Value="_extractionText"
+                                  Value="@_extractionText"
+                                  ValueChanged="@((string val) => { _extractionText = val; StateHasChanged(); })"
                                   Lines="10"
                                   Placeholder="Paste business card, email signature, or any text containing customer details..."
-                                  Class="extraction-textarea" />
+                                  Immediate="true" />
                 </MudItem>
                 
                 <MudItem xs="12" md="6">
@@ -112,7 +113,7 @@
     }
 
     <!-- Form Content with MudForm for validation -->
-    <MudForm @ref="_form" ValidationDelay="0">
+    <MudForm @ref="_form" ValidationDelay="0" Class="mt-6">
         
         <!-- Section 01: Customer Information -->
         <FormSection SectionNumber="01" 
@@ -560,39 +561,41 @@
     </MudForm>
 
     <!-- Spacer for fixed action bar -->
-    <div style="height: 100px;"></div>
+    <div style="height: 120px;"></div>
 </MudContainer>
 
-<!-- Fixed Action Bar -->
-<MudPaper Elevation="8" Class="mud-theme-surface" Style="position: sticky; bottom: 0; z-index: 100; border-top: 1px solid var(--mud-palette-divider); margin: 0 -24px -24px -24px;">
-    <MudContainer MaxWidth="MaxWidth.Large">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="py-4">
-            <MudButton Variant="Variant.Text" 
-                       OnClick="Cancel"
-                       Disabled="@_isSubmitting"
-                       Size="Size.Large">
-                Cancel
-            </MudButton>
-            
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Primary"
-                       Size="Size.Large"
-                       StartIcon="@Icons.Material.Filled.Save"
-                       OnClick="Submit"
-                       Disabled="@(_isSubmitting || !IsFormValid())">
-                @if (_isSubmitting)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    <span>Creating Customer...</span>
-                }
-                else
-                {
-                    <span>Create Customer</span>
-                }
-            </MudButton>
-        </MudStack>
-    </MudContainer>
-</MudPaper>
+<!-- Fixed Action Bar (Pill-shaped) -->
+<div style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; padding: 24px; pointer-events: none;">
+    <div style="max-width: 600px; margin: 0 auto; pointer-events: auto;">
+        <MudPaper Elevation="8" Class="mud-theme-surface" Style="border-radius: 50px; padding: 12px 24px;">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="4">
+                <MudButton Variant="Variant.Text" 
+                           OnClick="Cancel"
+                           Disabled="@_isSubmitting"
+                           Size="Size.Large">
+                    Cancel
+                </MudButton>
+                
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           OnClick="Submit"
+                           Disabled="@(_isSubmitting || !IsFormValid())">
+                    @if (_isSubmitting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Creating Customer...</span>
+                    }
+                    else
+                    {
+                        <span>Create Customer</span>
+                    }
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </div>
+</div>
 
 <style>
     /* Responsive stepper */
