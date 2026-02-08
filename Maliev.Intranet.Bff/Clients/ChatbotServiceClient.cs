@@ -22,18 +22,31 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     /// </summary>
     public async Task<ChatbotSessionResponse?> InitiateSessionAsync(string channel, string language, CancellationToken ct = default)
     {
-        var payload = new { channel, language };
-        var content = JsonContent.Create(payload, options: SnakeCaseOptions);
-
-        var response = await httpClient.PostAsync("/chatbot/v1/sessions/initiate", content, ct);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var errorBody = await response.Content.ReadAsStringAsync(ct);
-            logger.LogError("ChatbotService session initiation failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+            var payload = new { channel, language };
+            var content = JsonContent.Create(payload, options: SnakeCaseOptions);
+
+            var response = await httpClient.PostAsync("/chatbot/v1/sessions/initiate", content, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("ChatbotService session initiation failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<ChatbotSessionResponse>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("ChatbotService session initiation timed out.");
             return null;
         }
-
-        return await response.Content.ReadFromJsonAsync<ChatbotSessionResponse>(SnakeCaseOptions, ct);
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ChatbotService session initiation failed unexpectedly.");
+            return null;
+        }
     }
 
     /// <summary>
@@ -47,26 +60,39 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         object? responseSchema = null,
         CancellationToken ct = default)
     {
-        var payload = new ChatbotSendMessageRequest
+        try
         {
-            SessionId = sessionId,
-            Content = content,
-            Attachments = attachments,
-            ResponseMimeType = responseMimeType,
-            ResponseSchema = responseSchema
-        };
+            var payload = new ChatbotSendMessageRequest
+            {
+                SessionId = sessionId,
+                Content = content,
+                Attachments = attachments,
+                ResponseMimeType = responseMimeType,
+                ResponseSchema = responseSchema
+            };
 
-        var jsonContent = JsonContent.Create(payload, options: SnakeCaseOptions);
+            var jsonContent = JsonContent.Create(payload, options: SnakeCaseOptions);
 
-        var response = await httpClient.PostAsync("/chatbot/v1/messages", jsonContent, ct);
-        if (!response.IsSuccessStatusCode)
+            var response = await httpClient.PostAsync("/chatbot/v1/messages", jsonContent, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("ChatbotService send message failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<ChatbotMessageResponse>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(ct);
-            logger.LogError("ChatbotService send message failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+            logger.LogWarning("ChatbotService send message timed out.");
             return null;
         }
-
-        return await response.Content.ReadFromJsonAsync<ChatbotMessageResponse>(SnakeCaseOptions, ct);
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ChatbotService send message failed unexpectedly.");
+            return null;
+        }
     }
 
     /// <summary>
@@ -80,23 +106,36 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     public async Task<ChatbotExtractCustomerResponse?> ExtractCustomerAsync(
         List<string> storagePaths, string? rawText, List<ChatbotExtractionFileData>? files = null, CancellationToken ct = default)
     {
-        var payload = new ChatbotExtractCustomerRequest
+        try
         {
-            StoragePaths = storagePaths,
-            RawText = rawText,
-            Files = files
-        };
-        var content = JsonContent.Create(payload, options: SnakeCaseOptions);
+            var payload = new ChatbotExtractCustomerRequest
+            {
+                StoragePaths = storagePaths,
+                RawText = rawText,
+                Files = files
+            };
+            var content = JsonContent.Create(payload, options: SnakeCaseOptions);
 
-        var response = await httpClient.PostAsync("/chatbot/v1/extraction/customer", content, ct);
-        if (!response.IsSuccessStatusCode)
+            var response = await httpClient.PostAsync("/chatbot/v1/extraction/customer", content, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("ChatbotService customer extraction failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<ChatbotExtractCustomerResponse>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(ct);
-            logger.LogError("ChatbotService customer extraction failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+            logger.LogWarning("ChatbotService customer extraction timed out.");
             return null;
         }
-
-        return await response.Content.ReadFromJsonAsync<ChatbotExtractCustomerResponse>(SnakeCaseOptions, ct);
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ChatbotService customer extraction failed unexpectedly.");
+            return null;
+        }
     }
 }
 

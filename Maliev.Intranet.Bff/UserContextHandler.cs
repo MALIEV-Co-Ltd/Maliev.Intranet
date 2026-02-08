@@ -77,17 +77,42 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
         }
 
 
-        var response = await base.SendAsync(request, cancellationToken);
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        try
         {
-            logger.LogError("Downstream service returned 401 Unauthorized for {Url}. User: {UserId}", request.RequestUri, userId);
-        }
-        else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-        {
-            logger.LogError("Downstream service returned 403 Forbidden for {Url}. User: {UserId}", request.RequestUri, userId);
-        }
+            var response = await base.SendAsync(request, cancellationToken);
 
-        return response;
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                logger.LogError("Downstream service returned 401 Unauthorized for {Url}. User: {UserId}", request.RequestUri, userId);
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                logger.LogError("Downstream service returned 403 Forbidden for {Url}. User: {UserId}", request.RequestUri, userId);
+            }
+
+            return response;
+        }
+        catch (OperationCanceledException ex)
+        {
+            logger.LogWarning(ex, "Request to downstream service timed out: {Url}. User: {UserId}", request.RequestUri, userId);
+            
+            // Return a 504 Gateway Timeout instead of letting the exception bubble up
+            return new HttpResponseMessage(System.Net.HttpStatusCode.GatewayTimeout)
+            {
+                RequestMessage = request,
+                Content = new StringContent("The request to the downstream service timed out.")
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error calling downstream service: {Url}. User: {UserId}", request.RequestUri, userId);
+            
+            // Return a 503 Service Unavailable for other network errors
+            return new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
+            {
+                RequestMessage = request,
+                Content = new StringContent($"Error calling downstream service: {ex.Message}")
+            };
+        }
     }
 }
