@@ -235,6 +235,10 @@ public class ChatbotExtractedAddress
     public string? Type { get; set; }
     /// <summary>First address line.</summary>
     public string? AddressLine1 { get; set; }
+    /// <summary>Second address line.</summary>
+    public string? AddressLine2 { get; set; }
+    /// <summary>Third address line.</summary>
+    public string? AddressLine3 { get; set; }
     /// <summary>Sub-district.</summary>
     public string? District { get; set; }
     /// <summary>District/city.</summary>

@@ -133,6 +133,8 @@ public class AiProcessingController(
             {
                 Type = a.Type,
                 AddressLine1 = a.AddressLine1,
+                AddressLine2 = a.AddressLine2,
+                AddressLine3 = a.AddressLine3,
                 District = a.District,
                 City = a.City,
                 StateProvince = a.StateProvince,
