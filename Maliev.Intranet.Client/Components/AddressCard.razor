@@ -10,7 +10,18 @@
             @Address.Type
             @if (Address.IsDefault)
             {
-                <span class="default-indicator">• Default</span>
+                @if (Address.Type == "Billing")
+                {
+                    <span class="default-indicator">• Default Billing</span>
+                }
+                else if (Address.Type == "Shipping")
+                {
+                    <span class="default-indicator">• Default Shipping</span>
+                }
+                else
+                {
+                    <span class="default-indicator">• Default</span>
+                }
             }
         </MudChip>
         <MudIconButton Icon="@Icons.Material.Filled.Delete" 
@@ -39,7 +50,7 @@
                          Value="@Address.IsDefault"
                          ValueChanged="@((bool val) => OnDefaultChanged?.Invoke(Index, val))"
                          Color="Color.Primary" 
-                         Label="Set as default address"
+                         Label="@GetDefaultLabel()"
                          Class="mt-4" />
         </MudItem>
 
@@ -289,6 +300,14 @@
         "Shipping" => Color.Secondary,
         "Both" => Color.Info,
         _ => Color.Default
+    };
+
+    private string GetDefaultLabel() => Address.Type switch
+    {
+        "Billing" => "Set as default billing address",
+        "Shipping" => "Set as default shipping address",
+        "Both" => "Set as default address",
+        _ => "Set as default address"
     };
 
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;

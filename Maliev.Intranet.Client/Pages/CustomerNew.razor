@@ -10,25 +10,23 @@
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16">
     
     <!-- Page Header with Progress -->
-    <MudPaper Elevation="0" Class="mb-6 pb-4">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="4" Class="flex-wrap">
-            <MudStack Spacing="1">
-                <MudText Typo="Typo.h4">Create New Customer</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-uppercase" Style="letter-spacing: 0.05em; font-weight: 500;">Complete onboarding workflow</MudText>
-            </MudStack>
-            <MudStepper @ref="_stepper" NonLinear="true" ActiveIndex="@_activeStepIndex" ActiveIndexChanged="OnStepChanged">
-                <MudStep Title="Extract" />
-                <MudStep Title="Details" />
-                <MudStep Title="Review" />
-            </MudStepper>
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="4" Class="flex-wrap mb-6 pb-4">
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.h4">Create New Customer</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-uppercase" Style="letter-spacing: 0.05em; font-weight: 500;">Complete onboarding workflow</MudText>
         </MudStack>
-    </MudPaper>
+        <MudStepper @ref="_stepper" NonLinear="true" ActiveIndex="@_activeStepIndex" ActiveIndexChanged="OnStepChanged">
+            <MudStep Title="Extract" />
+            <MudStep Title="Details" />
+            <MudStep Title="Review" />
+        </MudStepper>
+    </MudStack>
 
     <!-- Two-column layout: AI Extraction (sticky) + Form -->
     <MudGrid Spacing="4">
         
         <!-- Left Column: AI Extraction (Sticky on Desktop) -->
-        <MudItem xs="12" lg="4">
+        <MudItem xs="12" lg="3">
             <div style="position: sticky; top: 24px;">
                 @if (_chatbotServiceAvailable)
                 {
@@ -44,10 +42,10 @@
                             
                             @if (_extractionConfidence > 0)
                             {
-                                <MudChip T="string" Color="Color.Success" Size="Size.Large" Style="width: 100%; justify-content: center;">
+                                <MudChip T="string" Color="Color.Success" Size="Size.Medium" Style="width: 100%; justify-content: center;">
                                     <MudStack Spacing="0" AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.h6" Style="font-weight: 700; line-height: 1;">@((_extractionConfidence * 100).ToString("F0"))%</MudText>
-                                        <MudText Typo="Typo.caption">Confidence</MudText>
+                                        <MudText Typo="Typo.body1" Style="font-weight: 700; line-height: 1;">@((_extractionConfidence * 100).ToString("F0"))%</MudText>
+                                        <MudText Typo="Typo.caption" Style="font-size: 0.7rem;">Confidence</MudText>
                                     </MudStack>
                                 </MudChip>
                             }
@@ -59,29 +57,30 @@
                                           ValueChanged="@((string val) => { _extractionText = val; StateHasChanged(); })"
                                           Lines="8"
                                           Placeholder="Paste business card, email signature, or any text containing customer details..."
-                                          Immediate="true" />
+                                          Immediate="true"
+                                          Style="font-size: 14px;" />
                             
                             <MudStack Spacing="2">
-                                <MudText Typo="Typo.body2" Class="text-uppercase" Color="Color.Secondary" Style="font-weight: 600; letter-spacing: 0.05em; font-size: 0.75rem;">OR UPLOAD DOCUMENTS</MudText>
+                                <MudText Typo="Typo.body2" Class="text-uppercase" Color="Color.Secondary" Style="font-weight: 600; letter-spacing: 0.05em; font-size: 0.7rem;">OR UPLOAD DOCUMENTS</MudText>
                                 <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
                                                FilesChanged="OnExtractionFilesSelected" 
                                                Accept=".pdf,.jpg,.jpeg,.png" 
                                                MaximumFileCount="5">
                                     <ActivatorContent>
-                                        <MudPaper Outlined="true" Class="pa-6 text-center cursor-pointer" Style="border: 2px dashed var(--mud-palette-divider); min-height: 140px; transition: all 0.2s;">
+                                        <MudPaper Outlined="true" Class="pa-4 text-center cursor-pointer" Style="border: 2px dashed var(--mud-palette-divider); min-height: 120px; transition: all 0.2s;">
                                             <MudStack Spacing="2" AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;">
-                                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Secondary" Style="opacity: 0.5;" />
-                                                <MudText Typo="Typo.body2">
+                                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Medium" Color="Color.Secondary" Style="opacity: 0.5;" />
+                                                <MudText Typo="Typo.body2" Style="font-size: 0.875rem;">
                                                     @if (_extractionFiles.Any())
                                                     {
-                                                        <strong>@_extractionFiles.Count file(s) selected</strong>
+                                                        <strong>@_extractionFiles.Count file(s)</strong>
                                                     }
                                                     else
                                                     {
-                                                        <span>Drop files or click to upload</span>
+                                                        <span>Drop or click</span>
                                                     }
                                                 </MudText>
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">PDF, JPG, PNG (max 5 files)</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 0.7rem;">PDF, JPG, PNG</MudText>
                                             </MudStack>
                                         </MudPaper>
                                     </ActivatorContent>
@@ -91,7 +90,7 @@
                             <MudButton Variant="Variant.Filled" 
                                        Color="Color.Primary"
                                        FullWidth="true"
-                                       Size="Size.Large"
+                                       Size="Size.Medium"
                                        StartIcon="@Icons.Material.Filled.Psychology"
                                        OnClick="ExtractCustomerData"
                                        Disabled="@(_isExtracting || !HasExtractionInput())">
@@ -118,7 +117,7 @@
         </MudItem>
 
         <!-- Right Column: Form Content -->
-        <MudItem xs="12" lg="8">
+        <MudItem xs="12" lg="9">
             <MudForm @ref="_form" ValidationDelay="0">
         
         <!-- Section 01: Customer Information -->
