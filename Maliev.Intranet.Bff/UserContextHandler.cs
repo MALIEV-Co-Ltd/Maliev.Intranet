@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 
 namespace Maliev.Intranet.Bff;
+
 
 /// <summary>
 /// HTTP message handler that propagates user identity context to downstream services.
@@ -31,29 +33,49 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
             return await base.SendAsync(request, cancellationToken);
         }
 
-        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = user.FindFirst("user_id")?.Value ?? user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!string.IsNullOrEmpty(userId) && !request.Headers.Contains("X-User-Id"))
         {
             request.Headers.Add("X-User-Id", userId);
         }
 
-        // Retrieve the JWT from the user's claims and attach as Bearer token
+        // 1. Try to get token from claims (access_token claim)
         var accessToken = user.FindFirst("access_token")?.Value;
+        
+        // 2. Try to get token from AuthenticationProperties (requires SaveTokens = true)
+        if (string.IsNullOrEmpty(accessToken))
+        {
+            accessToken = await httpContext.GetTokenAsync("access_token");
+        }
+        
+        // 3. Fallback: Check if the incoming request already has a Bearer token
+        if (string.IsNullOrEmpty(accessToken))
+        {
+            var authHeader = httpContext.Request.Headers.Authorization.FirstOrDefault();
+            if (authHeader?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                accessToken = authHeader[7..];
+            }
+        }
+
+
         if (!string.IsNullOrEmpty(accessToken))
         {
             if (request.Headers.Authorization == null)
             {
+                logger.LogDebug("Attaching platform JWT for user {UserId} to request {Url}", userId, request.RequestUri);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
             }
         }
         else
         {
-            logger.LogWarning("Access token is missing in user claims for user {UserId}", userId);
+            logger.LogError("CRITICAL: Access token is missing in user claims for authenticated user {UserId}. Downstream calls will likely fail with 401.", userId);
 
             // Log available claims for debugging
             var claimTypes = user.Claims.Select(c => c.Type).ToList();
             logger.LogDebug("Available claims for user {UserId}: {Claims}", userId, string.Join(", ", claimTypes));
         }
+
 
         var response = await base.SendAsync(request, cancellationToken);
 

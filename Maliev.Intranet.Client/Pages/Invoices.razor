@@ -22,12 +22,12 @@
     </MudStack>
 </MudPaper>
 
-<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
     <MudTabs Elevation="0" Rounded="false" PanelClass="pa-0" Class="border-b mud-border-lines-default">
         <MudTabPanel Text="All" Icon="@Icons.Material.Outlined.List" />
-        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="2" BadgeColor="Color.Default" />
-        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" BadgeData="15" BadgeColor="Color.Primary" />
-        <MudTabPanel Text="Overdue" Icon="@Icons.Material.Outlined.Warning" BadgeData="3" BadgeColor="Color.Error" />
+        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="@(_invoices.Count(x => x.Status == "Draft") > 0 ? _invoices.Count(x => x.Status == "Draft") : null)" BadgeColor="Color.Default" />
+        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" BadgeData="@(_invoices.Count(x => x.Status == "Sent") > 0 ? _invoices.Count(x => x.Status == "Sent") : null)" BadgeColor="Color.Primary" />
+        <MudTabPanel Text="Overdue" Icon="@Icons.Material.Outlined.Warning" BadgeData="@(_invoices.Count(x => x.Status == "Overdue") > 0 ? _invoices.Count(x => x.Status == "Overdue") : null)" BadgeColor="Color.Error" />
         <MudTabPanel Text="Paid" Icon="@Icons.Material.Outlined.CheckCircle" />
     </MudTabs>
 

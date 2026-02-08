@@ -1,7 +1,7 @@
 @page "/permissions"
 @using Microsoft.AspNetCore.Authorization
 @using Maliev.Intranet.Shared
-@attribute [Authorize(Policy = MalievPermissions.Iam.Manage)]
+@attribute [RequirePermission(MalievPermissions.Iam.Manage)]
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject ILogger<Permissions> Logger
@@ -25,16 +25,17 @@
                     {
                         <MudListItem Icon="@Icons.Material.Filled.Badge">
                             <div class="d-flex flex-column">
-                                <MudText Typo="Typo.body1">@role.Name</MudText>
+                                <MudText Typo="Typo.body1">@role.RoleId</MudText>
                                 <MudText Typo="Typo.caption">@role.Description</MudText>
                                 <div class="mt-1">
-                                    @foreach (var p in role.Permissions)
+                                    @foreach (var p in role.PermissionIds)
                                     {
                                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@p</MudChip>
                                     }
                                 </div>
                             </div>
                         </MudListItem>
+
                         <MudDivider />
                     }
                 </MudList>
@@ -56,10 +57,11 @@
                         <MudTh>Permission</MudTh>
                         <MudTh>Description</MudTh>
                     </HeaderContent>
-                    <RowTemplate>
-                        <MudTd><code>@context.Name</code></MudTd>
-                        <MudTd>@context.Description</MudTd>
-                    </RowTemplate>
+                     <RowTemplate>
+                         <MudTd><code>@context.PermissionId</code></MudTd>
+                         <MudTd>@context.Description</MudTd>
+                     </RowTemplate>
+
                 </MudTable>
             }
         </MudCard>

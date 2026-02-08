@@ -85,7 +85,8 @@
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.h6" Class="mb-4">Predicted Price</MudText>
                     <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
-                        <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">${_predictedPrice:N2}</MudText>
+                        <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">$@_predictedPrice.ToString("N2")</MudText>
+
                         <MudText Typo="Typo.h6" Color="Color.Secondary" Class="pb-1">USD per unit</MudText>
                     </MudStack>
                     <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
@@ -107,25 +108,26 @@
                     <MudStack Spacing="2">
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Material Cost</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">${(_predictedPrice * 0.35m):N2}</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">$@((_predictedPrice * 0.35m).ToString("N2"))</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Labor & Machine Time</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">${(_predictedPrice * 0.40m):N2}</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">$@((_predictedPrice * 0.40m).ToString("N2"))</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Overhead</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">${(_predictedPrice * 0.15m):N2}</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">$@((_predictedPrice * 0.15m).ToString("N2"))</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Margin</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">${(_predictedPrice * 0.10m):N2}</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">$@((_predictedPrice * 0.10m).ToString("N2"))</MudText>
                         </MudStack>
                         <MudDivider Class="my-2" />
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">Total (Qty: @_quantity)</MudText>
-                            <MudText Typo="Typo.subtitle1" Color="Color.Primary" Style="font-weight: 700;">${(_predictedPrice * _quantity):N2}</MudText>
+                            <MudText Typo="Typo.subtitle1" Color="Color.Primary" Style="font-weight: 700;">$@((_predictedPrice * _quantity).ToString("N2"))</MudText>
                         </MudStack>
+
                     </MudStack>
                 </MudPaper>
 
@@ -164,43 +166,27 @@
         _hasResults = false;
         StateHasChanged();
 
-        await Task.Delay(1500); // Simulate AI processing
-
-        // Mock prediction - will be replaced with real PredictionService
-        var volume = _length * _width * _height / 1000000; // cm³
-        var basePrice = _selectedProcess switch
+        try
         {
-            "3D-FDM" => 0.15m,
-            "3D-SLA" => 0.25m,
-            "CNC" => 0.50m,
-            "SheetMetal" => 0.30m,
-            _ => 0.20m
-        };
-
-        var materialMultiplier = _selectedMaterial switch
+            // TODO: Replace with real PredictionService call via BFF
+            // var result = await Http.PostAsJsonAsync("api/pricing/predict", new { Material = _selectedMaterial, ... });
+            // _predictedPrice = await result.Content.ReadFromJsonAsync<decimal>();
+            
+            await Task.Delay(1500); // Latency for UX
+            
+            // For now, return 0 as database is empty and service is not yet wired
+            _predictedPrice = 0;
+            _confidence = 0;
+            _similarOrders = 0;
+            _hasResults = true;
+        }
+        catch (Exception ex)
         {
-            "PLA" => 1.0m,
-            "ABS" => 1.2m,
-            "PETG" => 1.3m,
-            "Nylon" => 1.5m,
-            "Aluminum" => 2.0m,
-            "Steel" => 2.5m,
-            _ => 1.0m
-        };
-
-        var finishMultiplier = _selectedFinish switch
+            Console.WriteLine($"Error calculating pricing: {ex.Message}");
+        }
+        finally
         {
-            "Standard" => 1.0m,
-            "Polished" => 1.3m,
-            "Anodized" => 1.5m,
-            "Powder Coated" => 1.4m,
-            _ => 1.0m
-        };
-
-        _predictedPrice = (decimal)volume * basePrice * materialMultiplier * finishMultiplier + 5.0m;
-        _confidence = new Random().Next(85, 96);
-        _similarOrders = new Random().Next(45, 120);
-        _hasResults = true;
-        _isCalculating = false;
+            _isCalculating = false;
+        }
     }
 }

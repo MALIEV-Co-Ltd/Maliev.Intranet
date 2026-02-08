@@ -1,3 +1,4 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,6 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for quotation-related operations, proxying to the Quotation Service.
 /// </summary>
 /// <param name="client">The quotation service client.</param>
-[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class QuotationsController(QuotationServiceClient client) : ControllerBase
@@ -20,6 +20,7 @@ public class QuotationsController(QuotationServiceClient client) : ControllerBas
     /// <param name="page">The page number.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <returns>A paged list of quotations.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<QuotationSummaryDto>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
@@ -32,6 +33,7 @@ public class QuotationsController(QuotationServiceClient client) : ControllerBas
     /// </summary>
     /// <param name="id">The quotation ID.</param>
     /// <returns>The quotation details.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<QuotationDetailDto>> GetById(Guid id)
     {

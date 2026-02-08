@@ -4,19 +4,40 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ChatService ChatService
+@inject HttpClient Http
 @implements IDisposable
 
 <div class="d-flex flex-column" style="height: 100%; overflow: hidden;">
     <!-- Header Area -->
     <div class="pa-4 pb-0">
-        <MudStack Spacing="0">
-            <MudText Typo="Typo.h6" Style="line-height: 1.1;">Assistant</MudText>
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Context: @ChatService.CurrentContext</MudText>
-        </MudStack>
+        <div class="d-flex align-center justify-space-between">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h6" Style="line-height: 1.1;">Assistant</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Context: @ChatService.CurrentContext</MudText>
+            </MudStack>
+            @if (!IsMobile)
+            {
+                <MudIconButton Icon="@(IsExpanded ? Icons.Material.Filled.CloseFullscreen : Icons.Material.Filled.OpenInFull)"
+                               Size="Size.Small"
+                               Color="Color.Secondary"
+                               OnClick="@(() => IsExpandedChanged.InvokeAsync(!IsExpanded))" />
+            }
+        </div>
         <MudDivider Class="mt-2" />
     </div>
 
-    <!-- Chat Messages Area -->
+    @if (!_isAiAvailable)
+    {
+        <!-- AI Unavailable Message -->
+        <div class="flex-grow-1 d-flex align-center justify-center pa-4">
+            <MudAlert Severity="Severity.Warning" Dense="false" Class="mt-2">
+                <MudText>AI Assistant is currently unavailable. Unable to establish a connection with the chatbot service.</MudText>
+            </MudAlert>
+        </div>
+    }
+    else
+    {
+        <!-- Chat Messages Area -->
     <div class="flex-grow-1 px-4 py-4" style="overflow-y: auto;">
         <MudChat ChatPosition="ChatBubblePosition.Start">
              <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
@@ -53,16 +74,48 @@
                     <div style="white-space: pre-wrap;">@message.Text</div>
                 </MudChatBubble>
             </MudChat>
+
+            @if (message.SuggestedActions != null && message.SuggestedActions.Count > 0)
+            {
+                <div class="d-flex flex-wrap gap-1 mt-1 mb-2 ml-12">
+                    @foreach (var action in message.SuggestedActions)
+                    {
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => HandleSuggestedAction(action.Text))">
+                            @action.Text
+                        </MudButton>
+                    }
+                </div>
+            }
+        }
+
+        @if (ChatService.IsLoading)
+        {
+            <MudChat ChatPosition="ChatBubblePosition.Start">
+                <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
+                    <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
+                </MudAvatar>
+                <MudChatBubble>
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" Style="width: 120px;" />
+                </MudChatBubble>
+            </MudChat>
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_errorMessage</MudAlert>
         }
     </div>
 
-    <!-- Bottom Input Area (Redesigned) -->
+    <!-- Bottom Input Area -->
     <div class="pa-4 mt-auto @(IsMobile ? "mb-16" : "")">
         <MudPaper Elevation="0" Class="rounded-xl pa-2 chat-input-container border border-solid mud-border-lines-default" Style="background-color: var(--mud-palette-surface);">
             <div class="px-2 pt-1">
-                <MudTextField @bind-Value="_currentInput" 
-                              Placeholder="Ask anything" 
-                              Variant="Variant.Text" 
+                <MudTextField @bind-Value="_currentInput"
+                              Placeholder="Ask anything"
+                              Variant="Variant.Text"
                               Underline="false"
                               Lines="1"
                               AutoGrow="true"
@@ -70,6 +123,7 @@
                               OnKeyDown="@HandleKeyDown"
                               Immediate="true"
                               autocomplete="off"
+                              Disabled="@ChatService.IsLoading"
                               Class="mt-0"
                               Style="font-size: 0.95rem;" />
             </div>
@@ -87,25 +141,27 @@
                 </div>
 
                 <div class="send-button-wrapper">
-                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" 
-                                   OnClick="@SendMessage" 
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                   OnClick="@SendMessage"
                                    Class="send-button-square"
-                                   Size="Size.Small" />
+                                   Size="Size.Small"
+                                   Disabled="@ChatService.IsLoading" />
                 </div>
             </div>
         </MudPaper>
-        
+
         <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="d-block mt-2" Style="font-size: 0.75rem;">
             AI can make mistakes. Please double-check responses.
         </MudText>
     </div>
+    }
 </div>
 
 <style>
     .chat-input-container {
         transition: box-shadow 0.2s;
     }
-    
+
     .chat-input-container:focus-within {
         box-shadow: 0 0 0 1px var(--mud-palette-primary) !important;
     }
@@ -134,15 +190,19 @@
 
 @code {
     [Parameter] public bool IsMobile { get; set; }
+    [Parameter] public bool IsExpanded { get; set; }
+    [Parameter] public EventCallback<bool> IsExpandedChanged { get; set; }
 
     private string _currentInput = "";
     private string? _userPicture;
     private string? _userName;
+    private string? _errorMessage;
+    private bool _isAiAvailable = false;
 
     protected override async Task OnInitializedAsync()
     {
         ChatService.OnChange += StateHasChanged;
-        
+
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
         if (user.Identity?.IsAuthenticated == true)
@@ -150,11 +210,88 @@
             _userPicture = user.FindFirst("picture")?.Value;
             _userName = user.Identity.Name;
         }
+
+        // Check if AI service is available by attempting to initiate a session
+        await CheckAiAvailability();
     }
+
+    private async Task CheckAiAvailability()
+    {
+        try
+        {
+            var response = await Http.GetAsync("api/aiprocessing/health");
+            if (response.IsSuccessStatusCode)
+            {
+                var healthData = await response.Content.ReadFromJsonAsync<AiHealthResponse>();
+                _isAiAvailable = healthData?.CanInitiateSession ?? false;
+            }
+            else
+            {
+                _isAiAvailable = false;
+            }
+        }
+        catch
+        {
+            _isAiAvailable = false;
+        }
+    }
+
+    private class AiHealthResponse
+    {
+        public string Status { get; set; } = string.Empty;
+        public string Service { get; set; } = string.Empty;
+        public Guid? SessionId { get; set; }
+        public bool CanInitiateSession { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private static readonly Dictionary<string, string> PageNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["/"] = "Dashboard",
+        ["/sales/customers"] = "Customers",
+        ["/sales/customers/new"] = "Create New Customer",
+        ["/sales/orders"] = "Orders",
+        ["/sales/quotations"] = "Quotations",
+        ["/sales/pricing-ai"] = "AI Pricing",
+        ["/finance/invoices"] = "Invoices",
+        ["/finance/payments"] = "Payments",
+        ["/finance/receipts"] = "Receipts",
+        ["/finance/ledger"] = "Ledger",
+        ["/mfg/materials"] = "Materials",
+        ["/mfg/suppliers"] = "Suppliers",
+        ["/mfg/procurement"] = "Procurement",
+        ["/mfg/models"] = "3D Models",
+        ["/hr/employees"] = "Employees",
+        ["/hr/directory"] = "Directory",
+        ["/hr/onboarding"] = "Onboarding",
+        ["/hr/recruitment"] = "Recruitment",
+        ["/hr/compensation"] = "Compensation",
+        ["/hr/performance"] = "Performance",
+        ["/hr/compliance"] = "Compliance",
+        ["/hr/time-off"] = "Time Off",
+        ["/admin/iam"] = "Identity & Access",
+        ["/admin/reference-data"] = "Reference Data",
+        ["/admin/notifications"] = "Notification Templates",
+        ["/admin/system-health"] = "System Health",
+        ["/permissions"] = "Permissions",
+    };
 
     private string GetPageName()
     {
-        return ChatService.CurrentContext.Trim('/').Split('/').LastOrDefault() ?? "Home";
+        var path = ChatService.CurrentContext.TrimEnd('/');
+        if (string.IsNullOrEmpty(path)) path = "/";
+
+        // Exact match
+        if (PageNames.TryGetValue(path, out var name))
+            return name;
+
+        // Customer detail page: /sales/customers/{guid}
+        if (path.StartsWith("/sales/customers/", StringComparison.OrdinalIgnoreCase) && path.Length > 18)
+            return "Customer Details";
+
+        // Fallback: humanize the last segment
+        var lastSegment = path.Split('/').LastOrDefault() ?? "Home";
+        return char.ToUpper(lastSegment[0]) + lastSegment[1..].Replace("-", " ");
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -169,21 +306,36 @@
     private async Task SendMessage()
     {
         var input = _currentInput;
-        if (string.IsNullOrWhiteSpace(input)) return;
+        if (string.IsNullOrWhiteSpace(input) || ChatService.IsLoading) return;
 
-        _currentInput = ""; // Clear immediately
+        _currentInput = "";
+        _errorMessage = null;
         ChatService.AddMessage(input, true);
-        
-        // Mock response
-        _ = Task.Delay(500).ContinueWith(_ =>
+
+        try
         {
-            InvokeAsync(() =>
+            var response = await ChatService.SendMessageAsync(input);
+            if (response != null)
             {
-                ChatService.AddMessage($"I'm a mockup assistant. You asked about '{input}' while on the {GetPageName()} page. Integration with Maliev.Chatbot is coming soon!", false);
-            });
-        });
-        
+                ChatService.AddMessage(response.Content, false, response.SuggestedActions);
+            }
+            else
+            {
+                _errorMessage = "Failed to get a response. Please try again.";
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Something went wrong. Please try again.";
+        }
+
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleSuggestedAction(string actionText)
+    {
+        _currentInput = actionText;
+        await SendMessage();
     }
 
     private void UploadFiles(IReadOnlyList<IBrowserFile> files)

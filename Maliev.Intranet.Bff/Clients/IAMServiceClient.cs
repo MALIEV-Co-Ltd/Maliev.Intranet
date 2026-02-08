@@ -40,6 +40,27 @@ public class IAMServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Gets the total count of principals for bootstrapping purposes.
+    /// </summary>
+    public async Task<int> GetPrincipalCountAsync(CancellationToken ct = default)
+    {
+        var response = await httpClient.GetFromJsonAsync<BootstrapStatusDto>("/iam/v1/principals/bootstrap/status", ct);
+        return response?.Count ?? 0;
+    }
+
+    /// <summary>
+    /// Promotes the current user to IAM Admin if it's the first user.
+    /// </summary>
+    public async Task<bool> PromoteCallerToAdminAsync(CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsync("/iam/v1/principals/bootstrap/promote", null, ct);
+        return response.IsSuccessStatusCode;
+    }
+
+    private record BootstrapStatusDto(int Count);
+
+
+    /// <summary>
     /// Retrieves role bindings for a principal.
     /// </summary>
     public async Task<List<RoleBindingDto>> GetPrincipalRolesAsync(Guid principalId, CancellationToken ct = default)

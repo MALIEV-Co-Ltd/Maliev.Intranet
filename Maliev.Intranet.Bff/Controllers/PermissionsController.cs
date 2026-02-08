@@ -1,3 +1,4 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for managing permissions and roles via IAM service.
 /// </summary>
 /// <param name="client">The IAM service client.</param>
-[Authorize(Policy = MalievPermissions.Iam.Manage)] // Only those with explicit IAM management permission
+[RequirePermission(MalievPermissions.Iam.Manage, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [Route("api/[controller]")]
 public class PermissionsController(IAMServiceClient client) : ControllerBase

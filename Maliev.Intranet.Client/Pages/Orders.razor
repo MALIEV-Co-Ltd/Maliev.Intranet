@@ -1,3 +1,4 @@
+@using Maliev.Intranet.Client.Helpers
 @page "/sales/orders"
 @using Maliev.Intranet.Shared
 @inject HttpClient Http
@@ -61,7 +62,7 @@ else
                 <MudCardContent>
                     <MudText Typo="Typo.body1" Style="font-weight: 600;">@context.OrderNumber</MudText>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">@context.CustomerName</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">@context.TotalAmount.ToString("C")</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">@ThaiCurrency.Format(context.TotalAmount, 2)</MudText>
                 </MudCardContent>
             </MudCard>
         </ItemRenderer>

@@ -1,3 +1,4 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for order-related operations, proxying to the Order Service.
 /// </summary>
 /// <param name="client">The order service client.</param>
-[Authorize(Policy = MalievPermissions.Order.Read)]
+[RequirePermission(MalievPermissions.Order.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [Route("api/[controller]")]
 public class OrdersController(OrderServiceClient client) : ControllerBase

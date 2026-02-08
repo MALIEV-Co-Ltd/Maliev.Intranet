@@ -24,12 +24,12 @@
     </MudStack>
 </MudPaper>
 
-<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
     <MudTabs Elevation="0" Rounded="false" PanelClass="pa-0" Class="border-b mud-border-lines-default">
         <MudTabPanel Text="All" Icon="@Icons.Material.Outlined.List" />
-        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="3" BadgeColor="Color.Default" />
-        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" BadgeData="8" BadgeColor="Color.Primary" />
-        <MudTabPanel Text="Accepted" Icon="@Icons.Material.Outlined.CheckCircle" BadgeData="12" BadgeColor="Color.Success" />
+        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="@(_quotations.Count(x => x.Status == "Draft") > 0 ? _quotations.Count(x => x.Status == "Draft") : null)" BadgeColor="Color.Default" />
+        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" BadgeData="@(_quotations.Count(x => x.Status == "Sent") > 0 ? _quotations.Count(x => x.Status == "Sent") : null)" BadgeColor="Color.Primary" />
+        <MudTabPanel Text="Accepted" Icon="@Icons.Material.Outlined.CheckCircle" BadgeData="@(_quotations.Count(x => x.Status == "Accepted") > 0 ? _quotations.Count(x => x.Status == "Accepted") : null)" BadgeColor="Color.Success" />
         <MudTabPanel Text="Expired" Icon="@Icons.Material.Outlined.EventBusy" />
     </MudTabs>
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
@@ -13,11 +14,12 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(IHttpClientFactory httpClientFactory, ILogger<AuthController> logger) : ControllerBase
+public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnvironment env, ILogger<AuthController> logger) : ControllerBase
 {
     /// <summary>
     /// Initiates the login process using Google Workspace.
     /// </summary>
+    [AllowAnonymous]
     [HttpGet("login")]
     public IActionResult Login([FromQuery] string returnUrl = "/")
     {
@@ -31,6 +33,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, ILogger<AuthCo
     /// <summary>
     /// Authenticates a user using standard corporate credentials by proxying to AuthService.
     /// </summary>
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> LoginStandard([FromBody] InternalLoginRequest request)
     {
@@ -99,12 +102,36 @@ public class AuthController(IHttpClientFactory httpClientFactory, ILogger<AuthCo
             authProperties);
 
         logger.LogInformation("User {Username} logged in successfully", request.Username);
+
+        // Auto-bootstrap: promote first employee to platform owner in Development
+        // Calls promote directly — the IAM endpoint has its own guard (humanUsers.Count <= 1)
+        if (env.IsDevelopment())
+        {
+            try
+            {
+                using var bootstrapClient = httpClientFactory.CreateClient("IAMServiceBootstrap");
+                bootstrapClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResult.AccessToken);
+
+                var promoteResp = await bootstrapClient.PostAsync("/iam/v1/principals/bootstrap/promote", null);
+                if (promoteResp.IsSuccessStatusCode)
+                {
+                    logger.LogInformation("Auto-bootstrapped first user {Username} as platform owner", request.Username);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Bootstrap auto-promotion check failed for {Username} (non-fatal)", request.Username);
+            }
+        }
+
         return Ok();
     }
 
     /// <summary>
     /// Logs out the current user.
     /// </summary>
+    [AllowAnonymous]
     [HttpGet("logout")]
     public async Task<IActionResult> Logout()
     {

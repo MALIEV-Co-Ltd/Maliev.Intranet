@@ -64,7 +64,7 @@
                             </div>
                             <div>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Phone number</MudText>
-                                <MudText Typo="Typo.body2">@(_customer.Phone ?? "Not provided")</MudText>
+                                <MudText Typo="Typo.body2">@(_customer.Mobile ?? _customer.Landline ?? "Not provided")</MudText>
                             </div>
                             <div>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Segment / Tier</MudText>

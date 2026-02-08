@@ -1,7 +1,15 @@
+using Maliev.Aspire.ServiceDefaults;
 using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Extensions;
+using Maliev.Intranet.Bff.Middleware;
 using Maliev.Intranet.Shared;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Hosting;
 using MudBlazor.Services;
 
 // Initialize bootstrap logging
@@ -15,6 +23,7 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     // Add shared secrets from Aspire AppHost directory during local development
+
     if (builder.Environment.IsDevelopment())
     {
         var sharedSecretsPath = Path.Combine(builder.Environment.ContentRootPath, "..", "..", "Maliev.Aspire", "Maliev.Aspire.AppHost", "sharedsecrets.json");
@@ -24,7 +33,7 @@ try
         }
     }
 
-    // Add Service Defaults (OpenTelemetry, Health Checks, etc.)
+    // Add Service Defaults (OpenTelemetry, health checks, etc.)
     builder.AddServiceDefaults();
     builder.AddServiceMeters("intranet-meter");
 
@@ -33,159 +42,165 @@ try
     builder.Services.AddHostedService<AlertBackgroundService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
+    builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
     builder.Services.AddSignalR();
     builder.Services.AddMudServices();
 
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddTransient<UserContextHandler>();
+    builder.Services.AddTransient<Maliev.Intranet.Bff.Handlers.CookieForwardingHandler>();
+
+    // Use ephemeral data protection in development to ensure cookies are invalidated on restart
+
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.AddDataProtection()
+            .UseEphemeralDataProtectionProvider();
+    }
 
     // Configure Authentication
-    builder.AddJwtAuthentication(); // Standard platform JWT support
+    builder.AddIAMServiceClient("IntranetBff");
+
+    // Register IAM management client for admin operations
+    builder.Services.AddHttpClient<Maliev.Intranet.Bff.Clients.IAMServiceClient>(client =>
+    {
+        client.BaseAddress = new Uri("http://IAMService");
+    })
+    .AddServiceDiscovery();
+
+    // Named client for IAM bootstrap (no UserContextHandler - token attached manually)
+    builder.Services.AddHttpClient("IAMServiceBootstrap", client =>
+    {
+        client.BaseAddress = new Uri("http://IAMService");
+    })
+    .AddServiceDiscovery();
+
+    // AddJwtAuthentication registers JwtBearerDefaults.AuthenticationScheme ("Bearer")
+    builder.AddJwtAuthentication(); 
+    builder.Services.AddPermissionAuthorization();
 
     builder.Services.AddAuthentication(options =>
     {
-        // Default to Cookies for the web UI
-        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        // Use a policy scheme to choose between Cookies and JWT Bearer for authentication
+        options.DefaultAuthenticateScheme = "SmartScheme";
+        // Always challenge and forbid using Cookies to ensure browser redirects
+        options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultSignOutScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     })
+    .AddPolicyScheme("SmartScheme", "SmartScheme", options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
+            if (authHeader?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return JwtBearerDefaults.AuthenticationScheme;
+            }
+
+            // Default to Cookies for all browser-based requests
+            return CookieAuthenticationDefaults.AuthenticationScheme;
+        };
+    })
+
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
     {
         options.LoginPath = "/login";
+        options.Cookie.Name = "Maliev.Intranet.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        // Add cookie size limits to prevent 431 errors
+        options.Cookie.MaxAge = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromHours(1);
     })
     .AddGoogle(options =>
     {
         options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? throw new InvalidOperationException("Google ClientId not configured");
         options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? throw new InvalidOperationException("Google ClientSecret not configured");
+
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+        options.SaveTokens = false; // Don't store OAuth tokens in cookie - reduces cookie size
+        
+        options.Events.OnRedirectToAuthorizationEndpoint = context =>
+        {
+            context.Response.Redirect(context.RedirectUri + "&prompt=select_account");
+            return Task.CompletedTask;
+        };
+        
         options.Events.OnTicketReceived = async context =>
         {
             var email = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
             var fullName = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
             var googleUserId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var picture = context.Principal?.FindFirst("picture")?.Value;
-
             var identity = context.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
 
-            // Ensure standard email claim is present for internal logic
             if (!string.IsNullOrEmpty(email) && identity != null && !identity.HasClaim(c => c.Type == "email"))
-            {
                 identity.AddClaim(new System.Security.Claims.Claim("email", email));
-            }
-
-            if (!string.IsNullOrEmpty(picture) && identity != null && !identity.HasClaim(c => c.Type == "picture"))
-            {
-                identity.AddClaim(new System.Security.Claims.Claim("picture", picture));
-            }
 
             if (string.IsNullOrEmpty(email) || !email.EndsWith("@maliev.com"))
             {
-                context.Fail("Unauthorized domain. Only @maliev.com accounts are allowed.");
+                context.Fail("Unauthorized domain.");
                 return;
             }
 
-            // Exchange Google token for Maliev Platform JWT
             var httpClientFactory = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
             var authClient = httpClientFactory.CreateClient("AuthService");
 
             try
             {
-                var exchangeRequest = new
-                {
-                    email = email,
-                    full_name = fullName,
-                    google_user_id = googleUserId
-                };
-
-                var response = await authClient.PostAsJsonAsync("/auth/v1/exchange/google", exchangeRequest);
-
+                var response = await authClient.PostAsJsonAsync("/auth/v1/exchange/google", new { email, full_name = fullName, google_user_id = googleUserId });
                 if (response.IsSuccessStatusCode)
                 {
                     var authResult = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
                     var accessToken = authResult.GetProperty("access_token").GetString();
-                    var refreshToken = authResult.GetProperty("refresh_token").GetString();
-
-                    if (!string.IsNullOrEmpty(accessToken))
+                    if (!string.IsNullOrEmpty(accessToken) && context.Properties != null)
                     {
-                        // Add the platform JWT to the user's claims so it can be propagated
-                        identity?.AddClaim(new System.Security.Claims.Claim("access_token", accessToken));
+                        // Store access_token in AuthenticationProperties instead of claims to reduce cookie size
+                        context.Properties.StoreTokens(new[] {
+                            new AuthenticationToken { Name = "access_token", Value = accessToken }
+                        });
 
-                        if (!string.IsNullOrEmpty(refreshToken))
-                        {
-                            identity?.AddClaim(new System.Security.Claims.Claim("refresh_token", refreshToken));
-                        }
-
-                        // Extract user info, roles, and permissions from the platform JWT
+                        // Parse JWT to extract essential claims for cookie
                         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
                         var jwtToken = handler.ReadJwtToken(accessToken);
 
-                        // Add user_id (sub claim from JWT)
-                        var userId = jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
-                        if (!string.IsNullOrEmpty(userId))
-                        {
-                            identity?.AddClaim(new System.Security.Claims.Claim("user_id", userId));
-                        }
+                        // Only store minimal claims needed for UI personalization (not roles/permissions)
+                        var essentialClaims = jwtToken.Claims.Where(c =>
+                            c.Type is "sub" or "user_id" or "user_type" or
+                            System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email or
+                            System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Name);
 
-                        // Add user_type claim
-                        var userType = jwtToken.Claims.FirstOrDefault(c => c.Type == "user_type")?.Value;
-                        if (!string.IsNullOrEmpty(userType))
-                        {
-                            identity?.AddClaim(new System.Security.Claims.Claim("user_type", userType));
-                        }
-
-                        // Extract and add roles/permissions from the platform JWT
-                        foreach (var claim in jwtToken.Claims.Where(c => c.Type is "roles" or "role" or "permissions"))
+                        foreach (var claim in essentialClaims)
                         {
                             identity?.AddClaim(new System.Security.Claims.Claim(claim.Type, claim.Value));
-                            if (claim.Type == "roles" || claim.Type == "role")
-                            {
-                                identity?.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, claim.Value));
-                            }
                         }
 
-                        logger.LogInformation("Successfully exchanged Google token for platform JWT for user {Email}", email);
-                    }
-                    else
-                    {
-                        logger.LogError("Exchange endpoint returned success but no access_token for {Email}", email);
-                        context.Fail("Authentication service returned invalid response.");
-                    }
-                }
-                else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    logger.LogWarning("Google SSO exchange rejected for {Email}: {Error}", email, errorContent);
+                        // Do NOT add roles/permissions to cookie - they will be read from JWT during authorization
 
-                    // Parse error to provide better user feedback
-                    if (errorContent.Contains("inactive", StringComparison.OrdinalIgnoreCase))
-                    {
-                        context.Fail("Your employee account is inactive. Please contact HR.");
+                        // Auto-bootstrap: promote first employee to platform owner in Development
+                        // Calls promote directly — the IAM endpoint has its own guard (humanUsers.Count <= 1)
+                        if (context.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
+                        {
+                            try
+                            {
+                                var iamFactory = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
+                                using var iamHttp = iamFactory.CreateClient("IAMServiceBootstrap");
+                                iamHttp.DefaultRequestHeaders.Authorization =
+                                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+                                await iamHttp.PostAsync("/iam/v1/principals/bootstrap/promote", null);
+                            }
+                            catch { /* Bootstrap is best-effort */ }
+                        }
                     }
-                    else if (errorContent.Contains("not found", StringComparison.OrdinalIgnoreCase))
-                    {
-                        context.Fail("Employee account not found. Please contact IT support.");
-                    }
-                    else
-                    {
-                        context.Fail("Access denied. Please contact support.");
-                    }
-                }
-                else if (response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
-                {
-                    logger.LogError("Employee lookup service unavailable during Google SSO for {Email}", email);
-                    context.Fail("Authentication service is temporarily unavailable. Please try again later.");
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    logger.LogError("Failed to exchange Google token for {Email}. Status: {StatusCode}, Error: {Error}",
-                        email, response.StatusCode, errorContent);
-                    context.Fail("Failed to complete authentication. Please try again.");
                 }
             }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Exception during Google SSO token exchange for {Email}", email);
-                context.Fail("An error occurred during authentication. Please try again.");
-            }
+            catch { context.Fail("Auth exchange failed"); }
         };
         options.Events.OnRemoteFailure = context =>
         {
@@ -197,103 +212,74 @@ try
 
     builder.Services.AddAuthorization(options =>
     {
-        // Map GCP-style permissions to Authorization Policies using type-safe constants
-        var permissions = new[]
-        {
-            MalievPermissions.Customer.Read,
-            MalievPermissions.Order.Read,
-            MalievPermissions.Order.Approve,
-            MalievPermissions.Iam.Manage,
-            MalievPermissions.Accounting.View
-        };
+        // Default policy for [Authorize] attributes without a policy name.
+        // Explicitly specify both Bearer and Cookies schemes for BFF scenarios (Blazor SSR + API)
+        options.DefaultPolicy = new AuthorizationPolicyBuilder(
+            JwtBearerDefaults.AuthenticationScheme,
+            CookieAuthenticationDefaults.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .Build();
 
-        foreach (var permission in permissions)
-        {
-            options.AddPolicy(permission, policy =>
-                policy.RequireAssertion(context =>
-                    context.User.HasClaim(c => (c.Type == "permissions" || c.Type == "permission") && c.Value == permission)));
-        }
+        // DO NOT use FallbackPolicy here - it breaks static file serving
+        // Instead, we require authorization explicitly on Razor Components below
     });
 
-    builder.Services.AddHttpClient("AuthService", client =>
+    // Named client for Google OAuth callback (no UserContextHandler - pre-auth)
+    builder.Services.AddHttpClient("AuthService", (sp, client) =>
     {
-        client.BaseAddress = new Uri(builder.Configuration["Services:AuthService:BaseUrl"] ?? "http://maliev-authservice-api");
+        var config = sp.GetRequiredService<IConfiguration>();
+        var url = config["Services:AuthService:BaseUrl"];
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(url) ? url : "http://AuthService");
     })
+    .AddServiceDiscovery()
     .AddStandardResilienceHandler();
 
-    builder.Services.AddHttpClient<CustomerServiceClient>(client =>
+    // BFF service clients with user context forwarding
+    builder.AddBffServiceClient<CustomerServiceClient>("CustomerService");
+    builder.AddBffServiceClient<CountryServiceClient>("CountryService");
+    builder.AddBffServiceClient<RegistryServiceClient>("RegistryService");
+    builder.AddBffServiceClient<OrderServiceClient>("OrderService");
+    builder.AddBffServiceClient<QuotationServiceClient>("QuotationService");
+    builder.AddBffServiceClient<MaterialServiceClient>("MaterialService");
+    builder.AddBffServiceClient<EmployeeServiceClient>("EmployeeService");
+    builder.AddBffServiceClient<InvoiceServiceClient>("InvoiceService");
+    builder.AddBffServiceClient<PaymentServiceClient>("PaymentService");
+    builder.AddBffServiceClient<SupplierServiceClient>("SupplierService");
+    builder.AddBffServiceClient<UploadServiceClient>("UploadService");
+    builder.AddBffServiceClient<ChatbotServiceClient>("ChatbotService");
+    builder.AddBffServiceClient<CareerServiceClient>("CareerService");
+    builder.AddBffServiceClient<TimeOffServiceClient>("EmployeeService"); // TimeOff uses EmployeeService
+
+    // Named HTTP client with service account authentication for reference data
+    builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>
     {
-        client.BaseAddress = new Uri(builder.Configuration["Services:CustomerService:BaseUrl"] ?? "http://maliev-customerservice-api");
+        var config = sp.GetRequiredService<IConfiguration>();
+        var explicitUrl = config["Services:CountryService:BaseUrl"];
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://CountryService");
+        client.Timeout = TimeSpan.FromSeconds(90);
     })
-    .AddHttpMessageHandler<UserContextHandler>()
+    .AddServiceDiscovery()
+    .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
     .AddStandardResilienceHandler();
 
-    builder.Services.AddHttpClient<OrderServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["Services:OrderService:BaseUrl"] ?? "http://maliev-orderservice-api");
-    })
-    .AddHttpMessageHandler<UserContextHandler>()
+    builder.Services.AddHttpClient("BffInternal")
+    .AddHttpMessageHandler<Maliev.Intranet.Bff.Handlers.CookieForwardingHandler>()
+    .AddServiceDiscovery()
     .AddStandardResilienceHandler();
 
-    builder.Services.AddHttpClient<IAMServiceClient>(client =>
+    builder.Services.AddScoped(sp => 
     {
-        client.BaseAddress = new Uri(builder.Configuration["Services:IAMService:BaseUrl"] ?? "http://maliev-iamservice-api");
-    })
-    .AddHttpMessageHandler<UserContextHandler>()
-    .AddStandardResilienceHandler();
-
-    builder.Services.AddHttpClient<QuotationServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["Services:QuotationService:BaseUrl"] ?? "http://maliev-quotationservice-api");
-    })
-    .AddHttpMessageHandler<UserContextHandler>()
-    .AddStandardResilienceHandler();
-
-    builder.Services.AddHttpClient<MaterialServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["Services:MaterialService:BaseUrl"] ?? "http://maliev-materialservice-api");
-    })
-    .AddHttpMessageHandler<UserContextHandler>()
-    .AddStandardResilienceHandler();
-
-    builder.Services.AddHttpClient<EmployeeServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["Services:EmployeeService:BaseUrl"] ?? "http://maliev-employeeservice-api");
-    })
-    .AddHttpMessageHandler<UserContextHandler>()
-    .AddStandardResilienceHandler();
-
-    builder.Services.AddHttpClient<InvoiceServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["Services:InvoiceService:BaseUrl"] ?? "http://maliev-invoiceservice-api");
-    })
-    .AddHttpMessageHandler<UserContextHandler>()
-    .AddStandardResilienceHandler();
-
-    builder.Services.AddHttpClient<PaymentServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["Services:PaymentService:BaseUrl"] ?? "http://maliev-paymentservice-api");
-    })
-    .AddHttpMessageHandler<UserContextHandler>()
-    .AddStandardResilienceHandler();
-
-    builder.Services.AddHttpClient<SupplierServiceClient>(client =>
-    {
-        client.BaseAddress = new Uri(builder.Configuration["Services:SupplierService:BaseUrl"] ?? "http://maliev-supplierservice-api");
-    })
-    .AddHttpMessageHandler<UserContextHandler>()
-    .AddStandardResilienceHandler();
-
-    // Register HttpClient for server-side execution of client components
-    builder.Services.AddScoped(sp =>
-    {
-        // In server-side Blazor, we need an HttpClient that points to the local server
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
         var navigationManager = sp.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
-        return new HttpClient
-        {
-            BaseAddress = new Uri(navigationManager.BaseUri)
-        };
+        var client = httpClientFactory.CreateClient("BffInternal");
+        client.BaseAddress = new Uri(navigationManager.BaseUri);
+        return client;
     });
+
+    // Register authentication state provider that persists state for interactive components
+
+    builder.Services.AddScoped<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider, PersistingRevalidatingAuthenticationStateProvider>();
+    builder.Services.AddCascadingAuthenticationState();
 
     builder.Services.AddControllersWithViews();
     builder.Services.AddRazorComponents()
@@ -303,38 +289,60 @@ try
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-    // Configure the HTTP request pipeline.
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseWebAssemblyDebugging();
-    }
-    else
-    {
-        app.UseExceptionHandler("/Error", createScopeForErrors: true);
-        app.UseHsts();
-    }
+    if (app.Environment.IsDevelopment()) app.UseWebAssemblyDebugging();
+    else { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }
 
-    if (!app.Environment.IsDevelopment())
-    {
-        app.UseHttpsRedirection();
-    }
+    if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.MapStaticAssets();
     app.UseAntiforgery();
 
     app.MapDefaultEndpoints("intranet");
-
     app.UseAuthentication();
+
+    // Clear stale auth cookies that the server can no longer decrypt (e.g. after restart with ephemeral DP)
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Cookies.ContainsKey("Maliev.Intranet.Auth") &&
+            context.User.Identity?.IsAuthenticated != true &&
+            !IsStaticResource(context.Request.Path))
+        {
+            context.Response.Cookies.Delete("Maliev.Intranet.Auth");
+        }
+        await next();
+    });
+
+    // Apply JWT claims enrichment only to non-static requests
+    app.UseWhen(
+        context => !IsStaticResource(context.Request.Path),
+        appBuilder => appBuilder.UseMiddleware<JwtClaimsEnrichmentMiddleware>());
+
+    // Redirect unauthenticated root requests to login to avoid 401/NavigationException loops
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path == "/" && context.User.Identity?.IsAuthenticated != true)
+        {
+            context.Response.Redirect("/login");
+            return;
+        }
+        await next();
+    });
+
     app.UseAuthorization();
 
+    // Do NOT add .RequireAuthorization() here - it conflicts with AuthorizeRouteView
+    // Authorization is handled by AuthorizeRouteView in Routes.razor + [AllowAnonymous] on Login page
     app.MapRazorComponents<Maliev.Intranet.Bff.Components.App>()
         .AddInteractiveServerRenderMode()
         .AddInteractiveWebAssemblyRenderMode()
         .AddAdditionalAssemblies(typeof(Maliev.Intranet.Client._Imports).Assembly);
 
-    app.MapHub<Maliev.Intranet.Bff.Hubs.NotificationHub>("/hubs/notifications");
+    app.MapHub<Maliev.Intranet.Bff.Hubs.NotificationHub>("/hubs/notifications")
+        .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
+    
+    app.MapControllers()
+        .RequireAuthorization(); // Require authentication for all API controllers by default
 
-    app.MapControllers();
 
     Program.Log.ServiceStarted(logger, "Intranet BFF");
     app.Run();
@@ -350,18 +358,31 @@ finally
 }
 
 /// <summary>
-/// Main program class for the Intranet BFF.
+/// The main entry point for the Intranet BFF application.
 /// </summary>
 public partial class Program
 {
+    /// <summary>
+    /// Determines if the request path is for a static resource that should bypass JWT claims enrichment.
+    /// </summary>
+    /// <param name="path">The request path to check.</param>
+    /// <returns>True if the path is for a static resource; otherwise, false.</returns>
+    private static bool IsStaticResource(PathString path)
+    {
+        var pathValue = path.Value ?? string.Empty;
+        return pathValue.StartsWith("/_framework/", StringComparison.OrdinalIgnoreCase) ||
+               pathValue.StartsWith("/_content/", StringComparison.OrdinalIgnoreCase) ||
+               pathValue.StartsWith("/css/", StringComparison.OrdinalIgnoreCase) ||
+               pathValue.StartsWith("/js/", StringComparison.OrdinalIgnoreCase) ||
+               pathValue.Contains("/hubs/", StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static partial class Log
     {
         [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
         public static partial void StartingHost(ILogger logger, string serviceName);
-
         [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
         public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
-
         [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
         public static partial void ServiceStarted(ILogger logger, string serviceName);
     }

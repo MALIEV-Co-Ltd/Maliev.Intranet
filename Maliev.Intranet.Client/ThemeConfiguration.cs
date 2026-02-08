@@ -10,51 +10,75 @@ public static class ThemeConfiguration
     /// <summary>
     /// The custom Maliev theme instance.
     /// </summary>
-    public static readonly MudTheme MalievTheme = new()
+    public static readonly MudTheme MalievTheme = CreateTheme();
+
+    private static MudTheme CreateTheme()
     {
-        PaletteDark = new PaletteDark()
+        var theme = new MudTheme()
         {
-            Primary = "#2f81f7", // GitHub Blue
-            Secondary = "#8b949e", // GitHub Dimmed Text
-            Tertiary = "#238636", // GitHub Green
-            Background = "#0d1117", // GitHub Main Background
-            Surface = "#161b22", // GitHub Secondary Background (Cards)
-            AppbarBackground = "#010409", // Darker Header
-            DrawerBackground = "#010409", // Sidebar match header
-            TextPrimary = "#c9d1d9", // High Contrast Text
-            TextSecondary = "#8b949e", // Muted Text
-            Success = "#238636",
-            Warning = "#d29922",
-            Error = "#f85149",
-            Info = "#58a6ff",
-            Divider = "#30363d", // Subtle borders
-            ActionDefault = "#8b949e",
-            LinesDefault = "#30363d",
-            TableLines = "#30363d",
-            DrawerText = "#c9d1d9",
-            AppbarText = "#c9d1d9"
-        },
-        PaletteLight = new PaletteLight()
-        {
-            Primary = "#0969da",
-            Secondary = "#57606a",
-            Tertiary = "#1f883d",
-            Background = "#ffffff",
-            Surface = "#f6f8fa",
-            AppbarBackground = "#f6f8fa", // Light Header on Light Mode
-            DrawerBackground = "#f6f8fa",
-            TextPrimary = "#24292f",
-            TextSecondary = "#57606a",
-            Success = "#1a7f37",
-            Warning = "#9a6700",
-            Error = "#cf222e",
-            Info = "#0969da",
-            Divider = "#d0d7de",
-            ActionDefault = "#57606a",
-            LinesDefault = "#d0d7de",
-            TableLines = "#d0d7de",
-            DrawerText = "#24292f",
-            AppbarText = "#24292f" // Dark text on light header
-        }
-    };
+            PaletteDark = new PaletteDark()
+            {
+                Primary = "#2f81f7", // GitHub Blue
+                Secondary = "#8b949e", // GitHub Dimmed Text
+                Tertiary = "#238636", // GitHub Green
+                Background = "#0d1117", // GitHub Main Background
+                Surface = "#161b22", // GitHub Secondary Background (Cards)
+                AppbarBackground = "#010409", // Darker Header
+                DrawerBackground = "#010409", // Sidebar match header
+                TextPrimary = "#c9d1d9", // High Contrast Text
+                TextSecondary = "#8b949e", // Muted Text
+                Success = "#238636",
+                Warning = "#d29922",
+                Error = "#f85149",
+                Info = "#58a6ff",
+                Divider = "#30363d", // Subtle borders
+                ActionDefault = "#8b949e",
+                LinesDefault = "#30363d",
+                TableLines = "#30363d",
+                DrawerText = "#c9d1d9",
+                AppbarText = "#c9d1d9"
+            },
+            PaletteLight = new PaletteLight()
+            {
+                Primary = "#0969da",
+                Secondary = "#57606a",
+                Tertiary = "#1f883d",
+                Background = "#ffffff",
+                Surface = "#f6f8fa",
+                AppbarBackground = "#f6f8fa", // Light Header on Light Mode
+                DrawerBackground = "#f6f8fa",
+                TextPrimary = "#24292f",
+                TextSecondary = "#57606a",
+                Success = "#1a7f37",
+                Warning = "#9a6700",
+                Error = "#cf222e",
+                Info = "#0969da",
+                Divider = "#d0d7de",
+                ActionDefault = "#57606a",
+                LinesDefault = "#d0d7de",
+                TableLines = "#d0d7de",
+                DrawerText = "#24292f",
+                AppbarText = "#24292f" // Dark text on light header
+            }
+        };
+
+        string[] fontStack = ["Noto Sans", "Noto Sans Thai", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"];
+
+        theme.Typography.Default.FontFamily = fontStack;
+        theme.Typography.H1.FontFamily = fontStack;
+        theme.Typography.H2.FontFamily = fontStack;
+        theme.Typography.H3.FontFamily = fontStack;
+        theme.Typography.H4.FontFamily = fontStack;
+        theme.Typography.H5.FontFamily = fontStack;
+        theme.Typography.H6.FontFamily = fontStack;
+        theme.Typography.Subtitle1.FontFamily = fontStack;
+        theme.Typography.Subtitle2.FontFamily = fontStack;
+        theme.Typography.Body1.FontFamily = fontStack;
+        theme.Typography.Body2.FontFamily = fontStack;
+        theme.Typography.Button.FontFamily = fontStack;
+        theme.Typography.Caption.FontFamily = fontStack;
+        theme.Typography.Overline.FontFamily = fontStack;
+
+        return theme;
+    }
 }

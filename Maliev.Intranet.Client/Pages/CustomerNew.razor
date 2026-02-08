@@ -1,0 +1,1146 @@
+@page "/sales/customers/new"
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Create New Customer - Maliev Intranet</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pb-16">
+    
+    <!-- Page Header with Progress -->
+    <MudPaper Elevation="0" Class="mb-6 pb-4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="4" Class="flex-wrap">
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.h4">Create New Customer</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-uppercase" Style="letter-spacing: 0.05em; font-weight: 500;">Complete onboarding workflow</MudText>
+            </MudStack>
+            <MudStepper @ref="_stepper" NonLinear="true" ActiveIndex="@_activeStepIndex" ActiveIndexChanged="OnStepChanged">
+                <MudStep Title="Extract" />
+                <MudStep Title="Details" />
+                <MudStep Title="Review" />
+            </MudStepper>
+        </MudStack>
+    </MudPaper>
+
+    <!-- AI Extraction Zone -->
+    @if (_chatbotServiceAvailable)
+    {
+        <MudPaper Elevation="2" Class="pa-6 mb-6" Style="background: linear-gradient(135deg, rgba(var(--mud-palette-primary-rgb), 0.05) 0%, rgba(var(--mud-palette-secondary-rgb), 0.05) 100%);">
+            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="3" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large" Color="Color.Primary" />
+                <MudStack Spacing="1" Class="flex-grow-1">
+                    <MudText Typo="Typo.h6">AI Data Extraction</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Upload documents or paste text to auto-fill customer information</MudText>
+                </MudStack>
+                @if (_extractionConfidence > 0)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Large">
+                        <MudStack Spacing="0" AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.h6" Style="font-weight: 700; line-height: 1;">@((_extractionConfidence * 100).ToString("F0"))%</MudText>
+                            <MudText Typo="Typo.caption">Confidence</MudText>
+                        </MudStack>
+                    </MudChip>
+                }
+            </MudStack>
+
+            <MudGrid Spacing="3" Class="mt-4">
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string" 
+                                  Label="Paste Customer Information" 
+                                  Variant="Variant.Outlined"
+                                  @bind-Value="_extractionText"
+                                  Lines="10"
+                                  Placeholder="Paste business card, email signature, or any text containing customer details..."
+                                  Class="extraction-textarea" />
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Class="mb-2 text-uppercase" Color="Color.Secondary" Style="font-weight: 600; letter-spacing: 0.05em;">OR UPLOAD DOCUMENTS</MudText>
+                    <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
+                                   FilesChanged="OnExtractionFilesSelected" 
+                                   Accept=".pdf,.jpg,.jpeg,.png" 
+                                   MaximumFileCount="5">
+                        <ActivatorContent>
+                            <MudPaper Outlined="true" Class="pa-8 text-center cursor-pointer" Style="border: 2px dashed var(--mud-palette-divider); min-height: 180px; transition: all 0.2s;">
+                                <MudStack Spacing="3" AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;">
+                                    <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Secondary" Style="opacity: 0.5;" />
+                                    <MudText Typo="Typo.body1">
+                                        @if (_extractionFiles.Any())
+                                        {
+                                            <strong>@_extractionFiles.Count file(s) selected</strong>
+                                        }
+                                        else
+                                        {
+                                            <span>Drop files or click to upload</span>
+                                        }
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">PDF, JPG, PNG (max 5 files)</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                </MudItem>
+
+                <MudItem xs="12" Class="d-flex justify-end">
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               StartIcon="@Icons.Material.Filled.Psychology"
+                               OnClick="ExtractCustomerData"
+                               Disabled="@(_isExtracting || !HasExtractionInput())">
+                        @if (_isExtracting)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Analyzing...</span>
+                        }
+                        else
+                        {
+                            <span>Extract & Auto-Fill</span>
+                        }
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-6">
+            AI extraction service is currently unavailable. Please fill the form manually.
+        </MudAlert>
+    }
+
+    <!-- Form Content with MudForm for validation -->
+    <MudForm @ref="_form" ValidationDelay="0">
+        
+        <!-- Section 01: Customer Information -->
+        <FormSection SectionNumber="01" 
+                     Title="Customer Information" 
+                     Description="Primary contact details"
+                     Icon="@Icons.Material.Filled.Person">
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" 
+                                  Label="First Name" 
+                                  @bind-Value="_customerData.Customer.FirstName"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="First name is required" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" 
+                                  Label="Last Name" 
+                                  @bind-Value="_customerData.Customer.LastName"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Last name is required"
+                                  />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string" 
+                                  Label="Email Address" 
+                                  @bind-Value="_customerData.Customer.Email"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Email is required"
+                                  Validation="@(new Func<string, Task<string?>>(ValidateEmailAsync))"
+                                  Immediate="true"
+                                  DebounceInterval="500"
+                                  InputType="InputType.Email"
+                                  />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" 
+                                  Label="Mobile Phone" 
+                                  @bind-Value="_customerData.Customer.Mobile"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="+66812345678"
+                                  />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" 
+                                  Label="Landline" 
+                                  @bind-Value="_customerData.Customer.Landline"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="+6621234567"
+                                  />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" 
+                               Label="Segment" 
+                               @bind-Value="_customerData.Customer.Segment"
+                               Variant="Variant.Outlined"
+                              >
+                        <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
+                        <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
+                        <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
+                        <MudSelectItem Value="@("Government")">Government</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" 
+                               Label="Tier" 
+                               @bind-Value="_customerData.Customer.Tier"
+                               Variant="Variant.Outlined"
+                              >
+                        <MudSelectItem Value="@("Bronze")">Bronze</MudSelectItem>
+                        <MudSelectItem Value="@("Silver")">Silver</MudSelectItem>
+                        <MudSelectItem Value="@("Gold")">Gold</MudSelectItem>
+                        <MudSelectItem Value="@("Platinum")">Platinum</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" 
+                               Label="Preferred Language" 
+                               @bind-Value="_customerData.Customer.PreferredLanguage"
+                               Variant="Variant.Outlined"
+                              >
+                        <MudSelectItem Value="@("en")">English</MudSelectItem>
+                        <MudSelectItem Value="@("th")">Thai (ไทย)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" 
+                               Label="Timezone" 
+                               @bind-Value="_customerData.Customer.Timezone"
+                               Variant="Variant.Outlined"
+                              >
+                        <MudSelectItem Value="@("Asia/Bangkok")">Bangkok (GMT+7)</MudSelectItem>
+                        <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                        <MudSelectItem Value="@("Asia/Singapore")">Singapore (GMT+8)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </FormSection>
+
+        <!-- Section 02: Company Information -->
+        <FormSection SectionNumber="02" 
+                     Title="Company Information" 
+                     Description="Business affiliation (optional)"
+                     Icon="@Icons.Material.Filled.Business">
+            <HeaderActions>
+                <MudSwitch T="bool" 
+                           @bind-Value="_hasCompany" 
+                           Color="Color.Primary" 
+                           Label="Company Customer"
+                           />
+            </HeaderActions>
+            <ChildContent>
+                @if (_hasCompany)
+                {
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudTextField T="string" 
+                                          Label="Company Name" 
+                                          @bind-Value="_newCompany.Name"
+                                          Variant="Variant.Outlined"
+                                          Required="true"
+                                          RequiredError="Company name is required"
+                                          />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string" 
+                                          Label="Tax ID / VAT Number" 
+                                          @bind-Value="_newCompany.VatNumber"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="0105536001097"
+                                          HelperText="13-digit Thai Tax ID"
+                                          />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string" 
+                                          Label="Company Phone" 
+                                          @bind-Value="_newCompany.ContactPhone"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="+6621234567"
+                                          />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string" 
+                                          Label="Extension (for customer)" 
+                                          @bind-Value="_customerData.Customer.Extension"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="101"
+                                          HelperText="Customer's direct line"
+                                          />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudRadioGroup T="string" @bind-Value="_companyOfficeType">
+                                <MudRadio T="string" Value="@("head")" Color="Color.Primary">Head Office</MudRadio>
+                                <MudRadio T="string" Value="@("branch")" Color="Color.Primary">Branch</MudRadio>
+                            </MudRadioGroup>
+                        </MudItem>
+
+                        @if (_companyOfficeType == "branch")
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudTextField T="string" 
+                                              Label="Branch Number" 
+                                              @bind-Value="_branchNumber"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="00001"
+                                              HelperText="5-digit format (00001-99999)"
+                                              />
+                            </MudItem>
+                        }
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" 
+                                       Label="Company Segment" 
+                                       @bind-Value="_newCompany.Segment"
+                                       Variant="Variant.Outlined"
+                                      >
+                                <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
+                                <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
+                                <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
+                                <MudSelectItem Value="@("Government")">Government</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" 
+                                       Label="Company Tier" 
+                                       @bind-Value="_newCompany.Tier"
+                                       Variant="Variant.Outlined"
+                                      >
+                                <MudSelectItem Value="@("Bronze")">Bronze</MudSelectItem>
+                                <MudSelectItem Value="@("Silver")">Silver</MudSelectItem>
+                                <MudSelectItem Value="@("Gold")">Gold</MudSelectItem>
+                                <MudSelectItem Value="@("Platinum")">Platinum</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                        Individual customer (no company affiliation)
+                    </MudAlert>
+                }
+            </ChildContent>
+        </FormSection>
+
+        <!-- Section 03: Addresses -->
+        <FormSection SectionNumber="03" 
+                     Title="Addresses" 
+                     Description="Billing and shipping locations"
+                     Icon="@Icons.Material.Filled.LocationOn">
+            <HeaderActions>
+                <MudButton Variant="Variant.Outlined" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Size="Size.Small"
+                           OnClick="AddAddress"
+                          >
+                    Add Address
+                </MudButton>
+            </HeaderActions>
+            <ChildContent>
+                @if (!_customerData.Addresses.Any())
+                {
+                    <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                        No addresses added. Click "Add Address" to create billing or shipping addresses.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudGrid Spacing="4">
+                        @foreach (var (address, index) in _customerData.Addresses.Select((a, i) => (a, i)))
+                        {
+                            <MudItem xs="12" lg="6">
+                                <AddressCard Address="address" 
+                                             Index="index"
+                                             OnTypeChanged="OnAddressTypeChanged"
+                                             OnDefaultChanged="OnDefaultChanged"
+                                             OnLocationSelected="OnThaiLocationSelected"
+                                             OnCountrySelected="OnCountrySelected"
+                                             OnRemove="RemoveAddress"
+                                             SearchLocations="SearchThaiLocations"
+                                             SearchCountries="SearchCountries"
+                                             SelectedCountry="_selectedCountries.GetValueOrDefault(index)" />
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+            </ChildContent>
+        </FormSection>
+
+        <!-- Section 04: Additional Details -->
+        <FormSection SectionNumber="04" 
+                     Title="Additional Details" 
+                     Description="Preferences, documents, and notes"
+                     Icon="@Icons.Material.Filled.MoreHoriz">
+            <MudGrid Spacing="4">
+                
+                <!-- Communication Preferences -->
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="subsection-paper">
+                        <MudText Typo="Typo.subtitle1" Class="subsection-title">COMMUNICATION PREFERENCES</MudText>
+                        <MudStack Spacing="2" Class="mt-3">
+                            <MudCheckBox T="bool" @bind-Value="_emailOptIn" Color="Color.Primary" Label="Email notifications" />
+                            <MudCheckBox T="bool" @bind-Value="_smsOptIn" Color="Color.Primary" Label="SMS notifications" />
+                            <MudCheckBox T="bool" @bind-Value="_marketingOptIn" Color="Color.Primary" Label="Marketing communications" />
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- NDA Information -->
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="subsection-paper">
+                        <div class="subsection-header">
+                            <MudText Typo="Typo.subtitle1" Class="subsection-title">NDA INFORMATION</MudText>
+                            <MudSwitch T="bool" @bind-Value="_includeNda" Color="Color.Primary" Class="subsection-toggle" />
+                        </div>
+                        
+                        @if (_includeNda)
+                        {
+                            <MudStack Spacing="2" Class="mt-3">
+                                <MudDatePicker Label="NDA Expiration Date (Optional)"
+                                               @bind-Date="_ndaExpiryDate"
+                                               Variant="Variant.Outlined"
+                                               MinDate="DateTime.Now"
+                                               />
+
+                                <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
+                                               FilesChanged="OnNdaFilesSelected" 
+                                               Accept=".pdf,.doc,.docx" 
+                                               MaximumFileCount="5">
+                                    <ActivatorContent>
+                                        <MudButton Variant="Variant.Outlined" 
+                                                   Color="Color.Primary"
+                                                   StartIcon="@Icons.Material.Filled.AttachFile"
+                                                   FullWidth="true"
+                                                   Disabled="@_isUploadingNda"
+                                                  >
+                                            @if (_ndaFiles.Any())
+                                            {
+                                                <span>@_ndaFiles.Count file(s) selected</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Select NDA Files</span>
+                                            }
+                                        </MudButton>
+                                    </ActivatorContent>
+                                </MudFileUpload>
+
+                                @if (_ndaFiles.Any())
+                                {
+                                    <MudButton Variant="Variant.Filled" 
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Upload"
+                                               OnClick="UploadNdaFiles"
+                                               Disabled="@_isUploadingNda"
+                                               FullWidth="true"
+                                              >
+                                        @if (_isUploadingNda)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                            <span>Uploading...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Upload Files</span>
+                                        }
+                                    </MudButton>
+                                }
+
+                                @if (_uploadedNdaDocs.Any())
+                                {
+                                    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
+                                        @_uploadedNdaDocs.Count document(s) uploaded
+                                    </MudAlert>
+                                }
+                            </MudStack>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-3">
+                                No NDA required for this customer
+                            </MudAlert>
+                        }
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Customer Documents -->
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="subsection-paper">
+                        <MudText Typo="Typo.subtitle1" Class="subsection-title">CUSTOMER DOCUMENTS</MudText>
+                        
+                        <MudStack Spacing="2" Class="mt-3">
+                            <MudTextField T="string" 
+                                          Label="Document Category" 
+                                          @bind-Value="_customerDocCategory"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="e.g., Business Card, Tax Registration"
+                                          />
+
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
+                                           FilesChanged="OnCustomerDocsSelected" 
+                                           Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" 
+                                           MaximumFileCount="10">
+                                <ActivatorContent>
+                                    <MudButton Variant="Variant.Outlined" 
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.AttachFile"
+                                               FullWidth="true"
+                                               Disabled="@_isUploadingCustomerDocs"
+                                              >
+                                        @if (_customerDocFiles.Any())
+                                        {
+                                            <span>@_customerDocFiles.Count file(s) selected</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Select Documents</span>
+                                        }
+                                    </MudButton>
+                                </ActivatorContent>
+                            </MudFileUpload>
+
+                            @if (_customerDocFiles.Any())
+                            {
+                                <MudButton Variant="Variant.Filled" 
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Upload"
+                                           OnClick="UploadCustomerDocuments"
+                                           Disabled="@_isUploadingCustomerDocs"
+                                           FullWidth="true"
+                                          >
+                                    @if (_isUploadingCustomerDocs)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                        <span>Uploading...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Upload Documents</span>
+                                    }
+                                </MudButton>
+                            }
+
+                            @if (_uploadedCustomerDocs.Any())
+                            {
+                                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
+                                    @_uploadedCustomerDocs.Count document(s) uploaded
+                                </MudAlert>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Internal Notes -->
+                <MudItem xs="12">
+                    <MudTextField T="string" 
+                                  Label="Internal Notes (Optional)" 
+                                  @bind-Value="_customerData.InternalNote"
+                                  Variant="Variant.Outlined"
+                                  Lines="6"
+                                  MaxLength="5000"
+                                  Counter="5000"
+                                  Immediate="true"
+                                  Placeholder="Add any internal notes about this customer..."
+                                  />
+                </MudItem>
+            </MudGrid>
+        </FormSection>
+    </MudForm>
+
+    <!-- Spacer for fixed action bar -->
+    <div style="height: 100px;"></div>
+</MudContainer>
+
+<!-- Fixed Action Bar -->
+<MudPaper Elevation="8" Class="mud-theme-surface" Style="position: sticky; bottom: 0; z-index: 100; border-top: 1px solid var(--mud-palette-divider); margin: 0 -24px -24px -24px;">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="py-4">
+            <MudButton Variant="Variant.Text" 
+                       OnClick="Cancel"
+                       Disabled="@_isSubmitting"
+                       Size="Size.Large">
+                Cancel
+            </MudButton>
+            
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="Submit"
+                       Disabled="@(_isSubmitting || !IsFormValid())">
+                @if (_isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Creating Customer...</span>
+                }
+                else
+                {
+                    <span>Create Customer</span>
+                }
+            </MudButton>
+        </MudStack>
+    </MudContainer>
+</MudPaper>
+
+<style>
+    /* Responsive stepper */
+    @@media (max-width: 960px) {
+        .flex-wrap > .mud-stepper {
+            width: 100%;
+        }
+    }
+</style>
+
+@code {
+    private MudForm? _form;
+    private MudStepper? _stepper;
+    private int _activeStepIndex = 0;
+
+    // Customer data
+    private CustomerOnboardingRequest _customerData = new()
+    {
+        Customer = new CreateCustomerRequest
+        {
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }
+    };
+    
+    // Company data
+    private bool _hasCompany = false;
+    private CreateCompanyRequest _newCompany = new() { Segment = "Retail", Tier = "Bronze" };
+    private string _companyOfficeType = "head";
+    private string _branchNumber = "00001";
+    
+    // Address data
+    private Dictionary<int, CountryDto?> _selectedCountries = new();
+    private Dictionary<int, RegistryThaiLocation?> _selectedLocations = new();
+    private List<CountryDto> _allCountries = new();
+    
+    // Communication preferences
+    private bool _emailOptIn = true;
+    private bool _smsOptIn = false;
+    private bool _marketingOptIn = false;
+    
+    // NDA
+    private bool _includeNda = false;
+    private DateTime? _ndaExpiryDate;
+    private List<IBrowserFile> _ndaFiles = new();
+    private List<CreateDocumentRequest> _uploadedNdaDocs = new();
+    private bool _isUploadingNda = false;
+    
+    // Customer documents
+    private List<IBrowserFile> _customerDocFiles = new();
+    private List<CreateDocumentRequest> _uploadedCustomerDocs = new();
+    private string _customerDocCategory = "General";
+    private bool _isUploadingCustomerDocs = false;
+    
+    // AI Extraction
+    private string _extractionText = string.Empty;
+    private List<IBrowserFile> _extractionFiles = new();
+    private bool _isExtracting = false;
+    private double _extractionConfidence = 0;
+    private bool _chatbotServiceAvailable = false;
+    
+    // Submission
+    private bool _isSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCountries();
+        await CheckChatbotServiceAvailability();
+    }
+
+    private void OnStepChanged(int index)
+    {
+        _activeStepIndex = index;
+    }
+
+    private async Task CheckChatbotServiceAvailability()
+    {
+        try
+        {
+            var response = await Http.GetAsync("api/aiprocessing/health");
+            if (response.IsSuccessStatusCode)
+            {
+                var healthData = await response.Content.ReadFromJsonAsync<AiHealthResponse>();
+                _chatbotServiceAvailable = healthData?.CanInitiateSession ?? false;
+            }
+            else
+            {
+                _chatbotServiceAvailable = false;
+            }
+        }
+        catch
+        {
+            _chatbotServiceAvailable = false;
+        }
+    }
+
+    private class AiHealthResponse
+    {
+        public string Status { get; set; } = string.Empty;
+        public string Service { get; set; } = string.Empty;
+        public Guid? SessionId { get; set; }
+        public bool CanInitiateSession { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private bool HasExtractionInput() => 
+        !string.IsNullOrWhiteSpace(_extractionText) || _extractionFiles.Any();
+
+    private async Task LoadCountries()
+    {
+        try
+        {
+            _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/customers/countries") ?? new();
+            
+            var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
+            if (thailand != null)
+            {
+                _selectedCountries[0] = thailand;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading countries: {ex.Message}", Severity.Error);
+        }
+    }
+
+    #region AI Extraction
+    
+    private void OnExtractionFilesSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        _extractionFiles.Clear();
+        _extractionFiles.AddRange(files);
+    }
+
+    private async Task ExtractCustomerData()
+    {
+        _isExtracting = true;
+        _extractionConfidence = 0;
+        _activeStepIndex = 0;
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            
+            if (!string.IsNullOrWhiteSpace(_extractionText))
+            {
+                content.Add(new StringContent(_extractionText), "rawText");
+            }
+            
+            foreach (var file in _extractionFiles)
+            {
+                var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var response = await Http.PostAsync("api/aiprocessing/extract-customer", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var extracted = await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
+                
+                if (extracted != null)
+                {
+                    PopulateFromExtraction(extracted);
+                    _extractionConfidence = extracted.Confidence;
+                    _activeStepIndex = 1;
+                    Snackbar.Add($"Data extracted with {(extracted.Confidence * 100):F0}% confidence!", Severity.Success);
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Extraction failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isExtracting = false;
+        }
+    }
+
+    private void PopulateFromExtraction(ExtractedCustomerDataResponse extracted)
+    {
+        // Customer fields
+        if (!string.IsNullOrWhiteSpace(extracted.FirstName)) _customerData.Customer.FirstName = extracted.FirstName;
+        if (!string.IsNullOrWhiteSpace(extracted.LastName)) _customerData.Customer.LastName = extracted.LastName;
+        if (!string.IsNullOrWhiteSpace(extracted.Email)) _customerData.Customer.Email = extracted.Email;
+        if (!string.IsNullOrWhiteSpace(extracted.Mobile)) _customerData.Customer.Mobile = extracted.Mobile;
+        if (!string.IsNullOrWhiteSpace(extracted.Landline)) _customerData.Customer.Landline = extracted.Landline;
+        if (!string.IsNullOrWhiteSpace(extracted.Extension)) _customerData.Customer.Extension = extracted.Extension;
+        if (!string.IsNullOrWhiteSpace(extracted.Segment)) _customerData.Customer.Segment = extracted.Segment;
+        
+        // Company fields
+        if (!string.IsNullOrWhiteSpace(extracted.CompanyName))
+        {
+            _hasCompany = true;
+            _newCompany.Name = extracted.CompanyName;
+            if (!string.IsNullOrWhiteSpace(extracted.VatNumber)) _newCompany.VatNumber = extracted.VatNumber;
+            if (!string.IsNullOrWhiteSpace(extracted.CompanyPhone)) _newCompany.ContactPhone = extracted.CompanyPhone;
+            if (!string.IsNullOrWhiteSpace(extracted.BranchNumber))
+            {
+                _branchNumber = extracted.BranchNumber;
+                _companyOfficeType = extracted.BranchNumber == "00000" ? "head" : "branch";
+            }
+        }
+        
+        // Addresses
+        if (extracted.Addresses?.Any() == true)
+        {
+            _customerData.Addresses.Clear();
+            var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
+            
+            foreach (var addr in extracted.Addresses)
+            {
+                var newAddr = new CreateAddressRequest
+                {
+                    Type = addr.Type ?? "Billing",
+                    IsDefault = _customerData.Addresses.Count == 0,
+                    AddressLine1 = addr.AddressLine1 ?? string.Empty,
+                    AddressLine2 = addr.AddressLine2,
+                    AddressLine3 = addr.AddressLine3,
+                    District = addr.District,
+                    City = addr.City ?? string.Empty,
+                    StateProvince = addr.StateProvince ?? string.Empty,
+                    PostalCode = addr.PostalCode ?? string.Empty,
+                    RecipientName = addr.RecipientName,
+                    RecipientPhone = addr.RecipientPhone
+                };
+                
+                if (thailand != null)
+                {
+                    newAddr.CountryId = thailand.Id;
+                    _selectedCountries[_customerData.Addresses.Count] = thailand;
+                }
+                
+                _customerData.Addresses.Add(newAddr);
+            }
+        }
+    }
+    
+    #endregion
+
+    #region Address Management
+    
+    private async Task<IEnumerable<RegistryThaiLocation>> SearchThaiLocations(string? query, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+            return Array.Empty<RegistryThaiLocation>();
+
+        try
+        {
+            var results = await Http.GetFromJsonAsync<List<RegistryThaiLocation>>(
+                $"api/customers/locations/thai?query={Uri.EscapeDataString(query)}&limit=10", cancellationToken);
+            return results ?? new List<RegistryThaiLocation>();
+        }
+        catch
+        {
+            return Array.Empty<RegistryThaiLocation>();
+        }
+    }
+
+    private void OnThaiLocationSelected(int addressIndex, RegistryThaiLocation? location)
+    {
+        if (location == null || addressIndex >= _customerData.Addresses.Count) return;
+
+        var address = _customerData.Addresses[addressIndex];
+        var useThai = IsThai(address.District ?? "") || IsThai(address.City ?? "") || IsThai(address.StateProvince ?? "");
+        
+        if (!useThai && string.IsNullOrEmpty(address.District) && string.IsNullOrEmpty(address.City) && string.IsNullOrEmpty(address.StateProvince))
+        {
+            useThai = true;
+        }
+        
+        address.District = useThai ? location.SubDistrictTh : location.SubDistrictEn;
+        address.City = useThai ? location.DistrictTh : location.DistrictEn;
+        address.StateProvince = useThai ? location.ProvinceTh : location.ProvinceEn;
+        address.PostalCode = location.PostalCode;
+        
+        _selectedLocations[addressIndex] = location;
+        
+        var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
+        if (thailand != null)
+        {
+            address.CountryId = thailand.Id;
+            _selectedCountries[addressIndex] = thailand;
+        }
+    }
+
+    private async Task<IEnumerable<CountryDto>> SearchCountries(string? query, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return _allCountries;
+
+        return _allCountries.Where(c => 
+            c.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            c.Code.Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OnCountrySelected(int addressIndex, CountryDto? country)
+    {
+        _selectedCountries[addressIndex] = country;
+        if (country != null && addressIndex < _customerData.Addresses.Count)
+        {
+            _customerData.Addresses[addressIndex].CountryId = country.Id;
+        }
+    }
+
+    private void OnAddressTypeChanged(int addressIndex, string type)
+    {
+        if (addressIndex < _customerData.Addresses.Count)
+        {
+            _customerData.Addresses[addressIndex].Type = type;
+        }
+    }
+
+    private void OnDefaultChanged(int addressIndex, bool isDefault)
+    {
+        if (!isDefault || addressIndex >= _customerData.Addresses.Count) return;
+
+        var address = _customerData.Addresses[addressIndex];
+        
+        foreach (var addr in _customerData.Addresses.Where(a => a != address && a.Type == address.Type))
+        {
+            addr.IsDefault = false;
+        }
+        
+        address.IsDefault = true;
+    }
+
+    private void AddAddress()
+    {
+        var type = _customerData.Addresses.Count == 1 ? "Shipping" : "Billing";
+        
+        var newAddress = new CreateAddressRequest
+        {
+            Type = type,
+            IsDefault = !_customerData.Addresses.Any(a => a.Type == type)
+        };
+        
+        var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
+        if (thailand != null)
+        {
+            newAddress.CountryId = thailand.Id;
+            _selectedCountries[_customerData.Addresses.Count] = thailand;
+        }
+        
+        _customerData.Addresses.Add(newAddress);
+    }
+
+    private void RemoveAddress(int index)
+    {
+        _customerData.Addresses.RemoveAt(index);
+        _selectedCountries.Remove(index);
+    }
+
+    private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
+    
+    #endregion
+
+    #region File Upload
+    
+    private void OnNdaFilesSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        _ndaFiles.Clear();
+        _ndaFiles.AddRange(files);
+    }
+
+    private async Task UploadNdaFiles()
+    {
+        await UploadDocuments(_ndaFiles, "nda", _uploadedNdaDocs, isNda: true);
+    }
+
+    private void OnCustomerDocsSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        _customerDocFiles.Clear();
+        _customerDocFiles.AddRange(files);
+    }
+
+    private async Task UploadCustomerDocuments()
+    {
+        await UploadDocuments(_customerDocFiles, _customerDocCategory, _uploadedCustomerDocs, isNda: false);
+    }
+
+    private async Task UploadDocuments(List<IBrowserFile> files, string category, List<CreateDocumentRequest> uploadedList, bool isNda)
+    {
+        if (isNda) _isUploadingNda = true;
+        else _isUploadingCustomerDocs = true;
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            
+            foreach (var file in files)
+            {
+                var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var response = await Http.PostAsync($"api/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var results = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
+                
+                foreach (var result in results ?? [])
+                {
+                    var doc = new CreateDocumentRequest
+                    {
+                        DocumentCategory = category,
+                        FileReference = result.StoragePath ?? result.FileReference,
+                        FileName = result.FileName,
+                        FileSize = result.Size,
+                        MimeType = GetMimeType(result.FileName)
+                    };
+                    uploadedList.Add(doc);
+                    _customerData.Documents.Add(doc);
+                }
+                
+                Snackbar.Add($"Uploaded {results?.Count ?? 0} file(s)", Severity.Success);
+                files.Clear();
+            }
+            else
+            {
+                Snackbar.Add("Upload failed", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            if (isNda) _isUploadingNda = false;
+            else _isUploadingCustomerDocs = false;
+        }
+    }
+
+    private static string GetMimeType(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
+    {
+        ".pdf" => "application/pdf",
+        ".doc" => "application/msword",
+        ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".png" => "image/png",
+        _ => "application/octet-stream"
+    };
+    
+    #endregion
+
+    #region Form Validation & Submission
+    
+    private async Task<string?> ValidateEmailAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return "Email is required";
+        if (!email.Contains("@") || !email.Contains(".")) return "Invalid email format";
+        
+        try
+        {
+            var exists = await Http.GetFromJsonAsync<bool>($"api/customers/check-email?email={Uri.EscapeDataString(email)}");
+            if (exists) return "A customer with this email already exists";
+        }
+        catch { }
+        
+        return null;
+    }
+    
+    private bool IsFormValid() =>
+        !string.IsNullOrWhiteSpace(_customerData.Customer.FirstName) &&
+        !string.IsNullOrWhiteSpace(_customerData.Customer.LastName) &&
+        !string.IsNullOrWhiteSpace(_customerData.Customer.Email) &&
+        (!_hasCompany || !string.IsNullOrWhiteSpace(_newCompany.Name));
+
+    private async Task Submit()
+    {
+        if (_form != null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid) 
+            {
+                Snackbar.Add("Please fix validation errors", Severity.Warning);
+                return;
+            }
+        }
+
+        if (!IsFormValid())
+        {
+            Snackbar.Add("Please fill in all required fields", Severity.Warning);
+            return;
+        }
+
+        _isSubmitting = true;
+        _activeStepIndex = 2;
+
+        try
+        {
+            _customerData.Customer.CommunicationPreferences = new Dictionary<string, bool>
+            {
+                ["email_opt_in"] = _emailOptIn,
+                ["sms_opt_in"] = _smsOptIn,
+                ["marketing_opt_in"] = _marketingOptIn
+            };
+            
+            _customerData.NewCompany = _hasCompany ? _newCompany : null;
+            _customerData.Customer.CompanyId = null;
+
+            if (_includeNda)
+            {
+                _customerData.Nda = new CreateNDARequest
+                {
+                    ExpiresAt = _ndaExpiryDate,
+                    IsActive = true
+                };
+            }
+
+            var response = await Http.PostAsJsonAsync("api/customers/onboard", _customerData);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<CustomerResponse>();
+                Snackbar.Add("Customer created successfully!", Severity.Success);
+                Navigation.NavigateTo($"/sales/customers/{result?.Id}");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to create customer: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo("/sales/customers");
+    
+    #endregion
+}

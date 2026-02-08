@@ -1,33 +1,33 @@
 @page "/hr/time-off"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
 
 <PageTitle>Time Off - Maliev Intranet</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Time Off Management</MudText>
 
 <MudGrid Class="mb-4">
-    @if (!_isLoading)
+    @if (_isLoading)
     {
-        <MudItem xs="12" sm="4">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Annual Leave</MudText>
-                <MudText Typo="Typo.h5" Class="mt-2">12 days</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Available</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="4">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Sick Leave</MudText>
-                <MudText Typo="Typo.h5" Class="mt-2">8 days</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Available</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="4">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Pending</MudText>
-                <MudText Typo="Typo.h5" Class="mt-2">2</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Requests</MudText>
-            </MudPaper>
-        </MudItem>
+        @for (int i = 0; i < 3; i++)
+        {
+            <MudItem xs="12" sm="4">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="100px" Class="rounded-lg" />
+            </MudItem>
+        }
+    }
+    else
+    {
+        @foreach (var balance in _balances)
+        {
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@balance.LeaveType</MudText>
+                    <MudText Typo="Typo.h5" Class="mt-2">@balance.Available days</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Available</MudText>
+                </MudPaper>
+            </MudItem>
+        }
     }
 </MudGrid>
 
@@ -45,33 +45,51 @@
 else
 {
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-        <MudDataGrid T="LeaveRequestDto" Items="@_requests" Dense="true" Hover="true" Elevation="0">
+        <MudDataGrid T="LeaveRequestSummaryDto" Items="@_requests" Dense="true" Hover="true" Elevation="0">
             <Columns>
-                <PropertyColumn Property="x => x.Type" Title="Type" />
+                <PropertyColumn Property="x => x.LeaveType" Title="Type" />
                 <PropertyColumn Property="x => x.StartDate" Title="Start" Format="dd MMM yyyy" />
                 <PropertyColumn Property="x => x.EndDate" Title="End" Format="dd MMM yyyy" />
                 <PropertyColumn Property="x => x.Days" Title="Days" />
                 <TemplateColumn Title="Status">
                     <CellTemplate>
-                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
                     </CellTemplate>
                 </TemplateColumn>
-                <PropertyColumn Property="x => x.Approver" Title="Approver" />
+                <PropertyColumn Property="x => x.ApproverName" Title="Approver" />
             </Columns>
+            <NoRecordsContent>
+                <MudText Class="pa-4 text-center" Color="Color.Secondary">No leave requests found</MudText>
+            </NoRecordsContent>
         </MudDataGrid>
     </MudPaper>
 }
 
 @code {
     private bool _isLoading = true;
-    private List<LeaveRequestDto> _requests = new();
+    private List<LeaveRequestSummaryDto> _requests = new();
+    private List<LeaveBalanceDto> _balances = new();
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _requests = await Http.GetFromJsonAsync<List<LeaveRequestDto>>("api/leave/requests");
-        await Task.Delay(500);
-        _isLoading = false;
+        try
+        {
+            var balancesTask = Http.GetFromJsonAsync<List<LeaveBalanceDto>>("api/timeoff/balances");
+            var requestsTask = Http.GetFromJsonAsync<List<LeaveRequestSummaryDto>>("api/timeoff/requests");
+
+            await Task.WhenAll(balancesTask, requestsTask);
+
+            _balances = await balancesTask ?? new();
+            _requests = await requestsTask ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading time off data: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private Color GetStatusColor(string status) => status switch
@@ -81,14 +99,5 @@ else
         "Rejected" => Color.Error,
         _ => Color.Default
     };
-
-    public class LeaveRequestDto
-    {
-        public string Type { get; set; } = "";
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
-        public int Days { get; set; }
-        public string Status { get; set; } = "";
-        public string Approver { get; set; } = "";
-    }
 }
+

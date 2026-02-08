@@ -1,3 +1,4 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +9,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <summary>
 /// Controller for managing and displaying the health status of microservices.
 /// </summary>
-[Authorize]
+[RequirePermission(MalievPermissions.System.HealthRead, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [Route("api/system-health")]
 public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfiguration configuration) : ControllerBase
@@ -22,7 +23,9 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         "LifecycleService", "PerformanceService", "ContactService",
         "CurrencyService", "InvoiceService", "MaterialService",
         "PaymentService", "PdfService", "PurchaseOrderService",
-        "ReceiptService", "UploadService"
+        "ReceiptService", "UploadService", "CountryService",
+        "RegistryService", "PricingService", "PredictionService",
+        "ChatbotService", "GeometryService"
     ];
 
     /// <summary>
@@ -78,6 +81,7 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         // Standard service prefix is usually the first part of the service name in lowercase
         // or we can just try /liveness or /readiness
         var servicePrefix = serviceName.Replace("Service", "").ToLower();
+        if (serviceName == "PurchaseOrderService") servicePrefix = "purchase-order";
 
         try
         {

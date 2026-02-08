@@ -9,18 +9,11 @@
 @inject NavigationManager Navigation
 @inject HttpClient Http
 @inject IConfiguration Configuration
-@inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject LayoutService LayoutService
 @inject ILogger<Login> Logger
 
 <PageTitle>Login - MALIEV</PageTitle>
-
-<MudThemeProvider Theme="ThemeConfiguration.MalievTheme"
-                  IsDarkMode="@LayoutService.IsDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
 
 <style>
     .login-page {
@@ -42,18 +35,25 @@
 </style>
 
 <div class="login-page">
-    <MudGrid Spacing="0" Class="vh-100" Style="height: 100vh; overflow: hidden;">
+    @if (_isCheckingAuth)
+    {
+        <!-- Show nothing while checking authentication to prevent flash -->
+    }
+    else
+    {
+        <MudGrid Spacing="0" Class="vh-100" Style="height: 100vh; overflow: hidden;">
         <!-- Left Side: Login Form -->
         <MudItem xs="12" md="5" lg="4" Class="d-flex flex-column justify-center px-8 px-md-16 relative login-form-container">
 
             <!-- Theme Toggle -->
             <div style="position: absolute; top: 1rem; right: 1rem; z-index: 10;">
-                <MudIconButton Icon="@GetThemeIcon()"
-                               Color="@GetThemeColor()"
-                               Style="@(LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "")"
-                               Class="@(LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "")"
-                               OnClick="@ToggleThemeAsync"
-                               title="Toggle Theme Mode" />
+                <MudTooltip Text="@GetThemeTooltip()">
+                    <MudIconButton Icon="@GetThemeIcon()"
+                                   Color="@GetThemeColor()"
+                                   Style="@(LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "")"
+                                   Class="@(LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "")"
+                                   OnClick="@ToggleThemeAsync" />
+                </MudTooltip>
             </div>
 
         <!-- Logo Area -->
@@ -124,14 +124,13 @@
         </EditForm>
         
         <MudButton Variant="Variant.Outlined" 
-                   StartIcon="@Icons.Custom.Brands.Google" 
                    Color="Color.Default" 
+                   Size="Size.Large" 
                    FullWidth="true" 
-                   Size="Size.Large"
-                   Class="rounded-pill"
-                   Style="height: 50px; text-transform: none; border-color: #dadce0; color: inherit;"
-                   Href="@($"api/auth/login?returnUrl={ReturnUrl}")">
-            Sign in with Google
+                   Href="/api/auth/login"
+                   Style="height: 50px; border-radius: 8px; font-weight: 600; letter-spacing: 1px;"
+                   StartIcon="@Icons.Custom.Brands.Google">
+            <MudText>SIGN IN WITH GOOGLE</MudText>
         </MudButton>
 
     </MudItem>
@@ -155,9 +154,8 @@
         </div>
     </MudItem>
 </MudGrid>
+    }
 </div>
-
-@implements IDisposable
 
 @code {
     [Parameter]
@@ -175,6 +173,7 @@
     private string _usernameInput = string.Empty;
     private bool _usernameError = false;
     private string _usernameErrorText = string.Empty;
+    private bool _isCheckingAuth = true; // Start with true to prevent flash
 
     // Computed property for password manager
     private string _fullEmailForPasswordManager =>
@@ -240,41 +239,41 @@
         _loginModel.Username = cleanValue;
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         ReturnUrl ??= "/";
-        LayoutService.MajorUpdateOccurred += OnLayoutUpdate;
+        
+        // CRITICAL: Check authentication during SSR to prevent flash
+        // This runs on both server and client, preventing the login form from rendering at all if authenticated
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated == true)
+            {
+                // User is already logged in, redirect immediately
+                Navigation.NavigateTo(ReturnUrl ?? "/", replace: true);
+                return; // Stop further initialization
+            }
+        }
+        catch 
+        { 
+            // If auth check fails, continue to show login page
+        }
+        
+        // User is NOT authenticated, show the login form
+        _isCheckingAuth = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Initialize theme service when JS is available
-            await LayoutService.InitializeAsync();
-
-            // Redirect if already authenticated
-            try
-            {
-                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-                if (authState.User.Identity?.IsAuthenticated == true)
-                {
-                    Navigation.NavigateTo(ReturnUrl ?? "/", replace: true);
-                    return;
-                }
-            }
-            catch { }
-
             if (!string.IsNullOrEmpty(Error))
             {
                 _errorMessage = Error;
+                StateHasChanged();
             }
         }
-    }
-
-    private void OnLayoutUpdate(object? sender, EventArgs e)
-    {
-        StateHasChanged();
     }
 
     private async Task ToggleThemeAsync()
@@ -294,6 +293,13 @@
         ThemeMode.Dark => Color.Primary,
         ThemeMode.Light => Color.Warning,
         _ => Color.Inherit
+    };
+
+    private string GetThemeTooltip() => LayoutService.CurrentMode switch
+    {
+        ThemeMode.Dark => "Dark theme",
+        ThemeMode.Light => "Light theme",
+        _ => "Auto"
     };
 
 
@@ -354,11 +360,6 @@
         {
             _isProcessing = false;
         }
-    }
-
-    public void Dispose()
-    {
-        LayoutService.MajorUpdateOccurred -= OnLayoutUpdate;
     }
 
     public class InternalLoginModel

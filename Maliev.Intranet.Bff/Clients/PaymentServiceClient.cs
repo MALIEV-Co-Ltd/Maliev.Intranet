@@ -9,8 +9,19 @@ namespace Maliev.Intranet.Bff.Clients;
 public class PaymentServiceClient(HttpClient httpClient)
 {
     /// <summary>
+    /// Retrieves payment metrics.
+    /// </summary>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>Payment statistics DTO.</returns>
+    public async Task<PaymentStatsDto?> GetPaymentStatsAsync(CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<PaymentStatsDto>("/payment/v1/metrics/stats", ct);
+    }
+
+    /// <summary>
     /// Retrieves a paged list of payments.
     /// </summary>
+
     /// <param name="page">The page number to retrieve.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <param name="ct">The cancellation token.</param>

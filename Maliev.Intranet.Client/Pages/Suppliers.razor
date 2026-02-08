@@ -1,4 +1,6 @@
 @page "/mfg/suppliers"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
 
 <PageTitle>Suppliers - Maliev Intranet</PageTitle>
 
@@ -34,19 +36,23 @@
         else
         {
             <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg" Style="max-height: 600px; overflow-y: auto;">
-                <MudList T="SupplierDto" Dense="true" SelectedValue="_selectedSupplier">
+                <MudList T="SupplierSummaryDto" Dense="true" SelectedValue="_selectedSupplier">
                     @foreach (var supplier in _suppliers)
                     {
-                        <MudListItem T="SupplierDto" Value="supplier" OnClick="@(() => OnSupplierSelected(supplier))">
+                        <MudListItem T="SupplierSummaryDto" Value="supplier" OnClick="@(() => OnSupplierSelected(supplier))">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.subtitle2">@supplier.Name</MudText>
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudRating SelectedValue="supplier.Rating" Size="Size.Small" ReadOnly="true" />
+                                    <MudRating SelectedValue="(int)supplier.Rating" Size="Size.Small" ReadOnly="true" />
                                     <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(supplier.Status)">@supplier.Status</MudChip>
                                 </MudStack>
                             </MudStack>
                         </MudListItem>
                         <MudDivider />
+                    }
+                    @if (!_suppliers.Any())
+                    {
+                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No suppliers found</MudText>
                     }
                 </MudList>
             </MudPaper>
@@ -54,14 +60,14 @@
     </MudItem>
 
     <MudItem xs="12" md="8">
-        @if (_selectedSupplier != null)
+        @if (_selectedSupplierDetails != null)
         {
             <MudStack Spacing="3">
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-4">
                         <div>
-                            <MudText Typo="Typo.h5">@_selectedSupplier.Name</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@_selectedSupplier.Category</MudText>
+                            <MudText Typo="Typo.h5">@_selectedSupplierDetails.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@_selectedSupplierDetails.Country</MudText>
                         </div>
                         <MudStack Row="true" Spacing="2">
                             <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Edit">Edit</MudButton>
@@ -74,47 +80,57 @@
                     <MudGrid>
                         <MudItem xs="6">
                             <MudText Typo="Typo.subtitle2" Class="mb-2">Contact Information</MudText>
-                            <MudStack Spacing="1">
-                                <MudText Typo="Typo.body2"><strong>Email:</strong> @_selectedSupplier.Email</MudText>
-                                <MudText Typo="Typo.body2"><strong>Phone:</strong> @_selectedSupplier.Phone</MudText>
-                                <MudText Typo="Typo.body2"><strong>Address:</strong> @_selectedSupplier.Address</MudText>
-                            </MudStack>
+                            @if (_isDetailsLoading)
+                            {
+                                <MudSkeleton Width="100%" />
+                                <MudSkeleton Width="80%" />
+                                <MudSkeleton Width="90%" />
+                            }
+                            else
+                            {
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.body2"><strong>Email:</strong> @_selectedSupplierDetails.Email</MudText>
+                                    <MudText Typo="Typo.body2"><strong>Phone:</strong> @_selectedSupplierDetails.Phone</MudText>
+                                    <MudText Typo="Typo.body2"><strong>Address:</strong> @_selectedSupplierDetails.Address</MudText>
+                                </MudStack>
+                            }
                         </MudItem>
                         <MudItem xs="6">
                             <MudText Typo="Typo.subtitle2" Class="mb-2">Performance</MudText>
-                            <MudStack Spacing="2">
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Rating</MudText>
-                                    <MudRating SelectedValue="@_selectedSupplier.Rating" ReadOnly="true" />
-                                </div>
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">On-Time Delivery</MudText>
-                                    <MudProgressLinear Color="Color.Success" Value="92" Size="Size.Small" />
-                                    <MudText Typo="Typo.caption">92%</MudText>
-                                </div>
-                            </MudStack>
+                            @if (_isDetailsLoading)
+                            {
+                                <MudSkeleton Width="40%" Height="40px" />
+                                <MudSkeleton Width="100%" Height="20px" />
+                            }
+                            else
+                            {
+                                <MudStack Spacing="2">
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Rating</MudText>
+                                        <MudRating SelectedValue="@((int)_selectedSupplierDetails.Rating)" ReadOnly="true" />
+                                    </div>
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                                        <MudChip T="string" Color="@GetStatusColor(_selectedSupplierDetails.Status)" Size="Size.Small">@_selectedSupplierDetails.Status</MudChip>
+                                    </div>
+                                </MudStack>
+                            }
                         </MudItem>
                     </MudGrid>
                 </MudPaper>
 
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
-                    <MudText Typo="Typo.h6" Class="mb-3">Recent Purchase Orders</MudText>
-                    <MudSimpleTable Dense="true" Hover="true">
-                        <thead>
-                            <tr>
-                                <th>PO Number</th>
-                                <th>Date</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td>PO-2026-0015</td><td>12 Jan 2026</td><td>$12,500</td><td><MudChip T="string" Size="Size.Small" Color="Color.Primary">Ordered</MudChip></td></tr>
-                            <tr><td>PO-2025-0487</td><td>28 Dec 2025</td><td>$8,750</td><td><MudChip T="string" Size="Size.Small" Color="Color.Success">Received</MudChip></td></tr>
-                        </tbody>
-                    </MudSimpleTable>
+                    <MudText Typo="Typo.h6" Class="mb-3">Recent Activity</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Activity history integration pending.</MudText>
                 </MudPaper>
             </MudStack>
+        }
+        else if (_isDetailsLoading)
+        {
+            <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Class="rounded-lg mb-4" />
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="150px" Class="rounded-lg" />
+            </MudPaper>
         }
         else
         {
@@ -128,21 +144,47 @@
 
 @code {
     private bool _isLoading = true;
+    private bool _isDetailsLoading = false;
     private string _searchString = "";
-    private List<SupplierDto> _suppliers = new();
-    private SupplierDto? _selectedSupplier;
+    private List<SupplierSummaryDto> _suppliers = new();
+    private SupplierSummaryDto? _selectedSupplier;
+    private SupplierDetailDto? _selectedSupplierDetails;
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _suppliers = await Http.GetFromJsonAsync<List<SupplierDto>>("api/suppliers");
-        await Task.Delay(500);
-        _isLoading = false;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>("api/suppliers");
+            _suppliers = response?.Data.ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading suppliers: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    private void OnSupplierSelected(SupplierDto supplier)
+    private async Task OnSupplierSelected(SupplierSummaryDto supplier)
     {
         _selectedSupplier = supplier;
+        _isDetailsLoading = true;
+        _selectedSupplierDetails = null;
+        
+        try
+        {
+            _selectedSupplierDetails = await Http.GetFromJsonAsync<SupplierDetailDto>($"api/suppliers/{supplier.Id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading supplier details: {ex.Message}");
+        }
+        finally
+        {
+            _isDetailsLoading = false;
+        }
     }
 
     private Color GetStatusColor(string status) => status switch
@@ -152,16 +194,5 @@
         "Pending" => Color.Warning,
         _ => Color.Default
     };
-
-    public class SupplierDto
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Category { get; set; } = string.Empty;
-        public int Rating { get; set; }
-        public string Status { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Phone { get; set; } = string.Empty;
-        public string Address { get; set; } = string.Empty;
-    }
 }
+

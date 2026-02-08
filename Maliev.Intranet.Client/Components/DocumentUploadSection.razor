@@ -1,0 +1,216 @@
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4" Elevation="1">
+    <div class="d-flex align-center mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Color="Color.Primary" Class="mr-2" />
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </div>
+
+    @if (!IsNdaSection)
+    {
+        <MudTextField Label="Document Category"
+                      @bind-Value="CustomCategory"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Placeholder="e.g., Business Card, Map, Tax Registration"
+                      HelperText="Specify what type of document this is"
+                      Class="mb-3" />
+    }
+    else
+    {
+        <MudSelect T="string"
+                   Label="NDA Document Type"
+                   @bind-Value="SelectedSubType"
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense"
+                   Class="mb-3">
+            <MudSelectItem Value="@("Draft")">Draft (Unsigned)</MudSelectItem>
+            <MudSelectItem Value="@("Signed")">Signed NDA</MudSelectItem>
+            <MudSelectItem Value="@("Amendment")">Amendment</MudSelectItem>
+            <MudSelectItem Value="@("Attachment")">Supporting Document</MudSelectItem>
+        </MudSelect>
+    }
+
+    <MudTextField Label="Description (Optional)"
+                  @bind-Value="Description"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Lines="2"
+                  Placeholder="Add notes about this document"
+                  Class="mb-3" />
+
+    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                   FilesChanged="OnFilesSelected"
+                   Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                   MaximumFileCount="10">
+        <ActivatorContent>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AttachFile"
+                       FullWidth="true"
+                       Disabled="@IsUploading">
+                Select Files
+            </MudButton>
+        </ActivatorContent>
+    </MudFileUpload>
+
+    @if (SelectedFiles.Any())
+    {
+        <MudList T="string" Dense="true" Class="mt-3">
+            @foreach (var file in SelectedFiles)
+            {
+                <MudListItem T="string">
+                    <div class="d-flex justify-space-between align-center">
+                        <div>
+                            <MudText Typo="Typo.body2">@file.Name</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @FormatFileSize(file.Size)
+                            </MudText>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                       Size="Size.Small"
+                                       OnClick="@(() => RemoveFile(file))" />
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Upload"
+                   OnClick="UploadFiles"
+                   Disabled="@(IsUploading || !IsValid())"
+                   FullWidth="true"
+                   Class="mt-3">
+            @(IsUploading ? "Uploading..." : $"Upload {SelectedFiles.Count} File(s)")
+        </MudButton>
+    }
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "Upload Documents";
+
+    [Parameter]
+    public bool IsNdaSection { get; set; }
+
+    [Parameter]
+    public EventCallback<List<CreateDocumentRequest>> OnDocumentsUploaded { get; set; }
+
+    private string CustomCategory { get; set; } = string.Empty;
+    private string? SelectedSubType { get; set; }
+    private string? Description { get; set; }
+    private List<IBrowserFile> SelectedFiles { get; set; } = [];
+    private bool IsUploading { get; set; }
+
+    private bool IsValid()
+    {
+        // For NDA documents, always valid
+        if (IsNdaSection) return true;
+
+        // For customer documents, allow upload with or without category
+        // If no category provided, use "General" as default
+        return true;
+    }
+
+    private void OnFilesSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        SelectedFiles.Clear();
+        SelectedFiles.AddRange(files);
+    }
+
+    private void RemoveFile(IBrowserFile file) => SelectedFiles.Remove(file);
+
+    private async Task UploadFiles()
+    {
+        IsUploading = true;
+        var uploadedDocs = new List<CreateDocumentRequest>();
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+
+            foreach (var file in SelectedFiles)
+            {
+                var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            // Use "General" as default category if none provided
+            var category = IsNdaSection ? "nda" :
+                (string.IsNullOrWhiteSpace(CustomCategory) ? "General" : CustomCategory.Trim());
+            var url = $"api/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}";
+            if (!string.IsNullOrEmpty(SelectedSubType))
+                url += $"&subType={Uri.EscapeDataString(SelectedSubType)}";
+
+            var response = await Http.PostAsync(url, content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var results = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
+
+                var finalCategory = IsNdaSection ? "NDA" :
+                    (string.IsNullOrWhiteSpace(CustomCategory) ? "General" : CustomCategory.Trim());
+
+                foreach (var result in results ?? [])
+                {
+                    uploadedDocs.Add(new CreateDocumentRequest
+                    {
+                        DocumentCategory = finalCategory,
+                        DocumentSubType = SelectedSubType,
+                        FileReference = result.StoragePath ?? result.FileReference,
+                        FileName = result.FileName,
+                        FileSize = result.Size,
+                        MimeType = GetMimeType(result.FileName),
+                        Description = Description
+                    });
+                }
+
+                Snackbar.Add($"Successfully uploaded {uploadedDocs.Count} file(s)", Severity.Success);
+
+                SelectedFiles.Clear();
+                CustomCategory = string.Empty;
+                SelectedSubType = null;
+                Description = null;
+
+                await OnDocumentsUploaded.InvokeAsync(uploadedDocs);
+            }
+            else
+            {
+                Snackbar.Add("Upload failed. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsUploading = false;
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+
+    private string GetMimeType(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".pdf" => "application/pdf",
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            _ => "application/octet-stream"
+        };
+    }
+}

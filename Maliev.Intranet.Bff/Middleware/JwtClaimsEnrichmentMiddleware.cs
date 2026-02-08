@@ -1,0 +1,86 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+
+namespace Maliev.Intranet.Bff.Middleware;
+
+/// <summary>
+/// Middleware that enriches the current user's claims with roles and permissions from the JWT access token.
+/// This keeps the authentication cookie small while ensuring authorization checks have access to all claims.
+/// </summary>
+public class JwtClaimsEnrichmentMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<JwtClaimsEnrichmentMiddleware> _logger;
+    private const string JwtClaimsCacheKey = "MalievJwtClaimsParsed";
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="JwtClaimsEnrichmentMiddleware"/> class.
+    /// </summary>
+    /// <param name="next">The next request delegate in the pipeline.</param>
+    /// <param name="logger">The logger instance.</param>
+    public JwtClaimsEnrichmentMiddleware(RequestDelegate next, ILogger<JwtClaimsEnrichmentMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Processes an HTTP request and enriches user claims from JWT if authenticated.
+    /// </summary>
+    /// <param name="context">The HTTP context.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public async Task InvokeAsync(HttpContext context)
+    {
+        // Only process authenticated requests
+        if (context.User?.Identity?.IsAuthenticated == true)
+        {
+            // Check if we've already enriched claims for this request
+            if (!context.Items.ContainsKey(JwtClaimsCacheKey))
+            {
+                try
+                {
+                    // Get access token from authentication properties
+                    var accessToken = await context.GetTokenAsync("access_token");
+
+                    if (!string.IsNullOrEmpty(accessToken))
+                    {
+                        // Parse JWT and extract claims
+                        var handler = new JwtSecurityTokenHandler();
+                        var jwtToken = handler.ReadJwtToken(accessToken);
+                        var identity = context.User.Identity as ClaimsIdentity;
+
+                        if (identity != null)
+                        {
+                            // Add roles and permissions from JWT to current identity
+                            foreach (var claim in jwtToken.Claims.Where(c =>
+                                c.Type is "roles" or "role" or "permissions" or "permission"))
+                            {
+                                // Only add if not already present
+                                if (!identity.HasClaim(claim.Type, claim.Value))
+                                {
+                                    identity.AddClaim(new Claim(claim.Type, claim.Value));
+                                }
+
+                                // Also add as ClaimTypes.Role for ASP.NET Core authorization
+                                if (claim.Type is "roles" or "role" && !identity.HasClaim(ClaimTypes.Role, claim.Value))
+                                {
+                                    identity.AddClaim(new Claim(ClaimTypes.Role, claim.Value));
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to enrich claims from JWT");
+                }
+
+                // Mark as processed to avoid re-parsing
+                context.Items[JwtClaimsCacheKey] = true;
+            }
+        }
+
+        await _next(context);
+    }
+}

@@ -1,3 +1,4 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,6 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for supplier-related operations, proxying to the Supplier Service.
 /// </summary>
 /// <param name="client">The supplier service client.</param>
-[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class SuppliersController(SupplierServiceClient client) : ControllerBase
@@ -20,6 +20,7 @@ public class SuppliersController(SupplierServiceClient client) : ControllerBase
     /// <param name="page">The page number.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <returns>A paged list of suppliers.</returns>
+    [RequirePermission(MalievPermissions.Supplier.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<SupplierSummaryDto>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
@@ -32,6 +33,7 @@ public class SuppliersController(SupplierServiceClient client) : ControllerBase
     /// </summary>
     /// <param name="id">The supplier ID.</param>
     /// <returns>The supplier details.</returns>
+    [RequirePermission(MalievPermissions.Supplier.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SupplierDetailDto>> GetById(Guid id)
     {

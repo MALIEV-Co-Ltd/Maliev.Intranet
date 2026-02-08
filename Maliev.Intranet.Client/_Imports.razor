@@ -1,4 +1,4 @@
-﻿@using System.Net.Http
+@using System.Net.Http
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
@@ -10,5 +10,9 @@
 @using MudBlazor
 @using Maliev.Intranet.Client
 @using Maliev.Intranet.Client.Layout
+@using Maliev.Intranet.Client.Components
+@using Maliev.Intranet.Client.Authorization
 @using Maliev.Intranet.Shared
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
+
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]

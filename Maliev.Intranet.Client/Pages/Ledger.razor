@@ -1,6 +1,10 @@
+@using Maliev.Intranet.Client.Helpers
 @page "/finance/ledger"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
 
 <PageTitle>General Ledger - Maliev Intranet</PageTitle>
+
 
 <MudText Typo="Typo.h4" Class="mb-4">General Ledger</MudText>
 
@@ -51,7 +55,7 @@
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">@account.Children.Count sub-accounts</MudText>
                                     }
                                 </div>
-                                <MudText Typo="Typo.subtitle2">@account.Balance.ToString("C0")</MudText>
+                                <MudText Typo="Typo.subtitle2">@ThaiCurrency.Format(account.Balance, 0)</MudText>
                             </MudStack>
                         </MudListItem>
                         <MudDivider />
@@ -111,34 +115,27 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.Delay(700);
-        
-        _accountsTree = new List<AccountNode>
+        try
         {
-            new AccountNode { Name = "Assets", Balance = 450000, Children = new List<AccountNode>
-            {
-                new AccountNode { Name = "Current Assets", Balance = 250000 },
-                new AccountNode { Name = "Fixed Assets", Balance = 200000 }
-            }},
-            new AccountNode { Name = "Liabilities", Balance = 180000, Children = new List<AccountNode>
-            {
-                new AccountNode { Name = "Current Liabilities", Balance = 80000 },
-                new AccountNode { Name = "Long-term Liabilities", Balance = 100000 }
-            }},
-            new AccountNode { Name = "Equity", Balance = 270000, Children = new List<AccountNode>() },
-            new AccountNode { Name = "Revenue", Balance = 580000, Children = new List<AccountNode>() },
-            new AccountNode { Name = "Expenses", Balance = 320000, Children = new List<AccountNode>() }
-        };
+            // TODO: Replace with real BFF API calls
+            // var accountsTask = Http.GetFromJsonAsync<List<AccountNode>>("api/accounting/accounts-tree");
+            // var entriesTask = Http.GetFromJsonAsync<List<JournalEntryDto>>("api/accounting/journal-entries");
+            // await Task.WhenAll(accountsTask, entriesTask);
+            // _accountsTree = await accountsTask ?? new();
+            // _entries = await entriesTask ?? new();
 
-        _entries = new List<JournalEntryDto>
+            // Zeroing out mocked data for hard-cut to real data structures
+            _accountsTree = new();
+            _entries = new();
+        }
+        catch (Exception ex)
         {
-            new() { Id = Guid.NewGuid(), EntryNumber = "JE-2026-0045", Date = DateTime.Now.AddDays(-2), Description = "Payment received from Acme Corporation", Debit = 15750.00m, Credit = 0m, Status = "Posted" },
-            new() { Id = Guid.NewGuid(), EntryNumber = "JE-2026-0044", Date = DateTime.Now.AddDays(-3), Description = "Inventory purchase", Debit = 0m, Credit = 8500.00m, Status = "Posted" },
-            new() { Id = Guid.NewGuid(), EntryNumber = "JE-2026-0043", Date = DateTime.Now.AddDays(-5), Description = "Equipment depreciation", Debit = 2200.00m, Credit = 2200.00m, Status = "Posted" },
-            new() { Id = Guid.NewGuid(), EntryNumber = "JE-2026-0042", Date = DateTime.Now, Description = "Utility bill payment", Debit = 1200.00m, Credit = 0m, Status = "Draft" },
-        };
-        
-        _isLoading = false;
+            Console.WriteLine($"Error loading ledger data: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private Color GetStatusColor(string status) => status switch

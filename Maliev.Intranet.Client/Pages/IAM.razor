@@ -1,14 +1,19 @@
 @page "/admin/iam"
+@using Maliev.Intranet.Shared
+@using Microsoft.AspNetCore.Authorization
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>IAM Console - Maliev Intranet</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">IAM Console</MudText>
 
 <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-4">
+    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-4" @bind-ActivePanelIndex="_activeTab">
         <!-- Users Tab -->
         <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.People">
-            @if (_isLoading)
+            @if (_isLoadingUsers)
             {
                 <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
             }
@@ -16,37 +21,27 @@
             {
                 <MudStack Spacing="3">
                     <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudTextField @bind-Value="_searchString" Placeholder="Search users..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" />
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd">Add User</MudButton>
+                        <MudTextField @bind-Value="_searchString" Placeholder="Search users..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
                     </MudStack>
                     
-                    <MudDataGrid T="UserDto" Items="@_users" Dense="true" Hover="true" Elevation="0">
+                    <MudDataGrid T="PrincipalSummaryDto" Items="@_users" Dense="true" Hover="true" Elevation="0" Filterable="true" QuickFilter="@_quickFilter">
                         <Columns>
-                            <PropertyColumn Property="x => x.Name" Title="Name" />
+                            <PropertyColumn Property="x => x.DisplayName" Title="Name" />
                             <PropertyColumn Property="x => x.Email" Title="Email" />
-                            <TemplateColumn Title="Roles">
-                                <CellTemplate>
-                                    <MudStack Row="true" Spacing="1">
-                                        @foreach (var role in context.Item.Roles)
-                                        {
-                                            <MudChip Size="Size.Small" Color="Color.Primary">@role</MudChip>
-                                        }
-                                    </MudStack>
-                                </CellTemplate>
-                            </TemplateColumn>
                             <TemplateColumn Title="Status">
                                 <CellTemplate>
-                                    <MudChip Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
+                                    <MudChip T="string" Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
                                         @(context.Item.IsActive ? "Active" : "Inactive")
                                     </MudChip>
                                 </CellTemplate>
                             </TemplateColumn>
-                            <PropertyColumn Property="x => x.LastLogin" Title="Last Login" Format="dd MMM yyyy HH:mm" />
+                            <PropertyColumn Property="x => x.CreatedAt" Title="Created" Format="dd MMM yyyy" />
                             <TemplateColumn Title="Actions" Sortable="false">
                                 <CellTemplate>
                                     <MudStack Row="true" Spacing="1">
-                                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
-                                        <MudIconButton Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" Color="Color.Default" />
+                                        <MudTooltip Text="Manage Roles">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.Security" Size="Size.Small" Color="Color.Primary" OnClick="@(() => ManageUserRoles(context.Item))" />
+                                        </MudTooltip>
                                     </MudStack>
                                 </CellTemplate>
                             </TemplateColumn>
@@ -58,68 +53,155 @@
 
         <!-- Roles Tab -->
         <MudTabPanel Text="Roles" Icon="@Icons.Material.Outlined.Security">
-            @if (_isLoading)
+            @if (_isLoadingRoles)
             {
                 <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
             }
             else
             {
                 <MudStack Spacing="3">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Create Role</MudButton>
-                    
-                    <MudList T="string" Dense="true">
-                        @foreach (var role in _roles)
-                        {
-                            <MudListItem T="string">
-                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                    <div>
-                                        <MudText Typo="Typo.subtitle2">@role.Name</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@role.PermissionCount permissions</MudText>
-                                    </div>
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                    <MudTable Items="@_roles" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Role ID</MudTh>
+                            <MudTh>Description</MudTh>
+                            <MudTh>Permissions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd><code>@context.RoleId</code></MudTd>
+                            <MudTd>@context.Description</MudTd>
+                            <MudTd>
+                                <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                                    @foreach (var p in context.PermissionIds.Take(3))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@p</MudChip>
+                                    }
+                                    @if (context.PermissionIds.Count > 3)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">+@(context.PermissionIds.Count - 3)</MudChip>
+                                    }
                                 </MudStack>
-                            </MudListItem>
-                            <MudDivider />
-                        }
-                    </MudList>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
                 </MudStack>
             }
         </MudTabPanel>
 
-        <!-- Audit Log Tab -->
-        <MudTabPanel Text="Audit Log" Icon="@Icons.Material.Outlined.History">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Recent IAM activities will appear here</MudText>
+        <!-- Permissions Tab -->
+        <MudTabPanel Text="Permissions" Icon="@Icons.Material.Outlined.List">
+            @if (_isLoadingPermissions)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
+            }
+            else
+            {
+                <MudTable Items="@_permissions" Dense="true" Hover="true" Elevation="0" Height="500px" FixedHeader="true">
+                    <HeaderContent>
+                        <MudTh>Permission</MudTh>
+                        <MudTh>Description</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd><code>@context.PermissionId</code></MudTd>
+                        <MudTd>@context.Description</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
         </MudTabPanel>
     </MudTabs>
 </MudPaper>
 
 @code {
-    private bool _isLoading = true;
+    private bool _isLoadingUsers = true;
+    private bool _isLoadingRoles = true;
+    private bool _isLoadingPermissions = true;
+    private int _activeTab = 0;
     private string _searchString = "";
-    private List<UserDto> _users = new();
+    private List<PrincipalSummaryDto> _users = new();
     private List<RoleDto> _roles = new();
+    private List<PermissionDto> _permissions = new();
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _users = await Http.GetFromJsonAsync<List<UserDto>>("api/iam/users");
-        // _roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/iam/roles");
-        await Task.Delay(500);
-        _isLoading = false;
+        await LoadUsers();
+        await LoadRoles();
+        await LoadPermissions();
     }
 
-    public class UserDto
+    private async Task LoadUsers()
     {
-        public string Name { get; set; } = "";
-        public string Email { get; set; } = "";
-        public string[] Roles { get; set; } = Array.Empty<string>();
-        public bool IsActive { get; set; }
-        public DateTime LastLogin { get; set; }
+        _isLoadingUsers = true;
+        try
+        {
+            _users = await Http.GetFromJsonAsync<List<PrincipalSummaryDto>>("api/iam/users") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading users: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingUsers = false;
+        }
     }
 
-    public class RoleDto
+    private async Task LoadRoles()
     {
-        public string Name { get; set; } = "";
-        public int PermissionCount { get; set; }
+        _isLoadingRoles = true;
+        try
+        {
+            _roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/iam/roles") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading roles: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingRoles = false;
+        }
+    }
+
+    private async Task LoadPermissions()
+    {
+        _isLoadingPermissions = true;
+        try
+        {
+            _permissions = await Http.GetFromJsonAsync<List<PermissionDto>>("api/iam/permissions") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading permissions: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingPermissions = false;
+        }
+    }
+
+    private Func<PrincipalSummaryDto, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.DisplayName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        if (x.Email?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        return false;
+    };
+
+    private async Task ManageUserRoles(PrincipalSummaryDto user)
+    {
+        var parameters = new DialogParameters<UserRolesDialog>
+        {
+            { x => x.User, user },
+            { x => x.AvailableRoles, _roles }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<UserRolesDialog>($"Manage Roles for {user.DisplayName}", parameters, options);
+        await dialog.Result;
     }
 }

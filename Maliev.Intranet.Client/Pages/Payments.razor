@@ -1,4 +1,7 @@
 @page "/finance/payments"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Helpers
+@inject HttpClient Http
 
 <PageTitle>Payments - Maliev Intranet</PageTitle>
 
@@ -20,9 +23,10 @@
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                 <MudStack Spacing="2">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Today's Total</MudText>
-                    <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">$42,350</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Success">
-                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +12% from yesterday
+                    <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">@ThaiCurrency.Format(_stats.TodayTotal, 2)</MudText>
+                    <MudText Typo="Typo.caption" Color="@(_stats.PercentageChangeFromYesterday >= 0 ? Color.Success : Color.Error)">
+                        <MudIcon Icon="@(_stats.PercentageChangeFromYesterday >= 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" Size="Size.Small" /> 
+                        @Math.Abs(_stats.PercentageChangeFromYesterday).ToString("P0") from yesterday
                     </MudText>
                 </MudStack>
             </MudPaper>
@@ -31,8 +35,8 @@
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                 <MudStack Spacing="2">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Pending</MudText>
-                    <MudText Typo="Typo.h5" Color="Color.Warning" Style="font-weight: 700;">$8,120</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">3 transactions</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Warning" Style="font-weight: 700;">@ThaiCurrency.Format(_stats.PendingTotal, 2)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_stats.PendingCount transactions</MudText>
                 </MudStack>
             </MudPaper>
         </MudItem>
@@ -40,7 +44,7 @@
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                 <MudStack Spacing="2">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Successful</MudText>
-                    <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">$156,780</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">@ThaiCurrency.Format(_stats.MonthTotal, 2)</MudText>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">This month</MudText>
                 </MudStack>
             </MudPaper>
@@ -49,8 +53,8 @@
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                 <MudStack Spacing="2">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Failed</MudText>
-                    <MudText Typo="Typo.h5" Color="Color.Error" Style="font-weight: 700;">$2,450</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Error">2 transactions</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Error" Style="font-weight: 700;">@ThaiCurrency.Format(_stats.FailedTotal, 2)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Error">@_stats.FailedCount transactions</MudText>
                 </MudStack>
             </MudPaper>
         </MudItem>
@@ -66,8 +70,6 @@
                       Variant="Variant.Outlined" 
                       Margin="Margin.Dense" 
                       Style="max-width: 400px;" />
-        
-        <MudDateRangePicker Label="Date Range" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" />
         
         <MudSpacer />
         
@@ -89,22 +91,20 @@
 else
 {
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-        <MudDataGrid T="PaymentDto" Items="@_payments" Dense="true" Hover="true" Elevation="0">
+        <MudDataGrid T="PaymentSummaryDto" Items="@_payments" Dense="true" Hover="true" Elevation="0">
             <Columns>
-                <PropertyColumn Property="x => x.TransactionId" Title="Transaction ID" />
-                <PropertyColumn Property="x => x.InvoiceNumber" Title="Invoice #" />
+                <PropertyColumn Property="x => x.PaymentNumber" Title="Number" />
                 <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
                 <PropertyColumn Property="x => x.Amount" Title="Amount" Format="C2" />
-                <PropertyColumn Property="x => x.Method" Title="Method" />
-                <PropertyColumn Property="x => x.Provider" Title="Provider" />
+                <PropertyColumn Property="x => x.PaymentMethod" Title="Method" />
                 <TemplateColumn Title="Status">
                     <CellTemplate>
-                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
                             @context.Item.Status
                         </MudChip>
                     </CellTemplate>
                 </TemplateColumn>
-                <PropertyColumn Property="x => x.Date" Title="Date" Format="dd MMM yyyy HH:mm" />
+                <PropertyColumn Property="x => x.PaymentDate" Title="Date" Format="dd MMM yyyy HH:mm" />
                 <TemplateColumn Title="Actions" Sortable="false">
                     <CellTemplate>
                         <MudStack Row="true" Spacing="1">
@@ -114,6 +114,9 @@ else
                     </CellTemplate>
                 </TemplateColumn>
             </Columns>
+            <NoRecordsContent>
+                <MudText Class="pa-4 text-center" Color="Color.Secondary">No transactions found</MudText>
+            </NoRecordsContent>
         </MudDataGrid>
     </MudPaper>
 }
@@ -121,14 +124,30 @@ else
 @code {
     private bool _isLoading = true;
     private string _searchString = "";
-    private List<PaymentDto> _payments = new();
+    private List<PaymentSummaryDto> _payments = new();
+    private PaymentStatsDto _stats = new();
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _payments = await Http.GetFromJsonAsync<List<PaymentDto>>("api/payments");
-        await Task.Delay(500);
-        _isLoading = false;
+        try
+        {
+            var statsTask = Http.GetFromJsonAsync<PaymentStatsDto>("api/payments/stats");
+            var paymentsTask = Http.GetFromJsonAsync<PagedResponse<PaymentSummaryDto>>("api/payments");
+
+            await Task.WhenAll(statsTask, paymentsTask);
+
+            _stats = await statsTask ?? new();
+            var response = await paymentsTask;
+            _payments = response?.Data.ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading payments: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private Color GetStatusColor(string status) => status switch
@@ -139,17 +158,5 @@ else
         "Refunded" => Color.Info,
         _ => Color.Default
     };
-
-    public class PaymentDto
-    {
-        public Guid Id { get; set; }
-        public string TransactionId { get; set; } = string.Empty;
-        public string InvoiceNumber { get; set; } = string.Empty;
-        public string CustomerName { get; set; } = string.Empty;
-        public decimal Amount { get; set; }
-        public string Method { get; set; } = string.Empty;
-        public string Provider { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public DateTime Date { get; set; }
-    }
 }
+

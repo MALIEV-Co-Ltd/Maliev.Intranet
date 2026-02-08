@@ -1,0 +1,119 @@
+@using MudBlazor
+
+<MudPaper Elevation="0" Class="form-section-paper">
+    <div class="section-header-wrapper">
+        <div class="section-header-content">
+            <div class="section-number">@SectionNumber</div>
+            <div class="section-text">
+                @if (Icon != null)
+                {
+                    <MudIcon Icon="@Icon" Size="Size.Small" Class="section-icon" />
+                }
+                <div>
+                    <MudText Typo="Typo.h5" Class="section-title">@Title</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="section-description">@Description</MudText>
+                </div>
+            </div>
+        </div>
+        @if (HeaderActions != null)
+        {
+            <div class="section-header-actions">
+                @HeaderActions
+            </div>
+        }
+    </div>
+    <MudDivider Class="section-divider" />
+    <div class="section-content">
+        @ChildContent
+    </div>
+</MudPaper>
+
+<style>
+    .form-section-paper {
+        margin-bottom: 2.5rem;
+        padding: 0;
+        border: none;
+    }
+
+    .section-header-wrapper {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 2rem;
+        padding-bottom: 1rem;
+    }
+
+    .section-header-content {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+        flex: 1;
+    }
+
+    .section-number {
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--mud-palette-primary);
+        line-height: 1;
+        flex-shrink: 0;
+        min-width: 3rem;
+    }
+
+    .section-text {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+    }
+
+    .section-icon {
+        margin-top: 0.25rem;
+        color: var(--mud-palette-primary);
+    }
+
+    .section-title {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+        line-height: 1.3;
+    }
+
+    .section-description {
+        margin: 0;
+        opacity: 0.7;
+    }
+
+    .section-header-actions {
+        flex-shrink: 0;
+    }
+
+    .section-divider {
+        margin: 0.75rem 0 1.5rem 0;
+    }
+
+    .section-content {
+        padding-left: 4rem;
+    }
+
+    @@media (max-width: 960px) {
+        .section-header-wrapper {
+            flex-direction: column;
+        }
+
+        .section-content {
+            padding-left: 0;
+        }
+
+        .section-number {
+            min-width: 2.5rem;
+            font-size: 1.25rem;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public string SectionNumber { get; set; } = "01";
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Description { get; set; } = "";
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

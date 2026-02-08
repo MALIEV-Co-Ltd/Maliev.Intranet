@@ -7,7 +7,11 @@
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
                 <Authorizing>
-                    <p>Authorizing...</p>
+                    <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+                        <div style="text-align: center;">
+                            <div style="margin-bottom: 1rem;">Loading...</div>
+                        </div>
+                    </div>
                 </Authorizing>
                 <NotAuthorized Context="authState">
                     @if (authState.User.Identity?.IsAuthenticated != true)

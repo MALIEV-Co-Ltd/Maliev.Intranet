@@ -1,3 +1,53 @@
 @inherits LayoutComponentBase
+@using Maliev.Intranet.Client.Services
+@inject LayoutService LayoutService
+@implements IDisposable
+
+<MudThemeProvider @ref="@_mudThemeProvider"
+                  Theme="ThemeConfiguration.MalievTheme"
+                  IsDarkMode="LayoutService.IsDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
 @Body
+
+@code {
+    private MudThemeProvider _mudThemeProvider = null!;
+
+    protected override void OnInitialized()
+    {
+        LayoutService.MajorUpdateOccurred += OnLayoutUpdate;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // CRITICAL: Initialize theme service after JS interop is available
+            await LayoutService.InitializeAsync();
+            
+            // Watch for system dark mode changes (for Auto mode)
+            await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemPreferenceChanged);
+
+            // Force re-render after theme initialization to sync MudThemeProvider
+            StateHasChanged();
+        }
+    }
+
+    private Task OnSystemPreferenceChanged(bool isSystemDark)
+    {
+        LayoutService.UpdateSystemPreference(isSystemDark);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLayoutUpdate(object? sender, EventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        LayoutService.MajorUpdateOccurred -= OnLayoutUpdate;
+    }
+}

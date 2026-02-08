@@ -80,10 +80,21 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _models = await Http.GetFromJsonAsync<List<Model3DDto>>("api/models");
-        await Task.Delay(500);
-        _isLoading = false;
+        try
+        {
+            // TODO: Replace with BFF API call
+            // _models = await Http.GetFromJsonAsync<List<Model3DDto>>("api/models");
+            
+            _models = new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading 3D models: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     public class Model3DDto

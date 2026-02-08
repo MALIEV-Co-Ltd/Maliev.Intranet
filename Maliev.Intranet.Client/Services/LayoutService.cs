@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Http;
 using Microsoft.JSInterop;
 
 namespace Maliev.Intranet.Client.Services;
@@ -30,30 +31,46 @@ public class LayoutService : IDisposable
     /// <param name="jsRuntime">The JS runtime for theme persistence.</param>
     /// <param name="state">The persistent component state to hydrate from server.</param>
     /// <param name="logger">The logger instance.</param>
-    public LayoutService(IJSRuntime jsRuntime, PersistentComponentState state, ILogger<LayoutService> logger)
+    /// <param name="httpContextAccessor">HTTP context accessor for reading cookies during SSR (optional).</param>
+    public LayoutService(
+        IJSRuntime jsRuntime, 
+        PersistentComponentState state, 
+        ILogger<LayoutService> logger,
+        IHttpContextAccessor? httpContextAccessor = null)
     {
         _jsRuntime = jsRuntime;
         _logger = logger;
 
-        // CRITICAL: Synchronously hydrate from server-side persisted state
-        // This prevents flash because SSR already determined the theme
-        if (state.TryTakeFromJson<string>(ThemeCookieName, out var persistedTheme))
+        // CRITICAL FIX: Read theme from cookie during SSR to prevent flash
+        // This ensures the initial render has the correct theme
+        var context = httpContextAccessor?.HttpContext;
+        if (context != null)
         {
-            _currentMode = persistedTheme switch
+            var cookieValue = context.Request.Cookies[ThemeCookieName];
+            var systemDarkHint = context.Request.Cookies["maliev_system_dark"];
+            
+            if (!string.IsNullOrEmpty(cookieValue))
             {
-                "dark" => ThemeMode.Dark,
-                "light" => ThemeMode.Light,
-                _ => ThemeMode.System
-            };
+                _currentMode = cookieValue switch
+                {
+                    "dark" => ThemeMode.Dark,
+                    "light" => ThemeMode.Light,
+                    _ => ThemeMode.System
+                };
+            }
 
-            // Try to get the system dark mode hint from the server
-            if (state.TryTakeFromJson<bool>("maliev_system_dark", out var systemDarkHint))
+            if (bool.TryParse(systemDarkHint, out var isDark))
             {
-                _systemPreferencesIsDark = systemDarkHint;
+                _systemPreferencesIsDark = isDark;
             }
 
             CalculateEffectiveTheme();
-            _isInitialized = true;
+        }
+        else
+        {
+            // Client-side rendering (WASM) - will initialize in OnAfterRenderAsync
+            _currentMode = ThemeMode.System;
+            _isDarkMode = false;
         }
     }
 
@@ -69,22 +86,33 @@ public class LayoutService : IDisposable
     public ThemeMode CurrentMode => _currentMode;
 
     /// <summary>
-    /// Initializes the theme service by reading from DOM if not already hydrated.
-    /// Call this ONCE in OnInitializedAsync, NOT in OnAfterRenderAsync.
+    /// Initializes the theme service by reading from DOM.
+    /// This should be called in OnAfterRenderAsync after JS interop is available.
     /// </summary>
     /// <returns>A task representing the asynchronous operation.</returns>
     public async Task InitializeAsync()
     {
-        if (_isInitialized) return; // Already hydrated from SSR
+        if (_isInitialized)
+        {
+            _logger.LogDebug("Theme already initialized, skipping");
+            return;
+        }
 
         try
         {
-            // Read from cookie/storage via JS to get the preference
+            // CRITICAL: Read from data-theme attribute first (set by blocking script)
+            // This ensures we sync with what the user sees on initial render
+            var currentThemeAttr = await _jsRuntime.InvokeAsync<string>(
+                "eval",
+                "document.documentElement.getAttribute('data-theme') || 'light'"
+            );
+            
+            // Read user preference from cookie/storage
             var themePref = await _jsRuntime.InvokeAsync<string>(
                 "eval",
                 $"document.cookie.split('; ').find(row => row.startsWith('{ThemeCookieName}='))?.split('=')[1] || localStorage.getItem('{ThemeCookieName}') || 'system'"
             );
-
+            
             _currentMode = themePref switch
             {
                 "dark" => ThemeMode.Dark,
@@ -97,20 +125,40 @@ public class LayoutService : IDisposable
                 "eval",
                 "window.matchMedia('(prefers-color-scheme: dark)').matches"
             );
-
+            
+            // Calculate what theme should be active based on preference
             CalculateEffectiveTheme();
+
+            // Trust the blocking script's decision (it ran first and set data-theme)
+            // This prevents any flash
+            var expectedTheme = _isDarkMode ? "dark" : "light";
+            if (currentThemeAttr != expectedTheme)
+            {
+                _isDarkMode = currentThemeAttr == "dark";
+            }
+
             _isInitialized = true;
 
+            // Notify UI to update
             MajorUpdateOccurred?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
+            // Ignore JS interop errors during prerendering
+            if (ex.GetType().Name == "JSDisconnectedException" || 
+                ex.Message.Contains("JavaScript interop calls cannot be issued at this time"))
+            {
+                _logger.LogDebug("JS not available yet (prerendering)");
+                return;
+            }
+
             _logger.LogError(ex, "Failed to initialize theme");
             // Default to system/light on error
             _currentMode = ThemeMode.System;
             _isDarkMode = false;
             _isInitialized = true;
         }
+
     }
 
     /// <summary>

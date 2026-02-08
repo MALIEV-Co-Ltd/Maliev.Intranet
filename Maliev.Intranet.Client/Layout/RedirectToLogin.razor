@@ -4,7 +4,11 @@
 @code {
     protected override void OnInitialized()
     {
-        // Use an absolute path to ensure the redirect works from any level of sub-directory
-        Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}");
+        var loginUrl = $"/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+        
+        if (!Navigation.Uri.Contains("/login", StringComparison.OrdinalIgnoreCase))
+        {
+            Navigation.NavigateTo(loginUrl, forceLoad: true);
+        }
     }
 }

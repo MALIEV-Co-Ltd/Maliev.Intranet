@@ -1,3 +1,4 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,6 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for material-related operations, proxying to the Material Service.
 /// </summary>
 /// <param name="client">The material service client.</param>
-[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class MaterialsController(MaterialServiceClient client) : ControllerBase
@@ -20,6 +20,7 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     /// <param name="page">The page number.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <returns>A paged list of materials.</returns>
+    [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<MaterialSummaryDto>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
@@ -32,6 +33,7 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     /// </summary>
     /// <param name="id">The material ID.</param>
     /// <returns>The material details.</returns>
+    [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<MaterialDetailDto>> GetById(Guid id)
     {

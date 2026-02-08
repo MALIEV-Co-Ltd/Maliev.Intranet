@@ -1,0 +1,31 @@
+using Maliev.Intranet.Shared;
+
+namespace Maliev.Intranet.Bff.Clients;
+
+/// <summary>
+/// Client for interacting with the Career microservice for recruitment data.
+/// </summary>
+/// <param name="httpClient">The HTTP client instance.</param>
+public class CareerServiceClient(HttpClient httpClient)
+{
+    /// <summary>
+    /// Retrieves active job postings from the Career service.
+    /// </summary>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>A list of job posting summaries.</returns>
+    public async Task<List<JobPostingSummaryDto>> GetJobPostingsAsync(CancellationToken ct = default)
+    {
+        var response = await httpClient.GetFromJsonAsync<MalievResponse<List<JobPostingSummaryDto>>>("/career/v1/job-postings", ct);
+        return response?.Data ?? new();
+    }
+
+    /// <summary>
+    /// Retrieves recruitment statistics from the Career service.
+    /// </summary>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>Recruitment statistics.</returns>
+    public async Task<RecruitmentStatsDto?> GetRecruitmentStatsAsync(CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<RecruitmentStatsDto>("/career/v1/metrics/recruitment", ct);
+    }
+}

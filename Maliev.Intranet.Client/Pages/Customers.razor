@@ -1,62 +1,181 @@
 @page "/sales/customers"
 @using MudBlazor
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Helpers
+@using Maliev.Intranet.Client.Services
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject ISignalRCustomerService SignalRService
+@inject ISnackbar Snackbar
+@implements IAsyncDisposable
 
 <PageTitle>Customers - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-6">Customers</MudText>
+<MudContainer MaxWidth="MaxWidth.False" Class="mt-8 px-4 px-sm-8">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-bold">Customers</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Manage your client relationships and account balances.</MudText>
+    </div>
 
-<MudDataGrid T="CustomerSummaryDto" ServerData="@LoadGridData" Filterable="true" SortMode="SortMode.Multiple" @ref="_grid">
-    <ToolBarContent>
-        <MudText Typo="Typo.h6">Customer List</MudText>
-        <MudSpacer />
-        <MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Placeholder="Search" Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
-    </ToolBarContent>
+    <MudDataGrid T="CustomerSummaryDto" ServerData="@LoadGridData" Filterable="true" SortMode="SortMode.Multiple" @ref="_grid"
+                 Dense="true" Hover="true" Striped="true" Elevation="2" Class="border mud-border-lines-default rounded-xl overflow-hidden">
+        <ToolBarContent>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="w-100 pa-4 flex-grow-1">
+                <MudText Typo="Typo.h6" Class="font-bold">Customer List</MudText>
+                <MudSpacer />
+                <div class="d-flex align-center gap-4">
+                    <MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Placeholder="Search customers..." Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" Immediate="true" 
+                                  Style="width: 350px;" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"></MudTextField>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" 
+                               OnClick="@(() => Navigation.NavigateTo("/sales/customers/new"))" Class="px-6">
+                        Create Customer
+                    </MudButton>
+                </div>
+            </MudStack>
+        </ToolBarContent>
     <Columns>
-        <TemplateColumn Title="Company Name" SortBy="x => x.Name">
+        <TemplateColumn Title="Customer Name" SortBy="x => x.Name" HeaderClass="pl-6" CellClass="pl-6">
             <CellTemplate>
-                <MudLink OnClick="@(() => ViewDetails(context.Item.Id))" Class="cursor-pointer" Underline="Underline.None">
+                <MudLink Href="@($"/sales/customers/{context.Item.Id}")" Class="cursor-pointer font-bold" Underline="Underline.None">
                     <div class="d-flex align-center">
-                        <MudAvatar Size="Size.Small" Color="Color.Primary" Class="mr-2">@context.Item.Name[0]</MudAvatar>
+                        <MudAvatar Size="Size.Small" Color="Color.Primary" Class="mr-3" Style="width: 28px; height: 28px; font-size: 0.75rem;">
+                            @(!string.IsNullOrEmpty(context.Item.Name) ? context.Item.Name[0] : 'C')
+                        </MudAvatar>
                         @context.Item.Name
                     </div>
                 </MudLink>
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.Email" />
-        <TemplateColumn Title="Status">
+        <TemplateColumn Title="Company" SortBy="x => x.CompanyName">
             <CellTemplate>
-                <MudChip T="string" Color="@GetStatusColor(context.Item.Status)" Size="Size.Small">@context.Item.Status</MudChip>
+                @if (context.Item.CompanyId.HasValue)
+                {
+                    <MudLink OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{context.Item.CompanyId}"))" Underline="Underline.Hover" Color="Color.Info">
+                        @context.Item.CompanyName
+                    </MudLink>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Personal</MudText>
+                }
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.OutstandingBalance" Title="Balance" Format="C2" />
-        <TemplateColumn CellClass="d-flex justify-end">
+        <PropertyColumn Property="x => x.Email" />
+        <TemplateColumn Title="Phone" HeaderStyle="width: 180px;">
             <CellTemplate>
-                <MudTooltip Text="View Details">
-                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewDetails(context.Item.Id))" />
-                </MudTooltip>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" />
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" />
+                <div class="d-flex flex-column">
+                    @if (!string.IsNullOrEmpty(context.Item.CompanyPhone))
+                    {
+                        <div class="d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Color="Color.Secondary" Style="font-size: 1rem;" />
+                            <MudText Typo="Typo.body2">@context.Item.CompanyPhone</MudText>
+                            @if (!string.IsNullOrEmpty(context.Item.Extension))
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default" Class="ma-0 px-1" Style="height: 18px; font-size: 0.7rem;">
+                                    ext. @context.Item.Extension
+                                </MudChip>
+                            }
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(context.Item.Landline))
+                    {
+                        <div class="d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Color="Color.Secondary" Style="font-size: 1rem;" />
+                            <MudText Typo="Typo.body2">@context.Item.Landline</MudText>
+                        </div>
+                    }
+                </div>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Mobile" HeaderStyle="width: 140px;">
+            <CellTemplate>
+                @if (!string.IsNullOrEmpty(context.Item.Mobile))
+                {
+                    <div class="d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Smartphone" Size="Size.Small" Color="Color.Secondary" Style="font-size: 1rem;" />
+                        <MudText Typo="Typo.body2">@context.Item.Mobile</MudText>
+                    </div>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Segment" Title="Segment" HeaderStyle="width: 120px;" />
+        <TemplateColumn Title="NDA" HeaderStyle="width: 100px;">
+            <CellTemplate>
+                <MudChip T="string" Color="@GetNdaColor(context.Item.NdaStatus)" Size="Size.Small" Variant="Variant.Filled" Class="ma-0">
+                    @(context.Item.NdaStatus ?? "None")
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Status" HeaderStyle="width: 100px;">
+            <CellTemplate>
+                <MudChip T="string" Color="@GetStatusColor(context.Item.Status)" Size="Size.Small" Variant="Variant.Text" Class="ma-0">
+                    @context.Item.Status
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Balance" HeaderStyle="width: 120px;" CellStyle="text-align: right;" HeaderClass="justify-end">
+            <CellTemplate>
+                <MudText Typo="Typo.body2" Class="font-mono">@ThaiCurrency.Format(context.Item.OutstandingBalance, 2)</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn CellClass="pr-6" HeaderClass="justify-end pr-6" HeaderStyle="width: 100px;">
+            <CellTemplate>
+                <div class="d-flex justify-end gap-1">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Href="@($"/sales/customers/{context.Item.Id}/edit")" />
+                </div>
             </CellTemplate>
         </TemplateColumn>
     </Columns>
     <NoRecordsContent>
-        <MudText>No customers found.</MudText>
+        <MudText Class="pa-4">No customers found.</MudText>
     </NoRecordsContent>
     <LoadingContent>
-        <MudText>Loading customers...</MudText>
+        <MudText Class="pa-4">Loading customers...</MudText>
     </LoadingContent>
-    <PagerContent>
-        <MudDataGridPager T="CustomerSummaryDto" />
-    </PagerContent>
-</MudDataGrid>
+        <PagerContent>
+            <MudDataGridPager T="CustomerSummaryDto" />
+        </PagerContent>
+    </MudDataGrid>
+</MudContainer>
+
+
+
 
 @code {
     private MudDataGrid<CustomerSummaryDto> _grid = null!;
     private string? _searchString;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        // Start SignalR connection
+        await SignalRService.StartAsync();
+        SignalRService.OnCustomerChanged += HandleCustomerChanged;
+
+        // Ensure grid loads data on initialization
+        await Task.CompletedTask;
+    }
+
+    private async Task HandleCustomerChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            if (_grid != null)
+            {
+                await _grid.ReloadServerData();
+                Snackbar.Add("Customer data updated by another user", Severity.Info);
+                StateHasChanged();
+            }
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        SignalRService.OnCustomerChanged -= HandleCustomerChanged;
+        await SignalRService.StopAsync();
+    }
 
     private async Task<GridData<CustomerSummaryDto>> LoadGridData(GridState<CustomerSummaryDto> state)
     {
@@ -89,16 +208,19 @@
         return _grid.ReloadServerData();
     }
 
-    private void ViewDetails(Guid id)
-    {
-        Navigation.NavigateTo($"/sales/customers/{id}");
-    }
-
     private Color GetStatusColor(string status) => status switch
     {
         "Active" => Color.Success,
         "Inactive" => Color.Warning,
         "Blocked" => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetNdaColor(string? status) => status switch
+    {
+        "Signed" => Color.Success,
+        "Expired" => Color.Error,
+        "Pending" => Color.Warning,
         _ => Color.Default
     };
 }
