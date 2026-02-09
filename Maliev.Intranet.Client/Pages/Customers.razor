@@ -35,10 +35,10 @@
             </MudStack>
         </ToolBarContent>
     <Columns>
-        <TemplateColumn Title="Customer Name" SortBy="x => x.Name" HeaderClass="pl-6" CellClass="pl-6">
+        <TemplateColumn Title="Customer Name" SortBy="x => x.Name" HeaderClass="pl-6" CellClass="pl-6" HeaderStyle="white-space: nowrap;">
             <CellTemplate>
                 <MudLink Href="@($"/sales/customers/{context.Item.Id}")" Class="cursor-pointer font-bold" Underline="Underline.None">
-                    <div class="d-flex align-center">
+                    <div class="d-flex align-center" style="white-space: nowrap;">
                         <MudAvatar Size="Size.Small" Color="Color.Primary" Class="mr-3" Style="width: 28px; height: 28px; font-size: 0.75rem;">
                             @(!string.IsNullOrEmpty(context.Item.Name) ? context.Item.Name[0] : 'C')
                         </MudAvatar>
@@ -47,24 +47,26 @@
                 </MudLink>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Company" SortBy="x => x.CompanyName">
+        <TemplateColumn Title="Company" SortBy="x => x.CompanyName" HeaderClass="d-none d-md-table-cell" CellClass="d-none d-md-table-cell" HeaderStyle="white-space: nowrap;">
             <CellTemplate>
-                @if (context.Item.CompanyId.HasValue)
-                {
-                    <MudLink OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{context.Item.CompanyId}"))" Underline="Underline.Hover" Color="Color.Info">
-                        @context.Item.CompanyName
-                    </MudLink>
-                }
-                else
-                {
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">Personal</MudText>
-                }
+                <div style="white-space: nowrap;">
+                    @if (context.Item.CompanyId.HasValue)
+                    {
+                        <MudLink OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{context.Item.CompanyId}"))" Underline="Underline.Hover" Color="Color.Info">
+                            @context.Item.CompanyName
+                        </MudLink>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Personal</MudText>
+                    }
+                </div>
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.Email" />
-        <TemplateColumn Title="Phone" HeaderStyle="width: 180px;">
+        <PropertyColumn Property="x => x.Email" HeaderClass="d-none d-lg-table-cell" CellClass="d-none d-lg-table-cell" HeaderStyle="white-space: nowrap;" />
+        <TemplateColumn Title="Phone" HeaderStyle="width: 180px; white-space: nowrap;" HeaderClass="d-none d-xl-table-cell" CellClass="d-none d-xl-table-cell">
             <CellTemplate>
-                <div class="d-flex flex-column">
+                <div class="d-flex flex-column" style="white-space: nowrap;">
                     @if (!string.IsNullOrEmpty(context.Item.CompanyPhone))
                     {
                         <div class="d-flex align-center gap-1">
@@ -88,41 +90,41 @@
                 </div>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Mobile" HeaderStyle="width: 140px;">
+        <TemplateColumn Title="Mobile" HeaderStyle="width: 140px; white-space: nowrap;" HeaderClass="d-none d-md-table-cell" CellClass="d-none d-md-table-cell">
             <CellTemplate>
                 @if (!string.IsNullOrEmpty(context.Item.Mobile))
                 {
-                    <div class="d-flex align-center gap-1">
+                    <div class="d-flex align-center gap-1" style="white-space: nowrap;">
                         <MudIcon Icon="@Icons.Material.Filled.Smartphone" Size="Size.Small" Color="Color.Secondary" Style="font-size: 1rem;" />
                         <MudText Typo="Typo.body2">@context.Item.Mobile</MudText>
                     </div>
                 }
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.Segment" Title="Segment" HeaderStyle="width: 120px;" />
-        <TemplateColumn Title="NDA" HeaderStyle="width: 100px;">
+        <PropertyColumn Property="x => x.Segment" Title="Segment" HeaderStyle="width: 120px; white-space: nowrap;" HeaderClass="d-none d-lg-table-cell" CellClass="d-none d-lg-table-cell" />
+        <TemplateColumn Title="NDA" HeaderStyle="width: 100px; white-space: nowrap;" HeaderClass="d-none d-sm-table-cell" CellClass="d-none d-sm-table-cell">
             <CellTemplate>
                 <MudChip T="string" Color="@GetNdaColor(context.Item.NdaStatus)" Size="Size.Small" Variant="Variant.Filled" Class="ma-0">
                     @(context.Item.NdaStatus ?? "None")
                 </MudChip>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Status" HeaderStyle="width: 100px;">
+        <TemplateColumn Title="Status" HeaderStyle="width: 100px; white-space: nowrap;">
             <CellTemplate>
                 <MudChip T="string" Color="@GetStatusColor(context.Item.Status)" Size="Size.Small" Variant="Variant.Text" Class="ma-0">
                     @context.Item.Status
                 </MudChip>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Balance" HeaderStyle="width: 120px;" CellStyle="text-align: right;" HeaderClass="justify-end">
+        <TemplateColumn Title="Balance" HeaderStyle="width: 120px; white-space: nowrap;" CellStyle="text-align: right;" HeaderClass="justify-end">
             <CellTemplate>
-                <MudText Typo="Typo.body2" Class="font-mono">@ThaiCurrency.Format(context.Item.OutstandingBalance, 2)</MudText>
+                <MudText Typo="Typo.body2" Class="font-mono" Style="white-space: nowrap;">@ThaiCurrency.Format(context.Item.OutstandingBalance, 2)</MudText>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn CellClass="pr-6" HeaderClass="justify-end pr-6" HeaderStyle="width: 100px;">
+        <TemplateColumn CellClass="pr-6" HeaderClass="justify-end pr-6" HeaderStyle="width: 60px;">
             <CellTemplate>
-                <div class="d-flex justify-end gap-1">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Href="@($"/sales/customers/{context.Item.Id}/edit")" />
+                <div class="d-flex justify-end">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Href="@($"/sales/customers/{context.Item.Id}")" />
                 </div>
             </CellTemplate>
         </TemplateColumn>
