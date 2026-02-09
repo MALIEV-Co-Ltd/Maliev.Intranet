@@ -47,10 +47,18 @@ public class CustomerDetailDto
     public decimal TotalSpent { get; set; }
     public int ActiveOrdersCount { get; set; }
     public int OpenQuotationsCount { get; set; }
+    public DateTime CreatedAt { get; set; }
     public Guid? CompanyId { get; set; }
     public string? CompanyName { get; set; }
     public string? CompanyPhone { get; set; }
+    public string? CompanyVatNumber { get; set; }
+    public string? CompanyRegistrationNumber { get; set; }
+    public string? CompanyContactEmail { get; set; }
+    public string? CompanySegment { get; set; }
+    public string? CompanyTier { get; set; }
+    public AddressResponse? CompanyBillingAddress { get; set; }
     public List<AddressResponse> Addresses { get; set; } = [];
+    public List<DocumentResponse> Documents { get; set; } = [];
     public NDAResponse? Nda { get; set; }
     public List<InternalNoteResponse> Notes { get; set; } = [];
     public Dictionary<string, bool> CommunicationPreferences { get; set; } = [];

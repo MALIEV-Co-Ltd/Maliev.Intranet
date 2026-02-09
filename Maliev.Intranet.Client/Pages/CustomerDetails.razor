@@ -2,6 +2,7 @@
 @using MudBlazor
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Client.Components
+@using System.Globalization
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -90,7 +91,7 @@
                                 <MudItem xs="12" sm="4">
                                     <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
                                         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Total Spent</MudText>
-                                        <MudText Typo="Typo.h4" Style="font-weight: 700;">@_customer.TotalSpent.ToString("C0")</MudText>
+                                        <MudText Typo="Typo.h4" Style="font-weight: 700;">@_customer.TotalSpent.ToString("C0", new CultureInfo("th-TH"))</MudText>
                                     </MudPaper>
                                 </MudItem>
                                 <MudItem xs="12" sm="4">
@@ -110,16 +111,24 @@
                                     <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
                                         <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Recent Activity</MudText>
                                         <MudStack Spacing="4">
-                                            @for (int i = 0; i < 3; i++)
+                                            <div class="d-flex gap-4">
+                                                <MudAvatar Color="Color.Primary" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-primary-hover);"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small"/></MudAvatar>
+                                                <MudStack Spacing="0">
+                                                    <MudText Typo="Typo.body2" Style="font-weight: 500;">Customer profile created</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_customer.CreatedAt.ToLocalTime().ToString("g") • by System</MudText>
+                                                </MudStack>
+                                            </div>
+                                            @if (_customer.Notes?.Any() == true)
                                             {
+                                                <MudDivider />
+                                                var latestNote = _customer.Notes.OrderByDescending(n => n.CreatedAt).First();
                                                 <div class="d-flex gap-4">
-                                                    <MudAvatar Color="Color.Primary" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-primary-hover);"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small"/></MudAvatar>
+                                                    <MudAvatar Color="Color.Info" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-info-hover);"><MudIcon Icon="@Icons.Material.Filled.Note" Size="Size.Small"/></MudAvatar>
                                                     <MudStack Spacing="0">
-                                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">Order #@(1000 + i) status changed to 'In Production'</MudText>
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(i + 1) hour(s) ago • by System</MudText>
+                                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">Internal note added</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@latestNote.CreatedAt.ToLocalTime().ToString("g") • by @latestNote.CreatedBy</MudText>
                                                     </MudStack>
                                                 </div>
-                                                @if (i < 2) { <MudDivider /> }
                                             }
                                         </MudStack>
                                     </MudCard>
@@ -139,28 +148,49 @@
                             </MudStack>
                             
                             <MudGrid Spacing="4">
-                                @foreach (var (address, index) in _customer.Addresses.Select((a, i) => (a, i)))
+                                @if (_customer.Addresses != null && _customer.Addresses.Any())
                                 {
+                                    @foreach (var (address, index) in _customer.Addresses.Select((a, i) => (a, i)))
+                                    {
+                                        <MudItem xs="12" sm="6">
+                                            <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
+                                                <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
+                                                    <MudChip T="string" Color="@(address.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@address.Type</MudChip>
+                                                    @if (address.IsDefault)
+                                                    {
+                                                        <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
+                                                    }
+                                                </MudStack>
+                                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@address.AddressLine1</MudText>
+                                                @if (!string.IsNullOrEmpty(address.AddressLine2)) { <MudText Typo="Typo.body2">@address.AddressLine2</MudText> }
+                                                @if (!string.IsNullOrEmpty(address.AddressLine3)) { <MudText Typo="Typo.body2">@address.AddressLine3</MudText> }
+                                                <MudText Typo="Typo.body2">@address.District, @address.City</MudText>
+                                                <MudText Typo="Typo.body2">@address.StateProvince @address.PostalCode</MudText>
+                                            </MudPaper>
+                                        </MudItem>
+                                    }
+                                }
+                                else if (_customer.CompanyId.HasValue && _customer.CompanyBillingAddress != null)
+                                {
+                                    <MudItem xs="12">
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Text">Using Company billing address. Individual customer addresses not found.</MudAlert>
+                                    </MudItem>
                                     <MudItem xs="12" sm="6">
-                                        @if (_isEditMode)
-                                        {
-                                            @* In edit mode we'd need to map AddressResponse to CreateAddressRequest or similar *@
-                                            @* For now, displaying as viewable cards but ensuring 2-column layout *@
-                                        }
                                         <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
                                             <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
-                                                <MudChip T="string" Color="@(address.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@address.Type</MudChip>
-                                                @if (address.IsDefault)
-                                                {
-                                                    <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
-                                                }
+                                                <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">Company Billing</MudChip>
+                                                <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
                                             </MudStack>
-                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@address.AddressLine1</MudText>
-                                            @if (!string.IsNullOrEmpty(address.AddressLine2)) { <MudText Typo="Typo.body2">@address.AddressLine2</MudText> }
-                                            @if (!string.IsNullOrEmpty(address.AddressLine3)) { <MudText Typo="Typo.body2">@address.AddressLine3</MudText> }
-                                            <MudText Typo="Typo.body2">@address.District, @address.City</MudText>
-                                            <MudText Typo="Typo.body2">@address.StateProvince @address.PostalCode</MudText>
+                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@_customer.CompanyBillingAddress.AddressLine1</MudText>
+                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City</MudText>
+                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.StateProvince @_customer.CompanyBillingAddress.PostalCode</MudText>
                                         </MudPaper>
+                                    </MudItem>
+                                }
+                                else
+                                {
+                                    <MudItem xs="12">
+                                        <MudAlert Severity="Severity.Warning" Variant="Variant.Text">No addresses found for this customer.</MudAlert>
                                     </MudItem>
                                 }
                             </MudGrid>
@@ -184,15 +214,30 @@
                                         </MudPaper>
                                     </MudItem>
                                 }
-                                <MudItem xs="12" sm="6">
-                                    <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" Elevation="0">
-                                        <MudIcon Icon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" Size="Size.Large" />
-                                        <MudStack Spacing="0">
-                                            <MudText Typo="Typo.body2" Style="font-weight: 700;">Business_Registration.pdf</MudText>
-                                            <MudText Typo="Typo.caption">1.2 MB • Uploaded 2 days ago</MudText>
-                                        </MudStack>
-                                    </MudPaper>
-                                </MudItem>
+                                
+                                @if (_customer.Documents?.Any() == true)
+                                {
+                                    @foreach (var doc in _customer.Documents)
+                                    {
+                                        <MudItem xs="12" sm="6">
+                                            <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" Elevation="0">
+                                                <MudIcon Icon="@GetDocumentIcon(doc.MimeType)" Color="@GetDocumentColor(doc.MimeType)" Size="Size.Large" />
+                                                <MudStack Spacing="0">
+                                                    <MudText Typo="Typo.body2" Style="font-weight: 700;">@doc.FileName</MudText>
+                                                    <MudText Typo="Typo.caption">@FormatFileSize(doc.FileSize) • @doc.DocumentCategory</MudText>
+                                                </MudStack>
+                                                <MudSpacer />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" />
+                                            </MudPaper>
+                                        </MudItem>
+                                    }
+                                }
+                                else if (_customer.Nda == null)
+                                {
+                                    <MudItem xs="12">
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Text">No documents found for this customer.</MudAlert>
+                                    </MudItem>
+                                }
                             </MudGrid>
                          </MudCard>
                     </MudTabPanel>
@@ -298,9 +343,45 @@
                                 <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Size="Size.Small" />
                                 <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Details</MudText>
                             </MudStack>
-                            <MudText Typo="Typo.body1" Style="font-weight: 600;">@_customer.CompanyName</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">@_customer.CompanyPhone</MudText>
-                            <MudButton Variant="Variant.Outlined" FullWidth="true" Color="Color.Primary" Size="Size.Small">View Company Profile</MudButton>
+                            
+                            <MudStack Spacing="3">
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Company Name</MudText>
+                                    <MudText Typo="Typo.body1" Style="font-weight: 600;">@_customer.CompanyName</MudText>
+                                </div>
+                                @if (!string.IsNullOrEmpty(_customer.CompanyVatNumber))
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Tax ID / VAT</MudText>
+                                        <MudText Typo="Typo.body2">@_customer.CompanyVatNumber</MudText>
+                                    </div>
+                                }
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Segment & Tier</MudText>
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info" Class="ma-0">@_customer.CompanySegment</MudChip>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="ma-0">@_customer.CompanyTier</MudChip>
+                                    </MudStack>
+                                </div>
+                                @if (_customer.CompanyBillingAddress != null)
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Billing Address</MudText>
+                                        <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.AddressLine1</MudText>
+                                        <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City</MudText>
+                                        <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.StateProvince @_customer.CompanyBillingAddress.PostalCode</MudText>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(_customer.CompanyPhone))
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Phone</MudText>
+                                        <MudText Typo="Typo.body2">@_customer.CompanyPhone</MudText>
+                                    </div>
+                                }
+                            </MudStack>
+
+                            <MudButton Variant="Variant.Outlined" FullWidth="true" Color="Color.Primary" Size="Size.Small" Class="mt-4 rounded-lg">View Company Profile</MudButton>
                         </MudCard>
                     }
 
@@ -445,4 +526,33 @@
         "Blocked" => Color.Error,
         _ => Color.Default
     };
+
+    private string GetDocumentIcon(string mimeType) => mimeType switch
+    {
+        "application/pdf" => Icons.Custom.FileFormats.FilePdf,
+        "application/msword" or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => Icons.Custom.FileFormats.FileDocument,
+        "image/jpeg" or "image/png" => Icons.Custom.FileFormats.FileImage,
+        _ => Icons.Material.Filled.InsertDriveFile
+    };
+
+    private Color GetDocumentColor(string mimeType) => mimeType switch
+    {
+        "application/pdf" => Color.Error,
+        "application/msword" or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => Color.Info,
+        "image/jpeg" or "image/png" => Color.Success,
+        _ => Color.Default
+    };
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        double size = bytes;
+        int unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+        return $"{size:F1} {units[unitIndex]}";
+    }
 }

@@ -74,28 +74,45 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         // Fetch related data in parallel
         var addressesTask = httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Customer&ownerId={id}", ct);
         var notesTask = httpClient.GetFromJsonAsync<List<InternalNoteResponse>>($"/customer/v1/internal-notes?ownerType=Customer&ownerId={id}", ct);
-        var ndasTask = httpClient.GetFromJsonAsync<List<NDAResponse>>($"/customer/v1/ndas/customer/{id}", ct); // Assuming this endpoint exists based on usual patterns
+        var ndasTask = httpClient.GetFromJsonAsync<List<NDAResponse>>($"/customer/v1/ndas/customer/{id}", ct);
+        var docsTask = httpClient.GetFromJsonAsync<List<DocumentResponse>>($"/customer/v1/documents?ownerType=Customer&ownerId={id}", ct);
         
         Task<CompanySummaryDto?>? companyTask = null;
+        Task<List<AddressResponse>?>? companyAddressesTask = null;
         if (customer.CompanyId.HasValue)
         {
             companyTask = httpClient.GetFromJsonAsync<CompanySummaryDto>($"/customer/v1/companies/{customer.CompanyId.Value}", ct);
+            companyAddressesTask = httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Company&ownerId={customer.CompanyId.Value}", ct);
         }
 
-        try { await Task.WhenAll(addressesTask, notesTask, ndasTask, companyTask ?? Task.FromResult<CompanySummaryDto?>(null)); }
+        try { await Task.WhenAll(addressesTask, notesTask, ndasTask, docsTask, companyTask ?? Task.FromResult<CompanySummaryDto?>(null), companyAddressesTask ?? Task.FromResult<List<AddressResponse>?>(null)); }
         catch (Exception ex) { logger.LogWarning(ex, "Error fetching some related data for customer {CustomerId}", id); }
 
         customer.Addresses = addressesTask.IsCompletedSuccessfully ? (addressesTask.Result ?? []) : [];
         customer.Notes = notesTask.IsCompletedSuccessfully ? (notesTask.Result ?? []) : [];
+        customer.Documents = docsTask.IsCompletedSuccessfully ? (docsTask.Result ?? []) : [];
         
         if (ndasTask.IsCompletedSuccessfully && ndasTask.Result != null)
         {
             customer.Nda = ndasTask.Result.OrderByDescending(n => n.CreatedAt).FirstOrDefault();
         }
 
-        if (companyTask != null && companyTask.IsCompletedSuccessfully)
+        if (companyTask != null && companyTask.IsCompletedSuccessfully && companyTask.Result != null)
         {
-            customer.CompanyName = companyTask.Result?.Name;
+            var company = companyTask.Result;
+            customer.CompanyName = company.Name;
+            customer.CompanyVatNumber = company.VatNumber;
+            customer.CompanyRegistrationNumber = company.RegistrationNumber;
+            customer.CompanyContactEmail = company.ContactEmail;
+            customer.CompanyPhone = company.ContactPhone;
+            customer.CompanySegment = company.Segment;
+            customer.CompanyTier = company.Tier;
+
+            if (companyAddressesTask != null && companyAddressesTask.IsCompletedSuccessfully)
+            {
+                customer.CompanyBillingAddress = companyAddressesTask.Result?.FirstOrDefault(a => a.Type == "Billing" && a.IsDefault) 
+                                              ?? companyAddressesTask.Result?.FirstOrDefault(a => a.Type == "Billing");
+            }
         }
 
         return customer;

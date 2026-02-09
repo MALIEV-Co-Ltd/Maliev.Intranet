@@ -11,7 +11,11 @@ public class CompanySummaryDto
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? VatNumber { get; set; }
+    public string? RegistrationNumber { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
     public string Segment { get; set; } = string.Empty;
+    public string Tier { get; set; } = string.Empty;
 }
 
 /// <summary>
