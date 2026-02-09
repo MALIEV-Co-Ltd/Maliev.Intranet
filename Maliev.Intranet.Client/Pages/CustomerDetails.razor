@@ -1,190 +1,331 @@
 @page "/sales/customers/{Id:guid}"
 @using MudBlazor
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
-<PageTitle>Customer Details - Maliev Intranet</PageTitle>
+<PageTitle>@(_customer?.Name ?? "Customer Details") - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-6 mb-12">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16 pt-8">
     @if (_customer == null && !_loading)
     {
-        <MudAlert Severity="Severity.Error">Customer not found.</MudAlert>
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="rounded-lg">Customer not found.</MudAlert>
     }
     else if (_loading)
     {
-        <!-- Loading Skeletons -->
         <MudGrid>
-            <MudItem xs="12" lg="3">
-                <MudCard Elevation="0" Class="rounded-lg mb-4">
-                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" Class="rounded-t-lg" />
-                    <MudCardContent Class="text-center" Style="margin-top: -50px;">
-                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="100px" Height="100px" Class="mx-auto mb-3" />
-                        <MudSkeleton Width="60%" Height="32px" Class="mx-auto mb-2" />
-                        <MudSkeleton Width="30%" Height="24px" Class="mx-auto" />
-                    </MudCardContent>
-                </MudCard>
+            <MudItem xs="12" lg="8">
+                <MudSkeleton Height="60px" Class="mb-4 rounded-lg" />
+                <MudSkeleton Height="400px" Class="rounded-lg" />
             </MudItem>
-            <MudItem xs="12" lg="9">
-                <MudGrid>
-                    <MudItem xs="12" sm="4"><MudSkeleton Height="100px" Class="rounded-lg" /></MudItem>
-                    <MudItem xs="12" sm="4"><MudSkeleton Height="100px" Class="rounded-lg" /></MudItem>
-                    <MudItem xs="12" sm="4"><MudSkeleton Height="100px" Class="rounded-lg" /></MudItem>
-                    <MudItem xs="12"><MudSkeleton Height="400px" Class="rounded-lg mt-4" /></MudItem>
-                </MudGrid>
+            <MudItem xs="12" lg="4">
+                <MudSkeleton Height="300px" Class="mb-4 rounded-lg" />
+                <MudSkeleton Height="200px" Class="rounded-lg" />
             </MudItem>
         </MudGrid>
     }
     else if (_customer != null)
     {
-        <MudGrid>
-            <!-- Left Column: Profile Card -->
-            <MudItem xs="12" lg="3">
-                <MudCard Elevation="0" Class="rounded-lg mb-4" Style="background-color: var(--mud-palette-surface);">
-                    <div style="height: 120px; background: linear-gradient(135deg, #3d7cf9 0%, #2f81f7 100%); border-radius: 8px 8px 0 0;"></div>
-                    <MudCardContent Class="text-center" Style="margin-top: -50px;">
-                        <MudAvatar Style="height:100px; width:100px; border: 4px solid var(--mud-palette-surface);" Class="mb-3">
-                            @_customer.Name[0]
-                        </MudAvatar>
-                        <MudText Typo="Typo.h6" Style="font-weight: 600;">@_customer.Name</MudText>
-                        <MudChip T="string" Color="@GetStatusColor(_customer.Status)" Size="Size.Small" Class="mt-1">@_customer.Status</MudChip>
-                        
-                        <div class="d-flex justify-center gap-2 mt-4">
-                            <MudIconButton Icon="@Icons.Material.Filled.Call" Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Email" Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Chat" Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" />
-                        </div>
-                    </MudCardContent>
-                    <MudDivider />
-                    <MudCardContent>
-                        <MudStack Spacing="3">
-                            <div>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Email address</MudText>
-                                <MudText Typo="Typo.body2">@_customer.Email</MudText>
-                            </div>
-                            <div>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Phone number</MudText>
-                                <MudText Typo="Typo.body2">@(_customer.Mobile ?? _customer.Landline ?? "Not provided")</MudText>
-                            </div>
-                            <div>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Segment / Tier</MudText>
-                                <MudText Typo="Typo.body2">@_customer.Segment / @_customer.Tier</MudText>
-                            </div>
-                            <div>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Company</MudText>
-                                <MudText Typo="Typo.body2">@(_customer.CompanyName ?? "N/A")</MudText>
-                            </div>
-                        </MudStack>
-                    </MudCardContent>
-                </MudCard>
+        <!-- Header -->
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-8">
+            <MudStack Spacing="0">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.h3" Style="font-weight: 700;">@_customer.Name</MudText>
+                    <MudChip T="string" Color="@GetStatusColor(_customer.Status)" Size="Size.Small" Variant="Variant.Filled" Class="mt-1">@_customer.Status</MudChip>
+                </MudStack>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">Customer ID: @_customer.Id</MudText>
+            </MudStack>
+            
+            <MudStack Row="true" Spacing="2">
+                 <MudButton Variant="Variant.Outlined" 
+                            Color="Color.Primary" 
+                            StartIcon="@Icons.Material.Filled.Edit"
+                            OnClick="ToggleEditMode"
+                            Class="px-6 rounded-lg">
+                     @( _isEditMode ? "Cancel Editing" : "Edit Profile")
+                 </MudButton>
+                 @if (!_isEditMode)
+                 {
+                     <MudButton Variant="Variant.Filled" 
+                                Color="Color.Primary" 
+                                StartIcon="@Icons.Material.Filled.Add"
+                                Class="px-6 rounded-lg shadow-none">
+                         Create Order
+                     </MudButton>
+                 }
+                 else
+                 {
+                     <MudButton Variant="Variant.Filled" 
+                                Color="Color.Primary" 
+                                StartIcon="@Icons.Material.Filled.Save"
+                                OnClick="SaveChanges"
+                                Disabled="@_isSaving"
+                                Class="px-6 rounded-lg shadow-none">
+                         @if (_isSaving)
+                         {
+                             <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                             <span>Saving...</span>
+                         }
+                         else
+                         {
+                             <span>Save Changes</span>
+                         }
+                     </MudButton>
+                 }
+            </MudStack>
+        </MudStack>
 
-                <MudCard Elevation="0" Class="rounded-lg" Style="background-color: var(--mud-palette-surface);">
-                    <MudCardHeader>
-                        <CardHeaderContent><MudText Typo="Typo.h6">Manufacturing Status</MudText></CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                         <MudStack Spacing="2">
-                            <div class="d-flex justify-space-between align-center">
-                                <MudText Typo="Typo.body2">Active Jobs</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Primary" Style="font-weight: 700;">@_customer.ActiveOrdersCount</MudText>
-                            </div>
-                            <MudProgressLinear Color="Color.Primary" Value="75" Class="my-2" />
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Current production efficiency: 94%</MudText>
-                         </MudStack>
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
+        <MudGrid Spacing="6">
+            <!-- Left Column: Main Content -->
+            <MudItem xs="12" lg="8">
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
+                    
+                    @if (!_isEditMode)
+                    {
+                        <MudTabPanel Text="Overview" Icon="@Icons.Material.Filled.Dashboard">
+                            <MudGrid Spacing="4">
+                                <MudItem xs="12" sm="4">
+                                    <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Total Spent</MudText>
+                                        <MudText Typo="Typo.h4" Style="font-weight: 700;">@_customer.TotalSpent.ToString("C0")</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Active Orders</MudText>
+                                        <MudText Typo="Typo.h4" Style="font-weight: 700;">@_customer.ActiveOrdersCount</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Open Quotations</MudText>
+                                        <MudText Typo="Typo.h4" Style="font-weight: 700;">@_customer.OpenQuotationsCount</MudText>
+                                    </MudPaper>
+                                </MudItem>
 
-            <!-- Right Column: Operations -->
-            <MudItem xs="12" lg="9">
-                <MudGrid>
-                    <!-- Quick Stats -->
-                    <MudItem xs="12" sm="4">
-                        <MudCard Elevation="0" Class="pa-4 rounded-lg" Style="background-color: var(--mud-palette-surface);">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Spent</MudText>
-                            <MudText Typo="Typo.h4" Style="font-weight: 600;">@_customer.TotalSpent.ToString("C0")</MudText>
-                        </MudCard>
-                    </MudItem>
-                    <MudItem xs="12" sm="4">
-                        <MudCard Elevation="0" Class="pa-4 rounded-lg" Style="background-color: var(--mud-palette-surface);">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Active Orders</MudText>
-                            <MudText Typo="Typo.h4" Style="font-weight: 600;">@_customer.ActiveOrdersCount</MudText>
-                        </MudCard>
-                    </MudItem>
-                    <MudItem xs="12" sm="4">
-                        <MudCard Elevation="0" Class="pa-4 rounded-lg" Style="background-color: var(--mud-palette-surface);">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Open Quotations</MudText>
-                            <MudText Typo="Typo.h4" Style="font-weight: 600;">@_customer.OpenQuotationsCount</MudText>
-                        </MudCard>
-                    </MudItem>
-
-                    <!-- Tabs -->
-                    <MudItem xs="12">
-                        <MudCard Elevation="0" Class="rounded-lg mt-4" Style="background-color: var(--mud-palette-surface);">
-                            <MudTabs Elevation="0" Outlined="false" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
-                                <MudTabPanel Text="Overview">
-                                    <MudCardContent>
-                                        <MudText Typo="Typo.h6" Class="mb-4">Recent Activity</MudText>
-                                        <MudStack Spacing="3">
+                                <MudItem xs="12">
+                                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Recent Activity</MudText>
+                                        <MudStack Spacing="4">
                                             @for (int i = 0; i < 3; i++)
                                             {
                                                 <div class="d-flex gap-4">
-                                                    <MudAvatar Color="Color.Dark" Size="Size.Small" Variant="Variant.Filled"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small"/></MudAvatar>
-                                                    <div>
-                                                        <MudText Typo="Typo.body2">Order #@(1000 + i) status changed to 'In Production'</MudText>
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(i + 1) hour(s) ago</MudText>
-                                                    </div>
+                                                    <MudAvatar Color="Color.Primary" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-primary-hover);"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small"/></MudAvatar>
+                                                    <MudStack Spacing="0">
+                                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">Order #@(1000 + i) status changed to 'In Production'</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(i + 1) hour(s) ago • by System</MudText>
+                                                    </MudStack>
                                                 </div>
+                                                @if (i < 2) { <MudDivider /> }
                                             }
                                         </MudStack>
-                                    </MudCardContent>
-                                </MudTabPanel>
-                                <MudTabPanel Text="Orders">
-                                    <MudCardContent>
-                                        <MudTable Items="@(new List<string>())" Elevation="0">
-                                            <HeaderContent>
-                                                <MudTh>Order ID</MudTh>
-                                                <MudTh>Date</MudTh>
-                                                <MudTh>Amount</MudTh>
-                                                <MudTh>Status</MudTh>
-                                            </HeaderContent>
-                                            <NoRecordsContent>
-                                                <MudText Class="pa-4">No active orders found.</MudText>
-                                                <MudSkeleton Height="40px" Class="my-2"/>
-                                                <MudSkeleton Height="40px" Class="my-2"/>
-                                            </NoRecordsContent>
-                                        </MudTable>
-                                    </MudCardContent>
-                                </MudTabPanel>
-                                <MudTabPanel Text="Quotations">
-                                    <MudCardContent>
-                                        <MudText>Quotation history will be displayed here.</MudText>
-                                        <MudSkeleton Height="200px" Class="mt-4" />
-                                    </MudCardContent>
-                                </MudTabPanel>
-                                <MudTabPanel Text="Files & CAD">
-                                    <MudCardContent>
-                                        <MudText>Technical drawings and NDA documents.</MudText>
-                                        <MudGrid Class="mt-4">
-                                            <MudItem xs="6" md="3">
-                                                <MudPaper Class="pa-4 d-flex flex-column align-center" Outlined="true">
-                                                    <MudIcon Icon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" Size="Size.Large" />
-                                                    <MudText Typo="Typo.caption" Class="mt-2">NDA_Signed.pdf</MudText>
-                                                </MudPaper>
+                                    </MudCard>
+                                </MudItem>
+                            </MudGrid>
+                        </MudTabPanel>
+                    }
+
+                    <MudTabPanel Text="Addresses" Icon="@Icons.Material.Filled.LocationOn">
+                        <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+                                <MudText Typo="Typo.h6" Style="font-weight: 700;">Delivery & Billing</MudText>
+                                @if (_isEditMode)
+                                {
+                                    <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AddAddress">Add Address</MudButton>
+                                }
+                            </MudStack>
+                            
+                            <MudGrid Spacing="4">
+                                @foreach (var (address, index) in _customer.Addresses.Select((a, i) => (a, i)))
+                                {
+                                    <MudItem xs="12" sm="6">
+                                        @if (_isEditMode)
+                                        {
+                                            @* In edit mode we'd need to map AddressResponse to CreateAddressRequest or similar *@
+                                            @* For now, displaying as viewable cards but ensuring 2-column layout *@
+                                        }
+                                        <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
+                                            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
+                                                <MudChip T="string" Color="@(address.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@address.Type</MudChip>
+                                                @if (address.IsDefault)
+                                                {
+                                                    <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
+                                                }
+                                            </MudStack>
+                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@address.AddressLine1</MudText>
+                                            @if (!string.IsNullOrEmpty(address.AddressLine2)) { <MudText Typo="Typo.body2">@address.AddressLine2</MudText> }
+                                            @if (!string.IsNullOrEmpty(address.AddressLine3)) { <MudText Typo="Typo.body2">@address.AddressLine3</MudText> }
+                                            <MudText Typo="Typo.body2">@address.District, @address.City</MudText>
+                                            <MudText Typo="Typo.body2">@address.StateProvince @address.PostalCode</MudText>
+                                        </MudPaper>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        </MudCard>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Documents" Icon="@Icons.Material.Filled.Attachment">
+                         <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                            <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Documents & NDA</MudText>
+                            <MudGrid Spacing="4">
+                                @if (_customer.Nda != null)
+                                {
+                                    <MudItem xs="12" sm="6">
+                                        <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" Elevation="0">
+                                            <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="Color.Primary" Size="Size.Large" />
+                                            <MudStack Spacing="0">
+                                                <MudText Typo="Typo.body2" Style="font-weight: 700;">NDA Record</MudText>
+                                                <MudText Typo="Typo.caption">Status: @_customer.Nda.Status</MudText>
+                                                <MudText Typo="Typo.caption">Expires: @(_customer.Nda.ExpiresAt?.ToShortDateString() ?? "N/A")</MudText>
+                                            </MudStack>
+                                        </MudPaper>
+                                    </MudItem>
+                                }
+                                <MudItem xs="12" sm="6">
+                                    <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" Elevation="0">
+                                        <MudIcon Icon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" Size="Size.Large" />
+                                        <MudStack Spacing="0">
+                                            <MudText Typo="Typo.body2" Style="font-weight: 700;">Business_Registration.pdf</MudText>
+                                            <MudText Typo="Typo.caption">1.2 MB • Uploaded 2 days ago</MudText>
+                                        </MudStack>
+                                    </MudPaper>
+                                </MudItem>
+                            </MudGrid>
+                         </MudCard>
+                    </MudTabPanel>
+
+                    @if (_isEditMode)
+                    {
+                        <MudTabPanel Text="Edit Form" Icon="@Icons.Material.Filled.FormatAlignLeft">
+                            <MudForm @ref="_editForm">
+                                <MudStack Spacing="6">
+                                    <!-- Personal Info Edit -->
+                                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Personal Information</MudText>
+                                        <MudGrid Spacing="4">
+                                            <MudItem xs="12" sm="6">
+                                                <MudTextField T="string" Label="First Name" @bind-Value="_updateRequest.FirstName" Variant="Variant.Outlined" Required="true" />
                                             </MudItem>
-                                            <MudItem xs="6" md="3">
-                                                <MudPaper Class="pa-4 d-flex flex-column align-center" Outlined="true">
-                                                    <MudIcon Icon="@Icons.Material.Filled.ModelTraining" Color="Color.Info" Size="Size.Large" />
-                                                    <MudText Typo="Typo.caption" Class="mt-2">Part_V2.step</MudText>
-                                                </MudPaper>
+                                            <MudItem xs="12" sm="6">
+                                                <MudTextField T="string" Label="Last Name" @bind-Value="_updateRequest.LastName" Variant="Variant.Outlined" Required="true" />
+                                            </MudItem>
+                                            <MudItem xs="12">
+                                                <MudTextField T="string" Label="Email" @bind-Value="_updateRequest.Email" Variant="Variant.Outlined" Required="true" />
+                                            </MudItem>
+                                            <MudItem xs="12" sm="6">
+                                                <MudTextField T="string" Label="Mobile" @bind-Value="_updateRequest.Mobile" Variant="Variant.Outlined" />
+                                            </MudItem>
+                                            <MudItem xs="12" sm="6">
+                                                <MudTextField T="string" Label="Landline" @bind-Value="_updateRequest.Landline" Variant="Variant.Outlined" />
                                             </MudItem>
                                         </MudGrid>
-                                    </MudCardContent>
-                                </MudTabPanel>
-                            </MudTabs>
+                                    </MudCard>
+
+                                    <!-- Preferences Edit -->
+                                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Preferences & Classification</MudText>
+                                        <MudGrid Spacing="4">
+                                            <MudItem xs="12" sm="6">
+                                                <MudSelect T="string" Label="Segment" @bind-Value="_updateRequest.Segment" Variant="Variant.Outlined">
+                                                    <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
+                                                    <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
+                                                    <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
+                                                    <MudSelectItem Value="@("Government")">Government</MudSelectItem>
+                                                </MudSelect>
+                                            </MudItem>
+                                            <MudItem xs="12" sm="6">
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1 d-block">Tier Level</MudText>
+                                                <MudToggleGroup T="string" @bind-Value="_updateRequest.Tier" SelectionMode="SelectionMode.SingleSelection" Color="Color.Primary" CheckMark="false" FixedContent="true" Class="w-100">
+                                                    <MudToggleItem Value="@("Bronze")" Text="Bronze" />
+                                                    <MudToggleItem Value="@("Silver")" Text="Silver" />
+                                                    <MudToggleItem Value="@("Gold")" Text="Gold" />
+                                                    <MudToggleItem Value="@("Platinum")" Text="Platinum" />
+                                                </MudToggleGroup>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </MudCard>
+                                </MudStack>
+                            </MudForm>
+                        </MudTabPanel>
+                    }
+                </MudTabs>
+            </MudItem>
+
+            <!-- Right Column: Sidebar Stats & Info -->
+            <MudItem xs="12" lg="4">
+                <MudStack Spacing="6">
+                    <!-- Profile Card -->
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                        <MudStack AlignItems="AlignItems.Center" Class="mb-6">
+                            <MudAvatar Color="Color.Primary" Style="height:80px; width:80px;" Variant="Variant.Filled">
+                                @(_customer.FirstName?[0])@(_customer.LastName?[0])
+                            </MudAvatar>
+                            <MudText Typo="Typo.h6" Style="font-weight: 700;">@_customer.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@_customer.Email</MudText>
+                        </MudStack>
+                        
+                        <MudStack Spacing="3">
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Phone</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@(_customer.Mobile ?? "N/A")</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Language</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@(_customer.PreferredLanguage == "th" ? "Thai" : "English")</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Timezone</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@_customer.Timezone</MudText>
+                            </div>
+                        </MudStack>
+
+                        <MudDivider Class="my-6" />
+
+                        <MudStack Spacing="3">
+                             <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Email" Color="Color.Primary" FullWidth="true" Style="justify-content: flex-start;">Send Email</MudButton>
+                             <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Message" Color="Color.Primary" FullWidth="true" Style="justify-content: flex-start;">Internal Chat</MudButton>
+                        </MudStack>
+                    </MudCard>
+
+                    <!-- Company Info Card -->
+                    @if (_customer.CompanyId.HasValue)
+                    {
+                        <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+                                <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Size="Size.Small" />
+                                <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Details</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.body1" Style="font-weight: 600;">@_customer.CompanyName</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">@_customer.CompanyPhone</MudText>
+                            <MudButton Variant="Variant.Outlined" FullWidth="true" Color="Color.Primary" Size="Size.Small">View Company Profile</MudButton>
                         </MudCard>
-                    </MudItem>
-                </MudGrid>
+                    }
+
+                    <!-- Internal Notes -->
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-4">Internal Notes</MudText>
+                        @if (_customer.Notes?.Any() == true)
+                        {
+                            <MudStack Spacing="3">
+                                @foreach (var note in _customer.Notes.OrderByDescending(n => n.CreatedAt).Take(2))
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.body2" Class="mb-1">@note.NoteText</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedBy • @note.CreatedAt.ToShortDateString()</MudText>
+                                    </div>
+                                }
+                            </MudStack>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">No internal notes.</MudText>
+                        }
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true" Class="mt-4" Size="Size.Small">View All Notes</MudButton>
+                    </MudCard>
+                </MudStack>
             </MudItem>
         </MudGrid>
     }
@@ -194,21 +335,107 @@
     [Parameter] public Guid Id { get; set; }
     private CustomerDetailDto? _customer;
     private bool _loading = true;
+    private bool _isEditMode = false;
+    private bool _isSaving = false;
+    
+    private MudForm? _editForm;
+    private UpdateCustomerRequest _updateRequest = new();
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadCustomerData();
+    }
+
+    private async Task LoadCustomerData()
+    {
+        _loading = true;
         try
         {
             _customer = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/customers/{Id}");
+            if (_customer != null)
+            {
+                MapToUpdateRequest();
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading customer details: {ex.Message}");
+            Snackbar.Add($"Error loading customer: {ex.Message}", Severity.Error);
         }
         finally
         {
             _loading = false;
         }
+    }
+
+    private void MapToUpdateRequest()
+    {
+        if (_customer == null) return;
+        
+        _updateRequest = new UpdateCustomerRequest
+        {
+            FirstName = _customer.FirstName,
+            LastName = _customer.LastName,
+            Email = _customer.Email,
+            Mobile = _customer.Mobile,
+            Landline = _customer.Landline,
+            Extension = _customer.Extension,
+            Segment = _customer.Segment,
+            Tier = _customer.Tier,
+            PreferredLanguage = _customer.PreferredLanguage,
+            Timezone = _customer.Timezone,
+            CommunicationPreferences = new Dictionary<string, bool>(_customer.CommunicationPreferences),
+            Version = _customer.Version
+        };
+    }
+
+    private void ToggleEditMode()
+    {
+        if (_isEditMode)
+        {
+            // Reset request when canceling
+            MapToUpdateRequest();
+        }
+        _isEditMode = !_isEditMode;
+    }
+
+    private async Task SaveChanges()
+    {
+        if (_editForm != null)
+        {
+            await _editForm.Validate();
+            if (!_editForm.IsValid) return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/customers/{Id}", _updateRequest);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Customer updated successfully!", Severity.Success);
+                _isEditMode = false;
+                await LoadCustomerData();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Update failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void AddAddress()
+    {
+        // Address addition logic would go here, likely opening a dialog or adding to a list
+        Snackbar.Add("Address management coming soon", Severity.Info);
     }
 
     private Color GetStatusColor(string status) => status switch
