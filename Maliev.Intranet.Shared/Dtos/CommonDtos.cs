@@ -80,3 +80,17 @@ public class BffUploadResponse
     public long Size { get; set; }
     public string? StoragePath { get; set; }
 }
+
+/// <summary>
+/// Standard error response for API failures.
+/// </summary>
+public class ApiErrorResponse
+{
+    public string Code { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public Dictionary<string, string[]>? Details { get; set; }
+    public string? TraceId { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string? Title { get; set; }
+    public int? Status { get; set; }
+}

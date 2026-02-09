@@ -218,7 +218,14 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             {
                 var errorBody = await companyResponse.Content.ReadAsStringAsync(ct);
                 logger.LogError("Company creation failed ({StatusCode}): {ErrorBody}", companyResponse.StatusCode, errorBody);
-                return null;
+                
+                string message = "Company creation failed";
+                try {
+                    var apiErr = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(errorBody, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (apiErr != null && !string.IsNullOrEmpty(apiErr.Message)) message = apiErr.Message;
+                } catch {}
+                
+                throw new HttpRequestException(message, null, companyResponse.StatusCode);
             }
         }
 
@@ -229,7 +236,14 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         {
             var errorBody = await customerResponse.Content.ReadAsStringAsync(ct);
             logger.LogError("Customer creation failed ({StatusCode}): {ErrorBody}", customerResponse.StatusCode, errorBody);
-            return null;
+            
+            string message = "Customer creation failed";
+            try {
+                var apiErr = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(errorBody, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiErr != null && !string.IsNullOrEmpty(apiErr.Message)) message = apiErr.Message;
+            } catch {}
+
+            throw new HttpRequestException(message, null, customerResponse.StatusCode);
         }
         
         var createdCustomer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>(ct);

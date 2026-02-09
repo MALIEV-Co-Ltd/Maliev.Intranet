@@ -54,7 +54,12 @@
                                  <MudTextField T="string" Label="Last Name" @bind-Value="_customerData.Customer.LastName" Variant="Variant.Outlined" Required="true" RequiredError="Last name is required" Placeholder="e.g. Cooper" />
                              </MudItem>
                              <MudItem xs="12">
-                                 <MudTextField T="string" Label="Email Address" @bind-Value="_customerData.Customer.Email" Variant="Variant.Outlined" Required="true" RequiredError="Email is required" Validation="@(new Func<string, Task<string?>>(ValidateEmailAsync))" InputType="InputType.Email" DebounceInterval="500" Placeholder="jane.cooper@company.com" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Email" />
+                                 <MudTextField T="string" Label="Email Address" @bind-Value="_customerData.Customer.Email" 
+                                               Variant="Variant.Outlined" Required="true" RequiredError="Email is required" 
+                                               Validation="@(new Func<string, Task<string?>>(ValidateEmailAsync))" 
+                                               InputType="InputType.Email" DebounceInterval="500" 
+                                               Placeholder="jane.cooper@company.com" Adornment="Adornment.Start" 
+                                               AdornmentIcon="@Icons.Material.Filled.Email" Immediate="true" />
                              </MudItem>
                              <MudItem xs="12" sm="6">
                                  <MudTextField T="string" Label="Mobile Number" @bind-Value="_customerData.Customer.Mobile" Variant="Variant.Outlined" Placeholder="+66 81 234-5678" />
@@ -821,8 +826,26 @@
             }
             else
             {
-                var error = await response.Content.ReadAsStringAsync();
-                Snackbar.Add($"Failed to create customer: {error}", Severity.Error);
+                string errorMessage = "Failed to create customer";
+                try
+                {
+                    var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+                    if (error != null)
+                    {
+                        errorMessage = !string.IsNullOrEmpty(error.Message) ? error.Message : (!string.IsNullOrEmpty(error.Title) ? error.Title : errorMessage);
+                    }
+                }
+                catch
+                {
+                    var rawError = await response.Content.ReadAsStringAsync();
+                    if (!string.IsNullOrEmpty(rawError))
+                    {
+                        // Fallback for simple string errors or unknown JSON
+                        errorMessage = rawError.Length < 100 ? rawError : errorMessage;
+                    }
+                }
+                
+                Snackbar.Add(errorMessage, Severity.Error);
             }
         }
         catch (Exception ex)

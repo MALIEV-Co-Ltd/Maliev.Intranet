@@ -78,16 +78,34 @@ public class CustomersController(
     /// </summary>
     [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("onboard")]
-    public async Task<ActionResult<CustomerResponse>> Onboard([FromBody] CustomerOnboardingRequest request)
+    public async Task<IActionResult> Onboard([FromBody] CustomerOnboardingRequest request)
     {
-        var result = await client.OnboardCustomerAsync(request);
-        if (result != null)
+        try
         {
-            // Notify all connected clients that customer data changed
-            await hubContext.Clients.All.SendAsync("CustomerChanged");
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            var result = await client.OnboardCustomerAsync(request);
+            if (result != null)
+            {
+                // Notify all connected clients that customer data changed
+                await hubContext.Clients.All.SendAsync("CustomerChanged");
+                return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            }
+            return BadRequest(new ApiErrorResponse { Message = "Failed to onboard customer. Unknown error." });
         }
-        return BadRequest();
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Downstream service error during onboarding");
+            return StatusCode((int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError), 
+                new ApiErrorResponse { 
+                    Message = ex.Message, 
+                    Title = "Downstream Service Error",
+                    Status = (int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError)
+                });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error during onboarding");
+            return StatusCode(500, new ApiErrorResponse { Message = ex.Message, Title = "Internal Server Error", Status = 500 });
+        }
     }
 
     /// <summary>
