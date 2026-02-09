@@ -115,7 +115,10 @@
                                                 <MudAvatar Color="Color.Primary" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-primary-hover);"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small"/></MudAvatar>
                                                 <MudStack Spacing="0">
                                                     <MudText Typo="Typo.body2" Style="font-weight: 500;">Customer profile created</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_customer.CreatedAt.ToLocalTime().ToString("g") • by @(_customer.CreatedBy ?? "System")</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                        @_customer.CreatedAt.ToLocalTime().ToString("g") • by 
+                                                        @(!string.IsNullOrEmpty(_customer.CreatedByName) ? $"{_customer.CreatedByName} ({_customer.CreatedByEmail})" : (_customer.CreatedBy ?? "System"))
+                                                    </MudText>
                                                 </MudStack>
                                             </div>
                                             @if (_customer.Notes?.Any() == true)
@@ -126,7 +129,10 @@
                                                     <MudAvatar Color="Color.Info" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-info-hover);"><MudIcon Icon="@Icons.Material.Filled.Note" Size="Size.Small"/></MudAvatar>
                                                     <MudStack Spacing="0">
                                                         <MudText Typo="Typo.body2" Style="font-weight: 500;">Internal note added</MudText>
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@latestNote.CreatedAt.ToLocalTime().ToString("g") • by @latestNote.CreatedBy</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            @latestNote.CreatedAt.ToLocalTime().ToString("g") • by 
+                                                            @(!string.IsNullOrEmpty(latestNote.CreatedByName) ? $"{latestNote.CreatedByName} ({latestNote.CreatedByEmail})" : latestNote.CreatedBy)
+                                                        </MudText>
                                                     </MudStack>
                                                 </div>
                                             }

@@ -19,7 +19,9 @@
                             <MudText Typo="Typo.body2">@note.NoteText</MudText>
                             <MudDivider Class="my-2" />
                             <MudStack Row="true" Justify="Justify.SpaceBetween">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Added by @note.CreatedBy</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Added by @(!string.IsNullOrEmpty(note.CreatedByName) ? $"{note.CreatedByName} ({note.CreatedByEmail})" : note.CreatedBy)
+                                </MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedAt.ToLocalTime().ToString("g")</MudText>
                             </MudStack>
                         </MudCard>

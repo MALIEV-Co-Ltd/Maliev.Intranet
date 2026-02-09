@@ -57,6 +57,8 @@ public class CustomerDetailDto
     public string? CompanySegment { get; set; }
     public string? CompanyTier { get; set; }
     public string? CreatedBy { get; set; }
+    public string? CreatedByName { get; set; }
+    public string? CreatedByEmail { get; set; }
     public AddressResponse? CompanyBillingAddress { get; set; }
     public List<AddressResponse> Addresses { get; set; } = [];
     public List<DocumentResponse> Documents { get; set; } = [];
@@ -117,6 +119,8 @@ public class InternalNoteResponse
     public Guid OwnerId { get; set; }
     public string NoteText { get; set; } = string.Empty;
     public string CreatedBy { get; set; } = string.Empty;
+    public string? CreatedByName { get; set; }
+    public string? CreatedByEmail { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public byte[] Version { get; set; } = [];
