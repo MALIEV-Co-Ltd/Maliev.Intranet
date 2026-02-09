@@ -404,7 +404,10 @@
                                 }
                             </MudStack>
 
-                            <MudButton Variant="Variant.Outlined" FullWidth="true" Color="Color.Primary" Size="Size.Small" Class="mt-4 rounded-lg">View Company Profile</MudButton>
+                             <MudButton Variant="Variant.Outlined" FullWidth="true" Color="Color.Primary" Size="Size.Small" 
+                                        Class="mt-4 rounded-lg" OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{_customer.CompanyId}"))">
+                                 View Company Profile
+                             </MudButton>
                         </MudCard>
                     }
 
@@ -427,7 +430,7 @@
                         {
                             <MudText Typo="Typo.body2" Color="Color.Secondary">No internal notes.</MudText>
                         }
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true" Class="mt-4" Size="Size.Small">View All Notes</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true" Class="mt-4" Size="Size.Small" OnClick="ViewAllNotes">View All Notes</MudButton>
                     </MudCard>
                 </MudStack>
             </MudItem>
@@ -608,6 +611,19 @@
     {
         _customer?.Addresses.Remove(address);
         StateHasChanged();
+    }
+
+    private async Task ViewAllNotes()
+    {
+        if (_customer == null) return;
+
+        var parameters = new DialogParameters<NoteDialog>
+        {
+            { x => x.Notes, _customer.Notes }
+        };
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        await DialogService.ShowAsync<NoteDialog>("Internal Notes", parameters, options);
     }
 
     private Color GetStatusColor(string status) => status switch

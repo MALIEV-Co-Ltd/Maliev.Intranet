@@ -113,16 +113,34 @@ public class CustomersController(
     /// </summary>
     [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPut("{id:guid}/full")]
-    public async Task<ActionResult<CustomerResponse>> UpdateFull(Guid id, [FromBody] CustomerOnboardingRequest request)
+    public async Task<IActionResult> UpdateFull(Guid id, [FromBody] CustomerOnboardingRequest request)
     {
-        var result = await client.UpdateCustomerFullAsync(id, request);
-        if (result != null)
+        try
         {
-            // Notify all connected clients that customer data changed
-            await hubContext.Clients.All.SendAsync("CustomerChanged");
-            return Ok(result);
+            var result = await client.UpdateCustomerFullAsync(id, request);
+            if (result != null)
+            {
+                // Notify all connected clients that customer data changed
+                await hubContext.Clients.All.SendAsync("CustomerChanged");
+                return Ok(result);
+            }
+            return NotFound(new ApiErrorResponse { Message = "Customer not found or update failed." });
         }
-        return NotFound();
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Downstream service error during update");
+            return StatusCode((int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError), 
+                new ApiErrorResponse { 
+                    Message = ex.Message, 
+                    Title = "Downstream Service Error",
+                    Status = (int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError)
+                });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error during update");
+            return StatusCode(500, new ApiErrorResponse { Message = ex.Message, Title = "Internal Server Error", Status = 500 });
+        }
     }
 
     /// <summary>

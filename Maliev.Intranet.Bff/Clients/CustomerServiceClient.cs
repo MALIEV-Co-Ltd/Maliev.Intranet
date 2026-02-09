@@ -139,13 +139,45 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// </summary>
     public async Task<CustomerResponse?> UpdateCustomerFullAsync(Guid id, CustomerOnboardingRequest request, CancellationToken ct = default)
     {
-        // 1. Update basic customer info
-        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", request.Customer, ct);
+        // Fetch current version first or expect it in request. 
+        // For simplicity and to match the CreateCustomerRequest pattern, we'll try to use the version from the CustomerOnboardingRequest if available.
+        // But CustomerOnboardingRequest.Customer is CreateCustomerRequest which doesn't have version.
+        // We'll need to fetch the customer first to get the version, OR change the DTO.
+        
+        var current = await httpClient.GetFromJsonAsync<CustomerDetailDto>($"/customer/v1/customers/{id}", ct);
+        if (current == null) return null;
+
+        // 1. Update basic customer info using Patch
+        var patchRequest = new
+        {
+            firstName = request.Customer.FirstName,
+            lastName = request.Customer.LastName,
+            email = request.Customer.Email,
+            mobile = request.Customer.Mobile,
+            extension = request.Customer.Extension,
+            landline = request.Customer.Landline,
+            segment = request.Customer.Segment,
+            tier = request.Customer.Tier,
+            preferredLanguage = request.Customer.PreferredLanguage,
+            timezone = request.Customer.Timezone,
+            communicationPreferences = request.Customer.CommunicationPreferences,
+            companyId = request.Customer.CompanyId,
+            version = current.Version
+        };
+
+        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", patchRequest, ct);
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(ct);
             logger.LogError("Customer update failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
-            return null;
+            
+            string message = "Customer update failed";
+            try {
+                var apiErr = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(errorBody, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiErr != null && !string.IsNullOrEmpty(apiErr.Message)) message = apiErr.Message;
+            } catch {}
+            
+            throw new HttpRequestException(message, null, response.StatusCode);
         }
         var updatedCustomer = await response.Content.ReadFromJsonAsync<CustomerResponse>(ct);
 
@@ -164,14 +196,29 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                     var company = await companyResponse.Content.ReadFromJsonAsync<CompanySummaryDto>(ct);
                     if (company != null)
                     {
-                        await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", new { companyId = company.Id }, ct);
+                        // Update customer with new companyId
+                        await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", new { companyId = company.Id, version = updatedCustomer?.Version }, ct);
                     }
                 }
             }
         }
 
-        // 3. Update addresses (simplified: delete existing and create new for now, or just add new ones)
-        // In a real scenario, we'd diff them. For this prototype, we'll just ensure they are created.
+        // 3. Update addresses
+        // Delete existing and create new (Prototype behavior)
+        // First get existing addresses
+        var existingAddresses = await httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Customer&ownerId={id}", ct);
+        if (existingAddresses != null)
+        {
+            foreach (var addr in existingAddresses)
+            {
+                var delReq = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addr.Id}")
+                {
+                    Content = System.Net.Http.Json.JsonContent.Create(new { version = addr.Version })
+                };
+                await httpClient.SendAsync(delReq, ct);
+            }
+        }
+
         foreach (var address in request.Addresses)
         {
             var addrReq = new 
@@ -179,7 +226,7 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 ownerType = "Customer",
                 ownerId = id,
                 type = address.Type,
-                isDefault = true,
+                isDefault = address.IsDefault,
                 addressLine1 = address.AddressLine1,
                 addressLine2 = address.AddressLine2,
                 addressLine3 = address.AddressLine3,

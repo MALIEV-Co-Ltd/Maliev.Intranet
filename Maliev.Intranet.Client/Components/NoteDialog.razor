@@ -1,0 +1,46 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Note" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Internal Notes</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudPaper Elevation="0" Class="pa-4" Style="max-height: 500px; overflow-y: auto;">
+            <MudStack Spacing="4">
+                @if (Notes?.Any() == true)
+                {
+                    @foreach (var note in Notes.OrderByDescending(n => n.CreatedAt))
+                    {
+                        <MudCard Elevation="0" Class="pa-4 rounded-lg border-solid border-1 mud-border-lines-default" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudText Typo="Typo.body2">@note.NoteText</MudText>
+                            <MudDivider Class="my-2" />
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Added by @note.CreatedBy</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedAt.ToLocalTime().ToString("g")</MudText>
+                            </MudStack>
+                        </MudCard>
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No notes found for this customer.</MudAlert>
+                }
+            </MudStack>
+        </MudPaper>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Variant="Variant.Filled" Color="Color.Primary">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public List<InternalNoteResponse> Notes { get; set; } = [];
+
+    private void Close() => MudDialog.Close();
+}

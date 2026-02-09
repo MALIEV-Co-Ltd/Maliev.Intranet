@@ -1,0 +1,28 @@
+@page "/sales/companies/{Id:guid}"
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Company Details - Maliev Intranet</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16 pt-8">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-8">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/sales/customers"))" />
+        <MudText Typo="Typo.h3" Style="font-weight: 700;">Company Details</MudText>
+    </MudStack>
+
+    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="rounded-lg">
+        Company management features are currently under development. 
+        Detailed view for ID: @Id will be available soon.
+    </MudAlert>
+
+    <MudCard Elevation="0" Class="pa-6 mt-6 rounded-xl border-solid border-1 mud-border-lines-default">
+        <MudText Typo="Typo.h6">System Information</MudText>
+        <MudText Typo="Typo.body2">Company ID: @Id</MudText>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+}

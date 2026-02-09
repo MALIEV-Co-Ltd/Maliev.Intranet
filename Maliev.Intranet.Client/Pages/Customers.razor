@@ -21,16 +21,17 @@
                  Dense="true" Hover="true" Striped="true" Elevation="2" Class="border mud-border-lines-default rounded-xl overflow-hidden">
         <ToolBarContent>
             <MudStack Row="true" AlignItems="AlignItems.Center" Class="w-100 pa-4 flex-grow-1">
-                <MudText Typo="Typo.h6" Class="font-bold">Customer List</MudText>
-                <MudSpacer />
-                <div class="d-flex align-center gap-4">
+                <div class="d-flex align-center gap-4 flex-grow-1">
                     <MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Placeholder="Search customers..." Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" Immediate="true" 
-                                  Style="width: 350px;" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"></MudTextField>
+                                  Style="max-width: 350px;" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"></MudTextField>
+                    <MudSpacer />
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" 
-                               OnClick="@(() => Navigation.NavigateTo("/sales/customers/new"))" Class="px-6">
+                               OnClick="@(() => Navigation.NavigateTo("/sales/customers/new"))" Class="px-6 rounded-lg d-none d-sm-flex">
                         Create Customer
                     </MudButton>
+                    <MudIconButton Variant="Variant.Filled" Color="Color.Primary" Icon="@Icons.Material.Filled.Add" 
+                                   OnClick="@(() => Navigation.NavigateTo("/sales/customers/new"))" Class="d-flex d-sm-none rounded-lg" />
                 </div>
             </MudStack>
         </ToolBarContent>
