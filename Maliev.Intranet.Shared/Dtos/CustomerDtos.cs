@@ -416,4 +416,10 @@ public class ExtractedAddress
     
     [JsonPropertyName("recipient_phone")]
     public string? RecipientPhone { get; set; }
+
+    /// <summary>
+    /// The matched location object from Registry (if found).
+    /// </summary>
+    [JsonPropertyName("location")]
+    public RegistryThaiLocation? Location { get; set; }
 }

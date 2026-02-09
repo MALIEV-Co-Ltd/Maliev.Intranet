@@ -129,22 +129,48 @@ public class AiProcessingController(
             CompanyPhone = result.CompanyPhone,
             VatNumber = result.VatNumber,
             BranchNumber = result.BranchNumber,
-            Addresses = result.Addresses?.Select(a => new ExtractedAddress
+            Addresses = result.Addresses?.Select(a => 
             {
-                Type = a.Type,
-                AddressLine1 = a.AddressLine1,
-                AddressLine2 = a.AddressLine2,
-                AddressLine3 = a.AddressLine3,
-                District = a.District,
-                City = a.City,
-                StateProvince = a.StateProvince,
-                PostalCode = a.PostalCode,
-                RecipientName = a.RecipientName,
-                RecipientPhone = a.RecipientPhone
+                _logger.LogInformation("Mapping address from AI: Type={Type}, Line1={Line1}, District={District}, City={City}, PC={PC}", 
+                    a.Type, a.AddressLine1, a.District, a.City, a.PostalCode);
+                
+                return new ExtractedAddress
+                {
+                    Type = a.Type,
+                    AddressLine1 = a.AddressLine1,
+                    AddressLine2 = a.AddressLine2,
+                    AddressLine3 = a.AddressLine3,
+                    District = a.District,
+                    City = a.City,
+                    StateProvince = a.StateProvince,
+                    PostalCode = a.PostalCode,
+                    RecipientName = a.RecipientName,
+                    RecipientPhone = a.RecipientPhone
+                };
             }).ToList()
         };
 
-        // 4. Resolve Thai locations via Registry service with multi-field composite scoring
+        // 4. Validate Company via Registry if Tax ID (VatNumber) is available
+        if (!string.IsNullOrWhiteSpace(extracted.VatNumber))
+        {
+            try
+            {
+                var companyProfiles = await registryClient.SearchCompaniesAsync(extracted.VatNumber, 1);
+                if (companyProfiles.Count > 0)
+                {
+                    var profile = companyProfiles[0];
+                    _logger.LogInformation("Validated company name via Registry for Tax ID {TaxId}: {OldName} -> {NewName}", 
+                        extracted.VatNumber, extracted.CompanyName, profile.CompanyNameTh);
+                    extracted.CompanyName = profile.CompanyNameTh;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to validate company via Registry for Tax ID {TaxId}", extracted.VatNumber);
+            }
+        }
+
+        // 5. Resolve Thai locations via Registry service with multi-field composite scoring
         if (extracted.Addresses != null)
         {
             foreach (var addr in extracted.Addresses)
@@ -167,20 +193,47 @@ public class AiProcessingController(
                     if (locations.Count > 0)
                     {
                         var loc = locations[0];  // Top match by composite similarity score
-                        var useThai = IsThai(addr.District ?? addr.City ?? addr.StateProvince ?? "");
                         
-                        addr.District = useThai ? loc.SubDistrictTh : loc.SubDistrictEn;
-                        addr.City = useThai ? loc.DistrictTh : loc.DistrictEn;
-                        addr.StateProvince = useThai ? loc.ProvinceTh : loc.ProvinceEn;
-                        addr.PostalCode = loc.PostalCode;
+                        // Detect if we should use Thai or English for corrections
+                        // Check ALL extracted fields for Thai characters to be robust
+                        var hasThai = IsThai(addr.District) || IsThai(addr.City) || IsThai(addr.StateProvince) || IsThai(addr.AddressLine1);
+                        var useThai = hasThai;
+                        
+                        // Default to Thai if it's ambiguous but we have a match in the Thai registry
+                        if (!useThai && string.IsNullOrWhiteSpace(addr.District) && string.IsNullOrWhiteSpace(addr.City))
+                        {
+                            useThai = true;
+                        }
+
+                        _logger.LogInformation("Registry match found. Correcting address fields. useThai={UseThai}", useThai);
+
+                        // Correct administrative fields ONLY if Registry has a non-empty value
+                        // This prevents wiping out AI data with empty Registry fields (especially for English)
+                        var correctedDistrict = useThai ? loc.SubDistrictTh : loc.SubDistrictEn;
+                        var correctedCity = useThai ? loc.DistrictTh : loc.DistrictEn;
+                        var correctedProvince = useThai ? loc.ProvinceTh : loc.ProvinceEn;
+
+                        _logger.LogInformation("Registry matched: District={D}, City={C}, Prov={P}, PC={PC}", 
+                            correctedDistrict, correctedCity, correctedProvince, loc.PostalCode);
+
+                        // Only update if we actually got a value from Registry
+                        // This ensures we keep the AI values if Registry lookup was partial or failed to provide better data
+                        if (!string.IsNullOrWhiteSpace(correctedDistrict)) addr.District = correctedDistrict;
+                        if (!string.IsNullOrWhiteSpace(correctedCity)) addr.City = correctedCity;
+                        if (!string.IsNullOrWhiteSpace(correctedProvince)) addr.StateProvince = correctedProvince;
+                        if (!string.IsNullOrWhiteSpace(loc.PostalCode)) addr.PostalCode = loc.PostalCode;
+                        
+                        // Pass the full location object back to the client for better UI binding
+                        addr.Location = loc;
                         
                         _logger.LogInformation(
-                            "Applied Registry correction: {District}, {City}, {Province} {PostalCode}",
-                            addr.District, addr.City, addr.StateProvince, addr.PostalCode);
+                            "Final address state (Thai:{Thai}): District:{District}, City:{City}, Province:{Province}, PostalCode:{PostalCode}",
+                            useThai, addr.District, addr.City, addr.StateProvince, addr.PostalCode);
                     }
                     else
                     {
-                        _logger.LogWarning("No Registry match found for address, using AI extraction");
+                        _logger.LogWarning("No Registry match found for address. Keeping AI values: District:{District}, City:{City}, Province:{Province}, PostalCode:{PostalCode}",
+                            addr.District, addr.City, addr.StateProvince, addr.PostalCode);
                     }
                 }
                 catch (Exception ex)
@@ -194,7 +247,7 @@ public class AiProcessingController(
             _logger.LogInformation("After Registry correction: {@Addresses}", extracted.Addresses);
         }
 
-        // 5. Compute confidence server-side based on filled fields
+        // 6. Compute confidence server-side based on filled fields
         extracted.Confidence = ComputeConfidence(extracted);
 
         return Ok(extracted);

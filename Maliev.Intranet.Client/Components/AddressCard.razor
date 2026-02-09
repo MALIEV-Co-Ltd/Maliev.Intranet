@@ -33,16 +33,13 @@
 
     <MudGrid Spacing="2">
         <MudItem xs="12" sm="6">
-            <MudSelect T="string" 
-                       Label="Address Type" 
-                       Value="@Address.Type"
-                       ValueChanged="@((string val) => OnTypeChanged?.Invoke(Index, val))"
-                       Variant="Variant.Outlined"
-                      >
-                <MudSelectItem Value="@("Billing")">Billing</MudSelectItem>
-                <MudSelectItem Value="@("Shipping")">Shipping</MudSelectItem>
-                <MudSelectItem Value="@("Both")">Both</MudSelectItem>
-            </MudSelect>
+            <MudRadioGroup T="string" 
+                           Value="@Address.Type"
+                           ValueChanged="@((string val) => OnTypeChanged?.Invoke(Index, val))"
+                           Class="mt-2">
+                <MudRadio Value="@("Billing")" Color="Color.Primary" Size="Size.Small" Dense="true">Billing</MudRadio>
+                <MudRadio Value="@("Shipping")" Color="Color.Secondary" Size="Size.Small" Dense="true">Shipping</MudRadio>
+            </MudRadioGroup>
         </MudItem>
 
         <MudItem xs="12" sm="6">
@@ -50,11 +47,49 @@
                          Value="@Address.IsDefault"
                          ValueChanged="@((bool val) => OnDefaultChanged?.Invoke(Index, val))"
                          Color="Color.Primary" 
-                         Label="@GetDefaultLabel()"
-                         Class="mt-4" />
+                         Dense="true"
+                         Class="mt-1">
+                <span style="font-size: 0.825rem;">@GetDefaultLabel()</span>
+            </MudCheckBox>
         </MudItem>
 
-        @if (Address.Type == "Shipping" || Address.Type == "Both")
+        @if (Address.Type == "Billing")
+        {
+            @if (HasCompany)
+            {
+                <MudItem xs="12">
+                    <MudTextField T="string" 
+                                  Label="Company Name" 
+                                  Value="@CompanyName" 
+                                  Variant="Variant.Outlined" 
+                                  ReadOnly="true" 
+                                  Disabled="true" />
+                </MudItem>
+            }
+            else
+            {
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" 
+                                  Label="Customer Name" 
+                                  Value="@CustomerName" 
+                                  Variant="Variant.Outlined" 
+                                  ReadOnly="true" 
+                                  Disabled="true"
+                                  HelperText="From personal information" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" 
+                                  Label="Customer Mobile" 
+                                  Value="@CustomerMobile" 
+                                  Variant="Variant.Outlined" 
+                                  ReadOnly="true" 
+                                  Disabled="true"
+                                  HelperText="From personal information" />
+                </MudItem>
+            }
+        }
+
+        @if (Address.Type == "Shipping")
         {
             <MudItem xs="12" sm="6">
                 <MudTextField T="string" 
@@ -105,30 +140,31 @@
         <MudItem xs="12" sm="6">
             <MudAutocomplete T="RegistryThaiLocation"
                              Label="District/Subdistrict"
+                             Value="@SelectedLocation"
                              Text="@Address.District"
                              TextChanged="@((string text) => Address.District = text)"
                              SearchFunc="@SearchLocations"
-                             ToStringFunc="@(l => l != null ? (IsThai(Address.District ?? "") ? l.SubDistrictTh : l.SubDistrictEn) : string.Empty)"
+                             ToStringFunc="@(l => l != null ? (IsThai(Address.District) ? l.SubDistrictTh : l.SubDistrictEn) : (Address.District ?? string.Empty))"
                              Variant="Variant.Outlined"
                              Clearable="true"
                              CoerceText="true"
-                             CoerceValue="true"
+                             CoerceValue="false"
                              ResetValueOnEmptyText="true"
                              DebounceInterval="500"
                              MinCharacters="2"
                              ValueChanged="@((RegistryThaiLocation? loc) => OnLocationSelected?.Invoke(Index, loc))"
                             >
                 <ItemTemplate Context="loc">
-                    <div class="autocomplete-item">
-                        @if (IsThai(Address.District ?? ""))
+                    <div class="autocomplete-item py-1">
+                        @if (IsThai(Address.District) || IsThai(loc.SubDistrictTh))
                         {
-                            <MudText Typo="Typo.body2">@loc.SubDistrictTh</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@loc.SubDistrictEn • @loc.DistrictTh, @loc.ProvinceTh @loc.PostalCode</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                         }
                         else
                         {
-                            <MudText Typo="Typo.body2">@loc.SubDistrictEn</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@loc.SubDistrictTh • @loc.DistrictTh, @loc.ProvinceTh @loc.PostalCode</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
                         }
                     </div>
                 </ItemTemplate>
@@ -138,31 +174,32 @@
         <MudItem xs="12" sm="6">
             <MudAutocomplete T="RegistryThaiLocation"
                              Label="City/District"
+                             Value="@SelectedLocation"
                              Text="@Address.City"
                              TextChanged="@((string text) => Address.City = text)"
                              SearchFunc="@SearchLocations"
-                             ToStringFunc="@(l => l != null ? (IsThai(Address.City ?? "") ? l.DistrictTh : l.DistrictEn) : string.Empty)"
+                             ToStringFunc="@(l => l != null ? (IsThai(Address.City) ? l.DistrictTh : l.DistrictEn) : (Address.City ?? string.Empty))"
                              Variant="Variant.Outlined"
                              Required="true"
                              Clearable="true"
                              CoerceText="true"
-                             CoerceValue="true"
+                             CoerceValue="false"
                              ResetValueOnEmptyText="true"
                              DebounceInterval="500"
                              MinCharacters="2"
                              ValueChanged="@((RegistryThaiLocation? loc) => OnLocationSelected?.Invoke(Index, loc))"
                             >
                 <ItemTemplate Context="loc">
-                    <div class="autocomplete-item">
-                        @if (IsThai(Address.City ?? ""))
+                    <div class="autocomplete-item py-1">
+                        @if (IsThai(Address.City) || IsThai(loc.DistrictTh))
                         {
-                            <MudText Typo="Typo.body2">@loc.DistrictTh</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@loc.DistrictEn • @loc.SubDistrictTh, @loc.ProvinceTh @loc.PostalCode</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                         }
                         else
                         {
-                            <MudText Typo="Typo.body2">@loc.DistrictEn</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@loc.DistrictTh • @loc.SubDistrictTh, @loc.ProvinceTh @loc.PostalCode</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
                         }
                     </div>
                 </ItemTemplate>
@@ -172,31 +209,32 @@
         <MudItem xs="12" sm="6">
             <MudAutocomplete T="RegistryThaiLocation"
                              Label="State/Province"
+                             Value="@SelectedLocation"
                              Text="@Address.StateProvince"
                              TextChanged="@((string text) => Address.StateProvince = text)"
                              SearchFunc="@SearchLocations"
-                             ToStringFunc="@(l => l != null ? (IsThai(Address.StateProvince ?? "") ? l.ProvinceTh : l.ProvinceEn) : string.Empty)"
+                             ToStringFunc="@(l => l != null ? (IsThai(Address.StateProvince) ? l.ProvinceTh : l.ProvinceEn) : (Address.StateProvince ?? string.Empty))"
                              Variant="Variant.Outlined"
                              Required="true"
                              Clearable="true"
                              CoerceText="true"
-                             CoerceValue="true"
+                             CoerceValue="false"
                              ResetValueOnEmptyText="true"
                              DebounceInterval="500"
                              MinCharacters="2"
                              ValueChanged="@((RegistryThaiLocation? loc) => OnLocationSelected?.Invoke(Index, loc))"
                             >
                 <ItemTemplate Context="loc">
-                    <div class="autocomplete-item">
-                        @if (IsThai(Address.StateProvince ?? ""))
+                    <div class="autocomplete-item py-1">
+                        @if (IsThai(Address.StateProvince) || IsThai(loc.ProvinceTh))
                         {
-                            <MudText Typo="Typo.body2">@loc.ProvinceTh</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@loc.ProvinceEn • @loc.PostalCode</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                         }
                         else
                         {
-                            <MudText Typo="Typo.body2">@loc.ProvinceEn</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@loc.ProvinceTh • @loc.PostalCode</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
                         }
                     </div>
                 </ItemTemplate>
@@ -206,24 +244,25 @@
         <MudItem xs="12" sm="6">
             <MudAutocomplete T="RegistryThaiLocation"
                              Label="Postal Code"
+                             Value="@SelectedLocation"
                              Text="@Address.PostalCode"
                              TextChanged="@((string text) => Address.PostalCode = text)"
                              SearchFunc="@SearchLocations"
-                             ToStringFunc="@(l => l?.PostalCode ?? string.Empty)"
+                             ToStringFunc="@(l => l?.PostalCode ?? (Address.PostalCode ?? string.Empty))"
                              Variant="Variant.Outlined"
                              Required="true"
                              Clearable="true"
                              CoerceText="true"
-                             CoerceValue="true"
+                             CoerceValue="false"
                              ResetValueOnEmptyText="true"
                              DebounceInterval="500"
                              MinCharacters="2"
                              ValueChanged="@((RegistryThaiLocation? loc) => OnLocationSelected?.Invoke(Index, loc))"
                             >
                 <ItemTemplate Context="loc">
-                    <div class="autocomplete-item">
-                        <MudText Typo="Typo.body2">@loc.PostalCode</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@loc.DistrictTh, @loc.SubDistrictTh, @loc.ProvinceTh</MudText>
+                    <div class="autocomplete-item py-1">
+                        <MudText Typo="Typo.body2" Style="font-weight: 500;">@loc.PostalCode</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh}, {loc.DistrictTh}, {loc.ProvinceTh}")</MudText>
                     </div>
                 </ItemTemplate>
             </MudAutocomplete>
@@ -286,6 +325,11 @@
     [Parameter] public CreateAddressRequest Address { get; set; } = new();
     [Parameter] public int Index { get; set; }
     [Parameter] public CountryDto? SelectedCountry { get; set; }
+    [Parameter] public RegistryThaiLocation? SelectedLocation { get; set; }
+    [Parameter] public bool HasCompany { get; set; }
+    [Parameter] public string? CompanyName { get; set; }
+    [Parameter] public string? CustomerName { get; set; }
+    [Parameter] public string? CustomerMobile { get; set; }
     [Parameter] public Action<int, string>? OnTypeChanged { get; set; }
     [Parameter] public Action<int, bool>? OnDefaultChanged { get; set; }
     [Parameter] public Action<int, RegistryThaiLocation?>? OnLocationSelected { get; set; }
@@ -298,16 +342,14 @@
     {
         "Billing" => Color.Primary,
         "Shipping" => Color.Secondary,
-        "Both" => Color.Info,
         _ => Color.Default
     };
 
     private string GetDefaultLabel() => Address.Type switch
     {
-        "Billing" => "Set as default billing address",
-        "Shipping" => "Set as default shipping address",
-        "Both" => "Set as default address",
-        _ => "Set as default address"
+        "Billing" => "Default billing",
+        "Shipping" => "Default shipping",
+        _ => "Default address"
     };
 
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;

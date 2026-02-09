@@ -129,28 +129,13 @@ public class CountryDto
 /// </summary>
 public class RegistryThaiLocation
 {
-    [JsonPropertyName("id")]
     public Guid Id { get; set; }
-
-    [JsonPropertyName("postalCode")]
     public string PostalCode { get; set; } = string.Empty;
-
-    [JsonPropertyName("subDistrictTh")]
     public string SubDistrictTh { get; set; } = string.Empty;
-
-    [JsonPropertyName("districtTh")]
     public string DistrictTh { get; set; } = string.Empty;
-
-    [JsonPropertyName("provinceTh")]
     public string ProvinceTh { get; set; } = string.Empty;
-
-    [JsonPropertyName("subDistrictEn")]
     public string SubDistrictEn { get; set; } = string.Empty;
-
-    [JsonPropertyName("districtEn")]
     public string DistrictEn { get; set; } = string.Empty;
-
-    [JsonPropertyName("provinceEn")]
     public string ProvinceEn { get; set; } = string.Empty;
 }
 
@@ -159,28 +144,13 @@ public class RegistryThaiLocation
 /// </summary>
 public class RegistryCompanyProfile
 {
-    [JsonPropertyName("statusCode")]
     public string StatusCode { get; set; } = string.Empty;
-
-    [JsonPropertyName("statusNameTh")]
     public string StatusNameTh { get; set; } = string.Empty;
-
-    [JsonPropertyName("taxId")]
     public string TaxId { get; set; } = string.Empty;
-
-    [JsonPropertyName("companyNameTh")]
     public string CompanyNameTh { get; set; } = string.Empty;
-
-    [JsonPropertyName("businessObjectives")]
     public string BusinessObjectives { get; set; } = string.Empty;
-
-    [JsonPropertyName("companyTypeCode")]
     public string CompanyTypeCode { get; set; } = string.Empty;
-
-    [JsonPropertyName("stockName")]
     public string? StockName { get; set; }
-
-    [JsonPropertyName("fullNameTh")]
     public string FullNameTh { get; set; } = string.Empty;
 }
 

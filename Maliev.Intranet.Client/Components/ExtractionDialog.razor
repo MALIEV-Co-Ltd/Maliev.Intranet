@@ -1,0 +1,145 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">AI Data Extraction</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+            Upload documents (business card, form) or paste text to auto-fill customer information.
+        </MudText>
+
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-4">
+            <MudTabPanel Text="Paste Text" Icon="@Icons.Material.Filled.ContentPaste">
+                <MudTextField T="string" 
+                              Label="Customer Information" 
+                              Variant="Variant.Outlined"
+                              Value="@_extractionText"
+                              ValueChanged="@((string val) => { _extractionText = val; StateHasChanged(); })"
+                              Lines="8"
+                              Placeholder="Paste business card text, email signature, or raw data here..."
+                              Immediate="true"
+                              AutoGrow="true"
+                              MaxLines="12" />
+            </MudTabPanel>
+            
+            <MudTabPanel Text="Upload File" Icon="@Icons.Material.Filled.UploadFile">
+                <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
+                               FilesChanged="OnExtractionFilesSelected" 
+                               Accept=".pdf,.jpg,.jpeg,.png" 
+                               MaximumFileCount="5">
+                    <ActivatorContent>
+                        <MudPaper Outlined="true" 
+                                  Class="d-flex flex-column align-center justify-center py-8 px-4 cursor-pointer mud-theme-surface"
+                                  Style="border: 2px dashed var(--mud-palette-divider); min-height: 200px; width: 100%; transition: background-color 0.2s;"
+                                  Elevation="0">
+                             <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
+                             
+                             @if (_extractionFiles.Any())
+                             {
+                                 <MudChip T="string" Color="Color.Primary" Variant="Variant.Text">@_extractionFiles.Count file(s) selected</MudChip>
+                                 <MudText Typo="Typo.caption" Class="mt-2">Click to change</MudText>
+                             }
+                             else
+                             {
+                                 <MudText Typo="Typo.h6" Align="Align.Center">Drag and drop files here</MudText>
+                                 <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">or click to browse</MudText>
+                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-4">Supports PDF, JPG, PNG</MudText>
+                             }
+                        </MudPaper>
+                    </ActivatorContent>
+                </MudFileUpload>
+            </MudTabPanel>
+        </MudTabs>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Psychology"
+                   OnClick="ExtractCustomerData"
+                   Disabled="@(_isExtracting || !HasExtractionInput())">
+            @if (_isExtracting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Analyzing...</span>
+            }
+            else
+            {
+                <span>Extract Data</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _extractionText = string.Empty;
+    private List<IBrowserFile> _extractionFiles = new();
+    private bool _isExtracting = false;
+
+    private bool HasExtractionInput() => 
+        !string.IsNullOrWhiteSpace(_extractionText) || _extractionFiles.Any();
+
+    private void OnExtractionFilesSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        _extractionFiles.Clear();
+        _extractionFiles.AddRange(files);
+    }
+
+    private async Task ExtractCustomerData()
+    {
+        _isExtracting = true;
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            
+            if (!string.IsNullOrWhiteSpace(_extractionText))
+            {
+                content.Add(new StringContent(_extractionText), "rawText");
+            }
+            
+            foreach (var file in _extractionFiles)
+            {
+                var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var response = await Http.PostAsync("api/aiprocessing/extract-customer", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var extracted = await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
+                if (extracted != null)
+                {
+                    MudDialog.Close(DialogResult.Ok(extracted));
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Extraction failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isExtracting = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

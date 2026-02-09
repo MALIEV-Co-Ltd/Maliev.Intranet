@@ -1,623 +1,337 @@
 @page "/sales/customers/new"
 @using MudBlazor
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Create New Customer - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16">
-    
-    <!-- Page Header with Progress -->
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="4" Class="flex-wrap mb-6 pb-4">
-        <MudStack Spacing="1">
-            <MudText Typo="Typo.h4">Create New Customer</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-uppercase" Style="letter-spacing: 0.05em; font-weight: 500;">Complete onboarding workflow</MudText>
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16 pt-8">
+    <!-- Header -->
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-8">
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.h3" Style="font-weight: 700;">Create New Customer</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary">Add a new client profile to your database.</MudText>
         </MudStack>
-        <MudStepper @ref="_stepper" NonLinear="true" ActiveIndex="@_activeStepIndex" ActiveIndexChanged="OnStepChanged">
-            <MudStep Title="Extract" />
-            <MudStep Title="Details" />
-            <MudStep Title="Review" />
-        </MudStepper>
+        
+        <MudStack Row="true" Spacing="2">
+            @if (_chatbotServiceAvailable)
+            {
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.AutoAwesome"
+                           OnClick="OpenExtractionDialog"
+                           Class="px-6 py-2 rounded-lg"
+                           Style="background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-secondary) 100%); text-transform: none; font-weight: 600;">
+                    AI Auto-Extract
+                </MudButton>
+            }
+        </MudStack>
     </MudStack>
 
-    <!-- Two-column layout: AI Extraction (sticky) + Form -->
-    <MudGrid Spacing="4">
-        
-        <!-- Left Column: AI Extraction (Sticky on Desktop) -->
-        <MudItem xs="12" lg="3">
-            <div style="position: sticky; top: 96px; z-index: 10;">
-                @if (_chatbotServiceAvailable)
-                {
-                    <MudPaper Elevation="2" Class="pa-6" Style="background: linear-gradient(135deg, rgba(var(--mud-palette-primary-rgb), 0.05) 0%, rgba(var(--mud-palette-secondary-rgb), 0.05) 100%);">
-                        <MudStack Spacing="3">
-                            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large" Color="Color.Primary" />
-                                <MudStack Spacing="1" Class="flex-grow-1">
-                                    <MudText Typo="Typo.h6">AI Data Extraction</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Upload documents or paste text to auto-fill customer information</MudText>
-                                </MudStack>
-                            </MudStack>
-                            
-                            @if (_extractionConfidence > 0)
-                            {
-                                <MudChip T="string" Color="Color.Success" Size="Size.Medium" Style="width: 100%; justify-content: center;">
-                                    <MudStack Spacing="0" AlignItems="AlignItems.Center">
-                                        <MudText Typo="Typo.body1" Style="font-weight: 700; line-height: 1;">@((_extractionConfidence * 100).ToString("F0"))%</MudText>
-                                        <MudText Typo="Typo.caption" Style="font-size: 0.7rem;">Confidence</MudText>
-                                    </MudStack>
-                                </MudChip>
-                            }
-                            
-                            <MudTextField T="string" 
-                                          Label="Paste Customer Information" 
-                                          Variant="Variant.Outlined"
-                                          Value="@_extractionText"
-                                          ValueChanged="@((string val) => { _extractionText = val; StateHasChanged(); })"
-                                          Lines="8"
-                                          Placeholder="Paste business card, email signature, or any text containing customer details..."
-                                          Immediate="true"
-                                          Style="font-size: 14px;" />
-                            
-                            <MudStack Spacing="2">
-                                <MudText Typo="Typo.body2" Class="text-uppercase" Color="Color.Secondary" Style="font-weight: 600; letter-spacing: 0.05em; font-size: 0.7rem;">OR UPLOAD DOCUMENTS</MudText>
-                                <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
-                                               FilesChanged="OnExtractionFilesSelected" 
-                                               Accept=".pdf,.jpg,.jpeg,.png" 
-                                               MaximumFileCount="5">
-                                    <ActivatorContent>
-                                        <MudPaper Outlined="true" Class="pa-4 text-center cursor-pointer" Style="border: 2px dashed var(--mud-palette-divider); min-height: 120px; transition: all 0.2s;">
-                                            <MudStack Spacing="2" AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;">
-                                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Medium" Color="Color.Secondary" Style="opacity: 0.5;" />
-                                                <MudText Typo="Typo.body2" Style="font-size: 0.875rem;">
-                                                    @if (_extractionFiles.Any())
-                                                    {
-                                                        <strong>@_extractionFiles.Count file(s)</strong>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span>Drop or click</span>
-                                                    }
-                                                </MudText>
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 0.7rem;">PDF, JPG, PNG</MudText>
-                                            </MudStack>
-                                        </MudPaper>
-                                    </ActivatorContent>
-                                </MudFileUpload>
-                            </MudStack>
-                            
-                            <MudButton Variant="Variant.Filled" 
-                                       Color="Color.Primary"
-                                       FullWidth="true"
-                                       Size="Size.Medium"
-                                       StartIcon="@Icons.Material.Filled.Psychology"
-                                       OnClick="ExtractCustomerData"
-                                       Disabled="@(_isExtracting || !HasExtractionInput())">
-                                @if (_isExtracting)
-                                {
-                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                                    <span>Analyzing...</span>
-                                }
-                                else
-                                {
-                                    <span>Extract & Auto-Fill</span>
-                                }
-                            </MudButton>
+    @if (_extractionConfidence > 0)
+    {
+        <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-6 rounded-lg" Dense="true" ShowCloseIcon="true" CloseIconClicked="(() => _extractionConfidence = 0)">
+            AI Extraction completed with @((_extractionConfidence * 100).ToString("F0"))% confidence. Please review the populated fields.
+        </MudAlert>
+    }
+
+    <MudForm @ref="_form" ValidationDelay="0">
+        <MudGrid Spacing="6">
+            
+            <!-- Left Column: Main Info -->
+            <MudItem xs="12" lg="8">
+                <MudStack Spacing="6">
+                    
+                    <!-- Personal Information Card -->
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-6">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 700;">Personal Information</MudText>
                         </MudStack>
-                    </MudPaper>
-                }
-                else
-                {
-                    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
-                        AI extraction service is currently unavailable. Please fill the form manually.
-                    </MudAlert>
-                }
-            </div>
-        </MudItem>
-
-        <!-- Right Column: Form Content -->
-        <MudItem xs="12" lg="9">
-            <MudForm @ref="_form" ValidationDelay="0">
-        
-        <!-- Section 01: Customer Information -->
-        <FormSection SectionNumber="01" 
-                     Title="Customer Information" 
-                     Description="Primary contact details"
-                     Icon="@Icons.Material.Filled.Person">
-            <MudGrid Spacing="3">
-                <MudItem xs="12" sm="6">
-                    <MudTextField T="string" 
-                                  Label="First Name" 
-                                  @bind-Value="_customerData.Customer.FirstName"
-                                  Variant="Variant.Outlined"
-                                  Required="true"
-                                  RequiredError="First name is required" />
-                </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudTextField T="string" 
-                                  Label="Last Name" 
-                                  @bind-Value="_customerData.Customer.LastName"
-                                  Variant="Variant.Outlined"
-                                  Required="true"
-                                  RequiredError="Last name is required"
-                                  />
-                </MudItem>
-
-                <MudItem xs="12">
-                    <MudTextField T="string" 
-                                  Label="Email Address" 
-                                  @bind-Value="_customerData.Customer.Email"
-                                  Variant="Variant.Outlined"
-                                  Required="true"
-                                  RequiredError="Email is required"
-                                  Validation="@(new Func<string, Task<string?>>(ValidateEmailAsync))"
-                                  Immediate="true"
-                                  DebounceInterval="500"
-                                  InputType="InputType.Email"
-                                  />
-                </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudTextField T="string" 
-                                  Label="Mobile Phone" 
-                                  @bind-Value="_customerData.Customer.Mobile"
-                                  Variant="Variant.Outlined"
-                                  Placeholder="+66812345678"
-                                  />
-                </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudTextField T="string" 
-                                  Label="Landline" 
-                                  @bind-Value="_customerData.Customer.Landline"
-                                  Variant="Variant.Outlined"
-                                  Placeholder="+6621234567"
-                                  />
-                </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="string" 
-                               Label="Segment" 
-                               @bind-Value="_customerData.Customer.Segment"
-                               Variant="Variant.Outlined"
-                              >
-                        <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
-                        <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
-                        <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
-                        <MudSelectItem Value="@("Government")">Government</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="string" 
-                               Label="Tier" 
-                               @bind-Value="_customerData.Customer.Tier"
-                               Variant="Variant.Outlined"
-                              >
-                        <MudSelectItem Value="@("Bronze")">Bronze</MudSelectItem>
-                        <MudSelectItem Value="@("Silver")">Silver</MudSelectItem>
-                        <MudSelectItem Value="@("Gold")">Gold</MudSelectItem>
-                        <MudSelectItem Value="@("Platinum")">Platinum</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="string" 
-                               Label="Preferred Language" 
-                               @bind-Value="_customerData.Customer.PreferredLanguage"
-                               Variant="Variant.Outlined"
-                              >
-                        <MudSelectItem Value="@("en")">English</MudSelectItem>
-                        <MudSelectItem Value="@("th")">Thai (ไทย)</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="string" 
-                               Label="Timezone" 
-                               @bind-Value="_customerData.Customer.Timezone"
-                               Variant="Variant.Outlined"
-                              >
-                        <MudSelectItem Value="@("Asia/Bangkok")">Bangkok (GMT+7)</MudSelectItem>
-                        <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
-                        <MudSelectItem Value="@("Asia/Singapore")">Singapore (GMT+8)</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-            </MudGrid>
-        </FormSection>
-
-        <!-- Section 02: Company Information -->
-        <FormSection SectionNumber="02" 
-                     Title="Company Information" 
-                     Description="Business affiliation (optional)"
-                     Icon="@Icons.Material.Filled.Business">
-            <HeaderActions>
-                <MudSwitch T="bool" 
-                           @bind-Value="_hasCompany" 
-                           Color="Color.Primary" 
-                           Label="Company Customer"
-                           />
-            </HeaderActions>
-            <ChildContent>
-                @if (_hasCompany)
-                {
-                    <MudGrid Spacing="3">
-                        <MudItem xs="12">
-                            <MudTextField T="string" 
-                                          Label="Company Name" 
-                                          @bind-Value="_newCompany.Name"
-                                          Variant="Variant.Outlined"
-                                          Required="true"
-                                          RequiredError="Company name is required"
-                                          />
-                        </MudItem>
-
-                        <MudItem xs="12" sm="6">
-                            <MudTextField T="string" 
-                                          Label="Tax ID / VAT Number" 
-                                          @bind-Value="_newCompany.VatNumber"
-                                          Variant="Variant.Outlined"
-                                          Placeholder="0105536001097"
-                                          HelperText="13-digit Thai Tax ID"
-                                          />
-                        </MudItem>
-
-                        <MudItem xs="12" sm="6">
-                            <MudTextField T="string" 
-                                          Label="Company Phone" 
-                                          @bind-Value="_newCompany.ContactPhone"
-                                          Variant="Variant.Outlined"
-                                          Placeholder="+6621234567"
-                                          />
-                        </MudItem>
-
-                        <MudItem xs="12" sm="6">
-                            <MudTextField T="string" 
-                                          Label="Extension (for customer)" 
-                                          @bind-Value="_customerData.Customer.Extension"
-                                          Variant="Variant.Outlined"
-                                          Placeholder="101"
-                                          HelperText="Customer's direct line"
-                                          />
-                        </MudItem>
-
-                        <MudItem xs="12" sm="6">
-                            <MudRadioGroup T="string" @bind-Value="_companyOfficeType">
-                                <MudRadio T="string" Value="@("head")" Color="Color.Primary">Head Office</MudRadio>
-                                <MudRadio T="string" Value="@("branch")" Color="Color.Primary">Branch</MudRadio>
-                            </MudRadioGroup>
-                        </MudItem>
-
-                        @if (_companyOfficeType == "branch")
-                        {
-                            <MudItem xs="12" sm="6">
-                                <MudTextField T="string" 
-                                              Label="Branch Number" 
-                                              @bind-Value="_branchNumber"
-                                              Variant="Variant.Outlined"
-                                              Placeholder="00001"
-                                              HelperText="5-digit format (00001-99999)"
-                                              />
-                            </MudItem>
-                        }
-
-                        <MudItem xs="12" sm="6">
-                            <MudSelect T="string" 
-                                       Label="Company Segment" 
-                                       @bind-Value="_newCompany.Segment"
-                                       Variant="Variant.Outlined"
-                                      >
-                                <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
-                                <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
-                                <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
-                                <MudSelectItem Value="@("Government")">Government</MudSelectItem>
-                            </MudSelect>
-                        </MudItem>
-
-                        <MudItem xs="12" sm="6">
-                            <MudSelect T="string" 
-                                       Label="Company Tier" 
-                                       @bind-Value="_newCompany.Tier"
-                                       Variant="Variant.Outlined"
-                                      >
-                                <MudSelectItem Value="@("Bronze")">Bronze</MudSelectItem>
-                                <MudSelectItem Value="@("Silver")">Silver</MudSelectItem>
-                                <MudSelectItem Value="@("Gold")">Gold</MudSelectItem>
-                                <MudSelectItem Value="@("Platinum")">Platinum</MudSelectItem>
-                            </MudSelect>
-                        </MudItem>
-                    </MudGrid>
-                }
-                else
-                {
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                        Individual customer (no company affiliation)
-                    </MudAlert>
-                }
-            </ChildContent>
-        </FormSection>
-
-        <!-- Section 03: Addresses -->
-        <FormSection SectionNumber="03" 
-                     Title="Addresses" 
-                     Description="Billing and shipping locations"
-                     Icon="@Icons.Material.Filled.LocationOn">
-            <HeaderActions>
-                <MudButton Variant="Variant.Outlined" 
-                           Color="Color.Primary" 
-                           StartIcon="@Icons.Material.Filled.Add"
-                           Size="Size.Small"
-                           OnClick="AddAddress"
-                          >
-                    Add Address
-                </MudButton>
-            </HeaderActions>
-            <ChildContent>
-                @if (!_customerData.Addresses.Any())
-                {
-                    <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
-                        No addresses added. Click "Add Address" to create billing or shipping addresses.
-                    </MudAlert>
-                }
-                else
-                {
-                    <MudGrid Spacing="4">
-                        @foreach (var (address, index) in _customerData.Addresses.Select((a, i) => (a, i)))
-                        {
-                            <MudItem xs="12" lg="6">
-                                <AddressCard Address="address" 
-                                             Index="index"
-                                             OnTypeChanged="OnAddressTypeChanged"
-                                             OnDefaultChanged="OnDefaultChanged"
-                                             OnLocationSelected="OnThaiLocationSelected"
-                                             OnCountrySelected="OnCountrySelected"
-                                             OnRemove="RemoveAddress"
-                                             SearchLocations="SearchThaiLocations"
-                                             SearchCountries="SearchCountries"
-                                             SelectedCountry="_selectedCountries.GetValueOrDefault(index)" />
-                            </MudItem>
-                        }
-                    </MudGrid>
-                }
-            </ChildContent>
-        </FormSection>
-
-        <!-- Section 04: Additional Details -->
-        <FormSection SectionNumber="04" 
-                     Title="Additional Details" 
-                     Description="Preferences, documents, and notes"
-                     Icon="@Icons.Material.Filled.MoreHoriz">
-            <MudGrid Spacing="4">
-                
-                <!-- Communication Preferences -->
-                <MudItem xs="12" md="4">
-                    <MudPaper Elevation="0" Class="subsection-paper">
-                        <MudText Typo="Typo.subtitle1" Class="subsection-title">COMMUNICATION PREFERENCES</MudText>
-                        <MudStack Spacing="2" Class="mt-3">
-                            <MudCheckBox T="bool" @bind-Value="_emailOptIn" Color="Color.Primary" Label="Email notifications" />
-                            <MudCheckBox T="bool" @bind-Value="_smsOptIn" Color="Color.Primary" Label="SMS notifications" />
-                            <MudCheckBox T="bool" @bind-Value="_marketingOptIn" Color="Color.Primary" Label="Marketing communications" />
-                        </MudStack>
-                    </MudPaper>
-                </MudItem>
-
-                <!-- NDA Information -->
-                <MudItem xs="12" md="4">
-                    <MudPaper Elevation="0" Class="subsection-paper">
-                        <div class="subsection-header">
-                            <MudText Typo="Typo.subtitle1" Class="subsection-title">NDA INFORMATION</MudText>
-                            <MudSwitch T="bool" @bind-Value="_includeNda" Color="Color.Primary" Class="subsection-toggle" />
-                        </div>
                         
-                        @if (_includeNda)
-                        {
-                            <MudStack Spacing="2" Class="mt-3">
-                                <MudDatePicker Label="NDA Expiration Date (Optional)"
-                                               @bind-Date="_ndaExpiryDate"
-                                               Variant="Variant.Outlined"
-                                               MinDate="DateTime.Now"
-                                               />
+                        <MudGrid Spacing="4">
+                             <MudItem xs="12" sm="6">
+                                 <MudTextField T="string" Label="First Name" @bind-Value="_customerData.Customer.FirstName" Variant="Variant.Outlined" Required="true" RequiredError="First name is required" Placeholder="e.g. Jane" />
+                             </MudItem>
+                             <MudItem xs="12" sm="6">
+                                 <MudTextField T="string" Label="Last Name" @bind-Value="_customerData.Customer.LastName" Variant="Variant.Outlined" Required="true" RequiredError="Last name is required" Placeholder="e.g. Cooper" />
+                             </MudItem>
+                             <MudItem xs="12">
+                                 <MudTextField T="string" Label="Email Address" @bind-Value="_customerData.Customer.Email" Variant="Variant.Outlined" Required="true" RequiredError="Email is required" Validation="@(new Func<string, Task<string?>>(ValidateEmailAsync))" InputType="InputType.Email" DebounceInterval="500" Placeholder="jane.cooper@company.com" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Email" />
+                             </MudItem>
+                             <MudItem xs="12" sm="6">
+                                 <MudTextField T="string" Label="Mobile Number" @bind-Value="_customerData.Customer.Mobile" Variant="Variant.Outlined" Placeholder="+66 81 234-5678" />
+                             </MudItem>
+                             <MudItem xs="12" sm="6">
+                                 <MudTextField T="string" Label="Landline" @bind-Value="_customerData.Customer.Landline" Variant="Variant.Outlined" Placeholder="+66 2 123-4567" />
+                             </MudItem>
+                             <MudItem xs="12" sm="6">
+                                 <MudSelect T="string" Label="Segment" @bind-Value="_customerData.Customer.Segment" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                     <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
+                                     <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
+                                     <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
+                                     <MudSelectItem Value="@("Government")">Government</MudSelectItem>
+                                 </MudSelect>
+                             </MudItem>
+                             <MudItem xs="12" sm="6">
+                                  <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1 d-block">Tier Level</MudText>
+                                  <MudToggleGroup T="string" @bind-Value="_customerData.Customer.Tier" SelectionMode="SelectionMode.SingleSelection" Color="Color.Primary" CheckMark="false" FixedContent="true" Class="w-100">
+                                      <MudToggleItem Value="@("Bronze")" Text="Bronze" />
+                                      <MudToggleItem Value="@("Silver")" Text="Silver" />
+                                      <MudToggleItem Value="@("Gold")" Text="Gold" />
+                                      <MudToggleItem Value="@("Platinum")" Text="Platinum" />
+                                  </MudToggleGroup>
+                             </MudItem>
+                        </MudGrid>
+                    </MudCard>
 
-                                <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
-                                               FilesChanged="OnNdaFilesSelected" 
-                                               Accept=".pdf,.doc,.docx" 
-                                               MaximumFileCount="5">
-                                    <ActivatorContent>
-                                        <MudButton Variant="Variant.Outlined" 
-                                                   Color="Color.Primary"
-                                                   StartIcon="@Icons.Material.Filled.AttachFile"
-                                                   FullWidth="true"
-                                                   Disabled="@_isUploadingNda"
-                                                  >
-                                            @if (_ndaFiles.Any())
-                                            {
-                                                <span>@_ndaFiles.Count file(s) selected</span>
-                                            }
-                                            else
-                                            {
-                                                <span>Select NDA Files</span>
-                                            }
-                                        </MudButton>
-                                    </ActivatorContent>
-                                </MudFileUpload>
-
-                                @if (_ndaFiles.Any())
-                                {
-                                    <MudButton Variant="Variant.Filled" 
-                                               Color="Color.Primary"
-                                               StartIcon="@Icons.Material.Filled.Upload"
-                                               OnClick="UploadNdaFiles"
-                                               Disabled="@_isUploadingNda"
-                                               FullWidth="true"
-                                              >
-                                        @if (_isUploadingNda)
-                                        {
-                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                                            <span>Uploading...</span>
-                                        }
-                                        else
-                                        {
-                                            <span>Upload Files</span>
-                                        }
-                                    </MudButton>
-                                }
-
-                                @if (_uploadedNdaDocs.Any())
-                                {
-                                    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
-                                        @_uploadedNdaDocs.Count document(s) uploaded
-                                    </MudAlert>
-                                }
+                    <!-- Company Details Card -->
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" />
+                                <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Details</MudText>
                             </MudStack>
+                            <MudSwitch T="bool" @bind-Value="_hasCompany" Color="Color.Primary" Label="Has Company" />
+                        </MudStack>
+                        
+                        @if (_hasCompany)
+                        {
+                            <MudGrid Spacing="4">
+                                <MudItem xs="12">
+                                    <MudTextField T="string" Label="Company Name" @bind-Value="_newCompany.Name" Variant="Variant.Outlined" Required="true" RequiredError="Company name is required" Placeholder="Acme Corp, Inc." />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField T="string" Label="Tax ID / VAT" @bind-Value="_newCompany.VatNumber" Variant="Variant.Outlined" Placeholder="US-123456789" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                         <MudRadioGroup T="string" @bind-Value="_companyOfficeType" Class="d-flex">
+                                             <MudRadio T="string" Value="@("head")" Color="Color.Primary" Dense="true">Head Office</MudRadio>
+                                             <MudRadio T="string" Value="@("branch")" Color="Color.Primary" Dense="true">Branch</MudRadio>
+                                         </MudRadioGroup>
+                                         @if (_companyOfficeType == "branch")
+                                         {
+                                             <MudTextField T="string" Label="Branch #" @bind-Value="_branchNumber" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="00001" />
+                                         }
+                                    </MudStack>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField T="string" Label="Company Phone" @bind-Value="_newCompany.ContactPhone" Variant="Variant.Outlined" Placeholder="+1 (555) 000-0000" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField T="string" Label="Extension" @bind-Value="_customerData.Customer.Extension" Variant="Variant.Outlined" Placeholder="101" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                     <MudSelect T="string" Label="Industry Segment" @bind-Value="_newCompany.Segment" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                         <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
+                                         <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
+                                         <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
+                                         <MudSelectItem Value="@("Government")">Government</MudSelectItem>
+                                     </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1 d-block">Company Tier</MudText>
+                                      <MudToggleGroup T="string" @bind-Value="_newCompany.Tier" SelectionMode="SelectionMode.SingleSelection" Color="Color.Primary" CheckMark="false" FixedContent="true" Class="w-100">
+                                          <MudToggleItem Value="@("Bronze")" Text="Bronze" />
+                                          <MudToggleItem Value="@("Silver")" Text="Silver" />
+                                          <MudToggleItem Value="@("Gold")" Text="Gold" />
+                                          <MudToggleItem Value="@("Platinum")" Text="Platinum" />
+                                      </MudToggleGroup>
+                                </MudItem>
+                            </MudGrid>
                         }
                         else
                         {
-                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-3">
-                                No NDA required for this customer
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Text" NoIcon="true" Class="pa-0">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Toggle "Has Company" above to add business details.</MudText>
                             </MudAlert>
                         }
-                    </MudPaper>
-                </MudItem>
+                    </MudCard>
 
-                <!-- Customer Documents -->
-                <MudItem xs="12" md="4">
-                    <MudPaper Elevation="0" Class="subsection-paper">
-                        <MudText Typo="Typo.subtitle1" Class="subsection-title">CUSTOMER DOCUMENTS</MudText>
-                        
-                        <MudStack Spacing="2" Class="mt-3">
-                            <MudTextField T="string" 
-                                          Label="Document Category" 
-                                          @bind-Value="_customerDocCategory"
-                                          Variant="Variant.Outlined"
-                                          Placeholder="e.g., Business Card, Tax Registration"
-                                          />
-
-                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
-                                           FilesChanged="OnCustomerDocsSelected" 
-                                           Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" 
-                                           MaximumFileCount="10">
-                                <ActivatorContent>
-                                    <MudButton Variant="Variant.Outlined" 
-                                               Color="Color.Primary"
-                                               StartIcon="@Icons.Material.Filled.AttachFile"
-                                               FullWidth="true"
-                                               Disabled="@_isUploadingCustomerDocs"
-                                              >
-                                        @if (_customerDocFiles.Any())
-                                        {
-                                            <span>@_customerDocFiles.Count file(s) selected</span>
-                                        }
-                                        else
-                                        {
-                                            <span>Select Documents</span>
-                                        }
-                                    </MudButton>
-                                </ActivatorContent>
-                            </MudFileUpload>
-
-                            @if (_customerDocFiles.Any())
-                            {
-                                <MudButton Variant="Variant.Filled" 
-                                           Color="Color.Primary"
-                                           StartIcon="@Icons.Material.Filled.Upload"
-                                           OnClick="UploadCustomerDocuments"
-                                           Disabled="@_isUploadingCustomerDocs"
-                                           FullWidth="true"
-                                          >
-                                    @if (_isUploadingCustomerDocs)
-                                    {
-                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                                        <span>Uploading...</span>
-                                    }
-                                    else
-                                    {
-                                        <span>Upload Documents</span>
-                                    }
-                                </MudButton>
-                            }
-
-                            @if (_uploadedCustomerDocs.Any())
-                            {
-                                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
-                                    @_uploadedCustomerDocs.Count document(s) uploaded
-                                </MudAlert>
-                            }
+                    <!-- Address Details Card -->
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Color="Color.Primary" />
+                                <MudText Typo="Typo.h6" Style="font-weight: 700;">Address Details</MudText>
+                            </MudStack>
+                            <MudLink OnClick="AddAddress" Underline="Underline.None" Color="Color.Primary" Style="font-weight: 600; cursor: pointer;">
+                                + Add Another
+                            </MudLink>
                         </MudStack>
-                    </MudPaper>
-                </MudItem>
+                        
+                        <MudGrid Spacing="4">
+                            @if (!_customerData.Addresses.Any())
+                            {
+                                <MudItem xs="12">
+                                    <MudPaper Class="pa-8 d-flex flex-column align-center justify-center border-dashed border-2 mud-border-primary" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                                        <MudIcon Icon="@Icons.Material.Filled.AddLocationAlt" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                                        <MudText Typo="Typo.body1" Color="Color.Secondary">No addresses added yet.</MudText>
+                                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="AddAddress">Add Address</MudButton>
+                                    </MudPaper>
+                                </MudItem>
+                            }
+                            else
+                            {
+                                @foreach (var (address, index) in _customerData.Addresses.Select((a, i) => (a, i)))
+                                {
+                                    <MudItem xs="12" sm="6">
+                                        <AddressCard Address="address" 
+                                                     Index="index"
+                                                     HasCompany="_hasCompany"
+                                                     CompanyName="@_newCompany.Name"
+                                                     CustomerName="@($"{_customerData.Customer.FirstName} {_customerData.Customer.LastName}")"
+                                                     CustomerMobile="@_customerData.Customer.Mobile"
+                                                     OnTypeChanged="OnAddressTypeChanged"
+                                                     OnDefaultChanged="OnDefaultChanged"
+                                                     OnLocationSelected="OnThaiLocationSelected"
+                                                     OnCountrySelected="OnCountrySelected"
+                                                     OnRemove="RemoveAddress"
+                                                     SearchLocations="SearchThaiLocations"
+                                                     SearchCountries="SearchCountries"
+                                                     SelectedCountry="_selectedCountries.GetValueOrDefault(index)"
+                                                     SelectedLocation="_selectedLocations.GetValueOrDefault(index)" />
+                                    </MudItem>
+                                }
+                            }
+                        </MudGrid>
+                    </MudCard>
+                    
+                    <!-- Action Buttons (Bottom of Form Flow) -->
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-4">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Large" OnClick="Cancel" Disabled="@_isSubmitting" Class="px-8 rounded-lg">Cancel</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" OnClick="Submit" Disabled="@(_isSubmitting || !IsFormValid())" Class="px-8 rounded-lg">
+                            @if (_isSubmitting)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Creating...</span>
+                            }
+                            else
+                            {
+                                <span>Create Customer</span>
+                            }
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudItem>
 
-                <!-- Internal Notes -->
-                <MudItem xs="12">
-                    <MudTextField T="string" 
-                                  Label="Internal Notes (Optional)" 
-                                  @bind-Value="_customerData.InternalNote"
-                                  Variant="Variant.Outlined"
-                                  Lines="6"
-                                  MaxLength="5000"
-                                  Counter="5000"
-                                  Immediate="true"
-                                  Placeholder="Add any internal notes about this customer..."
-                                  />
-                </MudItem>
-            </MudGrid>
-        </FormSection>
+            <!-- Right Column: Sidebar -->
+            <MudItem xs="12" lg="4">
+                <MudStack Spacing="6">
+                    
+                    <!-- Preferences Card -->
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                         <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Preferences</MudText>
+                         
+                         <MudStack Spacing="4">
+                             <MudSelect T="string" Label="Language" @bind-Value="_customerData.Customer.PreferredLanguage" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                 <MudSelectItem Value="@("en")">English (US)</MudSelectItem>
+                                 <MudSelectItem Value="@("th")">Thai (ไทย)</MudSelectItem>
+                             </MudSelect>
+                             
+                             <MudSelect T="string" Label="Timezone" @bind-Value="_customerData.Customer.Timezone" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                 <MudSelectItem Value="@("Asia/Bangkok")">(GMT+07:00) Bangkok</MudSelectItem>
+                                 <MudSelectItem Value="@("UTC")">(UTC) Coordinated Universal Time</MudSelectItem>
+                                 <MudSelectItem Value="@("Asia/Singapore")">(GMT+08:00) Singapore</MudSelectItem>
+                             </MudSelect>
+                             
+                             <div>
+                                 <MudText Typo="Typo.body2" Style="font-weight: 600;" Class="mb-2">Communication</MudText>
+                                 <MudStack Row="true" Spacing="4">
+                                     <MudCheckBox T="bool" @bind-Value="_emailOptIn" Color="Color.Primary" Label="Email" Dense="true" Size="Size.Small" />
+                                     <MudCheckBox T="bool" @bind-Value="_smsOptIn" Color="Color.Primary" Label="SMS" Dense="true" Size="Size.Small" />
+                                     <MudCheckBox T="bool" @bind-Value="_marketingOptIn" Color="Color.Primary" Label="Phone" Dense="true" Size="Size.Small" />
+                                 </MudStack>
+                             </div>
+                         </MudStack>
+                    </MudCard>
+
+                    <!-- Documents Card -->
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                         <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Documents</MudText>
+                         
+                         <MudStack Spacing="4">
+                             <!-- NDA Toggle -->
+                             <MudSwitch T="bool" @bind-Value="_includeNda" Color="Color.Primary" Label="Require NDA" />
+                             
+                             @if (_includeNda)
+                             {
+                                 <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnNdaFilesSelected" Accept=".pdf,.doc,.docx" MaximumFileCount="5">
+                                     <ActivatorContent>
+                                         <MudPaper Outlined="true" Class="pa-6 d-flex flex-column align-center justify-center cursor-pointer border-dashed border-2 mud-border-primary" Elevation="0" Style="background-color: var(--mud-palette-background-grey); min-height: 120px;">
+                                              <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Medium" Color="Color.Primary" Class="mb-2" />
+                                              <MudText Typo="Typo.body2" Align="Align.Center" Style="font-weight: 600;">Click to upload NDA</MudText>
+                                              <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">or drag and drop files here</MudText>
+                                         </MudPaper>
+                                     </ActivatorContent>
+                                 </MudFileUpload>
+                                 
+                                 @if (_ndaFiles.Any())
+                                 {
+                                     <MudList T="IBrowserFile" Dense="true">
+                                         @foreach (var file in _ndaFiles)
+                                         {
+                                             <MudListItem Icon="@Icons.Material.Filled.InsertDriveFile">
+                                                 <div class="d-flex justify-space-between align-center w-100">
+                                                     <MudText Typo="Typo.body2">@file.Name</MudText>
+                                                     <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _ndaFiles.Remove(file))" />
+                                                 </div>
+                                             </MudListItem>
+                                         }
+                                     </MudList>
+                                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="UploadNdaFiles" Disabled="@_isUploadingNda">
+                                         @(_isUploadingNda ? "Uploading..." : "Upload NDA")
+                                     </MudButton>
+                                 }
+                             }
+                             
+                             <MudDivider />
+                             
+                             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Other Documents</MudText>
+                             <MudTextField T="string" Label="Category" @bind-Value="_customerDocCategory" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. Business Card" />
+                             
+                             <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnCustomerDocsSelected" Accept=".pdf,.jpg,.png,.doc" MaximumFileCount="10">
+                                 <ActivatorContent>
+                                     <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true" StartIcon="@Icons.Material.Filled.AttachFile">Select Files</MudButton>
+                                 </ActivatorContent>
+                             </MudFileUpload>
+                             
+                             @if (_customerDocFiles.Any())
+                             {
+                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="UploadCustomerDocuments" Disabled="@_isUploadingCustomerDocs">
+                                     @(_isUploadingCustomerDocs ? "Uploading..." : "Upload Docs")
+                                 </MudButton>
+                             }
+                         </MudStack>
+                    </MudCard>
+
+                    <!-- Internal Notes Card -->
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                         <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-4">Internal Notes</MudText>
+                         <MudTextField T="string" 
+                                      @bind-Value="_customerData.InternalNote" 
+                                      Variant="Variant.Outlined" 
+                                      Lines="6" 
+                                      Placeholder="Add any private notes about this customer..." 
+                                      MaxLength="5000" 
+                                      Counter="5000" 
+                                      Immediate="true" />
+                    </MudCard>
+                    
+                </MudStack>
+            </MudItem>
+            
+        </MudGrid>
     </MudForm>
-        </MudItem><!-- End Right Column -->
-        
-    </MudGrid><!-- End Two-column Grid -->
-
-    <!-- Spacer for fixed action bar -->
-    <div style="height: 120px;"></div>
 </MudContainer>
-
-<!-- Fixed Action Bar (Pill-shaped) -->
-<div style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; padding: 24px; pointer-events: none;">
-    <div style="max-width: 600px; margin: 0 auto; pointer-events: auto;">
-        <MudPaper Elevation="8" Class="mud-theme-surface" Style="border-radius: 50px; padding: 12px 24px;">
-            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="4">
-                <MudButton Variant="Variant.Text" 
-                           OnClick="Cancel"
-                           Disabled="@_isSubmitting"
-                           Size="Size.Large">
-                    Cancel
-                </MudButton>
-                
-                <MudButton Variant="Variant.Filled" 
-                           Color="Color.Primary"
-                           Size="Size.Large"
-                           StartIcon="@Icons.Material.Filled.Save"
-                           OnClick="Submit"
-                           Disabled="@(_isSubmitting || !IsFormValid())">
-                    @if (_isSubmitting)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                        <span>Creating Customer...</span>
-                    }
-                    else
-                    {
-                        <span>Create Customer</span>
-                    }
-                </MudButton>
-            </MudStack>
-        </MudPaper>
-    </div>
-</div>
-
-<style>
-    /* Responsive stepper */
-    @@media (max-width: 960px) {
-        .flex-wrap > .mud-stepper {
-            width: 100%;
-        }
-    }
-</style>
 
 @code {
     private MudForm? _form;
-    private MudStepper? _stepper;
-    private int _activeStepIndex = 0;
 
     // Customer data
     private CustomerOnboardingRequest _customerData = new()
@@ -649,7 +363,7 @@
     
     // NDA
     private bool _includeNda = false;
-    private DateTime? _ndaExpiryDate;
+    private DateTime? _ndaExpiryDate = DateTime.Now.AddYears(1);
     private List<IBrowserFile> _ndaFiles = new();
     private List<CreateDocumentRequest> _uploadedNdaDocs = new();
     private bool _isUploadingNda = false;
@@ -661,9 +375,6 @@
     private bool _isUploadingCustomerDocs = false;
     
     // AI Extraction
-    private string _extractionText = string.Empty;
-    private List<IBrowserFile> _extractionFiles = new();
-    private bool _isExtracting = false;
     private double _extractionConfidence = 0;
     private bool _chatbotServiceAvailable = false;
     
@@ -674,11 +385,6 @@
     {
         await LoadCountries();
         await CheckChatbotServiceAvailability();
-    }
-
-    private void OnStepChanged(int index)
-    {
-        _activeStepIndex = index;
     }
 
     private async Task CheckChatbotServiceAvailability()
@@ -711,9 +417,6 @@
         public string? Message { get; set; }
     }
 
-    private bool HasExtractionInput() => 
-        !string.IsNullOrWhiteSpace(_extractionText) || _extractionFiles.Any();
-
     private async Task LoadCountries()
     {
         try
@@ -734,62 +437,17 @@
 
     #region AI Extraction
     
-    private void OnExtractionFilesSelected(IReadOnlyList<IBrowserFile> files)
+    private async Task OpenExtractionDialog()
     {
-        _extractionFiles.Clear();
-        _extractionFiles.AddRange(files);
-    }
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ExtractionDialog>("AI Data Extraction", options);
+        var result = await dialog.Result;
 
-    private async Task ExtractCustomerData()
-    {
-        _isExtracting = true;
-        _extractionConfidence = 0;
-        _activeStepIndex = 0;
-
-        try
+        if (result != null && !result.Canceled && result.Data is ExtractedCustomerDataResponse extracted)
         {
-            using var content = new MultipartFormDataContent();
-            
-            if (!string.IsNullOrWhiteSpace(_extractionText))
-            {
-                content.Add(new StringContent(_extractionText), "rawText");
-            }
-            
-            foreach (var file in _extractionFiles)
-            {
-                var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-                var fileContent = new StreamContent(stream);
-                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
-                content.Add(fileContent, "files", file.Name);
-            }
-
-            var response = await Http.PostAsync("api/aiprocessing/extract-customer", content);
-            
-            if (response.IsSuccessStatusCode)
-            {
-                var extracted = await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
-                
-                if (extracted != null)
-                {
-                    PopulateFromExtraction(extracted);
-                    _extractionConfidence = extracted.Confidence;
-                    _activeStepIndex = 1;
-                    Snackbar.Add($"Data extracted with {(extracted.Confidence * 100):F0}% confidence!", Severity.Success);
-                }
-            }
-            else
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                Snackbar.Add($"Extraction failed: {error}", Severity.Error);
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _isExtracting = false;
+            PopulateFromExtraction(extracted);
+            _extractionConfidence = extracted.Confidence;
+            Snackbar.Add($"Data extracted with {(extracted.Confidence * 100):F0}% confidence!", Severity.Success);
         }
     }
 
@@ -826,20 +484,27 @@
             
             foreach (var addr in extracted.Addresses)
             {
+                var type = addr.Type ?? "Billing";
                 var newAddr = new CreateAddressRequest
                 {
-                    Type = addr.Type ?? "Billing",
-                    IsDefault = _customerData.Addresses.Count == 0,
+                    Type = type,
+                    // Default logic will be applied by UpdateAddressDefaults() below
+                    IsDefault = false,
                     AddressLine1 = addr.AddressLine1 ?? string.Empty,
                     AddressLine2 = addr.AddressLine2,
                     AddressLine3 = addr.AddressLine3,
-                    District = addr.District,
+                    District = addr.District ?? string.Empty,
                     City = addr.City ?? string.Empty,
                     StateProvince = addr.StateProvince ?? string.Empty,
                     PostalCode = addr.PostalCode ?? string.Empty,
                     RecipientName = addr.RecipientName,
                     RecipientPhone = addr.RecipientPhone
                 };
+                
+                if (addr.Location != null)
+                {
+                    _selectedLocations[_customerData.Addresses.Count] = addr.Location;
+                }
                 
                 if (thailand != null)
                 {
@@ -849,6 +514,8 @@
                 
                 _customerData.Addresses.Add(newAddr);
             }
+
+            UpdateAddressDefaults();
         }
     }
     
@@ -875,10 +542,16 @@
 
     private void OnThaiLocationSelected(int addressIndex, RegistryThaiLocation? location)
     {
-        if (location == null || addressIndex >= _customerData.Addresses.Count) return;
+        if (addressIndex >= _customerData.Addresses.Count) return;
 
         var address = _customerData.Addresses[addressIndex];
-        var useThai = IsThai(address.District ?? "") || IsThai(address.City ?? "") || IsThai(address.StateProvince ?? "");
+        
+        // Update the selected location object for binding
+        _selectedLocations[addressIndex] = location;
+
+        if (location == null) return;
+
+        var useThai = IsThai(address.District ?? "") || IsThai(address.City ?? "") || IsThai(address.StateProvince ?? "") || IsThai(address.AddressLine1);
         
         if (!useThai && string.IsNullOrEmpty(address.District) && string.IsNullOrEmpty(address.City) && string.IsNullOrEmpty(address.StateProvince))
         {
@@ -889,8 +562,6 @@
         address.City = useThai ? location.DistrictTh : location.DistrictEn;
         address.StateProvince = useThai ? location.ProvinceTh : location.ProvinceEn;
         address.PostalCode = location.PostalCode;
-        
-        _selectedLocations[addressIndex] = location;
         
         var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
         if (thailand != null)
@@ -923,6 +594,7 @@
         if (addressIndex < _customerData.Addresses.Count)
         {
             _customerData.Addresses[addressIndex].Type = type;
+            UpdateAddressDefaults();
         }
     }
 
@@ -940,9 +612,29 @@
         address.IsDefault = true;
     }
 
+    private void UpdateAddressDefaults()
+    {
+        var hasDefaultBilling = false;
+        var hasDefaultShipping = false;
+        
+        foreach (var addr in _customerData.Addresses)
+        {
+            if (addr.Type == "Billing")
+            {
+                addr.IsDefault = !hasDefaultBilling;
+                if (addr.IsDefault) hasDefaultBilling = true;
+            }
+            else if (addr.Type == "Shipping")
+            {
+                addr.IsDefault = !hasDefaultShipping;
+                if (addr.IsDefault) hasDefaultShipping = true;
+            }
+        }
+    }
+
     private void AddAddress()
     {
-        var type = _customerData.Addresses.Count == 1 ? "Shipping" : "Billing";
+        var type = _customerData.Addresses.Count(a => a.Type == "Billing") >= 1 ? "Shipping" : "Billing";
         
         var newAddress = new CreateAddressRequest
         {
@@ -958,12 +650,14 @@
         }
         
         _customerData.Addresses.Add(newAddress);
+        UpdateAddressDefaults();
     }
 
     private void RemoveAddress(int index)
     {
         _customerData.Addresses.RemoveAt(index);
         _selectedCountries.Remove(index);
+        UpdateAddressDefaults();
     }
 
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
@@ -1104,7 +798,6 @@
         }
 
         _isSubmitting = true;
-        _activeStepIndex = 2;
 
         try
         {
