@@ -32,13 +32,6 @@
         </MudStack>
     </MudStack>
 
-    @if (_extractionConfidence > 0)
-    {
-        <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-6 rounded-lg" Dense="true" ShowCloseIcon="true" CloseIconClicked="(() => _extractionConfidence = 0)">
-            AI Extraction completed with @((_extractionConfidence * 100).ToString("F0"))% confidence. Please review the populated fields.
-        </MudAlert>
-    }
-
     <MudForm @ref="_form" ValidationDelay="0">
         <MudGrid Spacing="6">
             
@@ -375,7 +368,6 @@
     private bool _isUploadingCustomerDocs = false;
     
     // AI Extraction
-    private double _extractionConfidence = 0;
     private bool _chatbotServiceAvailable = false;
     
     // Submission
@@ -446,8 +438,7 @@
         if (result != null && !result.Canceled && result.Data is ExtractedCustomerDataResponse extracted)
         {
             PopulateFromExtraction(extracted);
-            _extractionConfidence = extracted.Confidence;
-            Snackbar.Add($"Data extracted with {(extracted.Confidence * 100):F0}% confidence!", Severity.Success);
+            Snackbar.Add($"AI Extraction completed with {(extracted.Confidence * 100):F0}% confidence. Please review the populated fields.", Severity.Success);
         }
     }
 
