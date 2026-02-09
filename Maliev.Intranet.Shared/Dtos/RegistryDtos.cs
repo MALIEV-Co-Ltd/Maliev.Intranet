@@ -19,6 +19,24 @@ public class CompanySummaryDto
 }
 
 /// <summary>
+/// Detailed information for a company.
+/// </summary>
+public class CompanyResponse
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? VatNumber { get; set; }
+    public string? RegistrationNumber { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public string Segment { get; set; } = string.Empty;
+    public string Tier { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public byte[] Version { get; set; } = [];
+}
+
+/// <summary>
 /// Source of company information.
 /// </summary>
 public enum CompanySource

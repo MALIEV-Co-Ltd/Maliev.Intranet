@@ -3,26 +3,155 @@
 @using Maliev.Intranet.Shared
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
-<PageTitle>Company Details - Maliev Intranet</PageTitle>
+<PageTitle>@(_company?.Name ?? "Company Details") - Maliev Intranet</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16 pt-8">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-8">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/sales/customers"))" />
-        <MudText Typo="Typo.h3" Style="font-weight: 700;">Company Details</MudText>
-    </MudStack>
+    @if (_loading)
+    {
+        <MudStack Spacing="4">
+            <MudSkeleton Height="60px" Width="40%" />
+            <MudGrid>
+                <MudItem xs="12" lg="8">
+                    <MudSkeleton Height="400px" />
+                </MudItem>
+                <MudItem xs="12" lg="4">
+                    <MudSkeleton Height="200px" />
+                </MudItem>
+            </MudGrid>
+        </MudStack>
+    }
+    else if (_company == null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">Company not found.</MudAlert>
+        <MudButton StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/sales/customers"))" Class="mt-4">Back to Customers</MudButton>
+    }
+    else
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-8">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/sales/customers"))" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.h3" Style="font-weight: 700;">@_company.Name</MudText>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary">Company ID: @_company.Id</MudText>
+                </MudStack>
+            </MudStack>
+            
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" Class="rounded-lg px-6">Edit Company</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="rounded-lg px-6 shadow-none">New Transaction</MudButton>
+            </MudStack>
+        </MudStack>
 
-    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="rounded-lg">
-        Company management features are currently under development. 
-        Detailed view for ID: @Id will be available soon.
-    </MudAlert>
+        <MudGrid Spacing="6">
+            <MudItem xs="12" lg="8">
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
+                    <MudTabPanel Text="Overview" Icon="@Icons.Material.Filled.Business">
+                        <MudGrid Spacing="4">
+                            <MudItem xs="12" sm="6">
+                                <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
+                                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Registration Info</MudText>
+                                    <MudStack Spacing="3">
+                                        <div>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tax ID / VAT Number</MudText>
+                                            <MudText Typo="Typo.body1">@(_company.VatNumber ?? "N/A")</MudText>
+                                        </div>
+                                        <div>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Registration Number</MudText>
+                                            <MudText Typo="Typo.body1">@(_company.RegistrationNumber ?? "N/A")</MudText>
+                                        </div>
+                                        <div>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Industry Segment</MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text" Class="ma-0">@_company.Segment</MudChip>
+                                        </div>
+                                        <div>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Customer Tier</MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Class="ma-0">@_company.Tier</MudChip>
+                                        </div>
+                                    </MudStack>
+                                </MudCard>
+                            </MudItem>
+                            
+                            <MudItem xs="12" sm="6">
+                                <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
+                                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Contact Information</MudText>
+                                    <MudStack Spacing="3">
+                                        <div>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Email Address</MudText>
+                                            <MudText Typo="Typo.body1">@(_company.ContactEmail ?? "N/A")</MudText>
+                                        </div>
+                                        <div>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Phone Number</MudText>
+                                            <MudText Typo="Typo.body1">@(_company.ContactPhone ?? "N/A")</MudText>
+                                        </div>
+                                    </MudStack>
+                                </MudCard>
+                            </MudItem>
 
-    <MudCard Elevation="0" Class="pa-6 mt-6 rounded-xl border-solid border-1 mud-border-lines-default">
-        <MudText Typo="Typo.h6">System Information</MudText>
-        <MudText Typo="Typo.body2">Company ID: @Id</MudText>
-    </MudCard>
+                            <MudItem xs="12">
+                                <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Recent Transactions</MudText>
+                                    <MudAlert Severity="Severity.Info" Variant="Variant.Text">No transactions found for this company.</MudAlert>
+                                </MudCard>
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
+                    
+                    <MudTabPanel Text="Associated Contacts" Icon="@Icons.Material.Filled.People">
+                        <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                            <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Employees & Contacts</MudText>
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Text">Contact management is coming soon.</MudAlert>
+                        </MudCard>
+                    </MudTabPanel>
+                </MudTabs>
+            </MudItem>
+
+            <MudItem xs="12" lg="4">
+                <MudStack Spacing="6">
+                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                        <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">System Details</MudText>
+                        <MudStack Spacing="2">
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Created At</MudText>
+                                <MudText Typo="Typo.body2">@_company.CreatedAt.ToLocalTime().ToString("g")</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Last Updated</MudText>
+                                <MudText Typo="Typo.body2">@_company.UpdatedAt.ToLocalTime().ToString("g")</MudText>
+                            </div>
+                        </MudStack>
+                    </MudCard>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    }
 </MudContainer>
 
 @code {
     [Parameter] public Guid Id { get; set; }
+    private CompanyResponse? _company;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCompany();
+    }
+
+    private async Task LoadCompany()
+    {
+        _loading = true;
+        try
+        {
+            _company = await Http.GetFromJsonAsync<CompanyResponse>($"api/companies/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading company: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
 }

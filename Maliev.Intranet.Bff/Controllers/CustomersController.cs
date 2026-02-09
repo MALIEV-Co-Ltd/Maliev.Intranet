@@ -212,4 +212,15 @@ public class CustomersController(
         var exists = await client.CheckEmailExistsAsync(email.Trim());
         return Ok(exists);
     }
+
+    /// <summary>
+    /// Creates an NDA record for a customer.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("ndas")]
+    public async Task<IActionResult> CreateNda([FromBody] object request)
+    {
+        var success = await client.CreateNdaAsync(request);
+        return success ? Ok() : BadRequest();
+    }
 }

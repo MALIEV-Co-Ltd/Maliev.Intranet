@@ -2,11 +2,15 @@
 @using MudBlazor
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Client.Components
+@using Maliev.Intranet.Client.Services
 @using System.Globalization
+@using System.Text.Json
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject ISignalRCustomerService SignalRService
+@implements IAsyncDisposable
 
 <PageTitle>@(_customer?.Name ?? "Customer Details") - Maliev Intranet</PageTitle>
 
@@ -15,7 +19,7 @@
     {
         <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="rounded-lg">Customer not found.</MudAlert>
     }
-    else if (_loading)
+    else if (_loading && _customer == null)
     {
         <MudGrid>
             <MudItem xs="12" lg="8">
@@ -43,7 +47,7 @@
             <MudStack Row="true" Spacing="2">
                  <MudButton Variant="Variant.Outlined" 
                             Color="Color.Primary" 
-                            StartIcon="@Icons.Material.Filled.Edit"
+                            StartIcon="@(_isEditMode ? Icons.Material.Filled.Close : Icons.Material.Filled.Edit)"
                             OnClick="ToggleEditMode"
                             Class="px-6 rounded-lg">
                      @( _isEditMode ? "Cancel Editing" : "Edit Profile")
@@ -82,10 +86,11 @@
         <MudGrid Spacing="6">
             <!-- Left Column: Main Content -->
             <MudItem xs="12" lg="8">
-                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
+                <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
                     
                     @if (!_isEditMode)
                     {
+                        @* View Mode Tabs *@
                         <MudTabPanel Text="Overview" Icon="@Icons.Material.Filled.Dashboard">
                             <MudGrid Spacing="4">
                                 <MudItem xs="12" sm="4">
@@ -141,46 +146,19 @@
                                 </MudItem>
                             </MudGrid>
                         </MudTabPanel>
-                    }
 
-                    <MudTabPanel Text="Addresses" Icon="@Icons.Material.Filled.LocationOn">
-                        <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
-                                <MudText Typo="Typo.h6" Style="font-weight: 700;">Delivery & Billing</MudText>
-                                @if (_isEditMode)
-                                {
-                                    <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AddAddress">Add Address</MudButton>
-                                }
-                            </MudStack>
-                            
-                            <MudGrid Spacing="4">
-                                @if (_customer.Addresses != null && _customer.Addresses.Any())
-                                {
-                                    @foreach (var (address, index) in _customer.Addresses.Select((a, i) => (a, i)))
+                        <MudTabPanel Text="Addresses" Icon="@Icons.Material.Filled.LocationOn">
+                            <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+                                    <MudText Typo="Typo.h6" Style="font-weight: 700;">Delivery & Billing</MudText>
+                                </MudStack>
+                                
+                                <MudGrid Spacing="4">
+                                    @if (_customer.Addresses != null && _customer.Addresses.Any())
                                     {
-                                        <MudItem xs="12" sm="6">
-                                            @if (_isEditMode)
-                                            {
-                                                <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
-                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
-                                                        <MudSelect T="string" @bind-Value="address.Type" Dense="true" Margin="Margin.Dense" Style="max-width: 120px;">
-                                                            <MudSelectItem Value="@("Billing")">Billing</MudSelectItem>
-                                                            <MudSelectItem Value="@("Shipping")">Shipping</MudSelectItem>
-                                                        </MudSelect>
-                                                        <MudStack Row="true">
-                                                            <MudCheckBox T="bool" @bind-Value="address.IsDefault" Label="Default" Dense="true" Size="Size.Small" />
-                                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveAddress(address))" />
-                                                        </MudStack>
-                                                    </MudStack>
-                                                    <MudTextField Label="Address Line 1" @bind-Value="address.AddressLine1" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                                                    <MudTextField Label="District" @bind-Value="address.District" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                                                    <MudTextField Label="City" @bind-Value="address.City" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                                                    <MudTextField Label="State / Province" @bind-Value="address.StateProvince" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                                                    <MudTextField Label="Postal Code" @bind-Value="address.PostalCode" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                                                </MudPaper>
-                                            }
-                                            else
-                                            {
+                                        @foreach (var (address, index) in _customer.Addresses.Select((a, i) => (a, i)))
+                                        {
+                                            <MudItem xs="12" sm="6">
                                                 <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
                                                     <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
                                                         <MudChip T="string" Color="@(address.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@address.Type</MudChip>
@@ -195,90 +173,92 @@
                                                     <MudText Typo="Typo.body2">@address.District, @address.City</MudText>
                                                     <MudText Typo="Typo.body2">@address.StateProvince @address.PostalCode</MudText>
                                                 </MudPaper>
-                                            }
-                                        </MudItem>
+                                            </MudItem>
+                                        }
                                     }
-                                }
-                                else if (_customer.CompanyId.HasValue && _customer.CompanyBillingAddress != null)
-                                {
-                                    <MudItem xs="12">
-                                        <MudAlert Severity="Severity.Info" Variant="Variant.Text">Using Company billing address. Individual customer addresses not found.</MudAlert>
-                                    </MudItem>
-                                    <MudItem xs="12" sm="6">
-                                        <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
-                                            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
-                                                <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">Company Billing</MudChip>
-                                                <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
-                                            </MudStack>
-                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@_customer.CompanyBillingAddress.AddressLine1</MudText>
-                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City</MudText>
-                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.StateProvince @_customer.CompanyBillingAddress.PostalCode</MudText>
-                                        </MudPaper>
-                                    </MudItem>
-                                }
-                                else
-                                {
-                                    <MudItem xs="12">
-                                        <MudAlert Severity="Severity.Warning" Variant="Variant.Text">No addresses found for this customer.</MudAlert>
-                                    </MudItem>
-                                }
-                            </MudGrid>
-                        </MudCard>
-                    </MudTabPanel>
-
-                    <MudTabPanel Text="Documents" Icon="@Icons.Material.Filled.Attachment">
-                         <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                            <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Documents & NDA</MudText>
-                            <MudGrid Spacing="4">
-                                @if (_customer.Nda != null)
-                                {
-                                    <MudItem xs="12" sm="6">
-                                        <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" Elevation="0">
-                                            <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="Color.Primary" Size="Size.Large" />
-                                            <MudStack Spacing="0">
-                                                <MudText Typo="Typo.body2" Style="font-weight: 700;">NDA Record</MudText>
-                                                <MudText Typo="Typo.caption">Status: @_customer.Nda.Status</MudText>
-                                                <MudText Typo="Typo.caption">Expires: @(_customer.Nda.ExpiresAt?.ToShortDateString() ?? "N/A")</MudText>
-                                            </MudStack>
-                                        </MudPaper>
-                                    </MudItem>
-                                }
-                                
-                                @if (_customer.Documents?.Any() == true)
-                                {
-                                    @foreach (var doc in _customer.Documents)
+                                    else if (_customer.CompanyId.HasValue && _customer.CompanyBillingAddress != null)
                                     {
+                                        <MudItem xs="12">
+                                            <MudAlert Severity="Severity.Info" Variant="Variant.Text">Using Company billing address. Individual customer addresses not found.</MudAlert>
+                                        </MudItem>
                                         <MudItem xs="12" sm="6">
-                                            <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" Elevation="0">
-                                                <MudIcon Icon="@GetDocumentIcon(doc.MimeType)" Color="@GetDocumentColor(doc.MimeType)" Size="Size.Large" />
-                                                <MudStack Spacing="0">
-                                                    <MudText Typo="Typo.body2" Style="font-weight: 700;">@doc.FileName</MudText>
-                                                    <MudText Typo="Typo.caption">@FormatFileSize(doc.FileSize) • @doc.DocumentCategory</MudText>
+                                            <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
+                                                <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
+                                                    <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">Company Billing</MudChip>
+                                                    <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
                                                 </MudStack>
-                                                <MudSpacer />
-                                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" />
+                                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@_customer.CompanyBillingAddress.AddressLine1</MudText>
+                                                <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City</MudText>
+                                                <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.StateProvince @_customer.CompanyBillingAddress.PostalCode</MudText>
                                             </MudPaper>
                                         </MudItem>
                                     }
-                                }
-                                else if (_customer.Nda == null)
-                                {
-                                    <MudItem xs="12">
-                                        <MudAlert Severity="Severity.Info" Variant="Variant.Text">No documents found for this customer.</MudAlert>
-                                    </MudItem>
-                                }
-                            </MudGrid>
-                         </MudCard>
-                    </MudTabPanel>
+                                    else
+                                    {
+                                        <MudItem xs="12">
+                                            <MudAlert Severity="Severity.Warning" Variant="Variant.Text">No addresses found for this customer.</MudAlert>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudCard>
+                        </MudTabPanel>
 
-                    @if (_isEditMode)
+                        <MudTabPanel Text="Documents" Icon="@Icons.Material.Filled.Attachment">
+                             <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+                                    <MudText Typo="Typo.h6" Style="font-weight: 700;">Documents & NDA</MudText>
+                                </MudStack>
+                                <MudGrid Spacing="4">
+                                    @if (_customer.Nda != null)
+                                    {
+                                        <MudItem xs="12" sm="6">
+                                            <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" Elevation="0">
+                                                <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="Color.Primary" Size="Size.Large" />
+                                                <MudStack Spacing="0">
+                                                    <MudText Typo="Typo.body2" Style="font-weight: 700;">NDA Record</MudText>
+                                                    <MudText Typo="Typo.caption">Status: @_customer.Nda.Status</MudText>
+                                                    <MudText Typo="Typo.caption">Expires: @(_customer.Nda.ExpiresAt?.ToShortDateString() ?? "N/A")</MudText>
+                                                </MudStack>
+                                            </MudPaper>
+                                        </MudItem>
+                                    }
+                                    
+                                    @if (_customer.Documents?.Any() == true)
+                                    {
+                                        @foreach (var doc in _customer.Documents)
+                                        {
+                                            <MudItem xs="12" sm="6">
+                                                <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" Elevation="0">
+                                                    <MudIcon Icon="@GetDocumentIcon(doc.MimeType)" Color="@GetDocumentColor(doc.MimeType)" Size="Size.Large" />
+                                                    <MudStack Spacing="0">
+                                                        <MudText Typo="Typo.body2" Style="font-weight: 700;">@doc.FileName</MudText>
+                                                        <MudText Typo="Typo.caption">@FormatFileSize(doc.FileSize) • @doc.DocumentCategory</MudText>
+                                                    </MudStack>
+                                                    <MudSpacer />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" />
+                                                </MudPaper>
+                                            </MudItem>
+                                        }
+                                    }
+                                    else if (_customer.Nda == null)
+                                    {
+                                        <MudItem xs="12">
+                                            <MudAlert Severity="Severity.Info" Variant="Variant.Text">No documents found for this customer.</MudAlert>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                             </MudCard>
+                        </MudTabPanel>
+                    }
+                    else
                     {
-                        <MudTabPanel Text="Edit Form" Icon="@Icons.Material.Filled.FormatAlignLeft">
+                        @* Edit Mode Tabs *@
+                        <MudTabPanel Text="Personal Information" Icon="@Icons.Material.Filled.Person">
                             <MudForm @ref="_editForm">
                                 <MudStack Spacing="6">
                                     <!-- Personal Info Edit -->
                                     <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Personal Information</MudText>
+                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Contact Details</MudText>
                                         <MudGrid Spacing="4">
                                             <MudItem xs="12" sm="6">
                                                 <MudTextField T="string" Label="First Name" @bind-Value="_updateRequest.FirstName" Variant="Variant.Outlined" Required="true" />
@@ -294,6 +274,9 @@
                                             </MudItem>
                                             <MudItem xs="12" sm="6">
                                                 <MudTextField T="string" Label="Landline" @bind-Value="_updateRequest.Landline" Variant="Variant.Outlined" />
+                                            </MudItem>
+                                            <MudItem xs="12" sm="6">
+                                                <MudTextField T="string" Label="Extension" @bind-Value="_updateRequest.Extension" Variant="Variant.Outlined" />
                                             </MudItem>
                                         </MudGrid>
                                     </MudCard>
@@ -319,10 +302,96 @@
                                                     <MudToggleItem Value="@("Platinum")" Text="Platinum" />
                                                 </MudToggleGroup>
                                             </MudItem>
+                                            <MudItem xs="12" sm="6">
+                                                 <MudSelect T="string" Label="Language" @bind-Value="_updateRequest.PreferredLanguage" Variant="Variant.Outlined">
+                                                     <MudSelectItem Value="@("en")">English</MudSelectItem>
+                                                     <MudSelectItem Value="@("th")">Thai</MudSelectItem>
+                                                 </MudSelect>
+                                            </MudItem>
+                                            <MudItem xs="12" sm="6">
+                                                 <MudSelect T="string" Label="Timezone" @bind-Value="_updateRequest.Timezone" Variant="Variant.Outlined">
+                                                     <MudSelectItem Value="@("Asia/Bangkok")">Bangkok (GMT+7)</MudSelectItem>
+                                                     <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                                                 </MudSelect>
+                                            </MudItem>
                                         </MudGrid>
                                     </MudCard>
                                 </MudStack>
                             </MudForm>
+                        </MudTabPanel>
+
+                        <MudTabPanel Text="Addresses" Icon="@Icons.Material.Filled.LocationOn">
+                            <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+                                    <MudText Typo="Typo.h6" Style="font-weight: 700;">Manage Addresses</MudText>
+                                    <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AddAddress">Add Address</MudButton>
+                                </MudStack>
+                                
+                                <MudGrid Spacing="4">
+                                    @foreach (var (address, index) in _editableAddresses.Select((a, i) => (a, i)))
+                                    {
+                                        <MudItem xs="12" sm="6">
+                                            <AddressCard Address="address" 
+                                                         Index="index"
+                                                         HasCompany="@(_customer.CompanyId.HasValue)"
+                                                         CompanyName="@_customer.CompanyName"
+                                                         CustomerName="@($"{_updateRequest.FirstName} {_updateRequest.LastName}")"
+                                                         CustomerMobile="@_updateRequest.Mobile"
+                                                         OnTypeChanged="OnAddressTypeChanged"
+                                                         OnDefaultChanged="OnDefaultChanged"
+                                                         OnLocationSelected="OnThaiLocationSelected"
+                                                         OnCountrySelected="OnCountrySelected"
+                                                         OnRemove="RemoveAddress"
+                                                         SearchLocations="SearchThaiLocations"
+                                                         SearchCountries="SearchCountries"
+                                                         SelectedCountry="_addressCountries.GetValueOrDefault(index)"
+                                                         SelectedLocation="_addressLocations.GetValueOrDefault(index)" />
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudCard>
+                        </MudTabPanel>
+
+                        <MudTabPanel Text="Upload Documents" Icon="@Icons.Material.Filled.UploadFile">
+                             <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Upload Files</MudText>
+                                <MudGrid Spacing="4">
+                                    <MudItem xs="12" sm="6">
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Customer Documents</MudText>
+                                        <MudStack Spacing="3">
+                                            <MudTextField T="string" Label="Category" @bind-Value="_customerDocCategory" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. ID Card, Business Card" />
+                                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnCustomerDocsSelected" Accept=".pdf,.jpg,.png,.doc" MaximumFileCount="10">
+                                                <ActivatorContent>
+                                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.AttachFile">Select Files</MudButton>
+                                                </ActivatorContent>
+                                            </MudFileUpload>
+                                            @if (_customerDocFiles.Any())
+                                            {
+                                                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="UploadCustomerDocuments" Disabled="@_isUploadingCustomerDocs">
+                                                    @(_isUploadingCustomerDocs ? "Uploading..." : $"Upload {_customerDocFiles.Count} File(s)")
+                                                </MudButton>
+                                            }
+                                        </MudStack>
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6">
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">NDA Document</MudText>
+                                        <MudStack Spacing="3">
+                                            <MudDatePicker Label="NDA Expiration" @bind-Date="_ndaExpiryDate" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnNdaFilesSelected" Accept=".pdf,.doc,.docx" MaximumFileCount="1">
+                                                <ActivatorContent>
+                                                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true" StartIcon="@Icons.Material.Filled.Gavel">Select Signed NDA</MudButton>
+                                                </ActivatorContent>
+                                            </MudFileUpload>
+                                            @if (_ndaFiles.Any())
+                                            {
+                                                <MudButton Variant="Variant.Filled" Color="Color.Secondary" FullWidth="true" OnClick="UploadNdaFiles" Disabled="@_isUploadingNda">
+                                                    @(_isUploadingNda ? "Uploading..." : "Upload NDA")
+                                                </MudButton>
+                                            }
+                                        </MudStack>
+                                    </MudItem>
+                                </MudGrid>
+                             </MudCard>
                         </MudTabPanel>
                     }
                 </MudTabs>
@@ -401,13 +470,6 @@
                                         <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.StateProvince @_customer.CompanyBillingAddress.PostalCode</MudText>
                                     </div>
                                 }
-                                @if (!string.IsNullOrEmpty(_customer.CompanyPhone))
-                                {
-                                    <div>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Phone</MudText>
-                                        <MudText Typo="Typo.body2">@_customer.CompanyPhone</MudText>
-                                    </div>
-                                }
                             </MudStack>
 
                              <MudButton Variant="Variant.Outlined" FullWidth="true" Color="Color.Primary" Size="Size.Small" 
@@ -427,7 +489,7 @@
                                 {
                                     <div>
                                         <MudText Typo="Typo.body2" Class="mb-1">@note.NoteText</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedBy • @note.CreatedAt.ToShortDateString()</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedByName • @note.CreatedAt.ToShortDateString()</MudText>
                                     </div>
                                 }
                             </MudStack>
@@ -450,13 +512,39 @@
     private bool _loading = true;
     private bool _isEditMode = false;
     private bool _isSaving = false;
+    private int _activeTabIndex = 0;
     
     private MudForm? _editForm;
     private UpdateCustomerRequest _updateRequest = new();
+    private List<CreateAddressRequest> _editableAddresses = [];
+    private Dictionary<int, CountryDto?> _addressCountries = new();
+    private Dictionary<int, RegistryThaiLocation?> _addressLocations = new();
+    private List<CountryDto> _allCountries = new();
+
+    // File Upload
+    private List<IBrowserFile> _ndaFiles = new();
+    private List<IBrowserFile> _customerDocFiles = new();
+    private string _customerDocCategory = "General";
+    private bool _isUploadingNda = false;
+    private bool _isUploadingCustomerDocs = false;
+    private DateTime? _ndaExpiryDate = DateTime.Now.AddYears(1);
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadCountries();
         await LoadCustomerData();
+        
+        // SignalR Real-time
+        await SignalRService.StartAsync();
+        SignalRService.OnCustomerChanged += async () => {
+            if (!_isEditMode) await LoadCustomerData();
+        };
+    }
+
+    private async Task LoadCountries()
+    {
+        try { _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/customers/countries") ?? []; }
+        catch { }
     }
 
     private async Task LoadCustomerData()
@@ -477,6 +565,7 @@
         finally
         {
             _loading = false;
+            StateHasChanged();
         }
     }
 
@@ -499,16 +588,53 @@
             CommunicationPreferences = new Dictionary<string, bool>(_customer.CommunicationPreferences),
             Version = _customer.Version
         };
+
+        // Map existing addresses for editing
+        _editableAddresses = _customer.Addresses.Select(a => new CreateAddressRequest
+        {
+            Type = a.Type,
+            IsDefault = a.IsDefault,
+            AddressLine1 = a.AddressLine1,
+            AddressLine2 = a.AddressLine2,
+            AddressLine3 = a.AddressLine3,
+            District = a.District,
+            City = a.City,
+            StateProvince = a.StateProvince,
+            PostalCode = a.PostalCode,
+            CountryId = a.CountryId
+        }).ToList();
+
+        _addressCountries.Clear();
+        _addressLocations.Clear();
+        for (int i = 0; i < _editableAddresses.Count; i++)
+        {
+            var addr = _editableAddresses[i];
+            _addressCountries[i] = _allCountries.FirstOrDefault(c => c.Id == addr.CountryId);
+        }
     }
 
-    private void ToggleEditMode()
+    private async Task ToggleEditMode()
     {
         if (_isEditMode)
         {
-            // Reset request when canceling
+            // Discard changes
+            var confirm = await DialogService.ShowMessageBox("Discard Changes", 
+                "Are you sure you want to discard your changes?", 
+                yesText: "Discard", cancelText: "Keep Editing");
+                
+            if (confirm == true)
+            {
+                _isEditMode = false;
+                _activeTabIndex = 0; // Back to Overview
+                await LoadCustomerData();
+            }
+        }
+        else
+        {
+            _isEditMode = true;
+            _activeTabIndex = 0; // To Personal Info
             MapToUpdateRequest();
         }
-        _isEditMode = !_isEditMode;
     }
 
     private async Task SaveChanges()
@@ -522,7 +648,6 @@
         _isSaving = true;
         try
         {
-            // Create full onboarding request for update (as we support updating addresses/notes too)
             var onboardingRequest = new CustomerOnboardingRequest
             {
                 Customer = new CreateCustomerRequest
@@ -540,19 +665,7 @@
                     CompanyId = _customer?.CompanyId,
                     CommunicationPreferences = _updateRequest.CommunicationPreferences
                 },
-                Addresses = _customer?.Addresses.Select(a => new CreateAddressRequest
-                {
-                    Type = a.Type,
-                    IsDefault = a.IsDefault,
-                    AddressLine1 = a.AddressLine1,
-                    AddressLine2 = a.AddressLine2,
-                    AddressLine3 = a.AddressLine3,
-                    District = a.District,
-                    City = a.City,
-                    StateProvince = a.StateProvince,
-                    PostalCode = a.PostalCode,
-                    CountryId = a.CountryId
-                }).ToList() ?? new List<CreateAddressRequest>()
+                Addresses = _editableAddresses
             };
 
             var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
@@ -560,28 +673,13 @@
             {
                 Snackbar.Add("Customer updated successfully!", Severity.Success);
                 _isEditMode = false;
+                _activeTabIndex = 0;
                 await LoadCustomerData();
             }
             else
             {
-                string errorMessage = "Update failed";
-                try
-                {
-                    var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-                    if (error != null)
-                    {
-                        errorMessage = !string.IsNullOrEmpty(error.Message) ? error.Message : (!string.IsNullOrEmpty(error.Title) ? error.Title : errorMessage);
-                    }
-                }
-                catch
-                {
-                    var rawError = await response.Content.ReadAsStringAsync();
-                    if (!string.IsNullOrEmpty(rawError))
-                    {
-                        errorMessage = rawError.Length < 100 ? rawError : errorMessage;
-                    }
-                }
-                Snackbar.Add(errorMessage, Severity.Error);
+                var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+                Snackbar.Add(error?.Message ?? "Update failed", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -594,78 +692,142 @@
         }
     }
 
-    private async Task AddAddress()
+    #region Address Management Logic
+
+    private async Task<IEnumerable<RegistryThaiLocation>> SearchThaiLocations(string? query, CancellationToken cancellationToken)
     {
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        // We'll reuse the logic from CustomerNew for address addition, but simplified for a dialog or inline
-        // For now, let's just add a blank address and enter edit mode if not already
-        if (_customer == null) return;
-        
-        var newAddress = new AddressResponse
+        if (string.IsNullOrWhiteSpace(query) || query.Length < 2) return [];
+        try
         {
-            Type = _customer.Addresses.Count(a => a.Type == "Billing") >= 1 ? "Shipping" : "Billing",
-            IsDefault = !_customer.Addresses.Any(a => a.Type == "Billing"),
-            AddressLine1 = "New Address"
-        };
-        
-        _customer.Addresses.Add(newAddress);
-        _isEditMode = true;
-        StateHasChanged();
+            return await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/customers/locations/thai?query={Uri.EscapeDataString(query)}&limit=10") ?? [];
+        }
+        catch { return []; }
     }
 
-    private void RemoveAddress(AddressResponse address)
+    private void OnThaiLocationSelected(int index, RegistryThaiLocation? location)
     {
-        _customer?.Addresses.Remove(address);
-        StateHasChanged();
+        if (index >= _editableAddresses.Count || location == null) return;
+        var addr = _editableAddresses[index];
+        _addressLocations[index] = location;
+        addr.District = location.SubDistrictEn;
+        addr.City = location.DistrictEn;
+        addr.StateProvince = location.ProvinceEn;
+        addr.PostalCode = location.PostalCode;
+        var thai = _allCountries.FirstOrDefault(c => c.Code == "TH");
+        if (thai != null) OnCountrySelected(index, thai);
     }
+
+    private async Task<IEnumerable<CountryDto>> SearchCountries(string? query, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(query)) return _allCountries;
+        return _allCountries.Where(c => c.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OnCountrySelected(int index, CountryDto? country)
+    {
+        if (index >= _editableAddresses.Count) return;
+        _addressCountries[index] = country;
+        if (country != null) _editableAddresses[index].CountryId = country.Id;
+    }
+
+    private void OnAddressTypeChanged(int index, string type) => _editableAddresses[index].Type = type;
+    private void OnDefaultChanged(int index, bool val)
+    {
+        foreach (var a in _editableAddresses.Where(x => x.Type == _editableAddresses[index].Type)) a.IsDefault = false;
+        _editableAddresses[index].IsDefault = val;
+    }
+
+    private void AddAddress()
+    {
+        var newAddr = new CreateAddressRequest { Type = "Shipping", IsDefault = !_editableAddresses.Any(a => a.Type == "Shipping") };
+        var thai = _allCountries.FirstOrDefault(c => c.Code == "TH");
+        if (thai != null) newAddr.CountryId = thai.Id;
+        _editableAddresses.Add(newAddr);
+        _addressCountries[_editableAddresses.Count - 1] = thai;
+    }
+
+    private void RemoveAddress(int index) => _editableAddresses.RemoveAt(index);
+
+    #endregion
+
+    #region File Upload Logic
+
+    private void OnNdaFilesSelected(IReadOnlyList<IBrowserFile> files) { _ndaFiles.Clear(); _ndaFiles.AddRange(files); }
+    private void OnCustomerDocsSelected(IReadOnlyList<IBrowserFile> files) { _customerDocFiles.Clear(); _customerDocFiles.AddRange(files); }
+
+    private async Task UploadNdaFiles() => await UploadFiles(_ndaFiles, "NDA", true);
+    private async Task UploadCustomerDocuments() => await UploadFiles(_customerDocFiles, _customerDocCategory, false);
+
+    private async Task UploadFiles(List<IBrowserFile> files, string category, bool isNda)
+    {
+        if (isNda) _isUploadingNda = true; else _isUploadingCustomerDocs = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            foreach (var file in files)
+            {
+                var stream = file.OpenReadStream(10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+            var response = await Http.PostAsync($"api/aiprocessing/upload-documents?category={category}", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var results = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
+                // In CustomerDetails, we usually want to persist these immediately or wait for Save.
+                // For simplicity, we'll reload data to show them in View Mode after Save, 
+                // but since these are uploaded to storage, we need to create the DB references.
+                // Let's create the references now.
+                var docs = results?.Select(r => new CreateDocumentRequest { 
+                    DocumentCategory = category, FileReference = r.StoragePath ?? r.FileReference, 
+                    FileName = r.FileName, FileSize = r.Size, MimeType = GetMimeType(r.FileName),
+                    DocumentSubType = isNda ? "Signed" : null
+                }).ToList() ?? [];
+                
+                // Call BFF to link documents
+                await Http.PostAsJsonAsync($"api/aiprocessing/link-documents?ownerType=Customer&ownerId={Id}", docs);
+                
+                if (isNda && _ndaExpiryDate.HasValue)
+                {
+                    // Create NDA record
+                    await Http.PostAsJsonAsync("api/customers/ndas", new { customerId = Id, expiresAt = _ndaExpiryDate, status = "Signed" });
+                }
+
+                Snackbar.Add("Files uploaded and linked successfully", Severity.Success);
+                files.Clear();
+                await LoadCustomerData();
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"Upload error: {ex.Message}", Severity.Error); }
+        finally { if (isNda) _isUploadingNda = false; else _isUploadingCustomerDocs = false; }
+    }
+
+    private static string GetMimeType(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
+    {
+        ".pdf" => "application/pdf",
+        ".doc" or ".docx" => "application/msword",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".png" => "image/png",
+        _ => "application/octet-stream"
+    };
+
+    #endregion
 
     private async Task ViewAllNotes()
     {
         if (_customer == null) return;
-
-        var parameters = new DialogParameters<NoteDialog>
-        {
-            { x => x.Notes, _customer.Notes }
-        };
-
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        await DialogService.ShowAsync<NoteDialog>("Internal Notes", parameters, options);
+        var parameters = new DialogParameters<NoteDialog> { { x => x.Notes, _customer.Notes } };
+        await DialogService.ShowAsync<NoteDialog>("Internal Notes", parameters, new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
     }
 
-    private Color GetStatusColor(string status) => status switch
-    {
-        "Active" => Color.Success,
-        "Inactive" => Color.Warning,
-        "Blocked" => Color.Error,
-        _ => Color.Default
-    };
+    private Color GetStatusColor(string status) => status switch { "Active" => Color.Success, "Inactive" => Color.Warning, "Blocked" => Color.Error, _ => Color.Default };
+    private string GetDocumentIcon(string mimeType) => mimeType.Contains("pdf") ? Icons.Custom.FileFormats.FilePdf : mimeType.Contains("image") ? Icons.Custom.FileFormats.FileImage : Icons.Custom.FileFormats.FileDocument;
+    private Color GetDocumentColor(string mimeType) => mimeType.Contains("pdf") ? Color.Error : mimeType.Contains("image") ? Color.Success : Color.Info;
+    private string FormatFileSize(long bytes) => $"{(bytes / 1024.0 / 1024.0):F2} MB";
 
-    private string GetDocumentIcon(string mimeType) => mimeType switch
+    public async ValueTask DisposeAsync()
     {
-        "application/pdf" => Icons.Custom.FileFormats.FilePdf,
-        "application/msword" or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => Icons.Custom.FileFormats.FileDocument,
-        "image/jpeg" or "image/png" => Icons.Custom.FileFormats.FileImage,
-        _ => Icons.Material.Filled.InsertDriveFile
-    };
-
-    private Color GetDocumentColor(string mimeType) => mimeType switch
-    {
-        "application/pdf" => Color.Error,
-        "application/msword" or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => Color.Info,
-        "image/jpeg" or "image/png" => Color.Success,
-        _ => Color.Default
-    };
-
-    private string FormatFileSize(long bytes)
-    {
-        string[] units = { "B", "KB", "MB", "GB", "TB" };
-        double size = bytes;
-        int unitIndex = 0;
-        while (size >= 1024 && unitIndex < units.Length - 1)
-        {
-            size /= 1024;
-            unitIndex++;
-        }
-        return $"{size:F1} {units[unitIndex]}";
+        SignalRService.OnCustomerChanged -= async () => { if (!_isEditMode) await LoadCustomerData(); };
     }
 }

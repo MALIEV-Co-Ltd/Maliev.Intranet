@@ -328,6 +328,23 @@ public class AiProcessingController(
         return Ok(results);
     }
 
+    /// <summary>
+    /// Links uploaded documents to an owner (Customer or Company).
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Write)]
+    [HttpPost("link-documents")]
+    public async Task<IActionResult> LinkDocuments(
+        [FromQuery] string ownerType,
+        [FromQuery] Guid ownerId,
+        [FromBody] List<CreateDocumentRequest> documents,
+        CustomerServiceClient customerClient)
+    {
+        if (documents == null || documents.Count == 0) return BadRequest("No documents to link.");
+        
+        await customerClient.CreateDocumentsAsync(ownerType, ownerId, documents);
+        return Ok();
+    }
+
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
 
     private static double ComputeConfidence(ExtractedCustomerDataResponse data)

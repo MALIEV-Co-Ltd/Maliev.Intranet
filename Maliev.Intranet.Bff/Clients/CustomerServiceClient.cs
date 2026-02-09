@@ -474,6 +474,23 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
+    /// Retrieves a single company by ID.
+    /// </summary>
+    public async Task<CompanyResponse?> GetCompanyByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<CompanyResponse>($"/customer/v1/companies/{id}", ct);
+    }
+
+    /// <summary>
+    /// Creates an NDA record for a customer.
+    /// </summary>
+    public async Task<bool> CreateNdaAsync(object ndaRequest, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/customer/v1/ndas", ndaRequest, ct);
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>
     /// Searches for companies in the Customer microservice.
     /// </summary>
     /// <param name="query">The search query for company name or VAT.</param>
