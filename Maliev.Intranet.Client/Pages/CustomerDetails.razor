@@ -116,30 +116,28 @@
                                     <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
                                         <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Recent Activity</MudText>
                                         <MudStack Spacing="4">
-                                            <div class="d-flex gap-4">
-                                                <MudAvatar Color="Color.Primary" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-primary-hover);"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small"/></MudAvatar>
-                                                <MudStack Spacing="0">
-                                                    <MudText Typo="Typo.body2" Style="font-weight: 500;">Customer profile created</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                        @_customer.CreatedAt.ToLocalTime().ToString("g") • by 
-                                                        @(!string.IsNullOrEmpty(_customer.CreatedByName) ? $"{_customer.CreatedByName} ({_customer.CreatedByEmail})" : (_customer.CreatedBy ?? "System"))
-                                                    </MudText>
-                                                </MudStack>
-                                            </div>
-                                            @if (_customer.Notes?.Any() == true)
+                                            @if (_activities != null && _activities.Any())
                                             {
-                                                <MudDivider />
-                                                var latestNote = _customer.Notes.OrderByDescending(n => n.CreatedAt).First();
-                                                <div class="d-flex gap-4">
-                                                    <MudAvatar Color="Color.Info" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-info-hover);"><MudIcon Icon="@Icons.Material.Filled.Note" Size="Size.Small"/></MudAvatar>
-                                                    <MudStack Spacing="0">
-                                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">Internal note added</MudText>
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                            @latestNote.CreatedAt.ToLocalTime().ToString("g") • by 
-                                                            @(!string.IsNullOrEmpty(latestNote.CreatedByName) ? $"{latestNote.CreatedByName} ({latestNote.CreatedByEmail})" : latestNote.CreatedBy)
-                                                        </MudText>
-                                                    </MudStack>
-                                                </div>
+                                                @foreach (var activity in _activities.Take(5))
+                                                {
+                                                    <div class="d-flex gap-4">
+                                                        <MudAvatar Color="@GetActivityColor(activity.Action)" Size="Size.Small" Variant="Variant.Text" Style="@($"background-color: var(--mud-palette-{GetActivityColor(activity.Action).ToString().ToLower()}-hover);")">
+                                                            <MudIcon Icon="@GetActivityIcon(activity.Action)" Size="Size.Small"/>
+                                                        </MudAvatar>
+                                                        <MudStack Spacing="0">
+                                                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@activity.Description</MudText>
+                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                @activity.Timestamp.ToLocalTime().ToString("g") • by 
+                                                                @(!string.IsNullOrEmpty(activity.ActorName) ? $"{activity.ActorName} ({activity.ActorEmail})" : activity.ActorId)
+                                                            </MudText>
+                                                        </MudStack>
+                                                    </div>
+                                                    @if (activity != _activities.Take(5).Last()) { <MudDivider /> }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <MudAlert Severity="Severity.Info" Variant="Variant.Text">No recent activity found.</MudAlert>
                                             }
                                         </MudStack>
                                     </MudCard>
@@ -266,9 +264,6 @@
                                             <MudItem xs="12" sm="6">
                                                 <MudTextField T="string" Label="Last Name" @bind-Value="_updateRequest.LastName" Variant="Variant.Outlined" Required="true" />
                                             </MudItem>
-                                            <MudItem xs="12">
-                                                <MudTextField T="string" Label="Email" @bind-Value="_updateRequest.Email" Variant="Variant.Outlined" Required="true" />
-                                            </MudItem>
                                             <MudItem xs="12" sm="6">
                                                 <MudTextField T="string" Label="Mobile" @bind-Value="_updateRequest.Mobile" Variant="Variant.Outlined" />
                                             </MudItem>
@@ -276,7 +271,7 @@
                                                 <MudTextField T="string" Label="Landline" @bind-Value="_updateRequest.Landline" Variant="Variant.Outlined" />
                                             </MudItem>
                                             <MudItem xs="12" sm="6">
-                                                <MudTextField T="string" Label="Extension" @bind-Value="_updateRequest.Extension" Variant="Variant.Outlined" />
+                                                <MudTextField T="string" Label="Extension (Company Landline)" @bind-Value="_updateRequest.Extension" Variant="Variant.Outlined" />
                                             </MudItem>
                                         </MudGrid>
                                     </MudCard>
@@ -316,6 +311,23 @@
                                             </MudItem>
                                         </MudGrid>
                                     </MudCard>
+
+                                    <!-- Identity Management -->
+                                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-4">Identity & Security</MudText>
+                                        <MudAlert Severity="Severity.Warning" Class="mb-4">Changing the primary email address requires careful confirmation as it affects customer sign-in.</MudAlert>
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
+                                            <MudTextField T="string" Label="Email Address" @bind-Value="_updateRequest.Email" Variant="Variant.Outlined" ReadOnly="@(!_canChangeEmail)" />
+                                            @if (!_canChangeEmail)
+                                            {
+                                                <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="@(() => _canChangeEmail = true)">Change Email</MudButton>
+                                            }
+                                            else
+                                            {
+                                                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => _canChangeEmail = false)">Confirm Change</MudButton>
+                                            }
+                                        </MudStack>
+                                    </MudCard>
                                 </MudStack>
                             </MudForm>
                         </MudTabPanel>
@@ -328,11 +340,13 @@
                                 </MudStack>
                                 
                                 <MudGrid Spacing="4">
-                                    @foreach (var (address, index) in _editableAddresses.Select((a, i) => (a, i)))
+                                    @for (int i = 0; i < _editableAddresses.Count; i++)
                                     {
+                                        var idx = i;
+                                        var address = _editableAddresses[idx];
                                         <MudItem xs="12" sm="6">
                                             <AddressCard Address="address" 
-                                                         Index="index"
+                                                         Index="idx"
                                                          HasCompany="@(_customer.CompanyId.HasValue)"
                                                          CompanyName="@_customer.CompanyName"
                                                          CustomerName="@($"{_updateRequest.FirstName} {_updateRequest.LastName}")"
@@ -344,8 +358,8 @@
                                                          OnRemove="RemoveAddress"
                                                          SearchLocations="SearchThaiLocations"
                                                          SearchCountries="SearchCountries"
-                                                         SelectedCountry="_addressCountries.GetValueOrDefault(index)"
-                                                         SelectedLocation="_addressLocations.GetValueOrDefault(index)" />
+                                                         SelectedCountry="_addressCountries.GetValueOrDefault(idx)"
+                                                         SelectedLocation="_addressLocations.GetValueOrDefault(idx)" />
                                         </MudItem>
                                     }
                                 </MudGrid>
@@ -353,11 +367,13 @@
                         </MudTabPanel>
 
                         <MudTabPanel Text="Upload Documents" Icon="@Icons.Material.Filled.UploadFile">
-                             <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Upload Files</MudText>
-                                <MudGrid Spacing="4">
-                                    <MudItem xs="12" sm="6">
-                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Customer Documents</MudText>
+                             <MudGrid Spacing="6">
+                                <MudItem xs="12" md="6">
+                                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+                                            <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Color="Color.Primary" />
+                                            <MudText Typo="Typo.h6" Style="font-weight: 700;">Customer Documents</MudText>
+                                        </MudStack>
                                         <MudStack Spacing="3">
                                             <MudTextField T="string" Label="Category" @bind-Value="_customerDocCategory" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. ID Card, Business Card" />
                                             <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnCustomerDocsSelected" Accept=".pdf,.jpg,.png,.doc" MaximumFileCount="10">
@@ -367,14 +383,29 @@
                                             </MudFileUpload>
                                             @if (_customerDocFiles.Any())
                                             {
+                                                <MudPaper Outlined="true" Class="pa-2 mud-bg-surface">
+                                                    @foreach (var file in _customerDocFiles)
+                                                    {
+                                                        <div class="d-flex align-center justify-space-between mb-1">
+                                                            <MudText Typo="Typo.caption">@file.Name</MudText>
+                                                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _customerDocFiles.Remove(file))" />
+                                                        </div>
+                                                    }
+                                                </MudPaper>
                                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="UploadCustomerDocuments" Disabled="@_isUploadingCustomerDocs">
-                                                    @(_isUploadingCustomerDocs ? "Uploading..." : $"Upload {_customerDocFiles.Count} File(s)")
+                                                    @(_isUploadingCustomerDocs ? "Uploading..." : "Upload Documents")
                                                 </MudButton>
                                             }
                                         </MudStack>
-                                    </MudItem>
-                                    <MudItem xs="12" sm="6">
-                                        <MudText Typo="Typo.subtitle2" Class="mb-2">NDA Document</MudText>
+                                    </MudCard>
+                                </MudItem>
+
+                                <MudItem xs="12" md="6">
+                                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+                                            <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="Color.Secondary" />
+                                            <MudText Typo="Typo.h6" Style="font-weight: 700;">NDA Agreement</MudText>
+                                        </MudStack>
                                         <MudStack Spacing="3">
                                             <MudDatePicker Label="NDA Expiration" @bind-Date="_ndaExpiryDate" Variant="Variant.Outlined" Margin="Margin.Dense" />
                                             <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnNdaFilesSelected" Accept=".pdf,.doc,.docx" MaximumFileCount="1">
@@ -384,14 +415,20 @@
                                             </MudFileUpload>
                                             @if (_ndaFiles.Any())
                                             {
-                                                <MudButton Variant="Variant.Filled" Color="Color.Secondary" FullWidth="true" OnClick="UploadNdaFiles" Disabled="@_isUploadingNda">
-                                                    @(_isUploadingNda ? "Uploading..." : "Upload NDA")
+                                                <MudPaper Outlined="true" Class="pa-2 mud-bg-surface">
+                                                    <div class="d-flex align-center justify-space-between">
+                                                        <MudText Typo="Typo.caption">@_ndaFiles[0].Name</MudText>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _ndaFiles.Clear())" />
+                                                    </div>
+                                                </MudPaper>
+                                                <MudButton Variant="Variant.Filled" Color="Color.Secondary" FullWidth="true" OnClick="UploadNdaFiles" Disabled="@(_isUploadingNda || !_ndaExpiryDate.HasValue)">
+                                                    @(_isUploadingNda ? "Uploading..." : "Upload Signed NDA")
                                                 </MudButton>
                                             }
                                         </MudStack>
-                                    </MudItem>
-                                </MudGrid>
-                             </MudCard>
+                                    </MudCard>
+                                </MudItem>
+                             </MudGrid>
                         </MudTabPanel>
                     }
                 </MudTabs>
@@ -509,9 +546,11 @@
 @code {
     [Parameter] public Guid Id { get; set; }
     private CustomerDetailDto? _customer;
+    private List<CustomerActivityResponse> _activities = [];
     private bool _loading = true;
     private bool _isEditMode = false;
     private bool _isSaving = false;
+    private bool _canChangeEmail = false;
     private int _activeTabIndex = 0;
     
     private MudForm? _editForm;
@@ -533,11 +572,16 @@
     {
         await LoadCountries();
         await LoadCustomerData();
+        await LoadActivityData();
         
         // SignalR Real-time
         await SignalRService.StartAsync();
         SignalRService.OnCustomerChanged += async () => {
-            if (!_isEditMode) await LoadCustomerData();
+            if (!_isEditMode) 
+            {
+                await LoadCustomerData();
+                await LoadActivityData();
+            }
         };
     }
 
@@ -546,6 +590,15 @@
         try { _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/customers/countries") ?? []; }
         catch { }
     }
+
+    private async Task LoadActivityData()
+    {
+        try { _activities = await Http.GetFromJsonAsync<List<CustomerActivityResponse>>($"api/customers/{Id}/history") ?? []; }
+        catch { }
+    }
+
+    private string GetActivityIcon(string action) => action switch { "Create" => Icons.Material.Filled.Add, "Update" => Icons.Material.Filled.Edit, "SoftDelete" => Icons.Material.Filled.Delete, _ => Icons.Material.Filled.History };
+    private Color GetActivityColor(string action) => action switch { "Create" => Color.Success, "Update" => Color.Primary, "SoftDelete" => Color.Error, _ => Color.Default };
 
     private async Task LoadCustomerData()
     {
@@ -601,7 +654,9 @@
             City = a.City,
             StateProvince = a.StateProvince,
             PostalCode = a.PostalCode,
-            CountryId = a.CountryId
+            CountryId = a.CountryId,
+            RecipientName = a.RecipientName,
+            RecipientPhone = a.RecipientPhone
         }).ToList();
 
         _addressCountries.Clear();
@@ -675,6 +730,7 @@
                 _isEditMode = false;
                 _activeTabIndex = 0;
                 await LoadCustomerData();
+                await LoadActivityData();
             }
             else
             {
@@ -775,28 +831,23 @@
             if (response.IsSuccessStatusCode)
             {
                 var results = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
-                // In CustomerDetails, we usually want to persist these immediately or wait for Save.
-                // For simplicity, we'll reload data to show them in View Mode after Save, 
-                // but since these are uploaded to storage, we need to create the DB references.
-                // Let's create the references now.
                 var docs = results?.Select(r => new CreateDocumentRequest { 
                     DocumentCategory = category, FileReference = r.StoragePath ?? r.FileReference, 
                     FileName = r.FileName, FileSize = r.Size, MimeType = GetMimeType(r.FileName),
                     DocumentSubType = isNda ? "Signed" : null
                 }).ToList() ?? [];
                 
-                // Call BFF to link documents
                 await Http.PostAsJsonAsync($"api/aiprocessing/link-documents?ownerType=Customer&ownerId={Id}", docs);
                 
                 if (isNda && _ndaExpiryDate.HasValue)
                 {
-                    // Create NDA record
                     await Http.PostAsJsonAsync("api/customers/ndas", new { customerId = Id, expiresAt = _ndaExpiryDate, status = "Signed" });
                 }
 
                 Snackbar.Add("Files uploaded and linked successfully", Severity.Success);
                 files.Clear();
                 await LoadCustomerData();
+                await LoadActivityData();
             }
         }
         catch (Exception ex) { Snackbar.Add($"Upload error: {ex.Message}", Severity.Error); }

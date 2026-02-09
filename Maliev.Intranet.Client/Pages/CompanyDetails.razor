@@ -8,6 +8,9 @@
 <PageTitle>@(_company?.Name ?? "Company Details") - Maliev Intranet</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16 pt-8">
+    <!-- Breadcrumbs -->
+    <MudBreadcrumbs Items="_breadcrumbs" Separator=">" Class="pa-0 mb-4" />
+
     @if (_loading)
     {
         <MudStack Spacing="4">
@@ -30,12 +33,9 @@
     else
     {
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-8">
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
-                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/sales/customers"))" />
-                <MudStack Spacing="0">
-                    <MudText Typo="Typo.h3" Style="font-weight: 700;">@_company.Name</MudText>
-                    <MudText Typo="Typo.body1" Color="Color.Secondary">Company ID: @_company.Id</MudText>
-                </MudStack>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h3" Style="font-weight: 700;">@_company.Name</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">Company ID: @_company.Id</MudText>
             </MudStack>
             
             <MudStack Row="true" Spacing="2">
@@ -54,11 +54,11 @@
                                     <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Registration Info</MudText>
                                     <MudStack Spacing="3">
                                         <div>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tax ID / VAT Number</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tax ID (เลขประจำตัวผู้เสียภาษี)</MudText>
                                             <MudText Typo="Typo.body1">@(_company.VatNumber ?? "N/A")</MudText>
                                         </div>
                                         <div>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Registration Number</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Registration Number (เลขทะเบียนนิติบุคคล)</MudText>
                                             <MudText Typo="Typo.body1">@(_company.RegistrationNumber ?? "N/A")</MudText>
                                         </div>
                                         <div>
@@ -75,7 +75,7 @@
                             
                             <MudItem xs="12" sm="6">
                                 <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
-                                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Contact Information</MudText>
+                                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Company Contact</MudText>
                                     <MudStack Spacing="3">
                                         <div>
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">Email Address</MudText>
@@ -100,8 +100,30 @@
                     
                     <MudTabPanel Text="Associated Contacts" Icon="@Icons.Material.Filled.People">
                         <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                            <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Employees & Contacts</MudText>
-                            <MudAlert Severity="Severity.Info" Variant="Variant.Text">Contact management is coming soon.</MudAlert>
+                            <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Company Representatives</MudText>
+                            @if (_associatedCustomers != null && _associatedCustomers.Any())
+                            {
+                                <MudTable Items="_associatedCustomers" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Email</MudTh>
+                                        <MudTh>Role/Segment</MudTh>
+                                        <MudTh></MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Name">@context.Name</MudTd>
+                                        <MudTd DataLabel="Email">@context.Email</MudTd>
+                                        <MudTd DataLabel="Segment">@context.Segment</MudTd>
+                                        <MudTd>
+                                            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo($"/sales/customers/{context.Id}"))">View Profile</MudButton>
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Text">No registered contacts found for this company.</MudAlert>
+                            }
                         </MudCard>
                     </MudTabPanel>
                 </MudTabs>
@@ -131,11 +153,29 @@
 @code {
     [Parameter] public Guid Id { get; set; }
     private CompanyResponse? _company;
+    private List<CustomerSummaryDto> _associatedCustomers = [];
     private bool _loading = true;
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Customers", href: "/sales/customers"),
+        new BreadcrumbItem("Company Details", href: null, disabled: true)
+    };
 
     protected override async Task OnInitializedAsync()
     {
         await LoadCompany();
+        await LoadAssociatedCustomers();
+    }
+
+    private async Task LoadAssociatedCustomers()
+    {
+        try 
+        { 
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>($"api/customers?companyId={Id}"); 
+            _associatedCustomers = response?.Data.ToList() ?? [];
+        }
+        catch { }
     }
 
     private async Task LoadCompany()

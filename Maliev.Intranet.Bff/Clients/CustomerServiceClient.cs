@@ -119,6 +119,14 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
+    /// Gets activity history for a customer.
+    /// </summary>
+    public async Task<List<CustomerActivityResponse>> GetCustomerActivityAsync(Guid id, CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<List<CustomerActivityResponse>>($"/customer/v1/customers/{id}/history", ct) ?? [];
+    }
+
+    /// <summary>
     /// Creates a new customer in the Customer microservice.
     /// </summary>
     /// <param name="request">The customer creation request.</param>
@@ -234,7 +242,9 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 city = address.City,
                 stateProvince = address.StateProvince,
                 postalCode = address.PostalCode,
-                countryId = address.CountryId
+                countryId = address.CountryId,
+                recipientName = address.RecipientName,
+                recipientPhone = address.RecipientPhone
             };
             await httpClient.PostAsJsonAsync("/customer/v1/addresses", addrReq, ct);
         }
@@ -316,7 +326,7 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 ownerType = "Customer",
                 ownerId = createdCustomer.Id,
                 type = address.Type,
-                isDefault = true,
+                isDefault = address.IsDefault,
                 addressLine1 = address.AddressLine1,
                 addressLine2 = address.AddressLine2,
                 addressLine3 = address.AddressLine3,
@@ -324,7 +334,9 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 city = address.City,
                 stateProvince = address.StateProvince,
                 postalCode = address.PostalCode,
-                countryId = address.CountryId
+                countryId = address.CountryId,
+                recipientName = address.RecipientName,
+                recipientPhone = address.RecipientPhone
             };
             var addrResponse = await httpClient.PostAsJsonAsync("/customer/v1/addresses", addrReq, ct);
             if (!addrResponse.IsSuccessStatusCode)

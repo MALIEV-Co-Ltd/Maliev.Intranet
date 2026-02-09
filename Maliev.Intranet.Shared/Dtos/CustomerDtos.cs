@@ -86,6 +86,8 @@ public class AddressResponse
     public string StateProvince { get; set; } = string.Empty;
     public string PostalCode { get; set; } = string.Empty;
     public Guid CountryId { get; set; }
+    public string? RecipientName { get; set; }
+    public string? RecipientPhone { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public byte[] Version { get; set; } = [];

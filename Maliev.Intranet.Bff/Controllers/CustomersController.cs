@@ -55,6 +55,17 @@ public class CustomersController(
     }
 
     /// <summary>
+    /// Gets activity history for a customer.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("{id:guid}/history")]
+    public async Task<ActionResult<List<CustomerActivityResponse>>> GetHistory(Guid id)
+    {
+        var result = await client.GetCustomerActivityAsync(id);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Creates a new customer.
     /// </summary>
     /// <param name="request">The customer creation request.</param>
