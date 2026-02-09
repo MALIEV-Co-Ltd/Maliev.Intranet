@@ -56,6 +56,7 @@ public class CustomerDetailDto
     public string? CompanyContactEmail { get; set; }
     public string? CompanySegment { get; set; }
     public string? CompanyTier { get; set; }
+    public string? CreatedBy { get; set; }
     public AddressResponse? CompanyBillingAddress { get; set; }
     public List<AddressResponse> Addresses { get; set; } = [];
     public List<DocumentResponse> Documents { get; set; } = [];

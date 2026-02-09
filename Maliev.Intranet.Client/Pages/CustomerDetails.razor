@@ -115,7 +115,7 @@
                                                 <MudAvatar Color="Color.Primary" Size="Size.Small" Variant="Variant.Text" Style="background-color: var(--mud-palette-primary-hover);"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small"/></MudAvatar>
                                                 <MudStack Spacing="0">
                                                     <MudText Typo="Typo.body2" Style="font-weight: 500;">Customer profile created</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_customer.CreatedAt.ToLocalTime().ToString("g") • by System</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_customer.CreatedAt.ToLocalTime().ToString("g") • by @(_customer.CreatedBy ?? "System")</MudText>
                                                 </MudStack>
                                             </div>
                                             @if (_customer.Notes?.Any() == true)
@@ -153,20 +153,43 @@
                                     @foreach (var (address, index) in _customer.Addresses.Select((a, i) => (a, i)))
                                     {
                                         <MudItem xs="12" sm="6">
-                                            <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
-                                                <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
-                                                    <MudChip T="string" Color="@(address.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@address.Type</MudChip>
-                                                    @if (address.IsDefault)
-                                                    {
-                                                        <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
-                                                    }
-                                                </MudStack>
-                                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@address.AddressLine1</MudText>
-                                                @if (!string.IsNullOrEmpty(address.AddressLine2)) { <MudText Typo="Typo.body2">@address.AddressLine2</MudText> }
-                                                @if (!string.IsNullOrEmpty(address.AddressLine3)) { <MudText Typo="Typo.body2">@address.AddressLine3</MudText> }
-                                                <MudText Typo="Typo.body2">@address.District, @address.City</MudText>
-                                                <MudText Typo="Typo.body2">@address.StateProvince @address.PostalCode</MudText>
-                                            </MudPaper>
+                                            @if (_isEditMode)
+                                            {
+                                                <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
+                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
+                                                        <MudSelect T="string" @bind-Value="address.Type" Dense="true" Margin="Margin.Dense" Style="max-width: 120px;">
+                                                            <MudSelectItem Value="@("Billing")">Billing</MudSelectItem>
+                                                            <MudSelectItem Value="@("Shipping")">Shipping</MudSelectItem>
+                                                        </MudSelect>
+                                                        <MudStack Row="true">
+                                                            <MudCheckBox T="bool" @bind-Value="address.IsDefault" Label="Default" Dense="true" Size="Size.Small" />
+                                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveAddress(address))" />
+                                                        </MudStack>
+                                                    </MudStack>
+                                                    <MudTextField Label="Address Line 1" @bind-Value="address.AddressLine1" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                                    <MudTextField Label="District" @bind-Value="address.District" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                                    <MudTextField Label="City" @bind-Value="address.City" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                                    <MudTextField Label="State / Province" @bind-Value="address.StateProvince" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                                    <MudTextField Label="Postal Code" @bind-Value="address.PostalCode" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                                </MudPaper>
+                                            }
+                                            else
+                                            {
+                                                <MudPaper Elevation="0" Class="pa-6 rounded-lg border-solid border-1 mud-border-lines-default h-100" Style="background-color: var(--mud-palette-background-grey);">
+                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
+                                                        <MudChip T="string" Color="@(address.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@address.Type</MudChip>
+                                                        @if (address.IsDefault)
+                                                        {
+                                                            <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
+                                                        }
+                                                    </MudStack>
+                                                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@address.AddressLine1</MudText>
+                                                    @if (!string.IsNullOrEmpty(address.AddressLine2)) { <MudText Typo="Typo.body2">@address.AddressLine2</MudText> }
+                                                    @if (!string.IsNullOrEmpty(address.AddressLine3)) { <MudText Typo="Typo.body2">@address.AddressLine3</MudText> }
+                                                    <MudText Typo="Typo.body2">@address.District, @address.City</MudText>
+                                                    <MudText Typo="Typo.body2">@address.StateProvince @address.PostalCode</MudText>
+                                                </MudPaper>
+                                            }
                                         </MudItem>
                                     }
                                 }
@@ -490,7 +513,40 @@
         _isSaving = true;
         try
         {
-            var response = await Http.PutAsJsonAsync($"api/customers/{Id}", _updateRequest);
+            // Create full onboarding request for update (as we support updating addresses/notes too)
+            var onboardingRequest = new CustomerOnboardingRequest
+            {
+                Customer = new CreateCustomerRequest
+                {
+                    FirstName = _updateRequest.FirstName,
+                    LastName = _updateRequest.LastName,
+                    Email = _updateRequest.Email,
+                    Mobile = _updateRequest.Mobile,
+                    Landline = _updateRequest.Landline,
+                    Extension = _updateRequest.Extension,
+                    Segment = _updateRequest.Segment,
+                    Tier = _updateRequest.Tier,
+                    PreferredLanguage = _updateRequest.PreferredLanguage,
+                    Timezone = _updateRequest.Timezone,
+                    CompanyId = _customer?.CompanyId,
+                    CommunicationPreferences = _updateRequest.CommunicationPreferences
+                },
+                Addresses = _customer?.Addresses.Select(a => new CreateAddressRequest
+                {
+                    Type = a.Type,
+                    IsDefault = a.IsDefault,
+                    AddressLine1 = a.AddressLine1,
+                    AddressLine2 = a.AddressLine2,
+                    AddressLine3 = a.AddressLine3,
+                    District = a.District,
+                    City = a.City,
+                    StateProvince = a.StateProvince,
+                    PostalCode = a.PostalCode,
+                    CountryId = a.CountryId
+                }).ToList() ?? new List<CreateAddressRequest>()
+            };
+
+            var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Customer updated successfully!", Severity.Success);
@@ -499,8 +555,24 @@
             }
             else
             {
-                var error = await response.Content.ReadAsStringAsync();
-                Snackbar.Add($"Update failed: {error}", Severity.Error);
+                string errorMessage = "Update failed";
+                try
+                {
+                    var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+                    if (error != null)
+                    {
+                        errorMessage = !string.IsNullOrEmpty(error.Message) ? error.Message : (!string.IsNullOrEmpty(error.Title) ? error.Title : errorMessage);
+                    }
+                }
+                catch
+                {
+                    var rawError = await response.Content.ReadAsStringAsync();
+                    if (!string.IsNullOrEmpty(rawError))
+                    {
+                        errorMessage = rawError.Length < 100 ? rawError : errorMessage;
+                    }
+                }
+                Snackbar.Add(errorMessage, Severity.Error);
             }
         }
         catch (Exception ex)
@@ -513,10 +585,29 @@
         }
     }
 
-    private void AddAddress()
+    private async Task AddAddress()
     {
-        // Address addition logic would go here, likely opening a dialog or adding to a list
-        Snackbar.Add("Address management coming soon", Severity.Info);
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        // We'll reuse the logic from CustomerNew for address addition, but simplified for a dialog or inline
+        // For now, let's just add a blank address and enter edit mode if not already
+        if (_customer == null) return;
+        
+        var newAddress = new AddressResponse
+        {
+            Type = _customer.Addresses.Count(a => a.Type == "Billing") >= 1 ? "Shipping" : "Billing",
+            IsDefault = !_customer.Addresses.Any(a => a.Type == "Billing"),
+            AddressLine1 = "New Address"
+        };
+        
+        _customer.Addresses.Add(newAddress);
+        _isEditMode = true;
+        StateHasChanged();
+    }
+
+    private void RemoveAddress(AddressResponse address)
+    {
+        _customer?.Addresses.Remove(address);
+        StateHasChanged();
     }
 
     private Color GetStatusColor(string status) => status switch
