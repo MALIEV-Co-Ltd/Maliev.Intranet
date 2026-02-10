@@ -1,5 +1,6 @@
 using Maliev.Intranet.Shared;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -36,6 +37,26 @@ public class UploadServiceClient(HttpClient httpClient)
             return await response.Content.ReadFromJsonAsync<BffUploadResponse>(ct);
         }
 
+        return null;
+    }
+
+    /// <summary>
+    /// Gets a temporary signed download URL for a file.
+    /// </summary>
+    public async Task<string?> GetDownloadUrlAsync(string fileReference, CancellationToken ct = default)
+    {
+        // The UploadService uses POST /upload/v1/files/{uploadId}/signed-url
+        var request = new { ExpirationMinutes = 60 };
+        var response = await _httpClient.PostAsJsonAsync($"/upload/v1/files/{fileReference}/signed-url", request, ct);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(ct);
+            if (result.TryGetProperty("signedUrl", out var urlProp))
+            {
+                return urlProp.GetString();
+            }
+        }
         return null;
     }
 }

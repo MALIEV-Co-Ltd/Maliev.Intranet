@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
@@ -10,42 +11,39 @@ using Microsoft.AspNetCore.SignalR;
 namespace Maliev.Intranet.Bff.Controllers;
 
 /// <summary>
-/// API controller for customer-related operations, proxying to the Customer Service.
+/// Controller for customer management operations.
 /// </summary>
 /// <param name="client">The customer service client.</param>
 /// <param name="registryClient">The registry service client.</param>
-/// <param name="referenceDataService">Reference data service for countries, etc.</param>
-/// <param name="hubContext">The SignalR hub context for broadcasting real-time updates.</param>
+/// <param name="referenceDataService">The reference data service.</param>
+/// <param name="hubContext">The SignalR hub context for notifications.</param>
 /// <param name="logger">The logger instance.</param>
+[Authorize(AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [Route("api/[controller]")]
 public class CustomersController(
-    CustomerServiceClient client,
+    CustomerServiceClient client, 
     RegistryServiceClient registryClient,
     IReferenceDataService referenceDataService,
-    IHubContext<NotificationHub> hubContext,
+    IHubContext<NotificationHub> hubContext, 
     ILogger<CustomersController> logger) : ControllerBase
 {
+    private readonly IHubContext<NotificationHub> _hubContext = hubContext;
 
     /// <summary>
-    /// Retrieves a paged list of customers.
+    /// Gets all customers.
     /// </summary>
-    /// <param name="query">Optional search query.</param>
-    /// <param name="page">The page number.</param>
-    /// <returns>A paged list of customers.</returns>
     [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get([FromQuery] string? query, [FromQuery] int page = 1)
+    public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get(string? query = null, int page = 1)
     {
         var result = await client.GetCustomersAsync(query, page);
-        return result != null ? Ok(result) : Ok(new PagedResponse<CustomerSummaryDto>());
+        return Ok(result);
     }
 
     /// <summary>
-    /// Retrieves detailed information for a single customer by ID.
+    /// Gets a single customer by ID.
     /// </summary>
-    /// <param name="id">The customer ID.</param>
-    /// <returns>The customer details.</returns>
     [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CustomerDetailDto>> GetById(Guid id)
@@ -68,8 +66,6 @@ public class CustomersController(
     /// <summary>
     /// Creates a new customer.
     /// </summary>
-    /// <param name="request">The customer creation request.</param>
-    /// <returns>The created customer.</returns>
     [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost]
     public async Task<ActionResult<CustomerResponse>> Create([FromBody] CreateCustomerRequest request)
@@ -77,8 +73,7 @@ public class CustomersController(
         var result = await client.CreateCustomerAsync(request);
         if (result != null)
         {
-            // Notify all connected clients that customer data changed
-            await hubContext.Clients.All.SendAsync("CustomerChanged");
+            await _hubContext.Clients.All.SendAsync("CustomerChanged");
             return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
         }
         return BadRequest();
@@ -96,8 +91,7 @@ public class CustomersController(
             var result = await client.OnboardCustomerAsync(request);
             if (result != null)
             {
-                // Notify all connected clients that customer data changed
-                await hubContext.Clients.All.SendAsync("CustomerChanged");
+                await _hubContext.Clients.All.SendAsync("CustomerChanged");
                 return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
             }
             return BadRequest(new ApiErrorResponse { Message = "Failed to onboard customer. Unknown error." });
@@ -120,6 +114,86 @@ public class CustomersController(
     }
 
     /// <summary>
+    /// Creates company (optional) + customer + internal note. Returns the created customer.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("create-basic")]
+    public async Task<IActionResult> CreateBasic([FromBody] CustomerOnboardingRequest request)
+    {
+        try
+        {
+            var result = await client.CreateBasicAsync(request);
+            if (result != null)
+            {
+                await _hubContext.Clients.All.SendAsync("CustomerChanged");
+                return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            }
+            return BadRequest(new ApiErrorResponse { Message = "Failed to create customer." });
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Downstream service error during create-basic");
+            return StatusCode((int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError),
+                new ApiErrorResponse
+                {
+                    Message = ex.Message,
+                    Title = "Downstream Service Error",
+                    Status = (int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError)
+                });
+        }
+    }
+
+    /// <summary>
+    /// Creates addresses for a customer (batch).
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/addresses")]
+    public async Task<IActionResult> CreateAddresses(Guid id, [FromBody] List<CreateAddressRequest> addresses)
+    {
+        try
+        {
+            var result = await client.CreateAddressesAsync(id, addresses);
+            return Ok(result);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Downstream service error during address creation for customer {CustomerId}", id);
+            return StatusCode((int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError),
+                new ApiErrorResponse
+                {
+                    Message = ex.Message,
+                    Title = "Address Creation Failed",
+                    Status = (int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError)
+                });
+        }
+    }
+
+    /// <summary>
+    /// Creates NDA for a customer, linking documents.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/nda")]
+    public async Task<IActionResult> CreateNda(Guid id, [FromBody] CreateNdaStepRequest request)
+    {
+        try
+        {
+            await client.CreateNdaWithDocumentsAsync(id, request.Nda, request.Documents);
+            return Ok();
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Downstream service error during NDA creation for customer {CustomerId}", id);
+            return StatusCode((int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError),
+                new ApiErrorResponse
+                {
+                    Message = ex.Message,
+                    Title = "NDA Creation Failed",
+                    Status = (int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError)
+                });
+        }
+    }
+
+    /// <summary>
     /// Updates an existing customer with full details.
     /// </summary>
     [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
@@ -131,8 +205,7 @@ public class CustomersController(
             var result = await client.UpdateCustomerFullAsync(id, request);
             if (result != null)
             {
-                // Notify all connected clients that customer data changed
-                await hubContext.Clients.All.SendAsync("CustomerChanged");
+                await _hubContext.Clients.All.SendAsync("CustomerChanged");
                 return Ok(result);
             }
             return NotFound(new ApiErrorResponse { Message = "Customer not found or update failed." });
@@ -155,24 +228,29 @@ public class CustomersController(
     }
 
     /// <summary>
-    /// Gets all countries. Requires authentication but uses service account for downstream calls.
+    /// Updates a customer profile.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}")]
+    public async Task<ActionResult<CustomerResponse>> Update(Guid id, [FromBody] object request)
+    {
+        var result = await client.UpdateCustomerAsync(id, request);
+        if (result != null)
+        {
+            await _hubContext.Clients.All.SendAsync("CustomerChanged");
+            return Ok(result);
+        }
+        return BadRequest();
+    }
+
+    /// <summary>
+    /// Gets a list of countries.
     /// </summary>
     [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("countries")]
     public async Task<ActionResult<List<CountryDto>>> GetCountries()
     {
-        var countries = await referenceDataService.GetCountriesAsync();
-        return Ok(countries);
-    }
-
-    /// <summary>
-    /// Searches for companies.
-    /// </summary>
-    [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
-    [HttpGet("companies")]
-    public async Task<ActionResult<List<CompanySummaryDto>>> SearchCompanies([FromQuery] string? query)
-    {
-        var result = await client.SearchCompaniesAsync(query);
+        var result = await referenceDataService.GetCountriesAsync();
         return Ok(result);
     }
 
@@ -209,19 +287,24 @@ public class CustomersController(
     /// <summary>
     /// Checks if a customer with the specified email already exists.
     /// </summary>
-    /// <param name="email">Email address to check.</param>
-    /// <returns>Email existence check result.</returns>
     [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("check-email")]
     public async Task<ActionResult<bool>> CheckEmail([FromQuery] string email)
     {
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return Ok(false);
-        }
-
+        if (string.IsNullOrWhiteSpace(email)) return Ok(false);
         var exists = await client.CheckEmailExistsAsync(email.Trim());
         return Ok(exists);
+    }
+
+    /// <summary>
+    /// Searches for companies.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("companies")]
+    public async Task<ActionResult<List<CompanySummaryDto>>> SearchCompanies([FromQuery] string? query)
+    {
+        var result = await client.SearchCompaniesAsync(query);
+        return Ok(result);
     }
 
     /// <summary>
@@ -232,6 +315,91 @@ public class CustomersController(
     public async Task<IActionResult> CreateNda([FromBody] object request)
     {
         var success = await client.CreateNdaAsync(request);
-        return success ? Ok() : BadRequest();
+        if (success)
+        {
+            await _hubContext.Clients.All.SendAsync("CustomerChanged");
+            return Ok();
+        }
+        return BadRequest();
+    }
+
+    /// <summary>
+    /// Updates NDA status for a customer.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("ndas/{ndaId:guid}/status")]
+    public async Task<IActionResult> UpdateNdaStatus(Guid ndaId, [FromBody] JsonElement body)
+    {
+        if (body.TryGetProperty("status", out var statusProp))
+        {
+            var status = statusProp.GetString();
+            if (!string.IsNullOrEmpty(status))
+            {
+                var success = await client.UpdateNdaStatusAsync(ndaId, status);
+                if (success)
+                {
+                    await _hubContext.Clients.All.SendAsync("CustomerChanged");
+                    return Ok();
+                }
+            }
+        }
+        return BadRequest();
+    }
+
+    /// <summary>
+    /// Adds an internal note to a customer.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/notes")]
+    public async Task<ActionResult<InternalNoteResponse>> AddNote(Guid id, [FromBody] string noteText)
+    {
+        if (string.IsNullOrWhiteSpace(noteText)) return BadRequest("Note text cannot be empty.");
+
+        var request = new CreateInternalNoteRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = id,
+            NoteText = noteText
+        };
+
+        var result = await client.CreateInternalNoteAsync(request);
+        if (result != null)
+        {
+            await _hubContext.Clients.All.SendAsync("CustomerChanged");
+            return Ok(result);
+        }
+        return BadRequest("Failed to add note.");
+    }
+
+    /// <summary>
+    /// Updates an internal note.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("notes/{noteId:guid}")]
+    public async Task<ActionResult<InternalNoteResponse>> UpdateNote(Guid noteId, [FromBody] UpdateInternalNoteRequest request)
+    {
+        var result = await client.UpdateInternalNoteAsync(noteId, request);
+        if (result != null)
+        {
+            await _hubContext.Clients.All.SendAsync("CustomerChanged");
+            return Ok(result);
+        }
+        return BadRequest("Failed to update note.");
+    }
+
+    /// <summary>
+    /// Deletes an internal note.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpDelete("notes/{noteId:guid}")]
+    public async Task<IActionResult> DeleteNote(Guid noteId)
+    {
+        var success = await client.DeleteInternalNoteAsync(noteId);
+        if (success)
+        {
+            await _hubContext.Clients.All.SendAsync("CustomerChanged");
+            return NoContent();
+        }
+        return BadRequest("Failed to delete note.");
     }
 }

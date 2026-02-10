@@ -44,6 +44,7 @@ try
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
     builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
+    builder.Services.AddSingleton<Maliev.Intranet.Shared.Services.IMarkdownService, Maliev.Intranet.Shared.Services.MarkdownService>();
     builder.Services.AddSignalR();
     builder.Services.AddMudServices();
 

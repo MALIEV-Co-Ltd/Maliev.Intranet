@@ -1,0 +1,349 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+
+<MudDialog>
+    <DialogContent>
+        <MudTimeline TimelinePosition="TimelinePosition.Start" Class="mt-2">
+            @if (HasCompany)
+            {
+                <MudTimelineItem Color="@GetStepColor(Step.Company)" Icon="@GetStepIcon(Step.Company)" Size="Size.Medium">
+                    <ItemContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudText Typo="Typo.body1" Style="@GetStepTextStyle(Step.Company)">Company Setup</MudText>
+                            @if (_currentStep == Step.Company)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                        </MudStack>
+                        @if (_stepErrors.ContainsKey(Step.Company))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">@_stepErrors[Step.Company]</MudText>
+                        }
+                    </ItemContent>
+                </MudTimelineItem>
+            }
+
+            <MudTimelineItem Color="@GetStepColor(Step.Customer)" Icon="@GetStepIcon(Step.Customer)" Size="Size.Medium">
+                <ItemContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudText Typo="Typo.body1" Style="@GetStepTextStyle(Step.Customer)">Customer Profile</MudText>
+                        @if (_currentStep == Step.Customer)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                    </MudStack>
+                    @if (_stepErrors.ContainsKey(Step.Customer))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error">@_stepErrors[Step.Customer]</MudText>
+                    }
+                </ItemContent>
+            </MudTimelineItem>
+
+            @if (Request.Addresses.Any())
+            {
+                <MudTimelineItem Color="@GetStepColor(Step.Addresses)" Icon="@GetStepIcon(Step.Addresses)" Size="Size.Medium">
+                    <ItemContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudText Typo="Typo.body1" Style="@GetStepTextStyle(Step.Addresses)">Addresses (@Request.Addresses.Count)</MudText>
+                            @if (_currentStep == Step.Addresses)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                        </MudStack>
+                        @if (_stepErrors.ContainsKey(Step.Addresses))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">@_stepErrors[Step.Addresses]</MudText>
+                        }
+                    </ItemContent>
+                </MudTimelineItem>
+            }
+
+            @if (Request.Documents.Any())
+            {
+                <MudTimelineItem Color="@GetStepColor(Step.Documents)" Icon="@GetStepIcon(Step.Documents)" Size="Size.Medium">
+                    <ItemContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudText Typo="Typo.body1" Style="@GetStepTextStyle(Step.Documents)">Documents (@Request.Documents.Count)</MudText>
+                            @if (_currentStep == Step.Documents)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                        </MudStack>
+                        @if (_stepErrors.ContainsKey(Step.Documents))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">@_stepErrors[Step.Documents]</MudText>
+                        }
+                    </ItemContent>
+                </MudTimelineItem>
+            }
+
+            @if (IncludeNda)
+            {
+                <MudTimelineItem Color="@GetStepColor(Step.Nda)" Icon="@GetStepIcon(Step.Nda)" Size="Size.Medium">
+                    <ItemContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudText Typo="Typo.body1" Style="@GetStepTextStyle(Step.Nda)">NDA Setup</MudText>
+                            @if (_currentStep == Step.Nda)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                        </MudStack>
+                        @if (_stepErrors.ContainsKey(Step.Nda))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">@_stepErrors[Step.Nda]</MudText>
+                        }
+                    </ItemContent>
+                </MudTimelineItem>
+            }
+        </MudTimeline>
+
+        @if (_isComplete && !_hasFailed)
+        {
+            <MudAlert Severity="Severity.Success" Class="mt-4">Customer created successfully!</MudAlert>
+        }
+        else if (_hasFailed)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">An error occurred. The customer may have been partially created.</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_isComplete && !_hasFailed)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ViewCustomer">View Customer</MudButton>
+        }
+        else if (_hasFailed)
+        {
+            <MudButton Variant="Variant.Outlined" OnClick="Close">Close</MudButton>
+            @if (_customerId.HasValue)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ViewCustomer">View Customer</MudButton>
+            }
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public CustomerOnboardingRequest Request { get; set; } = new();
+
+    [Parameter]
+    public bool HasCompany { get; set; }
+
+    [Parameter]
+    public bool IncludeNda { get; set; }
+
+    private enum Step { Company, Customer, Addresses, Documents, Nda }
+    private enum StepState { Pending, InProgress, Completed, Failed, Skipped }
+
+    private Step? _currentStep;
+    private Dictionary<Step, StepState> _stepStates = new();
+    private Dictionary<Step, string> _stepErrors = new();
+    private Guid? _customerId;
+    private bool _isComplete;
+    private bool _hasFailed;
+    private List<DocumentResponse> _createdDocuments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize all step states
+        if (HasCompany) _stepStates[Step.Company] = StepState.Pending;
+        _stepStates[Step.Customer] = StepState.Pending;
+        if (Request.Addresses.Any()) _stepStates[Step.Addresses] = StepState.Pending;
+        if (Request.Documents.Any()) _stepStates[Step.Documents] = StepState.Pending;
+        if (IncludeNda) _stepStates[Step.Nda] = StepState.Pending;
+
+        await RunOnboarding();
+    }
+
+    private async Task RunOnboarding()
+    {
+        try
+        {
+            // Step 1: Create company + customer + note
+            if (HasCompany)
+            {
+                await SetStep(Step.Company, StepState.InProgress);
+            }
+            await SetStep(Step.Customer, StepState.InProgress);
+
+            var response = await Http.PostAsJsonAsync("api/customers/create-basic", Request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await ReadError(response);
+                var failStep = HasCompany ? Step.Company : Step.Customer;
+                await SetStep(failStep, StepState.Failed, error);
+                _hasFailed = true;
+                _isComplete = true;
+                return;
+            }
+
+            var customer = await response.Content.ReadFromJsonAsync<CustomerResponse>();
+            _customerId = customer?.Id;
+
+            if (HasCompany) await SetStep(Step.Company, StepState.Completed);
+            await SetStep(Step.Customer, StepState.Completed);
+
+            if (_customerId == null)
+            {
+                _hasFailed = true;
+                _isComplete = true;
+                return;
+            }
+
+            // Step 2: Create addresses
+            if (Request.Addresses.Any())
+            {
+                await SetStep(Step.Addresses, StepState.InProgress);
+                var addrResponse = await Http.PostAsJsonAsync($"api/customers/{_customerId}/addresses", Request.Addresses);
+                if (!addrResponse.IsSuccessStatusCode)
+                {
+                    var error = await ReadError(addrResponse);
+                    await SetStep(Step.Addresses, StepState.Failed, error);
+                    _hasFailed = true;
+                    _isComplete = true;
+                    return;
+                }
+                await SetStep(Step.Addresses, StepState.Completed);
+            }
+
+            // Step 3: Link documents
+            if (Request.Documents.Any())
+            {
+                await SetStep(Step.Documents, StepState.InProgress);
+                var docResponse = await Http.PostAsJsonAsync(
+                    $"api/aiprocessing/link-documents?ownerType=Customer&ownerId={_customerId}",
+                    Request.Documents);
+                if (docResponse.IsSuccessStatusCode)
+                {
+                    _createdDocuments = await docResponse.Content.ReadFromJsonAsync<List<DocumentResponse>>() ?? [];
+                    await SetStep(Step.Documents, StepState.Completed);
+                }
+                else
+                {
+                    var error = await ReadError(docResponse);
+                    await SetStep(Step.Documents, StepState.Failed, error);
+                    // Continue to NDA even if docs fail — NDA can be created without doc link
+                }
+            }
+
+            // Step 4: Create NDA
+            if (IncludeNda && Request.Nda != null)
+            {
+                await SetStep(Step.Nda, StepState.InProgress);
+                var ndaRequest = new CreateNdaStepRequest
+                {
+                    Nda = Request.Nda,
+                    Documents = _createdDocuments
+                };
+                var ndaResponse = await Http.PostAsJsonAsync($"api/customers/{_customerId}/nda", ndaRequest);
+                if (!ndaResponse.IsSuccessStatusCode)
+                {
+                    var error = await ReadError(ndaResponse);
+                    await SetStep(Step.Nda, StepState.Failed, error);
+                    // NDA failure is non-fatal — customer was already created
+                }
+                else
+                {
+                    await SetStep(Step.Nda, StepState.Completed);
+                }
+            }
+
+            _isComplete = true;
+            if (!_hasFailed)
+            {
+                // Auto-close with success after a brief delay for user to see the completion
+                await Task.Delay(800);
+                MudDialog.Close(DialogResult.Ok(_customerId));
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_currentStep.HasValue)
+            {
+                await SetStep(_currentStep.Value, StepState.Failed, ex.Message);
+            }
+            _hasFailed = true;
+            _isComplete = true;
+        }
+    }
+
+    private async Task SetStep(Step step, StepState state, string? error = null)
+    {
+        _stepStates[step] = state;
+        if (state == StepState.InProgress) _currentStep = step;
+        if (error != null) _stepErrors[step] = error;
+        if (state is StepState.Completed or StepState.Failed) _currentStep = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static async Task<string> ReadError(HttpResponseMessage response)
+    {
+        try
+        {
+            var apiErr = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+            if (apiErr != null && !string.IsNullOrEmpty(apiErr.Message)) return apiErr.Message;
+        }
+        catch
+        {
+            try
+            {
+                var raw = await response.Content.ReadAsStringAsync();
+                if (!string.IsNullOrEmpty(raw) && raw.Length < 200) return raw;
+            }
+            catch { }
+        }
+        return $"Request failed with status {(int)response.StatusCode}";
+    }
+
+    private Color GetStepColor(Step step)
+    {
+        if (!_stepStates.ContainsKey(step)) return Color.Default;
+        return _stepStates[step] switch
+        {
+            StepState.Completed => Color.Success,
+            StepState.InProgress => Color.Primary,
+            StepState.Failed => Color.Error,
+            StepState.Skipped => Color.Default,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStepIcon(Step step)
+    {
+        if (!_stepStates.ContainsKey(step)) return Icons.Material.Filled.Circle;
+        return _stepStates[step] switch
+        {
+            StepState.Completed => Icons.Material.Filled.CheckCircle,
+            StepState.InProgress => Icons.Material.Filled.HourglassTop,
+            StepState.Failed => Icons.Material.Filled.Error,
+            StepState.Skipped => Icons.Material.Filled.SkipNext,
+            _ => Icons.Material.Filled.Circle
+        };
+    }
+
+    private string GetStepTextStyle(Step step)
+    {
+        if (!_stepStates.ContainsKey(step)) return "color: var(--mud-palette-text-disabled);";
+        return _stepStates[step] switch
+        {
+            StepState.Completed => "font-weight: 600;",
+            StepState.InProgress => "font-weight: 700;",
+            StepState.Failed => "font-weight: 600; color: var(--mud-palette-error);",
+            _ => "color: var(--mud-palette-text-disabled);"
+        };
+    }
+
+    private void ViewCustomer()
+    {
+        MudDialog.Close(DialogResult.Ok(_customerId));
+    }
+
+    private void Close()
+    {
+        MudDialog.Close(DialogResult.Cancel());
+    }
+}

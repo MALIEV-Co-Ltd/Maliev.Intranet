@@ -129,6 +129,35 @@ public class InternalNoteResponse
 }
 
 /// <summary>
+/// Request model for creating an internal note.
+/// </summary>
+public class CreateInternalNoteRequest
+{
+    [Required]
+    public string OwnerType { get; set; } = string.Empty;
+    
+    [Required]
+    public Guid OwnerId { get; set; }
+    
+    [Required]
+    [StringLength(5000)]
+    public string NoteText { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Request model for updating an internal note.
+/// </summary>
+public class UpdateInternalNoteRequest
+{
+    [Required]
+    [StringLength(5000)]
+    public string NoteText { get; set; } = string.Empty;
+    
+    [Required]
+    public byte[] Version { get; set; } = [];
+}
+
+/// <summary>
 /// Request model for creating a document.
 /// </summary>
 public class CreateDocumentRequest
@@ -175,13 +204,54 @@ public class DocumentResponse
     public string FileName { get; set; } = string.Empty;
     public long FileSize { get; set; }
     public string MimeType { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = string.Empty;
+    public string? CreatedByName { get; set; }
+    public string? CreatedByEmail { get; set; }
     public string? Description { get; set; }
     public int? DisplayOrder { get; set; }
     public bool IsActive { get; set; }
-    public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+
     public DateTime UpdatedAt { get; set; }
-    public byte[] Version { get; set; } = [];
+    public int Version { get; set; }
+    public byte[] RowVersion { get; set; } = [];
+}
+
+/// <summary>
+/// Request model for creating a new address.
+/// </summary>
+public class CreateAddressRequest
+{
+    public Guid? Id { get; set; }
+    
+    [Required]
+    public string Type { get; set; } = "Billing";
+    
+    public bool IsDefault { get; set; } = true;
+    
+    [Required]
+    public string AddressLine1 { get; set; } = string.Empty;
+    
+    public string? AddressLine2 { get; set; }
+    public string? AddressLine3 { get; set; }
+    public string? District { get; set; }
+    
+    [Required]
+    public string City { get; set; } = string.Empty;
+    
+    [Required]
+    public string StateProvince { get; set; } = string.Empty;
+    
+    [Required]
+    public string PostalCode { get; set; } = string.Empty;
+    
+    [Required]
+    public Guid CountryId { get; set; }
+
+    public string? RecipientName { get; set; }
+    public string? RecipientPhone { get; set; }
+
+    public byte[]? Version { get; set; }
 }
 
 /// <summary>
@@ -198,18 +268,18 @@ public class CreateCustomerRequest
     public string LastName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Email is required")]
-    [EmailAddress]
+    [EmailAddress(ErrorMessage = "Invalid email format")]
     [StringLength(255)]
     public string Email { get; set; } = string.Empty;
 
-    [Phone]
+    [RegularExpression(@"^$|^[+]?[0-9\s-]{7,20}$", ErrorMessage = "Invalid phone format")]
     [StringLength(20)]
     public string? Mobile { get; set; }
 
     [StringLength(10)]
     public string? Extension { get; set; }
 
-    [Phone]
+    [RegularExpression(@"^$|^[+]?[0-9\s-]{7,20}$", ErrorMessage = "Invalid phone format")]
     [StringLength(20)]
     public string? Landline { get; set; }
 
@@ -253,18 +323,18 @@ public class UpdateCustomerRequest
     public string LastName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Email is required")]
-    [EmailAddress]
+    [EmailAddress(ErrorMessage = "Invalid email format")]
     [StringLength(255)]
     public string Email { get; set; } = string.Empty;
 
-    [Phone]
+    [RegularExpression(@"^$|^[+]?[0-9\s-]{7,20}$", ErrorMessage = "Invalid phone format")]
     [StringLength(20)]
     public string? Mobile { get; set; }
 
     [StringLength(10)]
     public string? Extension { get; set; }
 
-    [Phone]
+    [RegularExpression(@"^$|^[+]?[0-9\s-]{7,20}$", ErrorMessage = "Invalid phone format")]
     [StringLength(20)]
     public string? Landline { get; set; }
 
@@ -321,6 +391,17 @@ public class CustomerResponse
 }
 
 /// <summary>
+/// Request model for creating an NDA record.
+/// </summary>
+public class CreateNDARequest
+{
+    public DateTime? ExpiresAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string? FileReference { get; set; }
+    public string? FileName { get; set; }
+}
+
+/// <summary>
 /// Composite request for customer onboarding.
 /// </summary>
 public class CustomerOnboardingRequest
@@ -341,6 +422,26 @@ public class CustomerOnboardingRequest
     /// NDA documents have DocumentCategory = "NDA".
     /// </summary>
     public List<CreateDocumentRequest> Documents { get; set; } = [];
+}
+
+/// <summary>
+/// Request for the NDA creation step during onboarding.
+/// </summary>
+public class CreateNdaStepRequest
+{
+    [Required]
+    public CreateNDARequest Nda { get; set; } = new();
+
+    public List<DocumentResponse> Documents { get; set; } = [];
+}
+
+/// <summary>
+/// Response model for email existence check.
+/// </summary>
+public class EmailExistsResponse
+{
+    public bool Exists { get; set; }
+    public string? Email { get; set; }
 }
 
 /// <summary>
@@ -437,4 +538,53 @@ public class ExtractedAddress
     /// </summary>
     [JsonPropertyName("location")]
     public RegistryThaiLocation? Location { get; set; }
+}
+
+/// <summary>
+/// Represents a search result for a company.
+/// </summary>
+public class CompanySearchResultDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? VatNumber { get; set; }
+    public string? RegistrationNumber { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public string Segment { get; set; } = string.Empty;
+    public string Tier { get; set; } = string.Empty;
+    public AddressResponse? DefaultBillingAddress { get; set; }
+}
+
+/// <summary>
+/// Represents a company response.
+/// </summary>
+public class CompanyResponse
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? VatNumber { get; set; }
+    public string? RegistrationNumber { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public string Segment { get; set; } = string.Empty;
+    public string Tier { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public byte[] Version { get; set; } = [];
+}
+
+/// <summary>
+/// Represents a company summary.
+/// </summary>
+public class CompanySummaryDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? VatNumber { get; set; }
+    public string? RegistrationNumber { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public string Segment { get; set; } = string.Empty;
+    public string Tier { get; set; } = string.Empty;
 }

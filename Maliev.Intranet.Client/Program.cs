@@ -15,6 +15,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthentication
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<IReferenceDataService, ClientReferenceDataService>();
+builder.Services.AddSingleton<IMarkdownService, MarkdownService>();
 builder.Services.AddMudServices();
 
 

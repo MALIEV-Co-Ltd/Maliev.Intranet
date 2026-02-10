@@ -1,0 +1,155 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+
+<MudPaper Elevation="0" Class="d-flex rounded-xl border-solid border-1 mud-border-lines-default overflow-hidden" Style="height: 700px;">
+    <!-- Sidebar List -->
+    <div class="d-flex flex-column border-solid border-r-1 mud-border-lines-default" style="width: 350px; min-width: 350px;">
+        <div class="pa-4 border-solid border-b-1 mud-border-lines-default">
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search documents..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Small" 
+                          Variant="Variant.Outlined" 
+                          Margin="Margin.Dense" 
+                          Clearable="true" />
+        </div>
+        
+        <div class="flex-grow-1 overflow-y-auto pa-2">
+            <MudList T="DocumentResponse" SelectedValue="@SelectedDocument" SelectedValueChanged="OnDocumentSelected">
+                @foreach (var doc in FilteredDocuments)
+                {
+                    <MudListItem Value="@doc" Class="rounded-lg mb-1">
+                        <div class="d-flex align-center gap-3">
+                            <MudIcon Icon="@GetDocumentIcon(doc.MimeType)" Color="@GetDocumentColor(doc.MimeType)" Size="Size.Medium" />
+                            <div class="d-flex flex-column flex-grow-1 min-width-0">
+                                <MudText Typo="Typo.body2" Style="font-weight: 700;" Class="text-truncate">@doc.FileName</MudText>
+                                <div class="d-flex align-center gap-2">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(doc.FileSize)</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">•</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
+                                </div>
+                            </div>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+            
+            @if (!FilteredDocuments.Any())
+            {
+                <div class="d-flex flex-column align-center justify-center pa-8 mt-4 text-center opacity-50">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Class="mb-2" />
+                    <MudText Typo="Typo.body2">No documents found</MudText>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Preview Area -->
+    <div class="flex-grow-1 d-flex flex-column" style="background-color: #f0f2f5;">
+        @if (SelectedDocument != null)
+        {
+            <div class="pa-3 px-6 border-solid border-b-1 mud-border-lines-default d-flex align-center justify-space-between mud-bg-surface">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    <MudIcon Icon="@GetDocumentIcon(SelectedDocument.MimeType)" Color="@GetDocumentColor(SelectedDocument.MimeType)" />
+                    <div class="d-flex flex-column">
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">@SelectedDocument.FileName</MudText>
+                        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                            <MudAvatar Size="Size.Small" Color="Color.Primary" Style="width: 16px; height: 16px; font-size: 0.6rem;">
+                                @((SelectedDocument.CreatedByName ?? "S")[0])
+                            </MudAvatar>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Uploaded by @(SelectedDocument.CreatedByName ?? "System") • @SelectedDocument.CreatedAt.ToLocalTime().ToString("g")
+                            </MudText>
+                        </MudStack>
+                    </div>
+                </MudStack>
+                <MudStack Row="true" Spacing="1">
+                    <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" OnClick="@(() => OnDownload.InvokeAsync(SelectedDocument.FileReference))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" OnClick="@(() => OnDownload.InvokeAsync(SelectedDocument.FileReference))" />
+                </MudStack>
+            </div>
+
+            <div class="flex-grow-1 relative d-flex align-center justify-center pa-10">
+                @if (_loadingPreview)
+                {
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                }
+                else if (!string.IsNullOrEmpty(_previewUrl))
+                {
+                    @if (SelectedDocument.MimeType.Contains("pdf"))
+                    {
+                        <div class="w-100 h-100 mud-elevation-12 rounded-lg overflow-hidden bg-white">
+                            <iframe src="@_previewUrl" style="width: 100%; height: 100%; border: none;"></iframe>
+                        </div>
+                    }
+                    else if (SelectedDocument.MimeType.Contains("image"))
+                    {
+                        <div class="pa-4 d-flex align-center justify-center h-100 w-100">
+                            <img src="@_previewUrl" style="max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: var(--mud-elevation-25); border-radius: 8px; background-color: white;" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column align-center justify-center pa-12 text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Large" Color="Color.Default" Class="mb-4 opacity-50" />
+                            <MudText Typo="Typo.h6">Preview not available</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">This file type (@Path.GetExtension(SelectedDocument.FileName)) cannot be previewed in the browser.</MudText>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => OnDownload.InvokeAsync(SelectedDocument.FileReference))">
+                                Download to View
+                            </MudButton>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text">Failed to load preview URL</MudAlert>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="flex-grow-1 d-flex flex-column align-center justify-center opacity-50">
+                <MudIcon Icon="@Icons.Material.Filled.Description" Style="font-size: 80px;" Class="mb-4" />
+                <MudText Typo="Typo.h6">Select a document to preview</MudText>
+            </div>
+        }
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter] public List<DocumentResponse> Documents { get; set; } = [];
+    [Parameter] public EventCallback<string> OnDownload { get; set; }
+    [Parameter] public Func<string, Task<string?>> GetPreviewUrlFunc { get; set; } = default!;
+
+    private DocumentResponse? SelectedDocument;
+    private string _searchString = "";
+    private string? _previewUrl;
+    private bool _loadingPreview;
+
+    private IEnumerable<DocumentResponse> FilteredDocuments => 
+        Documents.Where(d => string.IsNullOrEmpty(_searchString) || d.FileName.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    private async Task OnDocumentSelected(DocumentResponse? doc)
+    {
+        SelectedDocument = doc;
+        _previewUrl = null;
+        
+        if (doc != null && (doc.MimeType.Contains("pdf") || doc.MimeType.Contains("image")))
+        {
+            _loadingPreview = true;
+            try
+            {
+                _previewUrl = await GetPreviewUrlFunc(doc.FileReference);
+            }
+            finally
+            {
+                _loadingPreview = false;
+            }
+        }
+    }
+
+    private string GetDocumentIcon(string mimeType) => mimeType.Contains("pdf") ? Icons.Custom.FileFormats.FilePdf : mimeType.Contains("image") ? Icons.Custom.FileFormats.FileImage : Icons.Custom.FileFormats.FileDocument;
+    private Color GetDocumentColor(string mimeType) => mimeType.Contains("pdf") ? Color.Error : mimeType.Contains("image") ? Color.Success : Color.Info;
+    private string FormatFileSize(long bytes) => $"{(bytes / 1024.0 / 1024.0):F2} MB";
+}

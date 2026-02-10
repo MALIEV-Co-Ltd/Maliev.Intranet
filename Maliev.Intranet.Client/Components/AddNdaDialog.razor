@@ -1,0 +1,48 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Gavel" Class="mr-3 mb-n1"/>
+            NDA Settings
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="4">
+            <MudDatePicker Label="Expiration Date" @bind-Date="_expiresAt" Variant="Variant.Outlined" Required="true" />
+            <MudSelect T="string" Label="Status" @bind-Value="_status" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("Draft")">Draft</MudSelectItem>
+                <MudSelectItem Value="@("Signed")">Signed</MudSelectItem>
+                <MudSelectItem Value="@("Expired")">Expired</MudSelectItem>
+                <MudSelectItem Value="@("Revoked")">Revoked</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save Changes</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid CustomerId { get; set; }
+    [Parameter] public NDAResponse ExistingNda { get; set; } = default!;
+
+    private DateTime? _expiresAt;
+    private string _status = "Draft";
+
+    protected override void OnInitialized()
+    {
+        _expiresAt = ExistingNda.ExpiresAt;
+        _status = ExistingNda.Status;
+    }
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(new { ExpiresAt = _expiresAt, Status = _status }));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

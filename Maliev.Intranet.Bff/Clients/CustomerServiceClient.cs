@@ -85,33 +85,55 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             companyAddressesTask = httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Company&ownerId={customer.CompanyId.Value}", ct);
         }
 
-        try { await Task.WhenAll(addressesTask, notesTask, ndasTask, docsTask, companyTask ?? Task.FromResult<CompanySummaryDto?>(null), companyAddressesTask ?? Task.FromResult<List<AddressResponse>?>(null)); }
-        catch (Exception ex) { logger.LogWarning(ex, "Error fetching some related data for customer {CustomerId}", id); }
-
-        customer.Addresses = addressesTask.IsCompletedSuccessfully ? (addressesTask.Result ?? []) : [];
-        customer.Notes = notesTask.IsCompletedSuccessfully ? (notesTask.Result ?? []) : [];
-        customer.Documents = docsTask.IsCompletedSuccessfully ? (docsTask.Result ?? []) : [];
-        
-        if (ndasTask.IsCompletedSuccessfully && ndasTask.Result != null)
-        {
-            customer.Nda = ndasTask.Result.OrderByDescending(n => n.CreatedAt).FirstOrDefault();
+        try 
+        { 
+            await Task.WhenAll(addressesTask, notesTask, ndasTask, docsTask, 
+                              companyTask ?? Task.FromResult<CompanySummaryDto?>(null), 
+                              companyAddressesTask ?? Task.FromResult<List<AddressResponse>?>(null)); 
+        }
+        catch (Exception ex) 
+        { 
+            logger.LogError(ex, "Failed to fetch some related data for customer {CustomerId}", id); 
         }
 
-        if (companyTask != null && companyTask.IsCompletedSuccessfully && companyTask.Result != null)
-        {
-            var company = companyTask.Result;
-            customer.CompanyName = company.Name;
-            customer.CompanyVatNumber = company.VatNumber;
-            customer.CompanyRegistrationNumber = company.RegistrationNumber;
-            customer.CompanyContactEmail = company.ContactEmail;
-            customer.CompanyPhone = company.ContactPhone;
-            customer.CompanySegment = company.Segment;
-            customer.CompanyTier = company.Tier;
+        if (addressesTask.IsCompletedSuccessfully) customer.Addresses = await addressesTask ?? [];
+        else logger.LogWarning("Addresses task failed for customer {CustomerId}", id);
 
-            if (companyAddressesTask != null && companyAddressesTask.IsCompletedSuccessfully)
+        if (notesTask.IsCompletedSuccessfully) customer.Notes = await notesTask ?? [];
+        else logger.LogWarning("Notes task failed for customer {CustomerId}", id);
+
+        if (docsTask.IsCompletedSuccessfully) customer.Documents = await docsTask ?? [];
+        else logger.LogWarning("Documents task failed for customer {CustomerId}", id);
+        
+        if (ndasTask.IsCompletedSuccessfully)
+        {
+            var ndas = await ndasTask;
+            if (ndas != null && ndas.Any())
             {
-                customer.CompanyBillingAddress = companyAddressesTask.Result?.FirstOrDefault(a => a.Type == "Billing" && a.IsDefault) 
-                                              ?? companyAddressesTask.Result?.FirstOrDefault(a => a.Type == "Billing");
+                customer.Nda = ndas.OrderByDescending(n => n.CreatedAt).FirstOrDefault();
+            }
+        }
+        else logger.LogWarning("NDAs task failed for customer {CustomerId}", id);
+
+        if (companyTask != null && companyTask.IsCompletedSuccessfully)
+        {
+            var company = await companyTask;
+            if (company != null)
+            {
+                customer.CompanyName = company.Name;
+                customer.CompanyVatNumber = company.VatNumber;
+                customer.CompanyRegistrationNumber = company.RegistrationNumber;
+                customer.CompanyContactEmail = company.ContactEmail;
+                customer.CompanyPhone = company.ContactPhone;
+                customer.CompanySegment = company.Segment;
+                customer.CompanyTier = company.Tier;
+
+                if (companyAddressesTask != null && companyAddressesTask.IsCompletedSuccessfully)
+                {
+                    var companyAddresses = await companyAddressesTask;
+                    customer.CompanyBillingAddress = companyAddresses?.FirstOrDefault(a => a.Type == "Billing" && a.IsDefault) 
+                                                  ?? companyAddresses?.FirstOrDefault(a => a.Type == "Billing");
+                }
             }
         }
 
@@ -135,6 +157,19 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     public async Task<CustomerResponse?> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct = default)
     {
         var response = await httpClient.PostAsJsonAsync("/customer/v1/customers", request, ct);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<CustomerResponse>(ct);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Updates a customer profile.
+    /// </summary>
+    public async Task<CustomerResponse?> UpdateCustomerAsync(Guid id, object request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", request, ct);
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<CustomerResponse>(ct);
@@ -212,19 +247,19 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         }
 
         // 3. Update addresses
-        // Delete existing and create new (Prototype behavior)
-        // First get existing addresses
-        var existingAddresses = await httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Customer&ownerId={id}", ct);
-        if (existingAddresses != null)
+        var existingAddresses = await httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Customer&ownerId={id}", ct) ?? [];
+        
+        // Find addresses to delete (exist in DB but not in request)
+        var requestAddressIds = request.Addresses.Where(a => a.Id.HasValue).Select(a => a.Id!.Value).ToList();
+        var addressesToDelete = existingAddresses.Where(a => !requestAddressIds.Contains(a.Id)).ToList();
+        
+        foreach (var addr in addressesToDelete)
         {
-            foreach (var addr in existingAddresses)
+            var delReq = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addr.Id}")
             {
-                var delReq = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addr.Id}")
-                {
-                    Content = System.Net.Http.Json.JsonContent.Create(new { version = addr.Version })
-                };
-                await httpClient.SendAsync(delReq, ct);
-            }
+                Content = System.Net.Http.Json.JsonContent.Create(new { version = addr.Version })
+            };
+            await httpClient.SendAsync(delReq, ct);
         }
 
         foreach (var address in request.Addresses)
@@ -244,12 +279,32 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 postalCode = address.PostalCode,
                 countryId = address.CountryId,
                 recipientName = address.RecipientName,
-                recipientPhone = address.RecipientPhone
+                recipientPhone = address.RecipientPhone,
+                version = address.Version
             };
-            await httpClient.PostAsJsonAsync("/customer/v1/addresses", addrReq, ct);
+
+            if (address.Id.HasValue)
+            {
+                // Update existing
+                await httpClient.PatchAsJsonAsync($"/customer/v1/addresses/{address.Id.Value}", addrReq, ct);
+            }
+            else
+            {
+                // Create new
+                await httpClient.PostAsJsonAsync("/customer/v1/addresses", addrReq, ct);
+            }
         }
 
         return updatedCustomer;
+    }
+
+    /// <summary>
+    /// Updates the status of an NDA record.
+    /// </summary>
+    public async Task<bool> UpdateNdaStatusAsync(Guid ndaId, string status, CancellationToken ct = default)
+    {
+        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/ndas/{ndaId}/status", new { status }, ct);
+        return response.IsSuccessStatusCode;
     }
 
     /// <summary>
@@ -306,13 +361,15 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         var createdCustomer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>(ct);
         if (createdCustomer == null) return null;
 
+        var newCustomerId = createdCustomer.Id;
+
         // 3. Create internal note if provided
         if (!string.IsNullOrWhiteSpace(request.InternalNote))
         {
             var noteReq = new
             {
                 ownerType = "Customer",
-                ownerId = createdCustomer.Id,
+                ownerId = newCustomerId,
                 noteText = request.InternalNote
             };
             await httpClient.PostAsJsonAsync("/customer/v1/internal-notes", noteReq, ct);
@@ -321,10 +378,11 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         // 4. Create addresses
         foreach (var address in request.Addresses)
         {
-            var addrReq = new 
+            // Use the microservice's expected polymorphic structure with the confirmed newCustomerId
+            var response = await httpClient.PostAsJsonAsync("/customer/v1/addresses", new
             {
                 ownerType = "Customer",
-                ownerId = createdCustomer.Id,
+                ownerId = newCustomerId,
                 type = address.Type,
                 isDefault = address.IsDefault,
                 addressLine1 = address.AddressLine1,
@@ -337,12 +395,14 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 countryId = address.CountryId,
                 recipientName = address.RecipientName,
                 recipientPhone = address.RecipientPhone
-            };
-            var addrResponse = await httpClient.PostAsJsonAsync("/customer/v1/addresses", addrReq, ct);
-            if (!addrResponse.IsSuccessStatusCode)
+            }, ct);
+
+            if (!response.IsSuccessStatusCode)
             {
-                var errorBody = await addrResponse.Content.ReadAsStringAsync(ct);
-                logger.LogError("Address creation failed ({StatusCode}): {ErrorBody}", addrResponse.StatusCode, errorBody);
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("Address creation failed for customer {CustomerId} ({StatusCode}): {ErrorBody}",
+                    newCustomerId, response.StatusCode, errorBody);
+                throw new HttpRequestException(ExtractErrorMessage(errorBody, "Address creation failed"), null, response.StatusCode);
             }
         }
 
@@ -350,7 +410,7 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         if (request.Documents.Any())
         {
             var createdDocuments = await CreateDocumentsAsync(
-                "Customer", createdCustomer.Id, request.Documents, ct);
+                "Customer", newCustomerId, request.Documents, ct);
 
             // 5a. If NDA is active, link the signed document
             if (request.Nda != null && request.Nda.IsActive)
@@ -361,7 +421,7 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
 
                 var ndaReq = new
                 {
-                    customerId = createdCustomer.Id,
+                    customerId = newCustomerId,
                     documentReferenceId = signedNdaDoc?.Id,
                     expiresAt = request.Nda.ExpiresAt
                 };
@@ -388,6 +448,178 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
+    /// Creates company (if provided), customer, and internal note.
+    /// Returns the created customer with ID.
+    /// </summary>
+    public async Task<CustomerResponse?> CreateBasicAsync(CustomerOnboardingRequest request, CancellationToken ct = default)
+    {
+        Guid? companyId = request.Customer.CompanyId;
+
+        // 1. Create company if provided
+        if (request.NewCompany != null)
+        {
+            var companyResponse = await httpClient.PostAsJsonAsync("/customer/v1/companies", request.NewCompany, ct);
+            if (companyResponse.IsSuccessStatusCode)
+            {
+                var company = await companyResponse.Content.ReadFromJsonAsync<CompanySummaryDto>(ct);
+                companyId = company?.Id;
+            }
+            else
+            {
+                var errorBody = await companyResponse.Content.ReadAsStringAsync(ct);
+                logger.LogError("Company creation failed ({StatusCode}): {ErrorBody}", companyResponse.StatusCode, errorBody);
+
+                string message = "Company creation failed";
+                try
+                {
+                    var apiErr = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(errorBody, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (apiErr != null && !string.IsNullOrEmpty(apiErr.Message)) message = apiErr.Message;
+                }
+                catch { }
+
+                throw new HttpRequestException(message, null, companyResponse.StatusCode);
+            }
+        }
+
+        // 2. Create customer
+        request.Customer.CompanyId = companyId;
+        var customerResponse = await httpClient.PostAsJsonAsync("/customer/v1/customers", request.Customer, ct);
+        if (!customerResponse.IsSuccessStatusCode)
+        {
+            var errorBody = await customerResponse.Content.ReadAsStringAsync(ct);
+            logger.LogError("Customer creation failed ({StatusCode}): {ErrorBody}", customerResponse.StatusCode, errorBody);
+
+            string message = "Customer creation failed";
+            try
+            {
+                var apiErr = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(errorBody, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiErr != null && !string.IsNullOrEmpty(apiErr.Message)) message = apiErr.Message;
+            }
+            catch { }
+
+            throw new HttpRequestException(message, null, customerResponse.StatusCode);
+        }
+
+        var createdCustomer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>(ct);
+        if (createdCustomer == null) return null;
+
+        // 3. Create internal note if provided
+        if (!string.IsNullOrWhiteSpace(request.InternalNote))
+        {
+            var noteReq = new
+            {
+                ownerType = "Customer",
+                ownerId = createdCustomer.Id,
+                noteText = request.InternalNote
+            };
+            await httpClient.PostAsJsonAsync("/customer/v1/internal-notes", noteReq, ct);
+        }
+
+        return createdCustomer;
+    }
+
+    /// <summary>
+    /// Creates addresses for a customer.
+    /// </summary>
+    public async Task<List<AddressResponse>> CreateAddressesAsync(Guid customerId, List<CreateAddressRequest> addresses, CancellationToken ct = default)
+    {
+        var results = new List<AddressResponse>();
+
+        foreach (var address in addresses)
+        {
+            var response = await httpClient.PostAsJsonAsync("/customer/v1/addresses", new
+            {
+                ownerType = "Customer",
+                ownerId = customerId,
+                type = address.Type,
+                isDefault = address.IsDefault,
+                addressLine1 = address.AddressLine1,
+                addressLine2 = address.AddressLine2,
+                addressLine3 = address.AddressLine3,
+                district = address.District,
+                city = address.City,
+                stateProvince = address.StateProvince,
+                postalCode = address.PostalCode,
+                countryId = address.CountryId,
+                recipientName = address.RecipientName,
+                recipientPhone = address.RecipientPhone
+            }, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("Address creation failed for customer {CustomerId} ({StatusCode}): {ErrorBody}",
+                    customerId, response.StatusCode, errorBody);
+                throw new HttpRequestException(ExtractErrorMessage(errorBody, "Address creation failed"), null, response.StatusCode);
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<AddressResponse>(ct);
+            if (result != null) results.Add(result);
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Creates NDA for a customer, linking documents if available.
+    /// </summary>
+    public async Task CreateNdaWithDocumentsAsync(Guid customerId, CreateNDARequest nda, List<DocumentResponse> documents, CancellationToken ct = default)
+    {
+        var signedNdaDoc = documents
+            .FirstOrDefault(d => d.DocumentCategory == "NDA" && d.DocumentSubType == "Signed");
+
+        var ndaReq = new
+        {
+            customerId,
+            documentReferenceId = signedNdaDoc?.Id,
+            expiresAt = nda.ExpiresAt
+        };
+
+        var ndaResponse = await httpClient.PostAsJsonAsync("/customer/v1/ndas", ndaReq, ct);
+        if (!ndaResponse.IsSuccessStatusCode)
+        {
+            var errorBody = await ndaResponse.Content.ReadAsStringAsync(ct);
+            logger.LogError("NDA creation failed for customer {CustomerId} ({StatusCode}): {ErrorBody}",
+                customerId, ndaResponse.StatusCode, errorBody);
+            throw new HttpRequestException(ExtractErrorMessage(errorBody, "NDA creation failed"), null, ndaResponse.StatusCode);
+        }
+
+        // Update status to Signed
+        var ndaJson = await ndaResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(ct);
+        if (ndaJson.ValueKind != System.Text.Json.JsonValueKind.Undefined &&
+            ndaJson.TryGetProperty("id", out var ndaIdProp) &&
+            ndaJson.TryGetProperty("version", out var versionProp))
+        {
+            Guid ndaId = ndaIdProp.GetGuid();
+            await httpClient.PatchAsJsonAsync(
+                $"/customer/v1/ndas/{ndaId}/status",
+                new { status = "Signed", version = versionProp.GetString() }, ct);
+        }
+    }
+
+    /// <summary>
+    /// Extracts a clean error message from a downstream API error response body.
+    /// Falls back to the provided default message if parsing fails.
+    /// </summary>
+    private static string ExtractErrorMessage(string errorBody, string fallback)
+    {
+        try
+        {
+            var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(errorBody);
+            if (json.TryGetProperty("error", out var errorProp) && errorProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                return errorProp.GetString() ?? fallback;
+            if (json.TryGetProperty("message", out var msgProp) && msgProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                return msgProp.GetString() ?? fallback;
+            if (json.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                return titleProp.GetString() ?? fallback;
+        }
+        catch { }
+
+        // If not JSON or no known field, return fallback
+        return fallback;
+    }
+
+    /// <summary>
     /// Creates multiple documents for an owner.
     /// </summary>
     /// <param name="ownerType">Type of owner (e.g., "Customer", "Company").</param>
@@ -409,14 +641,9 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             {
                 ownerType,
                 ownerId,
-                documentCategory = doc.DocumentCategory,
-                documentSubType = doc.DocumentSubType,
+                documentType = doc.DocumentCategory, // Corrected mapping
                 fileReference = doc.FileReference,
-                fileName = doc.FileName,
-                fileSize = doc.FileSize,
-                mimeType = doc.MimeType,
-                description = doc.Description,
-                displayOrder = doc.DisplayOrder
+                filename = doc.FileName // Corrected casing
             };
 
             var response = await httpClient.PostAsJsonAsync("/customer/v1/documents", docReq, ct);
@@ -459,17 +686,17 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// Deletes a document.
     /// </summary>
     /// <param name="documentId">The document ID.</param>
-    /// <param name="version">The document version for optimistic concurrency.</param>
+    /// <param name="rowVersion">The document row version for optimistic concurrency.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>True if successful, false otherwise.</returns>
     public async Task<bool> DeleteDocumentAsync(
         Guid documentId,
-        byte[] version,
+        byte[] rowVersion,
         CancellationToken ct = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/documents/{documentId}")
         {
-            Content = System.Net.Http.Json.JsonContent.Create(new { version })
+            Content = System.Net.Http.Json.JsonContent.Create(new { version = rowVersion })
         };
 
         var response = await httpClient.SendAsync(request, ct);
@@ -539,6 +766,41 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         var url = $"/customer/v1/customers/check-email?email={Uri.EscapeDataString(email.Trim())}";
         var response = await httpClient.GetFromJsonAsync<EmailExistsResponse>(url, ct);
         return response?.Exists ?? false;
+    }
+
+    /// <summary>
+    /// Creates an internal note for a customer or company.
+    /// </summary>
+    public async Task<InternalNoteResponse?> CreateInternalNoteAsync(CreateInternalNoteRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/customer/v1/internal-notes", request, ct);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<InternalNoteResponse>(ct);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Updates an existing internal note.
+    /// </summary>
+    public async Task<InternalNoteResponse?> UpdateInternalNoteAsync(Guid id, UpdateInternalNoteRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/internal-notes/{id}", request, ct);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<InternalNoteResponse>(ct);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Deletes an internal note.
+    /// </summary>
+    public async Task<bool> DeleteInternalNoteAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync($"/customer/v1/internal-notes/{id}", ct);
+        return response.IsSuccessStatusCode;
     }
 }
 

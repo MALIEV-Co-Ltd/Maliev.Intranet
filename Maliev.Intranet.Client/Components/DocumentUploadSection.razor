@@ -161,12 +161,13 @@
                     {
                         DocumentCategory = finalCategory,
                         DocumentSubType = SelectedSubType,
-                        FileReference = result.StoragePath ?? result.FileReference,
+                        FileReference = result.UploadId,
                         FileName = result.FileName,
-                        FileSize = result.Size,
+                        FileSize = result.FileSize,
                         MimeType = GetMimeType(result.FileName),
                         Description = Description
                     });
+
                 }
 
                 Snackbar.Add($"Successfully uploaded {uploadedDocs.Count} file(s)", Severity.Success);

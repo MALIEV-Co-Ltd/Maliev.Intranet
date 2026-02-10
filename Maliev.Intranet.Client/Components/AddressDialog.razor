@@ -1,0 +1,287 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@(Address.Type == "Billing" ? Icons.Material.Filled.ReceiptLong : Icons.Material.Filled.LocalShipping)" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@(IsNew ? "Add" : "Edit") @Address.Type Address</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" Model="@Address">
+            <MudStack Spacing="4">
+                <!-- Type and Default Toggle -->
+                <MudPaper Elevation="0" Class="pa-4 mud-bg-surface-light rounded-xl border-solid border-1 mud-border-lines-default">
+                    <MudGrid Spacing="2" Justify="Justify.Center">
+                        <MudItem xs="12" sm="7">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Secondary">ADDRESS TYPE</MudText>
+                                <MudToggleGroup T="string" Value="@Address.Type" ValueChanged="@OnTypeChanged" 
+                                                SelectionMode="SelectionMode.SingleSelection" Color="Color.Primary" 
+                                                CheckMark="false" FixedContent="true" Class="rounded-lg">
+                                    <MudToggleItem Value="@("Billing")" Text="Billing" UnselectedIcon="@Icons.Material.Filled.ReceiptLong" SelectedIcon="@Icons.Material.Filled.ReceiptLong" />
+                                    <MudToggleItem Value="@("Shipping")" Text="Shipping" UnselectedIcon="@Icons.Material.Filled.LocalShipping" SelectedIcon="@Icons.Material.Filled.LocalShipping" />
+                                </MudToggleGroup>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" sm="5">
+                            <MudStack AlignItems="AlignItems.Start" Spacing="0">
+                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Secondary">PRIMARY STATUS</MudText>
+                                <MudSwitch T="bool" @bind-Value="Address.IsDefault" Color="Color.Success" 
+                                           Label="@(Address.IsDefault ? $"Default {Address.Type}" : "Set as Default")" />
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+
+                <MudGrid Spacing="3">
+                    @if (Address.Type == "Billing")
+                    {
+                        @if (HasCompany)
+                        {
+                            <MudItem xs="12">
+                                <MudTextField T="string" Label="Company Name" Value="@CompanyName" Variant="Variant.Outlined" ReadOnly="true" Disabled="true" Margin="Margin.Dense" />
+                            </MudItem>
+                        }
+                        else
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudTextField T="string" Label="Customer Name" Value="@CustomerName" Variant="Variant.Outlined" ReadOnly="true" Disabled="true" Margin="Margin.Dense" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField T="string" Label="Customer Mobile" Value="@CustomerMobile" Variant="Variant.Outlined" ReadOnly="true" Disabled="true" Margin="Margin.Dense" />
+                            </MudItem>
+                        }
+                    }
+
+                    @if (Address.Type == "Shipping")
+                    {
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string" Label="Recipient Name" @bind-Value="Address.RecipientName" Variant="Variant.Outlined" Placeholder="@CustomerName" Margin="Margin.Dense" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string" Label="Recipient Phone" @bind-Value="Address.RecipientPhone" Variant="Variant.Outlined" Placeholder="@CustomerMobile" Margin="Margin.Dense" />
+                        </MudItem>
+                    }
+
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="Address Line 1" @bind-Value="Address.AddressLine1" Variant="Variant.Outlined" Required="true" Placeholder="House/building number, street" Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="Address Line 2 (Optional)" @bind-Value="Address.AddressLine2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="Address Line 3 (Optional)" @bind-Value="Address.AddressLine3" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudAutocomplete T="RegistryThaiLocation"
+                                         Label="District/Subdistrict"
+                                         Value="@SelectedLocation"
+                                         SearchFunc="@SearchLocations"
+                                         ToStringFunc="@GetLocationString"
+                                         Variant="Variant.Outlined"
+                                         Clearable="true"
+                                         CoerceText="true"
+                                         CoerceValue="false"
+                                         ResetValueOnEmptyText="true"
+                                         DebounceInterval="500"
+                                         MinCharacters="2"
+                                         Margin="Margin.Dense"
+                                         ValueChanged="@OnLocationSelected"
+                                         Validation="@(new Func<RegistryThaiLocation?, string?>(v => string.IsNullOrEmpty(Address.District) ? "Required" : null))"
+                                        >
+                            <ItemTemplate Context="loc">
+                                <div class="py-1">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                                </div>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudAutocomplete T="RegistryThaiLocation"
+                                         Label="City/District"
+                                         Value="@SelectedLocation"
+                                         SearchFunc="@SearchLocations"
+                                         ToStringFunc="@GetCityString"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         Validation="@(new Func<RegistryThaiLocation?, string?>(v => string.IsNullOrEmpty(Address.City) ? "Required" : null))"
+                                         Clearable="true"
+                                         CoerceText="true"
+                                         CoerceValue="false"
+                                         ResetValueOnEmptyText="true"
+                                         DebounceInterval="500"
+                                         MinCharacters="2"
+                                         ValueChanged="@OnLocationSelected"
+                                        >
+                            <ItemTemplate Context="loc">
+                                <div class="py-1">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                                </div>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudAutocomplete T="RegistryThaiLocation"
+                                         Label="State/Province"
+                                         Value="@SelectedLocation"
+                                         SearchFunc="@SearchLocations"
+                                         ToStringFunc="@GetProvinceString"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         Validation="@(new Func<RegistryThaiLocation?, string?>(v => string.IsNullOrEmpty(Address.StateProvince) ? "Required" : null))"
+                                         Clearable="true"
+                                         CoerceText="true"
+                                         CoerceValue="false"
+                                         ResetValueOnEmptyText="true"
+                                         DebounceInterval="500"
+                                         MinCharacters="2"
+                                         ValueChanged="@OnLocationSelected"
+                                        >
+                            <ItemTemplate Context="loc">
+                                <div class="py-1">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                                </div>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudAutocomplete T="RegistryThaiLocation"
+                                         Label="Postal Code"
+                                         Value="@SelectedLocation"
+                                         SearchFunc="@SearchLocations"
+                                         ToStringFunc="@(l => l?.PostalCode ?? (Address.PostalCode ?? string.Empty))"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         Validation="@(new Func<RegistryThaiLocation?, string?>(v => string.IsNullOrEmpty(Address.PostalCode) ? "Required" : null))"
+                                         Clearable="true"
+                                         CoerceText="true"
+                                         CoerceValue="false"
+                                         ResetValueOnEmptyText="true"
+                                         DebounceInterval="500"
+                                         MinCharacters="2"
+                                         ValueChanged="@OnLocationSelected"
+                                        >
+                            <ItemTemplate Context="loc">
+                                <div class="py-1">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 500;">@loc.PostalCode</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh}, {loc.DistrictTh}, {loc.ProvinceTh}")</MudText>
+                                </div>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudAutocomplete T="CountryDto"
+                                         Label="Country"
+                                         Value="@SelectedCountry"
+                                         SearchFunc="@SearchCountries"
+                                         ToStringFunc="@(c => c?.Name ?? string.Empty)"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         Required="true"
+                                         ValueChanged="@OnCountryChanged"
+                                         />
+                    </MudItem>
+                </MudGrid>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Class="px-8">Save Changes</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public CreateAddressRequest Address { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public bool HasCompany { get; set; }
+    [Parameter] public string? CompanyName { get; set; }
+    [Parameter] public string? CustomerName { get; set; }
+    [Parameter] public string? CustomerMobile { get; set; }
+    [Parameter] public List<CountryDto> AllCountries { get; set; } = [];
+    [Parameter] public Func<string?, CancellationToken, Task<IEnumerable<RegistryThaiLocation>>> SearchLocations { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private CountryDto? SelectedCountry;
+    private RegistryThaiLocation? SelectedLocation;
+
+    protected override void OnInitialized()
+    {
+        SelectedCountry = AllCountries.FirstOrDefault(c => c.Id == Address.CountryId);
+        
+        if (!string.IsNullOrEmpty(Address.District) || !string.IsNullOrEmpty(Address.City))
+        {
+            SelectedLocation = new RegistryThaiLocation
+            {
+                SubDistrictTh = Address.District ?? string.Empty,
+                SubDistrictEn = Address.District ?? string.Empty,
+                DistrictTh = Address.City ?? string.Empty,
+                DistrictEn = Address.City ?? string.Empty,
+                ProvinceTh = Address.StateProvince ?? string.Empty,
+                ProvinceEn = Address.StateProvince ?? string.Empty,
+                PostalCode = Address.PostalCode ?? string.Empty
+            };
+        }
+    }
+
+    private void OnTypeChanged(string type)
+    {
+        Address.Type = type;
+    }
+
+    private void OnLocationSelected(RegistryThaiLocation? location)
+    {
+        if (location == null) return;
+        SelectedLocation = location;
+        
+        var useThai = IsThai(Address.AddressLine1) || IsThai(Address.District);
+        
+        Address.District = useThai ? location.SubDistrictTh : location.SubDistrictEn;
+        Address.City = useThai ? location.DistrictTh : location.DistrictEn;
+        Address.StateProvince = useThai ? location.ProvinceTh : location.ProvinceEn;
+        Address.PostalCode = location.PostalCode;
+        
+        var thai = AllCountries.FirstOrDefault(c => c.Code == "TH");
+        if (thai != null) OnCountryChanged(thai);
+    }
+
+    private void OnCountryChanged(CountryDto? country)
+    {
+        SelectedCountry = country;
+        if (country != null) Address.CountryId = country.Id;
+    }
+
+    private Task<IEnumerable<CountryDto>> SearchCountries(string? query, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(query)) return Task.FromResult<IEnumerable<CountryDto>>(AllCountries);
+        return Task.FromResult(AllCountries.Where(c => c.Name.Contains(query, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private string GetLocationString(RegistryThaiLocation? l) => l != null ? (IsThai(Address.District) ? l.SubDistrictTh : l.SubDistrictEn) : (Address.District ?? string.Empty);
+    private string GetCityString(RegistryThaiLocation? l) => l != null ? (IsThai(Address.City) ? l.DistrictTh : l.DistrictEn) : (Address.City ?? string.Empty);
+    private string GetProvinceString(RegistryThaiLocation? l) => l != null ? (IsThai(Address.StateProvince) ? l.ProvinceTh : l.ProvinceEn) : (Address.StateProvince ?? string.Empty);
+
+    private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (_form.IsValid) MudDialog.Close(DialogResult.Ok(Address));
+        else Snackbar.Add("Please fill in all required fields correctly.", Severity.Warning);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

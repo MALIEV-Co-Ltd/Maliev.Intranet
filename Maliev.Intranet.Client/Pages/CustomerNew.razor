@@ -61,12 +61,12 @@
                                                Placeholder="jane.cooper@company.com" Adornment="Adornment.Start" 
                                                AdornmentIcon="@Icons.Material.Filled.Email" Immediate="true" />
                              </MudItem>
-                             <MudItem xs="12" sm="6">
-                                 <MudTextField T="string" Label="Mobile Number" @bind-Value="_customerData.Customer.Mobile" Variant="Variant.Outlined" Placeholder="+66 81 234-5678" />
-                             </MudItem>
-                             <MudItem xs="12" sm="6">
-                                 <MudTextField T="string" Label="Landline" @bind-Value="_customerData.Customer.Landline" Variant="Variant.Outlined" Placeholder="+66 2 123-4567" />
-                             </MudItem>
+                              <MudItem xs="12" sm="6">
+                                  <MudTextField T="string" Label="Mobile Number" @bind-Value="_customerData.Customer.Mobile" Variant="Variant.Outlined" Placeholder="+66 81 234-5678" Immediate="true" />
+                              </MudItem>
+                              <MudItem xs="12" sm="6">
+                                  <MudTextField T="string" Label="Landline" @bind-Value="_customerData.Customer.Landline" Variant="Variant.Outlined" Placeholder="+66 2 123-4567" Immediate="true" />
+                              </MudItem>
                              <MudItem xs="12" sm="6">
                                  <MudSelect T="string" Label="Segment" @bind-Value="_customerData.Customer.Segment" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
                                      <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
@@ -465,10 +465,24 @@
             _newCompany.Name = extracted.CompanyName;
             if (!string.IsNullOrWhiteSpace(extracted.VatNumber)) _newCompany.VatNumber = extracted.VatNumber;
             if (!string.IsNullOrWhiteSpace(extracted.CompanyPhone)) _newCompany.ContactPhone = extracted.CompanyPhone;
+            
             if (!string.IsNullOrWhiteSpace(extracted.BranchNumber))
             {
-                _branchNumber = extracted.BranchNumber;
-                _companyOfficeType = extracted.BranchNumber == "00000" ? "head" : "branch";
+                var branch = extracted.BranchNumber.Trim();
+                var isHeadOffice = branch == "00000" || 
+                                   branch.Equals("Head Office", StringComparison.OrdinalIgnoreCase) || 
+                                   branch.Equals("สำนักงานใหญ่", StringComparison.OrdinalIgnoreCase);
+                
+                if (isHeadOffice)
+                {
+                    _companyOfficeType = "head";
+                    _branchNumber = "00000";
+                }
+                else
+                {
+                    _companyOfficeType = "branch";
+                    _branchNumber = branch;
+                }
             }
         }
         
@@ -712,9 +726,9 @@
                     var doc = new CreateDocumentRequest
                     {
                         DocumentCategory = category,
-                        FileReference = result.StoragePath ?? result.FileReference,
+                        FileReference = result.UploadId,
                         FileName = result.FileName,
-                        FileSize = result.Size,
+                        FileSize = result.FileSize,
                         MimeType = GetMimeType(result.FileName)
                     };
                     uploadedList.Add(doc);
@@ -726,7 +740,8 @@
             }
             else
             {
-                Snackbar.Add("Upload failed", Severity.Error);
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Upload failed: {response.StatusCode}. {errorBody}", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -773,37 +788,45 @@
         !string.IsNullOrWhiteSpace(_customerData.Customer.FirstName) &&
         !string.IsNullOrWhiteSpace(_customerData.Customer.LastName) &&
         !string.IsNullOrWhiteSpace(_customerData.Customer.Email) &&
-        (!_hasCompany || !string.IsNullOrWhiteSpace(_newCompany.Name));
+        (!_hasCompany || !string.IsNullOrWhiteSpace(_newCompany.Name)) &&
+        _customerData.Addresses.All(a =>
+            !string.IsNullOrWhiteSpace(a.AddressLine1) &&
+            !string.IsNullOrWhiteSpace(a.City) &&
+            !string.IsNullOrWhiteSpace(a.StateProvince) &&
+            !string.IsNullOrWhiteSpace(a.PostalCode) &&
+            a.CountryId != Guid.Empty);
 
     private async Task Submit()
     {
-        if (_form != null)
-        {
-            await _form.Validate();
-            if (!_form.IsValid) 
-            {
-                Snackbar.Add("Please fix validation errors", Severity.Warning);
-                return;
-            }
-        }
-
-        if (!IsFormValid())
-        {
-            Snackbar.Add("Please fill in all required fields", Severity.Warning);
-            return;
-        }
-
+        if (_isSubmitting) return;
         _isSubmitting = true;
 
         try
         {
+            if (_form != null)
+            {
+                await _form.Validate();
+                if (!_form.IsValid)
+                {
+                    Snackbar.Add("Please fix validation errors", Severity.Warning);
+                    return;
+                }
+            }
+
+            if (!IsFormValid())
+            {
+                Snackbar.Add("Please fill in all required fields", Severity.Warning);
+                return;
+            }
+
+            // Build request data
             _customerData.Customer.CommunicationPreferences = new Dictionary<string, bool>
             {
                 ["email_opt_in"] = _emailOptIn,
                 ["sms_opt_in"] = _smsOptIn,
                 ["marketing_opt_in"] = _marketingOptIn
             };
-            
+
             _customerData.NewCompany = _hasCompany ? _newCompany : null;
             _customerData.Customer.CompanyId = null;
 
@@ -816,36 +839,26 @@
                 };
             }
 
-            var response = await Http.PostAsJsonAsync("api/customers/onboard", _customerData);
+            // Open progress dialog
+            var parameters = new DialogParameters<CustomerOnboardingDialog>
+            {
+                { x => x.Request, _customerData },
+                { x => x.HasCompany, _hasCompany },
+                { x => x.IncludeNda, _includeNda }
+            };
+            var options = new DialogOptions
+            {
+                CloseOnEscapeKey = false,
+                BackdropClick = false,
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true
+            };
+            var dialog = await DialogService.ShowAsync<CustomerOnboardingDialog>("Creating Customer", parameters, options);
+            var result = await dialog.Result;
 
-            if (response.IsSuccessStatusCode)
+            if (result != null && !result.Canceled && result.Data is Guid customerId)
             {
-                var result = await response.Content.ReadFromJsonAsync<CustomerResponse>();
-                Snackbar.Add("Customer created successfully!", Severity.Success);
-                Navigation.NavigateTo($"/sales/customers/{result?.Id}");
-            }
-            else
-            {
-                string errorMessage = "Failed to create customer";
-                try
-                {
-                    var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-                    if (error != null)
-                    {
-                        errorMessage = !string.IsNullOrEmpty(error.Message) ? error.Message : (!string.IsNullOrEmpty(error.Title) ? error.Title : errorMessage);
-                    }
-                }
-                catch
-                {
-                    var rawError = await response.Content.ReadAsStringAsync();
-                    if (!string.IsNullOrEmpty(rawError))
-                    {
-                        // Fallback for simple string errors or unknown JSON
-                        errorMessage = rawError.Length < 100 ? rawError : errorMessage;
-                    }
-                }
-                
-                Snackbar.Add(errorMessage, Severity.Error);
+                Navigation.NavigateTo($"/sales/customers/{customerId}");
             }
         }
         catch (Exception ex)

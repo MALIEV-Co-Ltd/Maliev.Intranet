@@ -150,6 +150,18 @@ public class AiProcessingController(
             }).ToList()
         };
 
+        // Standardize Head Office Branch Number
+        if (!string.IsNullOrWhiteSpace(extracted.BranchNumber))
+        {
+            var branch = extracted.BranchNumber.Trim();
+            if (branch == "0" || branch == "00000" || 
+                branch.Equals("Head Office", StringComparison.OrdinalIgnoreCase) || 
+                branch.Equals("สำนักงานใหญ่", StringComparison.OrdinalIgnoreCase))
+            {
+                extracted.BranchNumber = "00000";
+            }
+        }
+
         // 4. Validate Company via Registry if Tax ID (VatNumber) is available
         if (!string.IsNullOrWhiteSpace(extracted.VatNumber))
         {
@@ -254,22 +266,25 @@ public class AiProcessingController(
     }
 
     /// <summary>
-    /// Uploads a document to the central upload service.
+    /// Uploads a single document to the central upload service.
     /// </summary>
     /// <param name="file">The file to upload.</param>
-    /// <param name="category">Optional category for the storage path (e.g., 'nda').</param>
-    /// <returns>The upload metadata.</returns>
+    /// <param name="category">The category (e.g. NDA, General).</param>
     [RequirePermission(MalievPermissions.Customer.Write)]
     [HttpPost("upload-document")]
-    public async Task<ActionResult<BffUploadResponse>> UploadDocument(IFormFile file, [FromQuery] string category = "general")
+    public async Task<ActionResult<BffUploadResponse>> UploadDocument(IFormFile file, [FromQuery] string category = "General")
     {
         if (file == null || file.Length == 0)
         {
             return BadRequest("No file uploaded.");
         }
 
+        var standardizedCategory = category.Trim();
+        if (standardizedCategory.Equals("nda", StringComparison.OrdinalIgnoreCase)) standardizedCategory = "NDA";
+        else if (standardizedCategory.Equals("general", StringComparison.OrdinalIgnoreCase)) standardizedCategory = "General";
+
         using var stream = file.OpenReadStream();
-        var path = $"customer-onboarding/{category}/{Guid.NewGuid()}/{file.FileName}";
+        var path = $"customer-onboarding/{standardizedCategory}/{{id}}/{file.FileName}";
 
         var uploadResult = await uploadClient.UploadFileAsync(file.FileName, stream, file.ContentType, path);
         if (uploadResult == null)
@@ -284,20 +299,25 @@ public class AiProcessingController(
     /// Uploads multiple documents with category specification.
     /// </summary>
     /// <param name="files">The files to upload.</param>
-    /// <param name="category">Document category (e.g., 'nda', 'general').</param>
+    /// <param name="category">Document category (e.g., 'NDA', 'General').</param>
     /// <param name="subType">Optional sub-type for categorization.</param>
     /// <returns>List of upload metadata for all files.</returns>
     [RequirePermission(MalievPermissions.Customer.Write)]
     [HttpPost("upload-documents")]
     public async Task<ActionResult<List<BffUploadResponse>>> UploadDocuments(
         [FromForm] IFormFileCollection files,
-        [FromQuery] string category = "general",
+        [FromQuery] string category = "General",
         [FromQuery] string? subType = null)
     {
         if (files == null || files.Count == 0)
         {
             return BadRequest("No files uploaded.");
         }
+
+        // Standardize category casing for storage paths (General, NDA, etc.)
+        var standardizedCategory = category.Trim();
+        if (standardizedCategory.Equals("nda", StringComparison.OrdinalIgnoreCase)) standardizedCategory = "NDA";
+        else if (standardizedCategory.Equals("general", StringComparison.OrdinalIgnoreCase)) standardizedCategory = "General";
 
         var results = new List<BffUploadResponse>();
 
@@ -309,7 +329,7 @@ public class AiProcessingController(
             }
 
             using var stream = file.OpenReadStream();
-            var path = $"customer-onboarding/{category}/{Guid.NewGuid()}/{file.FileName}";
+            var path = $"customer-onboarding/{standardizedCategory}/{{id}}/{file.FileName}";
 
             var uploadResult = await uploadClient.UploadFileAsync(
                 file.FileName, stream, file.ContentType, path);
@@ -341,8 +361,20 @@ public class AiProcessingController(
     {
         if (documents == null || documents.Count == 0) return BadRequest("No documents to link.");
         
-        await customerClient.CreateDocumentsAsync(ownerType, ownerId, documents);
-        return Ok();
+        var created = await customerClient.CreateDocumentsAsync(ownerType, ownerId, documents);
+        return Ok(created);
+    }
+
+    /// <summary>
+    /// Gets a signed download URL for a file.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Read)]
+    [HttpGet("download-url/{fileReference}")]
+    public async Task<ActionResult<string>> GetDownloadUrl(string fileReference)
+    {
+        var url = await uploadClient.GetDownloadUrlAsync(fileReference);
+        if (string.IsNullOrEmpty(url)) return NotFound("File not found or URL generation failed.");
+        return Ok(new { url });
     }
 
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;

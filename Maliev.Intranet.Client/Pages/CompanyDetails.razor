@@ -8,9 +8,6 @@
 <PageTitle>@(_company?.Name ?? "Company Details") - Maliev Intranet</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16 pt-8">
-    <!-- Breadcrumbs -->
-    <MudBreadcrumbs Items="_breadcrumbs" Separator=">" Class="pa-0 mb-4" />
-
     @if (_loading)
     {
         <MudStack Spacing="4">

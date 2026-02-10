@@ -1,0 +1,223 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@using System.Net.Http.Headers
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Class="mr-3 mb-n1"/>
+            Upload Documents
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="4">
+            <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
+                           FilesChanged="OnFilesSelected" 
+                           Accept="@Accept"
+                           MaximumFileCount="10"
+                           @ref="_fileUpload">
+                <ActivatorContent>
+                    <div class="@($"relative d-flex flex-column align-center justify-center py-12 px-6 border-dashed border-2 mud-border-primary rounded-xl transition-all {(_dragOver ? "mud-bg-primary-hover scale-102 shadow-lg" : "mud-bg-surface")}")"
+                         style="cursor: pointer;"
+                         @ondragenter="@(() => _dragOver = true)"
+                         @ondragleave="@(() => _dragOver = false)"
+                         @ondragover:preventDefault
+                         @ondrop:preventDefault
+                         @ondrop="@(() => { _dragOver = false; })">
+                        <MudIcon Icon="@Icons.Material.Filled.FileUpload" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
+                        <MudText Typo="Typo.h6">Click to upload or drag and drop</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Upload documents up to 10MB each</MudText>
+                    </div>
+                </ActivatorContent>
+            </MudFileUpload>
+
+            @if (_uploadingFiles.Any())
+            {
+                <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">Selected Files (@_uploadingFiles.Count)</MudText>
+                <div style="max-height: 250px; overflow-y: auto;" class="pr-2">
+                    <MudStack Spacing="2">
+                        @foreach (var file in _uploadingFiles)
+                        {
+                            <MudPaper Outlined="true" Class="pa-3 rounded-lg d-flex flex-column gap-2">
+                                <div class="d-flex align-center justify-space-between">
+                                    <div class="d-flex align-center gap-3">
+                                        <MudIcon Icon="@GetFileIcon(file.Name)" Color="Color.Primary" Size="Size.Small" />
+                                        <div class="d-flex flex-column">
+                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@file.Name</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(file.Size)</MudText>
+                                        </div>
+                                    </div>
+                                    @if (!file.IsUploading && !file.IsCompleted)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => RemoveFile(file))" />
+                                    }
+                                    @if (file.IsCompleted)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                    }
+                                    @if (file.Error != null)
+                                    {
+                                        <MudTooltip Text="@file.Error">
+                                            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                                        </MudTooltip>
+                                    }
+                                </div>
+                                @if (file.IsUploading)
+                                {
+                                    <MudProgressLinear Color="Color.Primary" Value="@file.Progress" Class="rounded-pill" />
+                                }
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </div>
+            }
+
+            <MudTextField T="string" Label="Document Category" @bind-Value="Category" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_isBusy">Cancel</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="StartUpload" 
+                   Disabled="@(!_uploadingFiles.Any() || _isBusy || _uploadingFiles.All(f => f.IsCompleted))">
+            @(_isBusy ? "Uploading..." : "Start Upload")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Category { get; set; } = "General";
+    [Parameter] public string Accept { get; set; } = ".pdf,.jpg,.jpeg,.png,.docx";
+    [Parameter] public Guid CustomerId { get; set; }
+    [Parameter] public HttpClient Http { get; set; } = default!;
+
+    private bool _dragOver;
+    private bool _isBusy;
+    private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
+    private List<UploadFileState> _uploadingFiles = new();
+
+    private class UploadFileState
+    {
+        public IBrowserFile BrowserFile { get; set; } = default!;
+        public string Name => BrowserFile.Name;
+        public long Size => BrowserFile.Size;
+        public int Progress { get; set; }
+        public bool IsUploading { get; set; }
+        public bool IsCompleted { get; set; }
+        public string? Error { get; set; }
+    }
+
+    private void OnFilesSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        foreach (var file in files)
+        {
+            if (!_uploadingFiles.Any(f => f.Name == file.Name && f.Size == file.Size))
+            {
+                _uploadingFiles.Add(new UploadFileState { BrowserFile = file });
+            }
+        }
+    }
+
+    private void RemoveFile(UploadFileState file) => _uploadingFiles.Remove(file);
+
+    private async Task StartUpload()
+    {
+        _isBusy = true;
+        
+        foreach (var file in _uploadingFiles.Where(f => !f.IsCompleted))
+        {
+            file.IsUploading = true;
+            file.Progress = 10;
+            StateHasChanged();
+
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                var stream = file.BrowserFile.OpenReadStream(10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.BrowserFile.ContentType);
+                content.Add(fileContent, "files", file.Name);
+
+                file.Progress = 30;
+                StateHasChanged();
+
+                var response = await Http.PostAsync($"api/aiprocessing/upload-documents?category={Category}", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    file.Progress = 70;
+                    StateHasChanged();
+
+                    var results = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
+                    var result = results?.FirstOrDefault();
+
+                    if (result != null)
+                    {
+                        var docs = new List<CreateDocumentRequest> {
+                            new CreateDocumentRequest { 
+                                DocumentCategory = Category, 
+                                FileReference = result.UploadId, 
+                                FileName = result.FileName, 
+                                FileSize = result.FileSize, 
+                                MimeType = GetMimeType(result.FileName)
+                            }
+                        };
+
+                        var linkResponse = await Http.PostAsJsonAsync($"api/aiprocessing/link-documents?ownerType=Customer&ownerId={CustomerId}", docs);
+                        if (linkResponse.IsSuccessStatusCode)
+                        {
+                            file.IsCompleted = true;
+                            file.Progress = 100;
+                        }
+                        else
+                        {
+                            file.Error = "Linking failed";
+                        }
+                    }
+                }
+                else
+                {
+                    file.Error = $"Upload failed: {response.StatusCode}";
+                }
+            }
+            catch (Exception ex)
+            {
+                file.Error = ex.Message;
+            }
+            finally
+            {
+                file.IsUploading = false;
+                StateHasChanged();
+            }
+        }
+
+        _isBusy = false;
+        if (_uploadingFiles.All(f => f.IsCompleted))
+        {
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private string GetFileIcon(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
+    {
+        ".pdf" => Icons.Custom.FileFormats.FilePdf,
+        ".jpg" or ".jpeg" or ".png" => Icons.Custom.FileFormats.FileImage,
+        ".doc" or ".docx" => Icons.Custom.FileFormats.FileDocument,
+        _ => Icons.Material.Filled.AttachFile
+    };
+
+    private string FormatFileSize(long bytes) => $"{(bytes / 1024.0 / 1024.0):F2} MB";
+
+    private static string GetMimeType(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
+    {
+        ".pdf" => "application/pdf",
+        ".doc" or ".docx" => "application/msword",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".png" => "image/png",
+        _ => "application/octet-stream"
+    };
+}

@@ -75,10 +75,20 @@ public class SystemHealthDto
 /// </summary>
 public class BffUploadResponse
 {
-    public string FileReference { get; set; } = string.Empty;
+    [JsonPropertyName("uploadId")]
+    public string UploadId { get; set; } = string.Empty;
+
+    [JsonPropertyName("fileName")]
     public string FileName { get; set; } = string.Empty;
-    public long Size { get; set; }
+
+    [JsonPropertyName("fileSize")]
+    public long FileSize { get; set; }
+
+    [JsonPropertyName("storagePath")]
     public string? StoragePath { get; set; }
+
+    [JsonPropertyName("fileReference")]
+    public string? FileReference { get; set; }
 }
 
 /// <summary>
