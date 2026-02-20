@@ -1,0 +1,144 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared.Dtos
+@using System.ComponentModel.DataAnnotations
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@(_isEdit ? Icons.Material.Filled.Edit : Icons.Material.Filled.Add)" Class="mr-3 mb-n1"/>
+            @(_isEdit ? "Edit Template" : "New Template")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@_model" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <MudStack Spacing="4">
+                <MudTextField Label="Name" @bind-Value="_model.Name" For="@(() => _model.Name)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField Label="Template Key" @bind-Value="_model.TemplateKey" For="@(() => _model.TemplateKey)" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_isEdit" />
+                
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudSelect T="string" Label="Channel" @bind-Value="_model.ChannelType" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true">
+                            <MudSelectItem Value="@("Email")">Email</MudSelectItem>
+                            <MudSelectItem Value="@("LINE")">LINE</MudSelectItem>
+                            <MudSelectItem Value="@("WhatsApp")">WhatsApp</MudSelectItem>
+                            <MudSelectItem Value="@("SMS")">SMS</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudNumericField T="int" Label="Version" @bind-Value="_model.Version" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudTextField Label="Lang" @bind-Value="_model.Language" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="5" />
+                    </MudItem>
+                </MudGrid>
+
+                @if (_model.ChannelType == "Email")
+                {
+                    <MudTextField Label="Subject Template" @bind-Value="_model.SubjectTemplate" For="@(() => _model.SubjectTemplate)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+
+                <MudTextField Label="Body Template" @bind-Value="_model.BodyTemplate" For="@(() => _model.BodyTemplate)" Variant="Variant.Outlined" Lines="8" Style="font-family: monospace;" />
+                
+                @if (_isEdit)
+                {
+                    <MudSwitch T="bool" @bind-Value="_model.IsActive" Label="Active" Color="Color.Success" />
+                }
+            </MudStack>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public NotificationTemplateDto? Template { get; set; }
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private TemplateFormModel _model = new();
+    private bool _isEdit => Template != null;
+
+    protected override void OnInitialized()
+    {
+        if (Template != null)
+        {
+            _model = new TemplateFormModel
+            {
+                Name = Template.Name,
+                TemplateKey = Template.TemplateKey,
+                SubjectTemplate = Template.SubjectTemplate,
+                BodyTemplate = Template.BodyTemplate,
+                ChannelType = Template.ChannelType,
+                Language = Template.Language,
+                Version = Template.Version,
+                IsActive = Template.IsActive
+            };
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        try
+        {
+            if (_isEdit)
+            {
+                var request = new UpdateNotificationTemplateRequest
+                {
+                    Name = _model.Name,
+                    SubjectTemplate = _model.SubjectTemplate,
+                    BodyTemplate = _model.BodyTemplate,
+                    IsActive = _model.IsActive
+                };
+                var response = await Http.PutAsJsonAsync($"api/notifications/templates/{Template!.Id}", request);
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Template updated", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+            }
+            else
+            {
+                var request = new CreateNotificationTemplateRequest
+                {
+                    Name = _model.Name,
+                    TemplateKey = _model.TemplateKey,
+                    SubjectTemplate = _model.SubjectTemplate ?? "",
+                    BodyTemplate = _model.BodyTemplate,
+                    ChannelType = _model.ChannelType,
+                    Language = _model.Language,
+                    Version = _model.Version
+                };
+                var response = await Http.PostAsJsonAsync("api/notifications/templates", request);
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Template created", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void HandleValidSubmit() { /* Handled by Submit button */ }
+
+    public class TemplateFormModel
+    {
+        [Required] public string Name { get; set; } = "";
+        [Required] public string TemplateKey { get; set; } = "";
+        public string? SubjectTemplate { get; set; }
+        [Required] public string BodyTemplate { get; set; } = "";
+        [Required] public string ChannelType { get; set; } = "Email";
+        public string Language { get; set; } = "en";
+        public int Version { get; set; } = 1;
+        public bool IsActive { get; set; } = true;
+    }
+}

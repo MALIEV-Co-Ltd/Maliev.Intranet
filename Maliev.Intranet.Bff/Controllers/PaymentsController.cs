@@ -52,4 +52,37 @@ public class PaymentsController(PaymentServiceClient client) : ControllerBase
         var result = await client.GetPaymentByIdAsync(id);
         return result != null ? Ok(result) : NotFound();
     }
+
+    /// <summary>
+    /// Records a new payment.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Payment.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreatePaymentRequest request, CancellationToken ct)
+    {
+        var response = await client.CreatePaymentAsync(request, ct);
+        return response.IsSuccessStatusCode ? StatusCode(201) : StatusCode((int)response.StatusCode);
+    }
+
+    /// <summary>
+    /// Allocates a payment to invoices.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Payment.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/allocate")]
+    public async Task<IActionResult> Allocate(Guid id, [FromBody] AllocatePaymentRequest request, CancellationToken ct)
+    {
+        var response = await client.AllocatePaymentAsync(id, request, ct);
+        return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
+    }
+
+    /// <summary>
+    /// Voids a payment.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Payment.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/void")]
+    public async Task<IActionResult> Void(Guid id, [FromBody] VoidPaymentRequest request, CancellationToken ct)
+    {
+        var response = await client.VoidPaymentAsync(id, request, ct);
+        return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
+    }
 }

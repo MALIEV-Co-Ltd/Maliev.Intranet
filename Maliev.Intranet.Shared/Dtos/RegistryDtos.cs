@@ -15,6 +15,16 @@ public class CreateCompanyRequest
     public string? ContactPhone { get; set; }
     public string Segment { get; set; } = "Retail";
     public string Tier { get; set; } = "Bronze";
+
+    // BDEX fields
+    public string? FullNameTh { get; set; }
+    public DateTime? RegistrationDate { get; set; }
+    public string? CompanyStatus { get; set; }
+    public string? CompanyStatusNameTh { get; set; }
+    public string? CompanyTypeCode { get; set; }
+    public string? BusinessObjectives { get; set; }
+    public bool IsVerifiedFromBdex { get; set; }
+    public string? StockSymbol { get; set; }
 }
 
 /// <summary>
@@ -23,10 +33,10 @@ public class CreateCompanyRequest
 public class CountryDto
 {
     public Guid Id { get; set; }
-    
+
     [JsonPropertyName("iso2")]
     public string Code { get; set; } = string.Empty;
-    
+
     public string Name { get; set; } = string.Empty;
 }
 
@@ -70,10 +80,10 @@ public class RegistryApiResponse<T>
 
     [JsonPropertyName("success")]
     public bool Success { get; set; }
-    
+
     [JsonPropertyName("message")]
     public string? ErrorMessage { get; set; }
-    
+
     [JsonPropertyName("errors")]
     public List<string>? Errors { get; set; }
 }

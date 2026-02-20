@@ -1,124 +1,334 @@
 @page "/admin/notifications"
+@using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Notifications - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Notification Templates</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">Notifications</MudText>
 
-<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-        <MudTextField @bind-Value="_searchString" Placeholder="Search templates..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 400px;" />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">New Template</MudButton>
-    </MudStack>
-</MudPaper>
+<MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    <MudTabPanel Text="Templates" Icon="@Icons.Material.Filled.Description">
+        <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudTextField @bind-Value="_templateSearchString" 
+                              Placeholder="Search templates..." 
+                              Variant="Variant.Outlined" 
+                              Margin="Margin.Dense" 
+                              Style="max-width: 400px;"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              OnKeyDown="HandleTemplateSearchKeyDown" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateTemplateDialog">New Template</MudButton>
+            </MudStack>
+        </MudPaper>
 
-<MudGrid>
-    <MudItem xs="12" md="5">
-        @if (_isLoading)
-        {
-            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="500px" Class="rounded-lg" />
-        }
-        else
-        {
-            <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-                <MudDataGrid T="TemplateDto" Items="@_templates" Dense="true" Hover="true" Elevation="0" SelectedItemChanged="@OnTemplateSelected">
-                    <Columns>
-                        <PropertyColumn Property="x => x.Name" Title="Template Name" />
-                        <TemplateColumn Title="Channel">
-                            <CellTemplate>
-                                <MudIcon Icon="@GetChannelIcon(context.Item.Channel)" Size="Size.Small" Color="Color.Primary" />
-                            </CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Title="Status">
-                            <CellTemplate>
-                                <MudChip Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
-                                    @(context.Item.IsActive ? "Active" : "Inactive")
-                                </MudChip>
-                            </CellTemplate>
-                        </TemplateColumn>
-                    </Columns>
-                </MudDataGrid>
-            </MudPaper>
-        }
-    </MudItem>
+        <MudGrid>
+            <MudItem xs="12" md="5">
+                @if (_isLoadingTemplates)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="500px" Class="rounded-lg" />
+                }
+                else
+                {
+                    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg overflow-hidden">
+                        <MudDataGrid T="NotificationTemplateDto" Items="@_templates" Dense="true" Hover="true" Elevation="0" SelectedItemChanged="@OnTemplateSelected">
+                            <Columns>
+                                <PropertyColumn Property="x => x.Name" Title="Name" />
+                                <PropertyColumn Property="x => x.TemplateKey" Title="Key" />
+                                <TemplateColumn Title="Channel">
+                                    <CellTemplate>
+                                        <MudTooltip Text="@context.Item.ChannelType">
+                                            <MudIcon Icon="@GetChannelIcon(context.Item.ChannelType)" Size="Size.Small" Color="Color.Primary" />
+                                        </MudTooltip>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Lang">
+                                    <CellTemplate>
+                                        <MudText Typo="Typo.caption">@context.Item.Language.ToUpper()</MudText>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Status">
+                                    <CellTemplate>
+                                        <MudChip T="string" Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)" Variant="Variant.Text">
+                                            @(context.Item.IsActive ? "Active" : "Inactive")
+                                        </MudChip>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                            </Columns>
+                        </MudDataGrid>
+                    </MudPaper>
+                }
+            </MudItem>
 
-    <MudItem xs="12" md="7">
-        @if (_selectedTemplate != null)
-        {
-            <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
-                <MudText Typo="Typo.h6" Class="mb-4">Template Preview</MudText>
+            <MudItem xs="12" md="7">
+                @if (_selectedTemplate != null)
+                {
+                    <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                            <MudText Typo="Typo.h6">Template Details</MudText>
+                            <MudStack Row="true" Spacing="2">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="OpenEditTemplateDialog" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="DeleteSelectedTemplate" />
+                            </MudStack>
+                        </MudStack>
+                        
+                        <MudStack Spacing="3">
+                            <MudField Label="Template Name" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.Name</MudField>
+                            <MudGrid>
+                                <MudItem xs="6">
+                                    <MudField Label="Template Key" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.TemplateKey</MudField>
+                                </MudItem>
+                                <MudItem xs="3">
+                                    <MudField Label="Version" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.Version</MudField>
+                                </MudItem>
+                                <MudItem xs="3">
+                                    <MudField Label="Language" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.Language.ToUpper()</MudField>
+                                </MudItem>
+                            </MudGrid>
+                            
+                            <MudField Label="Channel" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.ChannelType</MudField>
+                            
+                            @if (!string.IsNullOrEmpty(_selectedTemplate.SubjectTemplate))
+                            {
+                                <MudField Label="Subject Template" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.SubjectTemplate</MudField>
+                            }
+                            
+                            <MudTextField Label="Body Template" 
+                                          Value="@_selectedTemplate.BodyTemplate" 
+                                          Variant="Variant.Outlined" 
+                                          Lines="10" 
+                                          ReadOnly="true" 
+                                          Style="font-family: monospace;" />
+                            
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Send">Test Send</MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                }
+                else
+                {
+                    <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
+                        <MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
+                        <MudText Typo="Typo.h6" Color="Color.Secondary">Select a template to view details</MudText>
+                    </MudPaper>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Delivery Logs" Icon="@Icons.Material.Filled.History">
+        <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudTextField @bind-Value="_logSearchString" 
+                              Placeholder="Filter by status or user..." 
+                              Variant="Variant.Outlined" 
+                              Margin="Margin.Dense" 
+                              Style="max-width: 400px;"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.FilterList"
+                              OnKeyDown="HandleLogSearchKeyDown" />
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadLogs">Refresh</MudButton>
+            </MudStack>
+        </MudPaper>
+
+        <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg overflow-hidden">
+            <MudTable Items="@_logs" Dense="true" Hover="true" Elevation="0" Loading="@_isLoadingLogs">
+                <HeaderContent>
+                    <MudTh>Timestamp</MudTh>
+                    <MudTh>Recipient</MudTh>
+                    <MudTh>Channel</MudTh>
+                    <MudTh>Subject</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Retries</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Timestamp">@context.CreatedAt.ToString("g")</MudTd>
+                    <MudTd DataLabel="Recipient">@context.Recipient</MudTd>
+                    <MudTd DataLabel="Channel">
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@GetChannelIcon(context.ChannelType)" Size="Size.Small" />
+                            <MudText Typo="Typo.body2">@context.ChannelType</MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Subject">@context.Subject</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Variant="Variant.Text">@context.Status</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Retries">@context.RetryCount</MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>No delivery logs found.</MudText>
+                </NoRecordsContent>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Preferences" Icon="@Icons.Material.Filled.Settings">
+        <MudText Typo="Typo.h6" Class="mb-4">Notification Preferences</MudText>
+        <MudAlert Severity="Severity.Info" Class="mb-4">Preference management is currently user-scoped. Bulk admin tools coming soon.</MudAlert>
+        
+        <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.subtitle1" Class="mb-4 fw-bold">Admin System Overrides</MudText>
+            <MudStack Spacing="3">
+                <MudCheckBox T="bool" Label="Global Email Kill-Switch" Color="Color.Error" />
+                <MudCheckBox T="bool" Label="Force SMS for Critical Alerts" Color="Color.Warning" />
+                <MudCheckBox T="bool" Label="Enable WhatsApp Beta Integration" Color="Color.Success" />
                 
-                <MudStack Spacing="3">
-                    <MudTextField @bind-Value="_selectedTemplate.Name" Label="Template Name" Variant="Variant.Outlined" ReadOnly="true" />
-                    <MudSelect @bind-Value="_selectedTemplate.Channel" Label="Channel" Variant="Variant.Outlined" Disabled="true">
-                        <MudSelectItem Value="@("Email")">Email</MudSelectItem>
-                        <MudSelectItem Value="@("LINE")">LINE</MudSelectItem>
-                        <MudSelectItem Value="@("WhatsApp")">WhatsApp</MudSelectItem>
-                    </MudSelect>
-                    <MudTextField @bind-Value="_selectedTemplate.Subject" Label="Subject" Variant="Variant.Outlined" ReadOnly="true" />
-                    <MudTextField @bind-Value="_selectedTemplate.Body" Label="Body" Variant="Variant.Outlined" Lines="8" ReadOnly="true" />
-                    
-                    <MudStack Row="true" Spacing="2">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit">Edit</MudButton>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Send">Test Send</MudButton>
-                    </MudStack>
-                </MudStack>
-            </MudPaper>
-        }
-        else
-        {
-            <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
-                <MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
-                <MudText Typo="Typo.h6" Color="Color.Secondary">Select a template to preview</MudText>
-            </MudPaper>
-        }
-    </MudItem>
-</MudGrid>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" Style="max-width: 200px;">Save Settings</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
 
 @code {
-    private bool _isLoading = true;
-    private string _searchString = "";
-    private List<TemplateDto> _templates = new();
-    private TemplateDto? _selectedTemplate;
+    private bool _isLoadingTemplates = true;
+    private bool _isLoadingLogs = true;
+    private string _templateSearchString = "";
+    private string _logSearchString = "";
+    private List<NotificationTemplateDto> _templates = new();
+    private List<NotificationDeliveryLogDto> _logs = new();
+    private NotificationTemplateDto? _selectedTemplate;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadTemplates();
+        await LoadLogs();
+    }
+
+    private async Task LoadTemplates()
+    {
+        _isLoadingTemplates = true;
         try
         {
-            // TODO: Replace with BFF API call
-            // _templates = await Http.GetFromJsonAsync<List<TemplateDto>>("api/notifications/templates");
-            
-            _templates = new();
+            var url = "api/notifications/templates?pageSize=100";
+            if (!string.IsNullOrWhiteSpace(_templateSearchString))
+                url += $"&filter={Uri.EscapeDataString(_templateSearchString)}";
+                
+            var response = await Http.GetFromJsonAsync<PagedResponse<NotificationTemplateDto>>(url);
+            _templates = response?.Data.ToList() ?? new();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading notification templates: {ex.Message}");
+            Snackbar.Add($"Error loading templates: {ex.Message}", Severity.Error);
         }
         finally
         {
-            _isLoading = false;
+            _isLoadingTemplates = false;
         }
     }
 
-    private void OnTemplateSelected(TemplateDto template)
+    private async Task LoadLogs()
+    {
+        _isLoadingLogs = true;
+        try
+        {
+            var url = "api/notifications/delivery-logs?pageSize=50";
+            if (!string.IsNullOrWhiteSpace(_logSearchString))
+                url += $"&filter={Uri.EscapeDataString(_logSearchString)}";
+
+            var response = await Http.GetFromJsonAsync<PagedResponse<NotificationDeliveryLogDto>>(url);
+            _logs = response?.Data.ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading logs: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingLogs = false;
+        }
+    }
+
+    private void OnTemplateSelected(NotificationTemplateDto template)
     {
         _selectedTemplate = template;
     }
 
-    private string GetChannelIcon(string channel) => channel switch
+    private async Task HandleTemplateSearchKeyDown(KeyboardEventArgs e)
     {
-        "Email" => Icons.Material.Outlined.Email,
-        "LINE" => Icons.Material.Outlined.Chat,
-        "WhatsApp" => Icons.Material.Outlined.ChatBubble,
+        if (e.Key == "Enter") await LoadTemplates();
+    }
+
+    private async Task HandleLogSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await LoadLogs();
+    }
+
+    private string GetChannelIcon(string channel) => channel.ToLower() switch
+    {
+        "email" => Icons.Material.Outlined.Email,
+        "line" => Icons.Material.Outlined.Chat,
+        "whatsapp" => Icons.Material.Outlined.ChatBubble,
+        "sms" => Icons.Material.Outlined.Sms,
         _ => Icons.Material.Outlined.Notifications
     };
 
-    public class TemplateDto
+    private Color GetStatusColor(string status) => status.ToLower() switch
     {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = "";
-        public string Channel { get; set; } = "";
-        public string Subject { get; set; } = "";
-        public string Body { get; set; } = "";
-        public bool IsActive { get; set; }
+        "sent" or "delivered" => Color.Success,
+        "failed" => Color.Error,
+        "pending" or "retrying" => Color.Warning,
+        "rate_limited" => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private async Task OpenCreateTemplateDialog()
+    {
+        var dialog = await DialogService.ShowAsync<NotificationTemplateDialog>("Create Template");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadTemplates();
+        }
+    }
+
+    private async Task OpenEditTemplateDialog()
+    {
+        if (_selectedTemplate == null) return;
+        
+        var parameters = new DialogParameters { ["Template"] = _selectedTemplate };
+        var dialog = await DialogService.ShowAsync<NotificationTemplateDialog>("Edit Template", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadTemplates();
+            // Refresh selected template
+            _selectedTemplate = _templates.FirstOrDefault(t => t.Id == _selectedTemplate.Id);
+        }
+    }
+
+    private async Task DeleteSelectedTemplate()
+    {
+        if (_selectedTemplate == null) return;
+
+        var result = await DialogService.ShowMessageBox(
+            "Delete Template",
+            $"Are you sure you want to delete template '{_selectedTemplate.Name}'?",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (result == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/notifications/templates/{_selectedTemplate.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Template deleted", Severity.Success);
+                    _selectedTemplate = null;
+                    await LoadTemplates();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
     }
 }

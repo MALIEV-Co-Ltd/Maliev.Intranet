@@ -1,0 +1,93 @@
+@using Maliev.Intranet.Shared
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudStack Spacing="3">
+                <MudDateRangePicker Label="Validity Period"
+                                    @bind-DateRange="_validityPeriod"
+                                    Required="true"
+                                    Variant="Variant.Outlined" />
+
+                <MudTextField Label="Delivery Expectations"
+                              @bind-Value="_deliveryExpectations"
+                              Lines="3"
+                              Variant="Variant.Outlined" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@(!_isValid || _isSaving)"
+                   OnClick="Submit">
+            @if (_isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Save Changes
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Guid QuotationId { get; set; }
+
+    [Parameter]
+    public QuotationDetailDto? Quotation { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+    private DateRange _validityPeriod = new DateRange(DateTime.Today, DateTime.Today.AddDays(30));
+    private string? _deliveryExpectations;
+
+    protected override void OnParametersSet()
+    {
+        if (Quotation != null)
+        {
+            _validityPeriod = new DateRange(Quotation.ValidityPeriodStart, Quotation.ValidityPeriodEnd);
+            _deliveryExpectations = Quotation.DeliveryExpectations;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isSaving = true;
+        try
+        {
+            var request = new UpdateQuotationRequest
+            {
+                ValidityDate = _validityPeriod.End
+            };
+            var response = await Http.PutAsJsonAsync($"api/quotations/{QuotationId}", request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Quotation updated successfully.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to update quotation.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

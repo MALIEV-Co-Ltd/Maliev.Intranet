@@ -30,4 +30,49 @@ public class MaterialServiceClient(HttpClient httpClient)
     {
         return await httpClient.GetFromJsonAsync<MaterialDetailDto>($"/material/v1/materials/{id}", ct);
     }
+
+    /// <summary>
+    /// Creates a new material.
+    /// </summary>
+    /// <param name="request">The creation request.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The created material summary.</returns>
+    public async Task<MaterialSummaryDto?> CreateMaterialAsync(CreateMaterialRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/material/v1/materials", request, ct);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<MaterialSummaryDto>(cancellationToken: ct);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Updates an existing material.
+    /// </summary>
+    /// <param name="id">The material ID.</param>
+    /// <param name="request">The update request.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The updated material detail.</returns>
+    public async Task<MaterialDetailDto?> UpdateMaterialAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/material/v1/materials/{id}", request, ct);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<MaterialDetailDto>(cancellationToken: ct);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Deletes a material.
+    /// </summary>
+    /// <param name="id">The material ID.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>True if successful.</returns>
+    public async Task<bool> DeleteMaterialAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync($"/material/v1/materials/{id}", ct);
+        return response.IsSuccessStatusCode;
+    }
 }

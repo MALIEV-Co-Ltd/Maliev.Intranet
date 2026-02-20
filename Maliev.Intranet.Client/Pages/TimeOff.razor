@@ -1,6 +1,9 @@
 @page "/hr/time-off"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Time Off - Maliev Intranet</PageTitle>
 
@@ -22,9 +25,15 @@
         {
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">@balance.LeaveType</MudText>
-                    <MudText Typo="Typo.h5" Class="mt-2">@balance.Available days</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Available</MudText>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+                        <div>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@balance.LeaveType</MudText>
+                            <MudText Typo="Typo.h5" Class="mt-2" Color="Color.Primary" Style="font-weight: 700;">@balance.Available days</MudText>
+                        </div>
+                        <MudIcon Icon="@GetLeaveIcon(balance.LeaveType)" Size="Size.Large" Color="Color.Default" Style="opacity: 0.3;" />
+                    </MudStack>
+                    <MudProgressLinear Color="Color.Primary" Value="@((double)(balance.Used / balance.Entitlement * 100))" Class="mt-3" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">@balance.Used of @balance.Entitlement used</MudText>
                 </MudPaper>
             </MudItem>
         }
@@ -34,7 +43,7 @@
 <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
     <MudStack Row="true" Justify="Justify.SpaceBetween">
         <MudText Typo="Typo.h6">My Leave Requests</MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Request Leave</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenRequestDialog">Request Leave</MudButton>
     </MudStack>
 </MudPaper>
 
@@ -57,6 +66,14 @@ else
                     </CellTemplate>
                 </TemplateColumn>
                 <PropertyColumn Property="x => x.ApproverName" Title="Approver" />
+                <TemplateColumn Title="Actions" Sortable="false">
+                    <CellTemplate>
+                        @if (context.Item.Status == "Pending")
+                        {
+                            <MudIconButton Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" Color="Color.Error" />
+                        }
+                    </CellTemplate>
+                </TemplateColumn>
             </Columns>
             <NoRecordsContent>
                 <MudText Class="pa-4 text-center" Color="Color.Secondary">No leave requests found</MudText>
@@ -72,8 +89,14 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
         try
         {
+            _isLoading = true;
             var balancesTask = Http.GetFromJsonAsync<List<LeaveBalanceDto>>("api/timeoff/balances");
             var requestsTask = Http.GetFromJsonAsync<List<LeaveRequestSummaryDto>>("api/timeoff/requests");
 
@@ -84,7 +107,7 @@ else
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading time off data: {ex.Message}");
+            Snackbar.Add($"Error loading time off data: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -92,12 +115,36 @@ else
         }
     }
 
+    private async Task OpenRequestDialog()
+    {
+        var parameters = new DialogParameters();
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        // TODO: Create a LeaveRequestDialog component
+        // var dialog = await DialogService.ShowAsync<LeaveRequestDialog>("Request Leave", parameters, options);
+        // var result = await dialog.Result;
+        
+        // if (!result.Canceled) { await LoadData(); }
+        
+        Snackbar.Add("Leave Request Dialog coming soon", Severity.Info);
+    }
+
     private Color GetStatusColor(string status) => status switch
     {
         "Pending" => Color.Warning,
         "Approved" => Color.Success,
         "Rejected" => Color.Error,
+        "Cancelled" => Color.Default,
         _ => Color.Default
     };
+
+    private string GetLeaveIcon(string type) => type switch
+    {
+        "Annual" => Icons.Material.Outlined.BeachAccess,
+        "Sick" => Icons.Material.Outlined.Sick,
+        "Personal" => Icons.Material.Outlined.Person,
+        _ => Icons.Material.Outlined.EventAvailable
+    };
 }
+
 

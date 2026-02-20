@@ -1,0 +1,32 @@
+@using Maliev.Intranet.Shared
+@using MudBlazor
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText>Are you sure you want to revoke this NDA? This action cannot be undone.</MudText>
+        <MudTextField @bind-Value="_reason" Label="Revocation Reason" Variant="Variant.Outlined" Lines="3" Class="mt-4" Required="true" RequiredError="Reason is required" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Submit" Disabled="@(string.IsNullOrWhiteSpace(_reason))">Revoke NDA</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _reason = string.Empty;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            Snackbar.Add("Please provide a reason for revocation.", Severity.Warning);
+            return;
+        }
+        MudDialog.Close(DialogResult.Ok(_reason));
+    }
+}

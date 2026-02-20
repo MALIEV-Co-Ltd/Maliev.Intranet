@@ -1,4 +1,9 @@
 @page "/mfg/materials"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
+@inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Materials - Maliev Intranet</PageTitle>
 
@@ -24,7 +29,8 @@
             
             <MudButton Variant="Variant.Filled" 
                        Color="Color.Primary" 
-                       StartIcon="@Icons.Material.Filled.Add">
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateDialog">
                 Add Material
             </MudButton>
         </MudStack>
@@ -43,7 +49,7 @@
 else
 {
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-        <MudDataGrid T="MaterialDto" 
+        <MudDataGrid T="MaterialSummaryDto" 
                      Items="@_materials" 
                      Dense="true" 
                      Hover="true"
@@ -55,16 +61,11 @@ else
                 <TemplateColumn Title="Stock Level">
                     <CellTemplate>
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudProgressLinear Color="@GetStockColor(context.Item.StockPercentage)" 
-                                               Value="@context.Item.StockPercentage" 
-                                               Size="Size.Small" 
-                                               Style="width: 100px;" />
-                            <MudText Typo="Typo.body2">@context.Item.StockQuantity @context.Item.Unit</MudText>
+                            <MudText Typo="Typo.body2">@context.Item.QuantityOnHand @context.Item.Unit</MudText>
                         </MudStack>
                     </CellTemplate>
                 </TemplateColumn>
-                <PropertyColumn Property="x => x.UnitCost" Title="Unit Cost" Format="C2" />
-                <PropertyColumn Property="x => x.SupplierCount" Title="Suppliers" />
+                <PropertyColumn Property="x => x.UnitPrice" Title="Unit Price" Format="C2" />
                 <TemplateColumn Title="Status">
                     <CellTemplate>
                         <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
@@ -75,8 +76,17 @@ else
                 <TemplateColumn Title="Actions" Sortable="false">
                     <CellTemplate>
                         <MudStack Row="true" Spacing="1">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility" 
+                                           Size="Size.Small" 
+                                           Color="Color.Default" 
+                                           Href="@($"/mfg/materials/{context.Item.Id}")" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" 
+                                           Size="Size.Small" 
+                                           Color="Color.Primary" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" 
+                                           Size="Size.Small" 
+                                           Color="Color.Error" 
+                                           OnClick="@(() => DeleteMaterial(context.Item))" />
                         </MudStack>
                     </CellTemplate>
                 </TemplateColumn>
@@ -89,20 +99,21 @@ else
     private bool _isLoading = true;
     private string _searchString = "";
     private string _filterCategory = "All";
-    private List<MaterialDto> _materials = new();
+    private List<MaterialSummaryDto> _materials = new();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // TODO: Replace with BFF API call
-            // _materials = await Http.GetFromJsonAsync<List<MaterialDto>>("api/materials");
-            
-            _materials = new();
+            var response = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>("api/materials");
+            if (response?.Data != null)
+            {
+                _materials = response.Data.ToList();
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading materials: {ex.Message}");
+            Snackbar.Add($"Error loading materials: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -110,11 +121,38 @@ else
         }
     }
 
-    private Color GetStockColor(int percentage)
+    private async Task OpenCreateDialog()
     {
-        if (percentage < 30) return Color.Error;
-        if (percentage < 60) return Color.Warning;
-        return Color.Success;
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateMaterialDialog>("Create Material", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+        }
+    }
+
+    private async Task DeleteMaterial(MaterialSummaryDto material)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete Material", 
+            $"Are you sure you want to delete {material.Name}?", 
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (result == true)
+        {
+            var response = await Http.DeleteAsync($"api/materials/{material.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Material deleted", Severity.Success);
+                await OnInitializedAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete material", Severity.Error);
+            }
+        }
     }
 
     private Color GetStatusColor(string status) => status switch
@@ -124,17 +162,4 @@ else
         "Out of Stock" => Color.Error,
         _ => Color.Default
     };
-
-    public class MaterialDto
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Category { get; set; } = string.Empty;
-        public int StockQuantity { get; set; }
-        public int StockPercentage { get; set; }
-        public string Unit { get; set; } = string.Empty;
-        public decimal UnitCost { get; set; }
-        public int SupplierCount { get; set; }
-        public string Status { get; set; } = string.Empty;
-    }
 }

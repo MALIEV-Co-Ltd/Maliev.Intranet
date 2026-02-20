@@ -1,0 +1,161 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-3 mb-n1"/>
+            NDA Audit History
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+        }
+        else if (_history.Any())
+        {
+            <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start" TimelineAlign="TimelineAlign.Start">
+                @foreach (var log in _history)
+                {
+                    <MudTimelineItem Color="@GetActionColor(log.Action, log.Status)" Size="Size.Small" Elevation="0">
+                        <ItemContent>
+                            <MudPaper Elevation="0" Class="rounded-lg border-solid border-1 mud-border-lines-default mt-n1">
+                                <MudStack Spacing="0">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">
+                                            @(log.Status == "Signed" && log.Action == "Update" ? "Signed" : log.Action)
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@log.Timestamp.ToLocalTime().ToString("g")</MudText>
+                                    </MudStack>
+                                    
+                                    <MudText Typo="Typo.caption" Class="mt-1">
+                                        Performed by: <strong>@GetActorDisplay(log)</strong>
+                                    </MudText>
+
+                                    @if (!string.IsNullOrEmpty(log.Status))
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-1">
+                                            <MudText Typo="Typo.caption">Status:</MudText>
+                                            @if (!string.IsNullOrEmpty(log.PreviousStatus))
+                                            {
+                                                <span style="text-decoration: line-through; color: var(--mud-palette-text-secondary); font-size: 0.75rem;" class="mr-1">@log.PreviousStatus</span>
+                                                <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" Class="mx-1" style="font-size: 1rem;" />
+                                            }
+                                            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(log.Status)" Variant="Variant.Text" Class="ma-0" Style="height: 20px;">@log.Status</MudChip>
+                                        </MudStack>
+                                    }
+
+                                    @if (log.DocumentReferenceId.HasValue && log.PreviousDocumentReferenceId.HasValue && log.DocumentReferenceId != log.PreviousDocumentReferenceId)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="mt-1 d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Class="mr-1" Color="Color.Info" style="font-size: 1rem;" />
+                                            Document updated: <strong class="ms-2">@log.DocumentName</strong>
+                                        </MudText>
+                                    }
+                                    else if (log.DocumentReferenceId.HasValue && !log.PreviousDocumentReferenceId.HasValue && log.Action == "Create")
+                                    {
+                                         <MudText Typo="Typo.caption" Class="mt-1 d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Class="mr-1" Color="Color.Info" style="font-size: 1rem;" />
+                                            Document: <strong class="ms-2">@log.DocumentName</strong>
+                                        </MudText>
+                                    }
+
+                                    @if (log.ExpiresAt.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Expiration set to: @log.ExpiresAt.Value.ToLocalTime().ToString("d")</MudText>
+                                    }
+                                    
+                                    @if (log.RevokedAt.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Error">Revoked on: @log.RevokedAt.Value.ToLocalTime().ToString("d")</MudText>
+                                    }
+                                </MudStack>
+                            </MudPaper>
+                        </ItemContent>
+                    </MudTimelineItem>
+                }
+            </MudTimeline>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">No history found for this NDA.</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid NdaId { get; set; }
+    [Parameter] public HttpClient Http { get; set; } = default!;
+
+    private List<NDAAuditLogResponse> _history = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _history = await Http.GetFromJsonAsync<List<NDAAuditLogResponse>>($"api/customers/ndas/{NdaId}/history") ?? [];
+        }
+        catch
+        {
+            // Handle error silently or show snackbar if passed
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(true));
+
+    private Color GetActionColor(string action, string? status)
+    {
+        if (status == "Signed") return Color.Success;
+        if (status == "Revoked" || status == "Expired") return Color.Error;
+        if (status == "Draft" && action == "Create") return Color.Info;
+        
+        return action switch
+        {
+            "Create" => Color.Info,
+            "Update" => Color.Default,
+            "Delete" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string GetActorDisplay(NDAAuditLogResponse log)
+    {
+        if (log.ActorId == "system" || log.ActorId == "System")
+            return "System";
+
+        var name = !string.IsNullOrEmpty(log.ActorName) && log.ActorName != "Unknown"
+            ? log.ActorName
+            : null;
+
+        var email = !string.IsNullOrEmpty(log.ActorEmail)
+            ? log.ActorEmail
+            : null;
+
+        if (name != null && email != null)
+            return $"{name} ({email})";
+        if (name != null)
+            return name;
+        if (email != null)
+            return email;
+        return log.ActorId;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Signed" => Color.Success,
+        "Draft" => Color.Info,
+        "Expired" => Color.Error,
+        "Revoked" => Color.Error,
+        _ => Color.Default
+    };
+}

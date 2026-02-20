@@ -1,3 +1,4 @@
+using Maliev.Intranet.Shared.Dtos;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -8,45 +9,57 @@ using System.Security.Claims;
 namespace Maliev.Intranet.Bff.Controllers;
 
 /// <summary>
-/// API controller for leave-related operations, proxying to the Employee Service.
+/// API controller for time-off operations, proxying to the Leave Service.
 /// </summary>
-/// <param name="client">The time-off service client.</param>
-[RequirePermission(MalievPermissions.Leave.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [Route("api/[controller]")]
-public class TimeOffController(TimeOffServiceClient client) : ControllerBase
+public class TimeOffController(ILeaveServiceClient client) : ControllerBase
 {
     /// <summary>
-    /// Retrieves leave balances for the current user.
+    /// Gets leave balances for the current user.
     /// </summary>
-    /// <returns>A list of leave balances.</returns>
+    [RequirePermission(MalievPermissions.Leave.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("balances")]
-    public async Task<ActionResult<List<LeaveBalanceDto>>> GetBalances()
+    public async Task<ActionResult<List<LeaveBalanceDto>>> GetBalances(CancellationToken ct)
     {
+        // TODO: Get real employee ID from user context. For MVP, we might need a way to map User ID -> Employee ID.
+        // Assuming the JWT sub claim is the Employee ID for now, or we fetch it.
+        // For development, we'll use a hardcoded test ID if not found, or throw.
         var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
         if (!Guid.TryParse(userIdString, out var employeeId))
         {
-            return BadRequest("Invalid user identifier.");
+            // Fallback for dev/testing if sub isn't a guid
+            employeeId = Guid.Empty;
         }
 
-        var result = await client.GetLeaveBalancesAsync(employeeId);
+        var result = await client.GetMyBalancesAsync(employeeId, ct);
         return Ok(result);
     }
 
     /// <summary>
-    /// Retrieves leave requests for the current user.
+    /// Gets leave requests for the current user.
     /// </summary>
-    /// <returns>A list of leave requests.</returns>
+    [RequirePermission(MalievPermissions.Leave.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("requests")]
-    public async Task<ActionResult<List<LeaveRequestSummaryDto>>> GetRequests()
+    public async Task<ActionResult<List<LeaveRequestSummaryDto>>> GetRequests(CancellationToken ct)
     {
         var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-        if (!Guid.TryParse(userIdString, out var employeeId))
-        {
-            return BadRequest("Invalid user identifier.");
-        }
-
-        var result = await client.GetLeaveRequestsAsync(employeeId);
+        if (!Guid.TryParse(userIdString, out var employeeId)) employeeId = Guid.Empty;
+        var result = await client.GetMyRequestsAsync(employeeId, DateTime.UtcNow.Year, ct);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Submits a new leave request.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Leave.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("requests")]
+    public async Task<ActionResult<LeaveRequestDetailDto>> SubmitRequest([FromBody] SubmitLeaveRequestDto request, CancellationToken ct)
+    {
+        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (!Guid.TryParse(userIdString, out var employeeId)) employeeId = Guid.Empty;
+
+        var result = await client.SubmitRequestAsync(employeeId, request, ct);
+        return result != null ? Ok(result) : BadRequest();
     }
 }

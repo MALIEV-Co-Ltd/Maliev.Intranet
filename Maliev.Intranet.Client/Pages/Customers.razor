@@ -44,6 +44,12 @@
                             @(!string.IsNullOrEmpty(context.Item.Name) ? context.Item.Name[0] : 'C')
                         </MudAvatar>
                         @context.Item.Name
+                        @if (context.Item.NdaStatus == "Signed")
+                        {
+                            <MudTooltip Text="Active NDA Protected">
+                                <MudIcon Icon="@Icons.Material.Filled.Shield" Color="Color.Success" Size="Size.Small" Class="ml-1" Style="font-size: 0.9rem;" />
+                            </MudTooltip>
+                        }
                     </div>
                 </MudLink>
             </CellTemplate>

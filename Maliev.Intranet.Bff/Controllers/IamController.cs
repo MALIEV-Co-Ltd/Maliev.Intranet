@@ -17,7 +17,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public class IamController(
-    IAMServiceClient client, 
+    IAMServiceClient client,
     IAuthorizationService authorizationService,
     IWebHostEnvironment env) : ControllerBase
 {

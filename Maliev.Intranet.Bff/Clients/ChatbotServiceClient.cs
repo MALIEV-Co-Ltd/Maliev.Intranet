@@ -20,7 +20,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     /// <summary>
     /// Initiates a new chatbot session.
     /// </summary>
-    public async Task<ChatbotSessionResponse?> InitiateSessionAsync(string channel, string language, CancellationToken ct = default)
+    public virtual async Task<ChatbotSessionResponse?> InitiateSessionAsync(string channel, string language, CancellationToken ct = default)
     {
         try
         {
@@ -52,7 +52,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     /// <summary>
     /// Sends a message to an existing chatbot session.
     /// </summary>
-    public async Task<ChatbotMessageResponse?> SendMessageAsync(
+    public virtual async Task<ChatbotMessageResponse?> SendMessageAsync(
         Guid sessionId,
         string content,
         List<ChatbotAttachment>? attachments = null,
@@ -96,6 +96,80 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     }
 
     /// <summary>
+    /// Sends a message with a callback URL for streaming thinking steps.
+    /// </summary>
+    public virtual async Task<ChatbotMessageResponse?> SendMessageStreamAsync(
+        Guid sessionId,
+        string content,
+        string callbackUrl,
+        List<ChatbotAttachment>? attachments = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var payload = new ChatbotSendMessageRequest
+            {
+                SessionId = sessionId,
+                Content = content,
+                Attachments = attachments,
+                CallbackUrl = callbackUrl
+            };
+
+            var jsonContent = JsonContent.Create(payload, options: SnakeCaseOptions);
+
+            var response = await httpClient.PostAsync("/chatbot/v1/messages", jsonContent, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("ChatbotService stream message failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<ChatbotMessageResponse>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("ChatbotService stream message timed out.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ChatbotService stream message failed unexpectedly.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Extracts customer intent (needs customer data, search term, needs history) from a user message.
+    /// </summary>
+    public virtual async Task<ChatbotCustomerIntentResponse?> ExtractCustomerIntentAsync(string userMessage, CancellationToken ct = default)
+    {
+        try
+        {
+            var payload = new { user_message = userMessage };
+            var content = JsonContent.Create(payload, options: SnakeCaseOptions);
+            var response = await httpClient.PostAsync("/chatbot/v1/extraction/customer-intent", content, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("ChatbotService customer intent extraction failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+            return await response.Content.ReadFromJsonAsync<ChatbotCustomerIntentResponse>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("ChatbotService customer intent extraction timed out.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ChatbotService customer intent extraction failed.");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Extracts customer data from documents or text via the ChatbotService extraction endpoint.
     /// </summary>
     /// <param name="storagePaths">Storage paths of uploaded files.</param>
@@ -103,7 +177,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     /// <param name="files">Optional file data for multimodal extraction.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Extracted customer data, or null on failure.</returns>
-    public async Task<ChatbotExtractCustomerResponse?> ExtractCustomerAsync(
+    public virtual async Task<ChatbotExtractCustomerResponse?> ExtractCustomerAsync(
         List<string> storagePaths, string? rawText, List<ChatbotExtractionFileData>? files = null, CancellationToken ct = default)
     {
         try
@@ -168,6 +242,7 @@ internal class ChatbotSendMessageRequest
     public List<ChatbotAttachment>? Attachments { get; set; }
     public string? ResponseMimeType { get; set; }
     public object? ResponseSchema { get; set; }
+    public string? CallbackUrl { get; set; }
 }
 
 /// <summary>
@@ -217,6 +292,27 @@ public class ChatbotMessageResponse
     public List<ChatbotSuggestedAction> SuggestedActions { get; set; } = new();
     /// <summary>Creation timestamp.</summary>
     public DateTimeOffset CreatedAt { get; set; }
+    /// <summary>Thinking steps from AI agent processing.</summary>
+    public List<ChatbotThinkingStep> ThinkingSteps { get; set; } = new();
+}
+
+/// <summary>
+/// Thinking step from ChatbotService response.
+/// </summary>
+public class ChatbotThinkingStep
+{
+    /// <summary>Step number.</summary>
+    public int StepNumber { get; set; }
+    /// <summary>Type of thinking step.</summary>
+    public string Type { get; set; } = string.Empty;
+    /// <summary>Title of thinking step.</summary>
+    public string Title { get; set; } = string.Empty;
+    /// <summary>Detail description of thinking step.</summary>
+    public string Detail { get; set; } = string.Empty;
+    /// <summary>Timestamp when step occurred.</summary>
+    public DateTimeOffset Timestamp { get; set; }
+    /// <summary>Duration of step in milliseconds.</summary>
+    public long? DurationMs { get; set; }
 }
 
 /// <summary>
@@ -314,5 +410,17 @@ public class ChatbotExtractedAddress
     public string? RecipientPhone { get; set; }
 }
 
+/// <summary>
+/// Response from ChatbotService customer intent extraction.
+/// </summary>
+public class ChatbotCustomerIntentResponse
+{
+    /// <summary>Whether the user needs customer data.</summary>
+    public bool NeedsCustomerData { get; set; }
+    /// <summary>Customer search term extracted from message.</summary>
+    public string? CustomerSearchTerm { get; set; }
+    /// <summary>Whether the user needs activity history.</summary>
+    public bool NeedsHistory { get; set; }
+}
 
 #endregion

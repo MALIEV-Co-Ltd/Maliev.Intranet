@@ -1,4 +1,6 @@
 @page "/finance/receipts"
+@using Maliev.Intranet.Client.Components
+@inject IDialogService DialogService
 
 <PageTitle>Receipts - Maliev Intranet</PageTitle>
 
@@ -14,9 +16,10 @@
                       Margin="Margin.Dense" 
                       Style="max-width: 400px;" />
         
-        <MudButton Variant="Variant.Filled" 
-                   Color="Color.Primary" 
-                   StartIcon="@Icons.Material.Filled.Add">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
             Create Receipt
         </MudButton>
     </MudStack>
@@ -67,7 +70,7 @@ else
         {
             // TODO: Replace with BFF API call
             // _receipts = await Http.GetFromJsonAsync<List<ReceiptDto>>("api/receipts");
-            
+
             // Hard-cut to real data structures (database is currently empty)
             _receipts = new();
         }
@@ -78,6 +81,25 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateReceiptDialog>("Create Receipt", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            // Reload receipts list
+            await OnInitializedAsync();
         }
     }
 

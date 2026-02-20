@@ -1,0 +1,107 @@
+@using Maliev.Intranet.Shared
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_model.Name"
+                              Label="Material Name"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="Name is required" />
+
+                <MudTextField @bind-Value="_model.SKU"
+                              Label="SKU"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="SKU is required" />
+
+                <MudSelect @bind-Value="_model.Category"
+                           Label="Category"
+                           Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomCenter">
+                    <MudSelectItem Value="@("Plastics")">Plastics</MudSelectItem>
+                    <MudSelectItem Value="@("Metals")">Metals</MudSelectItem>
+                    <MudSelectItem Value="@("Composites")">Composites</MudSelectItem>
+                    <MudSelectItem Value="@("Others")">Others</MudSelectItem>
+                </MudSelect>
+
+                <MudNumericField @bind-Value="_model.UnitPrice"
+                                 Label="Unit Price"
+                                 Variant="Variant.Outlined"
+                                 Min="0m"
+                                 Format="N2" />
+
+                <MudTextField @bind-Value="_model.Unit"
+                              Label="Unit"
+                              Variant="Variant.Outlined"
+                              Placeholder="pcs, kg, m" />
+
+                <MudTextField @bind-Value="_model.Description"
+                              Label="Description"
+                              Variant="Variant.Outlined"
+                              Lines="3" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">Creating...</MudText>
+            }
+            else
+            {
+                <text>Create</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+    private CreateMaterialRequest _model = new();
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isSubmitting = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/materials", _model);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Material created successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to create material", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

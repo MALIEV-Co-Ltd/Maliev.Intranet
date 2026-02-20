@@ -1,0 +1,243 @@
+@page "/sales/orders/{Id:guid}"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Helpers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Order Details - Maliev Intranet</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (_order == null)
+{
+    <MudAlert Severity="Severity.Error">Order not found.</MudAlert>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/sales/orders"))">
+        Back to Board
+    </MudButton>
+}
+else
+{
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    <MudPaper Elevation="0" Class="pa-4 mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudText Typo="Typo.h5">Order @_order.OrderNumber</MudText>
+                <MudChip T="string" Size="Size.Medium" Color="@GetStatusColor(_order.Status)">
+                    @_order.Status
+                </MudChip>
+            </MudStack>
+
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Outlined.Edit"
+                           OnClick="@OpenEditDialog">
+                    Edit Order
+                </MudButton>
+                <MudMenu Label="Actions" 
+                         Variant="Variant.Outlined" 
+                         EndIcon="@Icons.Material.Filled.KeyboardArrowDown" 
+                         AnchorOrigin="Origin.BottomRight" 
+                         TransformOrigin="Origin.TopRight">
+                    <MudMenuItem Icon="@Icons.Material.Outlined.LocalShipping">Create Delivery Note</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Receipt">Generate Invoice</MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Cancel">Cancel Order</MudMenuItem>
+                </MudMenu>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudTabs Elevation="0" Rounded="true" Border="true" ApplyEffectsToContainer="true">
+                <MudTabPanel Text="Items" Icon="@Icons.Material.Outlined.Inventory2">
+                    <MudPaper Elevation="0" Class="pa-4">
+                        <MudTable Items="@_order.Items" Dense="true" Hover="true">
+                            <HeaderContent>
+                                <MudTh>Service Type</MudTh>
+                                <MudTh>Description</MudTh>
+                                <MudTh Style="text-align: right;">Qty</MudTh>
+                                <MudTh Style="text-align: right;">Unit Price</MudTh>
+                                <MudTh Style="text-align: right;">Total</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Service">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@context.ServiceType</MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="Description">
+                                    <MudText Typo="Typo.body2">@context.Description</MudText>
+                                    @if (!string.IsNullOrEmpty(context.ProductCode))
+                                    {
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary">SKU: @context.ProductCode</MudText>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Qty" Style="text-align: right;">@context.Quantity.ToString("N0")</MudTd>
+                                <MudTd DataLabel="Unit Price" Style="text-align: right;">@context.UnitPrice.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Total" Style="text-align: right;">@context.TotalPrice.ToString("C2")</MudTd>
+                            </RowTemplate>
+                            <FooterContent>
+                                <MudTFootRow>
+                                    <MudTd colspan="4" Style="text-align: right;"><strong>Grand Total</strong></MudTd>
+                                    <MudTd Style="text-align: right;"><strong>@_order.TotalAmount.ToString("C2")</strong></MudTd>
+                                </MudTFootRow>
+                            </FooterContent>
+                        </MudTable>
+                    </MudPaper>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Timeline" Icon="@Icons.Material.Outlined.History">
+                    <MudPaper Elevation="0" Class="pa-4">
+                        <MudTimeline TimelineAlign="TimelineAlign.Start">
+                            @foreach (var entry in _order.Timeline.OrderByDescending(t => t.Timestamp))
+                            {
+                                <MudTimelineItem Color="@GetStatusColor(entry.Status)" Size="Size.Small">
+                                    <ItemContent>
+                                        <MudText Typo="Typo.body1"><strong>@entry.Status</strong></MudText>
+                                        <MudText Typo="Typo.body2">@entry.Note</MudText>
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                            @entry.Timestamp.ToString("dd MMM yyyy HH:mm") • by @(entry.UpdatedBy ?? "System")
+                                        </MudText>
+                                    </ItemContent>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    </MudPaper>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Files" Icon="@Icons.Material.Outlined.AttachFile">
+                    <MudPaper Elevation="0" Class="pa-4">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">No files attached to this order.</MudText>
+                    </MudPaper>
+                </MudTabPanel>
+            </MudTabs>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudStack Spacing="4">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Order Info</MudText>
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">Customer:</MudText>
+                            <MudLink Href="@($"/sales/customers/{_order.CustomerId}")" Typo="Typo.body2">@_order.CustomerName</MudLink>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">Type:</MudText>
+                            <MudText Typo="Typo.body2">@_order.CustomerType</MudText>
+                        </MudStack>
+                        <MudDivider />
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">Order Date:</MudText>
+                            <MudText Typo="Typo.body2">@_order.CreatedAt.ToString("dd MMM yyyy")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">PO Number:</MudText>
+                            <MudText Typo="Typo.body2">@(_order.CustomerPoNumber ?? "N/A")</MudText>
+                        </MudStack>
+                        @if (_order.CustomerPoFileId.HasValue)
+                        {
+                            <MudStack Row="true" Justify="Justify.FlexEnd">
+                                <MudLink Typo="Typo.caption" Color="Color.Primary" Underline="Underline.Always">View PO Document</MudLink>
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Manufacturing Status</MudText>
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">Ordered Quantity:</MudText>
+                            <MudText Typo="Typo.body2">@(_order.OrderedQuantity?.ToString("N0") ?? "0")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">Manufactured:</MudText>
+                            <MudText Typo="Typo.body2">@(_order.ManufacturedQuantity?.ToString("N0") ?? "0")</MudText>
+                        </MudStack>
+                        @{
+                            var progress = _order.OrderedQuantity > 0 
+                                ? (double)(_order.ManufacturedQuantity ?? 0) / _order.OrderedQuantity.Value * 100 
+                                : 0;
+                        }
+                        <MudProgressLinear Color="Color.Success" Value="@progress" Class="my-2" />
+                        <MudText Typo="Typo.caption" Align="Align.Center">@progress.ToString("N1")% Complete</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private OrderDetailDto? _order;
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrder();
+
+        _breadcrumbs = 
+        [
+            new BreadcrumbItem("Home", href: "/"),
+            new BreadcrumbItem("Sales", href: null, disabled: true),
+            new BreadcrumbItem("Orders", href: "/sales/orders"),
+            new BreadcrumbItem(_order?.OrderNumber ?? "Detail", href: null, disabled: true)
+        ];
+    }
+
+    private async Task LoadOrder()
+    {
+        try
+        {
+            _isLoading = true;
+            _order = await Http.GetFromJsonAsync<OrderDetailDto>($"api/orders/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading order: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenEditDialog()
+    {
+        if (_order == null) return;
+
+        var parameters = new DialogParameters<EditOrderDialog>
+        {
+            { x => x.OrderId, Id.ToString() },
+            { x => x.Order, _order }
+        };
+        var dialog = await DialogService.ShowAsync<EditOrderDialog>("Edit Order", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadOrder();
+        }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "New" => Color.Default,
+        "Processing" => Color.Primary,
+        "Shipped" => Color.Info,
+        "Delivered" => Color.Success,
+        "Cancelled" => Color.Error,
+        "OnHold" => Color.Warning,
+        _ => Color.Default
+    };
+}

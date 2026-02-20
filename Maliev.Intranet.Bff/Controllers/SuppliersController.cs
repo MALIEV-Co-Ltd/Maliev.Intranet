@@ -40,4 +40,37 @@ public class SuppliersController(SupplierServiceClient client) : ControllerBase
         var result = await client.GetSupplierByIdAsync(id);
         return result != null ? Ok(result) : NotFound();
     }
+
+    /// <summary>
+    /// Creates a new supplier.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Supplier.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateSupplierRequest request, CancellationToken ct)
+    {
+        var response = await client.CreateSupplierAsync(request, ct);
+        return response.IsSuccessStatusCode ? StatusCode(201) : StatusCode((int)response.StatusCode);
+    }
+
+    /// <summary>
+    /// Updates an existing supplier.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Supplier.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateSupplierRequest request, CancellationToken ct)
+    {
+        var response = await client.UpdateSupplierAsync(id, request, ct);
+        return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
+    }
+
+    /// <summary>
+    /// Deactivates a supplier.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Supplier.Delete, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}/deactivate")]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
+    {
+        var response = await client.DeactivateSupplierAsync(id, ct);
+        return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
+    }
 }

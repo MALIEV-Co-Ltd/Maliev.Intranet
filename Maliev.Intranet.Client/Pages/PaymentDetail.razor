@@ -1,0 +1,187 @@
+@page "/finance/payments/{Id:guid}"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Payment Details - Maliev Intranet</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (_payment == null)
+{
+    <MudAlert Severity="Severity.Error">Payment not found.</MudAlert>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/finance/payments"))">
+        Back to List
+    </MudButton>
+}
+else
+{
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    <MudPaper Elevation="0" Class="pa-4 mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudText Typo="Typo.h5">Payment @_payment.PaymentNumber</MudText>
+                <MudChip T="string" Size="Size.Medium" Color="@GetStatusColor(_payment.Status)">
+                    @_payment.Status
+                </MudChip>
+            </MudStack>
+
+            <MudStack Row="true" Spacing="2">
+                @if (_payment.Status != "Voided")
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               StartIcon="@Icons.Material.Outlined.Cancel"
+                               OnClick="@VoidPayment">
+                        Void Payment
+                    </MudButton>
+                }
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.h6" Class="mb-3">Payment Information</MudText>
+                <MudStack Spacing="2">
+                    <MudStack Row="true">
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Amount:</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@_payment.Amount.ToString("N2") @_payment.Currency</MudText>
+                    </MudStack>
+                    <MudStack Row="true">
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Method:</MudText>
+                        <MudText Typo="Typo.body2">@_payment.PaymentMethod</MudText>
+                    </MudStack>
+                    <MudStack Row="true">
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Payment Date:</MudText>
+                        <MudText Typo="Typo.body2">@_payment.PaymentDate.ToString("dd MMM yyyy")</MudText>
+                    </MudStack>
+                    @if (!string.IsNullOrEmpty(_payment.CustomerName))
+                    {
+                        <MudStack Row="true">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Customer:</MudText>
+                            <MudText Typo="Typo.body2">@_payment.CustomerName</MudText>
+                        </MudStack>
+                    }
+                    @if (_payment.InvoiceId.HasValue)
+                    {
+                        <MudStack Row="true">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Invoice:</MudText>
+                            <MudLink Href="@($"/finance/invoices/{_payment.InvoiceId}")" Color="Color.Primary">
+                                @(_payment.InvoiceNumber ?? _payment.InvoiceId.ToString())
+                            </MudLink>
+                        </MudStack>
+                    }
+                    @if (!string.IsNullOrEmpty(_payment.Notes))
+                    {
+                        <MudStack Row="true">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Notes:</MudText>
+                            <MudText Typo="Typo.body2">@_payment.Notes</MudText>
+                        </MudStack>
+                    }
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.h6" Class="mb-3">Activity</MudText>
+                <MudTimeline TimelineAlign="TimelineAlign.Start" TimelinePosition="TimelinePosition.Start">
+                    <MudTimelineItem Color="Color.Success" Size="Size.Small">
+                        <ItemContent>
+                            <MudText Typo="Typo.body1"><strong>Payment Recorded</strong></MudText>
+                            <MudText Typo="Typo.body2">@_payment.CreatedAt.ToString("dd MMM yyyy HH:mm")</MudText>
+                            @if (!string.IsNullOrEmpty(_payment.CreatedBy))
+                            {
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">by @_payment.CreatedBy</MudText>
+                            }
+                        </ItemContent>
+                    </MudTimelineItem>
+                    @if (_payment.Status == "Voided" && _payment.VoidedAt.HasValue)
+                    {
+                        <MudTimelineItem Color="Color.Error" Size="Size.Small">
+                            <ItemContent>
+                                <MudText Typo="Typo.body1"><strong>Voided</strong></MudText>
+                                <MudText Typo="Typo.body2">@_payment.VoidedAt.Value.ToString("dd MMM yyyy HH:mm")</MudText>
+                            </ItemContent>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private PaymentDetailDto? _payment;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPayment();
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/"),
+            new BreadcrumbItem("Finance", href: null, disabled: true),
+            new BreadcrumbItem("Payments", href: "/finance/payments"),
+            new BreadcrumbItem(_payment?.PaymentNumber ?? Id.ToString(), href: null, disabled: true)
+        };
+    }
+
+    private async Task LoadPayment()
+    {
+        try
+        {
+            _isLoading = true;
+            _payment = await Http.GetFromJsonAsync<PaymentDetailDto>($"api/payments/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading payment: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task VoidPayment()
+    {
+        if (_payment == null) return;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/payments/{Id}/void", new VoidPaymentRequest { Reason = "Voided by user" });
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Payment voided successfully.", Severity.Success);
+                await LoadPayment();
+            }
+            else
+            {
+                Snackbar.Add("Failed to void payment.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetStatusColor(string? status) => status switch
+    {
+        "Completed" => Color.Success,
+        "Pending" => Color.Warning,
+        "Voided" => Color.Error,
+        _ => Color.Default
+    };
+}

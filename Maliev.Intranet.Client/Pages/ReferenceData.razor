@@ -1,4 +1,5 @@
 @page "/admin/reference-data"
+@inject Maliev.Intranet.Shared.Services.IReferenceDataService ReferenceDataService
 
 <PageTitle>Reference Data - Maliev Intranet</PageTitle>
 
@@ -20,18 +21,10 @@
                         <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Upload">Import CSV</MudButton>
                     </MudStack>
                     
-                    <MudDataGrid T="CountryDto" Items="@_countries" Dense="true" Hover="true" Elevation="0">
+                    <MudDataGrid T="Maliev.Intranet.Shared.CountryDto" Items="@_countries" Dense="true" Hover="true" Elevation="0">
                         <Columns>
                             <PropertyColumn Property="x => x.Code" Title="Code" />
                             <PropertyColumn Property="x => x.Name" Title="Name" />
-                            <PropertyColumn Property="x => x.Region" Title="Region" />
-                            <TemplateColumn Title="Status">
-                                <CellTemplate>
-                                    <MudChip Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
-                                        @(context.Item.IsActive ? "Active" : "Inactive")
-                                    </MudChip>
-                                </CellTemplate>
-                            </TemplateColumn>
                             <TemplateColumn Title="Actions" Sortable="false">
                                 <CellTemplate>
                                     <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
@@ -81,18 +74,14 @@
 @code {
     private bool _isLoading = true;
     private string _searchString = "";
-    private List<CountryDto> _countries = new();
+    private List<Maliev.Intranet.Shared.CountryDto> _countries = new();
     private List<CurrencyDto> _currencies = new();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // TODO: Replace with BFF API call
-            // _countries = await Http.GetFromJsonAsync<List<CountryDto>>("api/countries");
-            // _currencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/currencies");
-            
-            _countries = new();
+            _countries = await ReferenceDataService.GetCountriesAsync();
             _currencies = new();
         }
         catch (Exception ex)
@@ -103,14 +92,6 @@
         {
             _isLoading = false;
         }
-    }
-
-    public class CountryDto
-    {
-        public string Code { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Region { get; set; } = "";
-        public bool IsActive { get; set; }
     }
 
     public class CurrencyDto

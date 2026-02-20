@@ -1,0 +1,362 @@
+@using System.Text.Json
+@using Maliev.Intranet.Client.Services
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject LayoutService LayoutService
+
+<MudPaper Elevation="@Elevation" Class="@PaperClass" Style="@PaperStyle">
+    @* Toolbar *@
+    <MudToolBar Dense="true" Class="note-editor-toolbar gap-2">
+        <MudIconButton Icon="@(_isEditing ? Icons.Material.Filled.Visibility : Icons.Material.Filled.Edit)"
+                       Size="Size.Small"
+                       OnClick="() => SetEditMode(!_isEditing)" />
+        @if (_isEditing)
+        {
+            <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+            <MudMenu Icon="@Icons.Material.Filled.Title" Size="Size.Small" Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" title="Heading Levels" aria-label="Heading levels">
+                <MudMenuItem OnClick='() => InsertPrefix("# ")'>Heading 1 (#)</MudMenuItem>
+                <MudMenuItem OnClick='() => InsertPrefix("## ")'>Heading 2 (##)</MudMenuItem>
+                <MudMenuItem OnClick='() => InsertPrefix("### ")'>Heading 3 (###)</MudMenuItem>
+            </MudMenu>
+            <MudIconButton Icon="@Icons.Material.Filled.FormatBold" Size="Size.Small" OnClick='() => WrapSelection("**", "**", "bold text")' />
+            <MudIconButton Icon="@Icons.Material.Filled.FormatItalic" Size="Size.Small" OnClick='() => WrapSelection("_", "_", "italic text")' />
+            <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+            <MudIconButton Icon="@Icons.Material.Filled.FormatListBulleted" Size="Size.Small" OnClick='() => InsertPrefix("- ")' />
+            <MudIconButton Icon="@Icons.Material.Filled.FormatListNumbered" Size="Size.Small" OnClick='() => InsertPrefix("1. ")' />
+            <MudIconButton Icon="@Icons.Material.Filled.CheckBox" Size="Size.Small" OnClick='() => InsertPrefix("- [ ] ")' />
+            <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+            <MudIconButton Icon="@Icons.Material.Filled.FormatQuote" Size="Size.Small" OnClick='() => InsertPrefix("> ")' />
+            <MudIconButton Icon="@Icons.Material.Filled.Code" Size="Size.Small" OnClick='() => WrapSelection("`", "`", "code")' />
+            <MudIconButton Icon="@Icons.Material.Filled.Link" Size="Size.Small" OnClick='() => WrapSelection("[", "](url)", "link text")' />
+            <MudIconButton Icon="@Icons.Material.Filled.TableChart" Size="Size.Small" OnClick="InsertTable" />
+        }
+    </MudToolBar>
+
+    @* Content Area *@
+    <div class="note-editor-content" style="@ContentStyle">
+        @if (_isEditing)
+        {
+            <MudTextField T="string"
+                          id="@_editorId"
+                          Value="@Value"
+                          ValueChanged="OnValueChanged"
+                          Lines="@(Compact ? 6 : 10)"
+                          Variant="Variant.Text"
+                          Placeholder="Enter note content... Markdown is supported."
+                          AutoGrow="true"
+                          Immediate="true"
+                          Counter="5000"
+                          MaxLength="5000"
+                          Class="note-text-field"
+                          Style="font-family: 'Roboto Mono', 'Noto Sans', 'Noto Sans Thai', monospace; font-size: 0.95rem; line-height: 1.6;" />
+        }
+        else
+        {
+            @if (string.IsNullOrWhiteSpace(Value))
+            {
+                <div class="d-flex flex-column align-center justify-center py-12 opacity-40">
+                    <MudIcon Icon="@Icons.Material.Filled.EditNote" Size="Size.Large" Class="mb-2" />
+                    <MudText Typo="Typo.body1">No content yet. Click the edit button to start writing.</MudText>
+                </div>
+            }
+            else
+            {
+                <div class="note-content-preview" style="user-select: text;">
+                    <MarkdownRenderer Markdown="@Value" />
+                </div>
+            }
+        }
+    </div>
+</MudPaper>
+
+@* Activity Section (below the editor paper, only for existing notes) *@
+@if (ShowActivityTab && NoteId.HasValue)
+{
+    <MudPaper Elevation="0" Class="ma-4 border-solid border-1 mud-border-lines-default">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" Color="Color.Secondary" />
+            <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">Activity</MudText>
+            @if (_noteActivity.Count > 0)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">@_noteActivity.Count</MudChip>
+            }
+        </MudStack>
+
+        @if (_noteActivityLoading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+        }
+        else
+        {
+            <div class="overflow-y-auto pr-2 mb-4" style="max-height: 400px;">
+                <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start" TimelineAlign="TimelineAlign.Start" Reverse="false" Class="pa-0 compact-timeline">
+                    @foreach (var item in _noteActivity)
+                    {
+                        var type = item.TryGetProperty("Type", out var tProp) ? tProp.GetString() : (item.TryGetProperty("type", out var t2Prop) ? t2Prop.GetString() : "");
+                        var actionName = (item.TryGetProperty("Action", out var aProp) ? aProp.GetString() : (item.TryGetProperty("action", out var a2Prop) ? a2Prop.GetString() : "")) ?? "";
+
+                        var actorName = type == "Comment"
+                            ? (item.TryGetProperty("CreatedByName", out var cnProp) ? cnProp.GetString() : (item.TryGetProperty("createdByName", out var cn2Prop) ? cn2Prop.GetString() : "User"))
+                            : (item.TryGetProperty("ActorName", out var anProp) ? anProp.GetString() : (item.TryGetProperty("actorName", out var an2Prop) ? an2Prop.GetString() : "System"));
+                        var timestampStr = item.TryGetProperty("Timestamp", out var tsProp) ? tsProp.GetString() : (item.TryGetProperty("timestamp", out var ts2Prop) ? ts2Prop.GetString() : null);
+                        var timestamp = !string.IsNullOrEmpty(timestampStr) ? DateTime.Parse(timestampStr).ToLocalTime() : DateTime.Now;
+                        var action = type == "Comment"
+                            ? "commented"
+                            : $"performed {actionName}";
+
+                        <MudTimelineItem Color="@(type == "Comment" ? Color.Primary : GetActivityColor(actionName))"
+                                         Variant="Variant.Outlined"
+                                         Icon="@(type == "Comment" ? Icons.Material.Filled.Comment : GetActivityIcon(actionName))"
+                                         Size="Size.Small">
+                            <ItemContent>
+                                <div>
+                                    <MudStack Spacing="0">
+                                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                            <MudText Typo="Typo.caption" Style="font-weight: 700;">@actorName</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@action</MudText>
+                                            <MudSpacer />
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatTimeAgo(timestamp)</MudText>
+                                        </MudStack>
+                                        @if (type == "Comment")
+                                        {
+                                            <div class="mud-bg-surface-light border-solid border-1 mud-border-lines-default">
+                                                <MudText Typo="Typo.body2" Style="line-height: 1.4;">@(item.TryGetProperty("CommentText", out var ctProp) ? ctProp.GetString() : (item.TryGetProperty("commentText", out var ct2Prop) ? ct2Prop.GetString() : ""))</MudText>
+                                            </div>
+                                        }
+                                    </MudStack>
+                                </div>
+                            </ItemContent>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            </div>
+
+            @* Add Comment *@
+            <div class="border-t pt-3 mud-border-lines-default">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudTextField @bind-Value="_newNoteComment"
+                                  Placeholder="Add a comment..."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  Class="flex-grow-1 rounded-lg" />
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Medium"
+                               OnClick="PostNoteComment"
+                               Disabled="@(string.IsNullOrWhiteSpace(_newNoteComment))"
+                               Class="rounded-lg shadow-none px-4"
+                               StartIcon="@Icons.Material.Filled.Send">Send</MudButton>
+                </MudStack>
+            </div>
+        }
+    </MudPaper>
+}
+
+@implements IDisposable
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool ShowActivityTab { get; set; } = false;
+    [Parameter] public Guid? NoteId { get; set; }
+    [Parameter] public bool StartInEditMode { get; set; } = false;
+    [Parameter] public bool Compact { get; set; } = false;
+    [Parameter] public int Elevation { get; set; } = 2;
+
+    private string _editorId = $"note-editor-{Guid.NewGuid():N}";
+    private bool _isEditing;
+    private List<JsonElement> _noteActivity = [];
+    private bool _noteActivityLoading = false;
+    private string _newNoteComment = "";
+    private Guid? _previousNoteId;
+
+    private string PaperClass => "note-editor-paper rounded overflow-hidden";
+    private string PaperStyle => LayoutService.IsDarkMode
+        ? "background-color: var(--mud-palette-surface);"
+        : "background-color: #ffffff;";
+    private string ContentStyle => Compact
+        ? "min-height: 180px;"
+        : "min-height: 300px;";
+
+    protected override void OnInitialized()
+    {
+        _isEditing = StartInEditMode;
+        LayoutService.MajorUpdateOccurred += OnThemeChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_isEditing)
+        {
+            await JSRuntime.InvokeVoidAsync("noteEditorInterop.setupEditor", _editorId);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (NoteId != _previousNoteId)
+        {
+            _previousNoteId = NoteId;
+            if (ShowActivityTab && NoteId.HasValue)
+            {
+                await LoadNoteActivity();
+            }
+            else
+            {
+                _noteActivity = [];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Switches the editor to preview mode and reloads activity. Call from parent after a successful save.
+    /// </summary>
+    public async Task SwitchToPreview()
+    {
+        _isEditing = false;
+        if (ShowActivityTab && NoteId.HasValue)
+        {
+            await LoadNoteActivity();
+        }
+        StateHasChanged();
+    }
+
+    private void SetEditMode(bool editing)
+    {
+        _isEditing = editing;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        LayoutService.MajorUpdateOccurred -= OnThemeChanged;
+    }
+
+    private async Task OnValueChanged(string newValue)
+    {
+        Value = newValue;
+        await ValueChanged.InvokeAsync(newValue);
+    }
+
+    private record SelectionInfo(int Start, int End, string Text);
+
+    private async Task WrapSelection(string prefix, string suffix, string placeholder)
+    {
+        var selection = await JSRuntime.InvokeAsync<SelectionInfo>("noteEditorInterop.getSelection", _editorId);
+        var selectedText = string.IsNullOrEmpty(selection.Text) ? placeholder : selection.Text;
+        var replacement = prefix + selectedText + suffix;
+        await JSRuntime.InvokeVoidAsync("noteEditorInterop.replaceSelection", _editorId, replacement);
+        // The JS dispatches an input event which Blazor picks up via the binding
+    }
+
+    private async Task InsertPrefix(string prefix)
+    {
+        var selection = await JSRuntime.InvokeAsync<SelectionInfo>("noteEditorInterop.getSelection", _editorId);
+        var needsNewline = selection.Start > 0 && Value.Length > 0 && !Value[..selection.Start].EndsWith('\n');
+        var replacement = (needsNewline ? "\n" : "") + prefix;
+        await JSRuntime.InvokeVoidAsync("noteEditorInterop.replaceSelection", _editorId, replacement);
+    }
+
+    private async Task InsertTable()
+    {
+        var template = "| Header 1 | Header 2 | Header 3 |\n| --- | --- | --- |\n| Cell 1 | Cell 2 | Cell 3 |";
+        var selection = await JSRuntime.InvokeAsync<SelectionInfo>("noteEditorInterop.getSelection", _editorId);
+        var needsNewline = selection.Start > 0 && Value.Length > 0 && !Value[..selection.Start].EndsWith('\n');
+        var replacement = (needsNewline ? "\n" : "") + template;
+        await JSRuntime.InvokeVoidAsync("noteEditorInterop.replaceSelection", _editorId, replacement);
+    }
+
+    #region Activity & Comments
+
+    private async Task LoadNoteActivity()
+    {
+        if (!NoteId.HasValue) return;
+        _noteActivityLoading = true;
+        try
+        {
+            var activity = await Http.GetFromJsonAsync<List<JsonElement>>($"api/customers/notes/{NoteId}/activity");
+            _noteActivity = activity ?? [];
+        }
+        catch { _noteActivity = []; }
+        finally { _noteActivityLoading = false; StateHasChanged(); }
+    }
+
+    private async Task PostNoteComment()
+    {
+        if (string.IsNullOrWhiteSpace(_newNoteComment) || !NoteId.HasValue) return;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/customers/notes/{NoteId}/comments", new { commentText = _newNoteComment });
+            if (response.IsSuccessStatusCode)
+            {
+                _newNoteComment = "";
+                await LoadNoteActivity();
+                Snackbar.Add("Comment posted", Severity.Success);
+            }
+        }
+        catch { }
+    }
+
+    private static string FormatTimeAgo(DateTime timestamp)
+    {
+        var diff = DateTime.UtcNow - timestamp.ToUniversalTime();
+        if (diff.TotalDays >= 1) return $"{(int)diff.TotalDays}d ago";
+        if (diff.TotalHours >= 1) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalMinutes >= 1) return $"{(int)diff.TotalMinutes}m ago";
+        return "just now";
+    }
+
+    private static string GetActivityIcon(string action) => action switch
+    {
+        "Create" => Icons.Material.Filled.AddCircle,
+        "Update" => Icons.Material.Filled.Edit,
+        "SoftDelete" => Icons.Material.Filled.Delete,
+        _ => Icons.Material.Filled.History
+    };
+
+    private static Color GetActivityColor(string action) => action switch
+    {
+        "Create" => Color.Success,
+        "Update" => Color.Primary,
+        "SoftDelete" => Color.Error,
+        _ => Color.Default
+    };
+
+    #endregion
+}
+
+<style>
+    .note-editor-toolbar {
+        background-color: var(--mud-palette-surface);
+        border-bottom: 1px solid var(--mud-palette-divider);
+    }
+
+    .note-editor-content {
+        padding: 16px 20px;
+    }
+
+    .note-editor-content .note-text-field .mud-input-control-input-container { padding: 0 !important; }
+    .note-editor-content .note-text-field textarea {
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        font-family: 'Roboto Mono', 'Noto Sans', 'Noto Sans Thai', monospace;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    .note-editor-content .note-content-preview .markdown-content {
+        font-size: 1rem;
+    }
+
+    .note-editor-paper .compact-timeline .mud-timeline-item {
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+    }
+</style>

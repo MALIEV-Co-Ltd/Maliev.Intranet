@@ -1,0 +1,117 @@
+@using Maliev.Intranet.Shared
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudStack Spacing="3">
+                <MudTextField Label="Name"
+                              @bind-Value="_name"
+                              Required="true"
+                              Variant="Variant.Outlined" />
+
+                <MudTextField Label="Description"
+                              @bind-Value="_description"
+                              Lines="3"
+                              Variant="Variant.Outlined" />
+
+                <MudTextField Label="Category"
+                              @bind-Value="_category"
+                              Variant="Variant.Outlined" />
+
+                <MudNumericField T="decimal?"
+                                 Label="Unit Price"
+                                 @bind-Value="_unitPrice"
+                                 Min="0"
+                                 Variant="Variant.Outlined" />
+
+                <MudTextField Label="Unit of Measure"
+                              @bind-Value="_unit"
+                              Variant="Variant.Outlined" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@(!_isValid || _isSaving)"
+                   OnClick="Submit">
+            @if (_isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Save Changes
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Guid MaterialId { get; set; }
+
+    [Parameter]
+    public MaterialDetailDto? Material { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+    private string _name = string.Empty;
+    private string? _description;
+    private string? _category;
+    private decimal? _unitPrice;
+    private string? _unit;
+
+    protected override void OnParametersSet()
+    {
+        if (Material != null)
+        {
+            _name = Material.Name;
+            _description = Material.Description;
+            _category = Material.Category;
+            _unitPrice = Material.UnitPrice;
+            _unit = Material.Unit;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isSaving = true;
+        try
+        {
+            var request = new UpdateMaterialRequest
+            {
+                Name = _name,
+                Description = _description,
+                Category = _category,
+                UnitPrice = _unitPrice,
+                Unit = _unit
+            };
+            var response = await Http.PutAsJsonAsync($"api/materials/{MaterialId}", request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Material updated successfully.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to update material.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

@@ -22,7 +22,7 @@ public static class MalievPermissions
     {
         public const string Read = "customer.customers.read";
         public const string Write = "customer.customers.write";
-        
+
         public static class Profile
         {
             public const string Read = "customer.profile.read";
@@ -66,6 +66,7 @@ public static class MalievPermissions
     {
         public const string Read = "invoice.invoices.read";
         public const string Write = "invoice.invoices.write";
+        public const string Create = "invoice.invoices.write"; // Map to Write
     }
 
     public static class Employee
@@ -107,5 +108,89 @@ public static class MalievPermissions
     {
         public const string HealthRead = "system.health.read";
         public const string DiagnosticsRead = "system.diagnostics.read";
+    }
+
+    // New Domains
+
+    public static class Accounting
+    {
+        public const string Read = "accounting.accounts.read";
+        public const string Write = "accounting.accounts.write";
+
+        public static class Journal
+        {
+            public const string Read = "accounting.journals.read";
+            public const string Write = "accounting.journals.write";
+        }
+    }
+
+    public static class Receipt
+    {
+        public const string Read = "receipt.receipts.read";
+        public const string Write = "receipt.receipts.write";
+    }
+
+    public static class Onboarding
+    {
+        public const string Read = "onboarding.tasks.read";
+        public const string Write = "onboarding.tasks.write";
+    }
+
+    public static class PurchaseOrder
+    {
+        public const string Read = "purchase-order.orders.read";
+        public const string Write = "purchase-order.orders.write";
+    }
+
+    public static class Compliance
+    {
+        public const string Read = "compliance.records.read";
+        public const string Write = "compliance.records.write";
+    }
+
+    public static class Performance
+    {
+        public const string Read = "performance.reviews.read";
+        public const string Write = "performance.reviews.write";
+    }
+
+    public static class Compensation
+    {
+        public const string Read = "compensation.salaries.read";
+        public const string Write = "compensation.salaries.write";
+    }
+
+    public static class BillingNote
+    {
+        public const string Read = "billing.notes.read";
+        public const string Write = "billing.notes.write";
+    }
+
+    public static class Preference
+    {
+        public const string Read = "preference.preferences.read";
+        public const string Write = "preference.preferences.write";
+    }
+
+    public static class Notification
+    {
+        public const string ReadTemplate = "notification.templates.read";
+        public const string WriteTemplate = "notification.templates.write";
+    }
+
+    public static class Pricing
+    {
+        public const string ReadConfig = "pricing.configuration.read";
+        public const string WriteConfig = "pricing.configuration.write";
+    }
+
+    public static class Delivery
+    {
+        public const string Read = "delivery.delivery-notes.read";
+        public const string Create = "delivery.delivery-notes.create";
+        public const string Update = "delivery.delivery-notes.update";
+        public const string Delete = "delivery.delivery-notes.delete";
+        public const string UpdateStatus = "delivery.delivery-notes.update-status";
+        public const string GeneratePdf = "delivery.delivery-notes.generate-pdf";
     }
 }

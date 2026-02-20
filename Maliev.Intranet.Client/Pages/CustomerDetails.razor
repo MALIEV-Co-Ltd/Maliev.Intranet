@@ -12,11 +12,12 @@
 @inject ISignalRCustomerService SignalRService
 @inject IJSRuntime JSRuntime
 @inject LayoutService LayoutService
+@inject ILogger<CustomerDetails> Logger
 @implements IAsyncDisposable
 
 <PageTitle>@(_customer?.Name ?? "Customer Details") - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16 pt-8">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16" Gutters="false">
     @if (_customer == null && !_loading)
     {
         <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="rounded-lg">Customer not found.</MudAlert>
@@ -24,53 +25,84 @@
     else if (_loading && _customer == null)
     {
         <MudGrid>
-            <MudItem xs="12" lg="8">
+            <MudItem xs="12">
                 <MudSkeleton Height="60px" Class="mb-4 rounded-lg" />
                 <MudSkeleton Height="400px" Class="rounded-lg" />
-            </MudItem>
-            <MudItem xs="12" lg="4">
-                <MudSkeleton Height="300px" Class="mb-4 rounded-lg" />
-                <MudSkeleton Height="200px" Class="rounded-lg" />
             </MudItem>
         </MudGrid>
     }
     else if (_customer != null)
     {
         <!-- Header -->
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-8">
-            <MudStack Spacing="0">
-                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudText Typo="Typo.h3" Style="font-weight: 700;">@_customer.Name</MudText>
-                    <MudChip T="string" Color="@GetStatusColor(_customer.Status)" Size="Size.Small" Variant="Variant.Filled" Class="mt-1">@_customer.Status</MudChip>
+        <!-- Header -->
+        <div class="d-flex flex-wrap align-center px-4 px-md-8 mb-4 gap-2">
+            @* Item 1: Name *@
+            <div class="d-flex align-center order-1 flex-grow-1 flex-md-grow-0" style="min-width: 0;">
+                <MudText Typo="Typo.h3" 
+                         Style="font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                         Class="flex-grow-1">
+                    @_customer.Name
+                </MudText>
+            </div>
+
+            @* Item 2: Badges - Goes to new line on mobile (order-3, w-100), stays inline on desktop (order-2, w-auto) *@
+            <div class="d-flex align-center order-3 order-md-2 w-100 w-md-auto mt-2 mt-md-0 ms-md-4">
+                <MudStack Row="true" Spacing="2">
+                    @if (_customer.Nda != null && _customer.Nda.Status == "Signed")
+                    {
+                        <MudTooltip Text="NDA Protected">
+                            <MudChip T="string" Icon="@Icons.Material.Filled.Shield" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Class="ma-0">Protected</MudChip>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudTooltip Text="No Signed NDA">
+                            <MudChip T="string" Icon="@Icons.Material.Filled.RemoveModerator" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0">Unprotected</MudChip>
+                        </MudTooltip>
+                    }
+                    
+                    <MudChip T="string" 
+                             Color="@GetStatusColor(_customer.Status)" 
+                             Size="Size.Small" 
+                             Variant="Variant.Filled"
+                             Class="ma-0">
+                        @_customer.Status
+                    </MudChip>
                 </MudStack>
-                <MudText Typo="Typo.body1" Color="Color.Secondary">Customer ID: @_customer.Id</MudText>
-            </MudStack>
-            
-            <MudStack Row="true" Spacing="2">
-                 <MudButton Variant="Variant.Outlined" 
-                            Color="Color.Primary" 
+            </div>
+
+            @* Spacer for desktop to push buttons to far right *@
+            <div class="order-md-2 flex-grow-1 d-none d-md-block"></div>
+
+            @* Item 3: Action Buttons *@
+            <div class="d-flex align-center order-2 order-md-3 ms-auto gap-2">
+                 <MudButton Variant="Variant.Outlined"
+                            Color="Color.Primary"
                             StartIcon="@(_isEditMode ? Icons.Material.Filled.Close : Icons.Material.Filled.Edit)"
                             OnClick="ToggleEditMode"
-                            Class="px-6 rounded-lg">
+                            Class="px-4 px-md-6 rounded-lg my-1"
+                            Style="white-space: nowrap;">
                      @( _isEditMode ? "Cancel Editing" : "Edit Profile")
                  </MudButton>
                  @if (!_isEditMode)
                  {
-                     <MudButton Variant="Variant.Filled" 
-                                Color="Color.Primary" 
+                     <MudButton Variant="Variant.Filled"
+                                Color="Color.Primary"
                                 StartIcon="@Icons.Material.Filled.Add"
-                                Class="px-6 rounded-lg shadow-none">
+                                Class="px-4 px-md-6 rounded-lg shadow-none my-1"
+                                Style="white-space: nowrap;">
                          Create Order
                      </MudButton>
                  }
                  else
                  {
-                     <MudButton Variant="Variant.Filled" 
-                                Color="Color.Primary" 
+                     <MudButton Variant="Variant.Filled"
+                                Color="Color.Primary"
                                 StartIcon="@Icons.Material.Filled.Save"
                                 OnClick="SaveChanges"
                                 Disabled="@_isSaving"
-                                Class="px-6 rounded-lg shadow-none">
+                                Class="px-4 px-md-6 rounded-lg shadow-none my-1"
+                                Style="white-space: nowrap;">
                          @if (_isSaving)
                          {
                              <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
@@ -82,12 +114,33 @@
                          }
                      </MudButton>
                  }
-            </MudStack>
+            </div>
+        </div>
+
+        <!-- Contact Info Bar -->
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Class="mb-8 px-4 px-md-8" Wrap="Wrap.Wrap">
+            @if (!string.IsNullOrEmpty(_customer.Email))
+            {
+                <a href="mailto:@_customer.Email" style="text-decoration: none; display: inline-flex;">
+                    <MudChip T="string" Icon="@Icons.Material.Filled.Email" Size="Size.Small" Variant="Variant.Text" Color="Color.Default" Style="cursor: pointer;">@_customer.Email</MudChip>
+                </a>
+            }
+            @if (!string.IsNullOrEmpty(_customer.Mobile))
+            {
+                <a href="tel:@_customer.Mobile" style="text-decoration: none; display: inline-flex;">
+                    <MudChip T="string" Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Variant="Variant.Text" Color="Color.Default" Style="cursor: pointer;">@_customer.Mobile</MudChip>
+                </a>
+            }
+            <MudChip T="string" Icon="@Icons.Material.Filled.Language" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">@(_customer.PreferredLanguage == "th" ? "Thai" : "English")</MudChip>
+            @if (!string.IsNullOrEmpty(_customer.Timezone))
+            {
+                <MudChip T="string" Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">@_customer.Timezone</MudChip>
+            }
         </MudStack>
 
-        <MudGrid Spacing="6">
-            <!-- Left Column: Main Content -->
-            <MudItem xs="12" lg="8">
+        <MudGrid Spacing="6" Class="px-4 px-md-8">
+            <!-- Main Content -->
+            <MudItem xs="12" lg="12">
                 <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
                     
                     @if (!_isEditMode)
@@ -95,6 +148,7 @@
                         @* View Mode Tabs *@
                         <MudTabPanel Text="Overview" Icon="@Icons.Material.Filled.Dashboard">
                             <MudGrid Spacing="4">
+                                @* Top Metrics *@
                                 <MudItem xs="12" sm="4">
                                     <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
                                         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Total Spent</MudText>
@@ -114,79 +168,198 @@
                                     </MudPaper>
                                 </MudItem>
 
-                                 <MudItem xs="12">
-                                     <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                         <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Recent Activity</MudText>
-                                         <div style="max-height: 400px; overflow-y: auto;" class="pr-2">
-                                             <MudStack Spacing="4">
-                                                 @if (_activities != null && _activities.Any())
-                                                 {
-                                                     @foreach (var activity in _activities.Take(20))
-                                                     {
-                                                         <div class="d-flex gap-4">
-                                                              <MudAvatar Color="@GetActivityColor(activity.Action)" Size="Size.Small" Variant="Variant.Filled" Style="color: white;">
-                                                                  <MudIcon Icon="@GetActivityIcon(activity.Action)" Size="Size.Small"/>
-                                                              </MudAvatar>
+                                @* Main Content Columns *@
+                                <MudItem xs="12" lg="6">
+                                    <MudStack Spacing="4">
+                                        @if (_customer.CompanyId.HasValue)
+                                        {
+                                            <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                        <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" />
+                                                        <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Details</MudText>
+                                                    </MudStack>
+                                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{_customer.CompanyId}"))">View Profile</MudButton>
+                                                </MudStack>
+                                                
+                                                <MudGrid Spacing="4">
+                                                    <MudItem xs="12">
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Company Name</MudText>
+                                                        <MudText Typo="Typo.body1" Style="font-weight: 600;">@_customer.CompanyName</MudText>
+                                                    </MudItem>
+                                                    @if (!string.IsNullOrEmpty(_customer.CompanyVatNumber))
+                                                    {
+                                                        <MudItem xs="12" sm="6">
+                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tax ID / VAT</MudText>
+                                                            <MudText Typo="Typo.body2">@_customer.CompanyVatNumber</MudText>
+                                                        </MudItem>
+                                                    }
+                                                    <MudItem xs="12" sm="6">
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Segment & Tier</MudText>
+                                                        <MudStack Row="true" Spacing="2">
+                                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info" Class="ma-0">@_customer.CompanySegment</MudChip>
+                                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="ma-0">@_customer.CompanyTier</MudChip>
+                                                        </MudStack>
+                                                    </MudItem>
+                                                    @if (_customer.CompanyBillingAddress != null)
+                                                    {
+                                                        <MudItem xs="12">
+                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Billing Address</MudText>
+                                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.AddressLine1</MudText>
+                                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City, @_customer.CompanyBillingAddress.PostalCode</MudText>
+                                                        </MudItem>
+                                                    }
+                                                </MudGrid>
+                                            </MudCard>
+                                        }
 
-                                                             <MudStack Spacing="0" Class="flex-grow-1">
-                                                                 <MudText Typo="Typo.body2" Style="font-weight: 500; white-space: pre-wrap;">@activity.Description</MudText>
-                                                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                                     @activity.Timestamp.ToLocalTime().ToString("g") • by 
-                                                                     @(!string.IsNullOrEmpty(activity.ActorName) ? $"{activity.ActorName} ({activity.ActorEmail})" : activity.ActorId)
-                                                                 </MudText>
-                                                             </MudStack>
-                                                         </div>
-                                                         @if (activity != _activities.Take(20).Last()) { <MudDivider /> }
-                                                     }
-                                                 }
-                                                 else
-                                                 {
-                                                     <MudAlert Severity="Severity.Info" Variant="Variant.Text">No recent activity found.</MudAlert>
-                                                 }
-                                             </MudStack>
-                                         </div>
-                                     </MudCard>
-                                 </MudItem>
+                                        @* Placeholder for Related Transactions *@
+                                        <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                            <MudText Typo="Typo.h6" Class="mb-4 font-bold">Related Transactions</MudText>
+                                            <MudStack Spacing="2">
+                                                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="rounded-lg">
+                                                    Transaction modules (Orders, Invoices, Quotations) are being integrated.
+                                                </MudAlert>
+                                                <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+                                                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ListAlt" Size="Size.Small" Disabled="true">Recent Orders</MudButton>
+                                                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.RequestPage" Size="Size.Small" Disabled="true">Pending Invoices</MudButton>
+                                                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.QuestionAnswer" Size="Size.Small" Disabled="true">Open Quotations</MudButton>
+                                                </MudStack>
+                                            </MudStack>
+                                        </MudCard>
+                                    </MudStack>
+                                </MudItem>
+
+                                <MudItem xs="12" lg="6">
+                                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
+                                        <MudText Typo="Typo.h6" Class="mb-6 font-bold">Recent Activity</MudText>
+                                        
+                                        <MudTable Items="_activities" 
+                                                  Hover="true" 
+                                                  Elevation="0" 
+                                                  Dense="true"
+                                                  Virtualize="true" 
+                                                  FixedHeader="true"
+                                                  Height="350px"
+                                                  Class="mud-width-full"
+                                          @ref="_virtualizeComponent">
+                                            <HeaderContent>
+                                                <MudTh Style="width: 50px"></MudTh>
+                                                <MudTh>Activity</MudTh>
+                                                <MudTh>Actor</MudTh>
+                                                <MudTh Style="width: 150px">Timestamp</MudTh>
+                                            </HeaderContent>
+                                            <RowTemplate>
+                                                <MudTd DataLabel="">
+                                                    <MudAvatar Color="GetActivityColor(context.Action)" Size="Size.Small">
+                                                        <MudIcon Icon="@GetActivityIcon(context.Action)" Size="Size.Small" />
+                                                    </MudAvatar>
+                                                </MudTd>
+                                                <MudTd DataLabel="Activity" Class="activity-item-content">
+                                                    <MarkdownRenderer Markdown="@SanitizeActivityDescription(context.Description)" />
+                                                </MudTd>
+                                                <MudTd DataLabel="Actor">
+                                                    <MudText Typo="Typo.body2">
+                                                        @(!string.IsNullOrEmpty(context.ActorName) ? context.ActorName : context.ActorId)
+                                                    </MudText>
+                                                </MudTd>
+                                                <MudTd DataLabel="Timestamp">
+                                                    <MudText Typo="Typo.caption">@context.Timestamp.ToLocalTime().ToString("g")</MudText>
+                                                </MudTd>
+                                            </RowTemplate>
+                                            <NoRecordsContent>
+                                                <MudAlert Severity="Severity.Info" Variant="Variant.Text">No recent activity found.</MudAlert>
+                                            </NoRecordsContent>
+                                        </MudTable>
+                                        
+                                        @if (_activityHasNextPage)
+                                        {
+                                            <div class="d-flex justify-center mt-4">
+                                                <MudButton OnClick="LoadMoreActivities" 
+                                                           Variant="Variant.Text" 
+                                                           Color="Color.Primary" 
+                                                           Size="Size.Small"
+                                                           Disabled="@_loadingMoreActivities">
+                                                    @if (_loadingMoreActivities)
+                                                    {
+                                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                                        <span>Loading...</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>Load more history</span>
+                                                    }
+                                                </MudButton>
+                                            </div>
+                                        }
+                                    </MudCard>
+
+                                </MudItem>
                             </MudGrid>
                         </MudTabPanel>
 
                         <MudTabPanel Text="Addresses" Icon="@Icons.Material.Filled.LocationOn">
                             <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
                                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
-                                    <MudText Typo="Typo.h6" Style="font-weight: 700;">Delivery & Billing</MudText>
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.h6" Style="font-weight: 700;">Delivery & Billing</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Drag and drop to set default addresses</MudText>
+                                    </MudStack>
                                     <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="AddAddressDialog">Add Address</MudButton>
                                 </MudStack>
                                 
-                                <MudGrid Spacing="4">
-                                    @if (_customer.Addresses != null && _customer.Addresses.Any())
-                                    {
-                                        @foreach (var (address, index) in _customer.Addresses.Select((a, i) => (a, i)))
-                                        {
-                                            <MudItem xs="12" sm="6" Class="d-flex">
-                                                <MudPaper Elevation="3" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default flex-grow-1"
-                                                          Style="@(LayoutService.IsDarkMode ? "background-color: #27272f;" : "background-color: #ffffff;")">
-                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-                                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                                            <MudIcon Icon="@(address.Type == "Billing" ? Icons.Material.Filled.ReceiptLong : Icons.Material.Filled.LocalShipping)" 
-                                                                     Color="@(address.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" />
-                                                            <MudChip T="string" Color="@(address.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@address.Type</MudChip>
-                                                        </MudStack>
-                                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
-                                                            @if (address.IsDefault)
-                                                            {
-                                                                <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;" Class="mr-2">DEFAULT</MudText>
-                                                            }
-                                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditAddressDialog(address))" />
-                                                            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="@(() => CopyAddressToClipboard(address))" />
-                                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteAddress(address))" />
-                                                        </MudStack>
-                                                    </MudStack>
+                                <MudDropContainer @ref="_dropContainer" T="AddressResponse" Items="_customer.Addresses" ItemsSelector="@((item, dropzone) => GetAddressZone(item) == dropzone)" ItemDropped="AddressItemDropped" Class="d-flex flex-column gap-6">
+                                    <ChildContent>
+                                        <div class="d-flex gap-6 mb-6 overflow-hidden" style="min-height: 250px;">
+                                            <div class="d-flex flex-column flex-grow-1" style="flex: 1 1 50%; min-width: 0;">
+                                                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2 ml-1" Style="font-weight: 700;">DEFAULT BILLING</MudText>
+                                                <MudDropZone T="AddressResponse" Identifier="billing-default" CanDropClass="mud-border-primary" Class="rounded-xl border-2 border-dashed mud-border-lines-default pa-4 d-flex flex-column gap-4 flex-grow-1" Style="background-color: var(--mud-palette-background-grey);">
+                                                </MudDropZone>
+                                            </div>
+                                            <div class="d-flex flex-column flex-grow-1" style="flex: 1 1 50%; min-width: 0;">
+                                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2 ml-1" Style="font-weight: 700;">DEFAULT SHIPPING</MudText>
+                                                <MudDropZone T="AddressResponse" Identifier="shipping-default" CanDropClass="mud-border-primary" Class="rounded-xl border-2 border-dashed mud-border-lines-default pa-4 d-flex flex-column gap-4 flex-grow-1" Style="background-color: var(--mud-palette-background-grey);">
+                                                </MudDropZone>
+                                            </div>
+                                        </div>
 
-                                                    @if (address.Type == "Billing")
+                                        <MudDivider Class="mb-6" />
+
+                                        <div class="d-flex flex-column">
+                                            <MudText Typo="Typo.subtitle2" Color="Color.Default" Class="mb-2 ml-1" Style="font-weight: 700;">OTHER ADDRESSES</MudText>
+                                            <MudDropZone T="AddressResponse" Identifier="others" CanDropClass="mud-border-primary" Class="rounded-xl border-2 border-dashed mud-border-lines-default pa-4 d-flex flex-row flex-wrap gap-6" Style="min-height: 200px; background-color: var(--mud-palette-background-grey);">
+                                            </MudDropZone>
+                                        </div>
+                                    </ChildContent>
+                                    <ItemRenderer>
+                                        <div @key="context.Id" class="d-flex" style="width: 100%;">
+                                            <MudPaper Elevation="3" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default flex-grow-1 d-flex flex-column"
+                                                      Style="background-color: var(--mud-palette-surface);">
+                                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                        <MudIcon Icon="@(context.Type == "Billing" ? Icons.Material.Filled.ReceiptLong : Icons.Material.Filled.LocalShipping)" 
+                                                                 Color="@(context.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" />
+                                                        <MudChip T="string" Color="@(context.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@context.Type</MudChip>
+                                                    </MudStack>
+                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
+                                                        @if (context.IsDefault)
+                                                        {
+                                                            <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;" Class="mr-2">DEFAULT</MudText>
+                                                        }
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditAddressDialog(context))" />
+                                                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="@(() => CopyAddressToClipboard(context))" />
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteAddress(context))" />
+                                                    </MudStack>
+                                                </MudStack>
+
+                                                <div class="flex-grow-1 overflow-hidden">
+                                                    @if (context.Type == "Billing")
                                                     {
                                                         if (_customer.CompanyId.HasValue)
                                                         {
-                                                            <MudText Typo="Typo.body2" Style="font-weight: 700;">@_customer.CompanyName</MudText>
+                                                            <MudLink OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{_customer.CompanyId}"))" Underline="Underline.None" Color="Color.Default">
+                                                                <MudText Typo="Typo.body2" Style="font-weight: 700;" Class="hover-primary">@_customer.CompanyName</MudText>
+                                                            </MudLink>
                                                             @if (!string.IsNullOrEmpty(_customer.CompanyVatNumber))
                                                             {
                                                                 <MudText Typo="Typo.caption" Class="d-block mb-2">เลขประจำตัวผู้เสียภาษี @_customer.CompanyVatNumber</MudText>
@@ -199,274 +372,608 @@
                                                         }
                                                     }
 
-                                                    @if (address.Type == "Shipping")
+                                                    @if (context.Type == "Shipping")
                                                     {
                                                         <MudStack Spacing="0" Class="mb-2">
-                                                            <MudText Typo="Typo.body2" Style="font-weight: 700;">@(string.IsNullOrEmpty(address.RecipientName) ? _customer.Name : address.RecipientName)</MudText>
-                                                            <MudText Typo="Typo.caption">@(string.IsNullOrEmpty(address.RecipientPhone) ? _customer.Mobile : address.RecipientPhone)</MudText>
+                                                            <MudText Typo="Typo.body2" Style="font-weight: 700;">@(string.IsNullOrEmpty(context.RecipientName) ? _customer.Name : context.RecipientName)</MudText>
+                                                            <MudText Typo="Typo.caption">@(string.IsNullOrEmpty(context.RecipientPhone) ? _customer.Mobile : context.RecipientPhone)</MudText>
                                                         </MudStack>
                                                     }
 
-                                                    <MudText Typo="Typo.body2">@address.AddressLine1</MudText>
-                                                    @if (!string.IsNullOrEmpty(address.AddressLine2)) { <MudText Typo="Typo.body2">@address.AddressLine2</MudText> }
-                                                    @if (!string.IsNullOrEmpty(address.AddressLine3)) { <MudText Typo="Typo.body2">@address.AddressLine3</MudText> }
-                                                    <MudText Typo="Typo.body2">@address.District, @address.City</MudText>
-                                                    <MudText Typo="Typo.body2">@address.StateProvince @address.PostalCode</MudText>
-                                                </MudPaper>
-                                            </MudItem>
-                                        }
-                                    }
-                                    else if (_customer.CompanyId.HasValue && _customer.CompanyBillingAddress != null)
-                                    {
-                                        <MudItem xs="12">
-                                            <MudAlert Severity="Severity.Info" Variant="Variant.Text">Using Company billing address. Individual customer addresses not found.</MudAlert>
-                                        </MudItem>
-                                        <MudItem xs="12" sm="6" Class="d-flex">
-                                                <MudPaper Elevation="3" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default flex-grow-1"
-                                                          Style="@(LayoutService.IsDarkMode ? "background-color: #27272f;" : "background-color: #ffffff;")">
-                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-                                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                                            <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Size="Size.Small" />
-                                                            <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">Company Billing</MudChip>
-                                                        </MudStack>
-                                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                                            <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
-                                                            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="@(() => CopyAddressToClipboard(_customer.CompanyBillingAddress))" />
-                                                        </MudStack>
-                                                    </MudStack>
-                                                    
-                                                    <MudText Typo="Typo.body2" Style="font-weight: 700;">@_customer.CompanyName</MudText>
-                                                    @if (!string.IsNullOrEmpty(_customer.CompanyVatNumber))
-                                                    {
-                                                        <MudText Typo="Typo.caption" Class="d-block mb-2">เลขประจำตัวผู้เสียภาษี @_customer.CompanyVatNumber</MudText>
-                                                    }
+                                                    <MudText Typo="Typo.body2">@context.AddressLine1</MudText>
+                                                    @if (!string.IsNullOrEmpty(context.AddressLine2)) { <MudText Typo="Typo.body2">@context.AddressLine2</MudText> }
+                                                    @if (!string.IsNullOrEmpty(context.AddressLine3)) { <MudText Typo="Typo.body2">@context.AddressLine3</MudText> }
+                                                    <MudText Typo="Typo.body2">@context.District, @context.City</MudText>
+                                                    <MudText Typo="Typo.body2">@context.StateProvince @context.PostalCode</MudText>
+                                                </div>
+                                            </MudPaper>
+                                        </div>
+                                    </ItemRenderer>
+                                </MudDropContainer>
 
-                                                    <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.AddressLine1</MudText>
-                                                    <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City</MudText>
-                                                    <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.StateProvince @_customer.CompanyBillingAddress.PostalCode</MudText>
-                                                </MudPaper>
-                                        </MudItem>
-                                    }
-                                    else
-                                    {
-                                        <MudItem xs="12">
-                                            <MudAlert Severity="Severity.Warning" Variant="Variant.Text">No addresses found for this customer.</MudAlert>
-                                        </MudItem>
-                                    }
-                                </MudGrid>
+                                @if (!_customer.Addresses.Any() && _customer.CompanyId.HasValue && _customer.CompanyBillingAddress != null)
+                                {
+                                    <MudDivider Class="my-6" />
+                                    <MudText Typo="Typo.subtitle2" Class="mb-4">Company Default Address</MudText>
+                                    <div style="width: 100%; max-width: 450px;">
+                                        <MudPaper Elevation="3" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default"
+                                                  Style="background-color: var(--mud-palette-surface);">
+                                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Size="Size.Small" />
+                                                    <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">Company Billing</MudChip>
+                                                </MudStack>
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                    <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 700;">DEFAULT</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="@(() => CopyAddressToClipboard(_customer.CompanyBillingAddress))" />
+                                                </MudStack>
+                                            </MudStack>
+                                            
+                                            <MudLink OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{_customer.CompanyId}"))" Underline="Underline.None" Color="Color.Default">
+                                                <MudText Typo="Typo.body2" Style="font-weight: 700;" Class="hover-primary">@_customer.CompanyName</MudText>
+                                            </MudLink>
+                                            @if (!string.IsNullOrEmpty(_customer.CompanyVatNumber))
+                                            {
+                                                <MudText Typo="Typo.caption" Class="d-block mb-2">เลขประจำตัวผู้เสียภาษี @_customer.CompanyVatNumber</MudText>
+                                            }
+
+                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.AddressLine1</MudText>
+                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City</MudText>
+                                            <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.StateProvince @_customer.CompanyBillingAddress.PostalCode</MudText>
+                                        </MudPaper>
+                                    </div>
+                                }
                             </MudCard>
                         </MudTabPanel>
 
                         <MudTabPanel Text="Docs" Icon="@Icons.Material.Filled.Attachment">
-                             <MudStack Spacing="6">
-                                <!-- NDA Section -->
-                                <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
-                                        <MudStack Spacing="0">
-                                            <MudText Typo="Typo.h6" Style="font-weight: 700;">NDA Agreement</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Non-Disclosure Agreement for this customer</MudText>
-                                        </MudStack>
-                                        
-                                        <MudStack Row="true">
-                                            @if (_customer.Nda != null)
+                            <MudGrid Spacing="0" Style="min-height: 800px;">
+                                <!-- Left Column: Vertical Navigation -->
+                                <MudItem xs="12" md="2" Class="border-solid border-r-1 mud-border-lines-default" Style="background: var(--mud-palette-surface);">
+                                    <MudNavMenu Class="docs-vertical-nav" Style="padding: 8px;">
+                                        <MudNavLink OnClick="@(() => _activeDocTabIndex = 0)"
+                                                    Icon="@Icons.Material.Filled.Gavel"
+                                                    IconColor="@(_activeDocTabIndex == 0 ? Color.Primary : Color.Default)"
+                                                    Class="@(_activeDocTabIndex == 0 ? "mud-selected-item" : "")"
+                                                    Style="border-radius: 8px; margin-bottom: 4px;">
+                                            NDA Agreement
+                                        </MudNavLink>
+                                        <MudNavLink OnClick="@(() => _activeDocTabIndex = 1)"
+                                                    Icon="@Icons.Material.Filled.FolderOpen"
+                                                    IconColor="@(_activeDocTabIndex == 1 ? Color.Primary : Color.Default)"
+                                                    Class="@(_activeDocTabIndex == 1 ? "mud-selected-item" : "")"
+                                                    Style="border-radius: 8px; margin-bottom: 4px;">
+                                            Customer Documents
+                                        </MudNavLink>
+                                    </MudNavMenu>
+                                </MudItem>
+
+                                <!-- Middle Column: Content Area -->
+                                <MudItem xs="12" md="@(_selectedPreviewDoc != null ? 5 : 10)" lg="@(_selectedPreviewDoc != null ? 4 : 10)" Style="overflow-y: auto; padding: 24px;">
+                                    @if (_activeDocTabIndex == 0)
+                                    {
+                                        <!-- NDA Agreement Content -->
+                                        <MudStack Spacing="6">
+                                            <!-- Title Zone -->
+                                            <MudStack Spacing="1">
+                                                <MudText Typo="Typo.h5" Style="font-weight: 700;">NDA Agreement</MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">Non-Disclosure Agreement for this customer</MudText>
+                                            </MudStack>
+
+                                            <!-- NDA Upload Zone and Progress -->
+                                            <MudStack Row="true" AlignItems="AlignItems.Stretch" Spacing="4" Wrap="Wrap.Wrap" Style="width: 100%;">
+                                                <div style="flex: 1;">
+                                                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                                   @ref="_ndaFileUpload"
+                                                                   FilesChanged="OnNdaFilesSelected"
+                                                                   Accept=".pdf"
+                                                                   MaximumFileCount="100"
+                                                                   Hidden="false"
+                                                                   Disabled="@_uploadingNda"
+                                                                   Class="nda-upload-zone"
+                                                                   Style="width: 100%; min-height: 200px; position: relative;"
+                                                                   InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
+                                                                   InputStyle="opacity:0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
+                                                        <ActivatorContent>
+                                                            <div class="file-upload-dropzone @(_ndaDragOver ? "drag-over" : "")"
+                                                                 style="background-color: rgba(33, 150, 243, 0.05); border: 2px dashed var(--mud-palette-info); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;"
+                                                                 @ondragenter="@(() => _ndaDragOver = true)"
+                                                                 @ondragleave="@(() => _ndaDragOver = false)"
+                                                                 @ondragover:preventDefault
+                                                                 @ondrop="@(() => _ndaDragOver = false)">
+                                                                <MudIcon Icon="@Icons.Material.Filled.Gavel" Style="font-size: 42px;" Color="Color.Info" Class="mb-2" />
+                                                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Drag & Drop or Click to Upload</MudText>
+                                                                <MudText Typo="Typo.body2" Color="Color.Secondary">PDF files only, up to 10MB each (max 20 files)</MudText>
+                                                            </div>
+                                                        </ActivatorContent>
+                                                    </MudFileUpload>
+                                                </div>
+
+                                                @if (_ndaUploadFiles.Any())
+                                                {
+                                                    <div style="flex: 1; max-height: 250px; overflow-y: auto;">
+                                                        <MudSimpleTable Dense="true" Hover="true" Bordered="true" Style="background-color: transparent;">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th style="width: 50%;">File</th>
+                                                                    <th style="width: 20%;">Size</th>
+                                                                    <th style="width: 30%;">Status</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var file in _ndaUploadFiles)
+                                                                {
+                                                                    <tr>
+                                                                        <td>
+                                                                            <div class="d-flex align-center gap-2">
+                                                                                <MudIcon Icon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Info" Size="Size.Small" />
+                                                                                <MudText Typo="Typo.caption" Class="text-truncate" Style="max-width: 150px;">@file.Name</MudText>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td><MudText Typo="Typo.caption">@FormatFileSize(file.Size)</MudText></td>
+                                                                        <td>
+                                                                            @if (file.IsCompleted)
+                                                                            {
+                                                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                                                            }
+                                                                            else if (file.Error != null)
+                                                                            {
+                                                                                <MudTooltip Text="@file.Error">
+                                                                                    <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                                                                                </MudTooltip>
+                                                                            }
+                                                                            else if (file.IsUploading)
+                                                                            {
+                                                                                <MudProgressLinear Color="Color.Info" Value="@file.Progress" Class="rounded-pill" />
+                                                                            }
+                                                                        </td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </MudSimpleTable>
+                                                    </div>
+                                                }
+                                            </MudStack>
+
+                                            <!-- NDA Management Section -->
+                                            @if (_customer.Ndas != null && _customer.Ndas.Any())
                                             {
-                                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditNdaDialog">Edit NDA</MudButton>
+                                                <MudPaper Elevation="0" Class="pa-4 rounded-lg border-solid border-1 mud-border-lines-default">
+                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                                                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">NDA Records</MudText>
+                                                        <MudStack Row="true" Spacing="2">
+                                                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditNdaDialog">Edit</MudButton>
+                                                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenNdaUpload">New</MudButton>
+                                                        </MudStack>
+                                                    </MudStack>
+                                                    <MudStack Spacing="2">
+                                                        @foreach (var nda in _customer.Ndas.OrderByDescending(n => n.CreatedAt))
+                                                        {
+                                                            <MudPaper Elevation="0" Class="pa-3 rounded-lg border-solid border-1 mud-border-lines-default d-flex align-center justify-space-between"
+                                                                      Style="background-color: var(--mud-palette-background-grey);">
+                                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                                                    <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="@(nda.Status == "Signed" ? Color.Success : Color.Default)" />
+                                                                    <div class="d-flex flex-column">
+                                                                        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">NDA Record</MudText>
+                                                                            <MudChip T="string" Color="@GetNdaColor(nda.Status)" Size="Size.Small" Variant="Variant.Filled" Class="ma-0">@nda.Status</MudChip>
+                                                                            @if (nda == _customer.Nda)
+                                                                            {
+                                                                                <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Text" Class="ma-0">Current</MudChip>
+                                                                            }
+                                                                        </MudStack>
+                                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                            Expires: @(nda.ExpiresAt?.ToLocalTime().ToString("d") ?? "Never") • Created: @nda.CreatedAt.ToLocalTime().ToString("g")
+                                                                        </MudText>
+                                                                    </div>
+                                                                </MudStack>
+                                                                <MudStack Row="true" Spacing="1">
+                                                                    <MudTooltip Text="View History">
+                                                                        <MudIconButton Icon="@Icons.Material.Filled.History" Size="Size.Small" OnClick="@(() => ViewNdaHistory(nda.Id))" />
+                                                                    </MudTooltip>
+                                                                    @if (nda.DocumentReferenceId.HasValue)
+                                                                    {
+                                                                        <MudTooltip Text="View Document">
+                                                                            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewNdaDocument(nda.DocumentReferenceId.Value))" />
+                                                                        </MudTooltip>
+                                                                    }
+                                                                    @if (nda.Status == "Draft" || nda.Status == "Signed" || nda.Status == "Expired")
+                                                                    {
+                                                                        <MudTooltip Text="@(nda.Status == "Draft" ? "Apply Signature" : "Upload New Version")">
+                                                                            <MudIconButton Icon="@Icons.Material.Filled.FileUpload" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenSignedNdaUpload(nda))" />
+                                                                        </MudTooltip>
+                                                                        @if (nda.Status == "Draft")
+                                                                        {
+                                                                            <MudTooltip Text="Upload Revised Draft">
+                                                                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Secondary" Size="Size.Small" OnClick="@(() => OpenNdaRevisionUpload(nda))" />
+                                                                            </MudTooltip>
+                                                                        }
+                                                                    }
+                                                                    <MudTooltip Text="Delete">
+                                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteNda(nda))" />
+                                                                    </MudTooltip>
+                                                                    @if (nda.Status == "Signed")
+                                                                    {
+                                                                        <MudTooltip Text="Revoke NDA">
+                                                                            <MudIconButton Icon="@Icons.Material.Filled.Block" Color="Color.Error" Size="Size.Small" OnClick="@(() => RevokeNda(nda))" />
+                                                                        </MudTooltip>
+                                                                    }
+                                                                </MudStack>
+                                                            </MudPaper>
+                                                        }
+                                                    </MudStack>
+                                                </MudPaper>
+                                            }
+
+                                            <!-- File List Zone -->
+                                            @if (GetNdaDocuments().Any())
+                                            {
+                                                <MudStack Spacing="2">
+                                                    <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">NDA Documents (@GetNdaDocuments().Count)</MudText>
+                                                    <MudList T="DocumentResponse" Dense="true" Class="pa-0">
+                                                        @foreach (var doc in GetNdaDocuments())
+                                                        {
+                                                            <MudListItem T="DocumentResponse"
+                                                                         OnClick="@(() => SelectDocumentForPreview(doc))"
+                                                                         Class="@($"rounded-lg mb-1 hover-elevation-1 {(_selectedPreviewDoc?.Id == doc.Id ? "mud-selected-item" : "")}")"
+                                                                         Style="border: 1px solid var(--mud-palette-lines-default); cursor: pointer;">
+                                                                <div class="d-flex align-center justify-space-between w-100 pa-2">
+                                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                                                        <MudIcon Icon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" />
+                                                                        <div class="d-flex flex-column">
+                                                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@doc.FileName</MudText>
+                                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(doc.FileSize) • @doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
+                                                                        </div>
+                                                                    </MudStack>
+                                                                    <MudStack Row="true" Spacing="0">
+                                                                        <div @onclick:stopPropagation="true">
+                                                                            <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" OnClick="@(() => DownloadDocument(doc.FileReference))" />
+                                                                        </div>
+                                                                        <div @onclick:stopPropagation="true">
+                                                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => HandleDeleteDocument(doc))" />
+                                                                        </div>
+                                                                    </MudStack>
+                                                                </div>
+                                                            </MudListItem>
+                                                        }
+                                                    </MudList>
+                                                </MudStack>
+                                            }
+                                        </MudStack>
+                                    }
+                                    else if (_activeDocTabIndex == 1)
+                                    {
+                                        <!-- Customer Documents Content -->
+
+                                        <!-- Customer Documents Content -->
+                                        <MudStack Spacing="6">
+                                            <!-- Title Zone -->
+                                            <MudStack Spacing="1">
+                                                <MudText Typo="Typo.h5" Style="font-weight: 700;">Customer Documents</MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">Supporting documents and identification</MudText>
+                                            </MudStack>
+
+                                            <!-- Upload Zone and Progress -->
+                                            <MudStack Row="true" AlignItems="AlignItems.Stretch" Spacing="4" Wrap="Wrap.Wrap" Style="width: 100%;">
+                                                <div style="flex: 1;">
+                                                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                                   @ref="_customerDocFileUpload"
+                                                                   FilesChanged="OnCustomerDocFilesSelected"
+                                                                   Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                                   MaximumFileCount="100"
+                                                                   Hidden="false"
+                                                                   Disabled="@_uploadingCustomerDoc"
+                                                                   Class="customer-docs-upload-zone"
+                                                                   Style="width: 100%; min-height: 200px; position: relative;"
+                                                                   InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
+                                                                   InputStyle="opacity:0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
+                                                        <ActivatorContent>
+                                                            <div class="file-upload-dropzone @(_customerDocDragOver ? "drag-over" : "")"
+                                                                 style="background-color: rgba(76, 175, 80, 0.05); border: 2px dashed var(--mud-palette-success); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;"
+                                                                 @ondragenter="@(() => _customerDocDragOver = true)"
+                                                                 @ondragleave="@(() => _customerDocDragOver = false)"
+                                                                 @ondragover:preventDefault
+                                                                 @ondrop="@(() => _customerDocDragOver = false)">
+                                                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Style="font-size: 42px;" Color="Color.Success" Class="mb-2" />
+                                                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Drag & Drop or Click to Upload</MudText>
+                                                                <MudText Typo="Typo.body2" Color="Color.Secondary">PDF, Word, or Image files, up to 10MB each (max 20 files)</MudText>
+                                                            </div>
+                                                        </ActivatorContent>
+                                                    </MudFileUpload>
+                                                </div>
+
+                                                @if (_customerDocUploadFiles.Any())
+                                                {
+                                                    <div style="flex: 1; max-height: 250px; overflow-y: auto;">
+                                                        <MudSimpleTable Dense="true" Hover="true" Bordered="true" Style="background-color: transparent;">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th style="width: 50%;">File</th>
+                                                                    <th style="width: 20%;">Size</th>
+                                                                    <th style="width: 30%;">Status</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var file in _customerDocUploadFiles)
+                                                                {
+                                                                    <tr>
+                                                                        <td>
+                                                                            <div class="d-flex align-center gap-2">
+                                                                                <MudIcon Icon="@GetDocumentIcon(file.MimeType)" Color="Color.Success" Size="Size.Small" />
+                                                                                <MudText Typo="Typo.caption" Class="text-truncate" Style="max-width: 150px;">@file.Name</MudText>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td><MudText Typo="Typo.caption">@FormatFileSize(file.Size)</MudText></td>
+                                                                        <td>
+                                                                            @if (file.IsCompleted)
+                                                                            {
+                                                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                                                            }
+                                                                            else if (file.Error != null)
+                                                                            {
+                                                                                <MudTooltip Text="@file.Error">
+                                                                                    <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                                                                                </MudTooltip>
+                                                                            }
+                                                                            else if (file.IsUploading)
+                                                                            {
+                                                                                <MudProgressLinear Color="Color.Success" Value="@file.Progress" Class="rounded-pill" />
+                                                                            }
+                                                                        </td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </MudSimpleTable>
+                                                    </div>
+                                                }
+                                            </MudStack>
+
+                                            <!-- File List Zone -->
+                                            @if (GetNonNdaDocuments().Any())
+                                            {
+                                                <MudStack Spacing="2">
+                                                    <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Documents (@GetNonNdaDocuments().Count)</MudText>
+                                                    <div style="max-height: 400px; overflow-y: auto;" class="pr-2">
+                                                        <MudList T="DocumentResponse" Dense="true" Class="pa-0">
+                                                            @foreach (var doc in GetNonNdaDocuments())
+                                                            {
+                                                                <MudListItem T="DocumentResponse"
+                                                                             OnClick="@(() => SelectDocumentForPreview(doc))"
+                                                                             Class="@($"rounded-lg mb-1 hover-elevation-1 {(_selectedPreviewDoc?.Id == doc.Id ? "mud-selected-item" : "")}")"
+                                                                             Style="border: 1px solid var(--mud-palette-lines-default); cursor: pointer;">
+                                                                    <div class="d-flex align-center justify-space-between w-100 pa-2">
+                                                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                                                            <MudIcon Icon="@GetDocumentIcon(doc.MimeType)" Color="@GetDocumentIconColor(doc.MimeType)" />
+                                                                            <div class="d-flex flex-column">
+                                                                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@doc.FileName</MudText>
+                                                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(doc.FileSize) • @doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
+                                                                            </div>
+                                                                        </MudStack>
+                                                                        <MudStack Row="true" Spacing="0">
+                                                                            <div @onclick:stopPropagation="true">
+                                                                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" OnClick="@(() => DownloadDocument(doc.FileReference))" />
+                                                                            </div>
+                                                                            <div @onclick:stopPropagation="true">
+                                                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => HandleDeleteDocument(doc))" />
+                                                                            </div>
+                                                                        </MudStack>
+                                                                    </div>
+                                                                </MudListItem>
+                                                            }
+                                                        </MudList>
+                                                    </div>
+                                                </MudStack>
                                             }
                                             else
                                             {
-                                                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Gavel" OnClick="OpenNdaUpload">Upload Signed NDA</MudButton>
+                                                <MudAlert Severity="Severity.Info" Variant="Variant.Text">No documents uploaded yet. Use the drop zone above to add documents.</MudAlert>
                                             }
                                         </MudStack>
-                                    </MudStack>
+                                    }
+                                </MudItem>
 
-                                    @if (_customer.Nda != null)
-                                    {
-                                        <MudPaper Class="pa-4 d-flex align-center gap-4 rounded-lg border-solid border-1 mud-border-lines-default" 
-                                                  Elevation="0" Style="@(LayoutService.IsDarkMode ? "background-color: #27272f;" : "background-color: #ffffff;")">
-                                            <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="@(_customer.Nda.Status == "Signed" ? Color.Success : Color.Primary)" Size="Size.Large" />
-                                            <MudStack Spacing="0" Class="flex-grow-1">
-                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                                    <MudText Typo="Typo.body2" Style="font-weight: 700;">NDA Record</MudText>
-                                                    <MudChip T="string" Size="Size.Small" Color="@(_customer.Nda.Status == "Signed" ? Color.Success : Color.Default)" Variant="Variant.Filled">@_customer.Nda.Status</MudChip>
+                                <!-- Right Column: Preview Pane (Hidden on mobile) -->
+                                @if (_selectedPreviewDoc != null)
+                                {
+                                    <MudItem xs="12" md="5" lg="6" Class="border-solid border-l-1 mud-border-lines-default" Style="background: var(--mud-palette-background-grey);">
+                                        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                                            <MudPaper Elevation="0" Class="pa-4" Style="height: 100%;">
+                                            <MudStack Spacing="2" Style="height: 100%;">
+                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                                        <MudText Typo="Typo.h6" Style="font-weight: 600;">@_selectedPreviewDoc.FileName</MudText>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _selectedPreviewDoc = null)" />
+                                                    </MudStack>
+
+                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="px-1">
+                                                        <div style="min-width: 0;">
+                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                @FormatFileSize(_selectedPreviewDoc.FileSize) • @_selectedPreviewDoc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")
+                                                            </MudText>
+                                                        </div>
+                                                        <MudStack Row="true" Spacing="0">
+                                                            <MudTooltip Text="Download">
+                                                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" OnClick="@(() => DownloadDocument(_selectedPreviewDoc.FileReference))" />
+                                                            </MudTooltip>
+                                                            <MudTooltip Text="Delete">
+                                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => HandleDeleteDocument(_selectedPreviewDoc))" />
+                                                            </MudTooltip>
+                                                        </MudStack>
+                                                    </MudStack>
+
+                                                    @if (_loadingPreview)
+                                                    {
+                                                        <div class="d-flex align-center justify-center flex-grow-1">
+                                                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                                                        </div>
+                                                    }
+                                                    else if (!string.IsNullOrEmpty(_previewUrl))
+                                                    {
+                                                        <div class="flex-grow-1" style="overflow: hidden;">
+                                                            @if (_selectedPreviewDoc.MimeType?.Contains("pdf") == true)
+                                                            {
+                                                                <iframe src="@_previewUrl" style="width: 100%; height: 100%; border: none; border-radius: 8px;"></iframe>
+                                                            }
+                                                            else if (_selectedPreviewDoc.MimeType?.Contains("image") == true)
+                                                            {
+                                                                <img src="@_previewUrl" alt="@_selectedPreviewDoc.FileName" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;" />
+                                                            }
+                                                            else
+                                                            {
+                                                                <MudAlert Severity="Severity.Info">Preview not available for this file type. Please download to view.</MudAlert>
+                                                            }
+                                                        </div>
+                                                    }
                                                 </MudStack>
-                                                <MudText Typo="Typo.caption">Expires: @(_customer.Nda.ExpiresAt?.ToShortDateString() ?? "N/A")</MudText>
-                                            </MudStack>
-                                            <MudStack Row="true">
-                                                @if (_customer.Nda.Status == "Draft")
-                                                {
-                                                    <MudTooltip Text="Mark as Signed">
-                                                        <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" OnClick="MarkNdaAsSigned" />
-                                                    </MudTooltip>
-                                                }
-                                                @if (_customer.Nda.DocumentReferenceId.HasValue)
-                                                {
-                                                    <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" OnClick="@(() => DownloadDocument(_customer.Nda.DocumentReferenceId.Value.ToString()))" />
-                                                }
-                                            </MudStack>
-                                        </MudPaper>
-                                    }
-                                    else
-                                    {
-                                        <MudAlert Severity="Severity.Warning" Variant="Variant.Text" Dense="true">No NDA recorded for this customer.</MudAlert>
-                                    }
-                                </MudCard>
-
-                                <!-- Customer Documents Section -->
-                                <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
-                                        <MudStack Spacing="0">
-                                            <MudText Typo="Typo.h6" Style="font-weight: 700;">Customer Documents</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Supporting documents and identification</MudText>
-                                        </MudStack>
-                                        
-                                        <MudButton Variant="Variant.Filled" 
-                                                   Color="Color.Primary" 
-                                                   StartIcon="@Icons.Material.Filled.CloudUpload"
-                                                   OnClick="OpenDocumentUpload">
-                                            Upload Documents
-                                        </MudButton>
-                                    </MudStack>
-
-                                    <DocumentViewer Documents="@(_customer.Documents ?? [])" 
-                                                    OnDownload="DownloadDocument" 
-                                                    GetPreviewUrlFunc="GetDocumentPreviewUrl" />
-                                </MudCard>
-                             </MudStack>
+                                            </MudPaper>
+                                        </MudHidden>
+                                        <MudHidden Breakpoint="Breakpoint.MdAndUp">
+                                            <div class="d-flex align-center justify-center flex-column pa-6">
+                                                <MudIcon Icon="@Icons.Material.Filled.PhoneAndroid" Style="font-size: 48px; opacity: 0.3;" Color="Color.Default" Class="mb-3" />
+                                                <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">Preview is only available on larger screens</MudText>
+                                                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => DownloadDocument(_selectedPreviewDoc.FileReference))" Class="mt-3">Download Document</MudButton>
+                                            </div>
+                                        </MudHidden>
+                                    </MudItem>
+                                }
+                            </MudGrid>
                         </MudTabPanel>
 
                         <MudTabPanel Text="Notes" Icon="@Icons.Material.Filled.Note">
-                             <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                                <MudStack Row="true" AlignItems="AlignItems.Baseline" Spacing="2">
                                     <MudText Typo="Typo.h6" Style="font-weight: 700;">Internal Notes</MudText>
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
-                                        <MudTextField @bind-Value="_noteSearchString" Placeholder="Search notes..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
-                                        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="AddInternalNote">Add Note</MudButton>
-                                    </MudStack>
+                                    @if (!string.IsNullOrEmpty(_noteSearchString))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">(showing @FilteredNotes.Count() of @(_customer?.Notes?.Count ?? 0) notes)</MudText>
+                                    }
                                 </MudStack>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
+                                    <MudTextField @bind-Value="_noteSearchString" Placeholder="Search notes..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Immediate="true" />
+                                    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="AddInternalNote">Add Note</MudButton>
+                                </MudStack>
+                            </MudStack>
 
-                                @if (_customer.Notes != null && _customer.Notes.Any())
-                                {
-                                    <MudStack Spacing="4">
-                                        @foreach (var note in FilteredNotes)
-                                        {
-                                            <MudPaper Elevation="1" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default"
-                                                      Style="@(LayoutService.IsDarkMode ? "background-color: #27272f;" : "background-color: #ffffff;")">
-                                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                                        <MudAvatar Color="Color.Primary" Size="Size.Small">
-                                                            @((note.CreatedByName ?? note.CreatedBy)?[0])
-                                                        </MudAvatar>
-                                                        <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">
-                                                            @(!string.IsNullOrEmpty(note.CreatedByName) ? note.CreatedByName : note.CreatedBy)
-                                                        </MudText>
+                            <div class="d-flex gap-6" style="min-height: 600px;">
+                                <!-- Notes list (left side) -->
+                                <div class="@(_noteDrawerOpen ? "flex-grow-0" : "flex-grow-1")"
+                                     style="@(_noteDrawerOpen ? "flex: 0 0 40%; max-width: 40%;" : "flex: 1 1 100%;") transition: all 0.3s ease; padding: 4px;">
+                                    @if (_customer.Notes != null && _customer.Notes.Any())
+                                    {
+                                        <MudStack Spacing="3">
+                                            @foreach (var note in FilteredNotes)
+                                            {
+                                                <MudPaper Elevation="@(_editingNoteId == note.Id ? 3 : 1)"
+                                                          Class="@($"pa-4 rounded-xl border-solid border-1 transition-all hover-elevation-1 {(_editingNoteId == note.Id ? "mud-border-primary" : "mud-border-lines-default")}")"
+                                                          Style="cursor: pointer; background-color: var(--mud-palette-surface);"
+                                                          @onclick="@(() => EditInternalNote(note))">
+                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                            <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                                                @((note.CreatedByName ?? note.CreatedBy)?[0])
+                                                            </MudAvatar>
+                                                            <MudStack Spacing="0">
+                                                                <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">
+                                                                    @(note.CreatedByName ?? "Unknown User")
+                                                                </MudText>
+                                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedAt.ToLocalTime().ToString("g")</MudText>
+                                                            </MudStack>
+                                                        </MudStack>
+                                                        <div @onclick:stopPropagation>
+                                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteInternalNote(note))" />
+                                                        </div>
                                                     </MudStack>
-                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedAt.ToLocalTime().ToString("g")</MudText>
-                                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditInternalNote(note))" />
-                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteInternalNote(note))" />
-                                                    </MudStack>
-                                                </MudStack>
-                                                <MudDivider Class="mb-3" />
-                                                <div class="note-content">
-                                                    @if (!string.IsNullOrEmpty(_noteSearchString))
-                                                    {
-                                                        <MudHighlighter Text="@note.NoteText" HighlightedText="@_noteSearchString" />
-                                                    }
-                                                    else
-                                                    {
-                                                        <MarkdownRenderer Markdown="@note.NoteText" />
-                                                    }
-                                                </div>
-                                            </MudPaper>
-                                        }
-                                    </MudStack>
-                                }
-                                else
+                                                    <div class="note-preview-content px-1" style="max-height: 300px; overflow: hidden;">
+                                                        @if (!string.IsNullOrEmpty(_noteSearchString))
+                                                        {
+                                                            <MudHighlighter Text="@note.NoteText" HighlightedText="@_noteSearchString" Style="font-size: 0.875rem; line-height: 1.6;" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <MarkdownRenderer Markdown="@note.NoteText" />
+                                                        }
+                                                    </div>
+                                                </MudPaper>
+                                            }
+                                        </MudStack>
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Text">No internal notes for this customer.</MudAlert>
+                                    }
+                                </div>
+
+                                <!-- Right pane editor -->
+                                @if (_noteDrawerOpen)
                                 {
-                                    <MudAlert Severity="Severity.Info" Variant="Variant.Text">No internal notes for this customer.</MudAlert>
+                                    <div class="flex-grow-1" style="min-width: 0;">
+                                        <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100 d-flex flex-column">
+                                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                                                <MudText Typo="Typo.h6" Style="font-weight: 700;">
+                                                    @(_isNewNote ? "Create Internal Note" : "Internal Note")
+                                                </MudText>
+                                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="CloseNoteDrawer" />
+                                            </MudStack>
+
+                                            <NoteEditor @ref="_noteEditorRef"
+                                                        @bind-Value="_editingNoteText"
+                                                        StartInEditMode="_isNewNote"
+                                                        ShowActivityTab="@(!_isNewNote && _editingNoteId.HasValue)"
+                                                        NoteId="_editingNoteId" />
+
+                                            <div class="d-flex justify-end gap-2 mt-4 pt-4 border-t border-solid mud-border-lines-default">
+                                                <MudButton OnClick="CloseNoteDrawer" Variant="Variant.Text" Class="rounded-lg">Cancel</MudButton>
+                                                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveNote"
+                                                           Class="px-8 rounded-lg shadow-none" Style="font-weight: 700;"
+                                                           Disabled="@(string.IsNullOrWhiteSpace(_editingNoteText) || (!_isNewNote && _editingNoteText == _originalNoteText))">
+                                                    @(_isNewNote ? "Create Note" : "Save Changes")
+                                                </MudButton>
+                                            </div>
+                                        </MudPaper>
+                                    </div>
                                 }
-                             </MudCard>
+                            </div>
                         </MudTabPanel>
                     }
                     else
                     {
-                        @* Edit Mode Tabs - Only Personal Information *@
-                        <MudTabPanel Text="Profile" Icon="@Icons.Material.Filled.Person">
-                            <MudForm @ref="_editForm">
+                        @* Edit Mode Panels *@
+                        <MudTabPanel Text="Personal Information" Icon="@Icons.Material.Filled.Person">
+                            <MudForm @ref="_editForm" Model="@_updateRequest">
                                 <MudStack Spacing="6">
-                                    <!-- Personal Info Edit -->
                                     <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Contact Details</MudText>
+                                        <MudText Typo="Typo.subtitle1" Class="mb-4 font-bold">Identity & Contact</MudText>
                                         <MudGrid Spacing="4">
                                             <MudItem xs="12" sm="6">
-                                                <MudTextField T="string" Label="First Name" @bind-Value="_updateRequest.FirstName" Variant="Variant.Outlined" Required="true" Immediate="true" />
+                                                <MudTextField @bind-Value="_updateRequest.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" />
                                             </MudItem>
                                             <MudItem xs="12" sm="6">
-                                                <MudTextField T="string" Label="Last Name" @bind-Value="_updateRequest.LastName" Variant="Variant.Outlined" Required="true" Immediate="true" />
+                                                <MudTextField @bind-Value="_updateRequest.LastName" Label="Last Name" Variant="Variant.Outlined" Required="true" />
                                             </MudItem>
                                             <MudItem xs="12" sm="6">
-                                                <MudTextField T="string" Label="Mobile" @bind-Value="_updateRequest.Mobile" Variant="Variant.Outlined" Immediate="true" />
+                                                <MudTextField @bind-Value="_updateRequest.Email" Label="Email Address" Variant="Variant.Outlined" Required="true" Disabled="@(!_canChangeEmail)" 
+                                                              Adornment="Adornment.End" AdornmentIcon="@(_canChangeEmail ? Icons.Material.Filled.LockOpen : Icons.Material.Filled.Lock)" 
+                                                              OnAdornmentClick="@(() => _canChangeEmail = !_canChangeEmail)" />
                                             </MudItem>
                                             <MudItem xs="12" sm="6">
-                                                <MudTextField T="string" Label="Landline" @bind-Value="_updateRequest.Landline" Variant="Variant.Outlined" Immediate="true" />
-                                            </MudItem>
-                                            <MudItem xs="12" sm="6">
-                                                <MudTextField T="string" Label="Extension (Company Landline)" @bind-Value="_updateRequest.Extension" Variant="Variant.Outlined" Immediate="true" />
+                                                <MudTextField @bind-Value="_updateRequest.Mobile" Label="Mobile Number" Variant="Variant.Outlined" />
                                             </MudItem>
                                         </MudGrid>
                                     </MudCard>
 
-                                    <!-- Preferences Edit -->
                                     <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-6">Preferences & Classification</MudText>
+                                        <MudText Typo="Typo.subtitle1" Class="mb-4 font-bold">Preferences</MudText>
                                         <MudGrid Spacing="4">
                                             <MudItem xs="12" sm="6">
-                                                <MudSelect T="string" Label="Segment" @bind-Value="_updateRequest.Segment" Variant="Variant.Outlined">
-                                                    <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
-                                                    <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
-                                                    <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
-                                                    <MudSelectItem Value="@("Government")">Government</MudSelectItem>
+                                                <MudSelect @bind-Value="_updateRequest.PreferredLanguage" Label="Preferred Language" Variant="Variant.Outlined">
+                                                    <MudSelectItem Value="@("en")">English</MudSelectItem>
+                                                    <MudSelectItem Value="@("th")">Thai</MudSelectItem>
                                                 </MudSelect>
                                             </MudItem>
                                             <MudItem xs="12" sm="6">
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1 d-block">Tier Level</MudText>
-                                                <MudToggleGroup T="string" @bind-Value="_updateRequest.Tier" SelectionMode="SelectionMode.SingleSelection" Color="Color.Primary" CheckMark="false" FixedContent="true" Class="w-100">
-                                                    <MudToggleItem Value="@("Bronze")" Text="Bronze" />
-                                                    <MudToggleItem Value="@("Silver")" Text="Silver" />
-                                                    <MudToggleItem Value="@("Gold")" Text="Gold" />
-                                                    <MudToggleItem Value="@("Platinum")" Text="Platinum" />
-                                                </MudToggleGroup>
-                                            </MudItem>
-                                            <MudItem xs="12" sm="6">
-                                                 <MudSelect T="string" Label="Language" @bind-Value="_updateRequest.PreferredLanguage" Variant="Variant.Outlined">
-                                                     <MudSelectItem Value="@("en")">English</MudSelectItem>
-                                                     <MudSelectItem Value="@("th")">Thai</MudSelectItem>
-                                                 </MudSelect>
-                                            </MudItem>
-                                            <MudItem xs="12" sm="6">
-                                                 <MudSelect T="string" Label="Timezone" @bind-Value="_updateRequest.Timezone" Variant="Variant.Outlined">
-                                                     <MudSelectItem Value="@("Asia/Bangkok")">Bangkok (GMT+7)</MudSelectItem>
-                                                     <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
-                                                 </MudSelect>
+                                                <MudAutocomplete T="string" @bind-Value="_updateRequest.Timezone" Label="Timezone" Variant="Variant.Outlined" 
+                                                                 SearchFunc="@((s, ct) => Task.FromResult(TimeZoneInfo.GetSystemTimeZones().Select(z => z.Id).Where(z => string.IsNullOrEmpty(s) || z.Contains(s, StringComparison.OrdinalIgnoreCase))))" />
                                             </MudItem>
                                         </MudGrid>
-                                    </MudCard>
-
-                                    <!-- Identity Management -->
-                                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                        <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-4">Identity & Security</MudText>
-                                        <MudAlert Severity="Severity.Warning" Class="mb-4">Changing the primary email address requires careful confirmation as it affects customer sign-in.</MudAlert>
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
-                                            <MudTextField T="string" Label="Email Address" @bind-Value="_updateRequest.Email" Variant="Variant.Outlined" ReadOnly="@(!_canChangeEmail)" Immediate="true" />
-                                            @if (!_canChangeEmail)
-                                            {
-                                                <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="@(() => _canChangeEmail = true)">Change Email</MudButton>
-                                            }
-                                            else
-                                            {
-                                                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => _canChangeEmail = false)">Confirm Change</MudButton>
-                                            }
-                                        </MudStack>
                                     </MudCard>
                                 </MudStack>
                             </MudForm>
@@ -475,85 +982,6 @@
                 </MudTabs>
             </MudItem>
 
-            <!-- Right Column: Sidebar Stats & Info -->
-            <MudItem xs="12" lg="4">
-                <MudStack Spacing="6">
-                    <!-- Profile Card -->
-                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                        <MudStack AlignItems="AlignItems.Center" Class="mb-6">
-                            <MudAvatar Color="Color.Primary" Style="height:80px; width:80px;" Variant="Variant.Filled">
-                                @(_customer.FirstName?[0])@(_customer.LastName?[0])
-                            </MudAvatar>
-                            <MudText Typo="Typo.h6" Style="font-weight: 700;">@_customer.Name</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@_customer.Email</MudText>
-                        </MudStack>
-                        
-                        <MudStack Spacing="3">
-                            <div class="d-flex justify-space-between">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Phone</MudText>
-                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@(_customer.Mobile ?? "N/A")</MudText>
-                            </div>
-                            <div class="d-flex justify-space-between">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Language</MudText>
-                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@(_customer.PreferredLanguage == "th" ? "Thai" : "English")</MudText>
-                            </div>
-                            <div class="d-flex justify-space-between">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Timezone</MudText>
-                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@_customer.Timezone</MudText>
-                            </div>
-                        </MudStack>
-
-                        <MudDivider Class="my-6" />
-
-                        <MudStack Spacing="3">
-                             <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Email" Color="Color.Primary" FullWidth="true" Style="justify-content: flex-start;">Send Email</MudButton>
-                             <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Message" Color="Color.Primary" FullWidth="true" Style="justify-content: flex-start;">Internal Chat</MudButton>
-                        </MudStack>
-                    </MudCard>
-
-                    <!-- Company Info Card -->
-                    @if (_customer.CompanyId.HasValue)
-                    {
-                        <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
-                                <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Size="Size.Small" />
-                                <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Details</MudText>
-                            </MudStack>
-                            
-                            <MudStack Spacing="3">
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Company Name</MudText>
-                                    <MudText Typo="Typo.body1" Style="font-weight: 600;">@_customer.CompanyName</MudText>
-                                </div>
-                                @if (!string.IsNullOrEmpty(_customer.CompanyVatNumber))
-                                {
-                                    <div>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Tax ID / VAT</MudText>
-                                        <MudText Typo="Typo.body2">@_customer.CompanyVatNumber</MudText>
-                                    </div>
-                                }
-                                <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Segment & Tier</MudText>
-                                    <MudStack Row="true" Spacing="2">
-                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info" Class="ma-0">@_customer.CompanySegment</MudChip>
-                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="ma-0">@_customer.CompanyTier</MudChip>
-                                    </MudStack>
-                                </div>
-                                @if (_customer.CompanyBillingAddress != null)
-                                {
-                                    <div>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Default Billing Address</MudText>
-                                        <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.AddressLine1</MudText>
-                                        <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City</MudText>
-                                        <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.PostalCode</MudText>
-                                    </div>
-                                }
-                            </MudStack>
-                        </MudCard>
-                    }
-
-                </MudStack>
-            </MudItem>
         </MudGrid>
     }
 </MudContainer>
@@ -568,15 +996,25 @@
     private bool _canChangeEmail = false;
     private int _activeTabIndex = 0;
     
+    private int _activityPage = 1;
+    private bool _activityHasNextPage = false;
+    private bool _loadingMoreActivities = false;
+    private MudTable<CustomerActivityResponse>? _virtualizeComponent;
+
+    private MudDropContainer<AddressResponse>? _dropContainer;
     private MudForm? _editForm;
     private UpdateCustomerRequest _updateRequest = new();
     private List<CountryDto> _allCountries = new();
 
-    // File Upload
-    private DateTime? _ndaExpiryDate = DateTime.Now.AddYears(1);
-
     private string _noteSearchString = "";
-    private IEnumerable<InternalNoteResponse> FilteredNotes => 
+    private bool _noteDrawerOpen = false;
+    private Guid? _editingNoteId;
+    private string _editingNoteText = "";
+    private string _originalNoteText = "";
+    private bool _isNewNote = true;
+    private NoteEditor? _noteEditorRef;
+
+    private IEnumerable<InternalNoteResponse> FilteredNotes =>
         (_customer?.Notes ?? [])
         .Where(n => string.IsNullOrEmpty(_noteSearchString) || n.NoteText.Contains(_noteSearchString, StringComparison.OrdinalIgnoreCase))
         .OrderByDescending(n => n.CreatedAt);
@@ -585,9 +1023,8 @@
     {
         await LoadCountries();
         await LoadCustomerData();
-        await LoadActivityData();
+        await LoadInitialActivities();
         
-        // SignalR Real-time
         await SignalRService.StartAsync();
         SignalRService.OnCustomerChanged += HandleCustomerChanged;
     }
@@ -599,268 +1036,226 @@
             if (!_isEditMode) 
             {
                 await LoadCustomerData();
-                await LoadActivityData();
+                await LoadInitialActivities();
             }
         });
     }
 
-    private async Task LoadCountries()
+    private string GetAddressZone(AddressResponse address) => address.IsDefault ? (address.Type == "Billing" ? "billing-default" : "shipping-default") : "others";
+
+    private async Task AddressItemDropped(MudItemDropInfo<AddressResponse> dropInfo)
     {
-        try { _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/customers/countries") ?? []; }
-        catch { }
+        if (dropInfo.Item == null || _customer == null) return;
+        var address = dropInfo.Item;
+        string newType = address.Type;
+        bool newIsDefault = address.IsDefault;
+        
+        if (dropInfo.DropzoneIdentifier == "billing-default") { newType = "Billing"; newIsDefault = true; }
+        else if (dropInfo.DropzoneIdentifier == "shipping-default") { newType = "Shipping"; newIsDefault = true; }
+        else if (dropInfo.DropzoneIdentifier == "others") { newIsDefault = false; }
+
+        if (newType != address.Type || newIsDefault != address.IsDefault)
+        {
+            try
+            {
+                // If we are setting a new default, we should update the entire collection to ensure 
+                // other addresses of the same type are no longer marked as default.
+                if (newIsDefault)
+                {
+                    var updatedAddresses = _customer.Addresses.Select(a => {
+                        if (a.Id == address.Id) 
+                            return new CreateAddressRequest { Id = a.Id, Type = newType, IsDefault = true, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version };
+                        
+                        if (a.Type == newType)
+                            return new CreateAddressRequest { Id = a.Id, Type = a.Type, IsDefault = false, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version };
+                        
+                        return new CreateAddressRequest { Id = a.Id, Type = a.Type, IsDefault = a.IsDefault, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version };
+                    }).ToList();
+
+                    var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CompanyId = _customer.CompanyId, CommunicationPreferences = _customer.CommunicationPreferences }, Addresses = updatedAddresses };
+                    var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Snackbar.Add("Address defaults updated", Severity.Success);
+                        await LoadCustomerData();
+                        await LoadInitialActivities();
+                    }
+                    else Snackbar.Add("Failed to update addresses", Severity.Error);
+                }
+                else
+                {
+                    // Just unsetting default or changing type without setting default can be a simple PATCH
+                    var updateRequest = new UpdateAddressRequest { Type = newType, IsDefault = newIsDefault, Version = address.Version } ;
+                    var response = await Http.PatchAsJsonAsync($"api/customers/addresses/{address.Id}", updateRequest);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Snackbar.Add("Address updated successfully", Severity.Success);
+                        await LoadCustomerData();
+                        await LoadInitialActivities();
+                    }
+                    else Snackbar.Add("Failed to update address", Severity.Error);
+                }
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            finally { _dropContainer?.Refresh(); }
+        }
     }
 
-    private async Task LoadActivityData()
+    private async Task LoadCountries() { try { _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/customers/countries") ?? []; } catch { } }
+    
+    private async ValueTask<ItemsProviderResult<CustomerActivityResponse>> LoadActivitiesProvider(ItemsProviderRequest request)
     {
-        try { _activities = await Http.GetFromJsonAsync<List<CustomerActivityResponse>>($"api/customers/{Id}/history") ?? []; }
-        catch { }
-    }
-
-    private string GetActivityIcon(string action) => action switch { "Create" => Icons.Material.Filled.Add, "Update" => Icons.Material.Filled.Edit, "SoftDelete" => Icons.Material.Filled.Delete, _ => Icons.Material.Filled.History };
-    private Color GetActivityColor(string action) => action switch { "Create" => Color.Success, "Update" => Color.Primary, "SoftDelete" => Color.Error, _ => Color.Default };
-
-    private async Task LoadCustomerData()
-    {
-        _loading = true;
         try
         {
-            _customer = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/customers/{Id}");
-            if (_customer != null)
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/customers/{Id}/history?skip={request.StartIndex}&take={request.Count}", request.CancellationToken);
+            if (response != null)
             {
-                MapToUpdateRequest();
+                return new ItemsProviderResult<CustomerActivityResponse>(response.Data, response.Meta.TotalItems);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading activities");
+        }
+
+        return new ItemsProviderResult<CustomerActivityResponse>(Enumerable.Empty<CustomerActivityResponse>(), 0);
+    }
+
+    private async Task LoadInitialActivities()
+    {
+        _activityPage = 1;
+        _activities.Clear();
+        await LoadActivities();
+    }
+
+    private async Task LoadMoreActivities()
+    {
+        _activityPage++;
+        await LoadActivities();
+    }
+
+    private async Task LoadActivities()
+    {
+        _loadingMoreActivities = true;
+        try
+        {
+            var take = 10;
+            var skip = (_activityPage - 1) * take;
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/customers/{Id}/history?skip={skip}&take={take}");
+            
+            if (response != null)
+            {
+                if (_activityPage == 1) _activities = response.Data.ToList();
+                else _activities.AddRange(response.Data);
+                
+                _activityHasNextPage = response.Data.Count() == take; // Simple check, assumption: if full page returned, likely more exists
+                // Or better calculate based on total items if available in PagedResponse
+                if (response.Meta != null) 
+                {
+                   _activityHasNextPage = _activities.Count < response.Meta.TotalItems;
+                }
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading customer: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error loading activities");
+            Snackbar.Add("Failed to load activities", Severity.Error);
         }
         finally
         {
-            _loading = false;
+            _loadingMoreActivities = false;
             StateHasChanged();
         }
+    }
+
+    private string GetActivityIcon(string action) => action switch { "Create" => Icons.Material.Filled.AddCircle, "Update" => Icons.Material.Filled.Edit, "SoftDelete" => Icons.Material.Filled.Delete, _ => Icons.Material.Filled.History };
+    private Color GetActivityColor(string action) => action switch { "Create" => Color.Success, "Update" => Color.Primary, "SoftDelete" => Color.Error, _ => Color.Default };
+
+    private async Task LoadCustomerData()
+    {
+        // Don't clear _customer here to avoid "Customer not found" flash
+        _loading = _customer == null; 
+        try
+        {
+            var result = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/customers/{Id}");
+            if (result != null)
+            {
+                _customer = result;
+                MapToUpdateRequest();
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error loading customer: {ex.Message}", Severity.Error); }
+        finally { _loading = false; StateHasChanged(); }
     }
 
     private void MapToUpdateRequest()
     {
         if (_customer == null) return;
-        _updateRequest = new UpdateCustomerRequest
-        {
-            FirstName = _customer.FirstName,
-            LastName = _customer.LastName,
-            Email = _customer.Email,
-            Mobile = _customer.Mobile,
-            Landline = _customer.Landline,
-            Extension = _customer.Extension,
-            Segment = _customer.Segment,
-            Tier = _customer.Tier,
-            PreferredLanguage = _customer.PreferredLanguage,
-            Timezone = _customer.Timezone,
-            CommunicationPreferences = _customer.CommunicationPreferences,
-            Version = _customer.Version
-        };
+        _updateRequest = new UpdateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CommunicationPreferences = _customer.CommunicationPreferences, Version = _customer.Version };
     }
 
-    private void ToggleEditMode()
-    {
-        if (_isEditMode)
-        {
-            // Cancel editing - reset request
-            MapToUpdateRequest();
-            _isEditMode = false;
-        }
-        else
-        {
-            _isEditMode = true;
-            _activeTabIndex = 0; // Focus on Personal info when starting edit
-        }
-    }
+    private void ToggleEditMode() { if (_isEditMode) MapToUpdateRequest(); else _activeTabIndex = 0; _isEditMode = !_isEditMode; }
 
     private async Task SaveChanges()
     {
-        if (_editForm != null)
-        {
-            await _editForm.Validate();
-            if (!_editForm.IsValid)
-            {
-                Snackbar.Add("Please correct validation errors first.", Severity.Warning);
-                return;
-            }
-        }
-
+        if (_editForm != null) { await _editForm.Validate(); if (!_editForm.IsValid) { Snackbar.Add("Please correct validation errors first.", Severity.Warning); return; } }
         _isSaving = true;
         try
         {
-            var onboardingRequest = new CustomerOnboardingRequest
-            {
-                Customer = new CreateCustomerRequest
-                {
-                    FirstName = _updateRequest.FirstName,
-                    LastName = _updateRequest.LastName,
-                    Email = _updateRequest.Email,
-                    Mobile = _updateRequest.Mobile,
-                    Landline = _updateRequest.Landline,
-                    Extension = _updateRequest.Extension,
-                    Segment = _updateRequest.Segment,
-                    Tier = _updateRequest.Tier,
-                    PreferredLanguage = _updateRequest.PreferredLanguage,
-                    Timezone = _updateRequest.Timezone,
-                    CompanyId = _customer?.CompanyId,
-                    CommunicationPreferences = _updateRequest.CommunicationPreferences
-                }
-            };
-
+            var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _updateRequest.FirstName, LastName = _updateRequest.LastName, Email = _updateRequest.Email, Mobile = _updateRequest.Mobile, Landline = _updateRequest.Landline, Extension = _updateRequest.Extension, Segment = _updateRequest.Segment, Tier = _updateRequest.Tier, PreferredLanguage = _updateRequest.PreferredLanguage, Timezone = _updateRequest.Timezone, CompanyId = _customer?.CompanyId, CommunicationPreferences = _updateRequest.CommunicationPreferences } };
             var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
-            if (response.IsSuccessStatusCode)
-            {
-                Snackbar.Add("Customer updated successfully!", Severity.Success);
-                _isEditMode = false;
-                await LoadCustomerData();
-                await LoadActivityData();
-            }
-            else
-            {
-                var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-                Snackbar.Add(error?.Message ?? "Update failed", Severity.Error);
-            }
+            if (response.IsSuccessStatusCode) { Snackbar.Add("Customer updated successfully!", Severity.Success); _isEditMode = false; await LoadCustomerData(); await LoadInitialActivities(); }
         }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _isSaving = false;
-        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _isSaving = false; }
     }
 
     private async Task AddAddressDialog()
     {
         if (_customer == null) return;
-        var parameters = new DialogParameters<AddressDialog>
-        {
-            { x => x.Address, new CreateAddressRequest { Type = "Shipping", IsDefault = !_customer.Addresses.Any(a => a.Type == "Shipping"), CountryId = _allCountries.FirstOrDefault(c => c.Code == "TH")?.Id ?? Guid.Empty } },
-            { x => x.IsNew, true },
-            { x => x.HasCompany, _customer.CompanyId.HasValue },
-            { x => x.CompanyName, _customer.CompanyName },
-            { x => x.CustomerName, _customer.Name },
-            { x => x.CustomerMobile, _customer.Mobile },
-            { x => x.AllCountries, _allCountries },
-            { x => x.SearchLocations, (Func<string?, CancellationToken, Task<IEnumerable<RegistryThaiLocation>>>)SearchThaiLocations }
-        };
-
+        var parameters = new DialogParameters<AddressDialog> { { x => x.Address, new CreateAddressRequest { Type = "Shipping", IsDefault = !_customer.Addresses.Any(a => a.Type == "Shipping"), CountryId = _allCountries.FirstOrDefault(c => c.Code == "TH")?.Id ?? Guid.Empty } }, { x => x.IsNew, true }, { x => x.HasCompany, _customer.CompanyId.HasValue }, { x => x.CompanyName, _customer.CompanyName }, { x => x.CustomerName, _customer.Name }, { x => x.CustomerMobile, _customer.Mobile }, { x => x.AllCountries, _allCountries }, { x => x.SearchLocations, (Func<string?, CancellationToken, Task<IEnumerable<RegistryThaiLocation>>>)SearchThaiLocations } };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<AddressDialog>("Add New Address", parameters, options);
         var result = await dialog.Result;
-
         if (result != null && !result.Canceled && result.Data is CreateAddressRequest newAddress)
         {
             try
             {
                 var response = await Http.PostAsJsonAsync($"api/customers/{Id}/addresses", new List<CreateAddressRequest> { newAddress });
-                if (response.IsSuccessStatusCode)
-                {
-                    Snackbar.Add("Address added successfully", Severity.Success);
-                    await LoadCustomerData();
-                    await LoadActivityData();
-                }
-                else
-                {
-                    var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-                    Snackbar.Add(error?.Message ?? "Failed to add address", Severity.Error);
-                }
+                if (response.IsSuccessStatusCode) { Snackbar.Add("Address added successfully", Severity.Success); await LoadCustomerData(); _dropContainer?.Refresh(); await LoadInitialActivities(); }
             }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
     private async Task EditAddressDialog(AddressResponse currentAddress)
     {
         if (_customer == null) return;
-        var editRequest = new CreateAddressRequest
-        {
-            Id = currentAddress.Id,
-            Type = currentAddress.Type,
-            IsDefault = currentAddress.IsDefault,
-            AddressLine1 = currentAddress.AddressLine1,
-            AddressLine2 = currentAddress.AddressLine2,
-            AddressLine3 = currentAddress.AddressLine3,
-            District = currentAddress.District,
-            City = currentAddress.City,
-            StateProvince = currentAddress.StateProvince,
-            PostalCode = currentAddress.PostalCode,
-            CountryId = currentAddress.CountryId,
-            RecipientName = currentAddress.RecipientName,
-            RecipientPhone = currentAddress.RecipientPhone,
-            Version = currentAddress.Version
-        };
-
-        var parameters = new DialogParameters<AddressDialog>
-        {
-            { x => x.Address, editRequest },
-            { x => x.IsNew, false },
-            { x => x.HasCompany, _customer.CompanyId.HasValue },
-            { x => x.CompanyName, _customer.CompanyName },
-            { x => x.CustomerName, _customer.Name },
-            { x => x.CustomerMobile, _customer.Mobile },
-            { x => x.AllCountries, _allCountries },
-            { x => x.SearchLocations, (Func<string?, CancellationToken, Task<IEnumerable<RegistryThaiLocation>>>)SearchThaiLocations }
-        };
-
+        var editRequest = new CreateAddressRequest { Id = currentAddress.Id, Type = currentAddress.Type, IsDefault = currentAddress.IsDefault, AddressLine1 = currentAddress.AddressLine1, AddressLine2 = currentAddress.AddressLine2, AddressLine3 = currentAddress.AddressLine3, District = currentAddress.District, City = currentAddress.City, StateProvince = currentAddress.StateProvince, PostalCode = currentAddress.PostalCode, CountryId = currentAddress.CountryId, RecipientName = currentAddress.RecipientName, RecipientPhone = currentAddress.RecipientPhone, Version = currentAddress.Version };
+        var parameters = new DialogParameters<AddressDialog> { { x => x.Address, editRequest }, { x => x.IsNew, false }, { x => x.HasCompany, _customer.CompanyId.HasValue }, { x => x.CompanyName, _customer.CompanyName }, { x => x.CustomerName, _customer.Name }, { x => x.CustomerMobile, _customer.Mobile }, { x => x.AllCountries, _allCountries }, { x => x.SearchLocations, (Func<string?, CancellationToken, Task<IEnumerable<RegistryThaiLocation>>>)SearchThaiLocations } };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<AddressDialog>("Edit Address", parameters, options);
         var result = await dialog.Result;
-
         if (result != null && !result.Canceled && result.Data is CreateAddressRequest updatedAddress)
         {
             try
             {
-                var onboardingRequest = new CustomerOnboardingRequest
-                {
-                    Customer = new CreateCustomerRequest
+                var addresses = _customer.Addresses.Select(a => {
+                    if (a.Id == currentAddress.Id) return updatedAddress;
+                    // If updated is set to default, unset others of same type
+                    if (updatedAddress.IsDefault && a.Type == updatedAddress.Type)
                     {
-                        FirstName = _customer.FirstName,
-                        LastName = _customer.LastName,
-                        Email = _customer.Email,
-                        Mobile = _customer.Mobile,
-                        Landline = _customer.Landline,
-                        Extension = _customer.Extension,
-                        Segment = _customer.Segment,
-                        Tier = _customer.Tier,
-                        PreferredLanguage = _customer.PreferredLanguage,
-                        Timezone = _customer.Timezone,
-                        CompanyId = _customer.CompanyId
-                    },
-                    Addresses = _customer.Addresses.Select(a => a.Id == currentAddress.Id ? updatedAddress : new CreateAddressRequest 
-                    { 
-                        Id = a.Id, Type = a.Type, IsDefault = a.IsDefault, AddressLine1 = a.AddressLine1,
-                        AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District,
-                        City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode,
-                        CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone,
-                        Version = a.Version
-                    }).ToList()
-                };
+                        return new CreateAddressRequest { Id = a.Id, Type = a.Type, IsDefault = false, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version };
+                    }
+                    return new CreateAddressRequest { Id = a.Id, Type = a.Type, IsDefault = a.IsDefault, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version };
+                }).ToList();
 
+                var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CompanyId = _customer.CompanyId, CommunicationPreferences = _customer.CommunicationPreferences }, Addresses = addresses };
                 var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
-                if (response.IsSuccessStatusCode)
-                {
-                    Snackbar.Add("Address updated successfully", Severity.Success);
-                    await LoadCustomerData();
-                    await LoadActivityData();
-                }
-                else
-                {
-                    var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-                    Snackbar.Add(error?.Message ?? "Failed to update address", Severity.Error);
-                }
-            }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-            }
+                if (response.IsSuccessStatusCode) { Snackbar.Add("Address updated successfully", Severity.Success); await LoadCustomerData(); _dropContainer?.Refresh(); await LoadInitialActivities(); }
+            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
@@ -872,166 +1267,226 @@
         {
             try
             {
-                var onboardingRequest = new CustomerOnboardingRequest
-                {
-                    Customer = new CreateCustomerRequest
-                    {
-                        FirstName = _customer.FirstName,
-                        LastName = _customer.LastName,
-                        Email = _customer.Email,
-                        Mobile = _customer.Mobile,
-                        Landline = _customer.Landline,
-                        Extension = _customer.Extension,
-                        Segment = _customer.Segment,
-                        Tier = _customer.Tier,
-                        PreferredLanguage = _customer.PreferredLanguage,
-                        Timezone = _customer.Timezone,
-                        CompanyId = _customer.CompanyId
-                    },
-                    Addresses = _customer.Addresses.Where(a => a.Id != address.Id).Select(a => new CreateAddressRequest 
-                    { 
-                        Id = a.Id, Type = a.Type, IsDefault = a.IsDefault, AddressLine1 = a.AddressLine1,
-                        AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District,
-                        City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode,
-                        CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone,
-                        Version = a.Version
-                    }).ToList()
-                };
-
+                var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CompanyId = _customer.CompanyId }, Addresses = _customer.Addresses.Where(a => a.Id != address.Id).Select(a => new CreateAddressRequest { Id = a.Id, Type = a.Type, IsDefault = a.IsDefault, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version }).ToList() };
                 var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
-                if (response.IsSuccessStatusCode)
-                {
-                    Snackbar.Add("Address deleted successfully", Severity.Success);
-                    await LoadCustomerData();
-                    await LoadActivityData();
-                }
-                else
-                {
-                    Snackbar.Add("Failed to delete address", Severity.Error);
-                }
-            }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-            }
+                if (response.IsSuccessStatusCode) { Snackbar.Add("Address deleted successfully", Severity.Success); await LoadCustomerData(); _dropContainer?.Refresh(); await LoadInitialActivities(); }
+            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
     private async Task OpenDocumentUpload()
     {
-        var parameters = new DialogParameters<UploadDocumentDialog>
-        {
-            { x => x.CustomerId, Id },
-            { x => x.Http, Http },
-            { x => x.Category, "General" }
-        };
+        var parameters = new DialogParameters<UploadDocumentDialog> { { x => x.CustomerId, Id }, { x => x.Http, Http }, { x => x.Category, "General" } };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
         var dialog = await DialogService.ShowAsync<UploadDocumentDialog>("Upload Documents", parameters, options);
         var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-        {
-            await LoadCustomerData();
-            await LoadActivityData();
-        }
+        if (result != null && !result.Canceled) { await LoadCustomerData(); await LoadInitialActivities(); }
     }
 
     private async Task OpenNdaUpload()
     {
-        var parameters = new DialogParameters<UploadDocumentDialog>
-        {
-            { x => x.CustomerId, Id },
-            { x => x.Http, Http },
-            { x => x.Category, "NDA" },
-            { x => x.Accept, ".pdf" }
-        };
+        var parameters = new DialogParameters<UploadDocumentDialog> { { x => x.CustomerId, Id }, { x => x.Http, Http }, { x => x.Category, "NDA" }, { x => x.Accept, ".pdf" }, { x => x.HideCategory, true } };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<UploadDocumentDialog>("Upload Signed NDA", parameters, options);
+        var dialog = await DialogService.ShowAsync<UploadDocumentDialog>("Upload NDA Document", parameters, options);
         var result = await dialog.Result;
-        if (result != null && !result.Canceled)
+
+        if (result != null && !result.Canceled && result.Data != null)
         {
-            if (_ndaExpiryDate.HasValue)
+            try
             {
-                await Http.PostAsJsonAsync("api/customers/ndas", new { customerId = Id, expiresAt = _ndaExpiryDate, status = "Signed" });
+                // Reload customer to get the newly linked document with its real ID
+                await LoadCustomerData();
+
+                var dataList = (IEnumerable<dynamic>)result.Data;
+                var firstUpload = dataList.FirstOrDefault();
+
+                if (firstUpload != null)
+                {
+                    string uploadId = firstUpload.UploadId;
+
+                    // Find the document reference that was created by link-documents
+                    var ndaDoc = _customer?.Documents?.FirstOrDefault(d =>
+                        d.FileReference == uploadId && d.DocumentCategory == "NDA");
+
+                    await Http.PostAsJsonAsync("api/customers/ndas", new {
+                        customerId = Id,
+                        status = "Draft",
+                        documentReferenceId = ndaDoc?.Id
+                    });
+
+                    Snackbar.Add("NDA uploaded and draft created", Severity.Success);
+                    await LoadCustomerData();
+                    await LoadInitialActivities();
+                }
             }
-            await LoadCustomerData();
-            await LoadActivityData();
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error creating NDA record: {ex.Message}", Severity.Error);
+            }
         }
     }
 
     private async Task EditNdaDialog()
     {
+        await LoadCustomerData();
         if (_customer?.Nda == null) return;
-        
-        var parameters = new DialogParameters<AddNdaDialog>
-        {
-            { x => x.CustomerId, Id },
-            { x => x.ExistingNda, _customer.Nda }
-        };
-        
+        var parameters = new DialogParameters<AddNdaDialog> { { x => x.CustomerId, Id }, { x => x.ExistingNda, _customer.Nda } };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
         var dialog = await DialogService.ShowAsync<AddNdaDialog>("NDA Settings", parameters, options);
         var result = await dialog.Result;
-        
         if (result != null && !result.Canceled && result.Data != null)
         {
             try
             {
-                // We'll use reflection to get the data from the anonymous object or just use the known type
-                // Actually the dialog returns an object, let's use a structured way if possible or just dynamic for now
                 var data = result.Data;
                 var expiresAt = (DateTime?)data.GetType().GetProperty("ExpiresAt")?.GetValue(data);
                 var status = (string?)data.GetType().GetProperty("Status")?.GetValue(data);
+                var version = (byte[]?)data.GetType().GetProperty("Version")?.GetValue(data);
+                var signedAt = (DateTime?)data.GetType().GetProperty("SignedAt")?.GetValue(data);
+                var signedBy = (string?)data.GetType().GetProperty("SignedBy")?.GetValue(data);
+                var revokeReason = (string?)data.GetType().GetProperty("RevokeReason")?.GetValue(data);
+                var revokedAt = (DateTime?)data.GetType().GetProperty("RevokedAt")?.GetValue(data);
 
-                var response = await Http.PatchAsJsonAsync($"api/customers/ndas/{_customer.Nda.Id}/status", new { status, expiresAt });
+                // Update status and expiration date via /status endpoint (now supports expiresAt)
+                var response = await Http.PatchAsJsonAsync($"api/customers/ndas/{_customer.Nda.Id}/status", new { status, expiresAt, version, signedAt, signedBy, revokeReason, revokedAt });
+
                 if (response.IsSuccessStatusCode)
                 {
                     Snackbar.Add("NDA updated successfully", Severity.Success);
                     await LoadCustomerData();
-                    await LoadActivityData();
+                    await LoadInitialActivities();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Failed to update NDA: {error}", Severity.Error);
+                }
+            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        }
+    }
+
+    private async Task<string?> GetDocumentPreviewUrl(string fileReference) { try { var response = await Http.GetFromJsonAsync<DownloadUrlResponse>($"api/aiprocessing/download-url/{fileReference}"); return response?.Url; } catch { return null; } }
+
+    private async Task OpenSignedNdaUpload(NDAResponse nda)
+    {
+        var parameters = new DialogParameters<SignNdaDialog> { { x => x.CustomerId, Id }, { x => x.Http, Http } };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SignNdaDialog>("Sign NDA", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data != null)
+        {
+            try
+            {
+                var data = result.Data;
+                var expiresAt = (DateTime?)data.GetType().GetProperty("ExpiresAt")?.GetValue(data);
+                var fileReference = (string?)data.GetType().GetProperty("FileReference")?.GetValue(data);
+
+                if (!string.IsNullOrEmpty(fileReference))
+                {
+                    // Reload customer to get the new document ID
+                    await LoadCustomerData();
+                    var newDoc = _customer?.Documents.FirstOrDefault(d => d.FileReference == fileReference);
+
+                    if (newDoc != null)
+                    {
+                        var response = await Http.PatchAsJsonAsync($"api/customers/ndas/{nda.Id}/status", new 
+                        { 
+                            status = "Signed", 
+                            version = nda.Version, 
+                            signedAt = DateTime.UtcNow, 
+                            signedBy = _customer?.Name, 
+                            expiresAt = expiresAt,
+                            documentReferenceId = newDoc.Id
+                        });
+
+                        if (response.IsSuccessStatusCode) 
+                        { 
+                            Snackbar.Add("NDA signed and uploaded successfully", Severity.Success); 
+                            await LoadCustomerData(); 
+                            await LoadInitialActivities(); 
+                        }
+                        else
+                        {
+                            Snackbar.Add("Failed to update NDA status", Severity.Error);
+                        }
+                    }
+                }
+            } 
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        }
+    }
+
+    private async Task OpenNdaRevisionUpload(NDAResponse nda)
+    {
+        var parameters = new DialogParameters<UploadDocumentDialog> { { x => x.CustomerId, Id }, { x => x.Http, Http }, { x => x.Category, "NDA" }, { x => x.Accept, ".pdf" }, { x => x.HideCategory, true } };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<UploadDocumentDialog>("Upload Revised Draft", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data != null)
+        {
+            try
+            {
+                await LoadCustomerData();
+                var dataList = (IEnumerable<dynamic>)result.Data;
+                var firstUpload = dataList.FirstOrDefault();
+
+                if (firstUpload != null)
+                {
+                    string uploadId = firstUpload.UploadId;
+                    var ndaDoc = _customer?.Documents?.FirstOrDefault(d => d.FileReference == uploadId && d.DocumentCategory == "NDA");
+
+                    if (ndaDoc != null)
+                    {
+                         var response = await Http.PatchAsJsonAsync($"api/customers/ndas/{nda.Id}/status", new 
+                        { 
+                            status = nda.Status, // Keep existing status (Draft)
+                            version = nda.Version, 
+                            documentReferenceId = ndaDoc.Id
+                        });
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            Snackbar.Add("NDA revision uploaded successfully", Severity.Success);
+                            await LoadCustomerData();
+                            await LoadInitialActivities();
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Error updating NDA revision: {ex.Message}", Severity.Error);
             }
         }
     }
 
-    private async Task<string?> GetDocumentPreviewUrl(string fileReference)
+    private async Task DeleteNda(NDAResponse nda)
     {
-        try
-        {
-            var response = await Http.GetFromJsonAsync<DownloadUrlResponse>($"api/aiprocessing/download-url/{fileReference}");
-            return response?.Url;
-        }
-        catch { return null; }
-    }
-
-    private async Task MarkNdaAsSigned()
-    {
-        if (_customer?.Nda == null) return;
-        
-        var result = await DialogService.ShowMessageBox("Confirm Signature", "Are you sure you want to mark this NDA as signed?", yesText: "Confirm", noText: "Cancel");
+        var result = await DialogService.ShowMessageBox("Delete NDA", "Are you sure you want to delete this NDA record?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try
             {
-                var response = await Http.PatchAsJsonAsync($"api/customers/ndas/{_customer.Nda.Id}/status", new { status = "Signed" });
-                if (response.IsSuccessStatusCode)
-                {
-                    Snackbar.Add("NDA marked as signed", Severity.Success);
-                    await LoadCustomerData();
-                    await LoadActivityData();
-                }
-                else
-                {
-                    Snackbar.Add("Failed to update NDA status", Severity.Error);
-                }
-            }
-            catch (Exception ex)
+                var versionBase64 = Convert.ToBase64String(nda.Version);
+                var response = await Http.DeleteAsync($"api/customers/ndas/{nda.Id}?version={Uri.EscapeDataString(versionBase64)}");
+                if (response.IsSuccessStatusCode) { Snackbar.Add("NDA deleted", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); }
+            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        }
+    }
+
+    private async Task HandleDeleteDocument(DocumentResponse doc)
+    {
+        var result = await DialogService.ShowMessageBox("Delete Document", $"Are you sure you want to delete '{doc.FileName}'?", yesText: "Delete", noText: "Cancel");
+        if (result == true)
+        {
+            try
             {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-            }
+                var versionBase64 = Convert.ToBase64String(doc.RowVersion);
+                var response = await Http.DeleteAsync($"api/customers/documents/{doc.Id}?version={Uri.EscapeDataString(versionBase64)}");
+                if (response.IsSuccessStatusCode) { Snackbar.Add("Document deleted", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); }
+            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
@@ -1040,19 +1495,8 @@
         try
         {
             var response = await Http.GetFromJsonAsync<DownloadUrlResponse>($"api/aiprocessing/download-url/{fileReference}");
-            if (response != null && !string.IsNullOrEmpty(response.Url))
-            {
-                await JSRuntime.InvokeVoidAsync("open", response.Url, "_blank");
-            }
-            else
-            {
-                Snackbar.Add("Could not generate download link", Severity.Error);
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Download error: {ex.Message}", Severity.Error);
-        }
+            if (response?.Url != null) await JSRuntime.InvokeVoidAsync("open", response.Url, "_blank");
+        } catch (Exception ex) { Snackbar.Add($"Download error: {ex.Message}", Severity.Error); }
     }
 
     private class DownloadUrlResponse { public string? Url { get; set; } }
@@ -1060,128 +1504,83 @@
     private async Task<IEnumerable<RegistryThaiLocation>> SearchThaiLocations(string? query, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query) || query.Length < 2) return [];
-        try
-        {
-            return await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/customers/locations/thai?query={Uri.EscapeDataString(query)}&limit=10") ?? [];
-        }
+        try { return await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/customers/locations/thai?query={Uri.EscapeDataString(query)}&limit=10") ?? []; }
         catch { return []; }
     }
-
-    #region File Upload Logic (Legacy removed)
-
-    #endregion
 
     private async Task CopyAddressToClipboard(AddressResponse address)
     {
         var lines = new List<string>();
-        
-        if (address.Type == "Billing")
-        {
-            if (_customer?.CompanyId != null)
-            {
-                lines.Add(_customer.CompanyName ?? "");
-                if (!string.IsNullOrEmpty(_customer.CompanyVatNumber))
-                    lines.Add($"เลขประจำตัวผู้เสียภาษี {_customer.CompanyVatNumber}");
-            }
-            else
-            {
-                lines.Add(_customer?.Name ?? "");
-                if (!string.IsNullOrEmpty(_customer?.Mobile))
-                    lines.Add(_customer.Mobile);
-            }
-        }
-        else if (address.Type == "Shipping")
-        {
-            var recipient = string.IsNullOrEmpty(address.RecipientName) ? _customer?.Name : address.RecipientName;
-            var phone = string.IsNullOrEmpty(address.RecipientPhone) ? _customer?.Mobile : address.RecipientPhone;
-            lines.Add(recipient ?? "");
-            if (!string.IsNullOrEmpty(phone))
-                lines.Add(phone);
-        }
-
-        lines.Add(address.AddressLine1);
-        if (!string.IsNullOrEmpty(address.AddressLine2)) lines.Add(address.AddressLine2);
-        if (!string.IsNullOrEmpty(address.AddressLine3)) lines.Add(address.AddressLine3);
-        lines.Add($"{address.District}, {address.City}");
-        lines.Add($"{address.StateProvince} {address.PostalCode}");
-
-        var fullAddress = string.Join("\n", lines.Where(l => !string.IsNullOrWhiteSpace(l)));
-        
-        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", fullAddress);
+        if (address.Type == "Billing") { if (_customer?.CompanyId != null) { lines.Add(_customer.CompanyName ?? ""); if (!string.IsNullOrEmpty(_customer.CompanyVatNumber)) lines.Add($"เลขประจำตัวผู้เสียภาษี {_customer.CompanyVatNumber}"); } else { lines.Add(_customer?.Name ?? ""); if (!string.IsNullOrEmpty(_customer?.Mobile)) lines.Add(_customer.Mobile); } }
+        else if (address.Type == "Shipping") { var recipient = string.IsNullOrEmpty(address.RecipientName) ? _customer?.Name : address.RecipientName; var phone = string.IsNullOrEmpty(address.RecipientPhone) ? _customer?.Mobile : address.RecipientPhone; lines.Add(recipient ?? ""); if (!string.IsNullOrEmpty(phone)) lines.Add(phone); }
+        lines.Add(address.AddressLine1); if (!string.IsNullOrEmpty(address.AddressLine2)) lines.Add(address.AddressLine2); if (!string.IsNullOrEmpty(address.AddressLine3)) lines.Add(address.AddressLine3); lines.Add($"{address.District}, {address.City}"); lines.Add($"{address.StateProvince} {address.PostalCode}");
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", string.Join("\n", lines.Where(l => !string.IsNullOrWhiteSpace(l))));
         Snackbar.Add("Address copied to clipboard!", Severity.Info);
     }
 
-    private async Task AddInternalNote()
+    private void AddInternalNote()
     {
-        var parameters = new DialogParameters<AddNoteDialog>
-        {
-            { x => x.IsEdit, false }
-        };
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<AddNoteDialog>("Add Internal Note", parameters, options);
-        var result = await dialog.Result;
+        _isNewNote = true;
+        _editingNoteId = null;
+        _editingNoteText = "";
+        _originalNoteText = "";
+        _noteDrawerOpen = true;
+    }
 
-        if (result != null && !result.Canceled && result.Data is string noteText)
+    private void EditInternalNote(InternalNoteResponse note)
+    {
+        _isNewNote = false;
+        _editingNoteId = note.Id;
+        _editingNoteText = note.NoteText;
+        _originalNoteText = note.NoteText;
+        _noteDrawerOpen = true;
+    }
+
+    private void CloseNoteDrawer()
+    {
+        _noteDrawerOpen = false;
+        _editingNoteId = null;
+        _editingNoteText = "";
+    }
+
+    private async Task SaveNote()
+    {
+        if (string.IsNullOrWhiteSpace(_editingNoteText)) return;
+
+        try
         {
-            try
+            if (_isNewNote)
             {
-                var response = await Http.PostAsJsonAsync($"api/customers/{Id}/notes", noteText);
+                var response = await Http.PostAsJsonAsync($"api/customers/{Id}/notes", new { ownerType = "Customer", ownerId = Id, noteText = _editingNoteText });
                 if (response.IsSuccessStatusCode)
                 {
                     Snackbar.Add("Note added successfully", Severity.Success);
+                    _noteDrawerOpen = false;
                     await LoadCustomerData();
-                    await LoadActivityData();
-                }
-                else
-                {
-                    Snackbar.Add("Failed to add note", Severity.Error);
+                    await LoadInitialActivities();
                 }
             }
-            catch (Exception ex)
+            else if (_editingNoteId.HasValue)
             {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+                var note = _customer?.Notes?.FirstOrDefault(n => n.Id == _editingNoteId.Value);
+                if (note != null)
+                {
+                    if (note.NoteText == _editingNoteText) return;
+
+                    var response = await Http.PatchAsJsonAsync($"api/customers/notes/{note.Id}", new { noteText = _editingNoteText, version = note.Version });
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Snackbar.Add("Note updated successfully", Severity.Success);
+                        _originalNoteText = _editingNoteText;
+                        await LoadCustomerData();
+                        await LoadInitialActivities();
+                        if (_noteEditorRef != null)
+                            await _noteEditorRef.SwitchToPreview();
+                    }
+                }
             }
         }
-    }
-
-    private async Task EditInternalNote(InternalNoteResponse note)
-    {
-        var parameters = new DialogParameters<AddNoteDialog>
-        {
-            { x => x.IsEdit, true },
-            { x => x.ExistingNote, note.NoteText }
-        };
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<AddNoteDialog>("Edit Internal Note", parameters, options);
-        var result = await dialog.Result;
-
-        if (result != null && !result.Canceled && result.Data is string noteText)
-        {
-            try
-            {
-                var request = new UpdateInternalNoteRequest
-                {
-                    NoteText = noteText,
-                    Version = note.Version
-                };
-                var response = await Http.PatchAsJsonAsync($"api/customers/notes/{note.Id}", request);
-                if (response.IsSuccessStatusCode)
-                {
-                    Snackbar.Add("Note updated successfully", Severity.Success);
-                    await LoadCustomerData();
-                    await LoadActivityData();
-                }
-                else
-                {
-                    var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-                    Snackbar.Add(error?.Message ?? "Failed to update note", Severity.Error);
-                }
-            }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-            }
-        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
     }
 
     private async Task DeleteInternalNote(InternalNoteResponse note)
@@ -1189,34 +1588,408 @@
         var result = await DialogService.ShowMessageBox("Delete Note", "Are you sure you want to delete this internal note?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
+            try { var response = await Http.DeleteAsync($"api/customers/notes/{note.Id}"); if (response.IsSuccessStatusCode) { Snackbar.Add("Note deleted successfully", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); } }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        }
+    }
+
+    private string SanitizeActivityDescription(string description)
+    {
+        if (description.Contains("changed note content from", StringComparison.OrdinalIgnoreCase))
+            return "Updated an internal note";
+        return description;
+    }
+
+    private List<DocumentResponse> GetNonNdaDocuments()
+    {
+        if (_customer?.Documents == null) return [];
+        var ndaDocIds = _customer.Ndas?.Where(n => n.DocumentReferenceId.HasValue).Select(n => n.DocumentReferenceId!.Value).ToHashSet() ?? [];
+        return _customer.Documents
+            .Where(d => !string.Equals(d.DocumentCategory, "NDA", StringComparison.OrdinalIgnoreCase) && !ndaDocIds.Contains(d.Id))
+            .ToList();
+    }
+
+    private List<DocumentResponse> GetNdaDocuments()
+    {
+        if (_customer?.Documents == null) return [];
+        var ndaDocIds = _customer.Ndas?.Where(n => n.DocumentReferenceId.HasValue).Select(n => n.DocumentReferenceId!.Value).ToHashSet() ?? [];
+        return _customer.Documents
+            .Where(d => string.Equals(d.DocumentCategory, "NDA", StringComparison.OrdinalIgnoreCase) || ndaDocIds.Contains(d.Id))
+            .ToList();
+    }
+
+    private Color GetStatusColor(string status) => status switch { "Active" => Color.Success, "Inactive" => Color.Warning, "Blocked" => Color.Error, _ => Color.Default };
+    private Color GetNdaColor(string? status) => status switch { "Signed" => Color.Success, "Expired" => Color.Error, "Draft" => Color.Warning, "Revoked" => Color.Default, _ => Color.Default };
+    private string GetDocumentIcon(string mimeType) => mimeType.Contains("pdf") ? Icons.Custom.FileFormats.FilePdf : mimeType.Contains("image") ? Icons.Custom.FileFormats.FileImage : Icons.Custom.FileFormats.FileDocument;
+    private Color GetDocumentColor(string mimeType) => mimeType.Contains("pdf") ? Color.Error : mimeType.Contains("image") ? Color.Success : Color.Info;
+    private string FormatFileSize(long bytes) => $"{(bytes / 1024.0 / 1024.0):F2} MB";
+
+    private async Task ViewNdaHistory(Guid ndaId)
+    {
+        var parameters = new DialogParameters<NdaHistoryDialog> { { x => x.NdaId, ndaId }, { x => x.Http, Http } };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<NdaHistoryDialog>("NDA History", parameters, options);
+    }
+
+    private async Task ViewNdaDocument(Guid docId)
+    {
+        var doc = _customer?.Documents.FirstOrDefault(d => d.Id == docId);
+        if (doc != null)
+        {
+            var url = await GetDocumentPreviewUrl(doc.FileReference);
+            if (!string.IsNullOrEmpty(url)) await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+        }
+    }
+
+    // File upload functionality for docs tab
+    private bool _uploadingNda = false;
+    private bool _uploadingCustomerDoc = false;
+    private int _activeDocTabIndex = 0;
+    private DocumentResponse? _selectedPreviewDoc = null;
+    private string? _previewUrl = null;
+    private bool _loadingPreview = false;
+    private bool _ndaDragOver = false;
+    private bool _customerDocDragOver = false;
+    private MudFileUpload<IReadOnlyList<IBrowserFile>>? _ndaFileUpload;
+    private MudFileUpload<IReadOnlyList<IBrowserFile>>? _customerDocFileUpload;
+    private List<FileUploadProgress> _ndaUploadFiles = new();
+    private List<FileUploadProgress> _customerDocUploadFiles = new();
+
+    private class FileUploadProgress
+    {
+        public IBrowserFile BrowserFile { get; set; } = default!;
+        public string Name => BrowserFile.Name;
+        public long Size => BrowserFile.Size;
+        public string MimeType => BrowserFile.ContentType;
+        public int Progress { get; set; }
+        public bool IsUploading { get; set; }
+        public bool IsCompleted { get; set; }
+        public string? Error { get; set; }
+    }
+
+
+    private async Task OnNdaFilesSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        if (!files.Any()) return;
+        const int maxFiles = 20;
+        var accepted = files.Take(maxFiles).ToList();
+        if (files.Count > maxFiles)
+        {
+            Snackbar.Add($"Only the first {maxFiles} files will be uploaded ({files.Count} selected).", Severity.Warning);
+        }
+        _ndaUploadFiles = accepted.Select(f => new FileUploadProgress { BrowserFile = f }).ToList();
+        StateHasChanged();
+        await UploadFilesAsync(accepted, "NDA", isNda: true);
+    }
+
+    private async Task OnCustomerDocFilesSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        if (!files.Any()) return;
+        const int maxFiles = 20;
+        var accepted = files.Take(maxFiles).ToList();
+        if (files.Count > maxFiles)
+        {
+            Snackbar.Add($"Only the first {maxFiles} files will be uploaded ({files.Count} selected).", Severity.Warning);
+        }
+        _customerDocUploadFiles = accepted.Select(f => new FileUploadProgress { BrowserFile = f }).ToList();
+        StateHasChanged();
+        await UploadFilesAsync(accepted, "General", isNda: false);
+    }
+
+    private async Task RevokeNda(NDAResponse nda)
+    {
+        var parameters = new DialogParameters<RevokeNdaDialog>();
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<RevokeNdaDialog>("Revoke NDA", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is string reason)
+        {
             try
             {
-                var response = await Http.DeleteAsync($"api/customers/notes/{note.Id}");
+                var request = new UpdateNDAStatusRequest
+                {
+                    Status = "Revoked",
+                    RevokedAt = DateTime.UtcNow,
+                    RevokeReason = reason,
+                    Version = nda.Version
+                };
+
+                var response = await Http.PatchAsJsonAsync($"api/customer/v1/ndas/{nda.Id}/status", request);
                 if (response.IsSuccessStatusCode)
                 {
-                    Snackbar.Add("Note deleted successfully", Severity.Success);
+                    Snackbar.Add("NDA revoked successfully", Severity.Success);
                     await LoadCustomerData();
-                    await LoadActivityData();
                 }
                 else
                 {
-                    Snackbar.Add("Failed to delete note", Severity.Error);
+                    var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+                    Snackbar.Add($"Failed to revoke NDA: {error?.Message ?? "Unknown error"}", Severity.Error);
                 }
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Error revoking NDA: {ex.Message}", Severity.Error);
             }
         }
     }
 
-    private Color GetStatusColor(string status) => status switch { "Active" => Color.Success, "Inactive" => Color.Warning, "Blocked" => Color.Error, _ => Color.Default };
-    private string GetDocumentIcon(string mimeType) => mimeType.Contains("pdf") ? Icons.Custom.FileFormats.FilePdf : mimeType.Contains("image") ? Icons.Custom.FileFormats.FileImage : Icons.Custom.FileFormats.FileDocument;
-    private Color GetDocumentColor(string mimeType) => mimeType.Contains("pdf") ? Color.Error : mimeType.Contains("image") ? Color.Success : Color.Info;
-    private string FormatFileSize(long bytes) => $"{(bytes / 1024.0 / 1024.0):F2} MB";
+    private async Task UploadFilesAsync(IReadOnlyList<IBrowserFile> files, string category, bool isNda)
+    {
+        if (isNda) _uploadingNda = true;
+        else _uploadingCustomerDoc = true;
+
+        var progressList = isNda ? _ndaUploadFiles : _customerDocUploadFiles;
+        
+        try
+        {
+            var uploadTasks = progressList.Select(fileProgress => UploadSingleFileAsync(fileProgress, category, isNda)).ToList();
+            await Task.WhenAll(uploadTasks);
+
+            var completedCount = progressList.Count(f => f.IsCompleted);
+            if (completedCount > 0)
+            {
+                Snackbar.Add(isNda
+                    ? $"NDA Draft created for {completedCount} file(s)"
+                    : $"Successfully uploaded {completedCount} file(s)", Severity.Success);
+                await LoadCustomerData();
+                await LoadInitialActivities();
+            }
+        }
+        finally
+        {
+            if (isNda) _uploadingNda = false;
+            else _uploadingCustomerDoc = false;
+
+            // Clear completed files from list after a short delay
+            _ = Task.Delay(2000).ContinueWith(_ =>
+            {
+                InvokeAsync(() =>
+                {
+                    progressList.RemoveAll(f => f.IsCompleted);
+                    StateHasChanged();
+                });
+            });
+        }
+    }
+
+    private async Task UploadSingleFileAsync(FileUploadProgress fileProgress, string category, bool isNda)
+    {
+        fileProgress.IsUploading = true;
+        fileProgress.Progress = 10;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var stream = fileProgress.BrowserFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(fileProgress.BrowserFile.ContentType);
+            content.Add(fileContent, "files", fileProgress.Name);
+
+            fileProgress.Progress = 30;
+            await InvokeAsync(StateHasChanged);
+
+            var url = $"api/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}";
+            var response = await Http.PostAsync(url, content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                fileProgress.Progress = 60;
+                await InvokeAsync(StateHasChanged);
+
+                var results = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
+                var result = results?.FirstOrDefault();
+
+                if (result != null)
+                {
+                    var document = new CreateDocumentRequest
+                    {
+                        DocumentCategory = category,
+                        FileReference = result.UploadId,
+                        FileName = result.FileName,
+                        FileSize = result.FileSize,
+                        MimeType = GetMimeTypeFromFileName(result.FileName)
+                    };
+
+                    fileProgress.Progress = 80;
+                    await InvokeAsync(StateHasChanged);
+
+                    var linkUrl = $"/api/aiprocessing/link-documents?ownerType=Customer&ownerId={Id}";
+                    var linkResponse = await Http.PostAsJsonAsync(linkUrl, new List<CreateDocumentRequest> { document });
+
+                    if (linkResponse.IsSuccessStatusCode)
+                    {
+                        if (isNda)
+                        {
+                            // For NDA, we need to create the NDA record after linking
+                            // We can't easily wait for LoadCustomerData here in parallel, 
+                            // so we'll do it once in the main loop or handle it specifically.
+                            // But we need the Document ID from the linked document.
+                            // The link endpoint should return the created documents with IDs.
+                            
+                            var linkedDocs = await linkResponse.Content.ReadFromJsonAsync<List<DocumentResponse>>();
+                            var createdDoc = linkedDocs?.FirstOrDefault();
+                            
+                            if (createdDoc != null)
+                            {
+                                await Http.PostAsJsonAsync("api/customers/ndas", new {
+                                    customerId = Id,
+                                    status = "Draft",
+                                    documentReferenceId = createdDoc.Id
+                                });
+                            }
+                        }
+
+                        fileProgress.IsCompleted = true;
+                        fileProgress.Progress = 100;
+                    }
+                    else
+                    {
+                        fileProgress.Error = "Linking failed";
+                    }
+                }
+                else
+                {
+                    fileProgress.Error = "No upload result returned";
+                }
+            }
+            else
+            {
+                fileProgress.Error = $"Upload failed: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            fileProgress.Error = ex.Message;
+        }
+        finally
+        {
+            fileProgress.IsUploading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string GetMimeTypeFromFileName(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".pdf" => "application/pdf",
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            _ => "application/octet-stream"
+        };
+    }
+
+    private async Task PreviewDocument(DocumentResponse doc)
+    {
+        var parameters = new DialogParameters<DocumentViewer>
+        {
+            { x => x.Documents, new List<DocumentResponse> { doc } },
+            { x => x.OnDownload, EventCallback.Factory.Create<string>(this, DownloadDocument) },
+            { x => x.OnDelete, EventCallback.Factory.Create<DocumentResponse>(this, HandleDeleteDocument) },
+            { x => x.GetPreviewUrlFunc, new Func<string, Task<string?>>(GetDocumentPreviewUrl) }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true };
+        await DialogService.ShowAsync<DocumentViewer>("Document Preview", parameters, options);
+    }
+
+    private async Task SelectDocumentForPreview(DocumentResponse doc)
+    {
+        _selectedPreviewDoc = doc;
+        _loadingPreview = true;
+        _previewUrl = null;
+
+        try
+        {
+            _previewUrl = await GetDocumentPreviewUrl(doc.FileReference);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load preview: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingPreview = false;
+        }
+    }
+
+    // NDA drag and drop handlers
+    private void HandleNdaDragOver() => _ndaDragOver = true;
+    private void HandleNdaDragLeave() => _ndaDragOver = false;
+    private void HandleNdaDrop()
+    {
+        _ndaDragOver = false;
+        // The MudFileUpload component will handle the actual file drop
+    }
+
+    // Customer Documents drag and drop handlers
+    private void HandleCustomerDocDragOver() => _customerDocDragOver = true;
+    private void HandleCustomerDocDragLeave() => _customerDocDragOver = false;
+    private void HandleCustomerDocDrop()
+    {
+        _customerDocDragOver = false;
+        // The MudFileUpload component will handle the actual file drop
+    }
+
+    private Color GetDocumentIconColor(string mimeType) => mimeType.Contains("pdf") ? Color.Error :
+        mimeType.Contains("image") ? Color.Success :
+        mimeType.Contains("word") || mimeType.Contains("doc") ? Color.Info :
+        Color.Default;
 
     public async ValueTask DisposeAsync()
     {
         SignalRService.OnCustomerChanged -= HandleCustomerChanged;
     }
 }
+
+<style>
+    .activity-item-content .markdown-content p { margin-bottom: 0; font-weight: 500; font-size: 0.875rem; }
+    .activity-item-content .markdown-content ul { margin-top: 0.25rem; margin-bottom: 0; }
+    .activity-item-content .markdown-content li { font-size: 0.875rem; }
+    .note-preview-content { line-height: 1.6; color: var(--mud-palette-text-primary); }
+    .note-preview-content .markdown-content p { margin-bottom: 0.5rem; font-size: 0.875rem; }
+    .note-preview-content .markdown-content p:last-child { margin-bottom: 0; }
+    .note-content-preview .markdown-content { font-size: 1rem; }
+    .hover-primary:hover { color: var(--mud-palette-primary) !important; cursor: pointer; transition: color 0.2s; }
+    .mud-drop-zone { transition: all 0.3s ease; }
+    .mud-drop-zone-dragover { background-color: var(--mud-palette-primary-lighten) !important; border-color: var(--mud-palette-primary) !important; transform: scale(1.01); }
+    .hover-elevation-1:hover { box-shadow: var(--mud-elevation-2); transition: box-shadow 0.2s ease; }
+    .hover-elevation-2:hover { box-shadow: var(--mud-elevation-4); transform: translateY(-1px); }
+
+    .docs-vertical-nav .mud-nav-link { text-align: left !important; padding: 12px 16px !important; }
+    .docs-vertical-nav .mud-nav-link-text { text-align: left !important; width: 100%; }
+    .mud-selected-item { background-color: rgba(var(--mud-palette-primary-rgb), 0.12) !important; }
+
+    .file-upload-dropzone {
+        padding: 24px;
+        border-radius: 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .file-upload-dropzone:hover {
+        transform: scale(1.01);
+        opacity: 0.9;
+    }
+    .file-upload-dropzone.drag-over {
+        transform: scale(1.02);
+        opacity: 1;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Force equal size for address cards in grid */
+    .flex-wrap.gap-6 > div {
+        flex: 1 1 350px;
+        max-width: 500px;
+    }
+
+</style>

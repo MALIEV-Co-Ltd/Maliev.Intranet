@@ -1,6 +1,9 @@
 @page "/sales/quotations"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
 @inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Quotations - Maliev Intranet</PageTitle>
 
@@ -16,9 +19,10 @@
                       Margin="Margin.Dense" 
                       Style="max-width: 400px;" />
         
-        <MudButton Variant="Variant.Filled" 
-                   Color="Color.Primary" 
-                   StartIcon="@Icons.Material.Filled.Add">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
             Create Quotation
         </MudButton>
     </MudStack>
@@ -27,9 +31,10 @@
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
     <MudTabs Elevation="0" Rounded="false" PanelClass="pa-0" Class="border-b mud-border-lines-default">
         <MudTabPanel Text="All" Icon="@Icons.Material.Outlined.List" />
-        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="@(_quotations.Count(x => x.Status == "Draft") > 0 ? _quotations.Count(x => x.Status == "Draft") : null)" BadgeColor="Color.Default" />
-        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" BadgeData="@(_quotations.Count(x => x.Status == "Sent") > 0 ? _quotations.Count(x => x.Status == "Sent") : null)" BadgeColor="Color.Primary" />
-        <MudTabPanel Text="Accepted" Icon="@Icons.Material.Outlined.CheckCircle" BadgeData="@(_quotations.Count(x => x.Status == "Accepted") > 0 ? _quotations.Count(x => x.Status == "Accepted") : null)" BadgeColor="Color.Success" />
+        <!-- Badge logic removed for now as it requires complex counting or separate API -->
+        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" />
+        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" />
+        <MudTabPanel Text="Accepted" Icon="@Icons.Material.Outlined.CheckCircle" />
         <MudTabPanel Text="Expired" Icon="@Icons.Material.Outlined.EventBusy" />
     </MudTabs>
 
@@ -44,25 +49,17 @@
     }
     else
     {
-        <MudDataGrid T="QuotationDto" 
+        <MudDataGrid T="QuotationSummaryDto" 
                      Items="@_quotations" 
                      Dense="true" 
                      Hover="true" 
                      Striped="false"
                      Elevation="0">
             <Columns>
-                <PropertyColumn Property="x => x.QuoteNumber" Title="Quote #" />
+                <PropertyColumn Property="x => x.QuotationNumber" Title="Quote #" />
                 <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
-                <PropertyColumn Property="x => x.CreatedDate" Title="Created" Format="dd MMM yyyy" />
-                <PropertyColumn Property="x => x.ExpiryDate" Title="Expiry" Format="dd MMM yyyy" />
+                <PropertyColumn Property="x => x.CreatedAt" Title="Created" Format="dd MMM yyyy" />
                 <PropertyColumn Property="x => x.Total" Title="Total" Format="C2" />
-                <TemplateColumn Title="Status">
-                    <CellTemplate>
-                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
-                            @context.Item.Status
-                        </MudChip>
-                    </CellTemplate>
-                </TemplateColumn>
                 <TemplateColumn Title="Actions" Sortable="false">
                     <CellTemplate>
                         <MudStack Row="true" Spacing="1">
@@ -70,12 +67,10 @@
                                            Size="Size.Small" 
                                            Color="Color.Default" 
                                            Href="@($"/sales/quotations/{context.Item.Id}")" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" 
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" 
                                            Size="Size.Small" 
-                                           Color="Color.Primary" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" 
-                                           Size="Size.Small" 
-                                           Color="Color.Default" />
+                                           Color="Color.Error" 
+                                           OnClick="@(() => DeleteQuotation(context.Item))" />
                         </MudStack>
                     </CellTemplate>
                 </TemplateColumn>
@@ -87,34 +82,65 @@
 @code {
     private bool _isLoading = true;
     private string _searchString = "";
-    private List<QuotationDto> _quotations = new();
+    private List<QuotationSummaryDto> _quotations = new();
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _quotations = await Http.GetFromJsonAsync<List<QuotationDto>>("api/quotations");
-        await Task.Delay(500);
-        _isLoading = false;
+        try 
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<QuotationSummaryDto>>("api/quotations");
+            if (response?.Data != null)
+            {
+                _quotations = response.Data.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading quotations: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    private Color GetStatusColor(string status) => status switch
+    private async Task OpenCreateDialog()
     {
-        "Draft" => Color.Default,
-        "Sent" => Color.Primary,
-        "Accepted" => Color.Success,
-        "Expired" => Color.Error,
-        "Rejected" => Color.Error,
-        _ => Color.Default
-    };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
 
-    public class QuotationDto
+        var dialog = await DialogService.ShowAsync<CreateQuotationDialog>("Create Quotation", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+        }
+    }
+
+    private async Task DeleteQuotation(QuotationSummaryDto quotation)
     {
-        public Guid Id { get; set; }
-        public string QuoteNumber { get; set; } = string.Empty;
-        public string CustomerName { get; set; } = string.Empty;
-        public DateTime CreatedDate { get; set; }
-        public DateTime ExpiryDate { get; set; }
-        public decimal Total { get; set; }
-        public string Status { get; set; } = string.Empty;
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete Quotation", 
+            $"Are you sure you want to delete {quotation.QuotationNumber}?", 
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (result == true)
+        {
+            var response = await Http.DeleteAsync($"api/quotations/{quotation.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Quotation deleted", Severity.Success);
+                await OnInitializedAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete quotation", Severity.Error);
+            }
+        }
     }
 }

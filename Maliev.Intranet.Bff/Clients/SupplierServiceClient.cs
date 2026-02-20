@@ -28,6 +28,33 @@ public class SupplierServiceClient(HttpClient httpClient)
     /// <returns>The supplier detail DTO.</returns>
     public async Task<SupplierDetailDto?> GetSupplierByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<SupplierDetailDto>($"/supplier/v1/suppliers/{id}", ct);
+        var response = await httpClient.GetAsync($"/supplier/v1/suppliers/{id}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SupplierDetailDto>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Creates a new supplier.
+    /// </summary>
+    public async Task<HttpResponseMessage> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PostAsJsonAsync("/supplier/v1/suppliers", request, ct);
+    }
+
+    /// <summary>
+    /// Updates an existing supplier.
+    /// </summary>
+    public async Task<HttpResponseMessage> UpdateSupplierAsync(Guid id, UpdateSupplierRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PutAsJsonAsync($"/supplier/v1/suppliers/{id}", request, ct);
+    }
+
+    /// <summary>
+    /// Deactivates a supplier.
+    /// </summary>
+    public async Task<HttpResponseMessage> DeactivateSupplierAsync(Guid id, CancellationToken ct = default)
+    {
+        return await httpClient.PatchAsync($"/supplier/v1/suppliers/{id}/deactivate", null, ct);
     }
 }

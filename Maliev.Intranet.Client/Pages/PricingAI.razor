@@ -1,4 +1,8 @@
 @page "/sales/pricing-ai"
+@using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Shared.Constants
+@inject HttpClient Http
+@inject ISnackbar Snackbar
 
 <PageTitle>Pricing AI - Maliev Intranet</PageTitle>
 
@@ -14,43 +18,37 @@
             <MudText Typo="Typo.h6" Class="mb-4">Input Parameters</MudText>
             
             <MudStack Spacing="3">
-                <MudSelect @bind-Value="_selectedMaterial" Label="Material" Variant="Variant.Outlined" Margin="Margin.Dense">
-                    <MudSelectItem Value="@("PLA")">PLA (Polylactic Acid)</MudSelectItem>
-                    <MudSelectItem Value="@("ABS")">ABS (Acrylonitrile Butadiene Styrene)</MudSelectItem>
-                    <MudSelectItem Value="@("PETG")">PETG</MudSelectItem>
-                    <MudSelectItem Value="@("Nylon")">Nylon</MudSelectItem>
-                    <MudSelectItem Value="@("Aluminum")">Aluminum 6061</MudSelectItem>
-                    <MudSelectItem Value="@("Steel")">Stainless Steel 304</MudSelectItem>
-                </MudSelect>
+                <MudAutocomplete T="MaterialSummaryDto" 
+                                 Label="Material" 
+                                 @bind-Value="_selectedMaterial" 
+                                 SearchFunc="@SearchMaterials"
+                                 ToStringFunc="@(m => m?.Name ?? "")"
+                                 Variant="Variant.Outlined" 
+                                 Margin="Margin.Dense"
+                                 Required="true"
+                                 Placeholder="Search materials..." />
 
-                <MudSelect @bind-Value="_selectedProcess" Label="Manufacturing Process" Variant="Variant.Outlined" Margin="Margin.Dense">
-                    <MudSelectItem Value="@("3D-FDM")">3D Printing (FDM)</MudSelectItem>
-                    <MudSelectItem Value="@("3D-SLA")">3D Printing (SLA)</MudSelectItem>
-                    <MudSelectItem Value="@("CNC")">CNC Machining</MudSelectItem>
-                    <MudSelectItem Value="@("SheetMetal")">Sheet Metal Fabrication</MudSelectItem>
-                    <MudSelectItem Value="@("Injection")">Injection Molding</MudSelectItem>
+                <MudSelect T="Guid" @bind-Value="_selectedProcessId" Label="Manufacturing Process" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true">
+                    <MudSelectItem Value="@ManufacturingProcesses.Fdm3DPrinting">3D Printing (FDM)</MudSelectItem>
+                    <MudSelectItem Value="@ManufacturingProcesses.Sla3DPrinting">3D Printing (SLA)</MudSelectItem>
+                    <MudSelectItem Value="@ManufacturingProcesses.CncMachining">CNC Machining</MudSelectItem>
+                    <MudSelectItem Value="@ManufacturingProcesses.SheetMetal">Sheet Metal Fabrication</MudSelectItem>
+                    <MudSelectItem Value="@ManufacturingProcesses.InjectionMolding">Injection Molding</MudSelectItem>
                 </MudSelect>
 
                 <MudText Typo="Typo.subtitle2" Class="mt-2">Dimensions (mm)</MudText>
-                <MudNumericField @bind-Value="_length" Label="Length" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
-                <MudNumericField @bind-Value="_width" Label="Width" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
-                <MudNumericField @bind-Value="_height" Label="Height" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+                <MudNumericField T="decimal" @bind-Value="_length" Label="Length (X)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" Step="0.1m" />
+                <MudNumericField T="decimal" @bind-Value="_width" Label="Width (Y)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" Step="0.1m" />
+                <MudNumericField T="decimal" @bind-Value="_height" Label="Height (Z)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" Step="0.1m" />
 
-                <MudNumericField @bind-Value="_quantity" Label="Quantity" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
-
-                <MudSelect @bind-Value="_selectedFinish" Label="Finish" Variant="Variant.Outlined" Margin="Margin.Dense">
-                    <MudSelectItem Value="@("Standard")">Standard</MudSelectItem>
-                    <MudSelectItem Value="@("Polished")">Polished</MudSelectItem>
-                    <MudSelectItem Value="@("Anodized")">Anodized</MudSelectItem>
-                    <MudSelectItem Value="@("Powder Coated")">Powder Coated</MudSelectItem>
-                </MudSelect>
+                <MudNumericField T="int" @bind-Value="_quantity" Label="Quantity" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
 
                 <MudButton Variant="Variant.Filled" 
                            Color="Color.Primary" 
                            FullWidth="true"
                            StartIcon="@Icons.Material.Filled.Analytics"
                            OnClick="@CalculatePricing"
-                           Disabled="@_isCalculating"
+                           Disabled="@(_isCalculating || _selectedMaterial == null || _selectedProcessId == Guid.Empty)"
                            Class="mt-4">
                     @if (_isCalculating)
                     {
@@ -78,28 +76,27 @@
                 </MudText>
             </MudPaper>
         }
-        else
+        else if (_pricingResult != null)
         {
             <MudStack Spacing="3">
                 <!-- Predicted Price Card -->
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.h6" Class="mb-4">Predicted Price</MudText>
                     <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
-                        <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">$@_predictedPrice.ToString("N2")</MudText>
-
-                        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="pb-1">USD per unit</MudText>
+                        <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">฿@_pricingResult.TotalUnitPrice.ToString("N2")</MudText>
+                        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="pb-1">THB per unit</MudText>
                     </MudStack>
-                    <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
-                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> 
-                        12% higher than last month's average
+                    <MudText Typo="Typo.body2" Color="Color.Info" Class="mt-2">
+                        <MudIcon Icon="@Icons.Material.Filled.AccessTime" Size="Size.Small" Class="mr-1" /> 
+                        Valid until @_pricingResult.ValidUntil.ToString("dd MMM yyyy")
                     </MudText>
                 </MudPaper>
 
                 <!-- Confidence Meter -->
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.h6" Class="mb-3">Confidence Level</MudText>
-                    <MudProgressLinear Color="Color.Success" Size="Size.Large" Value="@_confidence" Class="mb-2" />
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">@_confidence% confidence based on @_similarOrders similar orders</MudText>
+                    <MudProgressLinear Color="@GetConfidenceColor(_pricingResult.ConfidenceLevel)" Size="Size.Large" Value="@((double)_pricingResult.ConfidenceLevel * 100)" Class="mb-2" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(_pricingResult.ConfidenceLevel * 100)% confidence based on historical data and @_pricingResult.Strategy strategy</MudText>
                 </MudPaper>
 
                 <!-- Price Breakdown -->
@@ -108,33 +105,45 @@
                     <MudStack Spacing="2">
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Material Cost</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">$@((_predictedPrice * 0.35m).ToString("N2"))</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.MaterialCost.ToString("N2")</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
-                            <MudText Typo="Typo.body2">Labor & Machine Time</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">$@((_predictedPrice * 0.40m).ToString("N2"))</MudText>
+                            <MudText Typo="Typo.body2">Support Cost</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.SupportMaterialCost.ToString("N2")</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
-                            <MudText Typo="Typo.body2">Overhead</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">$@((_predictedPrice * 0.15m).ToString("N2"))</MudText>
+                            <MudText Typo="Typo.body2">Machine Time Cost</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.MachineTimeCost.ToString("N2")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Setup Cost</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.SetupCost.ToString("N2")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Complexity Surcharge</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.ComplexitySurcharge.ToString("N2")</MudText>
+                        </MudStack>
+                        <MudDivider Class="my-2" />
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Subtotal</MudText>
+                            <MudText Typo="Typo.body2">฿@_pricingResult.SubtotalBeforeMargin.ToString("N2")</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Margin</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">$@((_predictedPrice * 0.10m).ToString("N2"))</MudText>
+                            <MudText Typo="Typo.body2">฿@_pricingResult.MarginAmount.ToString("N2")</MudText>
                         </MudStack>
                         <MudDivider Class="my-2" />
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">Total (Qty: @_quantity)</MudText>
-                            <MudText Typo="Typo.subtitle1" Color="Color.Primary" Style="font-weight: 700;">$@((_predictedPrice * _quantity).ToString("N2"))</MudText>
+                            <MudText Typo="Typo.subtitle1" Color="Color.Primary" Style="font-weight: 700;">฿@_pricingResult.TotalPrice.ToString("N2")</MudText>
                         </MudStack>
-
                     </MudStack>
                 </MudPaper>
 
                 <!-- Actions -->
                 <MudStack Row="true" Spacing="2">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
-                        Save to Quotation
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="SaveSnapshot">
+                        Save Snapshot
                     </MudButton>
                     <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download">
                         Export Analysis
@@ -146,47 +155,127 @@
 </MudGrid>
 
 @code {
-    private string _selectedMaterial = "PLA";
-    private string _selectedProcess = "3D-FDM";
-    private string _selectedFinish = "Standard";
-    private double _length = 100;
-    private double _width = 50;
-    private double _height = 30;
-    private int _quantity = 10;
+    private MaterialSummaryDto? _selectedMaterial;
+    private Guid _selectedProcessId = ManufacturingProcesses.Fdm3DPrinting;
+    private decimal _length = 100;
+    private decimal _width = 50;
+    private decimal _height = 30;
+    private int _quantity = 1;
     
     private bool _isCalculating = false;
     private bool _hasResults = false;
-    private decimal _predictedPrice = 0;
-    private int _confidence = 0;
-    private int _similarOrders = 0;
+    private PricingResultDto? _pricingResult;
+
+    private async Task<IEnumerable<MaterialSummaryDto>> SearchMaterials(string value, CancellationToken token)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>("api/materials?pageSize=100");
+            if (response?.Data == null) return [];
+            
+            if (string.IsNullOrEmpty(value))
+                return response.Data;
+                
+            return response.Data.Where(x => x.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+        catch
+        {
+            return [];
+        }
+    }
 
     private async Task CalculatePricing()
     {
+        if (_selectedMaterial == null || _selectedProcessId == Guid.Empty) return;
+
         _isCalculating = true;
         _hasResults = false;
         StateHasChanged();
 
         try
         {
-            // TODO: Replace with real PredictionService call via BFF
-            // var result = await Http.PostAsJsonAsync("api/pricing/predict", new { Material = _selectedMaterial, ... });
-            // _predictedPrice = await result.Content.ReadFromJsonAsync<decimal>();
+            // Estimating volume from dimensions for the AI calculator
+            decimal volume = _length * _width * _height / 1000m; // simple cubic volume cm3
             
-            await Task.Delay(1500); // Latency for UX
-            
-            // For now, return 0 as database is empty and service is not yet wired
-            _predictedPrice = 0;
-            _confidence = 0;
-            _similarOrders = 0;
-            _hasResults = true;
+            var request = new PricingRequestDto
+            {
+                FileId = Guid.Empty, // Ad-hoc calculation
+                CustomerId = Guid.Empty, // Anonymous calculation
+                MaterialId = _selectedMaterial.Id,
+                MaterialCode = _selectedMaterial.SKU,
+                ManufacturingProcessId = _selectedProcessId,
+                ManufacturingProcessName = ManufacturingProcesses.GetName(_selectedProcessId),
+                Quantity = _quantity,
+                Geometry = new GeometryMetricsDto
+                {
+                    VolumeCm3 = volume,
+                    SupportVolumeCm3 = volume * 0.15m, // 15% support estimate
+                    SurfaceAreaCm2 = (_length * _width + _width * _height + _height * _length) * 2 / 100m,
+                    BoundingBoxX = _length,
+                    BoundingBoxY = _width,
+                    BoundingBoxZ = _height,
+                    IsManifold = true,
+                    TriangleCount = 5000
+                }
+            };
+
+            var response = await Http.PostAsJsonAsync("api/pricing/calculate", request);
+            if (response.IsSuccessStatusCode)
+            {
+                _pricingResult = await response.Content.ReadFromJsonAsync<PricingResultDto>();
+                _hasResults = true;
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Calculation failed: {error}", Severity.Error);
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error calculating pricing: {ex.Message}");
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
         }
         finally
         {
             _isCalculating = false;
         }
+    }
+
+    private async Task SaveSnapshot()
+    {
+        if (_pricingResult == null || _selectedMaterial == null) return;
+
+        try
+        {
+            var request = new CreatePricingSnapshotRequest
+            {
+                OrderId = "Ad-Hoc",
+                Technology = ManufacturingProcesses.GetName(_selectedProcessId),
+                MaterialCode = _selectedMaterial.SKU,
+                CalculatedPrice = _pricingResult.TotalUnitPrice,
+                Status = "Draft"
+            };
+
+            var response = await Http.PostAsJsonAsync("api/pricing/snapshots", request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Pricing snapshot saved", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to save snapshot", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving snapshot: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetConfidenceColor(decimal confidence)
+    {
+        if (confidence >= 0.8m) return Color.Success;
+        if (confidence >= 0.5m) return Color.Warning;
+        return Color.Error;
     }
 }

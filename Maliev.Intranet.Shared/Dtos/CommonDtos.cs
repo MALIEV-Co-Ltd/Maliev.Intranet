@@ -92,6 +92,28 @@ public class BffUploadResponse
 }
 
 /// <summary>
+/// Response model for AI-extracted NDA dates.
+/// </summary>
+public class ExtractedNdaDatesResponse
+{
+    public DateTime? ExpirationDate { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+    public DateTime? SignedDate { get; set; }
+}
+
+/// <summary>
+/// Response model for AI-generated NDA document summary.
+/// </summary>
+public class NdaSummaryResponse
+{
+    public string Summary { get; set; } = string.Empty;
+    public List<string> KeyTerms { get; set; } = [];
+    public string? ConfidentialityScope { get; set; }
+    public string? Duration { get; set; }
+    public string? GoverningLaw { get; set; }
+}
+
+/// <summary>
 /// Standard error response for API failures.
 /// </summary>
 public class ApiErrorResponse

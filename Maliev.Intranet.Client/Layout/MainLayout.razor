@@ -7,8 +7,9 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LayoutService LayoutService
-@inject ChatService ChatService
-@inject ILogger<MainLayout> Logger
+    @inject ChatService ChatService
+    @inject IJSRuntime JSRuntime
+    @inject ILogger<MainLayout> Logger
 @implements IAsyncDisposable
 
 <MudThemeProvider @ref="@_mudThemeProvider" 
@@ -35,9 +36,14 @@
     @@media (max-width: 959.98px) {
         .mud-main-content {
             padding-bottom: 72px !important;
-            padding-top: 0 !important; /* Ensure no top gap on mobile */
+            padding-top: 0 !important;
         }
         
+        /* Ensure breadcrumb is at the very top on mobile */
+        .breadcrumb-header {
+            top: 0 !important;
+        }
+
         /* Ensure temporary drawer on mobile is full height and correctly positioned */
         .mud-drawer-temporary {
             height: 100% !important;
@@ -233,31 +239,44 @@
         </MudDrawer>
     }
 
-    <MudMainContent Class="@(_isMobile ? "pt-0 px-2" : "pt-16 px-2 px-sm-4 px-md-6")">
-        <div class="d-flex flex-row gap-6">
-            <!-- Main Application Content Area -->
-            <div class="flex-grow-1 main-content-area">
-                <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="@(_isMobile ? "mt-0 mb-8" : "mt-4 mt-md-6 mb-8 mb-md-12")">
-                    <!-- Breadcrumbs -->
-                    <MudBreadcrumbs Items="_breadcrumbs" Class="px-0 mb-4" Separator=">">
-                         <ItemTemplate Context="item">
-                            <MudLink Href="@item.Href" Typo="Typo.body2" Color="Color.Secondary" Underline="Underline.None">@item.Text</MudLink>
-                        </ItemTemplate>
-                    </MudBreadcrumbs>
-                    
-                    @Body
-                </MudContainer>
+    <MudMainContent Class="@(_isMobile ? "pt-0" : "pt-16")">
+        <div class="d-flex flex-column">
+            <!-- Breadcrumb Header -->
+            <div class="breadcrumb-header border-b border-solid mud-border-lines-default px-4 py-2 d-flex align-center" style="@($"min-height: 48px; position: sticky; top: {(_isMobile ? "0" : "64px")}; z-index: 100; background-color: var(--mud-palette-surface);")">
+                @if (_breadcrumbs.Count > 1)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" OnClick="HandleBack" Class="mr-2" />
+                    <MudDivider Vertical="true" FlexItem="true" Class="mx-2 my-2" Style="height: 20px;" />
+                }
+                <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 ml-2" Separator=">">
+                    <ItemTemplate Context="item">
+                        <MudLink Href="@item.Href" 
+                                 Typo="Typo.body2" 
+                                 Color="@(item.Disabled ? Color.Default : Color.Secondary)" 
+                                 Style="@(item.Disabled ? "font-weight: 600; color: var(--mud-palette-text-primary);" : "color: var(--mud-palette-text-secondary);")"
+                                 Underline="Underline.None">@item.Text</MudLink>
+                    </ItemTemplate>
+                </MudBreadcrumbs>
             </div>
 
-            <!-- Integrated Desktop/Tablet Chatbot Section -->
-            @if (!_isMobile && _chatDrawerOpen)
-            {
-                <div class="chatbot-integrated-section d-none d-md-flex flex-column py-6" style="@(_chatExpanded ? "width: 50vw; min-width: 50vw;" : "width: 380px; min-width: 380px;") transition: width 0.1s ease-out, min-width 0.1s ease-out;">
-                    <MudPaper Elevation="3" Class="chatbot-integrated-card rounded-lg overflow-hidden d-flex flex-column">
-                        <ChatDrawer IsExpanded="_chatExpanded" IsExpandedChanged="@(v => { _chatExpanded = v; StateHasChanged(); })" />
-                    </MudPaper>
+            <div class="d-flex flex-row gap-6">
+                <!-- Main Application Content Area -->
+                <div class="flex-grow-1 main-content-area">
+                    <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="@(_isMobile ? "mt-0 mb-8 px-4" : "mt-4 mt-md-6 mb-8 mb-md-12 px-4 px-md-8")">
+                        @Body
+                    </MudContainer>
                 </div>
-            }
+
+                <!-- Integrated Desktop/Tablet Chatbot Section -->
+                @if (!_isMobile && _chatDrawerOpen)
+                {
+                    <div class="chatbot-integrated-section d-none d-md-flex flex-column py-6 pr-6" style="@(_chatExpanded ? "width: 50vw; min-width: 50vw;" : "width: 380px; min-width: 380px;") transition: width 0.1s ease-out, min-width 0.1s ease-out;">
+                        <MudPaper Elevation="3" Class="chatbot-integrated-card rounded-lg overflow-hidden d-flex flex-column">
+                            <ChatDrawer IsExpanded="_chatExpanded" IsExpandedChanged="@(v => { _chatExpanded = v; StateHasChanged(); })" />
+                        </MudPaper>
+                    </div>
+                }
+            </div>
         </div>
     </MudMainContent>
 
@@ -522,7 +541,13 @@
         _hasUnreadNotifications = false;
     }
 
+    private async Task HandleBack()
+    {
+        await JSRuntime.InvokeVoidAsync("history.back");
+    }
+
     private void OnLayoutUpdate(object? sender, EventArgs e)
+
     {
         InvokeAsync(StateHasChanged);
     }

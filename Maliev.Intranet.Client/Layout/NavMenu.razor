@@ -14,14 +14,17 @@
             <MudTooltip Text="Customers" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="sales/customers" Icon="@Icons.Material.Outlined.People">Customers</MudNavLink>
             </MudTooltip>
+            <MudTooltip Text="Companies" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="sales/companies" Icon="@Icons.Material.Outlined.Business">Companies</MudNavLink>
+            </MudTooltip>
             <MudTooltip Text="Quotations" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="sales/quotations" Icon="@Icons.Material.Outlined.Description">Quotations</MudNavLink>
             </MudTooltip>
             <MudTooltip Text="Orders" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="sales/orders" Icon="@Icons.Material.Outlined.ShoppingCart">Orders</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="Pricing AI" Placement="Placement.Right" Delay="300" Inline="false">
-                <MudNavLink Href="sales/pricing-ai" Icon="@Icons.Material.Outlined.AutoGraph">Pricing AI</MudNavLink>
+            <MudTooltip Text="Pricing Calculator" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="sales/pricing-ai" Icon="@Icons.Material.Outlined.AutoGraph">Pricing Calculator</MudNavLink>
             </MudTooltip>
         </MudNavGroup>
 
@@ -32,6 +35,12 @@
             </MudTooltip>
             <MudTooltip Text="Materials" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="mfg/materials" Icon="@Icons.Material.Outlined.Inventory2">Materials</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Inventory [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="mfg/inventory" Icon="@Icons.Material.Outlined.Warehouse">Inventory [PL]</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Production Queue [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="mfg/production-queue" Icon="@Icons.Material.Outlined.PrecisionManufacturing">Prod. Queue [PL]</MudNavLink>
             </MudTooltip>
             <MudTooltip Text="Procurement" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="mfg/procurement" Icon="@Icons.Material.Outlined.ShoppingBag">Procurement</MudNavLink>
@@ -52,15 +61,30 @@
             <MudTooltip Text="Receipts" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="finance/receipts" Icon="@Icons.Material.Outlined.RequestQuote">Receipts</MudNavLink>
             </MudTooltip>
+            <MudTooltip Text="Delivery Notes" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="finance/delivery-notes" Icon="@Icons.Material.Outlined.LocalShipping">Delivery Notes</MudNavLink>
+            </MudTooltip>
             <MudTooltip Text="General Ledger" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="finance/ledger" Icon="@Icons.Material.Outlined.AccountBalance">General Ledger</MudNavLink>
             </MudTooltip>
+            <MudTooltip Text="Financial Reports" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="finance/reports" Icon="@Icons.Material.Outlined.Assessment">Financial Reports</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Budget Planning [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="finance/budget" Icon="@Icons.Material.Outlined.AttachMoney">Budget [PL]</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Report Builder [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="finance/report-builder" Icon="@Icons.Material.Outlined.Build">Rep. Builder [PL]</MudNavLink>
+            </MudTooltip>
         </MudNavGroup>
 
-        <!-- HR & Organization -->
-        <MudNavGroup Title="HR & Org" Icon="@Icons.Material.Outlined.Groups" Expanded="false">
-            <MudTooltip Text="Employees" Placement="Placement.Right" Delay="300" Inline="false">
-                <MudNavLink Href="hr/employees" Icon="@Icons.Material.Outlined.Badge">Employees</MudNavLink>
+        <!-- HR & People -->
+        <MudNavGroup Title="HR & People" Icon="@Icons.Material.Outlined.Groups" Expanded="false">
+            <MudTooltip Text="People Directory" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/directory" Icon="@Icons.Material.Outlined.ContactPage">People Directory</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Employee Management" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/employees" Icon="@Icons.Material.Outlined.Badge">Employee Management</MudNavLink>
             </MudTooltip>
             <MudTooltip Text="Recruitment" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/recruitment" Icon="@Icons.Material.Outlined.WorkOutline">Recruitment</MudNavLink>
@@ -68,11 +92,11 @@
             <MudTooltip Text="Onboarding" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/onboarding" Icon="@Icons.Material.Outlined.AssignmentInd">Onboarding</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="Time Off" Placement="Placement.Right" Delay="300" Inline="false">
-                <MudNavLink Href="hr/time-off" Icon="@Icons.Material.Outlined.EventBusy">Time Off</MudNavLink>
+            <MudTooltip Text="Time & Leave" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/time-off" Icon="@Icons.Material.Outlined.EventBusy">Time & Leave</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="Compliance" Placement="Placement.Right" Delay="300" Inline="false">
-                <MudNavLink Href="hr/compliance" Icon="@Icons.Material.Outlined.FactCheck">Compliance</MudNavLink>
+            <MudTooltip Text="Training [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/training" Icon="@Icons.Material.Outlined.School">Training [PL]</MudNavLink>
             </MudTooltip>
             <MudTooltip Text="Performance" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/performance" Icon="@Icons.Material.Outlined.Speed">Performance</MudNavLink>
@@ -80,24 +104,39 @@
             <MudTooltip Text="Compensation" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/compensation" Icon="@Icons.Material.Outlined.MonetizationOn">Compensation</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="Directory" Placement="Placement.Right" Delay="300" Inline="false">
-                <MudNavLink Href="hr/directory" Icon="@Icons.Material.Outlined.ContactPage">Directory</MudNavLink>
+            <MudTooltip Text="Compliance" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/compliance" Icon="@Icons.Material.Outlined.FactCheck">Compliance</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="HR Analytics" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="hr/analytics" Icon="@Icons.Material.Outlined.Analytics">HR Analytics</MudNavLink>
             </MudTooltip>
         </MudNavGroup>
 
-        <!-- Admin -->
-        <MudNavGroup Title="Admin" Icon="@Icons.Material.Outlined.AdminPanelSettings" Expanded="false">
+        <!-- Operations -->
+        <MudNavGroup Title="Operations" Icon="@Icons.Material.Outlined.AdminPanelSettings" Expanded="false">
             <MudTooltip Text="IAM Console" Placement="Placement.Right" Delay="300" Inline="false">
-                <MudNavLink Href="admin/iam" Icon="@Icons.Material.Outlined.AdminPanelSettings">IAM Console</MudNavLink>
+                <MudNavLink Href="admin/iam" Icon="@Icons.Material.Outlined.Security">IAM Console</MudNavLink>
             </MudTooltip>
             <MudTooltip Text="Notifications" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="admin/notifications" Icon="@Icons.Material.Outlined.Notifications">Notifications</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Content Management [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="admin/content" Icon="@Icons.Material.Outlined.Article">Content [PL]</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Workflow Automation [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="admin/workflows" Icon="@Icons.Material.Outlined.Schema">Workflows [PL]</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Audit Dashboard [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="admin/audit" Icon="@Icons.Material.Outlined.History">Audit [PL]</MudNavLink>
             </MudTooltip>
             <MudTooltip Text="System Health" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="admin/system-health" Icon="@Icons.Material.Outlined.HealthAndSafety">System Health</MudNavLink>
             </MudTooltip>
             <MudTooltip Text="Reference Data" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="admin/reference-data" Icon="@Icons.Material.Outlined.SettingsSuggest">Reference Data</MudNavLink>
+            </MudTooltip>
+            <MudTooltip Text="Portal Config [PLACEHOLDER]" Placement="Placement.Right" Delay="300" Inline="false">
+                <MudNavLink Href="admin/portal-config" Icon="@Icons.Material.Outlined.Web">Portal Config [PL]</MudNavLink>
             </MudTooltip>
         </MudNavGroup>
     </div>

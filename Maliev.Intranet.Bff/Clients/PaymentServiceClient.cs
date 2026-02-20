@@ -15,7 +15,9 @@ public class PaymentServiceClient(HttpClient httpClient)
     /// <returns>Payment statistics DTO.</returns>
     public async Task<PaymentStatsDto?> GetPaymentStatsAsync(CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PaymentStatsDto>("/payment/v1/metrics/stats", ct);
+        var response = await httpClient.GetAsync("/payment/v1/metrics/stats", ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<PaymentStatsDto>(cancellationToken: ct);
     }
 
     /// <summary>
@@ -39,6 +41,33 @@ public class PaymentServiceClient(HttpClient httpClient)
     /// <returns>The payment detail DTO.</returns>
     public async Task<PaymentDetailDto?> GetPaymentByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PaymentDetailDto>($"/payment/v1/payments/{id}", ct);
+        var response = await httpClient.GetAsync($"/payment/v1/payments/{id}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PaymentDetailDto>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Records a new payment.
+    /// </summary>
+    public async Task<HttpResponseMessage> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PostAsJsonAsync("/payment/v1/payments", request, ct);
+    }
+
+    /// <summary>
+    /// Allocates a payment to invoices.
+    /// </summary>
+    public async Task<HttpResponseMessage> AllocatePaymentAsync(Guid id, AllocatePaymentRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PostAsJsonAsync($"/payment/v1/payments/{id}/allocate", request, ct);
+    }
+
+    /// <summary>
+    /// Voids a payment.
+    /// </summary>
+    public async Task<HttpResponseMessage> VoidPaymentAsync(Guid id, VoidPaymentRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PostAsJsonAsync($"/payment/v1/payments/{id}/void", request, ct);
     }
 }

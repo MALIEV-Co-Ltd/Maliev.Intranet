@@ -1,5 +1,6 @@
 @page "/hr/compliance"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 
 <PageTitle>Compliance - Maliev Intranet</PageTitle>
@@ -46,16 +47,19 @@
 else
 {
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-        <MudDataGrid T="WorkAuthDto" Items="@_authorizations" Dense="true" Hover="true" Elevation="0">
+        <MudDataGrid T="ComplianceRecordDto" Items="@_authorizations" Dense="true" Hover="true" Elevation="0">
             <Columns>
-                <PropertyColumn Property="x => x.EmployeeName" Title="Employee" />
-                <PropertyColumn Property="x => x.DocumentType" Title="Document Type" />
-                <PropertyColumn Property="x => x.IssueDate" Title="Issue Date" Format="dd MMM yyyy" />
+                <PropertyColumn Property="x => x.EmployeeId" Title="Employee ID" />
+                <PropertyColumn Property="x => x.Type" Title="Document Type" />
+                <PropertyColumn Property="x => x.Date" Title="Issue Date" Format="dd MMM yyyy" />
                 <PropertyColumn Property="x => x.ExpiryDate" Title="Expiry Date" Format="dd MMM yyyy" />
                 <TemplateColumn Title="Days Remaining">
                     <CellTemplate>
-                        <MudText Typo="Typo.body2" Color="@GetDaysColor(context.Item.DaysRemaining)">
-                            @context.Item.DaysRemaining days
+                        @{
+                            var days = (context.Item.ExpiryDate.HasValue) ? (context.Item.ExpiryDate.Value - DateTime.Today).Days : 0;
+                        }
+                        <MudText Typo="Typo.body2" Color="@GetDaysColor(days)">
+                            @(context.Item.ExpiryDate.HasValue ? $"{days} days" : "N/A")
                         </MudText>
                     </CellTemplate>
                 </TemplateColumn>
@@ -74,7 +78,7 @@ else
 
 @code {
     private bool _isLoading = true;
-    private List<WorkAuthDto> _authorizations = new();
+    private List<ComplianceRecordDto> _authorizations = new();
     private ComplianceStatsDto _stats = new();
 
     protected override async Task OnInitializedAsync()
@@ -82,12 +86,13 @@ else
         try
         {
             var statsTask = Http.GetFromJsonAsync<ComplianceStatsDto>("api/compliance/stats");
-            var authTask = Http.GetFromJsonAsync<List<WorkAuthDto>>("api/compliance/work-authorizations");
+            var authTask = Http.GetFromJsonAsync<PagedResponse<ComplianceRecordDto>>("api/compliance");
 
             await Task.WhenAll(statsTask, authTask);
 
             _stats = await statsTask ?? new();
-            _authorizations = await authTask ?? new();
+            var response = await authTask;
+            _authorizations = response?.Data.ToList() ?? new();
         }
         catch (Exception ex)
         {
@@ -113,15 +118,5 @@ else
         "Expired" => Color.Error,
         _ => Color.Default
     };
-
-    public class WorkAuthDto
-    {
-        public string EmployeeName { get; set; } = "";
-        public string DocumentType { get; set; } = "";
-        public DateTime IssueDate { get; set; }
-        public DateTime ExpiryDate { get; set; }
-        public int DaysRemaining { get; set; }
-        public string Status { get; set; } = "";
-    }
 }
 

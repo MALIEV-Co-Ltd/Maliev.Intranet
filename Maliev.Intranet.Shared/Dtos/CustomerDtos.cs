@@ -4,6 +4,24 @@ using System.Text.Json.Serialization;
 namespace Maliev.Intranet.Shared;
 
 /// <summary>
+/// Predefined document categories for customer documents.
+/// </summary>
+public static class DocumentCategories
+{
+    public const string General = "General";
+    public const string NDA = "NDA";
+    public const string Contract = "Contract";
+    public const string Invoice = "Invoice";
+    public const string TaxRegistration = "Tax Registration";
+    public const string BusinessCard = "Business Card";
+    public const string Identification = "Identification";
+    public const string Certificate = "Certificate";
+    public const string Map = "Map";
+
+    public static readonly string[] All = [General, NDA, Contract, Invoice, TaxRegistration, BusinessCard, Identification, Certificate, Map];
+}
+
+/// <summary>
 /// Represents a summary of a customer record.
 /// </summary>
 public class CustomerSummaryDto
@@ -62,7 +80,8 @@ public class CustomerDetailDto
     public AddressResponse? CompanyBillingAddress { get; set; }
     public List<AddressResponse> Addresses { get; set; } = [];
     public List<DocumentResponse> Documents { get; set; } = [];
-    public NDAResponse? Nda { get; set; }
+    public List<NDAResponse> Ndas { get; set; } = [];
+    public NDAResponse? Nda => Ndas.OrderByDescending(n => n.CreatedAt).FirstOrDefault();
     public List<InternalNoteResponse> Notes { get; set; } = [];
     public Dictionary<string, bool> CommunicationPreferences { get; set; } = [];
     public byte[] Version { get; set; } = [];
@@ -112,6 +131,52 @@ public class NDAResponse
 }
 
 /// <summary>
+/// Request model for updating NDA status.
+/// </summary>
+public class UpdateNDAStatusRequest
+{
+    [Required]
+    public string Status { get; set; } = string.Empty;
+
+    public string? SignedBy { get; set; }
+
+    public DateTime? SignedAt { get; set; }
+
+    public DateTime? RevokedAt { get; set; }
+
+    public string? RevokeReason { get; set; }
+
+    public DateTime? ExpiresAt { get; set; }
+
+    public Guid? DocumentReferenceId { get; set; }
+
+    [Required]
+    public byte[] Version { get; set; } = [];
+}
+
+/// <summary>
+/// Response model for NDA audit log data.
+/// </summary>
+public class NDAAuditLogResponse
+{
+    public Guid Id { get; set; }
+    public string Action { get; set; } = string.Empty;
+    public string ActorId { get; set; } = string.Empty;
+    public string ActorType { get; set; } = string.Empty;
+    public string? ActorName { get; set; }
+    public string? ActorEmail { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string? Status { get; set; }
+    public string? PreviousStatus { get; set; }
+    public DateTime? ExpiresAt { get; set; }
+    public DateTime? RevokedAt { get; set; }
+    public Guid? DocumentReferenceId { get; set; }
+    public string? DocumentName { get; set; }
+    public Guid? PreviousDocumentReferenceId { get; set; }
+    public string? PreviousDocumentName { get; set; }
+}
+
+/// <summary>
 /// Response model for internal note data.
 /// </summary>
 public class InternalNoteResponse
@@ -129,16 +194,41 @@ public class InternalNoteResponse
 }
 
 /// <summary>
+/// Request model for creating a comment on an internal note.
+/// </summary>
+public class CreateInternalNoteCommentRequest
+{
+    [Required]
+    [StringLength(2000)]
+    public string CommentText { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response model for internal note comment data.
+/// </summary>
+public class InternalNoteCommentResponse
+{
+    public Guid Id { get; set; }
+    public Guid InternalNoteId { get; set; }
+    public string CommentText { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = string.Empty;
+    public string? CreatedByName { get; set; }
+    public string? CreatedByEmail { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public byte[] Version { get; set; } = [];
+}
+
+/// <summary>
 /// Request model for creating an internal note.
 /// </summary>
 public class CreateInternalNoteRequest
 {
     [Required]
     public string OwnerType { get; set; } = string.Empty;
-    
+
     [Required]
     public Guid OwnerId { get; set; }
-    
+
     [Required]
     [StringLength(5000)]
     public string NoteText { get; set; } = string.Empty;
@@ -152,7 +242,7 @@ public class UpdateInternalNoteRequest
     [Required]
     [StringLength(5000)]
     public string NoteText { get; set; } = string.Empty;
-    
+
     [Required]
     public byte[] Version { get; set; } = [];
 }
@@ -198,6 +288,7 @@ public class DocumentResponse
     public Guid Id { get; set; }
     public string OwnerType { get; set; } = string.Empty;
     public Guid OwnerId { get; set; }
+    [JsonPropertyName("documentType")]
     public string DocumentCategory { get; set; } = string.Empty;
     public string? DocumentSubType { get; set; }
     public string FileReference { get; set; } = string.Empty;
@@ -223,28 +314,28 @@ public class DocumentResponse
 public class CreateAddressRequest
 {
     public Guid? Id { get; set; }
-    
+
     [Required]
     public string Type { get; set; } = "Billing";
-    
+
     public bool IsDefault { get; set; } = true;
-    
+
     [Required]
     public string AddressLine1 { get; set; } = string.Empty;
-    
+
     public string? AddressLine2 { get; set; }
     public string? AddressLine3 { get; set; }
     public string? District { get; set; }
-    
+
     [Required]
     public string City { get; set; } = string.Empty;
-    
+
     [Required]
     public string StateProvince { get; set; } = string.Empty;
-    
+
     [Required]
     public string PostalCode { get; set; } = string.Empty;
-    
+
     [Required]
     public Guid CountryId { get; set; }
 
@@ -252,6 +343,28 @@ public class CreateAddressRequest
     public string? RecipientPhone { get; set; }
 
     public byte[]? Version { get; set; }
+}
+
+/// <summary>
+/// Request model for updating an existing address.
+/// </summary>
+public class UpdateAddressRequest
+{
+    public string? Type { get; set; }
+    public bool? IsDefault { get; set; }
+    public string? AddressLine1 { get; set; }
+    public string? AddressLine2 { get; set; }
+    public string? AddressLine3 { get; set; }
+    public string? District { get; set; }
+    public string? City { get; set; }
+    public string? StateProvince { get; set; }
+    public string? PostalCode { get; set; }
+    public Guid? CountryId { get; set; }
+    public string? RecipientName { get; set; }
+    public string? RecipientPhone { get; set; }
+
+    [Required]
+    public byte[] Version { get; set; } = [];
 }
 
 /// <summary>
@@ -460,40 +573,40 @@ public class ExtractedCustomerDataResponse
 {
     [JsonPropertyName("first_name")]
     public string? FirstName { get; set; }
-    
+
     [JsonPropertyName("last_name")]
     public string? LastName { get; set; }
-    
+
     [JsonPropertyName("email")]
     public string? Email { get; set; }
-    
+
     [JsonPropertyName("mobile")]
     public string? Mobile { get; set; }
-    
+
     [JsonPropertyName("landline")]
     public string? Landline { get; set; }
-    
+
     [JsonPropertyName("extension")]
     public string? Extension { get; set; }
-    
+
     [JsonPropertyName("segment")]
     public string? Segment { get; set; }
-    
+
     [JsonPropertyName("company_name")]
     public string? CompanyName { get; set; }
-    
+
     [JsonPropertyName("company_phone")]
     public string? CompanyPhone { get; set; }
-    
+
     [JsonPropertyName("vat_number")]
     public string? VatNumber { get; set; }
-    
+
     [JsonPropertyName("branch_number")]
     public string? BranchNumber { get; set; }
-    
+
     [JsonPropertyName("addresses")]
     public List<ExtractedAddress>? Addresses { get; set; }
-    
+
     [JsonPropertyName("confidence")]
     public double Confidence { get; set; }
 }
@@ -505,31 +618,31 @@ public class ExtractedAddress
 {
     [JsonPropertyName("type")]
     public string? Type { get; set; }
-    
+
     [JsonPropertyName("address_line_1")]
     public string? AddressLine1 { get; set; }
-    
+
     [JsonPropertyName("address_line_2")]
     public string? AddressLine2 { get; set; }
-    
+
     [JsonPropertyName("address_line_3")]
     public string? AddressLine3 { get; set; }
-    
+
     [JsonPropertyName("district")]
     public string? District { get; set; }
-    
+
     [JsonPropertyName("city")]
     public string? City { get; set; }
-    
+
     [JsonPropertyName("state_province")]
     public string? StateProvince { get; set; }
-    
+
     [JsonPropertyName("postal_code")]
     public string? PostalCode { get; set; }
-    
+
     [JsonPropertyName("recipient_name")]
     public string? RecipientName { get; set; }
-    
+
     [JsonPropertyName("recipient_phone")]
     public string? RecipientPhone { get; set; }
 

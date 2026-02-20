@@ -9,7 +9,7 @@
 
 <PageTitle>Create New Customer - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16 pt-8">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge">
     <!-- Header -->
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-8">
         <MudStack Spacing="0">
@@ -18,17 +18,12 @@
         </MudStack>
         
         <MudStack Row="true" Spacing="2">
-            @if (_chatbotServiceAvailable)
-            {
-                <MudButton Variant="Variant.Filled" 
-                           Color="Color.Primary" 
-                           StartIcon="@Icons.Material.Filled.AutoAwesome"
-                           OnClick="OpenExtractionDialog"
-                           Class="px-6 py-2 rounded-lg"
-                           Style="background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-secondary) 100%); text-transform: none; font-weight: 600;">
-                    AI Auto-Extract
-                </MudButton>
-            }
+            <MudTooltip Text="AI Data Extraction">
+                <MudIconButton Color="Color.Primary" 
+                               Icon="@Icons.Material.Filled.AutoAwesome"
+                               OnClick="OpenExtractionDialog"
+                               Disabled="@(!_chatbotServiceAvailable)" />
+            </MudTooltip>
         </MudStack>
     </MudStack>
 
@@ -89,23 +84,171 @@
 
                     <!-- Company Details Card -->
                     <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" />
-                                <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Details</MudText>
-                            </MudStack>
-                            <MudSwitch T="bool" @bind-Value="_hasCompany" Color="Color.Primary" Label="Has Company" />
-                        </MudStack>
-                        
-                        @if (_hasCompany)
+                         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                 <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" />
+                                 <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Information</MudText>
+                             </MudStack>
+                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                 @if (_newCompany.IsVerifiedFromBdex)
+                                 {
+                                     <MudChip T="string" Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" Size="Size.Small">Verified from DBD</MudChip>
+                                 }
+                                 else if (_companyIsManualEntry)
+                                 {
+                                     <MudChip T="string" Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small">Manual Entry</MudChip>
+                                 }
+                                 <MudTooltip Text="Remove company">
+                                     <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Error" OnClick="RemoveCompany" Size="Size.Small" />
+                                 </MudTooltip>
+                             </MudStack>
+                         </MudStack>
+
+                        @if (!string.IsNullOrWhiteSpace(_newCompany.VatNumber) || _showCompanyFields)
                         {
                             <MudGrid Spacing="4">
+                                <!-- Tax ID with Search -->
                                 <MudItem xs="12">
-                                    <MudTextField T="string" Label="Company Name" @bind-Value="_newCompany.Name" Variant="Variant.Outlined" Required="true" RequiredError="Company name is required" Placeholder="Acme Corp, Inc." />
+                                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Start">
+                                        <MudTextField T="string"
+                                                      Label="Tax ID / Juristic ID"
+                                                      @bind-Value="_newCompany.VatNumber"
+                                                      Variant="Variant.Outlined"
+                                                      Placeholder="0105500002375 (13 digits)"
+                                                      ReadOnly="@_newCompany.IsVerifiedFromBdex"
+                                                      Class="flex-grow-1"
+                                                      Adornment="Adornment.Start"
+                                                      AdornmentIcon="@Icons.Material.Filled.Badge"
+                                                      HelperText="@(_newCompany.IsVerifiedFromBdex ? "" : "Enter 13-digit Thai Tax ID to verify from DBD registry")" />
+
+                                        @if (!_newCompany.IsVerifiedFromBdex)
+                                        {
+                                            <MudTooltip Text="@(_isLookingUpCompany ? "Searching..." : "Verify company from DBD registry")">
+                                                <MudButton Variant="Variant.Filled"
+                                                           Color="Color.Primary"
+                                                           OnClick="LookupCompanyByTaxId"
+                                                           Disabled="@(_isLookingUpCompany || string.IsNullOrWhiteSpace(_newCompany.VatNumber))"
+                                                           Style="margin-top: 4px; min-width: 120px;">
+                                                    @if (_isLookingUpCompany)
+                                                    {
+                                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                                        <span>Verifying...</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" Class="mr-1" />
+                                                        <span>Verify</span>
+                                                    }
+                                                </MudButton>
+                                            </MudTooltip>
+                                        }
+                                        else
+                                        {
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       OnClick="ResetCompanyVerification"
+                                                       Style="margin-top: 4px; min-width: 120px;">
+                                                <MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Class="mr-1" />
+                                                <span>Re-verify</span>
+                                            </MudButton>
+                                        }
+                                    </MudStack>
                                 </MudItem>
+
+                                <!-- Warning for manual entry -->
+                                @if (_companyIsManualEntry && !_newCompany.IsVerifiedFromBdex)
+                                {
+                                    <MudItem xs="12">
+                                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="my-2">
+                                            <MudText Typo="Typo.body2">
+                                                <strong>Manual Entry Mode:</strong> We recommend using the "Verify" button to automatically retrieve accurate company data from the DBD registry.
+                                            </MudText>
+                                        </MudAlert>
+                                    </MudItem>
+                                }
+
+                                <!-- Company Name (Thai) -->
                                 <MudItem xs="12" sm="6">
-                                    <MudTextField T="string" Label="Tax ID / VAT" @bind-Value="_newCompany.VatNumber" Variant="Variant.Outlined" Placeholder="US-123456789" />
+                                    <MudTextField T="string"
+                                                  Label="@(_newCompany.IsVerifiedFromBdex ? "Company Name (Thai) - Verified" : "Company Name *")"
+                                                  @bind-Value="_newCompany.Name"
+                                                  Variant="Variant.Outlined"
+                                                  Required="true"
+                                                  RequiredError="Company name is required"
+                                                  Placeholder="e.g. บริษัท มาลีฟ จำกัด"
+                                                  ReadOnly="@_newCompany.IsVerifiedFromBdex"
+                                                  Adornment="@(_newCompany.IsVerifiedFromBdex ? Adornment.End : Adornment.None)"
+                                                  AdornmentIcon="@(_newCompany.IsVerifiedFromBdex ? Icons.Material.Filled.Lock : "")"
+                                                  AdornmentColor="Color.Success" />
                                 </MudItem>
+
+                                <!-- Full Name (Thai) - Only show if verified -->
+                                @if (_newCompany.IsVerifiedFromBdex && !string.IsNullOrWhiteSpace(_newCompany.FullNameTh))
+                                {
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField T="string"
+                                                      Label="Full Legal Name (Thai)"
+                                                      Value="@_newCompany.FullNameTh"
+                                                      Variant="Variant.Outlined"
+                                                      ReadOnly="true"
+                                                      Adornment="Adornment.End"
+                                                      AdornmentIcon="@Icons.Material.Filled.Lock"
+                                                      AdornmentColor="Color.Success" />
+                                    </MudItem>
+                                }
+                                else
+                                {
+                                    <!-- Company Phone when not verified, or next to Full Name when verified -->
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField T="string" Label="Company Phone" @bind-Value="_newCompany.ContactPhone" Variant="Variant.Outlined" Placeholder="+66 2 123-4567" />
+                                    </MudItem>
+                                }
+
+                                <!-- Verified Company Details -->
+                                @if (_newCompany.IsVerifiedFromBdex)
+                                {
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField T="string"
+                                                      Label="Registration Date"
+                                                      Value="@(_newCompany.RegistrationDate?.ToString("MMMM dd, yyyy"))"
+                                                      Variant="Variant.Outlined"
+                                                      ReadOnly="true"
+                                                      Adornment="Adornment.Start"
+                                                      AdornmentIcon="@Icons.Material.Filled.CalendarToday" />
+                                    </MudItem>
+
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField T="string"
+                                                      Label="Company Status"
+                                                      Value="@_newCompany.CompanyStatusNameTh"
+                                                      Variant="Variant.Outlined"
+                                                      ReadOnly="true"
+                                                      Adornment="Adornment.Start"
+                                                      AdornmentIcon="@Icons.Material.Filled.CheckCircle"
+                                                      AdornmentColor="@(_newCompany.CompanyStatus == "1" ? Color.Success : Color.Default)" />
+                                    </MudItem>
+
+                                    @if (!string.IsNullOrWhiteSpace(_newCompany.BusinessObjectives))
+                                    {
+                                        <MudItem xs="12">
+                                            <MudTextField T="string"
+                                                          Label="Business Objectives"
+                                                          Value="@(TruncateText(_newCompany.BusinessObjectives, 200))"
+                                                          Variant="Variant.Outlined"
+                                                          ReadOnly="true"
+                                                          Lines="3"
+                                                          Adornment="Adornment.Start"
+                                                          AdornmentIcon="@Icons.Material.Filled.BusinessCenter" />
+                                        </MudItem>
+                                    }
+
+                                    <!-- Editable fields even when verified -->
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField T="string" Label="Company Phone" @bind-Value="_newCompany.ContactPhone" Variant="Variant.Outlined" Placeholder="+66 2 123-4567" />
+                                    </MudItem>
+                                }
+
+                                <!-- Office Type & Extension -->
                                 <MudItem xs="12" sm="6">
                                     <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
                                          <MudRadioGroup T="string" @bind-Value="_companyOfficeType" Class="d-flex">
@@ -118,12 +261,12 @@
                                          }
                                     </MudStack>
                                 </MudItem>
-                                <MudItem xs="12" sm="6">
-                                    <MudTextField T="string" Label="Company Phone" @bind-Value="_newCompany.ContactPhone" Variant="Variant.Outlined" Placeholder="+1 (555) 000-0000" />
-                                </MudItem>
+
                                 <MudItem xs="12" sm="6">
                                     <MudTextField T="string" Label="Extension" @bind-Value="_customerData.Customer.Extension" Variant="Variant.Outlined" Placeholder="101" />
                                 </MudItem>
+
+                                <!-- Segment & Tier (Always editable) -->
                                 <MudItem xs="12" sm="6">
                                      <MudSelect T="string" Label="Industry Segment" @bind-Value="_newCompany.Segment" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
                                          <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
@@ -145,9 +288,20 @@
                         }
                         else
                         {
-                            <MudAlert Severity="Severity.Info" Variant="Variant.Text" NoIcon="true" Class="pa-0">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Toggle "Has Company" above to add business details.</MudText>
-                            </MudAlert>
+                            <!-- Empty state -->
+                            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-6">
+                                <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-3">No company information provided</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="mb-4" Style="max-width: 400px;">
+                                    To link this customer to a company, enter the company's 13-digit Thai Tax ID above. We'll help you verify the details from the DBD registry.
+                                </MudText>
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => _showCompanyFields = true)"
+                                           StartIcon="@Icons.Material.Filled.Add">
+                                    Add Company Information
+                                </MudButton>
+                            </MudStack>
                         }
                     </MudCard>
 
@@ -179,9 +333,9 @@
                                 @foreach (var (address, index) in _customerData.Addresses.Select((a, i) => (a, i)))
                                 {
                                     <MudItem xs="12" sm="6">
-                                        <AddressCard Address="address" 
+                                        <AddressCard Address="address"
                                                      Index="index"
-                                                     HasCompany="_hasCompany"
+                                                     HasCompany="@(!string.IsNullOrWhiteSpace(_newCompany.VatNumber))"
                                                      CompanyName="@_newCompany.Name"
                                                      CustomerName="@($"{_customerData.Customer.FirstName} {_customerData.Customer.LastName}")"
                                                      CustomerMobile="@_customerData.Customer.Mobile"
@@ -257,68 +411,120 @@
                              <!-- NDA Toggle -->
                              <MudSwitch T="bool" @bind-Value="_includeNda" Color="Color.Primary" Label="Require NDA" />
                              
-                             @if (_includeNda)
-                             {
-                                 <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnNdaFilesSelected" Accept=".pdf,.doc,.docx" MaximumFileCount="5">
-                                     <ActivatorContent>
-                                         <MudPaper Outlined="true" Class="pa-6 d-flex flex-column align-center justify-center cursor-pointer border-dashed border-2 mud-border-primary" Elevation="0" Style="background-color: var(--mud-palette-background-grey); min-height: 120px;">
-                                              <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Medium" Color="Color.Primary" Class="mb-2" />
-                                              <MudText Typo="Typo.body2" Align="Align.Center" Style="font-weight: 600;">Click to upload NDA</MudText>
-                                              <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">or drag and drop files here</MudText>
-                                         </MudPaper>
-                                     </ActivatorContent>
-                                 </MudFileUpload>
-                                 
-                                 @if (_ndaFiles.Any())
-                                 {
-                                     <MudList T="IBrowserFile" Dense="true">
-                                         @foreach (var file in _ndaFiles)
-                                         {
-                                             <MudListItem Icon="@Icons.Material.Filled.InsertDriveFile">
-                                                 <div class="d-flex justify-space-between align-center w-100">
-                                                     <MudText Typo="Typo.body2">@file.Name</MudText>
-                                                     <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _ndaFiles.Remove(file))" />
-                                                 </div>
-                                             </MudListItem>
-                                         }
-                                     </MudList>
-                                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="UploadNdaFiles" Disabled="@_isUploadingNda">
-                                         @(_isUploadingNda ? "Uploading..." : "Upload NDA")
-                                     </MudButton>
-                                 }
-                             }
-                             
-                             <MudDivider />
-                             
-                             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Other Documents</MudText>
-                             <MudTextField T="string" Label="Category" @bind-Value="_customerDocCategory" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. Business Card" />
-                             
-                             <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnCustomerDocsSelected" Accept=".pdf,.jpg,.png,.doc" MaximumFileCount="10">
-                                 <ActivatorContent>
-                                     <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true" StartIcon="@Icons.Material.Filled.AttachFile">Select Files</MudButton>
-                                 </ActivatorContent>
-                             </MudFileUpload>
-                             
-                             @if (_customerDocFiles.Any())
-                             {
-                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="UploadCustomerDocuments" Disabled="@_isUploadingCustomerDocs">
-                                     @(_isUploadingCustomerDocs ? "Uploading..." : "Upload Docs")
-                                 </MudButton>
-                             }
+                              @if (_includeNda)
+                              {
+                                  <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnNdaFilesSelected" Accept=".pdf,.doc,.docx" MaximumFileCount="100">
+                                      <ActivatorContent>
+                                          <MudPaper Outlined="true" Class="pa-6 d-flex flex-column align-center justify-center cursor-pointer border-dashed border-2 mud-border-primary" Elevation="0" Style="background-color: var(--mud-palette-background-grey); min-height: 120px;">
+                                               <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Medium" Color="Color.Primary" Class="mb-2" />
+                                               <MudText Typo="Typo.body2" Align="Align.Center" Style="font-weight: 600;">Click to upload NDA</MudText>
+                                               <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">or drag and drop files here</MudText>
+                                          </MudPaper>
+                                      </ActivatorContent>
+                                  </MudFileUpload>
+                                  
+                                  @if (_ndaFiles.Any())
+                                  {
+                                      <div class="mt-2">
+                                          <MudText Typo="Typo.caption" Color="Color.Primary" Class="font-bold">Files to Upload:</MudText>
+                                          <MudList T="IBrowserFile" Dense="true">
+                                              @foreach (var file in _ndaFiles.ToList())
+                                              {
+                                                  <MudListItem Icon="@Icons.Material.Filled.AttachFile" IconColor="Color.Info" Dense="true">
+                                                      <div class="d-flex justify-space-between align-center w-100">
+                                                          <MudText Typo="Typo.body2">@file.Name</MudText>
+                                                          <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => _ndaFiles.Remove(file))" />
+                                                      </div>
+                                                  </MudListItem>
+                                              }
+                                          </MudList>
+                                          <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="UploadNdaFiles" Disabled="@_isUploadingNda" StartIcon="@Icons.Material.Filled.FileUpload">
+                                              @(_isUploadingNda ? "Uploading..." : "Upload NDA Files")
+                                          </MudButton>
+                                      </div>
+                                  }
+
+                                  @if (_uploadedNdaDocs.Any())
+                                  {
+                                      <div class="mt-4">
+                                          <MudText Typo="Typo.caption" Color="Color.Success" Class="font-bold">Uploaded NDA Documents:</MudText>
+                                          <MudList T="CreateDocumentRequest" Dense="true">
+                                              @foreach (var doc in _uploadedNdaDocs.ToList())
+                                              {
+                                                  <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success" Dense="true">
+                                                      <div class="d-flex justify-space-between align-center w-100">
+                                                          <MudText Typo="Typo.body2">@doc.FileName</MudText>
+                                                          <MudIconButton Icon="@Icons.Material.Filled.RemoveCircle" Color="Color.Warning" Size="Size.Small" OnClick="@(() => RemoveUploadedDoc(doc, true))" />
+                                                      </div>
+                                                  </MudListItem>
+                                              }
+                                          </MudList>
+                                      </div>
+                                  }
+                              }
+                              
+                              <MudDivider Class="my-2" />
+                              
+                              <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Other Documents</MudText>
+                              <MudTextField T="string" Label="Category" @bind-Value="_customerDocCategory" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. Business Card" />
+                              
+                              <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnCustomerDocsSelected" Accept=".pdf,.jpg,.png,.doc" MaximumFileCount="100">
+                                  <ActivatorContent>
+                                      <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true" StartIcon="@Icons.Material.Filled.Add">Select Files</MudButton>
+                                  </ActivatorContent>
+                              </MudFileUpload>
+
+                              @if (_customerDocFiles.Any())
+                              {
+                                  <div class="mt-2">
+                                      <MudText Typo="Typo.caption" Color="Color.Primary" Class="font-bold">Files to Upload:</MudText>
+                                      <MudList T="IBrowserFile" Dense="true">
+                                          @foreach (var file in _customerDocFiles.ToList())
+                                          {
+                                              <MudListItem Icon="@Icons.Material.Filled.AttachFile" IconColor="Color.Info" Dense="true">
+                                                  <div class="d-flex justify-space-between align-center w-100">
+                                                      <MudText Typo="Typo.body2">@file.Name</MudText>
+                                                      <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => _customerDocFiles.Remove(file))" />
+                                                  </div>
+                                              </MudListItem>
+                                          }
+                                      </MudList>
+                                      <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="UploadCustomerDocuments" Disabled="@_isUploadingCustomerDocs" StartIcon="@Icons.Material.Filled.FileUpload">
+                                          @(_isUploadingCustomerDocs ? "Uploading..." : "Upload Selected Files")
+                                      </MudButton>
+                                  </div>
+                              }
+
+                              @if (_uploadedCustomerDocs.Any())
+                              {
+                                  <div class="mt-4">
+                                      <MudText Typo="Typo.caption" Color="Color.Success" Class="font-bold">Uploaded Documents:</MudText>
+                                      <MudList T="CreateDocumentRequest" Dense="true">
+                                          @foreach (var doc in _uploadedCustomerDocs.ToList())
+                                          {
+                                              <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success" Dense="true">
+                                                  <div class="d-flex justify-space-between align-center w-100">
+                                                      <MudText Typo="Typo.body2">@doc.FileName (@doc.DocumentCategory)</MudText>
+                                                      <MudIconButton Icon="@Icons.Material.Filled.RemoveCircle" Color="Color.Warning" Size="Size.Small" OnClick="@(() => RemoveUploadedDoc(doc, false))" />
+                                                  </div>
+                                              </MudListItem>
+                                          }
+                                      </MudList>
+                                  </div>
+                              }
                          </MudStack>
                     </MudCard>
 
                     <!-- Internal Notes Card -->
-                    <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                         <MudText Typo="Typo.h6" Style="font-weight: 700;" Class="mb-4">Internal Notes</MudText>
-                         <MudTextField T="string" 
-                                      @bind-Value="_customerData.InternalNote" 
-                                      Variant="Variant.Outlined" 
-                                      Lines="6" 
-                                      Placeholder="Add any private notes about this customer..." 
-                                      MaxLength="5000" 
-                                      Counter="5000" 
-                                      Immediate="true" />
+                    <MudCard Elevation="0" Class="pa-6 rounded-l border-solid border-x1 mud-border-lines-default">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+                            <MudIcon Icon="@Icons.Material.Filled.Description" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 700;">Internal Notes</MudText>
+                        </MudStack>
+                        <NoteEditor @bind-Value="_customerData.InternalNote"
+                                    StartInEditMode="true"
+                                    Compact="true"
+                                    ShowActivityTab="false" />
                     </MudCard>
                     
                 </MudStack>
@@ -344,10 +550,12 @@
     };
     
     // Company data
-    private bool _hasCompany = false;
     private CreateCompanyRequest _newCompany = new() { Segment = "Retail", Tier = "Bronze" };
     private string _companyOfficeType = "head";
     private string _branchNumber = "00001";
+    private bool _isLookingUpCompany = false;
+    private bool _showCompanyFields = false;
+    private bool _companyIsManualEntry = false;
     
     // Address data
     private Dictionary<int, CountryDto?> _selectedCountries = new();
@@ -461,7 +669,8 @@
         // Company fields
         if (!string.IsNullOrWhiteSpace(extracted.CompanyName))
         {
-            _hasCompany = true;
+            _showCompanyFields = true;
+            _companyIsManualEntry = true; // Extracted data is not verified from BDEX
             _newCompany.Name = extracted.CompanyName;
             if (!string.IsNullOrWhiteSpace(extracted.VatNumber)) _newCompany.VatNumber = extracted.VatNumber;
             if (!string.IsNullOrWhiteSpace(extracted.CompanyPhone)) _newCompany.ContactPhone = extracted.CompanyPhone;
@@ -679,7 +888,16 @@
     private void OnNdaFilesSelected(IReadOnlyList<IBrowserFile> files)
     {
         _ndaFiles.Clear();
-        _ndaFiles.AddRange(files);
+        const int maxFiles = 20;
+        if (files.Count > maxFiles)
+        {
+            Snackbar.Add($"Only the first {maxFiles} files will be accepted ({files.Count} selected).", Severity.Warning);
+            _ndaFiles.AddRange(files.Take(maxFiles));
+        }
+        else
+        {
+            _ndaFiles.AddRange(files);
+        }
     }
 
     private async Task UploadNdaFiles()
@@ -690,7 +908,16 @@
     private void OnCustomerDocsSelected(IReadOnlyList<IBrowserFile> files)
     {
         _customerDocFiles.Clear();
-        _customerDocFiles.AddRange(files);
+        const int maxFiles = 20;
+        if (files.Count > maxFiles)
+        {
+            Snackbar.Add($"Only the first {maxFiles} files will be accepted ({files.Count} selected).", Severity.Warning);
+            _customerDocFiles.AddRange(files.Take(maxFiles));
+        }
+        else
+        {
+            _customerDocFiles.AddRange(files);
+        }
     }
 
     private async Task UploadCustomerDocuments()
@@ -784,17 +1011,27 @@
         return null;
     }
     
-    private bool IsFormValid() =>
-        !string.IsNullOrWhiteSpace(_customerData.Customer.FirstName) &&
-        !string.IsNullOrWhiteSpace(_customerData.Customer.LastName) &&
-        !string.IsNullOrWhiteSpace(_customerData.Customer.Email) &&
-        (!_hasCompany || !string.IsNullOrWhiteSpace(_newCompany.Name)) &&
-        _customerData.Addresses.All(a =>
+    private bool IsFormValid()
+    {
+        // Basic customer validation
+        var basicValid = !string.IsNullOrWhiteSpace(_customerData.Customer.FirstName) &&
+                         !string.IsNullOrWhiteSpace(_customerData.Customer.LastName) &&
+                         !string.IsNullOrWhiteSpace(_customerData.Customer.Email);
+
+        // Company validation (only if Tax ID is provided)
+        var hasCompanyData = !string.IsNullOrWhiteSpace(_newCompany.VatNumber);
+        var companyValid = !hasCompanyData || !string.IsNullOrWhiteSpace(_newCompany.Name);
+
+        // Address validation
+        var addressesValid = _customerData.Addresses.All(a =>
             !string.IsNullOrWhiteSpace(a.AddressLine1) &&
             !string.IsNullOrWhiteSpace(a.City) &&
             !string.IsNullOrWhiteSpace(a.StateProvince) &&
             !string.IsNullOrWhiteSpace(a.PostalCode) &&
             a.CountryId != Guid.Empty);
+
+        return basicValid && companyValid && addressesValid;
+    }
 
     private async Task Submit()
     {
@@ -827,7 +1064,9 @@
                 ["marketing_opt_in"] = _marketingOptIn
             };
 
-            _customerData.NewCompany = _hasCompany ? _newCompany : null;
+            // Include company data only if Tax ID is provided
+            var hasCompanyData = !string.IsNullOrWhiteSpace(_newCompany.VatNumber);
+            _customerData.NewCompany = hasCompanyData ? _newCompany : null;
             _customerData.Customer.CompanyId = null;
 
             if (_includeNda)
@@ -843,7 +1082,7 @@
             var parameters = new DialogParameters<CustomerOnboardingDialog>
             {
                 { x => x.Request, _customerData },
-                { x => x.HasCompany, _hasCompany },
+                { x => x.HasCompany, hasCompanyData },
                 { x => x.IncludeNda, _includeNda }
             };
             var options = new DialogOptions
@@ -871,7 +1110,191 @@
         }
     }
 
+    private void RemoveUploadedDoc(CreateDocumentRequest doc, bool isNda)
+    {
+        if (isNda) _uploadedNdaDocs.Remove(doc);
+        else _uploadedCustomerDocs.Remove(doc);
+        
+        _customerData.Documents.Remove(doc);
+        StateHasChanged();
+    }
+
     private void Cancel() => Navigation.NavigateTo("/sales/customers");
-    
+
+    #endregion
+
+    #region Company Lookup
+
+    private async Task LookupCompanyByTaxId()
+    {
+        if (string.IsNullOrWhiteSpace(_newCompany.VatNumber)) return;
+
+        _isLookingUpCompany = true;
+        try
+        {
+            // Validate Tax ID format (13 digits for Thai companies)
+            var sanitizedTaxId = new string(_newCompany.VatNumber.Where(char.IsDigit).ToArray());
+            if (sanitizedTaxId.Length != 13)
+            {
+                Snackbar.Add("Tax ID must be exactly 13 digits", Severity.Warning);
+                _isLookingUpCompany = false;
+                return;
+            }
+
+            var httpResponse = await Http.GetAsync($"api/customers/companies/search?query={Uri.EscapeDataString(_newCompany.VatNumber)}&limit=1");
+
+            if (httpResponse.IsSuccessStatusCode)
+            {
+                var response = await httpResponse.Content.ReadFromJsonAsync<List<RegistryCompanyProfile>>();
+
+                if (response?.Any() == true)
+                {
+                    var company = response.First();
+
+                    // Populate all BDEX fields
+                    _newCompany.Name = company.CompanyNameTh;
+                    _newCompany.FullNameTh = company.FullNameTh;
+                    _newCompany.CompanyStatus = company.StatusCode;
+                    _newCompany.CompanyStatusNameTh = company.StatusNameTh;
+                    _newCompany.CompanyTypeCode = company.CompanyTypeCode;
+                    _newCompany.BusinessObjectives = company.BusinessObjectives;
+                    _newCompany.StockSymbol = company.StockName;
+                    _newCompany.IsVerifiedFromBdex = true;
+
+                    // Try to parse registration date if available (format may vary)
+                    // TODO: Check actual date format from BDEX API
+                    // _newCompany.RegistrationDate = ...
+
+                    _companyIsManualEntry = false;
+                    _showCompanyFields = true;
+
+                    // Extract business type from status
+                    var statusInfo = !string.IsNullOrWhiteSpace(company.StatusNameTh)
+                        ? $" - {company.StatusNameTh}"
+                        : string.Empty;
+
+                    Snackbar.Add($"✓ Company verified: {company.CompanyNameTh}{statusInfo}", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add("No company found with this Tax ID. You can enter details manually.", Severity.Warning);
+                    _companyIsManualEntry = true;
+                    _showCompanyFields = true;
+                }
+            }
+            else
+            {
+                // Handle API error responses
+                var errorMessage = await GetBdexErrorMessage(httpResponse);
+                Snackbar.Add(errorMessage, Severity.Error);
+                _companyIsManualEntry = true;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Network error: Unable to connect to company registry service. You can enter details manually.", Severity.Warning);
+            _companyIsManualEntry = true;
+            _showCompanyFields = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error looking up company: {ex.Message}", Severity.Error);
+            _companyIsManualEntry = true;
+            _showCompanyFields = true;
+        }
+        finally
+        {
+            _isLookingUpCompany = false;
+        }
+    }
+
+    private void ResetCompanyVerification()
+    {
+        var taxId = _newCompany.VatNumber;
+        _newCompany = new CreateCompanyRequest
+        {
+            VatNumber = taxId,
+            Segment = _newCompany.Segment,
+            Tier = _newCompany.Tier
+        };
+        _companyIsManualEntry = false;
+        _showCompanyFields = true;
+        Snackbar.Add("Company verification reset. Click 'Verify' to search again.", Severity.Info);
+    }
+
+    private async Task RemoveCompany()
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Content, "Are you sure you want to remove the company information?" },
+            { x => x.ConfirmButtonText, "Remove" },
+            { x => x.ConfirmButtonColor, Color.Error }
+        };
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Remove Company", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            _newCompany = new CreateCompanyRequest { Segment = "Retail", Tier = "Bronze" };
+            _companyOfficeType = "head";
+            _branchNumber = "00001";
+            _companyIsManualEntry = false;
+            _showCompanyFields = false;
+            Snackbar.Add("Company information removed", Severity.Success);
+        }
+    }
+
+    private static string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Length <= maxLength)
+            return text;
+
+        return text.Substring(0, maxLength) + "...";
+    }
+
+    private async Task<string> GetBdexErrorMessage(HttpResponseMessage response)
+    {
+        try
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+
+            // Try to parse as API error response
+            if (!string.IsNullOrWhiteSpace(errorContent))
+            {
+                try
+                {
+                    var apiError = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(errorContent);
+                    if (apiError?.Message != null)
+                    {
+                        return apiError.Message;
+                    }
+                }
+                catch
+                {
+                    // Failed to parse error response, will use generic message
+                }
+            }
+
+            // Return generic error based on status code
+            return response.StatusCode switch
+            {
+                System.Net.HttpStatusCode.BadRequest => "Invalid request: Please check the Tax ID format",
+                System.Net.HttpStatusCode.Unauthorized => "Authentication failed: Please contact system administrator",
+                System.Net.HttpStatusCode.Forbidden => "Access denied: Insufficient permissions to access company registry",
+                System.Net.HttpStatusCode.NotFound => "Company registry service not available",
+                System.Net.HttpStatusCode.TooManyRequests => "Too many requests: Please wait a moment and try again",
+                System.Net.HttpStatusCode.ServiceUnavailable => "Company registry service is temporarily unavailable",
+                System.Net.HttpStatusCode.GatewayTimeout => "Request timeout: Company registry service is taking too long to respond",
+                _ => $"Company lookup failed (Status: {(int)response.StatusCode})"
+            };
+        }
+        catch
+        {
+            return $"Company lookup failed (Status: {(int)response.StatusCode})";
+        }
+    }
+
     #endregion
 }

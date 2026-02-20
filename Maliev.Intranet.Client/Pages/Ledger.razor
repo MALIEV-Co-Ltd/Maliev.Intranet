@@ -1,10 +1,12 @@
 @using Maliev.Intranet.Client.Helpers
 @page "/finance/ledger"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>General Ledger - Maliev Intranet</PageTitle>
-
 
 <MudText Typo="Typo.h4" Class="mb-4">General Ledger</MudText>
 
@@ -18,13 +20,13 @@
         
         <MudSpacer />
         
-        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Calculate">
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Calculate" OnClick="@(() => Snackbar.Add("Trial Balance generation requested", Severity.Info))">
             Trial Balance
         </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download">
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => Snackbar.Add("Excel export starting...", Severity.Info))">
             Export to Excel
         </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenNewEntryDialog">
             New Entry
         </MudButton>
     </MudStack>
@@ -49,7 +51,7 @@
                         <MudListItem T="string">
                             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                                 <div>
-                                    <MudText Typo="Typo.subtitle2">@account.Name</MudText>
+                                    <MudText Typo="Typo.subtitle2">@account.Code - @account.Name</MudText>
                                     @if (account.Children.Count > 0)
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">@account.Children.Count sub-accounts</MudText>
@@ -59,6 +61,10 @@
                             </MudStack>
                         </MudListItem>
                         <MudDivider />
+                    }
+                    @if (!_accountsTree.Any())
+                    {
+                        <MudText Typo="Typo.body2" Class="pa-4 text-center mud-text-secondary">No accounts found.</MudText>
                     }
                 </MudList>
             }
@@ -83,11 +89,11 @@
                         <PropertyColumn Property="x => x.EntryNumber" Title="Entry #" />
                         <PropertyColumn Property="x => x.Date" Title="Date" Format="dd MMM yyyy" />
                         <PropertyColumn Property="x => x.Description" Title="Description" />
-                        <PropertyColumn Property="x => x.Debit" Title="Debit" Format="C2" />
-                        <PropertyColumn Property="x => x.Credit" Title="Credit" Format="C2" />
+                        <PropertyColumn Property="x => x.TotalDebit" Title="Debit" Format="C2" />
+                        <PropertyColumn Property="x => x.TotalCredit" Title="Credit" Format="C2" />
                         <TemplateColumn Title="Status">
                             <CellTemplate>
-                                <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
+                                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
                                     @context.Item.Status
                                 </MudChip>
                             </CellTemplate>
@@ -95,12 +101,15 @@
                         <TemplateColumn Title="Actions" Sortable="false">
                             <CellTemplate>
                                 <MudStack Row="true" Spacing="1">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" />
                                     <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Default" />
                                 </MudStack>
                             </CellTemplate>
                         </TemplateColumn>
                     </Columns>
+                    <NoRecordsContent>
+                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No journal entries found</MudText>
+                    </NoRecordsContent>
                 </MudDataGrid>
             }
         </MudPaper>
@@ -110,32 +119,41 @@
 @code {
     private bool _isLoading = true;
     private string _selectedPeriod = "January 2026";
-    private List<AccountNode> _accountsTree = new();
+    private List<ChartOfAccountDto> _accountsTree = new();
     private List<JournalEntryDto> _entries = new();
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
         try
         {
-            // TODO: Replace with real BFF API calls
-            // var accountsTask = Http.GetFromJsonAsync<List<AccountNode>>("api/accounting/accounts-tree");
-            // var entriesTask = Http.GetFromJsonAsync<List<JournalEntryDto>>("api/accounting/journal-entries");
-            // await Task.WhenAll(accountsTask, entriesTask);
-            // _accountsTree = await accountsTask ?? new();
-            // _entries = await entriesTask ?? new();
+            _isLoading = true;
+            var accountsTask = Http.GetFromJsonAsync<List<ChartOfAccountDto>>("api/accounting/accounts-tree");
+            var entriesTask = Http.GetFromJsonAsync<PagedResponse<JournalEntryDto>>("api/accounting/journal-entries");
 
-            // Zeroing out mocked data for hard-cut to real data structures
-            _accountsTree = new();
-            _entries = new();
+            await Task.WhenAll(accountsTask, entriesTask);
+
+            _accountsTree = await accountsTask ?? new();
+            var response = await entriesTask;
+            _entries = response?.Data.ToList() ?? new();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading ledger data: {ex.Message}");
+            Snackbar.Add($"Error loading ledger data: {ex.Message}", Severity.Error);
         }
         finally
         {
             _isLoading = false;
         }
+    }
+
+    private async Task OpenNewEntryDialog()
+    {
+        Snackbar.Add("New Journal Entry dialog coming soon", Severity.Info);
     }
 
     private Color GetStatusColor(string status) => status switch
@@ -145,22 +163,4 @@
         "Void" => Color.Error,
         _ => Color.Default
     };
-
-    public class AccountNode
-    {
-        public string Name { get; set; } = string.Empty;
-        public decimal Balance { get; set; }
-        public List<AccountNode> Children { get; set; } = new();
-    }
-
-    public class JournalEntryDto
-    {
-        public Guid Id { get; set; }
-        public string EntryNumber { get; set; } = string.Empty;
-        public DateTime Date { get; set; }
-        public string Description { get; set; } = string.Empty;
-        public decimal Debit { get; set; }
-        public decimal Credit { get; set; }
-        public string Status { get; set; } = string.Empty;
-    }
 }

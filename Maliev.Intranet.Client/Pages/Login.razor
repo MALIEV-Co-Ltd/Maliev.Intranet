@@ -6,154 +6,208 @@
 @using Maliev.Intranet.Client.Services
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
+@implements IAsyncDisposable
 @inject NavigationManager Navigation
 @inject HttpClient Http
 @inject IConfiguration Configuration
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject LayoutService LayoutService
 @inject ILogger<Login> Logger
+@inject IJSRuntime JSRuntime
 
-<PageTitle>Login - MALIEV</PageTitle>
+<PageTitle>MALIEV - Customer Management Portal</PageTitle>
 
 <style>
-    .login-page {
+    .login-container {
         min-height: 100vh;
-        background-color: var(--mud-palette-background);
+        width: 100vw;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--mud-palette-background-grey);
     }
 
-    .login-form-container {
-        background-color: var(--mud-palette-surface);
-        color: var(--mud-palette-text-primary);
-        border-right: 1px solid var(--mud-palette-divider);
+    #login-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
     }
 
-    .auto-mode-icon i {
-        background: linear-gradient(135deg, #FFD700 0%, #2196F3 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    /* Glassmorphism Card */
+    .login-card {
+        z-index: 10;
+        width: 100%;
+        max-width: 600px;
+        padding: 3rem;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        transition: box-shadow 0.3s ease;
+    }
+
+    .login-card:hover {
+        box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    
+    /* Light mode specific overrides */
+    :root[data-theme="light"] #login-canvas {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    }
+
+    :root[data-theme="light"] .login-card {
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+    }
+
+    .premium-input .mud-input-slot {
+        background-color: transparent !important;
+    }
+
+    .company-link {
+        color: var(--mud-palette-text-secondary);
+        transition: color 0.2s;
+    }
+    
+    .company-link:hover {
+        color: var(--mud-palette-primary);
+    }
+    
+    @@media (max-width: 600px) {
+        .login-card {
+            padding: 1.5rem !important;
+            margin: 1rem;
+            max-width: 100% !important;
+        }
+        
+        .login-container {
+            align-items: flex-start;
+            padding-top: 2rem;
+        }
     }
 </style>
 
-<div class="login-page">
+<div class="login-container">
     @if (_isCheckingAuth)
     {
-        <!-- Show nothing while checking authentication to prevent flash -->
+        <!-- Show nothing while checking authentication -->
     }
     else
     {
-        <MudGrid Spacing="0" Class="vh-100" Style="height: 100vh; overflow: hidden;">
-        <!-- Left Side: Login Form -->
-        <MudItem xs="12" md="5" lg="4" Class="d-flex flex-column justify-center px-8 px-md-16 relative login-form-container">
+        <canvas id="login-canvas"></canvas>
 
-            <!-- Theme Toggle -->
-            <div style="position: absolute; top: 1rem; right: 1rem; z-index: 10;">
+        <div class="login-card animated fadeIn">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6 w-100">
+                <MudImage Src="@LogoUrl"
+                          Alt="MALIEV"
+                          Style="height: 20px;"
+                          Class="hover-scale" />
                 <MudTooltip Text="@GetThemeTooltip()">
                     <MudIconButton Icon="@GetThemeIcon()"
-                                   Color="@GetThemeColor()"
-                                   Style="@(LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "")"
-                                   Class="@(LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "")"
+                                   Color="Color.Inherit"
                                    OnClick="@ToggleThemeAsync" />
                 </MudTooltip>
+            </MudStack>
+
+            <div class="d-flex flex-column align-start mb-8">
+                <MudText Typo="Typo.h5" Style="font-weight: 700; letter-spacing: -0.5px;">Welcome Back</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">Sign in to access your workspace</MudText>
             </div>
 
-        <!-- Logo Area -->
-        <div class="mb-12">
-             <MudImage Src="@LogoUrl"
-                       Alt="MALIEV Logo"
-                       Style="height: 30px;" />
+            <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin" FormName="LoginForm">
+                <DataAnnotationsValidator />
+
+                <MudStack Spacing="4">
+                    <MudTextField T="string"
+                                  Label="Username"
+                                  Value="@_usernameInputInput"
+                                  ValueChanged="@((string value) => OnUsernameChanged(value))"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.End"
+                                  AdornmentText="@("@maliev.com")"
+                                  Placeholder="john.doe"
+                                  Immediate="true"
+                                  Class="premium-input"
+                                  Error="@_usernameError"
+                                  ErrorText="@_usernameErrorText"
+                                  UserAttributes="@(new Dictionary<string, object> { {"autocomplete", "username"}, {"data-lpignore", "true"} })" />
+
+                    <MudTextField T="string"
+                                  Label="Password"
+                                  @bind-Value="_loginModel.Password"
+                                  InputType="@(_passwordVisible ? InputType.Text : InputType.Password)"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(_passwordVisible ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                  OnAdornmentClick="TogglePasswordVisibility"
+                                  Class="premium-input"
+                                  UserAttributes="@(new Dictionary<string, object> { {"autocomplete", "current-password"} })" />
+
+                    <div class="d-flex justify-end mt-n2">
+                        <MudLink Href="forgot-password" Underline="Underline.Hover" Color="Color.Primary" Typo="Typo.caption" Style="font-weight: 600;">
+                            Forgot Password?
+                        </MudLink>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_errorMessage))
+                    {
+                        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-2 rounded-lg" Dense="true">@_errorMessage</MudAlert>
+                    }
+
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               FullWidth="true"
+                               Disabled="@_isProcessing"
+                               Class="py-3 rounded-lg elevation-4 mt-2 hover-lift"
+                               Style="font-weight: 700; letter-spacing: 0.5px; text-transform: none;">
+                        @if (_isProcessing)
+                        {
+                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ms-2">Signing In...</MudText>
+                        }
+                        else
+                        {
+                            <MudText>Sign In</MudText>
+                        }
+                    </MudButton>
+                    
+                    <div class="d-flex align-center my-4 w-100 gap-3">
+                        <div style="flex: 1; height: 1px; background-color: var(--mud-palette-lines-inputs);"></div>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">OR</MudText>
+                        <div style="flex: 1; height: 1px; background-color: var(--mud-palette-lines-inputs);"></div>
+                    </div>
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Inherit"
+                               Size="Size.Large"
+                               FullWidth="true"
+                               Href="/api/auth/login"
+                               StartIcon="@Icons.Custom.Brands.Google"
+                               Class="py-3 rounded-lg"
+                               Style="font-weight: 600; text-transform: none; border-color: inherit; opacity: 0.8;">
+                        Sign in with Google
+                    </MudButton>
+
+                </MudStack>
+            </EditForm>
+            
+            <div class="mt-8 text-center">
+                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                     Not an employee? Visit <a href="https://www.maliev.com" target="_blank" class="company-link" style="font-weight: 600; text-decoration: none;">maliev.com</a>
+                 </MudText>
+            </div>
         </div>
-
-        <MudText Typo="Typo.h3" GutterBottom="true" Style="font-weight: 500;">Sign In</MudText>
-        
-        <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin" FormName="LoginForm">
-            <div class="mt-8">
-                <MudTextField T="string"
-                              Label="Username"
-                              Value="@_usernameInput"
-                              ValueChanged="@((string value) => OnUsernameChanged(value))"
-                              Variant="Variant.Outlined"
-                              Class="mb-6"
-                              Immediate="true"
-                              Adornment="Adornment.End"
-                              AdornmentText="@("@maliev.com")"
-                              Error="@_usernameError"
-                              ErrorText="@_usernameErrorText"
-                              HelperText="Enter username only, domain will be added"
-                              UserAttributes="@(new Dictionary<string, object> { {"autocomplete", "username"} })" />
-
-                 <MudTextField T="string"
-                              Label="Password"
-                              @bind-Value="_loginModel.Password"
-                              InputType="@(_passwordVisible ? InputType.Text : InputType.Password)"
-                              Variant="Variant.Outlined"
-                              Class="mb-2"
-                              Adornment="Adornment.End"
-                              AdornmentIcon="@(_passwordVisible ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                              OnAdornmentClick="TogglePasswordVisibility"
-                              AdornmentAriaLabel="Show Password"
-                              UserAttributes="@(new Dictionary<string, object> { {"autocomplete", "current-password"} })" />
-            </div>
-
-            <div class="d-flex justify-space-between align-center mb-8">
-                 <MudLink Href="forgot-password" Underline="Underline.None" Typo="Typo.caption" Class="text-uppercase" Color="Color.Inherit" Style="font-weight: 700;">Forgot Password?</MudLink>
-            </div>
-
-            @if (!string.IsNullOrEmpty(_errorMessage))
-            {
-                <MudAlert Severity="Severity.Error" Class="mb-4" Variant="Variant.Filled">@_errorMessage</MudAlert>
-            }
-
-            <MudButton ButtonType="ButtonType.Submit" 
-                       Variant="Variant.Filled" 
-                       Color="Color.Primary" 
-                       Size="Size.Large" 
-                       FullWidth="true" 
-                       Disabled="@_isProcessing"
-                       Style="height: 50px; border-radius: 8px; font-weight: 600; letter-spacing: 1px;"
-                       Class="mb-4">
-                @if (_isProcessing)
-                {
-                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                    <MudText Class="ms-2">SIGNING IN...</MudText>
-                }
-                else
-                {
-                    <MudText>SIGN IN</MudText>
-                }
-            </MudButton>
-        </EditForm>
-        
-        <MudButton Variant="Variant.Outlined" 
-                   Color="Color.Default" 
-                   Size="Size.Large" 
-                   FullWidth="true" 
-                   Href="/api/auth/login"
-                   Style="height: 50px; border-radius: 8px; font-weight: 600; letter-spacing: 1px;"
-                   StartIcon="@Icons.Custom.Brands.Google">
-            <MudText>SIGN IN WITH GOOGLE</MudText>
-        </MudButton>
-
-    </MudItem>
-
-    <!-- Right Side: Image -->
-    <MudItem xs="0" md="7" lg="8" Class="d-none d-md-flex relative align-end justify-start pa-16" 
-             Style="background-image: url('images/login-bg.png'); background-size: cover; background-position: center;">
-        
-        <div style="position: absolute; inset: 0; background: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 60%); pointer-events: none;"></div>
-
-        <div style="z-index: 1; max-width: 600px;">
-            <MudText Typo="Typo.h3" Class="mb-4" Style="font-weight: 400; color: white;">
-                Your Manufacturing Hub for
-            </MudText>
-            <MudText Typo="Typo.h3" Class="mb-6" Style="font-weight: 700; color: white;">
-                Rapid Prototyping & Custom Parts
-            </MudText>
-            <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.8); max-width: 500px;">
-                From 3D printing to CNC machining, we bring your ideas to life with high-quality manufacturing services.
-            </MudText>
-        </div>
-    </MudItem>
-</MudGrid>
     }
 </div>
 
@@ -170,97 +224,30 @@
     private bool _isProcessing;
     private bool _passwordVisible;
     private string? _errorMessage;
-    private string _usernameInput = string.Empty;
+    private string _usernameInputInput = string.Empty;
     private bool _usernameError = false;
     private string _usernameErrorText = string.Empty;
-    private bool _isCheckingAuth = true; // Start with true to prevent flash
-
-    // Computed property for password manager
-    private string _fullEmailForPasswordManager =>
-        string.IsNullOrWhiteSpace(_loginModel.Username)
-            ? string.Empty
-            : $"{_loginModel.Username}@maliev.com";
+    private bool _isCheckingAuth = true;
+    private IJSObjectReference? _module;
 
     // Theme-aware logo URLs
     private string LogoUrl => LayoutService.IsDarkMode
         ? "https://storage.googleapis.com/maliev.com/web-contents/images/logo-white-20px.png"
         : "https://storage.googleapis.com/maliev.com/web-contents/images/logo-black-20px.png";
 
-    private void OnUsernameChanged(string value)
-    {
-        // Reset error state
-        _usernameError = false;
-        _usernameErrorText = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            _usernameInput = string.Empty;
-            _loginModel.Username = string.Empty;
-            return;
-        }
-
-        var cleanValue = value.Trim();
-        bool hadDomain = false;
-
-        // Check if user entered @ symbol
-        if (cleanValue.Contains("@"))
-        {
-            // Extract the part before @
-            var parts = cleanValue.Split('@');
-            var usernamePart = parts[0].Trim();
-
-            // If they entered a domain, note it for warning
-            if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
-            {
-                hadDomain = true;
-            }
-
-            // Auto-correct by removing the domain part
-            _usernameInput = usernamePart;
-            cleanValue = usernamePart;
-        }
-        else
-        {
-            _usernameInput = cleanValue;
-        }
-
-        // Validate username format (only alphanumeric, dots, hyphens, underscores)
-        if (!string.IsNullOrEmpty(cleanValue) && !System.Text.RegularExpressions.Regex.IsMatch(cleanValue, @"^[a-zA-Z0-9._-]+$"))
-        {
-            _usernameError = true;
-            _usernameErrorText = "Username can only contain letters, numbers, dots, hyphens, and underscores.";
-        }
-        else if (hadDomain)
-        {
-            // Show info message but don't block submission
-            _usernameErrorText = "Domain automatically removed - only username needed";
-        }
-
-        _loginModel.Username = cleanValue;
-    }
-
     protected override async Task OnInitializedAsync()
     {
         ReturnUrl ??= "/";
-        
-        // CRITICAL: Check authentication during SSR to prevent flash
-        // This runs on both server and client, preventing the login form from rendering at all if authenticated
         try
         {
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             if (authState.User.Identity?.IsAuthenticated == true)
             {
-                // User is already logged in, redirect immediately
                 Navigation.NavigateTo(ReturnUrl ?? "/", replace: true);
-                return; // Stop further initialization
+                return;
             }
         }
-        catch 
-        { 
-            // If auth check fails, continue to show login page
-        }
-        
-        // User is NOT authenticated, show the login form
+        catch { }
         _isCheckingAuth = false;
     }
 
@@ -273,13 +260,77 @@
                 _errorMessage = Error;
                 StateHasChanged();
             }
+            
+            try
+            {
+                _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/login-bg.js?v=4");
+                await _module.InvokeVoidAsync("initLoginBg");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to initialize login background animation");
+            }
         }
     }
 
-    private async Task ToggleThemeAsync()
+    async ValueTask IAsyncDisposable.DisposeAsync()
     {
-        await LayoutService.ToggleModeAsync();
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
     }
+
+    private void OnUsernameChanged(string value)
+    {
+        _usernameError = false;
+        _usernameErrorText = string.Empty;
+        
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _usernameInputInput = string.Empty;
+            _loginModel.Username = string.Empty;
+            return;
+        }
+
+        var cleanValue = value.Trim();
+        bool hadDomain = false;
+
+        if (cleanValue.Contains("@"))
+        {
+            var parts = cleanValue.Split('@');
+            var usernamePart = parts[0].Trim();
+            if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1])) hadDomain = true;
+            _usernameInputInput = usernamePart;
+            cleanValue = usernamePart;
+        }
+        else
+        {
+            _usernameInputInput = cleanValue;
+        }
+
+        if (!string.IsNullOrEmpty(cleanValue) && !System.Text.RegularExpressions.Regex.IsMatch(cleanValue, @"^[a-zA-Z0-9._-]+$"))
+        {
+            _usernameError = true;
+            _usernameErrorText = "Only letters, numbers, dots, hyphens, and underscores allowed.";
+        }
+        else if (hadDomain)
+        {
+            _usernameErrorText = "Domain automatically removed";
+             _usernameError = true;
+             _usernameError = false;
+        }
+
+        _loginModel.Username = cleanValue;
+    }
+
+    private async Task ToggleThemeAsync() => await LayoutService.ToggleModeAsync();
 
     private string GetThemeIcon() => LayoutService.CurrentMode switch
     {
@@ -288,25 +339,14 @@
         _ => Icons.Material.Filled.AutoMode
     };
 
-    private Color GetThemeColor() => LayoutService.CurrentMode switch
-    {
-        ThemeMode.Dark => Color.Primary,
-        ThemeMode.Light => Color.Warning,
-        _ => Color.Inherit
-    };
-
     private string GetThemeTooltip() => LayoutService.CurrentMode switch
     {
-        ThemeMode.Dark => "Dark theme",
-        ThemeMode.Light => "Light theme",
-        _ => "Auto"
+        ThemeMode.Dark => "Dark Mode",
+        ThemeMode.Light => "Light Mode",
+        _ => "Auto Mode"
     };
 
-
-    private void TogglePasswordVisibility()
-    {
-        _passwordVisible = !_passwordVisible;
-    }
+    private void TogglePasswordVisibility() => _passwordVisible = !_passwordVisible;
 
     private async Task HandleLogin()
     {
@@ -315,24 +355,20 @@
 
         try
         {
-            // Validate username is not empty
             if (string.IsNullOrWhiteSpace(_loginModel.Username))
             {
                 _usernameError = true;
-                _usernameErrorText = "Username is required";
+                _usernameErrorText = "Required";
                 _isProcessing = false;
                 return;
             }
 
-            // Validate username format
             if (_usernameError)
             {
-                _errorMessage = "Please fix the errors before submitting.";
-                _isProcessing = false;
-                return;
+               _isProcessing = false;
+               return;
             }
 
-            // Build the full username for the API
             var fullUsername = $"{_loginModel.Username}@maliev.com";
 
             var response = await Http.PostAsJsonAsync("api/auth/login", new
@@ -348,13 +384,13 @@
             }
             else
             {
-                _errorMessage = "Invalid corporate email or password. Please try again.";
+                _errorMessage = "Invalid credentials. Please try again.";
             }
         }
         catch (Exception ex)
         {
-            _errorMessage = "An unexpected error occurred. Please try again later.";
-            Logger.LogError(ex, "Login failed for username {Username}", _loginModel.Username);
+            _errorMessage = "Something went wrong. Please try again.";
+            Logger.LogError(ex, "Login failed");
         }
         finally
         {
@@ -364,10 +400,10 @@
 
     public class InternalLoginModel
     {
-        [Required(ErrorMessage = "Username is required")]
+        [Required]
         public string Username { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Password is required")]
+        [Required]
         public string Password { get; set; } = string.Empty;
 
         public bool RememberMe { get; set; }

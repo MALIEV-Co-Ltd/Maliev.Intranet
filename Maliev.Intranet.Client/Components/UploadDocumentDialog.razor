@@ -11,25 +11,33 @@
     </TitleContent>
     <DialogContent>
         <MudStack Spacing="4">
-            <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
-                           FilesChanged="OnFilesSelected" 
+            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                           FilesChanged="OnFilesSelected"
                            Accept="@Accept"
-                           MaximumFileCount="10"
-                           @ref="_fileUpload">
+                           MaximumFileCount="100"
+                           @ref="_fileUpload"
+                           Hidden="false"
+                           InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
+                           InputStyle="opacity:0">
                 <ActivatorContent>
-                    <div class="@($"relative d-flex flex-column align-center justify-center py-12 px-6 border-dashed border-2 mud-border-primary rounded-xl transition-all {(_dragOver ? "mud-bg-primary-hover scale-102 shadow-lg" : "mud-bg-surface")}")"
-                         style="cursor: pointer;"
-                         @ondragenter="@(() => _dragOver = true)"
-                         @ondragleave="@(() => _dragOver = false)"
-                         @ondragover:preventDefault
-                         @ondrop:preventDefault
-                         @ondrop="@(() => { _dragOver = false; })">
+                    <MudPaper Outlined="true"
+                              Class="@($"relative d-flex flex-column align-center justify-center py-12 px-6 border-dashed border-2 rounded-xl transition-all {(_dragOver ? "mud-border-primary mud-bg-primary-hover" : "mud-border-lines-default")}")"
+                              Style="cursor: pointer;"
+                              @ondragenter="@(() => _dragOver = true)"
+                              @ondragleave="@(() => _dragOver = false)"
+                              @ondragover:preventDefault
+                              @ondrop="@(() => _dragOver = false)">
                         <MudIcon Icon="@Icons.Material.Filled.FileUpload" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
                         <MudText Typo="Typo.h6">Click to upload or drag and drop</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">Upload documents up to 10MB each</MudText>
-                    </div>
+                    </MudPaper>
                 </ActivatorContent>
             </MudFileUpload>
+
+            @if (!string.IsNullOrEmpty(_fileCountWarning))
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">@_fileCountWarning</MudAlert>
+            }
 
             @if (_uploadingFiles.Any())
             {
@@ -72,17 +80,88 @@
                 </div>
             }
 
-            <MudTextField T="string" Label="Document Category" @bind-Value="Category" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            @if (!HideCategory)
+            {
+                <MudAutocomplete T="string" Label="Document Category" @bind-Value="Category"
+                                 SearchFunc="@SearchCategories"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense"
+                                 CoerceText="false" CoerceValue="false"
+                                 Placeholder="Select or type a category" />
+            }
+
+            @if (_isSummarizing)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
+                    <MudText Typo="Typo.caption" Color="Color.Primary">Summarizing NDA document...</MudText>
+                </MudStack>
+            }
+
+            @if (_ndaSummary != null)
+            {
+                <MudPaper Outlined="true" Class="pa-4 rounded-lg">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">AI Document Summary</MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.body2">@_ndaSummary.Summary</MudText>
+                        @if (_ndaSummary.KeyTerms.Count > 0)
+                        {
+                            <div>
+                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Secondary" Class="mb-1">Key Terms</MudText>
+                                @foreach (var term in _ndaSummary.KeyTerms)
+                                {
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Start" Class="mb-1">
+                                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.body2">@term</MudText>
+                                    </MudStack>
+                                }
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_ndaSummary.Duration) || !string.IsNullOrWhiteSpace(_ndaSummary.GoverningLaw))
+                        {
+                            <MudStack Row="true" Spacing="4">
+                                @if (!string.IsNullOrWhiteSpace(_ndaSummary.Duration))
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Duration</MudText>
+                                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@_ndaSummary.Duration</MudText>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(_ndaSummary.GoverningLaw))
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Governing Law</MudText>
+                                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@_ndaSummary.GoverningLaw</MudText>
+                                    </div>
+                                }
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
         </MudStack>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Disabled="_isBusy">Cancel</MudButton>
-        <MudButton Color="Color.Primary" 
-                   Variant="Variant.Filled" 
-                   OnClick="StartUpload" 
-                   Disabled="@(!_uploadingFiles.Any() || _isBusy || _uploadingFiles.All(f => f.IsCompleted))">
-            @(_isBusy ? "Uploading..." : "Start Upload")
-        </MudButton>
+        <MudButton OnClick="Cancel" Disabled="@(_isBusy || _isSummarizing)">Cancel</MudButton>
+        @if (_ndaSummary != null)
+        {
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="ConfirmClose">
+                Done
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="StartUpload"
+                       Disabled="@(!_uploadingFiles.Any() || _isBusy || _uploadingFiles.All(f => f.IsCompleted))">
+                @(_isBusy ? "Uploading..." : "Start Upload")
+            </MudButton>
+        }
     </DialogActions>
 </MudDialog>
 
@@ -92,9 +171,12 @@
     [Parameter] public string Accept { get; set; } = ".pdf,.jpg,.jpeg,.png,.docx";
     [Parameter] public Guid CustomerId { get; set; }
     [Parameter] public HttpClient Http { get; set; } = default!;
+    [Parameter] public bool HideCategory { get; set; }
 
     private bool _dragOver;
     private bool _isBusy;
+    private bool _isSummarizing;
+    private NdaSummaryResponse? _ndaSummary;
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
     private List<UploadFileState> _uploadingFiles = new();
 
@@ -107,11 +189,30 @@
         public bool IsUploading { get; set; }
         public bool IsCompleted { get; set; }
         public string? Error { get; set; }
+        public string? UploadId { get; set; }
     }
+
+    private Task<IEnumerable<string>> SearchCategories(string? value, CancellationToken ct)
+    {
+        var results = DocumentCategories.All.Where(c => c != "NDA").AsEnumerable();
+        if (!string.IsNullOrEmpty(value))
+            results = results.Where(c => c.Contains(value, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(results);
+    }
+
+    private const int MaxFileCount = 20;
+    private string? _fileCountWarning;
 
     private void OnFilesSelected(IReadOnlyList<IBrowserFile> files)
     {
-        foreach (var file in files)
+        _fileCountWarning = null;
+        var incoming = files.ToList();
+        if (incoming.Count > MaxFileCount)
+        {
+            _fileCountWarning = $"Only the first {MaxFileCount} files will be accepted ({incoming.Count} selected).";
+            incoming = incoming.Take(MaxFileCount).ToList();
+        }
+        foreach (var file in incoming)
         {
             if (!_uploadingFiles.Any(f => f.Name == file.Name && f.Size == file.Size))
             {
@@ -125,7 +226,7 @@
     private async Task StartUpload()
     {
         _isBusy = true;
-        
+
         foreach (var file in _uploadingFiles.Where(f => !f.IsCompleted))
         {
             file.IsUploading = true;
@@ -143,8 +244,8 @@
                 file.Progress = 30;
                 StateHasChanged();
 
-                var response = await Http.PostAsync($"api/aiprocessing/upload-documents?category={Category}", content);
-                
+                var response = await Http.PostAsync($"api/aiprocessing/upload-documents?category={Category}&customerId={CustomerId}", content);
+
                 if (response.IsSuccessStatusCode)
                 {
                     file.Progress = 70;
@@ -156,11 +257,11 @@
                     if (result != null)
                     {
                         var docs = new List<CreateDocumentRequest> {
-                            new CreateDocumentRequest { 
-                                DocumentCategory = Category, 
-                                FileReference = result.UploadId, 
-                                FileName = result.FileName, 
-                                FileSize = result.FileSize, 
+                            new CreateDocumentRequest {
+                                DocumentCategory = Category,
+                                FileReference = result.UploadId,
+                                FileName = result.FileName,
+                                FileSize = result.FileSize,
                                 MimeType = GetMimeType(result.FileName)
                             }
                         };
@@ -170,6 +271,7 @@
                         {
                             file.IsCompleted = true;
                             file.Progress = 100;
+                            file.UploadId = result.UploadId;
                         }
                         else
                         {
@@ -196,8 +298,65 @@
         _isBusy = false;
         if (_uploadingFiles.All(f => f.IsCompleted))
         {
-            MudDialog.Close(DialogResult.Ok(true));
+            if (IsNdaCategory)
+            {
+                await SummarizeNdaAsync();
+            }
+            else
+            {
+                CloseWithResults();
+            }
         }
+    }
+
+    private bool IsNdaCategory => Category.Equals("NDA", StringComparison.OrdinalIgnoreCase);
+
+    private async Task SummarizeNdaAsync()
+    {
+        var firstCompleted = _uploadingFiles.FirstOrDefault(f => f.IsCompleted);
+        if (firstCompleted == null) return;
+
+        _isSummarizing = true;
+        StateHasChanged();
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var stream = firstCompleted.BrowserFile.OpenReadStream(10 * 1024 * 1024);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(firstCompleted.BrowserFile.ContentType);
+            content.Add(fileContent, "file", firstCompleted.Name);
+
+            var response = await Http.PostAsync("api/aiprocessing/summarize-nda", content);
+            if (response.IsSuccessStatusCode)
+            {
+                _ndaSummary = await response.Content.ReadFromJsonAsync<NdaSummaryResponse>();
+            }
+        }
+        catch
+        {
+            // Summarization is best-effort; allow user to proceed
+        }
+        finally
+        {
+            _isSummarizing = false;
+            StateHasChanged();
+        }
+
+        if (_ndaSummary == null)
+        {
+            CloseWithResults();
+        }
+    }
+
+    private void ConfirmClose() => CloseWithResults();
+
+    private void CloseWithResults()
+    {
+        var results = _uploadingFiles.Where(f => f.IsCompleted && f.UploadId != null)
+            .Select(f => new { f.Name, f.Size, f.UploadId })
+            .ToList();
+        MudDialog.Close(DialogResult.Ok(results));
     }
 
     private void Cancel() => MudDialog.Cancel();

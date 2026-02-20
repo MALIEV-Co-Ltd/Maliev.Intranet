@@ -13,7 +13,7 @@ public class RegistryServiceClient(HttpClient httpClient)
     /// <summary>
     /// Searches for Thai locations by query.
     /// </summary>
-    public async Task<List<RegistryThaiLocation>> AutocompleteLocationsAsync(string query, int limit = 10, CancellationToken ct = default)
+    public virtual async Task<List<RegistryThaiLocation>> AutocompleteLocationsAsync(string query, int limit = 10, CancellationToken ct = default)
     {
         var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var response = await _httpClient.GetFromJsonAsync<RegistryApiResponse<IEnumerable<RegistryThaiLocation>>>($"/registry/v1/thai/addresses/autocomplete?query={Uri.EscapeDataString(query)}&limit={limit}", options, ct);
@@ -31,7 +31,7 @@ public class RegistryServiceClient(HttpClient httpClient)
     /// <param name="limit">Maximum number of results (default: 3).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Locations ranked by composite similarity score.</returns>
-    public async Task<List<RegistryThaiLocation>> AutocompleteLocationsMultiFieldAsync(
+    public virtual async Task<List<RegistryThaiLocation>> AutocompleteLocationsMultiFieldAsync(
         string? postalCode,
         string? district,
         string? city,
@@ -40,30 +40,30 @@ public class RegistryServiceClient(HttpClient httpClient)
         CancellationToken ct = default)
     {
         var queryParams = new List<string>();
-        
-        if (!string.IsNullOrWhiteSpace(postalCode)) 
+
+        if (!string.IsNullOrWhiteSpace(postalCode))
             queryParams.Add($"postalCode={Uri.EscapeDataString(postalCode)}");
-        if (!string.IsNullOrWhiteSpace(district)) 
+        if (!string.IsNullOrWhiteSpace(district))
             queryParams.Add($"district={Uri.EscapeDataString(district)}");
-        if (!string.IsNullOrWhiteSpace(city)) 
+        if (!string.IsNullOrWhiteSpace(city))
             queryParams.Add($"city={Uri.EscapeDataString(city)}");
-        if (!string.IsNullOrWhiteSpace(province)) 
+        if (!string.IsNullOrWhiteSpace(province))
             queryParams.Add($"province={Uri.EscapeDataString(province)}");
-        
+
         queryParams.Add($"limit={limit}");
-        
+
         var query = string.Join("&", queryParams);
         var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var response = await _httpClient.GetFromJsonAsync<RegistryApiResponse<IEnumerable<RegistryThaiLocation>>>(
             $"/registry/v1/thai/addresses/autocomplete-multi?{query}", options, ct);
-        
+
         return response?.Data?.ToList() ?? [];
     }
 
     /// <summary>
     /// Searches for Thai companies by name or tax ID.
     /// </summary>
-    public async Task<List<RegistryCompanyProfile>> SearchCompaniesAsync(string query, int limit = 10, CancellationToken ct = default)
+    public virtual async Task<List<RegistryCompanyProfile>> SearchCompaniesAsync(string query, int limit = 10, CancellationToken ct = default)
     {
         var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var response = await _httpClient.GetFromJsonAsync<RegistryApiResponse<IEnumerable<RegistryCompanyProfile>>>($"/registry/v1/thai/companies/search?query={Uri.EscapeDataString(query)}&limit={limit}", options, ct);

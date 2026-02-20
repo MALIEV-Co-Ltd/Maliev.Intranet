@@ -21,12 +21,12 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
         Services.AddMudServices();
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton(_authMock.Object);
-        
+
         // Mock ChatService
         var handler = new MockHttpMessageHandler();
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(new ChatService(client, null!)); // Mocking SignalR as null
-        
+
         Services.AddSingleton(client);
 
         _authMock.Setup(x => x.GetAuthenticationStateAsync())

@@ -28,4 +28,36 @@ public class CareerServiceClient(HttpClient httpClient)
     {
         return await httpClient.GetFromJsonAsync<RecruitmentStatsDto>("/career/v1/metrics/recruitment", ct);
     }
+
+    /// <summary>
+    /// Creates a new job posting.
+    /// </summary>
+    public async Task<HttpResponseMessage> CreateJobPostingAsync(CreateJobPostingRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PostAsJsonAsync("/career/v1/job-postings", request, ct);
+    }
+
+    /// <summary>
+    /// Updates an existing job posting.
+    /// </summary>
+    public async Task<HttpResponseMessage> UpdateJobPostingAsync(Guid id, UpdateJobPostingRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PutAsJsonAsync($"/career/v1/job-postings/{id}", request, ct);
+    }
+
+    /// <summary>
+    /// Creates a new candidate application for a job posting.
+    /// </summary>
+    public async Task<HttpResponseMessage> CreateCandidateAsync(CreateCandidateRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PostAsJsonAsync("/career/v1/candidates", request, ct);
+    }
+
+    /// <summary>
+    /// Updates the status of a candidate application.
+    /// </summary>
+    public async Task<HttpResponseMessage> UpdateCandidateStatusAsync(Guid id, UpdateCandidateStatusRequest request, CancellationToken ct = default)
+    {
+        return await httpClient.PatchAsJsonAsync($"/career/v1/candidates/{id}/status", request, ct);
+    }
 }

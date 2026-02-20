@@ -1,4 +1,8 @@
 @page "/mfg/procurement"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject ISnackbar Snackbar
 
 <PageTitle>Procurement - Maliev Intranet</PageTitle>
 
@@ -16,7 +20,8 @@
         
         <MudButton Variant="Variant.Filled" 
                    Color="Color.Primary" 
-                   StartIcon="@Icons.Material.Filled.Add">
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => Snackbar.Add("Create PO flow coming soon", Severity.Info))">
             Create PO
         </MudButton>
     </MudStack>
@@ -58,12 +63,18 @@
                 <TemplateColumn Title="Actions" Sortable="false">
                     <CellTemplate>
                         <MudStack Row="true" Spacing="1">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Check" Size="Size.Small" Color="Color.Success" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Primary" OnClick="@(() => ViewDetails(context.Item))" />
+                            @if (context.Item.Status == "Draft")
+                            {
+                                <MudIconButton Icon="@Icons.Material.Outlined.Check" Size="Size.Small" Color="Color.Success" />
+                            }
                         </MudStack>
                     </CellTemplate>
                 </TemplateColumn>
             </Columns>
+            <NoRecordsContent>
+                <MudText Class="pa-4 text-center" Color="Color.Secondary">No purchase orders found</MudText>
+            </NoRecordsContent>
         </MudDataGrid>
     }
 </MudPaper>
@@ -75,10 +86,30 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _purchaseOrders = await Http.GetFromJsonAsync<List<PurchaseOrderDto>>("api/purchase-orders");
-        await Task.Delay(500);
-        _isLoading = false;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            _isLoading = true;
+            var response = await Http.GetFromJsonAsync<PagedResponse<PurchaseOrderDto>>("api/procurement");
+            _purchaseOrders = response?.Data.ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading procurement data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ViewDetails(PurchaseOrderDto po)
+    {
+        Snackbar.Add($"Detail view for {po.PoNumber} coming soon", Severity.Info);
     }
 
     private Color GetStatusColor(string status) => status switch
@@ -89,18 +120,8 @@
         "Ordered" => Color.Primary,
         "Partial" => Color.Warning,
         "Received" => Color.Success,
+        "Cancelled" => Color.Error,
         _ => Color.Default
     };
-
-    public class PurchaseOrderDto
-    {
-        public Guid Id { get; set; }
-        public string PoNumber { get; set; } = string.Empty;
-        public string SupplierName { get; set; } = string.Empty;
-        public int ItemsCount { get; set; }
-        public decimal TotalValue { get; set; }
-        public string Status { get; set; } = string.Empty;
-        public DateTime CreatedDate { get; set; }
-        public DateTime ExpectedDelivery { get; set; }
-    }
 }
+

@@ -13,6 +13,17 @@ namespace Maliev.Intranet.Bff.Controllers;
 public class CompaniesController(CustomerServiceClient client) : ControllerBase
 {
     /// <summary>
+    /// Retrieves a paged list of companies.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet]
+    public async Task<ActionResult<PagedResponse<CompanySummaryDto>>> Get([FromQuery] string? query = null, [FromQuery] int page = 1, CancellationToken ct = default)
+    {
+        var result = await client.GetCompaniesAsync(query, page, ct);
+        return result != null ? Ok(result) : Ok(new PagedResponse<CompanySummaryDto>());
+    }
+
+    /// <summary>
     /// Retrieves a single company by ID.
     /// </summary>
     /// <param name="id">The company ID.</param>

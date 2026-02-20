@@ -43,7 +43,7 @@ public class JwtClaimsEnrichmentMiddleware
                 {
                     // Try to get access token from authentication properties first
                     var accessToken = await context.GetTokenAsync("access_token");
-                    
+
                     // If not in auth properties, try to get from claims
                     if (string.IsNullOrEmpty(accessToken))
                     {
@@ -55,15 +55,15 @@ public class JwtClaimsEnrichmentMiddleware
                         // Parse JWT and extract claims
                         var handler = new JwtSecurityTokenHandler();
                         var jwtToken = handler.ReadJwtToken(accessToken);
-                        
+
                         // Check if token is expired
                         if (jwtToken.ValidTo < DateTime.UtcNow)
                         {
-                            _logger.LogWarning("JWT token expired for user {UserId}. Forcing sign out.", 
+                            _logger.LogWarning("JWT token expired for user {UserId}. Forcing sign out.",
                                 context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
-                            
+
                             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                            
+
                             if (IsApiRequest(context))
                             {
                                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -74,7 +74,7 @@ public class JwtClaimsEnrichmentMiddleware
                             }
                             return;
                         }
-                        
+
                         var identity = context.User.Identity as ClaimsIdentity;
 
                         if (identity != null)
@@ -102,9 +102,9 @@ public class JwtClaimsEnrichmentMiddleware
                         // No access token found - this is a stale cookie scenario
                         _logger.LogWarning("No access token found for authenticated user {UserId}. Forcing sign out.",
                             context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
-                        
+
                         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                        
+
                         if (IsApiRequest(context))
                         {
                             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -120,9 +120,9 @@ public class JwtClaimsEnrichmentMiddleware
                 {
                     _logger.LogError(ex, "Failed to enrich claims from JWT for user {UserId}. Forcing sign out.",
                         context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
-                    
+
                     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                    
+
                     if (IsApiRequest(context))
                     {
                         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -144,7 +144,7 @@ public class JwtClaimsEnrichmentMiddleware
 
     private static bool IsApiRequest(HttpContext context)
     {
-        return context.Request.Path.StartsWithSegments("/api") || 
+        return context.Request.Path.StartsWithSegments("/api") ||
                context.Request.Path.StartsWithSegments("/hubs") ||
                context.Request.Headers["X-Requested-With"] == "XMLHttpRequest";
     }

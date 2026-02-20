@@ -5,76 +5,88 @@
 
 <MudDialog>
     <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-4 pt-4">
             <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">AI Data Extraction</MudText>
+            <MudText Typo="Typo.h6" Style="font-weight: 700;">AI Data Extraction</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
-            Upload documents (business card, form) or paste text to auto-fill customer information.
-        </MudText>
+        <div class="px-4">
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+                Upload documents (business card, form) or paste text to auto-fill customer information.
+            </MudText>
 
-        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-4">
-            <MudTabPanel Text="Paste Text" Icon="@Icons.Material.Filled.ContentPaste">
-                <MudTextField T="string" 
-                              Label="Customer Information" 
-                              Variant="Variant.Outlined"
-                              Value="@_extractionText"
-                              ValueChanged="@((string val) => { _extractionText = val; StateHasChanged(); })"
-                              Lines="8"
-                              Placeholder="Paste business card text, email signature, or raw data here..."
-                              Immediate="true"
-                              AutoGrow="true"
-                              MaxLines="12" />
-            </MudTabPanel>
-            
-            <MudTabPanel Text="Upload File" Icon="@Icons.Material.Filled.UploadFile">
-                <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
-                               FilesChanged="OnExtractionFilesSelected" 
-                               Accept=".pdf,.jpg,.jpeg,.png" 
-                               MaximumFileCount="5">
-                    <ActivatorContent>
-                        <MudPaper Outlined="true" 
-                                  Class="d-flex flex-column align-center justify-center py-8 px-4 cursor-pointer mud-theme-surface"
-                                  Style="border: 2px dashed var(--mud-palette-divider); min-height: 200px; width: 100%; transition: background-color 0.2s;"
-                                  Elevation="0">
-                             <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
-                             
-                             @if (_extractionFiles.Any())
-                             {
-                                 <MudChip T="string" Color="Color.Primary" Variant="Variant.Text">@_extractionFiles.Count file(s) selected</MudChip>
-                                 <MudText Typo="Typo.caption" Class="mt-2">Click to change</MudText>
-                             }
-                             else
-                             {
-                                 <MudText Typo="Typo.h6" Align="Align.Center">Drag and drop files here</MudText>
-                                 <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">or click to browse</MudText>
-                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-4">Supports PDF, JPG, PNG</MudText>
-                             }
-                        </MudPaper>
-                    </ActivatorContent>
-                </MudFileUpload>
-            </MudTabPanel>
-        </MudTabs>
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
+                <MudTabPanel Text="Paste Text" Icon="@Icons.Material.Filled.ContentPaste">
+                    <MudTextField T="string" 
+                                  Label="Customer Information" 
+                                  Variant="Variant.Outlined"
+                                  Value="@_extractionText"
+                                  ValueChanged="@((string val) => { _extractionText = val; StateHasChanged(); })"
+                                  Lines="10"
+                                  Placeholder="Paste business card text, email signature, or raw data here..."
+                                  Immediate="true"
+                                  AutoGrow="true"
+                                  MaxLines="15"
+                                  Class="rounded-xl" />
+                </MudTabPanel>
+                
+                <MudTabPanel Text="Upload File" Icon="@Icons.Material.Filled.UploadFile">
+                    <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
+                                   FilesChanged="OnExtractionFilesSelected" 
+                                   Accept=".pdf,.jpg,.jpeg,.png" 
+                                   MaximumFileCount="100">
+                        <ActivatorContent>
+                            <MudPaper Outlined="true" 
+                                      Class="d-flex flex-column align-center justify-center py-12 px-6 cursor-pointer mud-theme-surface rounded-xl"
+                                      Style="border: 2px dashed var(--mud-palette-divider); min-height: 250px; width: 100%; transition: all 0.2s ease-in-out;"
+                                      Elevation="0">
+                                 <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
+                                 
+                                 @if (_extractionFiles.Any())
+                                 {
+                                     <MudStack Spacing="1" AlignItems="AlignItems.Center">
+                                         <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">@_extractionFiles.Count file(s) selected</MudChip>
+                                         @foreach (var f in _extractionFiles)
+                                         {
+                                             <MudText Typo="Typo.caption" Color="Color.Secondary">@f.Name</MudText>
+                                         }
+                                         <MudText Typo="Typo.caption" Class="mt-1">Click to change</MudText>
+                                     </MudStack>
+                                 }
+                                 else
+                                 {
+                                     <MudText Typo="Typo.h6" Align="Align.Center" Style="font-weight: 700;">Drag and drop files here</MudText>
+                                     <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">or click to browse local storage</MudText>
+                                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-6">Supports PDF, JPG, PNG (Max 10MB)</MudText>
+                                 }
+                            </MudPaper>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                </MudTabPanel>
+            </MudTabs>
+        </div>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" 
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Psychology"
-                   OnClick="ExtractCustomerData"
-                   Disabled="@(_isExtracting || !HasExtractionInput())">
-            @if (_isExtracting)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <span>Analyzing...</span>
-            }
-            else
-            {
-                <span>Extract Data</span>
-            }
-        </MudButton>
+        <div class="px-8 pb-8 d-flex w-100 justify-end gap-2">
+            <MudButton OnClick="Cancel" Variant="Variant.Text" Class="rounded-lg">CANCEL</MudButton>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Psychology"
+                       OnClick="ExtractCustomerData"
+                       Disabled="@(_isExtracting || !HasExtractionInput())"
+                       Class="px-8 rounded-lg shadow-none">
+                @if (_isExtracting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>@GetExtractionStatusText()</span>
+                }
+                else
+                {
+                    <span>EXTRACT DATA</span>
+                }
+            </MudButton>
+        </div>
     </DialogActions>
 </MudDialog>
 
@@ -84,6 +96,7 @@
     private string _extractionText = string.Empty;
     private List<IBrowserFile> _extractionFiles = new();
     private bool _isExtracting = false;
+    private int _attemptCount = 0;
 
     private bool HasExtractionInput() => 
         !string.IsNullOrWhiteSpace(_extractionText) || _extractionFiles.Any();
@@ -91,44 +104,89 @@
     private void OnExtractionFilesSelected(IReadOnlyList<IBrowserFile> files)
     {
         _extractionFiles.Clear();
-        _extractionFiles.AddRange(files);
+        const int maxFiles = 10;
+        if (files.Count > maxFiles)
+        {
+            Snackbar.Add($"Only the first {maxFiles} files will be used ({files.Count} selected).", Severity.Warning);
+            _extractionFiles.AddRange(files.Take(maxFiles));
+        }
+        else
+        {
+            _extractionFiles.AddRange(files);
+        }
     }
 
     private async Task ExtractCustomerData()
     {
         _isExtracting = true;
+        _attemptCount = 0;
+        ExtractedCustomerDataResponse? bestResult = null;
 
         try
         {
-            using var content = new MultipartFormDataContent();
-            
-            if (!string.IsNullOrWhiteSpace(_extractionText))
+            while (_attemptCount < 3)
             {
-                content.Add(new StringContent(_extractionText), "rawText");
-            }
-            
-            foreach (var file in _extractionFiles)
-            {
-                var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-                var fileContent = new StreamContent(stream);
-                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
-                content.Add(fileContent, "files", file.Name);
+                _attemptCount++;
+                StateHasChanged();
+
+                using var content = new MultipartFormDataContent();
+                
+                if (!string.IsNullOrWhiteSpace(_extractionText))
+                {
+                    content.Add(new StringContent(_extractionText), "rawText");
+                }
+                
+                foreach (var file in _extractionFiles)
+                {
+                    var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                    var fileContent = new StreamContent(stream);
+                    fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+                    content.Add(fileContent, "files", file.Name);
+                }
+
+                var response = await Http.PostAsync("api/aiprocessing/extract-customer", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var extracted = await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
+                    if (extracted != null)
+                    {
+                        if (bestResult == null || extracted.Confidence > bestResult.Confidence)
+                        {
+                            bestResult = extracted;
+                        }
+
+                        // If confidence is 85% or higher, stop immediately
+                        if (extracted.Confidence >= 0.85)
+                        {
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Attempt {_attemptCount} failed: {error}", Severity.Warning);
+                }
+
+                // Small delay between retries if needed, but usually the network call is enough
+                if (_attemptCount < 3 && (bestResult == null || bestResult.Confidence < 0.85))
+                {
+                    await Task.Delay(500); 
+                }
             }
 
-            var response = await Http.PostAsync("api/aiprocessing/extract-customer", content);
-            
-            if (response.IsSuccessStatusCode)
+            if (bestResult != null && bestResult.Confidence >= 0.85)
             {
-                var extracted = await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
-                if (extracted != null)
-                {
-                    MudDialog.Close(DialogResult.Ok(extracted));
-                }
+                MudDialog.Close(DialogResult.Ok(bestResult));
+            }
+            else if (bestResult != null)
+            {
+                Snackbar.Add($"Extraction achieved only {(bestResult.Confidence * 100):F0}% confidence (85% required). Please refine your input and try again.", Severity.Error);
             }
             else
             {
-                var error = await response.Content.ReadAsStringAsync();
-                Snackbar.Add($"Extraction failed: {error}", Severity.Error);
+                Snackbar.Add("Failed to extract data after 3 attempts.", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -138,8 +196,17 @@
         finally
         {
             _isExtracting = false;
+            _attemptCount = 0;
         }
     }
+
+    private string GetExtractionStatusText() => _attemptCount switch
+    {
+        1 => "ANALYZING...",
+        2 => "IMPROVING...",
+        3 => "FINALIZING...",
+        _ => "ANALYZING..."
+    };
 
     private void Cancel() => MudDialog.Cancel();
 }

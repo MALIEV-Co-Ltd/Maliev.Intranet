@@ -33,8 +33,7 @@ public class LayoutService : IDisposable
     /// <param name="logger">The logger instance.</param>
     /// <param name="httpContextAccessor">HTTP context accessor for reading cookies during SSR (optional).</param>
     public LayoutService(
-        IJSRuntime jsRuntime, 
-        PersistentComponentState state, 
+        IJSRuntime jsRuntime,
         ILogger<LayoutService> logger,
         IHttpContextAccessor? httpContextAccessor = null)
     {
@@ -48,7 +47,7 @@ public class LayoutService : IDisposable
         {
             var cookieValue = context.Request.Cookies[ThemeCookieName];
             var systemDarkHint = context.Request.Cookies["maliev_system_dark"];
-            
+
             if (!string.IsNullOrEmpty(cookieValue))
             {
                 _currentMode = cookieValue switch
@@ -106,13 +105,13 @@ public class LayoutService : IDisposable
                 "eval",
                 "document.documentElement.getAttribute('data-theme') || 'light'"
             );
-            
+
             // Read user preference from cookie/storage
             var themePref = await _jsRuntime.InvokeAsync<string>(
                 "eval",
                 $"document.cookie.split('; ').find(row => row.startsWith('{ThemeCookieName}='))?.split('=')[1] || localStorage.getItem('{ThemeCookieName}') || 'system'"
             );
-            
+
             _currentMode = themePref switch
             {
                 "dark" => ThemeMode.Dark,
@@ -125,7 +124,7 @@ public class LayoutService : IDisposable
                 "eval",
                 "window.matchMedia('(prefers-color-scheme: dark)').matches"
             );
-            
+
             // Calculate what theme should be active based on preference
             CalculateEffectiveTheme();
 
@@ -145,7 +144,7 @@ public class LayoutService : IDisposable
         catch (Exception ex)
         {
             // Ignore JS interop errors during prerendering
-            if (ex.GetType().Name == "JSDisconnectedException" || 
+            if (ex.GetType().Name == "JSDisconnectedException" ||
                 ex.Message.Contains("JavaScript interop calls cannot be issued at this time"))
             {
                 _logger.LogDebug("JS not available yet (prerendering)");

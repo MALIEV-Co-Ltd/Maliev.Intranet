@@ -47,7 +47,7 @@
         background-color: var(--mud-palette-background-grey);
         padding: 0.2rem 0.4rem;
         border-radius: 4px;
-        font-family: monospace;
+        font-family: 'Roboto Mono', monospace;
     }
     .markdown-content pre {
         background-color: var(--mud-palette-background-grey);
@@ -55,6 +55,12 @@
         border-radius: 8px;
         overflow-x: auto;
         margin-bottom: 1rem;
+        border: 1px solid var(--mud-palette-divider);
+    }
+    .markdown-content pre code {
+        font-family: 'Roboto Mono', monospace !important;
+        background-color: transparent;
+        padding: 0;
     }
     .markdown-content blockquote {
         border-left: 4px solid var(--mud-palette-primary);

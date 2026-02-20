@@ -41,13 +41,13 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
 
         // 1. Try to get token from claims (access_token claim)
         var accessToken = user.FindFirst("access_token")?.Value;
-        
+
         // 2. Try to get token from AuthenticationProperties (requires SaveTokens = true)
         if (string.IsNullOrEmpty(accessToken))
         {
             accessToken = await httpContext.GetTokenAsync("access_token");
         }
-        
+
         // 3. Fallback: Check if the incoming request already has a Bearer token
         if (string.IsNullOrEmpty(accessToken))
         {
@@ -95,7 +95,7 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
         catch (OperationCanceledException ex)
         {
             logger.LogWarning(ex, "Request to downstream service timed out: {Url}. User: {UserId}", request.RequestUri, userId);
-            
+
             // Return a 504 Gateway Timeout instead of letting the exception bubble up
             return new HttpResponseMessage(System.Net.HttpStatusCode.GatewayTimeout)
             {
@@ -106,7 +106,7 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
         catch (Exception ex)
         {
             logger.LogError(ex, "Unexpected error calling downstream service: {Url}. User: {UserId}", request.RequestUri, userId);
-            
+
             // Return a 503 Service Unavailable for other network errors
             return new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
             {

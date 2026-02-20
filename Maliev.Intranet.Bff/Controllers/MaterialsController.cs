@@ -40,4 +40,47 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
         var result = await client.GetMaterialByIdAsync(id);
         return result != null ? Ok(result) : NotFound();
     }
+
+    /// <summary>
+    /// Creates a new material.
+    /// </summary>
+    /// <param name="request">The creation request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created material.</returns>
+    [RequirePermission(MalievPermissions.Material.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost]
+    public async Task<ActionResult<MaterialSummaryDto>> Create([FromBody] CreateMaterialRequest request, CancellationToken ct)
+    {
+        var result = await client.CreateMaterialAsync(request, ct);
+        return result != null ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result) : BadRequest();
+    }
+
+    /// <summary>
+    /// Updates an existing material.
+    /// </summary>
+    /// <param name="id">The material ID.</param>
+    /// <param name="request">The update request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The updated material.</returns>
+    [RequirePermission(MalievPermissions.Material.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<MaterialDetailDto>> Update(Guid id, [FromBody] UpdateMaterialRequest request, CancellationToken ct)
+    {
+        var result = await client.UpdateMaterialAsync(id, request, ct);
+        return result != null ? Ok(result) : NotFound();
+    }
+
+    /// <summary>
+    /// Deletes a material.
+    /// </summary>
+    /// <param name="id">The material ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>No content.</returns>
+    [RequirePermission(MalievPermissions.Material.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var success = await client.DeleteMaterialAsync(id, ct);
+        return success ? NoContent() : NotFound();
+    }
 }

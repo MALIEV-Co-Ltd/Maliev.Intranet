@@ -5,7 +5,8 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ChatService ChatService
 @inject HttpClient Http
-@implements IDisposable
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
 
 <div class="d-flex flex-column" style="height: 100%; overflow: hidden;">
     <!-- Header Area -->
@@ -26,7 +27,14 @@
         <MudDivider Class="mt-2" />
     </div>
 
-    @if (!_isAiAvailable)
+    @if (_isCheckingAvailability)
+    {
+        <!-- Loading while checking AI availability -->
+        <div class="flex-grow-1 d-flex align-center justify-center pa-4">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+        </div>
+    }
+    else if (!_isAiAvailable)
     {
         <!-- AI Unavailable Message -->
         <div class="flex-grow-1 d-flex align-center justify-center pa-4">
@@ -38,22 +46,36 @@
     else
     {
         <!-- Chat Messages Area -->
-    <div class="flex-grow-1 px-4 py-4" style="overflow-y: auto;">
-        <MudChat ChatPosition="ChatBubblePosition.Start">
-             <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
-                <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
-            </MudAvatar>
-            <MudChatBubble>
-                Hello! I'm your AI assistant. I see you are currently viewing the <b>@GetPageName()</b> page. How can I help you?
-            </MudChatBubble>
-        </MudChat>
-
+    <div id="chat-container" class="flex-grow-1 px-4 py-4 scroll-container" style="overflow-y: auto; position: relative;" @onscroll="HandleScroll">
         @foreach (var message in ChatService.Messages)
         {
+            @* Show thinking chain above assistant messages that have thinking steps *@
+            @if (!message.IsUser && message.ThinkingSteps.Count > 0)
+            {
+                <ThinkingChain Steps="message.ThinkingSteps" IsProcessing="message.IsProcessing" />
+            }
+
+            @* Show processing placeholder with thinking chain only *@
+            @if (message.IsProcessing && string.IsNullOrEmpty(message.Text))
+            {
+                @if (message.ThinkingSteps.Count == 0)
+                {
+                    <MudChat ChatPosition="ChatBubblePosition.Start">
+                        <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
+                            <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
+                        </MudAvatar>
+                        <MudChatBubble>
+                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" Style="width: 120px;" />
+                        </MudChatBubble>
+                    </MudChat>
+                }
+                continue;
+            }
+
             <MudChat ChatPosition="@(message.IsUser ? ChatBubblePosition.End : ChatBubblePosition.Start)">
                 @if (message.IsUser)
                 {
-                    <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Style="align-self: flex-start; margin-top: 4px;">
                         @if (!string.IsNullOrEmpty(_userPicture))
                         {
                             <MudImage Src="@_userPicture" />
@@ -70,8 +92,16 @@
                         <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
                     </MudAvatar>
                 }
-                <MudChatBubble>
-                    <div style="white-space: pre-wrap;">@message.Text</div>
+                <MudChatBubble Color="@(message.IsUser ? Color.Primary : Color.Surface)"
+                               Variant="Variant.Filled" >
+                    @if (message.IsUser)
+                    {
+                        <div style="white-space: pre-wrap;">@message.Text</div>
+                    }
+                    else
+                    {
+                        <MarkdownRenderer Markdown="@message.Text" />
+                    }
                 </MudChatBubble>
             </MudChat>
 
@@ -91,7 +121,7 @@
             }
         }
 
-        @if (ChatService.IsLoading)
+        @if (ChatService.IsLoading && !ChatService.Messages.Any(m => m.IsProcessing))
         {
             <MudChat ChatPosition="ChatBubblePosition.Start">
                 <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
@@ -107,13 +137,25 @@
         {
             <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_errorMessage</MudAlert>
         }
+
+        @if (_showScrollButton)
+        {
+            <div style="position: sticky; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 10;">
+                <MudFab Color="Color.Primary" 
+                        StartIcon="@Icons.Material.Filled.ArrowDownward" 
+                        Size="Size.Small" 
+                        OnClick="ScrollToBottom"
+                        Style="pointer-events: auto;" />
+            </div>
+        }
     </div>
 
     <!-- Bottom Input Area -->
     <div class="pa-4 mt-auto @(IsMobile ? "mb-16" : "")">
         <MudPaper Elevation="0" Class="rounded-xl pa-2 chat-input-container border border-solid mud-border-lines-default" Style="background-color: var(--mud-palette-surface);">
             <div class="px-2 pt-1">
-                <MudTextField @bind-Value="_currentInput"
+                <MudTextField @ref="_inputField"
+                              @bind-Value="_currentInput"
                               Placeholder="Ask anything"
                               Variant="Variant.Text"
                               Underline="false"
@@ -186,6 +228,16 @@
     .send-button-square:disabled {
         background-color: var(--mud-palette-action-disabled-background) !important;
     }
+
+    .scroll-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .scroll-container::-webkit-scrollbar-thumb {
+        background-color: var(--mud-palette-divider);
+        border-radius: 10px;
+    }
+
 </style>
 
 @code {
@@ -193,15 +245,20 @@
     [Parameter] public bool IsExpanded { get; set; }
     [Parameter] public EventCallback<bool> IsExpandedChanged { get; set; }
 
+    private MudTextField<string>? _inputField;
+
     private string _currentInput = "";
     private string? _userPicture;
     private string? _userName;
     private string? _errorMessage;
     private bool _isAiAvailable = false;
+    private bool _isCheckingAvailability = true;
+    private bool _showScrollButton = false;
+    private bool _shouldScrollToBottom = false;
 
     protected override async Task OnInitializedAsync()
     {
-        ChatService.OnChange += StateHasChanged;
+        ChatService.OnChange += HandleChatChange;
 
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
@@ -213,6 +270,41 @@
 
         // Check if AI service is available by attempting to initiate a session
         await CheckAiAvailability();
+
+        // Connect to SignalR for real-time thinking steps
+        await ChatService.ConnectSignalRAsync();
+    }
+
+    private void HandleChatChange()
+    {
+        _shouldScrollToBottom = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_shouldScrollToBottom)
+        {
+            _shouldScrollToBottom = false;
+            await ScrollToBottom();
+        }
+    }
+
+    private async Task HandleScroll()
+    {
+        var atBottom = await JSRuntime.InvokeAsync<bool>("chatHelpers.isAtBottom", "chat-container");
+        if (_showScrollButton == atBottom)
+        {
+            _showScrollButton = !atBottom;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await JSRuntime.InvokeVoidAsync("chatHelpers.scrollToBottom", "chat-container");
+        _showScrollButton = false;
+        StateHasChanged();
     }
 
     private async Task CheckAiAvailability()
@@ -233,6 +325,11 @@
         catch
         {
             _isAiAvailable = false;
+        }
+        finally
+        {
+            _isCheckingAvailability = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -317,7 +414,17 @@
             var response = await ChatService.SendMessageAsync(input);
             if (response != null)
             {
-                ChatService.AddMessage(response.Content, false, response.SuggestedActions);
+                // When using streaming, ChatService already updates the placeholder message
+                // Only add a new message when NOT streaming (no placeholder exists)
+                var existingPlaceholder = ChatService.Messages.LastOrDefault(m => !m.IsUser && !m.IsProcessing && m.Text == response.Content);
+                if (existingPlaceholder == null)
+                {
+                    // No streaming placeholder was used — add normally
+                    if (!ChatService.Messages.Any(m => !m.IsUser && m.Text == response.Content))
+                    {
+                        ChatService.AddMessage(response.Content, false, response.SuggestedActions);
+                    }
+                }
             }
             else
             {
@@ -330,6 +437,10 @@
         }
 
         await InvokeAsync(StateHasChanged);
+        if (_inputField != null)
+        {
+            await _inputField.FocusAsync();
+        }
     }
 
     private async Task HandleSuggestedAction(string actionText)
@@ -346,8 +457,9 @@
         }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        ChatService.OnChange -= StateHasChanged;
+        ChatService.OnChange -= HandleChatChange;
+        await ChatService.DisposeAsync();
     }
 }

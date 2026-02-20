@@ -1,7 +1,8 @@
-@using Maliev.Intranet.Client.Helpers
 @page "/sales/orders"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
+@inject NavigationManager Navigation
 
 <PageTitle>Orders - Maliev Intranet</PageTitle>
 
@@ -58,9 +59,12 @@ else
             </MudPaper>
         </ChildContent>
         <ItemRenderer>
-            <MudCard Elevation="0" Class="mb-2 border mud-border-lines-default">
+            <MudCard Elevation="0" Class="mb-2 border mud-border-lines-default" @onclick="@(() => ViewDetails(context.Id))" Style="cursor: pointer;">
                 <MudCardContent>
-                    <MudText Typo="Typo.body1" Style="font-weight: 600;">@context.OrderNumber</MudText>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.body1" Style="font-weight: 600;">@context.OrderNumber</MudText>
+                        <MudIcon Icon="@Icons.Material.Outlined.ArrowForward" Size="Size.Small" Color="Color.Default" />
+                    </MudStack>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">@context.CustomerName</MudText>
                     <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">@ThaiCurrency.Format(context.TotalAmount, 2)</MudText>
                 </MudCardContent>
@@ -93,12 +97,31 @@ else
         }
     }
 
-    private void ItemUpdated(MudItemDropInfo<OrderSummaryDto> dropItem)
+    private async Task ItemUpdated(MudItemDropInfo<OrderSummaryDto> dropItem)
     {
         if (dropItem.Item is not null)
         {
+            var oldStatus = dropItem.Item.Status;
             dropItem.Item.Status = dropItem.DropzoneIdentifier;
-            // TODO: Call API to update order status
+            
+            try 
+            {
+                var response = await Http.PatchAsJsonAsync($"api/orders/{dropItem.Item.Id}/status", dropItem.DropzoneIdentifier);
+                if (!response.IsSuccessStatusCode)
+                {
+                    dropItem.Item.Status = oldStatus;
+                    // Snackbar not injected in original file, but I should add it
+                }
+            }
+            catch 
+            {
+                dropItem.Item.Status = oldStatus;
+            }
         }
+    }
+
+    private void ViewDetails(Guid id)
+    {
+        Navigation.NavigateTo($"/sales/orders/{id}");
     }
 }

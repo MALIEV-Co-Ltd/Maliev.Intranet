@@ -44,6 +44,8 @@ try
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
     builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
+    builder.Services.AddScoped<Maliev.Intranet.Bff.Services.IChatContextResolver, Maliev.Intranet.Bff.Services.ChatContextResolver>();
+    builder.Services.AddSingleton<Maliev.Intranet.Bff.Services.ChatHubService>();
     builder.Services.AddSingleton<Maliev.Intranet.Shared.Services.IMarkdownService, Maliev.Intranet.Shared.Services.MarkdownService>();
     builder.Services.AddSignalR();
     builder.Services.AddMudServices();
@@ -78,7 +80,7 @@ try
     .AddServiceDiscovery();
 
     // AddJwtAuthentication registers JwtBearerDefaults.AuthenticationScheme ("Bearer")
-    builder.AddJwtAuthentication(); 
+    builder.AddJwtAuthentication();
     builder.Services.AddPermissionAuthorization();
 
     builder.Services.AddAuthentication(options =>
@@ -126,13 +128,13 @@ try
         options.Scope.Add("profile");
         options.Scope.Add("email");
         options.SaveTokens = false; // Don't store OAuth tokens in cookie - reduces cookie size
-        
+
         options.Events.OnRedirectToAuthorizationEndpoint = context =>
         {
             context.Response.Redirect(context.RedirectUri + "&prompt=select_account");
             return Task.CompletedTask;
         };
-        
+
         options.Events.OnTicketReceived = async context =>
         {
             var email = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
@@ -250,6 +252,17 @@ try
     builder.AddBffServiceClient<ChatbotServiceClient>("ChatbotService");
     builder.AddBffServiceClient<CareerServiceClient>("CareerService");
     builder.AddBffServiceClient<TimeOffServiceClient>("EmployeeService"); // TimeOff uses EmployeeService
+    builder.AddBffServiceClient<ComplianceServiceClient>("ComplianceService");
+    builder.AddBffServiceClient<PerformanceServiceClient>("PerformanceService");
+    builder.AddBffServiceClient<CompensationServiceClient>("CompensationService");
+    builder.AddBffServiceClient<DeliveryServiceClient>("DeliveryService");
+    builder.AddBffServiceClient<IAccountingServiceClient, AccountingServiceClient>("AccountingService");
+    builder.AddBffServiceClient<IReceiptServiceClient, ReceiptServiceClient>("ReceiptService");
+    builder.AddBffServiceClient<ILifecycleServiceClient, LifecycleServiceClient>("LifecycleService");
+    builder.AddBffServiceClient<IPurchaseOrderServiceClient, PurchaseOrderServiceClient>("PurchaseOrderService");
+    builder.AddBffServiceClient<ILeaveServiceClient, LeaveServiceClient>("LeaveService");
+    builder.AddBffServiceClient<IPricingServiceClient, PricingServiceClient>("PricingService");
+    builder.AddBffServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
 
     // Named HTTP client with service account authentication for reference data
     builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>
@@ -263,12 +276,15 @@ try
     .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
     .AddStandardResilienceHandler();
 
+    builder.Services.AddHttpClient("ServiceHealthCheck")
+    .AddServiceDiscovery();
+
     builder.Services.AddHttpClient("BffInternal")
     .AddHttpMessageHandler<Maliev.Intranet.Bff.Handlers.CookieForwardingHandler>()
     .AddServiceDiscovery()
     .AddStandardResilienceHandler();
 
-    builder.Services.AddScoped(sp => 
+    builder.Services.AddScoped(sp =>
     {
         var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
         var navigationManager = sp.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
@@ -340,7 +356,10 @@ try
 
     app.MapHub<Maliev.Intranet.Bff.Hubs.NotificationHub>("/hubs/notifications")
         .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
-    
+
+    app.MapHub<Maliev.Intranet.Bff.Hubs.ChatHub>("/hubs/chat")
+        .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
+
     app.MapControllers()
         .RequireAuthorization(); // Require authentication for all API controllers by default
 

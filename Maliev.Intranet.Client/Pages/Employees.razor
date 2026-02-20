@@ -1,4 +1,9 @@
 @page "/hr/employees"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
+@inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Employees - Maliev Intranet</PageTitle>
 
@@ -26,6 +31,13 @@
                                  Icon="@Icons.Material.Outlined.GridView" 
                                  ToggledIcon="@Icons.Material.Outlined.TableChart"
                                  Color="Color.Primary" />
+                                 
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateDialog">
+                Add Employee
+            </MudButton>
         </MudStack>
     </MudStack>
 </MudPaper>
@@ -44,7 +56,7 @@
 else if (_viewMode)
 {
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-        <MudDataGrid T="EmployeeDto" Items="@_employees" Dense="true" Hover="true" Elevation="0">
+        <MudDataGrid T="EmployeeSummaryDto" Items="@_employees" Dense="true" Hover="true" Elevation="0">
             <Columns>
                 <TemplateColumn Title="Name">
                     <CellTemplate>
@@ -106,26 +118,37 @@ else
     private string _searchString = "";
     private string _filterDepartment = "All";
     private bool _viewMode = false;
-    private List<EmployeeDto> _employees = new();
+    private List<EmployeeSummaryDto> _employees = new();
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _employees = await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees");
-        await Task.Delay(500);
-        _isLoading = false;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<EmployeeSummaryDto>>("api/employees");
+            if (response?.Data != null)
+            {
+                _employees = response.Data.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading employees: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    public class EmployeeDto
+    private async Task OpenCreateDialog()
     {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Title { get; set; } = string.Empty;
-        public string Department { get; set; } = string.Empty;
-        public string Manager { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Phone { get; set; } = string.Empty;
-        public DateTime HireDate { get; set; }
-        public string Status { get; set; } = string.Empty;
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateEmployeeDialog>("Create Employee", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+        }
     }
 }

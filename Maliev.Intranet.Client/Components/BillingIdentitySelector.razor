@@ -1,0 +1,107 @@
+@using Maliev.Intranet.Shared
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudText Typo="Typo.h6" Class="mb-3">Billing Identity</MudText>
+
+    @if (Customer == null)
+    {
+        <MudAlert Severity="Severity.Info">Loading customer information...</MudAlert>
+    }
+    else if (!HasPersonalIdentity && !HasCorporateIdentity)
+    {
+        <MudAlert Severity="Severity.Warning">
+            This customer has neither a Thai National ID nor a linked company.
+            Please add identity information to the customer profile before creating documents.
+        </MudAlert>
+    }
+    else if (HasPersonalIdentity && HasCorporateIdentity)
+    {
+        <MudRadioGroup @bind-Value="SelectedIdentityType" T="BillingIdentityType">
+            <MudRadio Value="BillingIdentityType.Personal" Color="Color.Primary">
+                <MudStack Row="false" Spacing="1">
+                    <MudText Typo="Typo.body1">
+                        <strong>Personal</strong>
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @Customer.FirstName @Customer.LastName
+                        <br />
+                        Thai National ID: @Customer.ThaiNationalIdMasked
+                    </MudText>
+                </MudStack>
+            </MudRadio>
+
+            <MudRadio Value="BillingIdentityType.Corporate" Color="Color.Primary" Class="mt-3">
+                <MudStack Row="false" Spacing="1">
+                    <MudText Typo="Typo.body1">
+                        <strong>Corporate</strong>
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @Customer.CompanyName
+                        <br />
+                        Tax ID: @Customer.CompanyTaxId
+                    </MudText>
+                </MudStack>
+            </MudRadio>
+        </MudRadioGroup>
+    }
+    else if (HasPersonalIdentity)
+    {
+        <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Filled.Person">
+            <MudText>
+                <strong>Billing Identity: Personal</strong>
+                <br />
+                @Customer.FirstName @Customer.LastName
+                <br />
+                Thai National ID: @Customer.ThaiNationalIdMasked
+            </MudText>
+        </MudAlert>
+        @if (SelectedIdentityType != BillingIdentityType.Personal)
+        {
+            SelectedIdentityType = BillingIdentityType.Personal;
+            SelectedIdentityTypeChanged.InvokeAsync(SelectedIdentityType);
+        }
+    }
+    else if (HasCorporateIdentity)
+    {
+        <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Filled.Business">
+            <MudText>
+                <strong>Billing Identity: Corporate</strong>
+                <br />
+                @Customer.CompanyName
+                <br />
+                Tax ID: @Customer.CompanyTaxId
+            </MudText>
+        </MudAlert>
+        @if (SelectedIdentityType != BillingIdentityType.Corporate)
+        {
+            SelectedIdentityType = BillingIdentityType.Corporate;
+            SelectedIdentityTypeChanged.InvokeAsync(SelectedIdentityType);
+        }
+    }
+</MudPaper>
+
+@code {
+    /// <summary>
+    /// Customer information including identity details
+    /// </summary>
+    [Parameter]
+    public CustomerIdentityDto? Customer { get; set; }
+
+    /// <summary>
+    /// Currently selected billing identity type
+    /// </summary>
+    [Parameter]
+    public BillingIdentityType SelectedIdentityType { get; set; } = BillingIdentityType.Corporate;
+
+    /// <summary>
+    /// Event callback when selected identity type changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<BillingIdentityType> SelectedIdentityTypeChanged { get; set; }
+
+    private bool HasPersonalIdentity =>
+        Customer != null && !string.IsNullOrEmpty(Customer.ThaiNationalIdMasked);
+
+    private bool HasCorporateIdentity =>
+        Customer != null && Customer.CompanyId.HasValue && !string.IsNullOrEmpty(Customer.CompanyName);
+}

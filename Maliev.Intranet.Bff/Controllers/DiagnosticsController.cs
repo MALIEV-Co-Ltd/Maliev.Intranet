@@ -24,12 +24,12 @@ public class DiagnosticsController(IAMServiceClient iamClient) : ControllerBase
     {
         var user = HttpContext.User;
         var claims = user.Claims.Select(c => new { c.Type, c.Value }).ToList();
-        
+
         var principalId = user.FindFirst("user_id")?.Value
             ?? user.FindFirst("sub")?.Value
             ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        var iamData = principalId != null 
+        var iamData = principalId != null
             ? await GetIamData(principalId)
             : null;
 

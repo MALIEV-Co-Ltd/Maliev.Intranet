@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -143,7 +144,31 @@ else
 
         try
         {
-            _dashboard = await Http.GetFromJsonAsync<DashboardViewModel>("api/dashboard");
+            // 1. Load User Preferences
+            string widgetQuery = "";
+            try
+            {
+                var pref = await Http.GetFromJsonAsync<UserPreferenceDto>("api/preferences/dashboard");
+                if (pref != null && pref.PreferenceData != null)
+                {
+                    // Map Dictionary to DashboardPreference
+                    if (pref.PreferenceData.TryGetValue("Widgets", out var widgetsObj) && widgetsObj is System.Text.Json.JsonElement widgetsElement)
+                    {
+                         var widgets = System.Text.Json.JsonSerializer.Deserialize<List<string>>(widgetsElement);
+                         if (widgets?.Any() == true)
+                         {
+                             widgetQuery = "?widgets=" + string.Join(",", widgets);
+                         }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore preference load errors (404, etc), use defaults
+            }
+
+            // 2. Load Dashboard Data
+            _dashboard = await Http.GetFromJsonAsync<DashboardViewModel>($"api/dashboard{widgetQuery}");
         }
         catch (Exception ex)
         {
@@ -153,6 +178,11 @@ else
         {
             _loading = false;
         }
+    }
+
+    private class DashboardPreference
+    {
+        public List<string> Widgets { get; set; } = new();
     }
 
     private class UserInfo

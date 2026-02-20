@@ -40,4 +40,77 @@ public class QuotationsController(QuotationServiceClient client) : ControllerBas
         var result = await client.GetQuotationByIdAsync(id);
         return result != null ? Ok(result) : NotFound();
     }
+
+    /// <summary>
+    /// Creates a new quotation.
+    /// </summary>
+    /// <param name="request">The creation request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created quotation.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost]
+    public async Task<ActionResult<QuotationSummaryDto>> Create([FromBody] CreateQuotationRequest request, CancellationToken ct)
+    {
+        var result = await client.CreateQuotationAsync(request, ct);
+        return result != null ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result) : BadRequest();
+    }
+
+    /// <summary>
+    /// Updates an existing quotation.
+    /// </summary>
+    /// <param name="id">The quotation ID.</param>
+    /// <param name="request">The update request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The updated quotation.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<QuotationDetailDto>> Update(Guid id, [FromBody] UpdateQuotationRequest request, CancellationToken ct)
+    {
+        var result = await client.UpdateQuotationAsync(id, request, ct);
+        return result != null ? Ok(result) : NotFound();
+    }
+
+    /// <summary>
+    /// Deletes a quotation.
+    /// </summary>
+    /// <param name="id">The quotation ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>No content.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var success = await client.DeleteQuotationAsync(id, ct);
+        return success ? NoContent() : NotFound();
+    }
+
+    /// <summary>
+    /// Updates the status of a quotation.
+    /// </summary>
+    /// <param name="id">The quotation ID.</param>
+    /// <param name="status">The new status.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>No content.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}/status")]
+    public async Task<ActionResult> UpdateStatus(Guid id, [FromBody] string status, CancellationToken ct)
+    {
+        var success = await client.UpdateStatusAsync(id, status, ct);
+        return success ? NoContent() : BadRequest();
+    }
+
+    /// <summary>
+    /// Adds an internal note to a quotation.
+    /// </summary>
+    /// <param name="id">The quotation ID.</param>
+    /// <param name="request">The note content.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Created status if successful.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/notes")]
+    public async Task<IActionResult> AddNote(Guid id, [FromBody] AddQuotationNoteRequest request, CancellationToken ct)
+    {
+        var response = await client.AddNoteAsync(id, request, ct);
+        return response.IsSuccessStatusCode ? StatusCode(201) : StatusCode((int)response.StatusCode);
+    }
 }

@@ -1,27 +1,34 @@
 @using MudBlazor
 @using Maliev.Intranet.Shared
 
-<MudPaper Elevation="0" Class="d-flex rounded-xl border-solid border-1 mud-border-lines-default overflow-hidden" Style="height: 700px;">
+<MudPaper Elevation="0" Class="d-flex border-solid border-1 mud-border-lines-default overflow-hidden" Style="height: 700px;">
     <!-- Sidebar List -->
     <div class="d-flex flex-column border-solid border-r-1 mud-border-lines-default" style="width: 350px; min-width: 350px;">
-        <div class="pa-4 border-solid border-b-1 mud-border-lines-default">
-            <MudTextField @bind-Value="_searchString" 
+        <div class="pe-4 py-4 pb-4 border-solid border-b-1 mud-border-lines-default">
+            <MudTextField T="string" 
+                          Value="@_searchString" 
+                          ValueChanged="OnSearchChanged"
                           Placeholder="Search documents..." 
                           Adornment="Adornment.Start" 
                           AdornmentIcon="@Icons.Material.Filled.Search" 
                           IconSize="Size.Small" 
                           Variant="Variant.Outlined" 
                           Margin="Margin.Dense" 
-                          Clearable="true" />
+                          Clearable="true"
+                          Immediate="true" />
+            @if (_isSearching)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-1" Style="height: 2px;" />
+            }
         </div>
         
         <div class="flex-grow-1 overflow-y-auto pa-2">
             <MudList T="DocumentResponse" SelectedValue="@SelectedDocument" SelectedValueChanged="OnDocumentSelected">
                 @foreach (var doc in FilteredDocuments)
                 {
-                    <MudListItem Value="@doc" Class="rounded-lg mb-1">
-                        <div class="d-flex align-center gap-3">
-                            <MudIcon Icon="@GetDocumentIcon(doc.MimeType)" Color="@GetDocumentColor(doc.MimeType)" Size="Size.Medium" />
+                    <MudListItem Value="@doc" Class="rounded-lg mb-1 pa-2">
+                        <div class="d-flex align-center gap-4 w-100">
+                            <MudIcon Icon="@GetDocumentIcon(doc.MimeType)" Color="@GetDocumentColor(doc.MimeType)" Size="Size.Medium" Class="flex-none" />
                             <div class="d-flex flex-column flex-grow-1 min-width-0">
                                 <MudText Typo="Typo.body2" Style="font-weight: 700;" Class="text-truncate">@doc.FileName</MudText>
                                 <div class="d-flex align-center gap-2">
@@ -29,6 +36,9 @@
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">•</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">@doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
                                 </div>
+                            </div>
+                            <div class="flex-none d-flex align-center">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => OnDelete.InvokeAsync(doc))" />
                             </div>
                         </div>
                     </MudListItem>
@@ -46,7 +56,7 @@
     </div>
 
     <!-- Preview Area -->
-    <div class="flex-grow-1 d-flex flex-column" style="background-color: #f0f2f5;">
+    <div class="flex-grow-1 d-flex flex-column" style="background-color: var(--mud-palette-background-grey);">
         @if (SelectedDocument != null)
         {
             <div class="pa-3 px-6 border-solid border-b-1 mud-border-lines-default d-flex align-center justify-space-between mud-bg-surface">
@@ -70,7 +80,7 @@
                 </MudStack>
             </div>
 
-            <div class="flex-grow-1 relative d-flex align-center justify-center pa-10">
+            <div class="flex-grow-1 relative d-flex align-center justify-center pa-0 overflow-hidden" style="min-height: 500px;">
                 @if (_loadingPreview)
                 {
                     <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
@@ -79,15 +89,11 @@
                 {
                     @if (SelectedDocument.MimeType.Contains("pdf"))
                     {
-                        <div class="w-100 h-100 mud-elevation-12 rounded-lg overflow-hidden bg-white">
-                            <iframe src="@_previewUrl" style="width: 100%; height: 100%; border: none;"></iframe>
-                        </div>
+                        <iframe src="@_previewUrl" style="width: 100%; height: 100%; border: none;"></iframe>
                     }
                     else if (SelectedDocument.MimeType.Contains("image"))
                     {
-                        <div class="pa-4 d-flex align-center justify-center h-100 w-100">
-                            <img src="@_previewUrl" style="max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: var(--mud-elevation-25); border-radius: 8px; background-color: white;" />
-                        </div>
+                        <img src="@_previewUrl" style="width: 100%; height: 100%; object-fit: contain; background-color: var(--mud-palette-background-grey);" />
                     }
                     else
                     {
@@ -120,15 +126,30 @@
 @code {
     [Parameter] public List<DocumentResponse> Documents { get; set; } = [];
     [Parameter] public EventCallback<string> OnDownload { get; set; }
+    [Parameter] public EventCallback<DocumentResponse> OnDelete { get; set; }
     [Parameter] public Func<string, Task<string?>> GetPreviewUrlFunc { get; set; } = default!;
 
     private DocumentResponse? SelectedDocument;
     private string _searchString = "";
     private string? _previewUrl;
     private bool _loadingPreview;
+    private bool _isSearching;
 
     private IEnumerable<DocumentResponse> FilteredDocuments => 
         Documents.Where(d => string.IsNullOrEmpty(_searchString) || d.FileName.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    private async Task OnSearchChanged(string value)
+    {
+        _searchString = value;
+        _isSearching = true;
+        StateHasChanged();
+        
+        // Artificial delay to show spinner and avoid too frequent UI updates if logic becomes heavier later
+        await Task.Delay(300);
+        
+        _isSearching = false;
+        StateHasChanged();
+    }
 
     private async Task OnDocumentSelected(DocumentResponse? doc)
     {

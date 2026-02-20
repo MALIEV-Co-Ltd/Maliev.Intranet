@@ -1,4 +1,6 @@
 using Maliev.Intranet.Shared;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.SignalR.Client;
 using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Client.Services;
@@ -10,20 +12,26 @@ public class ChatMessage
     public string? Context { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.Now;
     public List<BffSuggestedAction>? SuggestedActions { get; set; }
+    public List<ThinkingStepDto> ThinkingSteps { get; set; } = new();
+    public bool IsProcessing { get; set; }
 }
 
-public class ChatService
+public class ChatService : IAsyncDisposable
 {
     private readonly HttpClient _httpClient;
+    private readonly NavigationManager _navigationManager;
+    private HubConnection? _hubConnection;
 
-    public ChatService(HttpClient httpClient)
+    public ChatService(HttpClient httpClient, NavigationManager navigationManager)
     {
         _httpClient = httpClient;
+        _navigationManager = navigationManager;
     }
 
     public List<ChatMessage> Messages { get; } = new();
     public Guid? SessionId { get; private set; }
     public bool IsLoading { get; private set; }
+    public bool IsSignalRConnected => _hubConnection?.State == HubConnectionState.Connected;
 
     private string _currentContext = "/";
     public string CurrentContext
@@ -54,6 +62,71 @@ public class ChatService
     }
 
     /// <summary>
+    /// Connects to the ChatHub for real-time thinking step updates.
+    /// </summary>
+    public async Task ConnectSignalRAsync()
+    {
+        if (!OperatingSystem.IsBrowser() || _hubConnection != null) return;
+
+        var hubUrl = _navigationManager.BaseUri.TrimEnd('/') + "/hubs/chat";
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<ThinkingStepDto>("ReceiveThinkingStep", step =>
+        {
+            var processingMessage = Messages.LastOrDefault(m => m.IsProcessing);
+            if (processingMessage != null)
+            {
+                processingMessage.ThinkingSteps.Add(step);
+                NotifyStateChanged();
+            }
+        });
+
+        _hubConnection.On<BffChatMessageResponse>("ReceiveMessage", response =>
+        {
+            // The final response arrives here via SignalR — UI can update if needed
+            NotifyStateChanged();
+        });
+
+        _hubConnection.On<string>("ReceiveError", error =>
+        {
+            var processingMessage = Messages.LastOrDefault(m => m.IsProcessing);
+            if (processingMessage != null)
+            {
+                processingMessage.IsProcessing = false;
+            }
+            NotifyStateChanged();
+        });
+
+        try
+        {
+            await _hubConnection.StartAsync();
+        }
+        catch
+        {
+            // SignalR connection failed — will fall back to HTTP-only
+        }
+    }
+
+    /// <summary>
+    /// Joins a session group for receiving targeted SignalR messages.
+    /// </summary>
+    private async Task JoinSessionGroupAsync()
+    {
+        if (_hubConnection?.State == HubConnectionState.Connected && SessionId.HasValue)
+        {
+            try
+            {
+                await _hubConnection.InvokeAsync("JoinSession", SessionId.Value.ToString());
+            }
+            catch { /* Best effort */ }
+        }
+    }
+
+    /// <summary>
     /// Initializes a chat session with the BFF.
     /// </summary>
     public async Task InitializeSessionAsync()
@@ -62,7 +135,8 @@ public class ChatService
 
         try
         {
-            var request = new BffChatSessionRequest { Channel = "intranet", Language = "en" };
+            var language = System.Globalization.CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
+            var request = new BffChatSessionRequest { Channel = "intranet", Language = language };
             var response = await _httpClient.PostAsJsonAsync("api/chat/session", request);
 
             if (response.IsSuccessStatusCode)
@@ -71,6 +145,7 @@ public class ChatService
                 if (result != null)
                 {
                     SessionId = result.SessionId;
+                    await JoinSessionGroupAsync();
                 }
             }
         }
@@ -82,6 +157,7 @@ public class ChatService
 
     /// <summary>
     /// Sends a message through the BFF to the ChatbotService.
+    /// Uses the streaming endpoint when SignalR is connected.
     /// </summary>
     public async Task<BffChatMessageResponse?> SendMessageAsync(string text)
     {
@@ -104,12 +180,54 @@ public class ChatService
                 Context = _currentContext
             };
 
-            var response = await _httpClient.PostAsJsonAsync("api/chat/message", request);
+            // Use streaming endpoint when SignalR is connected
+            var endpoint = IsSignalRConnected
+                ? "api/chat/message/stream"
+                : "api/chat/message";
+
+            // Add a placeholder processing message for thinking steps
+            if (IsSignalRConnected)
+            {
+                Messages.Add(new ChatMessage
+                {
+                    Text = "",
+                    IsUser = false,
+                    Context = _currentContext,
+                    IsProcessing = true
+                });
+                NotifyStateChanged();
+            }
+
+            var response = await _httpClient.PostAsJsonAsync(endpoint, request);
 
             if (response.IsSuccessStatusCode)
             {
-                return await response.Content.ReadFromJsonAsync<BffChatMessageResponse>();
+                var result = await response.Content.ReadFromJsonAsync<BffChatMessageResponse>();
+
+                // Remove the processing placeholder if it exists
+                var placeholder = Messages.LastOrDefault(m => m.IsProcessing);
+                if (placeholder != null)
+                {
+                    // Keep the thinking steps but mark as done
+                    placeholder.IsProcessing = false;
+                    placeholder.Text = result?.Content ?? "";
+                    placeholder.SuggestedActions = result?.SuggestedActions;
+
+                    // Merge any thinking steps from the HTTP response
+                    if (result?.ThinkingSteps?.Count > 0 && placeholder.ThinkingSteps.Count == 0)
+                    {
+                        placeholder.ThinkingSteps = result.ThinkingSteps;
+                    }
+
+                    return result;
+                }
+
+                return result;
             }
+
+            // Remove placeholder on failure
+            var failPlaceholder = Messages.LastOrDefault(m => m.IsProcessing);
+            if (failPlaceholder != null) Messages.Remove(failPlaceholder);
 
             return null;
         }
@@ -121,4 +239,14 @@ public class ChatService
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.StopAsync();
+            await _hubConnection.DisposeAsync();
+            _hubConnection = null;
+        }
+    }
 }

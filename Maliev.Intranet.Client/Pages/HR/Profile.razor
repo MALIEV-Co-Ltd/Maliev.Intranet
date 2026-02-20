@@ -1,0 +1,137 @@
+@page "/hr/profile"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>My Profile - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">My Profile</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (_profile == null)
+{
+    <MudAlert Severity="Severity.Warning">
+        Employee profile not found. Your account may not be linked to an employee record yet.
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        <!-- Personal Information -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.h6" Class="mb-3">Personal Information</MudText>
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Full Name</MudText>
+                        <MudText Typo="Typo.body1">@_profile.Name</MudText>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Work Email</MudText>
+                        <MudText Typo="Typo.body1">@_profile.Email</MudText>
+                    </MudItem>
+                    @if (!string.IsNullOrEmpty(_profile.Phone))
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Phone</MudText>
+                            <MudText Typo="Typo.body1">@_profile.Phone</MudText>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Employment Information -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.h6" Class="mb-3">Employment</MudText>
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Title</MudText>
+                        <MudText Typo="Typo.body1">@(_profile.Title.Length > 0 ? _profile.Title : "—")</MudText>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Department</MudText>
+                        <MudText Typo="Typo.body1">@(_profile.Department.Length > 0 ? _profile.Department : "—")</MudText>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@(_profile.Status == "Active" ? Color.Success : Color.Default)">@_profile.Status</MudChip>
+                    </MudItem>
+                    @if (!string.IsNullOrEmpty(_profile.ManagerName))
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Manager</MudText>
+                            <MudText Typo="Typo.body1">@_profile.ManagerName</MudText>
+                        </MudItem>
+                    }
+                    @if (_profile.HireDate.HasValue)
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Start Date</MudText>
+                            <MudText Typo="Typo.body1">@_profile.HireDate.Value.ToString("d MMM yyyy")</MudText>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Emergency Contacts -->
+        @if (_profile.EmergencyContacts.Count > 0)
+        {
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Emergency Contacts</MudText>
+                    <MudSimpleTable Hover="true" Dense="true">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Relationship</th>
+                                <th>Phone</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var contact in _profile.EmergencyContacts)
+                            {
+                                <tr>
+                                    <td>@contact.Name</td>
+                                    <td>@contact.Relationship</td>
+                                    <td>@contact.Phone</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private bool _isLoading = true;
+    private EmployeeDetailDto? _profile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _profile = await Http.GetFromJsonAsync<EmployeeDetailDto>("api/employees/me");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            _profile = null;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load profile.", Severity.Error);
+            Console.WriteLine($"Error loading profile: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

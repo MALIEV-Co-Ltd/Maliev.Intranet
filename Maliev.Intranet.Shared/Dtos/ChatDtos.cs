@@ -40,6 +40,7 @@ public class BffChatMessageResponse
     public string Content { get; set; } = string.Empty;
     public string Role { get; set; } = "assistant";
     public List<BffSuggestedAction> SuggestedActions { get; set; } = new();
+    public List<ThinkingStepDto> ThinkingSteps { get; set; } = new();
 }
 
 /// <summary>
@@ -61,4 +62,17 @@ public class BffSuggestedAction
     public string Text { get; set; } = string.Empty;
     public string Action { get; set; } = string.Empty;
     public string? Data { get; set; }
+}
+
+/// <summary>
+/// A step in the AI's thinking/reasoning chain, shared between BFF and Client.
+/// </summary>
+public class ThinkingStepDto
+{
+    public int StepNumber { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Detail { get; set; } = string.Empty;
+    public DateTimeOffset Timestamp { get; set; }
+    public long? DurationMs { get; set; }
 }

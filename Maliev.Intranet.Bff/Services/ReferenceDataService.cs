@@ -47,9 +47,9 @@ public class ReferenceDataService : IReferenceDataService
 
             var countryResponse = await response.Content.ReadFromJsonAsync<CountryPaginatedResponse<CountryDto>>(cancellationToken);
             var countries = countryResponse?.Data.ToList() ?? new List<CountryDto>();
-            
+
             _logger.LogInformation("Fetched {Count} countries from Country Service", countries.Count);
-            
+
             return countries;
         }
         catch (Exception ex)

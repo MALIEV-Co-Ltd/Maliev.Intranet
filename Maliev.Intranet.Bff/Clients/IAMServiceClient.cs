@@ -13,7 +13,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// </summary>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A list of permissions.</returns>
-    public async Task<List<PermissionDto>> GetPermissionsAsync(CancellationToken ct = default)
+    public virtual async Task<List<PermissionDto>> GetPermissionsAsync(CancellationToken ct = default)
     {
         var response = await httpClient.GetFromJsonAsync<List<PermissionDto>>("/iam/v1/permissions", ct);
         return response ?? new();
@@ -24,7 +24,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// </summary>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A list of roles.</returns>
-    public async Task<List<RoleDto>> GetRolesAsync(CancellationToken ct = default)
+    public virtual async Task<List<RoleDto>> GetRolesAsync(CancellationToken ct = default)
     {
         var response = await httpClient.GetFromJsonAsync<List<RoleDto>>("/iam/v1/roles", ct);
         return response ?? new();
@@ -33,7 +33,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <summary>
     /// Retrieves all principals from the IAM service.
     /// </summary>
-    public async Task<List<PrincipalSummaryDto>> GetPrincipalsAsync(CancellationToken ct = default)
+    public virtual async Task<List<PrincipalSummaryDto>> GetPrincipalsAsync(CancellationToken ct = default)
     {
         var response = await httpClient.GetFromJsonAsync<List<PrincipalSummaryDto>>("/iam/v1/principals", ct);
         return response ?? new();
@@ -42,7 +42,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <summary>
     /// Gets the total count of principals for bootstrapping purposes.
     /// </summary>
-    public async Task<int> GetPrincipalCountAsync(CancellationToken ct = default)
+    public virtual async Task<int> GetPrincipalCountAsync(CancellationToken ct = default)
     {
         var response = await httpClient.GetFromJsonAsync<BootstrapStatusDto>("/iam/v1/principals/bootstrap/status", ct);
         return response?.Count ?? 0;
@@ -51,7 +51,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <summary>
     /// Promotes the current user to IAM Admin if it's the first user.
     /// </summary>
-    public async Task<bool> PromoteCallerToAdminAsync(CancellationToken ct = default)
+    public virtual async Task<bool> PromoteCallerToAdminAsync(CancellationToken ct = default)
     {
         var response = await httpClient.PostAsync("/iam/v1/principals/bootstrap/promote", null, ct);
         return response.IsSuccessStatusCode;
@@ -63,7 +63,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <summary>
     /// Retrieves role bindings for a principal.
     /// </summary>
-    public async Task<List<RoleBindingDto>> GetPrincipalRolesAsync(Guid principalId, CancellationToken ct = default)
+    public virtual async Task<List<RoleBindingDto>> GetPrincipalRolesAsync(Guid principalId, CancellationToken ct = default)
     {
         var response = await httpClient.GetFromJsonAsync<List<RoleBindingDto>>($"/iam/v1/principals/{principalId}/roles", ct);
         return response ?? new();
@@ -72,7 +72,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <summary>
     /// Grants a role to a principal.
     /// </summary>
-    public async Task<bool> GrantRoleAsync(Guid principalId, GrantRoleRequestDto request, CancellationToken ct = default)
+    public virtual async Task<bool> GrantRoleAsync(Guid principalId, GrantRoleRequestDto request, CancellationToken ct = default)
     {
         var response = await httpClient.PostAsJsonAsync($"/iam/v1/principals/{principalId}/roles", request, ct);
         return response.IsSuccessStatusCode;
@@ -81,7 +81,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <summary>
     /// Revokes a role from a principal.
     /// </summary>
-    public async Task<bool> RevokeRoleAsync(Guid principalId, Guid bindingId, CancellationToken ct = default)
+    public virtual async Task<bool> RevokeRoleAsync(Guid principalId, Guid bindingId, CancellationToken ct = default)
     {
         var response = await httpClient.DeleteAsync($"/iam/v1/principals/{principalId}/roles/{bindingId}", ct);
         return response.IsSuccessStatusCode;
@@ -93,7 +93,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <param name="request">The assignment request.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A task representing the operation.</returns>
-    public async Task<bool> AssignToUserAsync(UserAssignmentRequest request, CancellationToken ct = default)
+    public virtual async Task<bool> AssignToUserAsync(UserAssignmentRequest request, CancellationToken ct = default)
     {
         if (!Guid.TryParse(request.UserId, out var principalId))
         {
@@ -114,7 +114,7 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <param name="userId">The user ID.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>The user's assignment details.</returns>
-    public async Task<UserContextDto?> GetUserAssignmentsAsync(string userId, CancellationToken ct = default)
+    public virtual async Task<UserContextDto?> GetUserAssignmentsAsync(string userId, CancellationToken ct = default)
     {
         if (!Guid.TryParse(userId, out var principalId))
         {

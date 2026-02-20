@@ -1,4 +1,9 @@
 @page "/finance/invoices"
+@using Maliev.Intranet.Client.Components
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Invoices - Maliev Intranet</PageTitle>
 
@@ -14,9 +19,10 @@
                       Margin="Margin.Dense" 
                       Style="max-width: 400px;" />
         
-        <MudButton Variant="Variant.Filled" 
-                   Color="Color.Primary" 
-                   StartIcon="@Icons.Material.Filled.Add">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
             Create Invoice
         </MudButton>
     </MudStack>
@@ -25,9 +31,9 @@
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
     <MudTabs Elevation="0" Rounded="false" PanelClass="pa-0" Class="border-b mud-border-lines-default">
         <MudTabPanel Text="All" Icon="@Icons.Material.Outlined.List" />
-        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="@(_invoices.Count(x => x.Status == "Draft") > 0 ? _invoices.Count(x => x.Status == "Draft") : null)" BadgeColor="Color.Default" />
-        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" BadgeData="@(_invoices.Count(x => x.Status == "Sent") > 0 ? _invoices.Count(x => x.Status == "Sent") : null)" BadgeColor="Color.Primary" />
-        <MudTabPanel Text="Overdue" Icon="@Icons.Material.Outlined.Warning" BadgeData="@(_invoices.Count(x => x.Status == "Overdue") > 0 ? _invoices.Count(x => x.Status == "Overdue") : null)" BadgeColor="Color.Error" />
+        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" />
+        <MudTabPanel Text="Sent" Icon="@Icons.Material.Outlined.Send" />
+        <MudTabPanel Text="Overdue" Icon="@Icons.Material.Outlined.Warning" />
         <MudTabPanel Text="Paid" Icon="@Icons.Material.Outlined.CheckCircle" />
     </MudTabs>
 
@@ -42,13 +48,13 @@
     }
     else
     {
-        <MudDataGrid T="InvoiceDto" Items="@_invoices" Dense="true" Hover="true" Elevation="0">
+        <MudDataGrid T="InvoiceSummaryDto" Items="@_invoices" Dense="true" Hover="true" Elevation="0">
             <Columns>
                 <PropertyColumn Property="x => x.InvoiceNumber" Title="Invoice #" />
                 <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
                 <PropertyColumn Property="x => x.IssueDate" Title="Issue Date" Format="dd MMM yyyy" />
                 <PropertyColumn Property="x => x.DueDate" Title="Due Date" Format="dd MMM yyyy" />
-                <PropertyColumn Property="x => x.Amount" Title="Amount" Format="C2" />
+                <PropertyColumn Property="x => x.Total" Title="Amount" Format="C2" />
                 <PropertyColumn Property="x => x.Balance" Title="Balance" Format="C2" />
                 <TemplateColumn Title="Status">
                     <CellTemplate>
@@ -63,6 +69,15 @@
                             <MudIconButton Icon="@Icons.Material.Outlined.PictureAsPdf" Size="Size.Small" Color="Color.Error" />
                             <MudIconButton Icon="@Icons.Material.Outlined.Send" Size="Size.Small" Color="Color.Primary" />
                             <MudIconButton Icon="@Icons.Material.Outlined.Payment" Size="Size.Small" Color="Color.Success" />
+                            @if (context.Item.Status == "Draft" || context.Item.Status == "Sent")
+                            {
+                                <MudTooltip Text="Split Invoice">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.CallSplit" 
+                                                   Size="Size.Small" 
+                                                   Color="Color.Secondary" 
+                                                   OnClick="@(() => OpenSplitDialog(context.Item))" />
+                                </MudTooltip>
+                            }
                         </MudStack>
                     </CellTemplate>
                 </TemplateColumn>
@@ -74,14 +89,62 @@
 @code {
     private bool _isLoading = true;
     private string _searchString = "";
-    private List<InvoiceDto> _invoices = new();
+    private List<InvoiceSummaryDto> _invoices = new();
 
     protected override async Task OnInitializedAsync()
     {
-        // TODO: Replace with BFF API call
-        // _invoices = await Http.GetFromJsonAsync<List<InvoiceDto>>("api/invoices");
-        await Task.Delay(500);
-        _isLoading = false;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<InvoiceSummaryDto>>("api/invoices");
+            if (response?.Data != null)
+            {
+                _invoices = response.Data.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading invoices: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateInvoiceDialog>("Create Invoice", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+        }
+    }
+
+    private async Task OpenSplitDialog(InvoiceSummaryDto invoice)
+    {
+        var parameters = new DialogParameters<InvoiceSplitDialog>
+        {
+            { x => x.InvoiceId, invoice.Id },
+            { x => x.InvoiceNumber, invoice.InvoiceNumber },
+            { x => x.TotalAmount, invoice.Total }
+        };
+
+        var dialog = await DialogService.ShowAsync<InvoiceSplitDialog>("Split Invoice", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+        }
     }
 
     private Color GetStatusColor(string status) => status switch
@@ -93,16 +156,4 @@
         "Partial" => Color.Warning,
         _ => Color.Default
     };
-
-    public class InvoiceDto
-    {
-        public Guid Id { get; set; }
-        public string InvoiceNumber { get; set; } = string.Empty;
-        public string CustomerName { get; set; } = string.Empty;
-        public DateTime IssueDate { get; set; }
-        public DateTime DueDate { get; set; }
-        public decimal Amount { get; set; }
-        public decimal Balance { get; set; }
-        public string Status { get; set; } = string.Empty;
-    }
 }

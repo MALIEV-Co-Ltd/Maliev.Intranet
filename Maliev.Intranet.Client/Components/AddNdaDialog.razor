@@ -17,11 +17,15 @@
                 <MudSelectItem Value="@("Expired")">Expired</MudSelectItem>
                 <MudSelectItem Value="@("Revoked")">Revoked</MudSelectItem>
             </MudSelect>
+            @if (_status == "Revoked")
+            {
+                <MudTextField @bind-Value="_revokeReason" Label="Revocation Reason" Variant="Variant.Outlined" Lines="3" Required="true" RequiredError="Reason is required" Immediate="true" />
+            }
         </MudStack>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save Changes</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(_status == "Revoked" && string.IsNullOrWhiteSpace(_revokeReason))">Save Changes</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -32,6 +36,7 @@
 
     private DateTime? _expiresAt;
     private string _status = "Draft";
+    private string _revokeReason = string.Empty;
 
     protected override void OnInitialized()
     {
@@ -41,7 +46,16 @@
 
     private void Submit()
     {
-        MudDialog.Close(DialogResult.Ok(new { ExpiresAt = _expiresAt, Status = _status }));
+        MudDialog.Close(DialogResult.Ok(new
+        {
+            ExpiresAt = _expiresAt,
+            Status = _status,
+            Version = ExistingNda.Version,
+            SignedAt = _status == "Signed" ? DateTime.UtcNow : (DateTime?)null,
+            SignedBy = _status == "Signed" ? "Employee" : null, // Placeholder, should be current user
+            RevokeReason = _status == "Revoked" ? _revokeReason : null,
+            RevokedAt = _status == "Revoked" ? DateTime.UtcNow : (DateTime?)null
+        }));
     }
 
     private void Cancel() => MudDialog.Cancel();

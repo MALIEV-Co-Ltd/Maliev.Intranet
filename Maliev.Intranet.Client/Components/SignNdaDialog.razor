@@ -1,0 +1,193 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@using System.Net.Http.Headers
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.AssignmentTurnedIn" Class="mr-3 mb-n1"/>
+            Sign NDA
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="4">
+            <MudAlert Severity="Severity.Info">Upload the signed document (PDF or image) and set the expiration date.</MudAlert>
+
+            <MudDatePicker Label="Expiration Date" @bind-Date="_expiresAt" Variant="Variant.Outlined" Required="true" />
+
+            @if (_aiDateDetected != null)
+            {
+                <MudAlert Severity="Severity.Success" Dense="true" NoIcon="false">
+                    AI detected expiration date: @_aiDateDetected.Value.ToString("dd MMM yyyy")
+                </MudAlert>
+            }
+            else if (_aiScanCompleted && _aiDateNotFound)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" NoIcon="false">
+                    No expiration date detected in the document. Please review the NDA and set the expiration date manually.
+                </MudAlert>
+            }
+
+            <MudFileUpload T="IBrowserFile" Disabled="@_isUploading" FilesChanged="OnFileSelected" Accept=".pdf,.jpg,.jpeg,.png,.webp" MaximumFileCount="1">
+                <ActivatorContent>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                               FullWidth="true">
+                        @(_file == null ? "Upload Signed Document" : _file.Name)
+                    </MudButton>
+                </ActivatorContent>
+            </MudFileUpload>
+
+            @if (_file != null)
+            {
+                <MudText Typo="Typo.caption">Size: @(_file.Size / 1024) KB</MudText>
+            }
+
+            @if (_isScanning)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
+                    <MudText Typo="Typo.caption" Color="Color.Primary">Scanning document for dates...</MudText>
+                </MudStack>
+            }
+
+            @if (_isUploading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_isUploading">Cancel</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Submit" Disabled="@(_file == null || _expiresAt == null || _isUploading)">Signed & Upload</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid CustomerId { get; set; }
+    [Parameter] public HttpClient Http { get; set; } = default!;
+
+    private DateTime? _expiresAt;
+    private IBrowserFile? _file;
+    private bool _isUploading;
+    private bool _isScanning;
+    private DateTime? _aiDateDetected;
+    private bool _aiScanCompleted;
+    private bool _aiDateNotFound;
+
+    private void OnFileSelected(IBrowserFile file)
+    {
+        _file = file;
+        _ = ScanForDatesAsync(file);
+    }
+
+    private async Task ScanForDatesAsync(IBrowserFile file)
+    {
+        _isScanning = true;
+        _aiDateDetected = null;
+        _aiScanCompleted = false;
+        _aiDateNotFound = false;
+        StateHasChanged();
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "file", file.Name);
+
+            var response = await Http.PostAsync("api/aiprocessing/extract-nda-dates", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ExtractedNdaDatesResponse>();
+                if (result?.ExpirationDate != null)
+                {
+                    _aiDateDetected = result.ExpirationDate;
+                    _expiresAt = result.ExpirationDate;
+                }
+                else
+                {
+                    _aiDateNotFound = true;
+                }
+            }
+            else
+            {
+                _aiDateNotFound = true;
+            }
+        }
+        catch
+        {
+            _aiDateNotFound = true;
+        }
+        finally
+        {
+            _isScanning = false;
+            _aiScanCompleted = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (_file == null || _expiresAt == null) return;
+        _isUploading = true;
+
+        try
+        {
+            // 1. Upload File
+            using var content = new MultipartFormDataContent();
+            var stream = _file.OpenReadStream(10 * 1024 * 1024);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(_file.ContentType);
+            content.Add(fileContent, "files", _file.Name);
+
+            var uploadResponse = await Http.PostAsync($"api/aiprocessing/upload-documents?category=NDA", content);
+            if (uploadResponse.IsSuccessStatusCode)
+            {
+                var results = await uploadResponse.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
+                var result = results?.FirstOrDefault();
+
+                if (result != null)
+                {
+                    // 2. Link Document
+                    var docs = new List<CreateDocumentRequest> {
+                        new CreateDocumentRequest {
+                            DocumentCategory = "NDA",
+                            DocumentSubType = "Signed",
+                            FileReference = result.UploadId,
+                            FileName = result.FileName,
+                            FileSize = result.FileSize,
+                            MimeType = "application/pdf"
+                        }
+                    };
+
+                    var linkResponse = await Http.PostAsJsonAsync($"api/aiprocessing/link-documents?ownerType=Customer&ownerId={CustomerId}", docs);
+
+                    if (linkResponse.IsSuccessStatusCode)
+                    {
+                        MudDialog.Close(DialogResult.Ok(new
+                        {
+                            ExpiresAt = _expiresAt,
+                            FileReference = result.UploadId,
+                            FileName = result.FileName
+                        }));
+                        return;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore for now
+        }
+        finally
+        {
+            _isUploading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

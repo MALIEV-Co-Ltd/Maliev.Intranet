@@ -1,5 +1,6 @@
 @page "/hr/performance"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 
 <PageTitle>Performance - Maliev Intranet</PageTitle>
@@ -15,10 +16,10 @@
             }
             else
             {
-                <MudDataGrid T="ReviewDto" Items="@_reviews" Dense="true" Hover="true" Elevation="0">
+                <MudDataGrid T="PerformanceReviewDto" Items="@_reviews" Dense="true" Hover="true" Elevation="0">
                     <Columns>
-                        <PropertyColumn Property="x => x.Period" Title="Review Period" />
-                        <PropertyColumn Property="x => x.Reviewer" Title="Reviewer" />
+                        <PropertyColumn Property="x => x.Cycle" Title="Review Period" />
+                        <PropertyColumn Property="x => x.ReviewerName" Title="Reviewer" />
                         <TemplateColumn Title="Rating">
                             <CellTemplate>
                                 <MudRating SelectedValue="@context.Item.Rating" Size="Size.Small" ReadOnly="true" />
@@ -71,14 +72,14 @@
 
 @code {
     private bool _isLoading = true;
-    private List<ReviewDto> _reviews = new();
+    private List<PerformanceReviewDto> _reviews = new();
     private List<GoalDto> _goals = new();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var reviewsTask = Http.GetFromJsonAsync<List<ReviewDto>>("api/performance/reviews");
+            var reviewsTask = Http.GetFromJsonAsync<List<PerformanceReviewDto>>("api/performance/reviews");
             var goalsTask = Http.GetFromJsonAsync<List<GoalDto>>("api/performance/goals");
 
             await Task.WhenAll(reviewsTask, goalsTask);
@@ -103,20 +104,4 @@
         "Complete" => Color.Success,
         _ => Color.Default
     };
-
-    public class ReviewDto
-    {
-        public string Period { get; set; } = "";
-        public string Reviewer { get; set; } = "";
-        public int Rating { get; set; }
-        public string Status { get; set; } = "";
-        public DateTime? CompletedDate { get; set; }
-    }
-
-    public class GoalDto
-    {
-        public string Title { get; set; } = "";
-        public int Progress { get; set; }
-    }
 }
-

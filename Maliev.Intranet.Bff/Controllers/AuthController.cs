@@ -94,12 +94,12 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         }
 
         var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var authProperties = new AuthenticationProperties 
-        { 
+        var authProperties = new AuthenticationProperties
+        {
             IsPersistent = request.RememberMe,
             ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) // Cookie expires in 8 hours
         };
-        
+
         // Store access token in authentication properties for middleware access
         authProperties.StoreTokens(new[]
         {

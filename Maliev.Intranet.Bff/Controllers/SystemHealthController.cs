@@ -72,11 +72,7 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
 
         var baseUrl = configuration[$"Services:{serviceName}:BaseUrl"];
         if (string.IsNullOrEmpty(baseUrl))
-        {
-            status.Status = "Misconfigured";
-            status.ErrorMessage = "Base URL not found in configuration";
-            return status;
-        }
+            baseUrl = $"http://{serviceName}";
 
         // Standard service prefix is usually the first part of the service name in lowercase
         // or we can just try /liveness or /readiness
@@ -85,7 +81,7 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
 
         try
         {
-            var client = httpClientFactory.CreateClient();
+            var client = httpClientFactory.CreateClient("ServiceHealthCheck");
             client.BaseAddress = new Uri(baseUrl);
             client.Timeout = TimeSpan.FromSeconds(5);
 
