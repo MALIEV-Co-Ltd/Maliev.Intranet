@@ -30,6 +30,7 @@ public class BffTestWebApplicationFactory : WebApplicationFactory<Program>
                 ["Authentication:Google:ClientSecret"] = "test-google-secret",
                 ["Services:AuthService:BaseUrl"] = "http://auth-service",
                 ["Services:CustomerService:BaseUrl"] = "http://customer-service",
+                ["Jwt:SecurityKey"] = "test-security-key-for-integration-tests-min32chars",
             });
         });
 

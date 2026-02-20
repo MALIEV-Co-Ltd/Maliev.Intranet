@@ -306,7 +306,7 @@ try
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-    if (app.Environment.IsDevelopment()) app.UseWebAssemblyDebugging();
+    if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.UseWebAssemblyDebugging();
     else { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }
 
     if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
