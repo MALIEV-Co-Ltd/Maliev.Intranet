@@ -307,7 +307,10 @@ try
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.UseWebAssemblyDebugging();
-    else { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }
+    if (app.Environment.IsEnvironment("Testing"))
+        app.UseExceptionHandler(exHandler => exHandler.Run(async ctx => ctx.Response.StatusCode = 500));
+    else if (!app.Environment.IsDevelopment())
+        { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }
 
     if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
     app.UseStaticFiles();
