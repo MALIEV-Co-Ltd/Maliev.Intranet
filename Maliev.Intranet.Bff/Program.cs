@@ -1,4 +1,4 @@
-﻿using Maliev.Aspire.ServiceDefaults;
+using Maliev.Aspire.ServiceDefaults;
 using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Extensions;
@@ -339,6 +339,7 @@ try
     builder.AddBffServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
     builder.AddBffServiceClient<IJobServiceClient, JobServiceClient>("JobService");
     builder.AddBffServiceClient<IInventoryServiceClient, InventoryServiceClient>("InventoryService");
+    builder.AddBffServiceClient<ICurrencyServiceClient, CurrencyServiceClient>("CurrencyService");
 
     // Named HTTP client with service account authentication for reference data
     builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>

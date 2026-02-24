@@ -1,0 +1,144 @@
+@using Maliev.Intranet.Shared.Dtos
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-3 mb-n1" />
+            Edit Currency
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudStack Spacing="3">
+                <MudTextField Value="@Currency.Code"
+                              Label="Code"
+                              ReadOnly="true"
+                              Variant="Variant.Outlined"
+                              Disabled="true" />
+                <MudTextField @bind-Value="_name"
+                              Label="Name"
+                              Required="true"
+                              RequiredError="Name is required"
+                              Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_symbol"
+                              Label="Symbol"
+                              Required="true"
+                              RequiredError="Symbol is required"
+                              Variant="Variant.Outlined" />
+                <MudNumericField @bind-Value="_exchangeRate"
+                                 Label="Exchange Rate (to THB)"
+                                 Required="true"
+                                 Min="0.0001m"
+                                 Format="N4"
+                                 Variant="Variant.Outlined" />
+                <MudNumericField @bind-Value="_decimalPlaces"
+                                 Label="Decimal Places"
+                                 Min="0"
+                                 Max="8"
+                                 Variant="Variant.Outlined" />
+                <MudSwitch @bind-Value="_isActive" Label="Active" Color="Color.Success" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Error" Variant="Variant.Text" OnClick="Delete" Disabled="@_isBusy">Delete</MudButton>
+        <MudSpacer />
+        <MudButton OnClick="Cancel" Disabled="@_isBusy">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _isBusy)">
+            @(_isBusy ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Parameter] public CurrencyDto Currency { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _isValid;
+    private bool _isBusy;
+    private string _name = string.Empty;
+    private string _symbol = string.Empty;
+    private decimal _exchangeRate = 1.0m;
+    private int _decimalPlaces = 2;
+    private bool _isActive = true;
+
+    protected override void OnInitialized()
+    {
+        _name = Currency.Name;
+        _symbol = Currency.Symbol;
+        _exchangeRate = Currency.ExchangeRate;
+        _decimalPlaces = Currency.DecimalPlaces;
+        _isActive = Currency.IsActive;
+    }
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isBusy = true;
+        try
+        {
+            var payload = new
+            {
+                Name = _name.Trim(),
+                Symbol = _symbol.Trim(),
+                ExchangeRate = _exchangeRate,
+                DecimalPlaces = _decimalPlaces,
+                IsActive = _isActive
+            };
+            var response = await Http.PutAsJsonAsync($"api/reference-data/currencies/{Currency.Id}", payload);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Currency updated", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to update currency", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task Delete()
+    {
+        _isBusy = true;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/reference-data/currencies/{Currency.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Currency deleted", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete currency", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

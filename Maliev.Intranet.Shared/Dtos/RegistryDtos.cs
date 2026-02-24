@@ -18,6 +18,8 @@ public class CreateCompanyRequest
     public string? ContactEmail { get; set; }
     /// <summary>Gets or sets the contact phone.</summary>
     public string? ContactPhone { get; set; }
+    /// <summary>Gets or sets the company website URL.</summary>
+    public string? WebsiteUrl { get; set; }
     /// <summary>Gets or sets the company segment (e.g., Retail, Corporate).</summary>
     public string Segment { get; set; } = "Retail";
     /// <summary>Gets or sets the company tier (e.g., Bronze, Silver, Gold).</summary>

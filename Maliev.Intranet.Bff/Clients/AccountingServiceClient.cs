@@ -72,26 +72,8 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
                 Sections = []
             };
 
-            var revenueSection = new ReportSectionDto { Title = "Revenues", Rows = [], Total = result.TotalRevenue };
-            foreach (var s in result.Revenues)
-            {
-                foreach (var item in s.Items)
-                {
-                    revenueSection.Rows.Add(new ReportRowDto { Label = $"{item.AccountName} ({item.AccountNumber})", Amount = item.Amount });
-                }
-            }
-            report.Sections.Add(revenueSection);
-
-            var expenseSection = new ReportSectionDto { Title = "Expenses", Rows = [], Total = result.TotalExpense };
-            foreach (var s in result.Expenses)
-            {
-                foreach (var item in s.Items)
-                {
-                    expenseSection.Rows.Add(new ReportRowDto { Label = $"{item.AccountName} ({item.AccountNumber})", Amount = item.Amount });
-                }
-            }
-            report.Sections.Add(expenseSection);
-
+            report.Sections.Add(MapIncomeStatementSection("Revenues", result.TotalRevenue, result.Revenues));
+            report.Sections.Add(MapIncomeStatementSection("Expenses", result.TotalExpense, result.Expenses));
             report.Sections.Add(new ReportSectionDto { Title = "Summary", Rows = [new ReportRowDto { Label = "Net Income", Amount = result.NetIncome }], Total = result.NetIncome });
 
             return report;
@@ -109,40 +91,40 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
                 Sections = []
             };
 
-            var assetSection = new ReportSectionDto { Title = "Assets", Rows = [], Total = result.TotalAssets };
-            foreach (var s in result.Assets)
-            {
-                foreach (var item in s.Items)
-                {
-                    assetSection.Rows.Add(new ReportRowDto { Label = $"{item.AccountName} ({item.AccountNumber})", Amount = item.Balance });
-                }
-            }
-            report.Sections.Add(assetSection);
-
-            var liabilitySection = new ReportSectionDto { Title = "Liabilities", Rows = [], Total = result.TotalLiabilities };
-            foreach (var s in result.Liabilities)
-            {
-                foreach (var item in s.Items)
-                {
-                    liabilitySection.Rows.Add(new ReportRowDto { Label = $"{item.AccountName} ({item.AccountNumber})", Amount = item.Balance });
-                }
-            }
-            report.Sections.Add(liabilitySection);
-
-            var equitySection = new ReportSectionDto { Title = "Equity", Rows = [], Total = result.TotalEquity };
-            foreach (var s in result.Equity)
-            {
-                foreach (var item in s.Items)
-                {
-                    equitySection.Rows.Add(new ReportRowDto { Label = $"{item.AccountName} ({item.AccountNumber})", Amount = item.Balance });
-                }
-            }
-            report.Sections.Add(equitySection);
+            report.Sections.Add(MapBalanceSheetSection("Assets", result.TotalAssets, result.Assets));
+            report.Sections.Add(MapBalanceSheetSection("Liabilities", result.TotalLiabilities, result.Liabilities));
+            report.Sections.Add(MapBalanceSheetSection("Equity", result.TotalEquity, result.Equity));
 
             return report;
         }
 
         return null;
+    }
+
+    private static ReportSectionDto MapIncomeStatementSection(string title, decimal total, List<IncomeStatementSection> sections)
+    {
+        var sectionDto = new ReportSectionDto { Title = title, Rows = [], Total = total };
+        foreach (var s in sections)
+        {
+            foreach (var item in s.Items)
+            {
+                sectionDto.Rows.Add(new ReportRowDto { Label = $"{item.AccountName} ({item.AccountNumber})", Amount = item.Amount });
+            }
+        }
+        return sectionDto;
+    }
+
+    private static ReportSectionDto MapBalanceSheetSection(string title, decimal total, List<BalanceSheetSection> sections)
+    {
+        var sectionDto = new ReportSectionDto { Title = title, Rows = [], Total = total };
+        foreach (var s in sections)
+        {
+            foreach (var item in s.Items)
+            {
+                sectionDto.Rows.Add(new ReportRowDto { Label = $"{item.AccountName} ({item.AccountNumber})", Amount = item.Balance });
+            }
+        }
+        return sectionDto;
     }
 
     #region Downstream Models

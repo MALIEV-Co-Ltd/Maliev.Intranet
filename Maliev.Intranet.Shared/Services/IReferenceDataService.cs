@@ -1,4 +1,5 @@
 namespace Maliev.Intranet.Shared.Services;
+using Maliev.Intranet.Shared.Dtos;
 
 /// <summary>
 /// Service interface for accessing reference data.
@@ -9,6 +10,11 @@ public interface IReferenceDataService
     /// Gets all countries.
     /// </summary>
     Task<List<CountryDto>> GetCountriesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates a country name.
+    /// </summary>
+    Task<CountryDto?> UpdateCountryAsync(string code, string name, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Searches for Thai locations by query.

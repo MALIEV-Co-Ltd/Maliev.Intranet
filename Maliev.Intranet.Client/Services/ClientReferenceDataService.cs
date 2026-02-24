@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Shared.Services;
 
 namespace Maliev.Intranet.Client.Services;
@@ -37,6 +38,29 @@ public class ClientReferenceDataService : IReferenceDataService
         {
             _logger.LogError(ex, "Error loading countries from BFF");
             return new List<CountryDto>();
+        }
+    }
+
+    /// <summary>
+    /// Updates a country name via the BFF API.
+    /// </summary>
+    public async Task<CountryDto?> UpdateCountryAsync(string code, string name, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var payload = new { Name = name };
+            var response = await _httpClient.PatchAsJsonAsync($"api/ReferenceData/countries/{code}", payload, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<CountryDto>(cancellationToken);
+            }
+            _logger.LogError("Failed to update country {Code}. Status: {StatusCode}", code, response.StatusCode);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating country {Code}", code);
+            return null;
         }
     }
 

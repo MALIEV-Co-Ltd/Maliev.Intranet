@@ -113,13 +113,15 @@
     private void OnSupplierChanged(SupplierSummaryDto supplier)
     {
         _selectedSupplier = supplier;
-        // In a real app, we'd map Guid to int if needed, but here we'll just use a placeholder int for the MVP 
-        // since the service expects int but SupplierService uses Guid.
+        // The purchase order service expects an integer ID, but SupplierService uses Guids.
+        // For the current MVP, we use 1 as a placeholder until the ID mapping is implemented.
         _model.SupplierID = 1; 
     }
 
     private void AddItem()
     {
+        // The purchase order service expects an integer MaterialID, but MaterialService uses Guids.
+        // For the current MVP, we use 1 as a placeholder until the ID mapping is implemented.
         _model.Items.Add(new PurchaseOrderLineItemDto { MaterialID = 1, Quantity = 1, UnitPrice = 0 });
     }
 

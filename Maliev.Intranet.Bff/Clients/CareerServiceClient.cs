@@ -6,7 +6,8 @@ namespace Maliev.Intranet.Bff.Clients;
 /// Client for interacting with the Career microservice for recruitment data.
 /// </summary>
 /// <param name="httpClient">The HTTP client instance.</param>
-public class CareerServiceClient(HttpClient httpClient)
+/// <param name="logger">The logger instance.</param>
+public class CareerServiceClient(HttpClient httpClient, ILogger<CareerServiceClient> logger)
 {
     /// <summary>
     /// Retrieves active job postings from the Career service.
@@ -40,8 +41,9 @@ public class CareerServiceClient(HttpClient httpClient)
                 Offer = element.TryGetProperty("positionsFilled", out var pf) ? pf.GetInt32() : 0
             };
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogError(ex, "Failed to get recruitment stats.");
             return null;
         }
     }

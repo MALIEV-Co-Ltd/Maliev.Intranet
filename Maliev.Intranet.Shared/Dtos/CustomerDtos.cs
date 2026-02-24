@@ -976,6 +976,8 @@ public class CompanyResponse
     public string? ContactEmail { get; set; }
     /// <summary>Gets or sets the contact phone.</summary>
     public string? ContactPhone { get; set; }
+    /// <summary>Gets or sets the website URL.</summary>
+    public string? WebsiteUrl { get; set; }
     /// <summary>Gets or sets the main contact ID.</summary>
     public Guid? MainContactId { get; set; }
     /// <summary>Gets or sets the main contact name.</summary>
@@ -984,6 +986,14 @@ public class CompanyResponse
     public string Segment { get; set; } = string.Empty;
     /// <summary>Gets or sets the tier.</summary>
     public string Tier { get; set; } = string.Empty;
+    /// <summary>Gets or sets whether company is verified from BDEX.</summary>
+    public bool IsVerifiedFromBdex { get; set; }
+    /// <summary>Gets or sets the current year purchase value (THB).</summary>
+    public decimal CurrentYearPurchaseValue { get; set; }
+    /// <summary>Gets or sets the current year order count.</summary>
+    public int CurrentYearOrderCount { get; set; }
+    /// <summary>Gets or sets when tier was last calculated.</summary>
+    public DateTime? TierCalculatedAt { get; set; }
     /// <summary>Gets or sets the creation timestamp.</summary>
     public DateTime CreatedAt { get; set; }
     /// <summary>Gets or sets the last update timestamp.</summary>
@@ -1013,6 +1023,8 @@ public class CompanySummaryDto
     public Guid? MainContactId { get; set; }
     /// <summary>Gets or sets the main contact name.</summary>
     public string? MainContactName { get; set; }
+    /// <summary>Gets or sets the main contact email.</summary>
+    public string? MainContactEmail { get; set; }
     /// <summary>Gets or sets the segment.</summary>
     public string Segment { get; set; } = string.Empty;
     /// <summary>Gets or sets the tier.</summary>

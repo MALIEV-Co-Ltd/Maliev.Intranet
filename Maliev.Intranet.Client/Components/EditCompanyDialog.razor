@@ -1,6 +1,8 @@
 @using Maliev.Intranet.Shared
+@using System.Security.Claims
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <MudDialog>
     <TitleContent>
@@ -17,47 +19,85 @@
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
                               Required="true"
-                              RequiredError="Company name is required" />
+                              RequiredError="Company name is required"
+                              Disabled="@(!_canEditBasicInfo)"
+                              HelperText="@(_canEditBasicInfo ? "" : "Contact admin to change company name")" />
 
-                <MudTextField Label="Contact Email"
+                <MudTextField Label="Company Email"
                               @bind-Value="_model.ContactEmail"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
-                              InputType="InputType.Email" />
+                              InputType="InputType.Email"
+                              Disabled="@(!_canEditBasicInfo)"
+                              HelperText="@(_canEditBasicInfo ? "Primary contact email for the company" : "Contact admin to change company email")" />
 
-                <MudTextField Label="Contact Phone"
+                <MudTextField Label="Company Phone"
                               @bind-Value="_model.ContactPhone"
                               Variant="Variant.Outlined"
-                              Margin="Margin.Dense" />
+                              Margin="Margin.Dense"
+                              Disabled="@(!_canEditBasicInfo)"
+                              HelperText="@(_canEditBasicInfo ? "" : "Contact admin to change company phone")" />
+
+                <MudTextField Label="Website"
+                              @bind-Value="_model.WebsiteUrl"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Placeholder="https://example.com"
+                              Disabled="@(!_canEditBasicInfo)" />
 
                 <MudGrid>
                     <MudItem xs="6">
-                        <MudSelect T="string" Label="Segment" @bind-Value="_model.Segment" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelect T="string" Label="Segment" @bind-Value="_model.Segment" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(!_canEditBasicInfo)">
                             <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
-                            <MudSelectItem Value="@("Corporate")">Corporate</MudSelectItem>
-                            <MudSelectItem Value="@("SME")">SME</MudSelectItem>
+                            <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
                             <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
                             <MudSelectItem Value="@("Government")">Government</MudSelectItem>
                         </MudSelect>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudSelect T="string" Label="Tier" @bind-Value="_model.Tier" Variant="Variant.Outlined" Margin="Margin.Dense">
-                            <MudSelectItem Value="@("Bronze")">Bronze</MudSelectItem>
+                        <MudSelect T="string" Label="Tier" @bind-Value="_model.Tier" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(!_canEditTier)">
+                            <MudSelectItem Value="@("Class")">Class</MudSelectItem>
                             <MudSelectItem Value="@("Silver")">Silver</MudSelectItem>
                             <MudSelectItem Value="@("Gold")">Gold</MudSelectItem>
-                            <MudSelectItem Value="@("Platinum")">Platinum</MudSelectItem>
-                            <MudSelectItem Value="@("Tier1")">Tier 1</MudSelectItem>
-                            <MudSelectItem Value="@("Tier2")">Tier 2</MudSelectItem>
-                            <MudSelectItem Value="@("Tier3")">Tier 3</MudSelectItem>
                         </MudSelect>
+                        @if (!_canEditTier)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tier is automatically calculated based on yearly purchase value</MudText>
+                        }
                     </MudItem>
                 </MudGrid>
+
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudTextField Value="@Company.VatNumber"
+                                      Label="Tax ID (VAT)"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      ReadOnly="true"
+                                      Disabled="true" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField Value="@Company.RegistrationNumber"
+                                      Label="Registration Number"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      ReadOnly="true"
+                                      Disabled="true" />
+                    </MudItem>
+                </MudGrid>
+
+                @if (Company.IsVerifiedFromBdex)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined">
+                        This company has been verified from the government registry. Core information cannot be modified.
+                    </MudAlert>
+                }
             </MudStack>
         </MudForm>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel" Disabled="_isSaving">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="!_isValid || _isSaving">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="!_isValid || _isSaving || (!_canEditBasicInfo && !_canEditTier)">
             @if (_isSaving)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
@@ -74,21 +114,41 @@
     private MudForm _form = default!;
     private bool _isValid;
     private bool _isSaving;
+    private bool _canEditBasicInfo;
+    private bool _canEditTier;
 
     private CreateCompanyRequest _model = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        await CheckPermissions();
+        
         _model = new CreateCompanyRequest
         {
             Name = Company.Name,
             ContactEmail = Company.ContactEmail,
             ContactPhone = Company.ContactPhone,
+            WebsiteUrl = Company.WebsiteUrl,
             Segment = Company.Segment,
             Tier = Company.Tier,
             VatNumber = Company.VatNumber,
             RegistrationNumber = Company.RegistrationNumber
         };
+    }
+
+    private async Task CheckPermissions()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        
+        _canEditBasicInfo = user.HasClaim(c => c.Type == "permissions" && c.Value == "customer.companies.write");
+        _canEditTier = user.HasClaim(c => c.Type == "permissions" && c.Value == "customer.companies.manage-tier");
+        
+        if (!_canEditBasicInfo && !_canEditTier)
+        {
+            _canEditBasicInfo = user.HasClaim(c => c.Type == "permission" && c.Value == "customer.companies.write");
+            _canEditTier = user.HasClaim(c => c.Type == "permission" && c.Value == "customer.companies.manage-tier");
+        }
     }
 
     private void Cancel() => MudDialog.Cancel();

@@ -39,6 +39,17 @@ public static class MalievPermissions
             /// <summary>Permission to write customer profiles.</summary>
             public const string Write = "customer.profile.write";
         }
+
+        /// <summary>Company management permissions.</summary>
+        public static class Companies
+        {
+            /// <summary>Permission to write company data (basic info, addresses, contacts).</summary>
+            public const string Write = "customer.companies.write";
+            /// <summary>Permission to manage company tier (promotion/demotion).</summary>
+            public const string ManageTier = "customer.companies.manage-tier";
+            /// <summary>Permission to manage company documents.</summary>
+            public const string Documents = "customer.companies.documents";
+        }
     }
 
     /// <summary>Order management permissions.</summary>

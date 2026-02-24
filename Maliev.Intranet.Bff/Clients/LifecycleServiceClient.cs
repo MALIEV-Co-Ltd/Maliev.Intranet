@@ -27,7 +27,9 @@ public interface ILifecycleServiceClient
 /// <summary>
 /// Default implementation of the lifecycle service client.
 /// </summary>
-public class LifecycleServiceClient(HttpClient httpClient) : ILifecycleServiceClient
+/// <param name="httpClient">The HTTP client instance.</param>
+/// <param name="logger">The logger instance.</param>
+public class LifecycleServiceClient(HttpClient httpClient, ILogger<LifecycleServiceClient> logger) : ILifecycleServiceClient
 {
     /// <inheritdoc />
     public async Task<PagedResponse<OnboardingSummaryDto>?> GetOnboardingsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
@@ -71,8 +73,9 @@ public class LifecycleServiceClient(HttpClient httpClient) : ILifecycleServiceCl
                 }
             };
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogError(ex, "Failed to retrieve and map onboardings.");
             return new PagedResponse<OnboardingSummaryDto>();
         }
     }

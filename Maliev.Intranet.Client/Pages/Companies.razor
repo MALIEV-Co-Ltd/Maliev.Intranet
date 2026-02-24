@@ -49,7 +49,7 @@ else
                 <PropertyColumn Property="x => x.VatNumber" Title="VAT #" />
                 <TemplateColumn Title="Email" SortBy="x => x.ContactEmail">
                     <CellTemplate>
-                        <MudText Typo="Typo.body2">@(context.Item.ContactEmail ?? "N/A")</MudText>
+                        <MudText Typo="Typo.body2">@(context.Item.ContactEmail ?? context.Item.MainContactEmail ?? "N/A")</MudText>
                     </CellTemplate>
                 </TemplateColumn>
                 <PropertyColumn Property="x => x.Segment" Title="Segment" />
