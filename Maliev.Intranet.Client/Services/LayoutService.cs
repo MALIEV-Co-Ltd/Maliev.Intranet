@@ -1,15 +1,21 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Http;
 using Microsoft.JSInterop;
 
 namespace Maliev.Intranet.Client.Services;
 
+/// <summary>
+/// Defines the available theme modes for the application.
+/// </summary>
 public enum ThemeMode
 {
+    /// <summary>Follow the system's preferred color scheme.</summary>
     System,
+    /// <summary>Always use the light theme.</summary>
     Light,
+    /// <summary>Always use the dark theme.</summary>
     Dark
 }
+
 
 /// <summary>
 /// Service to manage the application layout and theme state with zero-flash persistence.
@@ -29,38 +35,31 @@ public class LayoutService : IDisposable
     /// Initializes a new instance of the <see cref="LayoutService"/> class.
     /// </summary>
     /// <param name="jsRuntime">The JS runtime for theme persistence.</param>
-    /// <param name="state">The persistent component state to hydrate from server.</param>
     /// <param name="logger">The logger instance.</param>
-    /// <param name="httpContextAccessor">HTTP context accessor for reading cookies during SSR (optional).</param>
+    /// <param name="initialTheme">The initial theme mode from cookies (optional, used during SSR).</param>
+    /// <param name="initialSystemDark">The initial system dark preference (optional, used during SSR).</param>
     public LayoutService(
         IJSRuntime jsRuntime,
         ILogger<LayoutService> logger,
-        IHttpContextAccessor? httpContextAccessor = null)
+        string? initialTheme = null,
+        bool? initialSystemDark = null)
+
     {
         _jsRuntime = jsRuntime;
         _logger = logger;
 
-        // CRITICAL FIX: Read theme from cookie during SSR to prevent flash
-        // This ensures the initial render has the correct theme
-        var context = httpContextAccessor?.HttpContext;
-        if (context != null)
+        if (initialTheme != null)
         {
-            var cookieValue = context.Request.Cookies[ThemeCookieName];
-            var systemDarkHint = context.Request.Cookies["maliev_system_dark"];
-
-            if (!string.IsNullOrEmpty(cookieValue))
+            _currentMode = initialTheme switch
             {
-                _currentMode = cookieValue switch
-                {
-                    "dark" => ThemeMode.Dark,
-                    "light" => ThemeMode.Light,
-                    _ => ThemeMode.System
-                };
-            }
+                "dark" => ThemeMode.Dark,
+                "light" => ThemeMode.Light,
+                _ => ThemeMode.System
+            };
 
-            if (bool.TryParse(systemDarkHint, out var isDark))
+            if (initialSystemDark.HasValue)
             {
-                _systemPreferencesIsDark = isDark;
+                _systemPreferencesIsDark = initialSystemDark.Value;
             }
 
             CalculateEffectiveTheme();

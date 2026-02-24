@@ -4,12 +4,14 @@
 
 @using Maliev.Intranet.Client.Services
 @using Maliev.Intranet.Client.Components
+@using Maliev.Intranet.Shared.Dtos
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LayoutService LayoutService
     @inject ChatService ChatService
     @inject IJSRuntime JSRuntime
     @inject ILogger<MainLayout> Logger
+    @inject HttpClient Http
 @implements IAsyncDisposable
 
 <MudThemeProvider @ref="@_mudThemeProvider" 
@@ -190,7 +192,7 @@
                         <Authorized>
                             <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" LockScroll="true">
                                 <ActivatorContent>
-                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="cursor-pointer ml-1">
+                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="cursor-pointer ml-1" @onclick="@context.ToggleAsync">
                                         <MudAvatar Style="height:40px; width:40px; font-size:1.1rem;">
                                             @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
                                             {
@@ -202,9 +204,8 @@
                                             }
                                         </MudAvatar>
                                          <MudStack Spacing="0" AlignItems="AlignItems.End" Class="d-none d-md-flex profile-name-stack pl-1">
-                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@auth.User.Identity?.Name</MudText>
-                                            <!-- TODO: Repalce the Managing Director with actual job position -->
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Managing Director</MudText>
+                                             <MudText Typo="Typo.body2" Style="font-weight: 600;">@auth.User.Identity?.Name</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@(_employeeProfile?.JobTitle ?? "Employee")</MudText>
                                          </MudStack>
                                         <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" Color="Color.Secondary" Class="d-none d-md-flex" />
                                     </MudStack>
@@ -365,6 +366,7 @@
     private MudThemeProvider _mudThemeProvider = null!;
     private string _searchString = "";
     private List<BreadcrumbItem> _breadcrumbs = new();
+    private EmployeeDetailDto? _employeeProfile;
 
     private DialogOptions _searchDialogOptions = new() { FullWidth = true, MaxWidth = MaxWidth.Small };
 
@@ -466,6 +468,19 @@
             StateHasChanged();
 
             var authState = await AuthStateTask;
+            if (authState.User.Identity?.IsAuthenticated == true)
+            {
+                try
+                {
+                    _employeeProfile = await Http.GetFromJsonAsync<EmployeeDetailDto>("api/employees/me");
+                    StateHasChanged();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning("Failed to load employee profile for Appbar: {Message}", ex.Message);
+                }
+            }
+
             if (authState.User.Identity?.IsAuthenticated == true && OperatingSystem.IsBrowser())
             {
                 try

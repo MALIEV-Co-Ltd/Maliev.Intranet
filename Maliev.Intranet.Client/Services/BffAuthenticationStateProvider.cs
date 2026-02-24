@@ -5,16 +5,25 @@ using System.Security.Claims;
 
 namespace Maliev.Intranet.Client.Services;
 
+/// <summary>
+/// Authentication state provider that integrates with the BFF.
+/// </summary>
 public class BffAuthenticationStateProvider : AuthenticationStateProvider
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BffAuthenticationStateProvider"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client.</param>
     public BffAuthenticationStateProvider(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
+    /// <inheritdoc />
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
+
     {
         try
         {

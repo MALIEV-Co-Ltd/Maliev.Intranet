@@ -5,35 +5,58 @@ using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Client.Services;
 
+/// <summary>
+/// Represents a message in the chat interface.
+/// </summary>
 public class ChatMessage
 {
+    /// <summary>Gets or sets the message text.</summary>
     public string Text { get; set; } = "";
+    /// <summary>Gets or sets a value indicating whether the message was sent by the user.</summary>
     public bool IsUser { get; set; }
+    /// <summary>Gets or sets the contextual path where the message was sent.</summary>
     public string? Context { get; set; }
+    /// <summary>Gets or sets the message timestamp.</summary>
     public DateTime Timestamp { get; set; } = DateTime.Now;
+    /// <summary>Gets or sets suggested follow-up actions.</summary>
     public List<BffSuggestedAction>? SuggestedActions { get; set; }
+    /// <summary>Gets or sets the collection of thinking steps for this message.</summary>
     public List<ThinkingStepDto> ThinkingSteps { get; set; } = new();
+    /// <summary>Gets or sets a value indicating whether the message is still being processed.</summary>
     public bool IsProcessing { get; set; }
 }
 
+/// <summary>
+/// Service for managing chat interactions and real-time updates.
+/// </summary>
 public class ChatService : IAsyncDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly NavigationManager _navigationManager;
     private HubConnection? _hubConnection;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ChatService"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client.</param>
+    /// <param name="navigationManager">The navigation manager.</param>
     public ChatService(HttpClient httpClient, NavigationManager navigationManager)
     {
         _httpClient = httpClient;
         _navigationManager = navigationManager;
     }
 
+    /// <summary>Gets the list of messages in the current session.</summary>
     public List<ChatMessage> Messages { get; } = new();
+    /// <summary>Gets the active session identifier.</summary>
     public Guid? SessionId { get; private set; }
+    /// <summary>Gets a value indicating whether a request is currently in progress.</summary>
     public bool IsLoading { get; private set; }
+    /// <summary>Gets a value indicating whether the SignalR connection is active.</summary>
     public bool IsSignalRConnected => _hubConnection?.State == HubConnectionState.Connected;
 
     private string _currentContext = "/";
+    /// <summary>Gets or sets the current UI context path.</summary>
     public string CurrentContext
     {
         get => _currentContext;
@@ -47,8 +70,15 @@ public class ChatService : IAsyncDisposable
         }
     }
 
+    /// <summary>Event raised when the service state has changed.</summary>
     public event Action? OnChange;
 
+    /// <summary>
+    /// Adds a message to the chat history.
+    /// </summary>
+    /// <param name="text">The message text.</param>
+    /// <param name="isUser">True if sent by user, false if by assistant.</param>
+    /// <param name="suggestedActions">Optional suggested actions.</param>
     public void AddMessage(string text, bool isUser, List<BffSuggestedAction>? suggestedActions = null)
     {
         Messages.Add(new ChatMessage
@@ -159,6 +189,8 @@ public class ChatService : IAsyncDisposable
     /// Sends a message through the BFF to the ChatbotService.
     /// Uses the streaming endpoint when SignalR is connected.
     /// </summary>
+    /// <param name="text">The message text to send.</param>
+    /// <returns>The response from the assistant.</returns>
     public async Task<BffChatMessageResponse?> SendMessageAsync(string text)
     {
         if (!SessionId.HasValue)
@@ -240,7 +272,8 @@ public class ChatService : IAsyncDisposable
 
     private void NotifyStateChanged() => OnChange?.Invoke();
 
-    public async ValueTask DisposeAsync()
+    /// <inheritdoc />
+    public async Task DisposeAsync()
     {
         if (_hubConnection != null)
         {
@@ -248,5 +281,11 @@ public class ChatService : IAsyncDisposable
             await _hubConnection.DisposeAsync();
             _hubConnection = null;
         }
+    }
+
+    /// <inheritdoc />
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        await DisposeAsync();
     }
 }
