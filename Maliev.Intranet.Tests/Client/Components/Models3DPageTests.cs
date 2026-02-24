@@ -13,12 +13,14 @@ using Microsoft.JSInterop;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the Models3D page component.</summary>
 public class Models3DPageTests : BunitContext, IAsyncLifetime
 {
     private readonly Mock<ISnackbar> _snackbarMock = new();
     private readonly Mock<IDialogService> _dialogMock = new();
     private readonly MockHttpMessageHandler _httpHandler = new();
 
+    /// <summary>Initializes a new instance of the <see cref="Models3DPageTests"/> class.</summary>
     public Models3DPageTests()
     {
         Services.AddMudServices();
@@ -33,10 +35,13 @@ public class Models3DPageTests : BunitContext, IAsyncLifetime
         Render<MudPopoverProvider>();
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that an empty state message is shown when no models are available.</summary>
     public void ShouldShowEmptyState_WhenNoModels()
     {
         // Arrange
@@ -52,6 +57,7 @@ public class Models3DPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    /// <summary>Verifies that model cards are shown when model data exists.</summary>
     public void ShouldShowModels_WhenDataExists()
     {
         // Arrange

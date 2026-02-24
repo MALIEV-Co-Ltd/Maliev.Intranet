@@ -1,6 +1,7 @@
 @page "/sales/quotations"
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Client.Components
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -17,7 +18,9 @@
                       AdornmentIcon="@Icons.Material.Filled.Search"
                       Variant="Variant.Outlined" 
                       Margin="Margin.Dense" 
-                      Style="max-width: 400px;" />
+                      Style="max-width: 400px;" 
+                      Immediate="true"
+                      DebounceInterval="300" />
         
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -29,7 +32,7 @@
 </MudPaper>
 
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-0" Class="border-b mud-border-lines-default">
+    <MudTabs Elevation="0" Rounded="false" TabPanelsClass="pa-0" Class="border-b mud-border-lines-default">
         <MudTabPanel Text="All" Icon="@Icons.Material.Outlined.List" />
         <!-- Badge logic removed for now as it requires complex counting or separate API -->
         <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" />
@@ -51,6 +54,7 @@
     {
         <MudDataGrid T="QuotationSummaryDto" 
                      Items="@_quotations" 
+                     QuickFilter="@_quickFilter"
                      Dense="true" 
                      Hover="true" 
                      Striped="false"
@@ -59,7 +63,11 @@
                 <PropertyColumn Property="x => x.QuotationNumber" Title="Quote #" />
                 <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
                 <PropertyColumn Property="x => x.CreatedAt" Title="Created" Format="dd MMM yyyy" />
-                <PropertyColumn Property="x => x.Total" Title="Total" Format="C2" />
+                <TemplateColumn Title="Total">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2">@ThaiCurrency.Format(context.Item.Total, 2)</MudText>
+                    </CellTemplate>
+                </TemplateColumn>
                 <TemplateColumn Title="Actions" Sortable="false">
                     <CellTemplate>
                         <MudStack Row="true" Spacing="1">
@@ -84,6 +92,20 @@
     private string _searchString = "";
     private List<QuotationSummaryDto> _quotations = new();
 
+    private Func<QuotationSummaryDto, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.QuotationNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (x.CustomerName.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+
     protected override async Task OnInitializedAsync()
     {
         try 
@@ -94,9 +116,23 @@
                 _quotations = response.Data.ToList();
             }
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
-            Snackbar.Add($"Error loading quotations: {ex.Message}", Severity.Error);
+            var message = ex.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Forbidden => "You do not have permission to view quotations.",
+                System.Net.HttpStatusCode.Unauthorized => "Your session has expired. Please log in again.",
+                System.Net.HttpStatusCode.NotFound => "Quotation data could not be found.",
+                System.Net.HttpStatusCode.ServiceUnavailable => "The quotation service is currently unavailable. Please try again later.",
+                System.Net.HttpStatusCode.GatewayTimeout => "The request timed out. Please try again.",
+                not null => $"Failed to load quotations (HTTP {(int)ex.StatusCode}).",
+                _ => "Failed to load quotations. Please try again."
+            };
+            Snackbar.Add(message, Severity.Error);
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("An unexpected error occurred while loading quotations.", Severity.Error);
         }
         finally
         {
@@ -124,7 +160,7 @@
 
     private async Task DeleteQuotation(QuotationSummaryDto quotation)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Delete Quotation", 
             $"Are you sure you want to delete {quotation.QuotationNumber}?", 
             yesText: "Delete", cancelText: "Cancel");

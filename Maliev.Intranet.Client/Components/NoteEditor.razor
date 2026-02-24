@@ -10,7 +10,8 @@
     <MudToolBar Dense="true" Class="note-editor-toolbar gap-2">
         <MudIconButton Icon="@(_isEditing ? Icons.Material.Filled.Visibility : Icons.Material.Filled.Edit)"
                        Size="Size.Small"
-                       OnClick="() => SetEditMode(!_isEditing)" />
+                       OnClick="() => SetEditMode(!_isEditing)"
+                       Class="ms-3" />
         @if (_isEditing)
         {
             <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
@@ -44,7 +45,6 @@
                           Lines="@(Compact ? 6 : 10)"
                           Variant="Variant.Text"
                           Placeholder="Enter note content... Markdown is supported."
-                          AutoGrow="true"
                           Immediate="true"
                           Counter="5000"
                           MaxLength="5000"

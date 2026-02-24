@@ -12,10 +12,12 @@ using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the ChatDrawer component.</summary>
 public class ChatDrawerTests : BunitContext, IAsyncLifetime
 {
     private readonly Mock<AuthenticationStateProvider> _authMock = new();
 
+    /// <summary>Initializes a new instance of the <see cref="ChatDrawerTests"/> class.</summary>
     public ChatDrawerTests()
     {
         Services.AddMudServices();
@@ -33,10 +35,13 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
             .ReturnsAsync(new AuthenticationState(new System.Security.Claims.ClaimsPrincipal()));
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that an unavailable message is shown when the health check fails.</summary>
     public void ShouldShowUnavailable_WhenHealthCheckFails()
     {
         // Arrange: health check returns 500
@@ -60,6 +65,7 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    /// <summary>Verifies that the chat interface is shown when the health check succeeds.</summary>
     public void ShouldShowChat_WhenHealthCheckSucceeds()
     {
         // Arrange: health check returns success

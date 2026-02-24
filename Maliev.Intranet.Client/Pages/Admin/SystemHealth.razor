@@ -42,7 +42,7 @@
                         <div class="d-flex flex-column gap-2">
                             <div class="d-flex justify-space-between">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
-                                <MudText Typo="Typo.caption" Style="@($"color: {GetServiceStatusColor(service.Status).ToDescriptionString()}; font-weight: 700;")">
+                                <MudText Typo="Typo.caption" Color="@GetServiceStatusColor(service.Status)" Style="font-weight: 700;">
                                     @service.Status
                                 </MudText>
                             </div>

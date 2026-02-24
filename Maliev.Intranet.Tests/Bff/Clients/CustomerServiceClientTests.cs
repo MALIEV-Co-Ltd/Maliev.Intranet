@@ -8,11 +8,13 @@ using Moq.Protected;
 
 namespace Maliev.Intranet.Tests.Bff.Clients;
 
+/// <summary>Tests for the customer service client.</summary>
 public class CustomerServiceClientTests
 {
     private readonly Mock<HttpMessageHandler> _httpMessageHandlerMock;
     private readonly CustomerServiceClient _client;
 
+    /// <summary>Initializes a new instance of the <see cref="CustomerServiceClientTests"/> class.</summary>
     public CustomerServiceClientTests()
     {
         _httpMessageHandlerMock = new Mock<HttpMessageHandler>();
@@ -24,6 +26,7 @@ public class CustomerServiceClientTests
         _client = new CustomerServiceClient(httpClient, logger);
     }
 
+    /// <summary>Verifies that creating a basic customer works successfully.</summary>
     [Fact]
     public async Task CreateCustomerBasicAsync_ShouldWork()
     {
@@ -57,6 +60,7 @@ public class CustomerServiceClientTests
         Assert.NotNull(result);
     }
 
+    /// <summary>Verifies that getting a customer by ID aggregates data from related services.</summary>
     [Fact]
     public async Task GetCustomerByIdAsync_ShouldAggregateData()
     {
@@ -87,6 +91,7 @@ public class CustomerServiceClientTests
         Assert.Equal("John", result.FirstName);
     }
 
+    /// <summary>Verifies that getting customers returns paged data.</summary>
     [Fact]
     public async Task GetCustomersAsync_ShouldReturnPagedData()
     {
@@ -115,6 +120,7 @@ public class CustomerServiceClientTests
         Assert.Single(result.Data);
     }
 
+    /// <summary>Verifies that updating an address returns true on success.</summary>
     [Fact]
     public async Task UpdateAddressAsync_ShouldReturnTrue()
     {
@@ -130,6 +136,7 @@ public class CustomerServiceClientTests
         Assert.True(result);
     }
 
+    /// <summary>Verifies that deleting a document returns true on success.</summary>
     [Fact]
     public async Task DeleteDocumentAsync_ShouldReturnTrue()
     {
@@ -145,6 +152,7 @@ public class CustomerServiceClientTests
         Assert.True(result);
     }
 
+    /// <summary>Verifies that getting NDA history returns data.</summary>
     [Fact]
     public async Task GetNdaHistoryAsync_ShouldReturnData()
     {

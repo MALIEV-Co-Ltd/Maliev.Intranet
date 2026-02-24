@@ -1,15 +1,215 @@
 @page "/mfg/inventory"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Inventory Management - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
-    <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
-        <MudIcon Icon="@Icons.Material.Outlined.Warehouse" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
-        <MudText Typo="Typo.h4" Align="Align.Center">Inventory Management</MudText>
-        <MudText Typo="Typo.h6" Color="Color.Secondary" Align="Align.Center" Class="mt-2">Coming Soon</MudText>
-        <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center" Class="mt-4" Style="max-width: 600px;">
-            We are working on a comprehensive inventory tracking system for raw materials, finished goods, and consumables.
-        </MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-8" Href="/">Back to Dashboard</MudButton>
-    </MudPaper>
-</MudContainer>
+<MudText Typo="Typo.h4" Class="mb-4">Inventory Management</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-4">Materials Stock</MudText>
+            
+            @if (_isLoading)
+            {
+                @for (int i = 0; i < 5; i++)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2 rounded" />
+                }
+            }
+            else
+            {
+                <MudList T="MaterialSummaryDto" Dense="true" SelectedValue="_selectedMaterial">
+                    @foreach (var material in _materials)
+                    {
+                        <MudListItem T="MaterialSummaryDto" Value="material" OnClick="@(() => OnMaterialSelected(material))">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">@material.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@material.Code</MudText>
+                                </div>
+                                <div class="text-end">
+                                    @{
+                                        _materialStatus.TryGetValue(material.Id, out var status);
+                                    }
+                                    @if (status != null)
+                                    {
+                                        <MudText Typo="Typo.body2" Color="@(status.HasLowStockAlert ? Color.Error : Color.Default)">
+                                            @status.TotalRemainingGrams.ToString("N0") g
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @status.ActiveBatches batches
+                                        </MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">No stock data</MudText>
+                                    }
+                                </div>
+                            </MudStack>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        @if (_selectedMaterial != null)
+        {
+            <MudStack Spacing="3">
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                        <div>
+                            <MudText Typo="Typo.h5">@_selectedMaterial.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Batch Management</MudText>
+                        </div>
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary" 
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="OpenAddBatchDialog">
+                            Register New Batch
+                        </MudButton>
+                    </MudStack>
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Active Batches</MudText>
+                    @if (_isDetailsLoading)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="100px" Class="rounded" />
+                    }
+                    else if (!_batches.Any())
+                    {
+                        <MudAlert Severity="Severity.Info">No active batches for this material.</MudAlert>
+                    }
+                    else
+                    {
+                        <MudSimpleTable Hover="true" Dense="true" Elevation="0" Class="border mud-border-lines-default rounded">
+                            <thead>
+                                <tr>
+                                    <th>Batch ID</th>
+                                    <th>Received</th>
+                                    <th>Remaining</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var batch in _batches)
+                                {
+                                    <tr>
+                                        <td><code>@batch.Id.ToString()[..8]</code></td>
+                                        <td>@batch.ReceivedAt.ToString("d MMM yyyy")</td>
+                                        <td>
+                                            <MudProgressLinear Color="@GetBatchColor(batch)" Value="@((double)(batch.RemainingWeightGrams / batch.InitialWeightGrams * 100))" Class="my-2" />
+                                            @batch.RemainingWeightGrams.ToString("N1") / @batch.InitialWeightGrams.ToString("N1") g
+                                        </td>
+                                        <td>@batch.Location</td>
+                                        <td><MudChip T="string" Size="Size.Small" Color="@GetStatusColor(batch.Status)">@batch.Status</MudChip></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </MudPaper>
+
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Usage Policy</MudText>
+                    <MudText Typo="Typo.body2">
+                        MALIEV follows a <strong>FIFO (First-In-First-Out)</strong> material deduction policy. 
+                        Stock is passively estimated based on calculated print volumes plus a 10% safety margin.
+                    </MudText>
+                </MudPaper>
+            </MudStack>
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
+                <MudIcon Icon="@Icons.Material.Outlined.Inventory2" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Select a material to manage inventory</MudText>
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isDetailsLoading = false;
+    private List<MaterialSummaryDto> _materials = new();
+    private MaterialSummaryDto? _selectedMaterial;
+    private Dictionary<Guid, MaterialStatusSummary> _materialStatus = new();
+    private List<InventoryBatchDto> _batches = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var materialsResponse = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>("api/materials");
+            _materials = materialsResponse?.Data.ToList() ?? new();
+
+            // Load status for each material
+            foreach (var m in _materials)
+            {
+                try {
+                    var status = await Http.GetFromJsonAsync<MaterialStatusSummary>($"api/inventory/materials/{m.Id}/status");
+                    if (status != null) _materialStatus[m.Id] = status;
+                } catch { /* Ignore missing status */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading inventory: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnMaterialSelected(MaterialSummaryDto material)
+    {
+        _selectedMaterial = material;
+        _isDetailsLoading = true;
+        _batches = new();
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<InventoryBatchDto>>($"api/inventory/materials/{material.Id}/batches/active");
+            _batches = response ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading batches: {ex.Message}");
+        }
+        finally
+        {
+            _isDetailsLoading = false;
+        }
+    }
+
+    private void OpenAddBatchDialog()
+    {
+        Snackbar.Add("Add Batch dialog implementation pending", Severity.Info);
+    }
+
+    private Color GetBatchColor(InventoryBatchDto batch)
+    {
+        if (batch.InitialWeightGrams == 0) return Color.Default;
+        var percentage = batch.RemainingWeightGrams / batch.InitialWeightGrams;
+        if (percentage < 0.15m) return Color.Error;
+        if (percentage < 0.40m) return Color.Warning;
+        return Color.Success;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success,
+        "Depleted" => Color.Default,
+        "Reserved" => Color.Info,
+        _ => Color.Default
+    };
+}

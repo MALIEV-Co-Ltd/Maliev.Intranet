@@ -1,12 +1,16 @@
 @page "/admin/reference-data"
+@using Maliev.Intranet.Shared
 @inject Maliev.Intranet.Shared.Services.IReferenceDataService ReferenceDataService
+@inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Reference Data - Maliev Intranet</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Reference Data Management</MudText>
 
 <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-4">
+    <MudTabs Elevation="0" Rounded="false" TabPanelsClass="pa-4">
         <!-- Countries Tab -->
         <MudTabPanel Text="Countries" Icon="@Icons.Material.Outlined.Public">
             @if (_isLoading)
@@ -17,17 +21,17 @@
             {
                 <MudStack Spacing="3">
                     <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudTextField @bind-Value="_searchString" Placeholder="Search countries..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" />
+                        <MudTextField @bind-Value="_searchString" Placeholder="Search countries..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" Immediate="true" />
                         <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Upload">Import CSV</MudButton>
                     </MudStack>
                     
-                    <MudDataGrid T="Maliev.Intranet.Shared.CountryDto" Items="@_countries" Dense="true" Hover="true" Elevation="0">
+                    <MudDataGrid T="CountryDto" Items="@FilteredCountries" Dense="true" Hover="true" Elevation="0">
                         <Columns>
                             <PropertyColumn Property="x => x.Code" Title="Code" />
                             <PropertyColumn Property="x => x.Name" Title="Name" />
                             <TemplateColumn Title="Actions" Sortable="false">
                                 <CellTemplate>
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(async () => await OpenEditCountryDialog(context.Item))" />
                                 </CellTemplate>
                             </TemplateColumn>
                         </Columns>
@@ -45,7 +49,7 @@
             else
             {
                 <MudStack Spacing="3">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Add Currency</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddCurrencyDialog">Add Currency</MudButton>
                     
                     <MudDataGrid T="CurrencyDto" Items="@_currencies" Dense="true" Hover="true" Elevation="0">
                         <Columns>
@@ -53,6 +57,11 @@
                             <PropertyColumn Property="x => x.Name" Title="Name" />
                             <PropertyColumn Property="x => x.Symbol" Title="Symbol" />
                             <PropertyColumn Property="x => x.ExchangeRate" Title="Exchange Rate" Format="N4" />
+                            <TemplateColumn Title="Is Active">
+                                <CellTemplate>
+                                    <MudChip T="string" Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)">@(context.Item.IsActive ? "Active" : "Inactive")</MudChip>
+                                </CellTemplate>
+                            </TemplateColumn>
                             <TemplateColumn Title="Actions" Sortable="false">
                                 <CellTemplate>
                                     <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
@@ -66,7 +75,11 @@
 
         <!-- Tax Codes Tab -->
         <MudTabPanel Text="Tax Codes" Icon="@Icons.Material.Outlined.Receipt">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Tax code configuration will appear here</MudText>
+             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">VAT Configuration</MudText>
+                <MudText Typo="Typo.body2">Standard VAT Rate: <strong>7.0%</strong></MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">Tax code management service integration pending.</MudText>
+             </MudPaper>
         </MudTabPanel>
     </MudTabs>
 </MudPaper>
@@ -74,15 +87,21 @@
 @code {
     private bool _isLoading = true;
     private string _searchString = "";
-    private List<Maliev.Intranet.Shared.CountryDto> _countries = new();
+    private List<CountryDto> _countries = new();
     private List<CurrencyDto> _currencies = new();
+
+    private IEnumerable<CountryDto> FilteredCountries => _countries
+        .Where(c => string.IsNullOrWhiteSpace(_searchString) || 
+                    c.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) || 
+                    c.Code.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             _countries = await ReferenceDataService.GetCountriesAsync();
-            _currencies = new();
+            var currencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/reference-data/currencies");
+            _currencies = currencies ?? [];
         }
         catch (Exception ex)
         {
@@ -94,11 +113,34 @@
         }
     }
 
-    public class CurrencyDto
+    private async Task OpenEditCountryDialog(CountryDto country)
     {
-        public string Code { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Symbol { get; set; } = "";
-        public decimal ExchangeRate { get; set; }
+        var parameters = new DialogParameters<EditCountryDialog>
+        {
+            { x => x.Country, country }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditCountryDialog>("Edit Country", parameters, options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            _isLoading = true;
+            _countries = await ReferenceDataService.GetCountriesAsync();
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenAddCurrencyDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddCurrencyDialog>("Add Currency", options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            _isLoading = true;
+            var currencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/reference-data/currencies");
+            _currencies = currencies ?? [];
+            _isLoading = false;
+        }
     }
 }

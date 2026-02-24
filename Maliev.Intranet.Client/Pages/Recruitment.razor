@@ -1,6 +1,8 @@
 @page "/hr/recruitment"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
 @inject HttpClient Http
+@inject IDialogService DialogService
 
 <PageTitle>Recruitment - Maliev Intranet</PageTitle>
 
@@ -11,7 +13,13 @@
         <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg mb-4">
             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
                 <MudText Typo="Typo.h6">Job Postings</MudText>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add">New Job</MudButton>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           Size="Size.Small" 
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="OpenCreateDialog">
+                    New Job
+                </MudButton>
             </MudStack>
             @if (!_isLoading)
             {
@@ -112,6 +120,18 @@
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateJobPostingDialog>("New Job Posting", options);
+        var result = await dialog.Result;
+        
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
         }
     }
 

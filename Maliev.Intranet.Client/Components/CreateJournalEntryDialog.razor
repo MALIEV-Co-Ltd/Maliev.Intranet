@@ -1,0 +1,210 @@
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@using MudBlazor
+@using Maliev.Intranet.Client.Helpers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudStack Spacing="3">
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudDatePicker Label="Entry Date"
+                                       @bind-Date="_entryDate"
+                                       Required="true"
+                                       Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField @bind-Value="_reference"
+                                      Label="Reference (Optional)"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_description"
+                                      Label="Description"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      RequiredError="Description is required"
+                                      Lines="2" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudPaper Elevation="0" Class="pa-3 border mud-border-lines-default rounded-lg">
+                    <MudStack Row="false" Spacing="2">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.h6">Lines</MudText>
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       Size="Size.Small"
+                                       OnClick="AddLine">
+                                Add Line
+                            </MudButton>
+                        </MudStack>
+
+                        @if (_lines.Count == 0)
+                        {
+                            <MudText Color="Color.Secondary">No lines yet. Click "Add Line" to begin.</MudText>
+                        }
+                        else
+                        {
+                            @foreach (var (line, index) in _lines.Select((l, i) => (l, i)))
+                            {
+                                <MudPaper Elevation="1" Class="pa-2">
+                                    <MudGrid Spacing="2">
+                                        <MudItem xs="4">
+                                            <MudTextField @bind-Value="line.AccountCode"
+                                                          Label="Account Code"
+                                                          Variant="Variant.Outlined"
+                                                          Margin="Margin.Dense"
+                                                          Required="true" />
+                                        </MudItem>
+                                        <MudItem xs="4">
+                                            <MudNumericField @bind-Value="line.DebitAmount"
+                                                             Label="Debit"
+                                                             Variant="Variant.Outlined"
+                                                             Margin="Margin.Dense"
+                                                             Format="N2"
+                                                             Min="0m" />
+                                        </MudItem>
+                                        <MudItem xs="3">
+                                            <MudNumericField @bind-Value="line.CreditAmount"
+                                                             Label="Credit"
+                                                             Variant="Variant.Outlined"
+                                                             Margin="Margin.Dense"
+                                                             Format="N2"
+                                                             Min="0m" />
+                                        </MudItem>
+                                        <MudItem xs="1">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                           Color="Color.Error"
+                                                           Size="Size.Small"
+                                                           OnClick="() => RemoveLine(index)" />
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudPaper>
+                            }
+
+                            <MudDivider />
+                            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="4">
+                                <MudText Typo="Typo.body1">
+                                    Total Debit: <strong>@ThaiCurrency.Format(_lines.Sum(l => l.DebitAmount), 2)</strong>
+                                </MudText>
+                                <MudText Typo="Typo.body1">
+                                    Total Credit: <strong>@ThaiCurrency.Format(_lines.Sum(l => l.CreditAmount), 2)</strong>
+                                </MudText>
+                            </MudStack>
+
+                            @if (!IsBalanced())
+                            {
+                                <MudAlert Severity="Severity.Warning">Debits and credits must be equal to post the entry.</MudAlert>
+                            }
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _lines.Count == 0 || !IsBalanced() || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">Creating...</MudText>
+            }
+            else
+            {
+                <text>Create Entry</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+
+    private DateTime? _entryDate = DateTime.Today;
+    private string _description = string.Empty;
+    private string? _reference;
+    private List<JournalLineModel> _lines = new();
+
+    private void AddLine()
+    {
+        _lines.Add(new JournalLineModel());
+    }
+
+    private void RemoveLine(int index)
+    {
+        _lines.RemoveAt(index);
+    }
+
+    private bool IsBalanced()
+    {
+        if (_lines.Count == 0) return false;
+        var totalDebit = _lines.Sum(l => l.DebitAmount);
+        var totalCredit = _lines.Sum(l => l.CreditAmount);
+        return totalDebit > 0 && totalCredit > 0 && Math.Abs(totalDebit - totalCredit) < 0.01m;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid || !IsBalanced()) return;
+
+        _isSubmitting = true;
+        try
+        {
+            var request = new
+            {
+                EntryDate = _entryDate!.Value,
+                Description = _description,
+                Reference = _reference,
+                Lines = _lines.Select(l => new
+                {
+                    AccountCode = l.AccountCode,
+                    DebitAmount = l.DebitAmount,
+                    CreditAmount = l.CreditAmount
+                }).ToList()
+            };
+
+            var response = await Http.PostAsJsonAsync("api/accounting/journal-entries", request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Journal entry created successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to create journal entry: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private class JournalLineModel
+    {
+        public string AccountCode { get; set; } = string.Empty;
+        public decimal DebitAmount { get; set; }
+        public decimal CreditAmount { get; set; }
+    }
+}

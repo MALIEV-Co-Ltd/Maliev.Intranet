@@ -9,7 +9,7 @@
 
 <MudText Typo="Typo.h4" Class="mb-4">Notifications</MudText>
 
-<MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+<MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4">
     <MudTabPanel Text="Templates" Icon="@Icons.Material.Filled.Description">
         <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
@@ -36,7 +36,6 @@
                     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg overflow-hidden">
                         <MudDataGrid T="NotificationTemplateDto" Items="@_templates" Dense="true" Hover="true" Elevation="0" SelectedItemChanged="@OnTemplateSelected">
                             <Columns>
-                                <PropertyColumn Property="x => x.Name" Title="Name" />
                                 <PropertyColumn Property="x => x.TemplateKey" Title="Key" />
                                 <TemplateColumn Title="Channel">
                                     <CellTemplate>
@@ -50,11 +49,9 @@
                                         <MudText Typo="Typo.caption">@context.Item.Language.ToUpper()</MudText>
                                     </CellTemplate>
                                 </TemplateColumn>
-                                <TemplateColumn Title="Status">
+                                <TemplateColumn Title="Version">
                                     <CellTemplate>
-                                        <MudChip T="string" Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)" Variant="Variant.Text">
-                                            @(context.Item.IsActive ? "Active" : "Inactive")
-                                        </MudChip>
+                                        <MudText Typo="Typo.caption">v@context.Item.Version</MudText>
                                     </CellTemplate>
                                 </TemplateColumn>
                             </Columns>
@@ -76,7 +73,6 @@
                         </MudStack>
                         
                         <MudStack Spacing="3">
-                            <MudField Label="Template Name" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.Name</MudField>
                             <MudGrid>
                                 <MudItem xs="6">
                                     <MudField Label="Template Key" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.TemplateKey</MudField>
@@ -91,17 +87,23 @@
                             
                             <MudField Label="Channel" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.ChannelType</MudField>
                             
-                            @if (!string.IsNullOrEmpty(_selectedTemplate.SubjectTemplate))
-                            {
-                                <MudField Label="Subject Template" Variant="Variant.Outlined" Margin="Margin.Dense">@_selectedTemplate.SubjectTemplate</MudField>
-                            }
+                            <MudTextField Label="Content" 
+                                           Value="@_selectedTemplate.ContentTemplate" 
+                                           Variant="Variant.Outlined" 
+                                           Lines="10" 
+                                           ReadOnly="true" 
+                                           Style="font-family: monospace;" />
                             
-                            <MudTextField Label="Body Template" 
-                                          Value="@_selectedTemplate.BodyTemplate" 
-                                          Variant="Variant.Outlined" 
-                                          Lines="10" 
-                                          ReadOnly="true" 
-                                          Style="font-family: monospace;" />
+                            @if (_selectedTemplate.Parameters.Any())
+                            {
+                                <MudText Typo="Typo.subtitle2">Parameters</MudText>
+                                <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1">
+                                    @foreach (var param in _selectedTemplate.Parameters)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@param</MudChip>
+                                    }
+                                </MudStack>
+                            }
                             
                             <MudStack Row="true" Spacing="2">
                                 <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Send">Test Send</MudButton>
@@ -308,9 +310,9 @@
     {
         if (_selectedTemplate == null) return;
 
-        var result = await DialogService.ShowMessageBox(
+        var result = await DialogService.ShowMessageBoxAsync(
             "Delete Template",
-            $"Are you sure you want to delete template '{_selectedTemplate.Name}'?",
+            $"Are you sure you want to delete template '{_selectedTemplate.TemplateKey}'?",
             yesText: "Delete", cancelText: "Cancel");
 
         if (result == true)

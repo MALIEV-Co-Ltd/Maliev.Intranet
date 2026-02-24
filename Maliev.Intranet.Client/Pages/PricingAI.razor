@@ -202,7 +202,7 @@
                 FileId = Guid.Empty, // Ad-hoc calculation
                 CustomerId = Guid.Empty, // Anonymous calculation
                 MaterialId = _selectedMaterial.Id,
-                MaterialCode = _selectedMaterial.SKU,
+                MaterialCode = _selectedMaterial.Code,
                 ManufacturingProcessId = _selectedProcessId,
                 ManufacturingProcessName = ManufacturingProcesses.GetName(_selectedProcessId),
                 Quantity = _quantity,
@@ -251,7 +251,7 @@
             {
                 OrderId = "Ad-Hoc",
                 Technology = ManufacturingProcesses.GetName(_selectedProcessId),
-                MaterialCode = _selectedMaterial.SKU,
+                MaterialCode = _selectedMaterial.Code,
                 CalculatedPrice = _pricingResult.TotalUnitPrice,
                 Status = "Draft"
             };

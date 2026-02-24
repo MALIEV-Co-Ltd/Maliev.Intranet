@@ -29,14 +29,14 @@
             }
 
             <MudFileUpload T="IBrowserFile" Disabled="@_isUploading" FilesChanged="OnFileSelected" Accept=".pdf,.jpg,.jpeg,.png,.webp" MaximumFileCount="1">
-                <ActivatorContent>
+                <CustomContent Context="_">
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.CloudUpload"
                                FullWidth="true">
                         @(_file == null ? "Upload Signed Document" : _file.Name)
                     </MudButton>
-                </ActivatorContent>
+                </CustomContent>
             </MudFileUpload>
 
             @if (_file != null)

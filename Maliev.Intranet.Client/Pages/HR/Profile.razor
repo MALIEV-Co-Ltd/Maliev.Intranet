@@ -25,19 +25,41 @@ else
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                 <MudText Typo="Typo.h6" Class="mb-3">Personal Information</MudText>
                 <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Employee #</MudText>
+                        <MudText Typo="Typo.body1">@_profile.EmployeeNumber</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Nationality</MudText>
+                        <MudText Typo="Typo.body1">@(_profile.Nationality ?? "—")</MudText>
+                    </MudItem>
                     <MudItem xs="12">
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Full Name</MudText>
-                        <MudText Typo="Typo.body1">@_profile.Name</MudText>
+                        <MudText Typo="Typo.body1">@_profile.FullName</MudText>
                     </MudItem>
-                    <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Work Email</MudText>
-                        <MudText Typo="Typo.body1">@_profile.Email</MudText>
-                    </MudItem>
-                    @if (!string.IsNullOrEmpty(_profile.Phone))
+                    @if (!string.IsNullOrEmpty(_profile.PreferredName))
                     {
                         <MudItem xs="12">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Phone</MudText>
-                            <MudText Typo="Typo.body1">@_profile.Phone</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Preferred Name</MudText>
+                            <MudText Typo="Typo.body1">@_profile.PreferredName</MudText>
+                        </MudItem>
+                    }
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Work Email</MudText>
+                        <MudText Typo="Typo.body1">@_profile.WorkEmail</MudText>
+                    </MudItem>
+                    @if (!string.IsNullOrEmpty(_profile.PersonalEmail))
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Personal Email</MudText>
+                            <MudText Typo="Typo.body1">@_profile.PersonalEmail</MudText>
+                        </MudItem>
+                    }
+                    @if (!string.IsNullOrEmpty(_profile.MobilePhone))
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Mobile</MudText>
+                            <MudText Typo="Typo.body1">@_profile.MobilePhone</MudText>
                         </MudItem>
                     }
                 </MudGrid>
@@ -51,15 +73,26 @@ else
                 <MudGrid>
                     <MudItem xs="12">
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Title</MudText>
-                        <MudText Typo="Typo.body1">@(_profile.Title.Length > 0 ? _profile.Title : "—")</MudText>
+                        <MudText Typo="Typo.body1">@(!string.IsNullOrEmpty(_profile.JobTitle) ? _profile.JobTitle : "—")</MudText>
                     </MudItem>
                     <MudItem xs="12">
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Department</MudText>
-                        <MudText Typo="Typo.body1">@(_profile.Department.Length > 0 ? _profile.Department : "—")</MudText>
+                        <MudText Typo="Typo.body1">@(!string.IsNullOrEmpty(_profile.DepartmentName) ? _profile.DepartmentName : "—")</MudText>
                     </MudItem>
-                    <MudItem xs="12">
+                    @if (!string.IsNullOrEmpty(_profile.WorkLocation))
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Work Location</MudText>
+                            <MudText Typo="Typo.body1">@_profile.WorkLocation</MudText>
+                        </MudItem>
+                    }
+                    <MudItem xs="6">
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
-                        <MudChip T="string" Size="Size.Small" Color="@(_profile.Status == "Active" ? Color.Success : Color.Default)">@_profile.Status</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@(_profile.EmploymentStatus == "Active" ? Color.Success : Color.Default)">@_profile.EmploymentStatus</MudChip>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Employment Type</MudText>
+                        <MudText Typo="Typo.body1">@System.Text.RegularExpressions.Regex.Replace(_profile.EmploymentType, "([a-z])([A-Z])", "$1 $2")</MudText>
                     </MudItem>
                     @if (!string.IsNullOrEmpty(_profile.ManagerName))
                     {
@@ -68,21 +101,66 @@ else
                             <MudText Typo="Typo.body1">@_profile.ManagerName</MudText>
                         </MudItem>
                     }
-                    @if (_profile.HireDate.HasValue)
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Start Date</MudText>
+                        <MudText Typo="Typo.body1">@_profile.StartDate.ToString("d MMM yyyy")</MudText>
+                    </MudItem>
+                    @if (_profile.TenureInYears.HasValue)
                     {
-                        <MudItem xs="12">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Start Date</MudText>
-                            <MudText Typo="Typo.body1">@_profile.HireDate.Value.ToString("d MMM yyyy")</MudText>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tenure</MudText>
+                            <MudText Typo="Typo.body1">@_profile.TenureInYears year@(_profile.TenureInYears == 1 ? "" : "s")</MudText>
                         </MudItem>
                     }
                 </MudGrid>
             </MudPaper>
         </MudItem>
 
+        <!-- Edit Personal Details -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.h6" Class="mb-3">Edit Personal Details</MudText>
+                <MudForm @ref="_editForm" @bind-IsValid="@_editFormValid">
+                    <MudStack Spacing="2">
+                        <MudTextField @bind-Value="_editPreferredName"
+                                      Label="Preferred Name"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" />
+                        <MudTextField @bind-Value="_editPersonalEmail"
+                                      Label="Personal Email"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      InputType="InputType.Email" />
+                        <MudTextField @bind-Value="_editMobilePhone"
+                                      Label="Mobile Phone"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" />
+                        <div>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="SavePersonalDetails"
+                                       Disabled="@_isSaving"
+                                       Size="Size.Small">
+                                @if (_isSaving)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                    <MudText Class="ml-2">Saving...</MudText>
+                                }
+                                else
+                                {
+                                    <text>Save Changes</text>
+                                }
+                            </MudButton>
+                        </div>
+                    </MudStack>
+                </MudForm>
+            </MudPaper>
+        </MudItem>
+
         <!-- Emergency Contacts -->
         @if (_profile.EmergencyContacts.Count > 0)
         {
-            <MudItem xs="12">
+            <MudItem xs="12" md="6">
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.h6" Class="mb-3">Emergency Contacts</MudText>
                     <MudSimpleTable Hover="true" Dense="true">
@@ -112,13 +190,26 @@ else
 
 @code {
     private bool _isLoading = true;
+    private bool _isSaving = false;
+    private bool _editFormValid = true;
     private EmployeeDetailDto? _profile;
+    private MudForm _editForm = null!;
+
+    private string? _editPreferredName;
+    private string? _editPersonalEmail;
+    private string? _editMobilePhone;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             _profile = await Http.GetFromJsonAsync<EmployeeDetailDto>("api/employees/me");
+            if (_profile != null)
+            {
+                _editPreferredName = _profile.PreferredName;
+                _editPersonalEmail = _profile.PersonalEmail;
+                _editMobilePhone = _profile.MobilePhone;
+            }
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -132,6 +223,44 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task SavePersonalDetails()
+    {
+        if (_profile == null) return;
+
+        _isSaving = true;
+        try
+        {
+            var patch = new
+            {
+                PreferredName = _editPreferredName,
+                PersonalEmail = _editPersonalEmail,
+                MobilePhone = _editMobilePhone
+            };
+
+            var response = await Http.PatchAsJsonAsync($"api/employees/{_profile.Id}/profile", patch);
+            if (response.IsSuccessStatusCode)
+            {
+                _profile.PreferredName = _editPreferredName;
+                _profile.PersonalEmail = _editPersonalEmail;
+                _profile.MobilePhone = _editMobilePhone;
+                Snackbar.Add("Profile updated successfully", Severity.Success);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to save: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
         }
     }
 }

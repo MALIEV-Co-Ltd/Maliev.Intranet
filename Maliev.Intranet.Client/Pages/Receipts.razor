@@ -1,5 +1,8 @@
 @page "/finance/receipts"
+@using Maliev.Intranet.Shared
 @using Maliev.Intranet.Client.Components
+@using Maliev.Intranet.Client.Helpers
+@inject HttpClient Http
 @inject IDialogService DialogService
 
 <PageTitle>Receipts - Maliev Intranet</PageTitle>
@@ -42,7 +45,11 @@ else
                 <PropertyColumn Property="x => x.ReceiptNumber" Title="Receipt #" />
                 <PropertyColumn Property="x => x.InvoiceNumber" Title="Invoice #" />
                 <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
-                <PropertyColumn Property="x => x.Amount" Title="Amount" Format="C2" />
+                <TemplateColumn Title="Amount">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2">@ThaiCurrency.Format(context.Item.Amount, 2)</MudText>
+                    </CellTemplate>
+                </TemplateColumn>
                 <PropertyColumn Property="x => x.PaymentMethod" Title="Method" />
                 <PropertyColumn Property="x => x.Date" Title="Date" Format="dd MMM yyyy" />
                 <TemplateColumn Title="Actions" Sortable="false">
@@ -68,11 +75,7 @@ else
     {
         try
         {
-            // TODO: Replace with BFF API call
-            // _receipts = await Http.GetFromJsonAsync<List<ReceiptDto>>("api/receipts");
-
-            // Hard-cut to real data structures (database is currently empty)
-            _receipts = new();
+             _receipts = await Http.GetFromJsonAsync<List<ReceiptDto>>("api/receipts") ?? [];
         }
         catch (Exception ex)
         {

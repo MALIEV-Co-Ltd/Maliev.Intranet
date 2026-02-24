@@ -10,11 +10,13 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the UploadModelDialog component.</summary>
 public class UploadDialogTests : BunitContext, IAsyncLifetime
 {
     private readonly Mock<ISnackbar> _snackbarMock = new();
     private readonly Mock<IMudDialogInstance> _dialogInstanceMock = new();
 
+    /// <summary>Initializes a new instance of the <see cref="UploadDialogTests"/> class.</summary>
     public UploadDialogTests()
     {
         Services.AddMudServices();
@@ -29,10 +31,13 @@ public class UploadDialogTests : BunitContext, IAsyncLifetime
         Render<MudDialogProvider>();
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that the upload dialog section renders and initializes correctly.</summary>
     public void ShouldRenderUploadSection()
     {
         // Try rendering the component directly as it's a dialog content

@@ -1,6 +1,7 @@
 @page "/hr/time-off"
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Components
 @inject HttpClient Http
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -117,16 +118,14 @@ else
 
     private async Task OpenRequestDialog()
     {
-        var parameters = new DialogParameters();
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        
-        // TODO: Create a LeaveRequestDialog component
-        // var dialog = await DialogService.ShowAsync<LeaveRequestDialog>("Request Leave", parameters, options);
-        // var result = await dialog.Result;
-        
-        // if (!result.Canceled) { await LoadData(); }
-        
-        Snackbar.Add("Leave Request Dialog coming soon", Severity.Info);
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<LeaveRequestDialog>("Request Leave", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
+        }
     }
 
     private Color GetStatusColor(string status) => status switch

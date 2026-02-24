@@ -4,6 +4,7 @@ using Xunit;
 
 namespace Maliev.Intranet.Tests.Client;
 
+/// <summary>Tests for frontend navigation routes to verify that the Blazor shell is returned correctly.</summary>
 public class NavigationTests(BffTestWebApplicationFactory factory) : IClassFixture<BffTestWebApplicationFactory>
 {
     private readonly BffTestWebApplicationFactory _factory = factory;
@@ -38,6 +39,7 @@ public class NavigationTests(BffTestWebApplicationFactory factory) : IClassFixtu
     [InlineData("/mfg/materials")]
     [InlineData("/mfg/procurement")]
     [InlineData("/mfg/suppliers")]
+    /// <summary>Verifies that each frontend route returns a successful response containing the Blazor shell.</summary>
     public async Task FrontendRoutes_ReturnBlazorShell(string url)
     {
         // Arrange

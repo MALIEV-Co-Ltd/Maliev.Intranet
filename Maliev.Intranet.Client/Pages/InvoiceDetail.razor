@@ -448,7 +448,7 @@ else
     {
         var parameters = new DialogParameters();
         // Here we'd usually have a small dialog to capture reason
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Cancel Invoice", 
             "Are you sure you want to cancel this invoice? This action cannot be undone.", 
             yesText: "Cancel Invoice", cancelText: "Go Back");

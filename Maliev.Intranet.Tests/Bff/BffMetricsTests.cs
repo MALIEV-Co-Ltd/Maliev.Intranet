@@ -4,8 +4,10 @@ using Moq;
 
 namespace Maliev.Intranet.Tests.Bff;
 
+/// <summary>Tests for BFF metrics functionality.</summary>
 public class BffMetricsTests
 {
+    /// <summary>Verifies that the constructor creates a meter.</summary>
     [Fact]
     public void Constructor_ShouldCreateMeter()
     {
@@ -19,6 +21,7 @@ public class BffMetricsTests
         meterFactoryMock.Verify(x => x.Create(It.Is<MeterOptions>(o => o.Name == "intranet-portal")), Times.Once);
     }
 
+    /// <summary>Verifies that recording a session started and ended does not throw an exception.</summary>
     [Fact]
     public void RecordSessionStarted_ShouldNotThrow()
     {

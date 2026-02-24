@@ -16,12 +16,14 @@ using System.Security.Claims;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the MainLayout component.</summary>
 public class MainLayoutTests : BunitContext, IAsyncLifetime
 {
     private readonly Mock<ILogger<MainLayout>> _loggerMock = new();
     private readonly Mock<ILogger<LayoutService>> _layoutLoggerMock = new();
     private readonly Mock<AuthenticationStateProvider> _authMock = new();
 
+    /// <summary>Initializes a new instance of the <see cref="MainLayoutTests"/> class.</summary>
     public MainLayoutTests()
     {
         Services.AddMudServices();
@@ -54,10 +56,13 @@ public class MainLayoutTests : BunitContext, IAsyncLifetime
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")], "Test"))));
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that the navigation layout is rendered.</summary>
     public void ShouldRenderNavigation()
     {
         var cut = Render<MainLayout>();

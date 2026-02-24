@@ -7,8 +7,10 @@ using Moq;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
+/// <summary>Tests for the delivery notes controller.</summary>
 public class DeliveryNotesControllerTests
 {
+    /// <summary>Verifies that Get returns OK.</summary>
     [Fact]
     public async Task Get_ReturnsOk()
     {
@@ -20,6 +22,7 @@ public class DeliveryNotesControllerTests
         Assert.IsType<OkObjectResult>(result.Result);
     }
 
+    /// <summary>Verifies that GetById returns OK when the delivery note is found.</summary>
     [Fact]
     public async Task GetById_WhenFound_ReturnsOk()
     {
@@ -31,6 +34,7 @@ public class DeliveryNotesControllerTests
         Assert.IsType<OkObjectResult>(result.Result);
     }
 
+    /// <summary>Verifies that GetById returns NotFound when the delivery note does not exist.</summary>
     [Fact]
     public async Task GetById_WhenNotFound_ReturnsNotFound()
     {
@@ -42,6 +46,7 @@ public class DeliveryNotesControllerTests
         Assert.IsType<NotFoundResult>(result.Result);
     }
 
+    /// <summary>Verifies that Create returns a Created result when the delivery note is created successfully.</summary>
     [Fact]
     public async Task Create_WhenSucceeds_ReturnsCreated()
     {
@@ -54,6 +59,7 @@ public class DeliveryNotesControllerTests
         Assert.IsType<CreatedAtActionResult>(result.Result);
     }
 
+    /// <summary>Verifies that UpdateStatus returns OK when the status update succeeds.</summary>
     [Fact]
     public async Task UpdateStatus_WhenSucceeds_ReturnsOk()
     {
@@ -65,6 +71,7 @@ public class DeliveryNotesControllerTests
         Assert.IsType<OkObjectResult>(result.Result);
     }
 
+    /// <summary>Verifies that GeneratePdf returns OK when the PDF is generated successfully.</summary>
     [Fact]
     public async Task GeneratePdf_WhenSucceeds_ReturnsOk()
     {
@@ -76,6 +83,7 @@ public class DeliveryNotesControllerTests
         Assert.IsType<OkObjectResult>(result.Result);
     }
 
+    /// <summary>Verifies that Delete returns NoContent when the delivery note is deleted successfully.</summary>
     [Fact]
     public async Task Delete_WhenSucceeds_ReturnsNoContent()
     {

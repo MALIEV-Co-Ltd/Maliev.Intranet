@@ -8,10 +8,12 @@ using Xunit;
 
 namespace Maliev.Intranet.Tests.Bff;
 
+/// <summary>Integration tests verifying that controller routes respond correctly.</summary>
 public class ControllerRouteTests(BffTestWebApplicationFactory factory) : IClassFixture<BffTestWebApplicationFactory>
 {
     private readonly BffTestWebApplicationFactory _factory = factory;
 
+    /// <summary>Verifies that GET endpoints return a success or unauthorized status code.</summary>
     [Theory]
     [InlineData("/api/auth/user")]
     [InlineData("/api/companies")]
@@ -59,6 +61,7 @@ public class ControllerRouteTests(BffTestWebApplicationFactory factory) : IClass
                     $"URL {url} returned {response.StatusCode}");
     }
 
+    /// <summary>Verifies that posting to the pricing calculate endpoint returns a success or unauthorized status code.</summary>
     [Fact]
     public async Task Post_PricingCalculate_ReturnsSuccessOrUnauthorized()
     {
@@ -93,6 +96,7 @@ public class ControllerRouteTests(BffTestWebApplicationFactory factory) : IClass
                     $"URL /api/pricing/calculate returned {response.StatusCode}");
     }
 
+    /// <summary>Verifies that an authenticated request to the diagnostics me endpoint returns OK.</summary>
     [Fact]
     public async Task Authenticated_DiagnosticsMe_ReturnsOk()
     {

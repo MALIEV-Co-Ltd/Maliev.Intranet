@@ -10,12 +10,14 @@ using Moq.Protected;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
+/// <summary>Tests for the invoices controller.</summary>
 public class InvoicesControllerTests
 {
     private readonly Mock<HttpMessageHandler> _httpMessageHandlerMock;
     private readonly InvoiceServiceClient _client;
     private readonly InvoicesController _controller;
 
+    /// <summary>Initializes a new instance of the <see cref="InvoicesControllerTests"/> class.</summary>
     public InvoicesControllerTests()
     {
         _httpMessageHandlerMock = new Mock<HttpMessageHandler>();
@@ -27,6 +29,7 @@ public class InvoicesControllerTests
         _controller = new InvoicesController(_client);
     }
 
+    /// <summary>Verifies that Get returns OK when the operation is successful.</summary>
     [Fact]
     public async Task Get_ShouldReturnOk_WhenSuccessful()
     {
@@ -49,6 +52,7 @@ public class InvoicesControllerTests
         Assert.NotNull(actual);
     }
 
+    /// <summary>Verifies that GetById returns NotFound when the client returns a 404.</summary>
     [Fact]
     public async Task GetById_ShouldReturnNotFound_WhenClientReturns404()
     {
@@ -64,6 +68,7 @@ public class InvoicesControllerTests
         Assert.IsType<NotFoundResult>(result.Result);
     }
 
+    /// <summary>Verifies that Create returns a Created result.</summary>
     [Fact]
     public async Task Create_ShouldReturnCreated()
     {

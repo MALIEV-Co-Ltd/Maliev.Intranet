@@ -41,6 +41,17 @@
         }
     </div>
 }
+else if (_hasError)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">
+        <MudText Typo="Typo.body2">Failed to load delivery notes. The DeliveryService may be unavailable.</MudText>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">@_errorMessage</MudText>
+        }
+    </MudAlert>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="RetryLoadAsync">Retry</MudButton>
+}
 else
 {
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
@@ -98,13 +109,23 @@ else
 
 @code {
     private bool _isLoading = true;
+    private bool _hasError = false;
+    private string? _errorMessage;
     private string _searchString = "";
     private List<DeliveryNoteSummaryDto> _deliveryNotes = new();
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _hasError = false;
+        _errorMessage = null;
         try
         {
+            _isLoading = true;
             var response = await Http.GetFromJsonAsync<PagedResponse<DeliveryNoteSummaryDto>>("api/deliverynotes");
             if (response?.Data != null)
             {
@@ -113,12 +134,18 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading delivery notes: {ex.Message}", Severity.Error);
+            _hasError = true;
+            _errorMessage = ex.Message;
         }
         finally
         {
             _isLoading = false;
         }
+    }
+
+    private async Task RetryLoadAsync()
+    {
+        await LoadDataAsync();
     }
 
     private async Task OpenCreateDialog()
@@ -129,7 +156,7 @@ else
 
         if (result != null && !result.Canceled)
         {
-            await OnInitializedAsync();
+            await LoadDataAsync();
         }
     }
 
@@ -146,7 +173,7 @@ else
 
         if (result != null && !result.Canceled)
         {
-            await OnInitializedAsync();
+            await LoadDataAsync();
         }
     }
 

@@ -141,7 +141,7 @@
         <MudGrid Spacing="6" Class="px-4 px-md-8">
             <!-- Main Content -->
             <MudItem xs="12" lg="12">
-                <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
+                <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
                     
                     @if (!_isEditMode)
                     {
@@ -179,7 +179,12 @@
                                                         <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" />
                                                         <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Details</MudText>
                                                     </MudStack>
-                                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{_customer.CompanyId}"))">View Profile</MudButton>
+                                                    <MudStack Row="true" Spacing="1">
+                                                        <MudTooltip Text="Change Company">
+                                                            <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz" Color="Color.Primary" Size="Size.Small" OnClick="OpenLinkCompanyDialog" />
+                                                        </MudTooltip>
+                                                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{_customer.CompanyId}"))">View Profile</MudButton>
+                                                    </MudStack>
                                                 </MudStack>
                                                 
                                                 <MudGrid Spacing="4">
@@ -210,6 +215,25 @@
                                                         </MudItem>
                                                     }
                                                 </MudGrid>
+                                            </MudCard>
+                                        }
+                                        else
+                                        {
+                                            <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Secondary" />
+                                                    <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Information</MudText>
+                                                </MudStack>
+                                                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-6" Icon="@Icons.Material.Filled.Info">
+                                                    This customer is currently not associated with a company profile.
+                                                </MudAlert>
+                                                <MudButton Variant="Variant.Filled" 
+                                                           Color="Color.Primary" 
+                                                           StartIcon="@Icons.Material.Filled.AddBusiness" 
+                                                           OnClick="OpenLinkCompanyDialog"
+                                                           Class="rounded-lg shadow-none py-3 px-6">
+                                                    Link to Company
+                                                </MudButton>
                                             </MudCard>
                                         }
 
@@ -260,7 +284,7 @@
                                                 </MudTd>
                                                 <MudTd DataLabel="Actor">
                                                     <MudText Typo="Typo.body2">
-                                                        @(!string.IsNullOrEmpty(context.ActorName) ? context.ActorName : context.ActorId)
+                                                        @GetActorDisplayName(context.ActorName, context.ActorId)
                                                     </MudText>
                                                 </MudTd>
                                                 <MudTd DataLabel="Timestamp">
@@ -472,9 +496,8 @@
                                                                    Disabled="@_uploadingNda"
                                                                    Class="nda-upload-zone"
                                                                    Style="width: 100%; min-height: 200px; position: relative;"
-                                                                   InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
-                                                                   InputStyle="opacity:0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
-                                                        <ActivatorContent>
+                                                                   InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10 opacity-0">
+                                                        <CustomContent Context="_">
                                                             <div class="file-upload-dropzone @(_ndaDragOver ? "drag-over" : "")"
                                                                  style="background-color: rgba(33, 150, 243, 0.05); border: 2px dashed var(--mud-palette-info); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;"
                                                                  @ondragenter="@(() => _ndaDragOver = true)"
@@ -485,7 +508,7 @@
                                                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Drag & Drop or Click to Upload</MudText>
                                                                 <MudText Typo="Typo.body2" Color="Color.Secondary">PDF files only, up to 10MB each (max 20 files)</MudText>
                                                             </div>
-                                                        </ActivatorContent>
+                                                        </CustomContent>
                                                     </MudFileUpload>
                                                 </div>
 
@@ -665,9 +688,8 @@
                                                                    Disabled="@_uploadingCustomerDoc"
                                                                    Class="customer-docs-upload-zone"
                                                                    Style="width: 100%; min-height: 200px; position: relative;"
-                                                                   InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
-                                                                   InputStyle="opacity:0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
-                                                        <ActivatorContent>
+                                                                   InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10 opacity-0">
+                                                        <CustomContent Context="_">
                                                             <div class="file-upload-dropzone @(_customerDocDragOver ? "drag-over" : "")"
                                                                  style="background-color: rgba(76, 175, 80, 0.05); border: 2px dashed var(--mud-palette-success); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;"
                                                                  @ondragenter="@(() => _customerDocDragOver = true)"
@@ -678,7 +700,7 @@
                                                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Drag & Drop or Click to Upload</MudText>
                                                                 <MudText Typo="Typo.body2" Color="Color.Secondary">PDF, Word, or Image files, up to 10MB each (max 20 files)</MudText>
                                                             </div>
-                                                        </ActivatorContent>
+                                                        </CustomContent>
                                                     </MudFileUpload>
                                                 </div>
 
@@ -873,7 +895,7 @@
                                                             </MudAvatar>
                                                             <MudStack Spacing="0">
                                                                 <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">
-                                                                    @(note.CreatedByName ?? "Unknown User")
+                                                                    @GetNoteAuthorDisplay(note.CreatedByName, note.CreatedByEmail, note.CreatedBy)
                                                                 </MudText>
                                                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedAt.ToLocalTime().ToString("g")</MudText>
                                                             </MudStack>
@@ -1212,6 +1234,98 @@
         finally { _isSaving = false; }
     }
 
+    private async Task OpenLinkCompanyDialog()
+    {
+        if (_customer == null) return;
+        
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var parameters = new DialogParameters { ["CustomerId"] = Id };
+        var dialog = await DialogService.ShowAsync<LinkCompanyDialog>("Link Company", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result != null && !result.Canceled && result.Data is LinkCompanyDialog.LinkCompanyResult linkResult)
+        {
+            try
+            {
+                _loading = true;
+                StateHasChanged();
+
+                CustomerOnboardingRequest onboardingRequest;
+                
+                if (linkResult.CompanyId.HasValue)
+                {
+                    // Link to existing company
+                    onboardingRequest = new CustomerOnboardingRequest 
+                    { 
+                        Customer = new CreateCustomerRequest 
+                        { 
+                            FirstName = _customer.FirstName, 
+                            LastName = _customer.LastName, 
+                            Email = _customer.Email, 
+                            Mobile = _customer.Mobile, 
+                            Landline = _customer.Landline, 
+                            Extension = _customer.Extension, 
+                            Segment = _customer.Segment, 
+                            Tier = _customer.Tier, 
+                            PreferredLanguage = _customer.PreferredLanguage, 
+                            Timezone = _customer.Timezone, 
+                            CompanyId = linkResult.CompanyId.Value,
+                            CommunicationPreferences = _customer.CommunicationPreferences 
+                        } 
+                    };
+                }
+                else if (linkResult.NewCompany != null)
+                {
+                    // Create and link to new company
+                    onboardingRequest = new CustomerOnboardingRequest 
+                    { 
+                        Customer = new CreateCustomerRequest 
+                        { 
+                            FirstName = _customer.FirstName, 
+                            LastName = _customer.LastName, 
+                            Email = _customer.Email, 
+                            Mobile = _customer.Mobile, 
+                            Landline = _customer.Landline, 
+                            Extension = _customer.Extension, 
+                            Segment = _customer.Segment, 
+                            Tier = _customer.Tier, 
+                            PreferredLanguage = _customer.PreferredLanguage, 
+                            Timezone = _customer.Timezone, 
+                            CommunicationPreferences = _customer.CommunicationPreferences 
+                        },
+                        NewCompany = linkResult.NewCompany
+                    };
+                }
+                else
+                {
+                    return;
+                }
+
+                var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Company linked successfully", Severity.Success);
+                    await LoadCustomerData();
+                    await LoadInitialActivities();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Failed to link company: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+            finally
+            {
+                _loading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
     private async Task AddAddressDialog()
     {
         if (_customer == null) return;
@@ -1262,7 +1376,7 @@
     private async Task DeleteAddress(AddressResponse address)
     {
         if (_customer == null) return;
-        var result = await DialogService.ShowMessageBox("Delete Address", "Are you sure you want to delete this address?", yesText: "Delete", noText: "Cancel");
+        var result = await DialogService.ShowMessageBoxAsync("Delete Address", "Are you sure you want to delete this address?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try
@@ -1464,7 +1578,7 @@
 
     private async Task DeleteNda(NDAResponse nda)
     {
-        var result = await DialogService.ShowMessageBox("Delete NDA", "Are you sure you want to delete this NDA record?", yesText: "Delete", noText: "Cancel");
+        var result = await DialogService.ShowMessageBoxAsync("Delete NDA", "Are you sure you want to delete this NDA record?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try
@@ -1478,7 +1592,7 @@
 
     private async Task HandleDeleteDocument(DocumentResponse doc)
     {
-        var result = await DialogService.ShowMessageBox("Delete Document", $"Are you sure you want to delete '{doc.FileName}'?", yesText: "Delete", noText: "Cancel");
+        var result = await DialogService.ShowMessageBoxAsync("Delete Document", $"Are you sure you want to delete '{doc.FileName}'?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try
@@ -1585,7 +1699,7 @@
 
     private async Task DeleteInternalNote(InternalNoteResponse note)
     {
-        var result = await DialogService.ShowMessageBox("Delete Note", "Are you sure you want to delete this internal note?", yesText: "Delete", noText: "Cancel");
+        var result = await DialogService.ShowMessageBoxAsync("Delete Note", "Are you sure you want to delete this internal note?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try { var response = await Http.DeleteAsync($"api/customers/notes/{note.Id}"); if (response.IsSuccessStatusCode) { Snackbar.Add("Note deleted successfully", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); } }
@@ -1598,6 +1712,33 @@
         if (description.Contains("changed note content from", StringComparison.OrdinalIgnoreCase))
             return "Updated an internal note";
         return description;
+    }
+
+    private string GetActorDisplayName(string? name, string? id)
+    {
+        if (!string.IsNullOrEmpty(name)) return name;
+        if (string.IsNullOrEmpty(id)) return "Unknown User";
+
+        if (id.Equals("00000000-0000-0000-0000-000000000001", StringComparison.OrdinalIgnoreCase) ||
+            id.Equals("system", StringComparison.OrdinalIgnoreCase))
+            return "System";
+
+        return id;
+    }
+
+    private string GetNoteAuthorDisplay(string? name, string? email, string? id)
+    {
+        if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(email))
+            return $"{name} ({email})";
+        if (!string.IsNullOrEmpty(name))
+            return name;
+        if (string.IsNullOrEmpty(id)) return "Unknown User";
+
+        if (id.Equals("00000000-0000-0000-0000-000000000001", StringComparison.OrdinalIgnoreCase) ||
+            id.Equals("system", StringComparison.OrdinalIgnoreCase))
+            return "System";
+
+        return id;
     }
 
     private List<DocumentResponse> GetNonNdaDocuments()

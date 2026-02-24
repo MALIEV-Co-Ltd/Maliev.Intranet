@@ -8,8 +8,10 @@ using Moq;
 
 namespace Maliev.Intranet.Tests.Bff.Clients;
 
+/// <summary>Tests for the accounting service client.</summary>
 public class AccountingServiceClientTests
 {
+    /// <summary>Verifies that getting the accounts tree returns data.</summary>
     [Fact]
     public async Task GetAccountsTreeAsync_ShouldReturnData()
     {
@@ -23,6 +25,7 @@ public class AccountingServiceClientTests
         Assert.NotNull(result);
     }
 
+    /// <summary>Verifies that getting journal entries returns data.</summary>
     [Fact]
     public async Task GetJournalEntriesAsync_ShouldReturnData()
     {

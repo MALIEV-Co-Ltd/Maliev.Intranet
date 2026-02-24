@@ -1,5 +1,6 @@
 @using Maliev.Intranet.Shared
 @using MudBlazor
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
@@ -25,7 +26,7 @@
                         <MudStack Row="false" Spacing="0">
                             <MudText Typo="Typo.body1">@invoice.InvoiceNumber - @invoice.CustomerName</MudText>
                             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                Amount: @invoice.TotalAmount.ToString("C2") | Due: @invoice.DueDate.ToString("dd MMM yyyy")
+                                Amount: @ThaiCurrency.Format(invoice.TotalAmount, 2) | Due: @invoice.DueDate.ToString("dd MMM yyyy")
                             </MudText>
                         </MudStack>
                     </ItemTemplate>
@@ -48,15 +49,15 @@
                                 </MudItem>
                                 <MudItem xs="6">
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">Total Amount</MudText>
-                                    <MudText Typo="Typo.body1">@_selectedInvoice.TotalAmount.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.body1">@ThaiCurrency.Format(_selectedInvoice.TotalAmount, 2)</MudText>
                                 </MudItem>
                                 <MudItem xs="6">
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">Already Paid</MudText>
-                                    <MudText Typo="Typo.body1">@_selectedInvoice.PaidAmount.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.body1">@ThaiCurrency.Format(_selectedInvoice.PaidAmount, 2)</MudText>
                                 </MudItem>
                                 <MudItem xs="12">
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">Remaining Balance</MudText>
-                                    <MudText Typo="Typo.h6" Color="Color.Primary">@(_selectedInvoice.TotalAmount - _selectedInvoice.PaidAmount).ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h6" Color="Color.Primary">@ThaiCurrency.Format(_selectedInvoice.TotalAmount - _selectedInvoice.PaidAmount, 2)</MudText>
                                 </MudItem>
                             </MudGrid>
                         </MudStack>
@@ -70,7 +71,7 @@
                                      Min="0.01m"
                                      Max="@(_selectedInvoice.TotalAmount - _selectedInvoice.PaidAmount)"
                                      Format="N2"
-                                     HelperText="@($"Maximum: {(_selectedInvoice.TotalAmount - _selectedInvoice.PaidAmount):C2}")" />
+                                     HelperText="@($"Maximum: {ThaiCurrency.Format(_selectedInvoice.TotalAmount - _selectedInvoice.PaidAmount, 2)}")" />
 
                     <MudSelect T="string"
                                @bind-Value="_paymentMethod"
@@ -131,32 +132,8 @@
 
         try
         {
-            // TODO: Replace with actual BFF API call to get unpaid/partially paid invoices
-            // var invoices = await Http.GetFromJsonAsync<List<InvoiceDto>>($"api/invoices/unpaid?q={value}", cancellationToken);
-            // return invoices ?? Array.Empty<InvoiceDto>();
-
-            // Mock data for now
-            return new[]
-            {
-                new InvoiceDto
-                {
-                    Id = Guid.NewGuid(),
-                    InvoiceNumber = "INV-2026-001",
-                    CustomerName = "John Doe",
-                    TotalAmount = 10000.00m,
-                    PaidAmount = 0m,
-                    DueDate = DateTime.Today.AddDays(15)
-                },
-                new InvoiceDto
-                {
-                    Id = Guid.NewGuid(),
-                    InvoiceNumber = "INV-2026-002",
-                    CustomerName = "Jane Smith",
-                    TotalAmount = 25000.00m,
-                    PaidAmount = 10000.00m,
-                    DueDate = DateTime.Today.AddDays(20)
-                }
-            };
+            var response = await Http.GetFromJsonAsync<PagedResponse<InvoiceDto>>($"api/invoices/unpaid?search={Uri.EscapeDataString(value)}", cancellationToken);
+            return response?.Data ?? Array.Empty<InvoiceDto>();
         }
         catch
         {
@@ -191,9 +168,8 @@
                 Notes = _notes
             };
 
-            // TODO: Replace with actual BFF API call
-            // var response = await Http.PostAsJsonAsync("api/receipts", request);
-            // response.EnsureSuccessStatusCode();
+            var response = await Http.PostAsJsonAsync("api/receipts", request);
+            response.EnsureSuccessStatusCode();
 
             Snackbar.Add("Receipt issued successfully!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));

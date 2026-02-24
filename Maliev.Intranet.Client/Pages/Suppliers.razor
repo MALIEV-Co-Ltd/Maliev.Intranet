@@ -1,6 +1,8 @@
 @page "/mfg/suppliers"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
 @inject HttpClient Http
+@inject IDialogService DialogService
 
 <PageTitle>Suppliers - Maliev Intranet</PageTitle>
 
@@ -18,7 +20,8 @@
         
         <MudButton Variant="Variant.Filled" 
                    Color="Color.Primary" 
-                   StartIcon="@Icons.Material.Filled.Add">
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
             Add Supplier
         </MudButton>
     </MudStack>
@@ -41,10 +44,10 @@
                     {
                         <MudListItem T="SupplierSummaryDto" Value="supplier" OnClick="@(() => OnSupplierSelected(supplier))">
                             <MudStack Spacing="1">
-                                <MudText Typo="Typo.subtitle2">@supplier.Name</MudText>
+                                <MudText Typo="Typo.subtitle2">@supplier.CompanyName</MudText>
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudRating SelectedValue="(int)supplier.Rating" Size="Size.Small" ReadOnly="true" />
                                     <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(supplier.Status)">@supplier.Status</MudChip>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@supplier.Country</MudText>
                                 </MudStack>
                             </MudStack>
                         </MudListItem>
@@ -66,7 +69,7 @@
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-4">
                         <div>
-                            <MudText Typo="Typo.h5">@_selectedSupplierDetails.Name</MudText>
+                            <MudText Typo="Typo.h5">@_selectedSupplierDetails.CompanyName</MudText>
                             <MudText Typo="Typo.body2" Color="Color.Secondary">@_selectedSupplierDetails.Country</MudText>
                         </div>
                         <MudStack Row="true" Spacing="2">
@@ -89,14 +92,15 @@
                             else
                             {
                                 <MudStack Spacing="1">
-                                    <MudText Typo="Typo.body2"><strong>Email:</strong> @_selectedSupplierDetails.Email</MudText>
-                                    <MudText Typo="Typo.body2"><strong>Phone:</strong> @_selectedSupplierDetails.Phone</MudText>
+                                    <MudText Typo="Typo.body2"><strong>Tax ID:</strong> @_selectedSupplierDetails.TaxId</MudText>
+                                    <MudText Typo="Typo.body2"><strong>City:</strong> @_selectedSupplierDetails.City</MudText>
                                     <MudText Typo="Typo.body2"><strong>Address:</strong> @_selectedSupplierDetails.Address</MudText>
+                                    <MudText Typo="Typo.body2"><strong>Postal Code:</strong> @(_selectedSupplierDetails.PostalCode ?? "—")</MudText>
                                 </MudStack>
                             }
                         </MudItem>
                         <MudItem xs="6">
-                            <MudText Typo="Typo.subtitle2" Class="mb-2">Performance</MudText>
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Onboarding</MudText>
                             @if (_isDetailsLoading)
                             {
                                 <MudSkeleton Width="40%" Height="40px" />
@@ -106,22 +110,23 @@
                             {
                                 <MudStack Spacing="2">
                                     <div>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Rating</MudText>
-                                        <MudRating SelectedValue="@((int)_selectedSupplierDetails.Rating)" ReadOnly="true" />
-                                    </div>
-                                    <div>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
                                         <MudChip T="string" Color="@GetStatusColor(_selectedSupplierDetails.Status)" Size="Size.Small">@_selectedSupplierDetails.Status</MudChip>
+                                    </div>
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Onboarding Stage</MudText>
+                                        <MudText Typo="Typo.body2">@_selectedSupplierDetails.OnboardingStage</MudText>
                                     </div>
                                 </MudStack>
                             }
                         </MudItem>
                     </MudGrid>
                 </MudPaper>
-
+                
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
-                    <MudText Typo="Typo.h6" Class="mb-3">Recent Activity</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">Activity history integration pending.</MudText>
+                    <MudText Typo="Typo.h6" Class="mb-3">Audit Details</MudText>
+                    <MudText Typo="Typo.body2"><strong>Created At:</strong> @_selectedSupplierDetails.CreatedAt.ToString("g")</MudText>
+                    <MudText Typo="Typo.body2"><strong>Last Updated:</strong> @_selectedSupplierDetails.UpdatedAt.ToString("g")</MudText>
                 </MudPaper>
             </MudStack>
         }
@@ -187,12 +192,26 @@
         }
     }
 
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateSupplierDialog>("Add New Supplier", options);
+        var result = await dialog.Result;
+        
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+        }
+    }
+
     private Color GetStatusColor(string status) => status switch
     {
         "Active" => Color.Success,
         "Inactive" => Color.Default,
         "Pending" => Color.Warning,
+        "Deactivated" => Color.Error,
         _ => Color.Default
     };
 }
+
 

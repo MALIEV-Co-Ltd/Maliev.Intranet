@@ -11,6 +11,7 @@ using Maliev.Intranet.Tests.Testing;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
+/// <summary>Tests for the chat controller.</summary>
 public class ChatControllerTests
 {
     private readonly Mock<ChatbotServiceClient> _chatbotClientMock;
@@ -19,6 +20,7 @@ public class ChatControllerTests
     private readonly Mock<IConfiguration> _configMock;
     private readonly ChatController _controller;
 
+    /// <summary>Initializes a new instance of the <see cref="ChatControllerTests"/> class.</summary>
     public ChatControllerTests()
     {
         var httpClient = new HttpClient(new MockHttpMessageHandler());
@@ -32,6 +34,7 @@ public class ChatControllerTests
         _controller = new ChatController(_chatbotClientMock.Object, _contextResolverMock.Object, _chatHubServiceMock.Object, _configMock.Object);
     }
 
+    /// <summary>Verifies that initiating a session returns OK.</summary>
     [Fact]
     public async Task InitiateSession_ShouldReturnOk()
     {
@@ -46,6 +49,7 @@ public class ChatControllerTests
         Assert.Equal(response.SessionId, bffResponse.SessionId);
     }
 
+    /// <summary>Verifies that sending a message returns OK.</summary>
     [Fact]
     public async Task SendMessage_ShouldReturnOk()
     {

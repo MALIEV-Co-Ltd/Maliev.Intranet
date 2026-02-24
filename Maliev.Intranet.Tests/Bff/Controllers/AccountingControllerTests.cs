@@ -7,17 +7,20 @@ using Moq;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
+/// <summary>Tests for the accounting controller.</summary>
 public class AccountingControllerTests
 {
     private readonly Mock<IAccountingServiceClient> _clientMock;
     private readonly AccountingController _controller;
 
+    /// <summary>Initializes a new instance of the <see cref="AccountingControllerTests"/> class.</summary>
     public AccountingControllerTests()
     {
         _clientMock = new Mock<IAccountingServiceClient>();
         _controller = new AccountingController(_clientMock.Object);
     }
 
+    /// <summary>Verifies that GetAccountsTree returns OK when the client returns data.</summary>
     [Fact]
     public async Task GetAccountsTree_ShouldReturnOk_WhenClientReturnsData()
     {
@@ -31,6 +34,7 @@ public class AccountingControllerTests
         Assert.Equal(data, okResult.Value);
     }
 
+    /// <summary>Verifies that GetAccountsTree returns an empty list when the client returns null.</summary>
     [Fact]
     public async Task GetAccountsTree_ShouldReturnEmptyList_WhenClientReturnsNull()
     {
@@ -44,6 +48,7 @@ public class AccountingControllerTests
         Assert.Empty(list);
     }
 
+    /// <summary>Verifies that GetJournalEntries returns data.</summary>
     [Fact]
     public async Task GetJournalEntries_ShouldReturnData()
     {
@@ -57,6 +62,7 @@ public class AccountingControllerTests
         Assert.Equal(response, okResult.Value);
     }
 
+    /// <summary>Verifies that CreateJournalEntry returns OK when the operation is successful.</summary>
     [Fact]
     public async Task CreateJournalEntry_ShouldReturnOk_WhenSuccessful()
     {
@@ -71,6 +77,7 @@ public class AccountingControllerTests
         Assert.Equal(response, okResult.Value);
     }
 
+    /// <summary>Verifies that CreateJournalEntry returns BadRequest when the operation fails.</summary>
     [Fact]
     public async Task CreateJournalEntry_ShouldReturnBadRequest_WhenFailed()
     {

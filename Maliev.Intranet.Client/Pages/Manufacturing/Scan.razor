@@ -1,0 +1,423 @@
+@page "/mfg/scan"
+@page "/mfg/scan/{JobId}"
+@using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Shared.Enums
+@using System.Text.Json
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<Scan> Logger
+@implements IAsyncDisposable
+
+<PageTitle>Scan Job - Maliev Intranet</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
+    <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-4">Scan Job QR Code</MudText>
+
+    @if (!string.IsNullOrEmpty(_jobIdFromRoute))
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            Job ID from route: @_jobIdFromRoute
+        </MudAlert>
+    }
+
+    <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+        <div id="qr-reader" style="width: 100%; min-height: 300px;"></div>
+    </MudPaper>
+
+    @if (_cameraError != null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-4">
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.body2">@_cameraError</MudText>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="StartScannerAsync">
+                    Try Again
+                </MudButton>
+            </MudStack>
+        </MudAlert>
+    }
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-4" />
+    }
+
+    @if (_scannedJob != null)
+    {
+        <MudCard Elevation="0" Class="mt-4 border mud-border-lines-default">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Job Found</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="2">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Job ID</MudText>
+                        <MudText Typo="Typo.body2">@_scannedJob.Id</MudText>
+                    </MudStack>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Technology</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@GetTechnologyColor(_scannedJob.Technology)">@_scannedJob.Technology</MudChip>
+                    </MudStack>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Status</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_scannedJob.Status)">@_scannedJob.Status</MudChip>
+                    </MudStack>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Machine</MudText>
+                        <MudText Typo="Typo.body2">@(_scannedJob.AssignedMachineId ?? "Not assigned")</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudCardContent>
+            <MudCardActions>
+                <MudStack Row="true" Justify="Justify.Center" Class="w-100" Spacing="2">
+                    @if (_scannedJob.Status == JobStatus.Pending)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Info" OnClick="@(() => UpdateStatusAsync("queue"))">
+                            <MudIcon Icon="@Icons.Material.Outlined.PlaylistAdd" Class="mr-2" />
+                            Queue Job
+                        </MudButton>
+                    }
+                    else if (_scannedJob.Status == JobStatus.Queued)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="@(() => UpdateStatusAsync("start"))">
+                            <MudIcon Icon="@Icons.Material.Outlined.PlayArrow" Class="mr-2" />
+                            Start
+                        </MudButton>
+                    }
+                    else if (_scannedJob.Status == JobStatus.InProgress)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@(() => UpdateStatusAsync("finish"))">
+                            <MudIcon Icon="@Icons.Material.Outlined.Build" Class="mr-2" />
+                            Finishing
+                        </MudButton>
+                    }
+                    else if (_scannedJob.Status == JobStatus.Finishing)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => UpdateStatusAsync("complete"))">
+                            <MudIcon Icon="@Icons.Material.Outlined.Check" Class="mr-2" />
+                            Complete
+                        </MudButton>
+                    }
+                    @if (_scannedJob.Status is JobStatus.Pending or JobStatus.Queued or JobStatus.InProgress)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@(() => _showCancelDialog = true)">
+                            <MudIcon Icon="@Icons.Material.Outlined.Cancel" Class="mr-2" />
+                            Cancel Job
+                        </MudButton>
+                    }
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ResetScannerAsync">
+                        <MudIcon Icon="@Icons.Material.Outlined.Refresh" Class="mr-2" />
+                        Scan Another
+                    </MudButton>
+                </MudStack>
+            </MudCardActions>
+        </MudCard>
+
+        @if (_showCancelDialog)
+        {
+            <MudCard Elevation="0" Class="mt-2 border mud-border-lines-default">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Cancellation Reason</MudText>
+                    <MudTextField @bind-Value="_cancelReason" Lines="2" Placeholder="Enter reason for cancellation..." Variant="Variant.Outlined" />
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Color="Color.Default" OnClick="@(() => { _showCancelDialog = false; _cancelReason = string.Empty; })">Dismiss</MudButton>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Filled" Color="Color.Error"
+                               Disabled="@string.IsNullOrWhiteSpace(_cancelReason)"
+                               OnClick="CancelJobAsync">
+                        Confirm Cancel
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        }
+    }
+</MudContainer>
+
+@code {
+    /// <summary>The Job ID pre-filled from the route parameter, if any.</summary>
+    [Parameter]
+    public string? JobId { get; set; }
+
+    private string? _jobIdFromRoute;
+    private bool _isLoading;
+    private JobDto? _scannedJob;
+    private bool _scannerStarted;
+    private bool _showCancelDialog;
+    private string _cancelReason = string.Empty;
+    private string? _cameraError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(JobId) && Guid.TryParse(JobId, out var jobIdGuid))
+        {
+            _jobIdFromRoute = JobId;
+            await LoadJobAsync(jobIdGuid);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _scannedJob == null)
+        {
+            await StartScannerAsync();
+        }
+    }
+
+    private async Task StartScannerAsync()
+    {
+        _cameraError = null;
+        try
+        {
+            // Request camera permission explicitly before starting the QR scanner
+            var permissionGranted = await JS.InvokeAsync<bool>("requestCameraPermission");
+            if (!permissionGranted)
+            {
+                _cameraError = "Camera access was denied. Please allow camera access in your browser settings and try again.";
+                StateHasChanged();
+                return;
+            }
+
+            await JS.InvokeVoidAsync("startQrScanner", "qr-reader", DotNetObjectReference.Create(this));
+            _scannerStarted = true;
+        }
+        catch (JSException jsEx) when (jsEx.Message.Contains("NotAllowed") || jsEx.Message.Contains("Permission") || jsEx.Message.Contains("denied"))
+        {
+            Logger.LogWarning(jsEx, "Camera permission denied");
+            _cameraError = "Camera access was denied. Please allow camera access in your browser settings and try again.";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to start QR scanner");
+            Snackbar.Add($"Failed to start scanner: {ex.Message}", Severity.Error);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnQrCodeScanned(string scannedData)
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            await StopScannerAsync();
+
+            if (Guid.TryParse(scannedData, out var jobId))
+            {
+                await LoadJobAsync(jobId);
+            }
+            else
+            {
+                Snackbar.Add($"Invalid QR code format: {scannedData}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error processing QR scan for data: {ScannedData}", scannedData);
+            Snackbar.Add($"Error processing scan: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadJobAsync(Guid jobId)
+    {
+        try
+        {
+            var job = await Http.GetFromJsonAsync<JobDto>($"api/jobs/{jobId}");
+            if (job != null)
+            {
+                _scannedJob = job;
+                Snackbar.Add($"Job loaded: {job.Id}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Job not found", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading job {JobId}", jobId);
+            Snackbar.Add($"Error loading job: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task UpdateStatusAsync(string action)
+    {
+        if (_scannedJob == null) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            HttpResponseMessage? response = action switch
+            {
+                "queue" => await Http.PostAsJsonAsync($"api/jobs/{_scannedJob.Id}/queue", new QueueJobRequest { MachineId = _scannedJob.AssignedMachineId ?? "UNASSIGNED" }),
+                "start" => await Http.PostAsync($"api/jobs/{_scannedJob.Id}/start", null),
+                "finish" => await Http.PostAsync($"api/jobs/{_scannedJob.Id}/finish", null),
+                "complete" => await Http.PostAsync($"api/jobs/{_scannedJob.Id}/complete", null),
+                _ => null
+            };
+
+            if (response != null && response.IsSuccessStatusCode)
+            {
+                try
+                {
+                    var updatedJob = await response.Content.ReadFromJsonAsync<JobDto>();
+                    if (updatedJob != null)
+                    {
+                        _scannedJob = updatedJob;
+                        Snackbar.Add($"Job status updated to {updatedJob.Status}", Severity.Success);
+                    }
+                    else
+                    {
+                        Snackbar.Add("Status updated but could not read response", Severity.Warning);
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    Logger.LogError(ex, "Failed to deserialize job response after {Action} for job {JobId}", action, _scannedJob.Id);
+                    Snackbar.Add("Status updated but response could not be parsed", Severity.Warning);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Failed to update job status", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating job {JobId} with action {Action}", _scannedJob?.Id, action);
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CancelJobAsync()
+    {
+        if (_scannedJob == null || string.IsNullOrWhiteSpace(_cancelReason)) return;
+
+        _showCancelDialog = false;
+        _isLoading = true;
+        StateHasChanged();
+
+        var jobId = _scannedJob.Id;
+        var reason = _cancelReason;
+        _cancelReason = string.Empty;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/jobs/{jobId}/cancel", new CancelJobRequest { Reason = reason });
+
+            if (response.IsSuccessStatusCode)
+            {
+                try
+                {
+                    var updatedJob = await response.Content.ReadFromJsonAsync<JobDto>();
+                    if (updatedJob != null)
+                    {
+                        _scannedJob = updatedJob;
+                        Snackbar.Add("Job cancelled", Severity.Success);
+                    }
+                    else
+                    {
+                        Snackbar.Add("Job cancelled but could not read response", Severity.Warning);
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    Logger.LogError(ex, "Failed to deserialize response after cancel for job {JobId}", jobId);
+                    Snackbar.Add("Job cancelled but response could not be parsed", Severity.Warning);
+                }
+            }
+            else
+            {
+                Logger.LogError("Failed to cancel job {JobId}: HTTP {StatusCode}", jobId, response.StatusCode);
+                Snackbar.Add("Failed to cancel job", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error cancelling job {JobId}", jobId);
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StopScannerAsync()
+    {
+        if (_scannerStarted)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("stopQrScanner");
+                _scannerStarted = false;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error stopping QR scanner");
+            }
+        }
+    }
+
+    private async Task ResetScannerAsync()
+    {
+        _scannedJob = null;
+        _jobIdFromRoute = null;
+        _showCancelDialog = false;
+        _cancelReason = string.Empty;
+        _cameraError = null;
+        StateHasChanged();
+        await StartScannerAsync();
+    }
+
+    private static Color GetTechnologyColor(string technology)
+    {
+        return technology?.ToUpperInvariant() switch
+        {
+            "FDM" => Color.Primary,
+            "SLA" => Color.Secondary,
+            "DLP" => Color.Tertiary,
+            "CNC" => Color.Warning,
+            "SCANNING" => Color.Info,
+            "DESIGN" => Color.Success,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetStatusColor(JobStatus status)
+    {
+        return status switch
+        {
+            JobStatus.Pending => Color.Default,
+            JobStatus.Queued => Color.Info,
+            JobStatus.InProgress => Color.Warning,
+            JobStatus.Finishing => Color.Secondary,
+            JobStatus.Completed => Color.Success,
+            JobStatus.Cancelled => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopScannerAsync();
+    }
+}

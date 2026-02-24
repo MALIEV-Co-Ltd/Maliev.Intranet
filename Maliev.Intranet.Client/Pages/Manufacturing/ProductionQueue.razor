@@ -1,15 +1,380 @@
 @page "/mfg/production-queue"
+@using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Shared.Enums
+@using Microsoft.AspNetCore.SignalR.Client
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ILogger<ProductionQueue> Logger
+@implements IAsyncDisposable
 
 <PageTitle>Production Queue - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
-    <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
-        <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
-        <MudText Typo="Typo.h4" Align="Align.Center">Production Queue</MudText>
-        <MudText Typo="Typo.h6" Color="Color.Secondary" Align="Align.Center" Class="mt-2">Coming Soon</MudText>
-        <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center" Class="mt-4" Style="max-width: 600px;">
-            The production queue will allow you to manage and schedule manufacturing jobs across all machines and processes.
-        </MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-8" Href="/">Back to Dashboard</MudButton>
-    </MudPaper>
-</MudContainer>
+<MudText Typo="Typo.h4" Class="mb-4">Production Queue</MudText>
+
+@if (_isReconnecting)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">Connection lost. Reconnecting&hellip; Data may be stale.</MudAlert>
+}
+
+@if (_isLoading)
+{
+    <MudGrid>
+        @for (int i = 0; i < 5; i++)
+        {
+            <MudItem xs="12" sm="6" md="2">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudSkeleton SkeletonType="SkeletonType.Text" Width="60%" Class="mb-2" />
+                    @for (int j = 0; j < 3; j++)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="100px" Class="mb-2 rounded" />
+                    }
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (_hasError)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">
+        <MudText Typo="Typo.body2">Failed to load production queue. The JobService may be unavailable or timing out.</MudText>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">@_errorMessage</MudText>
+        }
+    </MudAlert>
+    <MudButton Variant="Variant.Outlined"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Outlined.Refresh"
+               OnClick="RetryLoadAsync">
+        Retry
+    </MudButton>
+}
+else
+{
+    <MudDropContainer T="KanbanJobDto" Items="@_allJobs" ItemsSelector="@ItemsSelector" ItemDropped="@ItemDropped" Class="d-flex flex-grow-1">
+        <ChildContent>
+            <div style="display:flex; overflow-x:auto; gap:8px; width:100%; align-items:flex-start;">
+                <MudPaper Elevation="0" Style="flex:0 0 280px;" MinHeight="500px" Class="pa-3 d-flex flex-column border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudText Typo="Typo.subtitle1"><b>Pending</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default">@_kanban.Pending.Count</MudChip>
+                    </MudStack>
+                    <MudDropZone T="KanbanJobDto" Identifier="@nameof(JobStatus.Pending)" Class="flex-grow-1" />
+                </MudPaper>
+
+                <MudPaper Elevation="0" Style="flex:0 0 280px;" MinHeight="500px" Class="pa-3 d-flex flex-column border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudText Typo="Typo.subtitle1"><b>Queued</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">@_kanban.Queued.Count</MudChip>
+                    </MudStack>
+                    <MudDropZone T="KanbanJobDto" Identifier="@nameof(JobStatus.Queued)" Class="flex-grow-1" />
+                </MudPaper>
+
+                <MudPaper Elevation="0" Style="flex:0 0 280px;" MinHeight="500px" Class="pa-3 d-flex flex-column border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudText Typo="Typo.subtitle1"><b>In Progress</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">@_kanban.InProgress.Count</MudChip>
+                    </MudStack>
+                    <MudDropZone T="KanbanJobDto" Identifier="@nameof(JobStatus.InProgress)" Class="flex-grow-1" />
+                </MudPaper>
+
+                <MudPaper Elevation="0" Style="flex:0 0 280px;" MinHeight="500px" Class="pa-3 d-flex flex-column border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudText Typo="Typo.subtitle1"><b>Finishing</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">@_kanban.Finishing.Count</MudChip>
+                    </MudStack>
+                    <MudDropZone T="KanbanJobDto" Identifier="@nameof(JobStatus.Finishing)" Class="flex-grow-1" />
+                </MudPaper>
+
+                <MudPaper Elevation="0" Style="flex:0 0 280px;" MinHeight="500px" Class="pa-3 d-flex flex-column border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudText Typo="Typo.subtitle1"><b>Completed</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">@_kanban.Completed.Count</MudChip>
+                    </MudStack>
+                    <MudDropZone T="KanbanJobDto" Identifier="@nameof(JobStatus.Completed)" Class="flex-grow-1" />
+                </MudPaper>
+            </div>
+        </ChildContent>
+        <ItemRenderer>
+            <MudCard Elevation="0" Class="mb-2 border mud-border-lines-default" Style="cursor: pointer;">
+                <MudCardContent>
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <MudChip T="string" Size="Size.Small" Color="@GetTechnologyColor(context.Technology)">@context.Technology</MudChip>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">#@context.Id.ToString()[..8]</MudText>
+                                <MudIconButton Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(() => InitiateCancel(context.Id))" />
+                            </MudStack>
+                        </MudStack>
+                        <MudText Typo="Typo.body2">@context.MachineId</MudText>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Volume.ToString("F2") cm³</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Primary">P@context.Priority</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </ItemRenderer>
+    </MudDropContainer>
+
+    @if (_cancelJobId.HasValue)
+    {
+        <MudOverlay Visible="true" DarkBackground="true" ZIndex="10" />
+        <div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:11; width:min(400px, 90vw);">
+            <MudCard Elevation="4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Cancel Job</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudTextField @bind-Value="_cancelReason" Label="Reason" Lines="3"
+                                  Placeholder="Enter cancellation reason..." Variant="Variant.Outlined" />
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Color="Color.Default" OnClick="DismissCancel">Dismiss</MudButton>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Filled" Color="Color.Error"
+                               Disabled="@string.IsNullOrWhiteSpace(_cancelReason)"
+                               OnClick="ConfirmCancelJobAsync">
+                        Cancel Job
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </div>
+    }
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isReconnecting;
+    private KanbanResponse _kanban = new();
+    private List<KanbanJobDto> _allJobs = [];
+    private Dictionary<Guid, JobStatus> _statusCache = new();
+    private Microsoft.AspNetCore.SignalR.Client.HubConnection? _hubConnection;
+    private Guid? _cancelJobId;
+    private string _cancelReason = string.Empty;
+    private bool _hasError;
+    private string _errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadKanbanAsync();
+        await InitializeSignalRAsync();
+    }
+
+    private async Task RetryLoadAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        await LoadKanbanAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadKanbanAsync()
+    {
+        _hasError = false;
+        _errorMessage = string.Empty;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<KanbanResponse>("api/jobs/kanban");
+            if (response != null)
+            {
+                _kanban = response;
+                _allJobs = _kanban.Pending
+                    .Concat(_kanban.Queued)
+                    .Concat(_kanban.InProgress)
+                    .Concat(_kanban.Finishing)
+                    .Concat(_kanban.Completed)
+                    .ToList();
+
+                _statusCache = new Dictionary<Guid, JobStatus>(_allJobs.Count);
+                foreach (var j in _kanban.Pending) _statusCache[j.Id] = JobStatus.Pending;
+                foreach (var j in _kanban.Queued) _statusCache[j.Id] = JobStatus.Queued;
+                foreach (var j in _kanban.InProgress) _statusCache[j.Id] = JobStatus.InProgress;
+                foreach (var j in _kanban.Finishing) _statusCache[j.Id] = JobStatus.Finishing;
+                foreach (var j in _kanban.Completed) _statusCache[j.Id] = JobStatus.Completed;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading production queue");
+            _hasError = true;
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        _hubConnection = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/production"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.Reconnecting += _ =>
+        {
+            _isReconnecting = true;
+            InvokeAsync(StateHasChanged);
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.Reconnected += _ =>
+        {
+            _isReconnecting = false;
+            InvokeAsync(async () =>
+            {
+                await LoadKanbanAsync();
+                StateHasChanged();
+            });
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.On<Guid, string, string>("JobStatusChanged", async (jobId, previousStatus, newStatus) =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadKanbanAsync();
+                StateHasChanged();
+            });
+        });
+
+        _hubConnection.On<Guid>("JobAdded", async (jobId) =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadKanbanAsync();
+                StateHasChanged();
+            });
+        });
+
+        await _hubConnection.StartAsync();
+        await _hubConnection.SendAsync("JoinProductionFloor");
+    }
+
+    private bool ItemsSelector(KanbanJobDto item, string dropZoneIdentifier)
+    {
+        var status = GetStatusForZone(dropZoneIdentifier);
+        return _statusCache.TryGetValue(item.Id, out var jobStatus) && jobStatus == status;
+    }
+
+    private JobStatus GetStatusForZone(string zone)
+    {
+        return zone switch
+        {
+            nameof(JobStatus.Pending) => JobStatus.Pending,
+            nameof(JobStatus.Queued) => JobStatus.Queued,
+            nameof(JobStatus.InProgress) => JobStatus.InProgress,
+            nameof(JobStatus.Finishing) => JobStatus.Finishing,
+            nameof(JobStatus.Completed) => JobStatus.Completed,
+            _ => JobStatus.Pending
+        };
+    }
+
+    private async Task ItemDropped(MudItemDropInfo<KanbanJobDto> dropItem)
+    {
+        if (dropItem.Item == null) return;
+
+        var jobId = dropItem.Item.Id;
+        var newStatus = dropItem.DropzoneIdentifier;
+
+        try
+        {
+            var response = newStatus switch
+            {
+                nameof(JobStatus.Queued) => await Http.PostAsJsonAsync($"api/jobs/{jobId}/queue", new QueueJobRequest { MachineId = dropItem.Item.MachineId ?? "UNASSIGNED" }),
+                nameof(JobStatus.InProgress) => await Http.PostAsync($"api/jobs/{jobId}/start", null),
+                nameof(JobStatus.Finishing) => await Http.PostAsync($"api/jobs/{jobId}/finish", null),
+                nameof(JobStatus.Completed) => await Http.PostAsync($"api/jobs/{jobId}/complete", null),
+                _ => null
+            };
+
+            if (response != null && !response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Failed to update job status", Severity.Error);
+                await LoadKanbanAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Job moved to {newStatus}", Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating job {JobId} to {NewStatus}", jobId, newStatus);
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            await LoadKanbanAsync();
+        }
+    }
+
+    private void InitiateCancel(Guid jobId)
+    {
+        _cancelJobId = jobId;
+        _cancelReason = string.Empty;
+    }
+
+    private void DismissCancel()
+    {
+        _cancelJobId = null;
+        _cancelReason = string.Empty;
+    }
+
+    private async Task ConfirmCancelJobAsync()
+    {
+        if (!_cancelJobId.HasValue || string.IsNullOrWhiteSpace(_cancelReason)) return;
+
+        var jobId = _cancelJobId.Value;
+        var reason = _cancelReason;
+        DismissCancel();
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/jobs/{jobId}/cancel", new CancelJobRequest { Reason = reason });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Job cancelled", Severity.Success);
+                await LoadKanbanAsync();
+            }
+            else
+            {
+                Logger.LogError("Failed to cancel job {JobId}: HTTP {StatusCode}", jobId, response.StatusCode);
+                Snackbar.Add("Failed to cancel job", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error cancelling job {JobId}", jobId);
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+
+        StateHasChanged();
+    }
+
+    private static Color GetTechnologyColor(string technology)
+    {
+        return technology?.ToUpperInvariant() switch
+        {
+            "FDM" => Color.Primary,
+            "SLA" => Color.Secondary,
+            "DLP" => Color.Tertiary,
+            "CNC" => Color.Warning,
+            "SCANNING" => Color.Info,
+            "DESIGN" => Color.Success,
+            _ => Color.Default
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}

@@ -9,11 +9,13 @@ using Maliev.Intranet.Tests.Testing;
 
 namespace Maliev.Intranet.Tests.Bff.Clients;
 
+/// <summary>Tests for the career service client.</summary>
 public class CareerServiceClientTests
 {
     private readonly MockHttpMessageHandler _handler;
     private readonly CareerServiceClient _client;
 
+    /// <summary>Initializes a new instance of the <see cref="CareerServiceClientTests"/> class.</summary>
     public CareerServiceClientTests()
     {
         _handler = new MockHttpMessageHandler();
@@ -21,6 +23,7 @@ public class CareerServiceClientTests
         _client = new CareerServiceClient(httpClient);
     }
 
+    /// <summary>Verifies that getting job postings returns data.</summary>
     [Fact]
     public async Task GetJobPostingsAsync_ShouldReturnData()
     {
@@ -35,6 +38,7 @@ public class CareerServiceClientTests
         Assert.NotNull(result);
     }
 
+    /// <summary>Verifies that getting recruitment stats returns data.</summary>
     [Fact]
     public async Task GetRecruitmentStatsAsync_ShouldReturnData()
     {

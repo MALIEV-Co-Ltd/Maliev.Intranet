@@ -27,10 +27,10 @@ else
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
                 <MudText Typo="Typo.h5">@_material.Name</MudText>
-                <MudChip T="string" Size="Size.Medium" Color="@GetStatusColor(_material.Status)">
-                    @_material.Status
+                <MudChip T="string" Size="Size.Medium" Color="@(_material.Active ? Color.Success : Color.Default)">
+                    @(_material.Active ? "Active" : "Inactive")
                 </MudChip>
-                <MudText Typo="Typo.subtitle1" Class="mud-text-secondary">@_material.SKU</MudText>
+                <MudText Typo="Typo.subtitle1" Class="mud-text-secondary">@_material.Code</MudText>
             </MudStack>
 
             <MudStack Row="true" Spacing="2">
@@ -60,17 +60,14 @@ else
                         <MudGrid>
                             <MudItem xs="12" sm="6">
                                 <MudList T="string">
-                                    <MudListItem Text="Category" SecondaryText="@_material.Category" Icon="@Icons.Material.Outlined.Category" />
-                                    <MudListItem Text="Material Type" SecondaryText="@(_material.MaterialType ?? "N/A")" Icon="@Icons.Material.Outlined.Architecture" />
-                                    <MudListItem Text="Brand" SecondaryText="@(_material.Brand ?? "N/A")" Icon="@Icons.Material.Outlined.Business" />
-                                    <MudListItem Text="Color" SecondaryText="@(_material.Color ?? "N/A")" Icon="@Icons.Material.Outlined.Palette" />
+                                    <MudListItem T="string" Text="Category" SecondaryText="Other" Icon="@Icons.Material.Outlined.Category" />
+                                    <MudListItem T="string" Text="Price" SecondaryText="@_material.PricePerUnit.ToString("C2")" Icon="@Icons.Material.Outlined.AttachMoney" />
                                 </MudList>
                             </MudItem>
                             <MudItem xs="12" sm="6">
                                 <MudList T="string">
-                                    <MudListItem Text="Unit Price" SecondaryText="@_material.UnitPrice.ToString("C2")" Icon="@Icons.Material.Outlined.AttachMoney" />
-                                    <MudListItem Text="Base Unit" SecondaryText="@_material.Unit" Icon="@Icons.Material.Outlined.Scale" />
-                                    <MudListItem Text="Weight" SecondaryText="@(_material.Weight?.ToString("N2") ?? "N/A")" Icon="@Icons.Material.Outlined.FitnessCenter" />
+                                    <MudListItem T="string" Text="Density" SecondaryText="@($"{_material.Density} g/cm³")" Icon="@Icons.Material.Outlined.Compress" />
+                                    <MudListItem T="string" Text="Cost/Kg" SecondaryText="@_material.CostPerKg.ToString("C2")" Icon="@Icons.Material.Outlined.LocalOffer" />
                                 </MudList>
                             </MudItem>
                         </MudGrid>
@@ -110,22 +107,16 @@ else
                         </MudStack>
 
                         <MudGrid>
-                            <MudItem xs="12" sm="4">
+                            <MudItem xs="12" sm="6">
                                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default text-center">
                                     <MudText Typo="Typo.caption" Class="mud-text-secondary">Quantity on Hand</MudText>
-                                    <MudText Typo="Typo.h4" Color="@(GetStockColor())">@_material.QuantityOnHand @_material.Unit</MudText>
+                                    <MudText Typo="Typo.h4" Color="@(GetStockColor())">@_material.StockLevel g</MudText>
                                 </MudPaper>
                             </MudItem>
-                            <MudItem xs="12" sm="4">
-                                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default text-center">
-                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Reorder Level</MudText>
-                                    <MudText Typo="Typo.h4">@_material.ReorderLevel @_material.Unit</MudText>
-                                </MudPaper>
-                            </MudItem>
-                            <MudItem xs="12" sm="4">
+                            <MudItem xs="12" sm="6">
                                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default text-center">
                                     <MudText Typo="Typo.caption" Class="mud-text-secondary">Status</MudText>
-                                    <MudText Typo="Typo.h4" Color="@GetStatusColor(_material.Status)">@_material.Status</MudText>
+                                    <MudText Typo="Typo.h4" Color="@(_material.Active ? Color.Success : Color.Default)">@(_material.Active ? "Active" : "Inactive")</MudText>
                                 </MudPaper>
                             </MudItem>
                         </MudGrid>
@@ -175,19 +166,15 @@ else
                             <MudTable Items="@_material.Suppliers" Dense="true" Hover="true">
                                 <HeaderContent>
                                     <MudTh>Supplier Name</MudTh>
-                                    <MudTh>Email</MudTh>
+                                    <MudTh>Country</MudTh>
                                     <MudTh>Status</MudTh>
-                                    <MudTh>Rating</MudTh>
                                     <MudTh></MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
-                                    <MudTd DataLabel="Name">@context.Name</MudTd>
-                                    <MudTd DataLabel="Email">@context.Email</MudTd>
+                                    <MudTd DataLabel="Supplier Name">@context.CompanyName</MudTd>
+                                    <MudTd DataLabel="Country">@context.Country</MudTd>
                                     <MudTd DataLabel="Status">
                                         <MudChip T="string" Size="Size.Small" Color="@(context.Status == "Active" ? Color.Success : Color.Default)">@context.Status</MudChip>
-                                    </MudTd>
-                                    <MudTd DataLabel="Rating">
-                                        <MudRating ReadOnly="true" SelectedValue="@((int)context.Rating)" Size="Size.Small" />
                                     </MudTd>
                                     <MudTd Style="text-align: right;">
                                         <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Href="@($"/mfg/suppliers/{context.Id}")" />
@@ -217,7 +204,7 @@ else
                                 <RowTemplate>
                                     <MudTd DataLabel="Date">@context.Timestamp.ToString("dd MMM yyyy HH:mm")</MudTd>
                                     <MudTd DataLabel="Reference">@context.Reference</MudTd>
-                                    <MudTd DataLabel="Quantity Used" Style="text-align: right;">@Math.Abs(context.Quantity) @_material.Unit</MudTd>
+                                    <MudTd DataLabel="Quantity Used" Style="text-align: right;">@Math.Abs(context.Quantity) g</MudTd>
                                     <MudTd DataLabel="Issued By">@context.PerformedBy</MudTd>
                                 </RowTemplate>
                             </MudTable>
@@ -251,11 +238,11 @@ else
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2" Class="mud-text-secondary">Last Updated:</MudText>
-                            <MudText Typo="Typo.body2">@_material.UpdatedAt.ToString("dd MMM yyyy HH:mm")</MudText>
+                            <MudText Typo="Typo.body2">@(_material.UpdatedAt?.ToString("dd MMM yyyy HH:mm") ?? "N/A")</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2" Class="mud-text-secondary">ID:</MudText>
-                            <MudText Typo="Typo.body2" Style="font-size: 0.7rem;">@_material.Id</MudText>
+                            <MudText Typo="Typo.body2" Style="font-size: 0.7rem;">@_material.Id.ToString()</MudText>
                         </MudStack>
                     </MudStack>
                 </MudPaper>
@@ -331,8 +318,7 @@ else
     private Color GetStockColor()
     {
         if (_material == null) return Color.Default;
-        if (_material.QuantityOnHand <= 0) return Color.Error;
-        if (_material.QuantityOnHand <= _material.ReorderLevel) return Color.Warning;
+        if (_material.StockLevel <= 0) return Color.Error;
         return Color.Success;
     }
 

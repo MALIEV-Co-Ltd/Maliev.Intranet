@@ -13,8 +13,7 @@
         <EditForm Model="@_model" OnValidSubmit="HandleValidSubmit">
             <DataAnnotationsValidator />
             <MudStack Spacing="4">
-                <MudTextField Label="Name" @bind-Value="_model.Name" For="@(() => _model.Name)" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                <MudTextField Label="Template Key" @bind-Value="_model.TemplateKey" For="@(() => _model.TemplateKey)" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_isEdit" />
+                <MudTextField Label="Template Key" @bind-Value="_model.TemplateKey" For="@(() => _model.TemplateKey)" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_isEdit" Placeholder="e.g. order-confirmed" />
                 
                 <MudGrid>
                     <MudItem xs="6">
@@ -33,17 +32,9 @@
                     </MudItem>
                 </MudGrid>
 
-                @if (_model.ChannelType == "Email")
-                {
-                    <MudTextField Label="Subject Template" @bind-Value="_model.SubjectTemplate" For="@(() => _model.SubjectTemplate)" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                }
-
-                <MudTextField Label="Body Template" @bind-Value="_model.BodyTemplate" For="@(() => _model.BodyTemplate)" Variant="Variant.Outlined" Lines="8" Style="font-family: monospace;" />
+                <MudTextField Label="Content Template" @bind-Value="_model.ContentTemplate" For="@(() => _model.ContentTemplate)" Variant="Variant.Outlined" Lines="8" Style="font-family: monospace;" HelperText="Use {{parameter}} for placeholders" />
                 
-                @if (_isEdit)
-                {
-                    <MudSwitch T="bool" @bind-Value="_model.IsActive" Label="Active" Color="Color.Success" />
-                }
+                <MudTextField Label="Parameters (comma separated)" @bind-Value="_model.ParametersCsv" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="e.g. orderId, customerName" />
             </MudStack>
         </EditForm>
     </DialogContent>
@@ -68,14 +59,12 @@
         {
             _model = new TemplateFormModel
             {
-                Name = Template.Name,
                 TemplateKey = Template.TemplateKey,
-                SubjectTemplate = Template.SubjectTemplate,
-                BodyTemplate = Template.BodyTemplate,
+                ContentTemplate = Template.ContentTemplate,
                 ChannelType = Template.ChannelType,
                 Language = Template.Language,
                 Version = Template.Version,
-                IsActive = Template.IsActive
+                ParametersCsv = string.Join(", ", Template.Parameters)
             };
         }
     }
@@ -86,14 +75,19 @@
     {
         try
         {
+            var parameters = _model.ParametersCsv?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+
             if (_isEdit)
             {
                 var request = new UpdateNotificationTemplateRequest
                 {
-                    Name = _model.Name,
-                    SubjectTemplate = _model.SubjectTemplate,
-                    BodyTemplate = _model.BodyTemplate,
-                    IsActive = _model.IsActive
+                    TemplateKey = _model.TemplateKey,
+                    ContentTemplate = _model.ContentTemplate,
+                    ChannelType = _model.ChannelType,
+                    Language = _model.Language,
+                    Version = _model.Version,
+                    Parameters = parameters
                 };
                 var response = await Http.PutAsJsonAsync($"api/notifications/templates/{Template!.Id}", request);
                 if (response.IsSuccessStatusCode)
@@ -106,13 +100,12 @@
             {
                 var request = new CreateNotificationTemplateRequest
                 {
-                    Name = _model.Name,
                     TemplateKey = _model.TemplateKey,
-                    SubjectTemplate = _model.SubjectTemplate ?? "",
-                    BodyTemplate = _model.BodyTemplate,
+                    ContentTemplate = _model.ContentTemplate,
                     ChannelType = _model.ChannelType,
                     Language = _model.Language,
-                    Version = _model.Version
+                    Version = _model.Version,
+                    Parameters = parameters
                 };
                 var response = await Http.PostAsJsonAsync("api/notifications/templates", request);
                 if (response.IsSuccessStatusCode)
@@ -132,13 +125,11 @@
 
     public class TemplateFormModel
     {
-        [Required] public string Name { get; set; } = "";
         [Required] public string TemplateKey { get; set; } = "";
-        public string? SubjectTemplate { get; set; }
-        [Required] public string BodyTemplate { get; set; } = "";
+        [Required] public string ContentTemplate { get; set; } = "";
         [Required] public string ChannelType { get; set; } = "Email";
         public string Language { get; set; } = "en";
         public int Version { get; set; } = 1;
-        public bool IsActive { get; set; } = true;
+        public string? ParametersCsv { get; set; }
     }
 }

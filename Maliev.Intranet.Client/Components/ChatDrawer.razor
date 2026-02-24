@@ -160,7 +160,6 @@
                               Variant="Variant.Text"
                               Underline="false"
                               Lines="1"
-                              AutoGrow="true"
                               MaxLines="8"
                               OnKeyDown="@HandleKeyDown"
                               Immediate="true"
@@ -173,9 +172,9 @@
             <div class="d-flex align-center justify-space-between mt-1 px-1">
                 <div class="d-flex align-center gap-1">
                     <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="UploadFiles" Hidden="true">
-                        <ActivatorContent>
+                        <CustomContent Context="_">
                             <MudIconButton Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" Class="action-icon" />
-                        </ActivatorContent>
+                        </CustomContent>
                     </MudFileUpload>
                     <MudIconButton Icon="@Icons.Material.Outlined.Public" Size="Size.Small" Class="action-icon" />
                     <MudIconButton Icon="@Icons.Material.Outlined.Lightbulb" Size="Size.Small" Class="action-icon" />

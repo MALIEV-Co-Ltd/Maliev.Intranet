@@ -15,12 +15,14 @@ using System.Security.Claims;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the responsive layout behavior of the main layout component.</summary>
 public class ResponsiveLayoutTests : BunitContext, IAsyncLifetime
 {
     private readonly Mock<ILogger<MainLayout>> _loggerMock = new();
     private readonly Mock<ILogger<LayoutService>> _layoutLoggerMock = new();
     private readonly Mock<AuthenticationStateProvider> _authMock = new();
 
+    /// <summary>Initializes a new instance of the <see cref="ResponsiveLayoutTests"/> class.</summary>
     public ResponsiveLayoutTests()
     {
         Services.AddMudServices();
@@ -53,10 +55,13 @@ public class ResponsiveLayoutTests : BunitContext, IAsyncLifetime
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")], "Test"))));
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that the layout adjusts correctly when the viewport breakpoint changes.</summary>
     public async Task ShouldAdjustLayout_WhenBreakpointChanges()
     {
         var cut = Render<MainLayout>();

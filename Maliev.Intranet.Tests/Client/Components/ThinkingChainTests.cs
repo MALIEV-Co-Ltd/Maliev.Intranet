@@ -8,8 +8,10 @@ using Microsoft.AspNetCore.Components.Web;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the ThinkingChain component.</summary>
 public class ThinkingChainTests : BunitContext, IAsyncLifetime
 {
+    /// <summary>Initializes a new instance of the <see cref="ThinkingChainTests"/> class.</summary>
     public ThinkingChainTests()
     {
         Services.AddMudServices();
@@ -17,10 +19,13 @@ public class ThinkingChainTests : BunitContext, IAsyncLifetime
         Render<MudPopoverProvider>();
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that nothing is rendered when no thinking steps are provided.</summary>
     public void ShouldRenderNothing_WhenNoSteps()
     {
         var cut = Render<ThinkingChain>(p => p.Add(x => x.Steps, new List<ThinkingStepDto>()));
@@ -29,6 +34,7 @@ public class ThinkingChainTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    /// <summary>Verifies that the thinking steps are rendered when they are provided.</summary>
     public void ShouldRenderSteps_WhenProvided()
     {
         var steps = new List<ThinkingStepDto>
@@ -48,6 +54,7 @@ public class ThinkingChainTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    /// <summary>Verifies that clicking the header toggles the expansion state of the thinking chain.</summary>
     public async Task ShouldToggleExpansion_OnHeaderClick()
     {
         var steps = new List<ThinkingStepDto>

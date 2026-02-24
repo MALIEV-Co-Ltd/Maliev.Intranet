@@ -10,8 +10,10 @@ using Maliev.Intranet.Tests.Testing;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
+/// <summary>Tests for the companies controller.</summary>
 public class CompaniesControllerTests
 {
+    /// <summary>Verifies that Get returns OK.</summary>
     [Fact]
     public async Task Get_ShouldReturnOk()
     {
@@ -23,8 +25,10 @@ public class CompaniesControllerTests
     }
 }
 
+/// <summary>Tests for the credit terms controller.</summary>
 public class CreditTermsControllerTests
 {
+    /// <summary>Verifies that Get returns OK.</summary>
     [Fact]
     public async Task Get_ShouldReturnOk()
     {
@@ -36,17 +40,20 @@ public class CreditTermsControllerTests
     }
 }
 
+/// <summary>Tests for the preferences controller.</summary>
 public class PreferencesControllerTests
 {
     private readonly Mock<EmployeeServiceClient> _clientMock;
     private readonly PreferencesController _controller;
 
+    /// <summary>Initializes a new instance of the <see cref="PreferencesControllerTests"/> class.</summary>
     public PreferencesControllerTests()
     {
         _clientMock = new Mock<EmployeeServiceClient>(new HttpClient());
         _controller = new PreferencesController(_clientMock.Object);
     }
 
+    /// <summary>Verifies that Get returns OK.</summary>
     [Fact]
     public async Task Get_ShouldReturnOk()
     {
@@ -56,13 +63,16 @@ public class PreferencesControllerTests
     }
 }
 
+/// <summary>Extended tests for the orders controller.</summary>
 public class OrdersControllerExtendedTests
 {
     // OrdersController does not have Create in the snippet seen.
 }
 
+/// <summary>Extended tests for the quotations controller.</summary>
 public class QuotationsControllerExtendedTests
 {
+    /// <summary>Verifies that Create returns a CreatedAtAction result.</summary>
     [Fact]
     public async Task Create_ShouldReturnCreatedAtAction()
     {
@@ -75,8 +85,10 @@ public class QuotationsControllerExtendedTests
     }
 }
 
+/// <summary>Extended tests for the materials controller.</summary>
 public class MaterialsControllerExtendedTests
 {
+    /// <summary>Verifies that GetById returns OK when the material is found.</summary>
     [Fact]
     public async Task GetById_ShouldReturnOk()
     {
@@ -88,8 +100,10 @@ public class MaterialsControllerExtendedTests
     }
 }
 
+/// <summary>Extended tests for the suppliers controller.</summary>
 public class SuppliersControllerExtendedTests
 {
+    /// <summary>Verifies that GetById returns OK when the supplier is found.</summary>
     [Fact]
     public async Task GetById_ShouldReturnOk()
     {

@@ -8,9 +8,11 @@ using Xunit;
 
 namespace Maliev.Intranet.Tests.Client.Services;
 
+/// <summary>Tests for the theme configuration and layout service behavior.</summary>
 public class ThemeServiceTests
 {
     [Fact]
+    /// <summary>Verifies that the Maliev theme is created and returns valid light and dark palette configurations.</summary>
     public void CreateMalievTheme_ReturnsValidTheme()
     {
         var theme = ThemeConfiguration.MalievTheme;
@@ -25,6 +27,7 @@ public class ThemeServiceTests
     }
 
     [Fact]
+    /// <summary>Verifies that toggling the layout service mode cycles correctly through System, Light, and Dark modes.</summary>
     public async Task LayoutService_ToggleCyclesCorrectly()
     {
         // Arrange
@@ -46,6 +49,7 @@ public class ThemeServiceTests
     }
 
     [Fact]
+    /// <summary>Verifies that the effective theme is calculated correctly when the system color preference changes.</summary>
     public async Task LayoutService_CalculateEffectiveTheme_WorksWithSystemPreference()
     {
         // Arrange

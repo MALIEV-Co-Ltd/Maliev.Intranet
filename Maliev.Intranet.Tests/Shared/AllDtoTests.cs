@@ -5,9 +5,11 @@ using Maliev.Intranet.Shared.Dtos;
 
 namespace Maliev.Intranet.Tests.Shared;
 
+/// <summary>Tests that verify all shared DTO types can be instantiated successfully.</summary>
 public class AllDtoTests
 {
     [Fact]
+    /// <summary>Verifies that all shared DTO types can be instantiated without error.</summary>
     public void AllDtos_ShouldBeInstantiable()
     {
         // Delivery
@@ -204,7 +206,7 @@ public class AllDtoTests
         _ = new ExtractCustomerDataRequest { FilePaths = new List<string>(), RawText = "T" };
         _ = new ExtractedCustomerDataResponse { FirstName = "F", LastName = "L", Email = "e", Mobile = "M", Landline = "L", Extension = "E", Segment = "S", CompanyName = "C", CompanyPhone = "P", VatNumber = "V", BranchNumber = "B", Addresses = new List<ExtractedAddress>(), Confidence = 0.9 };
         _ = new ExtractedAddress { Type = "B", AddressLine1 = "A", AddressLine2 = "A", AddressLine3 = "A", District = "D", City = "C", StateProvince = "S", PostalCode = "P", RecipientName = "N", RecipientPhone = "P", Location = new RegistryThaiLocation() };
-        _ = new CompanySearchResultDto { Id = Guid.NewGuid(), Name = "N", VatNumber = "V", RegistrationNumber = "R", ContactEmail = "e", ContactPhone = "P", Segment = "S", Tier = "T", DefaultBillingAddress = new AddressResponse() };
+        _ = new CompanySearchResultDto { Id = Guid.NewGuid(), Name = "N", VatNumber = "V", RegistrationNumber = "R", ContactEmail = "e", ContactPhone = "P", Segment = "S" };
         _ = new CompanyResponse { Id = Guid.NewGuid(), Name = "N", VatNumber = "V", RegistrationNumber = "R", ContactEmail = "e", ContactPhone = "P", Segment = "S", Tier = "T", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now, Version = new byte[0] };
         _ = new CompanySummaryDto { Id = Guid.NewGuid(), Name = "N", VatNumber = "V", RegistrationNumber = "R", ContactEmail = "e", ContactPhone = "P", Segment = "S", Tier = "T" };
 

@@ -1,0 +1,174 @@
+@using Maliev.Intranet.Shared
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.CompanyName"
+                                  Label="Company Name"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Company name is required" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_model.TaxId"
+                                  Label="Tax ID"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Tax ID is required" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudAutocomplete T="string"
+                                     Value="_model.Country"
+                                     Label="Country"
+                                     Variant="Variant.Outlined"
+                                     Required="true"
+                                     RequiredError="Country is required"
+                                     SearchFunc="SearchCountries"
+                                     ValueChanged="@(v => _model.Country = v ?? string.Empty)"
+                                     CoerceValue="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Address"
+                                  Label="Address"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Address is required"
+                                  Lines="2" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_model.City"
+                                  Label="City"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="City is required" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_model.PostalCode"
+                                  Label="Postal Code"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mt-2">Primary Contact</MudText>
+                    <MudDivider Class="mb-2" />
+                </MudItem>
+                
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_contact.Name"
+                                  Label="Contact Name"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Contact name is required" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_contact.Email"
+                                  Label="Contact Email"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Contact email is required" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_contact.Phone"
+                                  Label="Contact Phone"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_contact.Role"
+                                  Label="Contact Role"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">Creating...</MudText>
+            }
+            else
+            {
+                <text>Create</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+    private CreateSupplierRequest _model = new();
+    private CreateSupplierContactRequest _contact = new() { IsPrimary = true };
+    private List<CountryDto> _countries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var countries = await Http.GetFromJsonAsync<List<CountryDto>>("api/reference-data/countries");
+            _countries = countries ?? new();
+        }
+        catch
+        {
+            // Countries not critical — proceed without them
+        }
+    }
+
+    private Task<IEnumerable<string>> SearchCountries(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult(_countries.Select(c => c.Name).Take(10));
+        var matches = _countries
+            .Where(c => c.Name.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                        c.Code.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Select(c => c.Name)
+            .Take(10);
+        return Task.FromResult(matches);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _model.PrimaryContact = _contact;
+        _isSubmitting = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/suppliers", _model);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Supplier added successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to add supplier: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

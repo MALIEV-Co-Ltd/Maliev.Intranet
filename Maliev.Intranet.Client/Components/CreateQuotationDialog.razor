@@ -1,5 +1,6 @@
 @using Maliev.Intranet.Shared
 @using MudBlazor
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
@@ -30,6 +31,14 @@
                     <!-- Billing Identity Selector -->
                     <BillingIdentitySelector Customer="_customerIdentity"
                                              @bind-SelectedIdentityType="_billingIdentityType" />
+
+                    <!-- Currency Selector -->
+                    <MudSelect @bind-Value="_selectedCurrencyCode" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var currency in _currencies)
+                        {
+                            <MudSelectItem Value="@currency.Code">@currency.Code — @currency.Name</MudSelectItem>
+                        }
+                    </MudSelect>
 
                     <!-- Validity Period -->
                     <MudDateRangePicker Label="Validity Period"
@@ -87,7 +96,7 @@
                                             </MudItem>
                                             <MudItem xs="2">
                                                 <MudText Typo="Typo.body2" Color="Color.Secondary">Total</MudText>
-                                                <MudText Typo="Typo.h6">@((item.Quantity * item.UnitPrice).ToString("C2"))</MudText>
+                                                <MudText Typo="Typo.h6">@ThaiCurrency.Format(item.Quantity * item.UnitPrice, 2)</MudText>
                                             </MudItem>
                                             <MudItem xs="1">
                                                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
@@ -101,7 +110,7 @@
 
                                 <MudDivider />
                                 <MudStack Row="true" Justify="Justify.FlexEnd">
-                                    <MudText Typo="Typo.h6">Total: @CalculateTotal().ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h6">Total: @ThaiCurrency.Format(CalculateTotal(), 2)</MudText>
                                 </MudStack>
                             }
                         </MudStack>
@@ -149,6 +158,22 @@
     private DateRange? _validityPeriod = new DateRange(DateTime.Today, DateTime.Today.AddDays(30));
     private string? _deliveryExpectations;
     private List<QuotationItemDto> _lineItems = new();
+    private string _selectedCurrencyCode = "THB";
+    private List<CurrencyDto> _currencies = [new CurrencyDto { Code = "THB", Name = "Thai Baht" }];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var currencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/reference-data/currencies");
+            if (currencies != null && currencies.Count > 0)
+                _currencies = currencies;
+        }
+        catch
+        {
+            // Keep default THB if fetch fails
+        }
+    }
 
     private async Task<IEnumerable<CustomerSummaryDto>> SearchCustomers(string value, CancellationToken cancellationToken)
     {
@@ -220,6 +245,7 @@
                 ValidityPeriodStart = _validityPeriod.Start ?? DateTime.Today,
                 ValidityPeriodEnd = _validityPeriod.End ?? DateTime.Today.AddDays(30),
                 Items = _lineItems,
+                CurrencyCode = _selectedCurrencyCode,
                 DeliveryExpectations = _deliveryExpectations
             };
 

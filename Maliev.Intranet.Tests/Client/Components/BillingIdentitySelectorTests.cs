@@ -8,22 +8,27 @@ using Microsoft.AspNetCore.Components;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the BillingIdentitySelector component.</summary>
 public class BillingIdentitySelectorTests : BunitContext, IAsyncLifetime
 {
+    /// <summary>Initializes a new instance of the <see cref="BillingIdentitySelectorTests"/> class.</summary>
     public BillingIdentitySelectorTests()
     {
         Services.AddMudServices();
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
 
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync()
     {
         await base.DisposeAsync();
     }
 
     [Fact]
+    /// <summary>Verifies that a loading message is rendered when the customer is null.</summary>
     public void ShouldRenderLoading_WhenCustomerIsNull()
     {
         var cut = Render<BillingIdentitySelector>(parameters => parameters
@@ -34,6 +39,7 @@ public class BillingIdentitySelectorTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    /// <summary>Verifies that the personal billing identity is rendered when only a personal identity exists.</summary>
     public void ShouldRenderPersonal_WhenOnlyPersonalExists()
     {
         var customer = new CustomerIdentityDto
@@ -52,6 +58,7 @@ public class BillingIdentitySelectorTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    /// <summary>Verifies that radio buttons for both personal and corporate identities are rendered when both exist.</summary>
     public void ShouldRenderRadios_WhenBothExist()
     {
         var customer = new CustomerIdentityDto

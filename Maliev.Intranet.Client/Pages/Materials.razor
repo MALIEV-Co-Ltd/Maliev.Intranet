@@ -57,19 +57,19 @@ else
                      Elevation="0">
             <Columns>
                 <PropertyColumn Property="x => x.Name" Title="Material Name" />
-                <PropertyColumn Property="x => x.Category" Title="Category" />
+                <PropertyColumn Property="x => x.Code" Title="Code" />
                 <TemplateColumn Title="Stock Level">
                     <CellTemplate>
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudText Typo="Typo.body2">@context.Item.QuantityOnHand @context.Item.Unit</MudText>
+                            <MudText Typo="Typo.body2">@context.Item.StockLevel g</MudText>
                         </MudStack>
                     </CellTemplate>
                 </TemplateColumn>
-                <PropertyColumn Property="x => x.UnitPrice" Title="Unit Price" Format="C2" />
+                <PropertyColumn Property="x => x.PricePerUnit" Title="Price Per Unit" Format="C2" />
                 <TemplateColumn Title="Status">
                     <CellTemplate>
-                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
-                            @context.Item.Status
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Item.Active ? Color.Success : Color.Default)">
+                            @(context.Item.Active ? "Active" : "Inactive")
                         </MudChip>
                     </CellTemplate>
                 </TemplateColumn>
@@ -103,6 +103,25 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData();
+        _isLoading = false;
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateMaterialDialog>("Create Material", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
         try
         {
             var response = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>("api/materials");
@@ -115,27 +134,11 @@ else
         {
             Snackbar.Add($"Error loading materials: {ex.Message}", Severity.Error);
         }
-        finally
-        {
-            _isLoading = false;
-        }
-    }
-
-    private async Task OpenCreateDialog()
-    {
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<CreateMaterialDialog>("Create Material", options);
-        var result = await dialog.Result;
-
-        if (result != null && !result.Canceled)
-        {
-            await OnInitializedAsync();
-        }
     }
 
     private async Task DeleteMaterial(MaterialSummaryDto material)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Delete Material", 
             $"Are you sure you want to delete {material.Name}?", 
             yesText: "Delete", cancelText: "Cancel");
@@ -146,7 +149,8 @@ else
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Material deleted", Severity.Success);
-                await OnInitializedAsync();
+                await LoadData();
+                StateHasChanged();
             }
             else
             {

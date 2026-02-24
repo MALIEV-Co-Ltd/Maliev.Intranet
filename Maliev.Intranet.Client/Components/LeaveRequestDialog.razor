@@ -1,0 +1,113 @@
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudStack Spacing="3">
+                <MudSelect @bind-Value="_leaveType"
+                           Label="Leave Type"
+                           Variant="Variant.Outlined"
+                           Required="true"
+                           RequiredError="Leave type is required">
+                    <MudSelectItem Value="@("Annual")">Annual Leave</MudSelectItem>
+                    <MudSelectItem Value="@("Sick")">Sick Leave</MudSelectItem>
+                    <MudSelectItem Value="@("Personal")">Personal Leave</MudSelectItem>
+                    <MudSelectItem Value="@("Maternity")">Maternity Leave</MudSelectItem>
+                    <MudSelectItem Value="@("Paternity")">Paternity Leave</MudSelectItem>
+                    <MudSelectItem Value="@("Unpaid")">Unpaid Leave</MudSelectItem>
+                </MudSelect>
+
+                <MudDateRangePicker Label="Leave Period"
+                                    @bind-DateRange="_dateRange"
+                                    Required="true"
+                                    Variant="Variant.Outlined"
+                                    MinDate="DateTime.Today" />
+
+                @if (_dateRange?.Start != null && _dateRange?.End != null)
+                {
+                    var days = (_dateRange.End.Value - _dateRange.Start.Value).Days + 1;
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Duration: <strong>@days day@(days == 1 ? "" : "s")</strong></MudText>
+                }
+
+                <MudTextField @bind-Value="_reason"
+                              Label="Reason (Optional)"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              Placeholder="Provide a brief reason for this leave request..." />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _dateRange?.Start == null || _dateRange?.End == null || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">Submitting...</MudText>
+            }
+            else
+            {
+                <text>Submit Request</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+
+    private string _leaveType = "Annual";
+    private DateRange? _dateRange = new DateRange(DateTime.Today, DateTime.Today.AddDays(1));
+    private string? _reason;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid || _dateRange?.Start == null || _dateRange?.End == null) return;
+
+        _isSubmitting = true;
+        try
+        {
+            var request = new
+            {
+                LeaveType = _leaveType,
+                StartDate = _dateRange.Start.Value,
+                EndDate = _dateRange.End.Value,
+                Reason = _reason
+            };
+
+            var response = await Http.PostAsJsonAsync("api/timeoff/requests", request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Leave request submitted successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to submit request: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

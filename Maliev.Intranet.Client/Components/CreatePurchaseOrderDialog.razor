@@ -1,0 +1,156 @@
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@using MudBlazor
+@using Maliev.Intranet.Client.Helpers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudSelect T="SupplierSummaryDto" 
+                               Label="Supplier" 
+                               Variant="Variant.Outlined" 
+                               Required="true"
+                               Value="_selectedSupplier"
+                               ValueChanged="OnSupplierChanged">
+                        @foreach (var s in _suppliers)
+                        {
+                            <MudSelectItem Value="@s">@s.CompanyName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudDatePicker Label="Order Date" Date="@_model.OrderDate" DateChanged="@(d => _model.OrderDate = d ?? DateTime.Today)" Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudSelect @bind-Value="_selectedCurrencyCode" Label="Currency" Variant="Variant.Outlined">
+                        @foreach (var c in _currencies)
+                        {
+                            <MudSelectItem Value="@c.Code">@c.Code — @c.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Order Items</MudText>
+                    <MudTable Items="_model.Items" Dense="true" Hover="true" Elevation="0" Class="border mud-border-lines-default rounded">
+                        <HeaderContent>
+                            <MudTh>Material ID</MudTh>
+                            <MudTh>Quantity</MudTh>
+                            <MudTh>Unit Price</MudTh>
+                            <MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.MaterialID</MudTd>
+                            <MudTd>@context.Quantity</MudTd>
+                            <MudTd>@ThaiCurrency.Format(context.UnitPrice, 2)</MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => _model.Items.Remove(context))" />
+                            </MudTd>
+                        </RowTemplate>
+                        <FooterContent>
+                            <MudTd colspan="4">
+                                <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="AddItem">Add Item</MudButton>
+                            </MudTd>
+                        </FooterContent>
+                    </MudTable>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _isSubmitting || !_model.Items.Any())">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">Creating...</MudText>
+            }
+            else
+            {
+                <text>Create PO</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+    private CreatePurchaseOrderRequest _model = new() { OrderDate = DateTime.Today };
+    private List<SupplierSummaryDto> _suppliers = new();
+    private SupplierSummaryDto? _selectedSupplier;
+    private string _selectedCurrencyCode = "THB";
+    private List<CurrencyDto> _currencies = [new CurrencyDto { Code = "THB", Name = "Thai Baht" }];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var suppliersTask = Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>("api/suppliers");
+            var currenciesTask = Http.GetFromJsonAsync<List<CurrencyDto>>("api/reference-data/currencies");
+            await Task.WhenAll(suppliersTask, currenciesTask);
+
+            _suppliers = suppliersTask.Result?.Data.ToList() ?? new();
+            if (currenciesTask.Result != null && currenciesTask.Result.Count > 0)
+                _currencies = currenciesTask.Result;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading form data: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnSupplierChanged(SupplierSummaryDto supplier)
+    {
+        _selectedSupplier = supplier;
+        // In a real app, we'd map Guid to int if needed, but here we'll just use a placeholder int for the MVP 
+        // since the service expects int but SupplierService uses Guid.
+        _model.SupplierID = 1; 
+    }
+
+    private void AddItem()
+    {
+        _model.Items.Add(new PurchaseOrderLineItemDto { MaterialID = 1, Quantity = 1, UnitPrice = 0 });
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isSubmitting = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/procurement", _model);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Purchase order created successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to create purchase order", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

@@ -47,9 +47,9 @@ else
         <MudItem xs="12" md="6">
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg" Style="height: 400px;">
                 <MudText Typo="Typo.h6" Class="mb-4">Department Distribution</MudText>
-                <MudChart ChartType="ChartType.Donut" 
-                          InputData="@(_analytics.DepartmentDistribution.Select(d => (double)d.Count).ToArray())" 
-                          InputLabels="@(_analytics.DepartmentDistribution.Select(d => d.Department).ToArray())" 
+                <MudChart T="double" ChartType="ChartType.Donut"
+                          ChartSeries="@(new List<ChartSeries<double>> { new ChartSeries<double> { Data = _analytics.DepartmentDistribution.Select(d => (double)d.Count).ToArray() } })"
+                          ChartLabels="@(_analytics.DepartmentDistribution.Select(d => d.Department).ToArray())"
                           Width="100%" Height="300px" />
             </MudPaper>
         </MudItem>
@@ -57,9 +57,9 @@ else
         <MudItem xs="12" md="6">
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg" Style="height: 400px;">
                 <MudText Typo="Typo.h6" Class="mb-4">Hiring Trend (Last 6 Months)</MudText>
-                <MudChart ChartType="ChartType.Line" 
-                          ChartSeries="@(_series)" 
-                          XAxisLabels="@(_analytics.HireTrend.Select(t => t.Month).ToArray())" 
+                <MudChart T="double" ChartType="ChartType.Line"
+                          ChartSeries="@(_series)"
+                          ChartLabels="@(_analytics.HireTrend.Select(t => t.Month).ToArray())"
                           Width="100%" Height="300px" />
             </MudPaper>
         </MudItem>
@@ -69,7 +69,7 @@ else
 @code {
     private bool _isLoading = true;
     private HrAnalyticsDto? _analytics;
-    private List<ChartSeries> _series = new();
+    private List<ChartSeries<double>> _series = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -85,9 +85,9 @@ else
             
             if (_analytics != null)
             {
-                _series = new List<ChartSeries>
+                _series = new List<ChartSeries<double>>
                 {
-                    new ChartSeries { Name = "New Hires", Data = _analytics.HireTrend.Select(t => (double)t.Count).ToArray() }
+                    new ChartSeries<double> { Name = "New Hires", Data = _analytics.HireTrend.Select(t => (double)t.Count).ToArray() }
                 };
             }
         }

@@ -7,8 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the ModelViewer component.</summary>
 public class ModelViewerTests : BunitContext, IAsyncLifetime
 {
+    /// <summary>Initializes a new instance of the <see cref="ModelViewerTests"/> class.</summary>
     public ModelViewerTests()
     {
         Services.AddMudServices();
@@ -16,10 +18,13 @@ public class ModelViewerTests : BunitContext, IAsyncLifetime
         Render<MudPopoverProvider>();
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that a canvas element is rendered by the model viewer.</summary>
     public void ShouldRenderCanvas()
     {
         var cut = Render<ModelViewer>();
@@ -27,6 +32,7 @@ public class ModelViewerTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    /// <summary>Verifies that the pending analysis state is displayed when the model has not been analyzed.</summary>
     public void ShouldDisplayPendingState_WhenNotAnalyzed()
     {
         var model = new Model3DDto { FileName = "test.stl", GeometryAnalyzed = false };
@@ -37,6 +43,7 @@ public class ModelViewerTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    /// <summary>Verifies that geometry statistics are displayed when the model has been analyzed.</summary>
     public void ShouldDisplayStats_WhenAnalyzed()
     {
         var model = new Model3DDto

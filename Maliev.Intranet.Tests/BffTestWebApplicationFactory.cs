@@ -14,10 +14,12 @@ using Microsoft.Extensions.Configuration;
 
 namespace Maliev.Intranet.Tests;
 
+/// <summary>Web application factory for BFF integration tests.</summary>
 public class BffTestWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly RSA _testRsa = RSA.Create(2048);
 
+    /// <summary>Configures the web host for testing.</summary>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -54,10 +56,12 @@ public class BffTestWebApplicationFactory : WebApplicationFactory<Program>
         });
     }
 
+    /// <summary>Allows derived classes to configure additional services for testing.</summary>
     protected virtual void ConfigureAdditionalServices(IServiceCollection services)
     {
     }
 
+    /// <summary>Creates a signed JWT test token with the specified user ID and permissions.</summary>
     public string CreateTestToken(string userId = "test-user", params string[] permissions)
     {
         var claims = new List<Claim>

@@ -2,6 +2,7 @@
 @page "/finance/ledger"
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Components
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -51,7 +52,7 @@
                         <MudListItem T="string">
                             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                                 <div>
-                                    <MudText Typo="Typo.subtitle2">@account.Code - @account.Name</MudText>
+                                    <MudText Typo="Typo.subtitle2">@account.AccountNumber - @account.Name</MudText>
                                     @if (account.Children.Count > 0)
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">@account.Children.Count sub-accounts</MudText>
@@ -87,10 +88,18 @@
                 <MudDataGrid T="JournalEntryDto" Items="@_entries" Dense="true" Hover="true" Elevation="0">
                     <Columns>
                         <PropertyColumn Property="x => x.EntryNumber" Title="Entry #" />
-                        <PropertyColumn Property="x => x.Date" Title="Date" Format="dd MMM yyyy" />
+                        <PropertyColumn Property="x => x.EntryDate" Title="Date" Format="dd MMM yyyy" />
                         <PropertyColumn Property="x => x.Description" Title="Description" />
-                        <PropertyColumn Property="x => x.TotalDebit" Title="Debit" Format="C2" />
-                        <PropertyColumn Property="x => x.TotalCredit" Title="Credit" Format="C2" />
+                        <TemplateColumn Title="Debit">
+                            <CellTemplate>
+                                <MudText Typo="Typo.body2">@ThaiCurrency.Format(context.Item.TotalDebit, 2)</MudText>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Credit">
+                            <CellTemplate>
+                                <MudText Typo="Typo.body2">@ThaiCurrency.Format(context.Item.TotalCredit, 2)</MudText>
+                            </CellTemplate>
+                        </TemplateColumn>
                         <TemplateColumn Title="Status">
                             <CellTemplate>
                                 <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
@@ -153,7 +162,14 @@
 
     private async Task OpenNewEntryDialog()
     {
-        Snackbar.Add("New Journal Entry dialog coming soon", Severity.Info);
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<CreateJournalEntryDialog>("New Journal Entry", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
+        }
     }
 
     private Color GetStatusColor(string status) => status switch

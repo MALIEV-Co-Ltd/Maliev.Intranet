@@ -4,6 +4,7 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Companies - Maliev Intranet</PageTitle>
 
@@ -21,10 +22,10 @@
                       DebounceInterval="300"
                       Style="max-width: 400px;" />
         
-        <MudButton Variant="Variant.Filled" 
-                   Color="Color.Primary" 
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="@(() => Snackbar.Add("New company onboarding coming soon", Severity.Info))">
+                   OnClick="OpenNewCompanyDialog">
             New Company
         </MudButton>
     </MudStack>
@@ -39,19 +40,22 @@ else
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
         <MudDataGrid T="CompanySummaryDto" Items="@_companies" Dense="true" Hover="true" Elevation="0">
             <Columns>
-                <PropertyColumn Property="x => x.Name" Title="Company Name" />
+                <TemplateColumn Title="Company Name" SortBy="x => x.Name">
+                    <CellTemplate>
+                        <MudLink Href="@($"/sales/companies/{context.Item.Id}")" Typo="Typo.body2">@context.Item.Name</MudLink>
+                    </CellTemplate>
+                </TemplateColumn>
                 <PropertyColumn Property="x => x.RegistrationNumber" Title="Reg #" />
                 <PropertyColumn Property="x => x.VatNumber" Title="VAT #" />
-                <PropertyColumn Property="x => x.ContactEmail" Title="Email" />
+                <TemplateColumn Title="Email" SortBy="x => x.ContactEmail">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2">@(context.Item.ContactEmail ?? "N/A")</MudText>
+                    </CellTemplate>
+                </TemplateColumn>
                 <PropertyColumn Property="x => x.Segment" Title="Segment" />
                 <TemplateColumn Title="Tier">
                     <CellTemplate>
                         <MudChip T="string" Size="Size.Small" Color="@GetTierColor(context.Item.Tier)">@context.Item.Tier</MudChip>
-                    </CellTemplate>
-                </TemplateColumn>
-                <TemplateColumn Title="Actions" Sortable="false">
-                    <CellTemplate>
-                        <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo($"/sales/companies/{context.Item.Id}"))" />
                     </CellTemplate>
                 </TemplateColumn>
             </Columns>
@@ -100,6 +104,21 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task OpenNewCompanyDialog()
+    {
+        var parameters = new DialogParameters<CustomerOnboardingDialog>
+        {
+            { x => x.HasCompany, true }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CustomerOnboardingDialog>("New Company", parameters, options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
         }
     }
 

@@ -1,6 +1,7 @@
 @page "/hr/onboarding"
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Components
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -12,7 +13,7 @@
 <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
         <MudTextField @bind-Value="_searchString" Placeholder="Search employees..." Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 300px;" />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="@(() => Snackbar.Add("New onboarding flow coming soon", Severity.Info))">New Onboarding</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="OpenNewOnboardingDialog">New Onboarding</MudButton>
     </MudStack>
 </MudPaper>
 
@@ -80,6 +81,18 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task OpenNewOnboardingDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<StartOnboardingDialog>("Start Onboarding", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
         }
     }
 

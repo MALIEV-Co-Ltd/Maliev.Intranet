@@ -1,5 +1,6 @@
 @using Maliev.Intranet.Shared
 @using MudBlazor
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
@@ -125,7 +126,7 @@
                                             </MudItem>
                                             <MudItem xs="2">
                                                 <MudText Typo="Typo.body2" Color="Color.Secondary">Total</MudText>
-                                                <MudText Typo="Typo.h6">@CalculateLineTotal(item).ToString("C2")</MudText>
+                                                <MudText Typo="Typo.h6">@ThaiCurrency.Format(CalculateLineTotal(item), 2)</MudText>
                                             </MudItem>
                                             <MudItem xs="1">
                                                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
@@ -139,9 +140,9 @@
 
                                 <MudDivider />
                                 <MudStack Row="false" AlignItems="AlignItems.End" Spacing="1">
-                                    <MudText Typo="Typo.body1">Subtotal: @CalculateSubtotal().ToString("C2")</MudText>
-                                    <MudText Typo="Typo.body1">VAT: @CalculateTotalVat().ToString("C2")</MudText>
-                                    <MudText Typo="Typo.h6">Total: @CalculateTotal().ToString("C2")</MudText>
+                                    <MudText Typo="Typo.body1">Subtotal: @ThaiCurrency.Format(CalculateSubtotal(), 2)</MudText>
+                                    <MudText Typo="Typo.body1">VAT: @ThaiCurrency.Format(CalculateTotalVat(), 2)</MudText>
+                                    <MudText Typo="Typo.h6">Total: @ThaiCurrency.Format(CalculateTotal(), 2)</MudText>
                                 </MudStack>
                             }
                         </MudStack>

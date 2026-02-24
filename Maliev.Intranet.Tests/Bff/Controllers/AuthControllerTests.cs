@@ -12,6 +12,7 @@ using Moq.Protected;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
+/// <summary>Tests for the authentication controller.</summary>
 public class AuthControllerTests
 {
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
@@ -20,6 +21,7 @@ public class AuthControllerTests
     private readonly Mock<HttpContext> _httpContextMock;
     private readonly AuthController _controller;
 
+    /// <summary>Initializes a new instance of the <see cref="AuthControllerTests"/> class.</summary>
     public AuthControllerTests()
     {
         _httpClientFactoryMock = new Mock<IHttpClientFactory>();
@@ -36,6 +38,7 @@ public class AuthControllerTests
         };
     }
 
+    /// <summary>Verifies that logout signs the user out and redirects to the login page.</summary>
     [Fact]
     public async Task Logout_ShouldSignOutAndRedirect()
     {
@@ -50,6 +53,7 @@ public class AuthControllerTests
         authServiceMock.Verify(x => x.SignOutAsync(It.IsAny<HttpContext>(), It.IsAny<string>(), It.IsAny<AuthenticationProperties>()), Times.Once);
     }
 
+    /// <summary>Verifies that GetUser returns Unauthorized when the user is not authenticated.</summary>
     [Fact]
     public void GetUser_ShouldReturnUnauthorized_WhenNotAuthenticated()
     {
@@ -60,6 +64,7 @@ public class AuthControllerTests
         Assert.IsType<UnauthorizedResult>(result);
     }
 
+    /// <summary>Verifies that GetUser returns the user context when the user is authenticated.</summary>
     [Fact]
     public void GetUser_ShouldReturnUserContext_WhenAuthenticated()
     {
@@ -85,6 +90,7 @@ public class AuthControllerTests
         Assert.Contains("read:all", userContext.Permissions);
     }
 
+    /// <summary>Verifies that standard login returns OK when authentication is successful.</summary>
     [Fact]
     public async Task LoginStandard_ShouldReturnOk_WhenSuccessful()
     {

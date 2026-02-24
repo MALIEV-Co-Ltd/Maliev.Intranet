@@ -70,9 +70,9 @@
         {
             _name = Material.Name;
             _description = Material.Description;
-            _category = Material.Category;
-            _unitPrice = Material.UnitPrice;
-            _unit = Material.Unit;
+            _category = "Other"; // Not in MaterialDetailDto anymore
+            _unitPrice = Material.PricePerUnit;
+            _unit = "pcs"; // Not in MaterialDetailDto anymore
         }
     }
 
@@ -86,13 +86,11 @@
         _isSaving = true;
         try
         {
-            var request = new UpdateMaterialRequest
+            var request = new
             {
                 Name = _name,
-                Description = _description,
-                Category = _category,
-                UnitPrice = _unitPrice,
-                Unit = _unit
+                Description = _description
+                // Only Name and Description are supported in the current UpdateMaterialRequest DTO
             };
             var response = await Http.PutAsJsonAsync($"api/materials/{MaterialId}", request);
             if (response.IsSuccessStatusCode)

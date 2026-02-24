@@ -1,0 +1,130 @@
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudStack Spacing="3">
+                <MudAutocomplete T="EmployeeSummaryDto"
+                                 Value="_selectedEmployee"
+                                 Label="Employee"
+                                 Required="true"
+                                 RequiredError="Employee is required"
+                                 SearchFunc="SearchEmployees"
+                                 ToStringFunc="@(e => e?.FullName ?? string.Empty)"
+                                 ValueChanged="@(e => _selectedEmployee = e)"
+                                 Variant="Variant.Outlined">
+                    <ItemTemplate Context="emp">
+                        <MudStack Row="false" Spacing="0">
+                            <MudText Typo="Typo.body1">@emp.FullName</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@emp.JobTitle — @emp.DepartmentName</MudText>
+                        </MudStack>
+                    </ItemTemplate>
+                </MudAutocomplete>
+
+                <MudDatePicker Label="Start Date"
+                               @bind-Date="_startDate"
+                               Required="true"
+                               Variant="Variant.Outlined" />
+
+                <MudTextField @bind-Value="_buddyName"
+                              Label="Buddy (Optional)"
+                              Variant="Variant.Outlined"
+                              HelperText="Name of the onboarding buddy assigned to this employee" />
+
+                <MudTextField @bind-Value="_notes"
+                              Label="Notes (Optional)"
+                              Variant="Variant.Outlined"
+                              Lines="2" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _selectedEmployee == null || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">Starting...</MudText>
+            }
+            else
+            {
+                <text>Start Onboarding</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+
+    private EmployeeSummaryDto? _selectedEmployee;
+    private DateTime? _startDate = DateTime.Today;
+    private string? _buddyName;
+    private string? _notes;
+
+    private async Task<IEnumerable<EmployeeSummaryDto>> SearchEmployees(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+            return Array.Empty<EmployeeSummaryDto>();
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<EmployeeSummaryDto>>($"api/employees?search={Uri.EscapeDataString(value)}", ct);
+            return response?.Data ?? Array.Empty<EmployeeSummaryDto>();
+        }
+        catch
+        {
+            return Array.Empty<EmployeeSummaryDto>();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid || _selectedEmployee == null) return;
+
+        _isSubmitting = true;
+        try
+        {
+            var request = new
+            {
+                StartDate = _startDate!.Value,
+                Buddy = _buddyName,
+                Notes = _notes
+            };
+
+            var response = await Http.PostAsJsonAsync($"api/onboarding/{_selectedEmployee.Id}/start", request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Onboarding started for {_selectedEmployee.FullName}", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to start onboarding: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

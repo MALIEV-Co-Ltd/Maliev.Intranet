@@ -24,7 +24,7 @@ else
     <MudPaper Elevation="0" Class="pa-4 mb-4">
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudText Typo="Typo.h5">@_supplier.Name</MudText>
+                <MudText Typo="Typo.h5">@_supplier.CompanyName</MudText>
                 <MudChip T="string" Size="Size.Medium" Color="@(_supplier.Status == "Active" ? Color.Success : Color.Default)">
                     @_supplier.Status
                 </MudChip>
@@ -51,29 +51,25 @@ else
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudText Typo="Typo.h6" Class="mb-3">Contact Details</MudText>
                         <MudStack Spacing="2">
-                            <MudStack Row="true">
-                                <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Email:</MudText>
-                                <MudLink Href="@($"mailto:{_supplier.Email}")">@_supplier.Email</MudLink>
-                            </MudStack>
-                            @if (!string.IsNullOrEmpty(_supplier.Phone))
+                            @{
+                                var primaryContact = _supplier.Contacts.FirstOrDefault(c => c.IsPrimary) ?? _supplier.Contacts.FirstOrDefault();
+                            }
+                            @if (primaryContact != null)
                             {
                                 <MudStack Row="true">
-                                    <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Phone:</MudText>
-                                    <MudText Typo="Typo.body2">@_supplier.Phone</MudText>
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Email:</MudText>
+                                    <MudLink Href="@($"mailto:{primaryContact.Email}")">@primaryContact.Email</MudLink>
                                 </MudStack>
-                            }
-                            @if (!string.IsNullOrEmpty(_supplier.ContactPerson))
-                            {
+                                @if (!string.IsNullOrEmpty(primaryContact.Phone))
+                                {
+                                    <MudStack Row="true">
+                                        <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Phone:</MudText>
+                                        <MudText Typo="Typo.body2">@primaryContact.Phone</MudText>
+                                    </MudStack>
+                                }
                                 <MudStack Row="true">
                                     <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Contact Person:</MudText>
-                                    <MudText Typo="Typo.body2">@_supplier.ContactPerson</MudText>
-                                </MudStack>
-                            }
-                            @if (!string.IsNullOrEmpty(_supplier.Website))
-                            {
-                                <MudStack Row="true">
-                                    <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Website:</MudText>
-                                    <MudLink Href="@_supplier.Website" Target="_blank">@_supplier.Website</MudLink>
+                                    <MudText Typo="Typo.body2">@primaryContact.Name</MudText>
                                 </MudStack>
                             }
                         </MudStack>
@@ -100,8 +96,15 @@ else
                             }
                             <MudStack Row="true">
                                 <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Rating:</MudText>
-                                <MudRating ReadOnly="true" SelectedValue="@((int)Math.Round(_supplier.Rating))" MaxValue="5" />
-                                <MudText Typo="Typo.body2">@_supplier.Rating.ToString("F1")</MudText>
+                                @if (_supplier.PerformanceSummary != null && _supplier.PerformanceSummary.OverallRating.HasValue)
+                                {
+                                    <MudRating ReadOnly="true" SelectedValue="@((int)Math.Round(_supplier.PerformanceSummary.OverallRating.Value))" MaxValue="5" />
+                                    <MudText Typo="Typo.body2">@_supplier.PerformanceSummary.OverallRating.Value.ToString("F1")</MudText>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2">No ratings yet</MudText>
+                                }
                             </MudStack>
                             <MudStack Row="true">
                                 <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="min-width: 140px;">Member Since:</MudText>
@@ -143,7 +146,7 @@ else
             new BreadcrumbItem("Home", href: "/"),
             new BreadcrumbItem("Manufacturing", href: null, disabled: true),
             new BreadcrumbItem("Suppliers", href: "/mfg/suppliers"),
-            new BreadcrumbItem(_supplier?.Name ?? Id.ToString(), href: null, disabled: true)
+            new BreadcrumbItem(_supplier?.CompanyName ?? Id.ToString(), href: null, disabled: true)
         };
     }
 

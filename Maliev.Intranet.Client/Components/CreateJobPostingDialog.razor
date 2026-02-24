@@ -1,0 +1,105 @@
+@using Maliev.Intranet.Shared
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_model.Title"
+                              Label="Job Title"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="Job title is required" />
+
+                <MudSelect @bind-Value="_model.Department"
+                           Label="Department"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Engineering")">Engineering</MudSelectItem>
+                    <MudSelectItem Value="@("Sales")">Sales</MudSelectItem>
+                    <MudSelectItem Value="@("Operations")">Operations</MudSelectItem>
+                    <MudSelectItem Value="@("HR")">HR</MudSelectItem>
+                    <MudSelectItem Value="@("Finance")">Finance</MudSelectItem>
+                </MudSelect>
+
+                <MudSelect @bind-Value="_model.EmploymentType"
+                           Label="Employment Type"
+                           Variant="Variant.Outlined"
+                           Required="true">
+                    <MudSelectItem Value="@("FullTime")">Full Time</MudSelectItem>
+                    <MudSelectItem Value="@("PartTime")">Part Time</MudSelectItem>
+                    <MudSelectItem Value="@("Contractor")">Contractor</MudSelectItem>
+                    <MudSelectItem Value="@("Intern")">Intern</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_model.Location"
+                              Label="Location"
+                              Variant="Variant.Outlined"
+                              Placeholder="e.g. Bangkok Office, Remote" />
+
+                <MudTextField @bind-Value="_model.Description"
+                              Label="Job Description"
+                              Variant="Variant.Outlined"
+                              Lines="5" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">Posting...</MudText>
+            }
+            else
+            {
+                <text>Create Posting</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+    private CreateJobPostingRequest _model = new();
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isSubmitting = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/career/postings", _model);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Job posting created successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to create job posting", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

@@ -13,32 +13,51 @@
                               Required="true"
                               RequiredError="Name is required" />
 
-                <MudTextField @bind-Value="_model.SKU"
-                              Label="SKU"
+                <MudTextField @bind-Value="_model.Code"
+                              Label="Material Code (SKU)"
                               Variant="Variant.Outlined"
                               Required="true"
-                              RequiredError="SKU is required" />
+                              RequiredError="Code is required" />
 
                 <MudSelect @bind-Value="_model.Category"
                            Label="Category"
                            Variant="Variant.Outlined"
                            AnchorOrigin="Origin.BottomCenter">
-                    <MudSelectItem Value="@("Plastics")">Plastics</MudSelectItem>
-                    <MudSelectItem Value="@("Metals")">Metals</MudSelectItem>
-                    <MudSelectItem Value="@("Composites")">Composites</MudSelectItem>
-                    <MudSelectItem Value="@("Others")">Others</MudSelectItem>
+                    <MudSelectItem Value="@("Filament")">Filament (FDM)</MudSelectItem>
+                    <MudSelectItem Value="@("Resin")">Resin (SLA/DLP)</MudSelectItem>
+                    <MudSelectItem Value="@("Metal")">Metal (CNC)</MudSelectItem>
+                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
                 </MudSelect>
 
-                <MudNumericField @bind-Value="_model.UnitPrice"
-                                 Label="Unit Price"
+                <MudNumericField @bind-Value="_model.PricePerUnit"
+                                 Label="Price Per Unit (THB)"
                                  Variant="Variant.Outlined"
                                  Min="0m"
                                  Format="N2" />
 
-                <MudTextField @bind-Value="_model.Unit"
-                              Label="Unit"
-                              Variant="Variant.Outlined"
-                              Placeholder="pcs, kg, m" />
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_model.Density"
+                                         Label="Density (g/cm³)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Max="25m"
+                                         Step="0.01m"
+                                         Format="N2" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_model.CostPerKg"
+                                         Label="Cost Per Kg (THB)"
+                                         Variant="Variant.Outlined"
+                                         Min="0m"
+                                         Format="N2" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudNumericField @bind-Value="_model.StockLevel"
+                                 Label="Initial Stock Level"
+                                 Variant="Variant.Outlined"
+                                 Min="0" />
 
                 <MudTextField @bind-Value="_model.Description"
                               Label="Description"

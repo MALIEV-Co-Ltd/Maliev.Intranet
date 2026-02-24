@@ -5,6 +5,7 @@ using Xunit;
 
 namespace Maliev.Intranet.Tests.Shared;
 
+/// <summary>Tests for JSON serialization and deserialization round-trips of shared DTO types.</summary>
 public class DtoSerializationTests
 {
     private static readonly JsonSerializerOptions Options = new()
@@ -14,6 +15,7 @@ public class DtoSerializationTests
     };
 
     [Fact]
+    /// <summary>Verifies that LeaveBalanceDto serializes and deserializes correctly.</summary>
     public void LeaveBalanceDto_ShouldRoundtrip()
     {
         var dto = new LeaveBalanceDto { LeaveType = "Annual", Entitlement = 20, Used = 5, Available = 15 };
@@ -26,6 +28,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that SubmitLeaveRequestDto serializes and deserializes correctly.</summary>
     public void SubmitLeaveRequestDto_ShouldRoundtrip()
     {
         var dto = new SubmitLeaveRequestDto
@@ -44,6 +47,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that DeliveryNoteSummaryDto serializes and deserializes correctly.</summary>
     public void DeliveryNoteSummaryDto_ShouldRoundtrip()
     {
         var dto = new DeliveryNoteSummaryDto { Id = Guid.NewGuid(), OrderNumber = "ORD-456", Status = "Delivered" };
@@ -56,6 +60,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that ReceiptDto serializes and deserializes correctly.</summary>
     public void ReceiptDto_ShouldRoundtrip()
     {
         var dto = new ReceiptDto { Id = Guid.NewGuid(), ReceiptNumber = "REC-001", TotalAmount = 1000m };
@@ -68,6 +73,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that CreateDeliveryNoteRequest serializes and deserializes correctly.</summary>
     public void CreateDeliveryNoteRequest_ShouldRoundtrip()
     {
         var dto = new CreateDeliveryNoteRequest
@@ -85,6 +91,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that LeaveRequestSummaryDto serializes and deserializes correctly.</summary>
     public void LeaveRequestSummaryDto_ShouldRoundtrip()
     {
         var dto = new LeaveRequestSummaryDto { Id = Guid.NewGuid(), LeaveType = "Annual", Status = "Approved", Days = 3 };
@@ -96,6 +103,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that CreateReceiptRequest serializes and deserializes correctly.</summary>
     public void CreateReceiptRequest_ShouldRoundtrip()
     {
         var dto = new CreateReceiptRequest { CustomerId = Guid.NewGuid(), Date = DateTime.UtcNow, Lines = [new() { Description = "Test", Amount = 100 }] };
@@ -107,6 +115,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that PurchaseOrderDto serializes and deserializes correctly.</summary>
     public void PurchaseOrderDto_ShouldRoundtrip()
     {
         var dto = new PurchaseOrderDto { Id = Guid.NewGuid(), PoNumber = "PO-123", TotalAmount = 5000m };
@@ -117,6 +126,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that PerformanceReviewDto serializes and deserializes correctly.</summary>
     public void PerformanceReviewDto_ShouldRoundtrip()
     {
         var dto = new PerformanceReviewDto { Id = Guid.NewGuid(), Rating = 5, Comments = "Excellent" };
@@ -127,6 +137,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that OnboardingChecklistDto serializes and deserializes correctly.</summary>
     public void OnboardingChecklistDto_ShouldRoundtrip()
     {
         var dto = new OnboardingChecklistDto { Id = Guid.NewGuid(), EmployeeId = Guid.NewGuid(), Tasks = new List<OnboardingTaskDto> { new() { Title = "Task 1" } } };
@@ -137,6 +148,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that OnboardingSummaryDto serializes and deserializes correctly.</summary>
     public void OnboardingSummaryDto_ShouldRoundtrip()
     {
         var dto = new OnboardingSummaryDto { Id = Guid.NewGuid(), EmployeeName = "John", Progress = 75 };
@@ -148,6 +160,7 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    /// <summary>Verifies that GoalDto serializes and deserializes correctly.</summary>
     public void GoalDto_ShouldRoundtrip()
     {
         var dto = new GoalDto { Id = Guid.NewGuid(), Title = "Learn C#", Progress = 50 };

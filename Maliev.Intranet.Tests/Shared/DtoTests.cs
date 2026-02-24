@@ -15,9 +15,11 @@ using Moq.Protected;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
+/// <summary>Tests that verify shared DTO types used across the BFF layer can be instantiated correctly.</summary>
 public class SharedDtoTests
 {
     [Fact]
+    /// <summary>Verifies that shared DTO instantiation works without throwing exceptions.</summary>
     public void DtoInstantiation_ShouldWork()
     {
         // Common

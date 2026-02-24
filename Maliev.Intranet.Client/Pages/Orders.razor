@@ -27,30 +27,30 @@
 }
 else
 {
-    <MudDropContainer T="OrderSummaryDto" Items="@_orders" ItemsSelector="@((item,column) => item.Status == column)" ItemDropped="ItemUpdated" Class="d-flex flex-wrap flex-grow-1">
+    <MudDropContainer T="OrderSummaryDto" Items="@_orders" ItemsSelector="@((item,column) => item.Status == column)" ItemDropped="ItemUpdated" Class="d-flex flex-grow-1" Style="overflow-x: auto; min-height: 500px;">
         <ChildContent>
-            <MudPaper Elevation="0" Width="25%" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
+            <MudPaper Elevation="0" Style="min-width: 280px; flex: 0 0 280px;" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
                     <MudText Typo="Typo.subtitle1"><b>New</b></MudText>
                     <MudChip T="string" Size="Size.Small" Color="Color.Default">@_orders.Count(x => x.Status == "New")</MudChip>
                 </MudStack>
                 <MudDropZone T="OrderSummaryDto" Identifier="New" Class="flex-grow-1" />
             </MudPaper>
-            <MudPaper Elevation="0" Width="25%" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
+            <MudPaper Elevation="0" Style="min-width: 280px; flex: 0 0 280px;" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
                     <MudText Typo="Typo.subtitle1"><b>Processing</b></MudText>
                     <MudChip T="string" Size="Size.Small" Color="Color.Primary">@_orders.Count(x => x.Status == "Processing")</MudChip>
                 </MudStack>
                 <MudDropZone T="OrderSummaryDto" Identifier="Processing" Class="flex-grow-1" />
             </MudPaper>
-            <MudPaper Elevation="0" Width="25%" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
+            <MudPaper Elevation="0" Style="min-width: 280px; flex: 0 0 280px;" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
                     <MudText Typo="Typo.subtitle1"><b>Shipped</b></MudText>
                     <MudChip T="string" Size="Size.Small" Color="Color.Info">@_orders.Count(x => x.Status == "Shipped")</MudChip>
                 </MudStack>
                 <MudDropZone T="OrderSummaryDto" Identifier="Shipped" Class="flex-grow-1" />
             </MudPaper>
-            <MudPaper Elevation="0" Width="22%" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
+            <MudPaper Elevation="0" Style="min-width: 280px; flex: 0 0 280px;" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
                     <MudText Typo="Typo.subtitle1"><b>Delivered</b></MudText>
                     <MudChip T="string" Size="Size.Small" Color="Color.Success">@_orders.Count(x => x.Status == "Delivered")</MudChip>

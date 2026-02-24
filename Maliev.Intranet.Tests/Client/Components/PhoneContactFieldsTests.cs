@@ -7,18 +7,23 @@ using Microsoft.AspNetCore.Components;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the PhoneContactFields component.</summary>
 public class PhoneContactFieldsTests : BunitContext, IAsyncLifetime
 {
+    /// <summary>Initializes a new instance of the <see cref="PhoneContactFieldsTests"/> class.</summary>
     public PhoneContactFieldsTests()
     {
         Services.AddMudServices();
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that the basic phone contact fields are rendered.</summary>
     public void ShouldRenderBasicFields()
     {
         var cut = Render<PhoneContactFields>(parameters => parameters

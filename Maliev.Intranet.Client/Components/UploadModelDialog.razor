@@ -18,9 +18,8 @@
                            MaximumFileCount="10"
                            @ref="_fileUpload"
                            Hidden="false"
-                           InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
-                           InputStyle="opacity:0">
-                <ActivatorContent>
+                           InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10 opacity-0">
+                <CustomContent Context="_">
                     <MudPaper Outlined="true"
                               Class="@($"relative d-flex flex-column align-center justify-center py-12 px-6 border-dashed border-2 rounded-xl transition-all {(_dragOver ? "mud-border-primary mud-bg-primary-hover" : "mud-border-lines-default")}")"
                               Style="cursor: pointer;"
@@ -32,7 +31,7 @@
                         <MudText Typo="Typo.h6">Click to upload or drag and drop</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">Upload 3D models up to 100MB each (STL, OBJ, STEP)</MudText>
                     </MudPaper>
-                </ActivatorContent>
+                </CustomContent>
             </MudFileUpload>
 
             @if (!string.IsNullOrEmpty(_fileCountWarning))
@@ -155,7 +154,11 @@
                 // 3D models can be large, up to 100MB
                 var stream = file.BrowserFile.OpenReadStream(100 * 1024 * 1024);
                 var fileContent = new StreamContent(stream);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.BrowserFile.ContentType ?? "application/octet-stream");
+                // Browsers don't know MIME types for 3D formats (.stl/.obj/.step) so ContentType is often empty
+                var mediaType = string.IsNullOrWhiteSpace(file.BrowserFile.ContentType)
+                    ? "application/octet-stream"
+                    : file.BrowserFile.ContentType;
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(mediaType);
                 content.Add(fileContent, "file", file.Name);
 
                 file.Progress = 40;

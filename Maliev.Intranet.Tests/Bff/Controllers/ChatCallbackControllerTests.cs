@@ -8,6 +8,7 @@ using Moq;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
+/// <summary>Tests for the chat callback controller.</summary>
 public class ChatCallbackControllerTests
 {
     private readonly Mock<IHubContext<Maliev.Intranet.Bff.Hubs.ChatHub>> _hubContextMock;
@@ -17,6 +18,7 @@ public class ChatCallbackControllerTests
     private readonly Mock<ILogger<ChatCallbackController>> _loggerMock;
     private readonly ChatCallbackController _controller;
 
+    /// <summary>Initializes a new instance of the <see cref="ChatCallbackControllerTests"/> class.</summary>
     public ChatCallbackControllerTests()
     {
         _hubContextMock = new Mock<IHubContext<Maliev.Intranet.Bff.Hubs.ChatHub>>();
@@ -31,6 +33,7 @@ public class ChatCallbackControllerTests
         _controller = new ChatCallbackController(_chatHubService, _loggerMock.Object);
     }
 
+    /// <summary>Verifies that ReceiveThinkingStep calls the underlying service.</summary>
     [Fact]
     public async Task ReceiveThinkingStep_ShouldCallService()
     {
@@ -41,6 +44,7 @@ public class ChatCallbackControllerTests
         Assert.IsType<OkResult>(result);
     }
 
+    /// <summary>Verifies that ReceiveComplete calls the underlying service.</summary>
     [Fact]
     public async Task ReceiveComplete_ShouldCallService()
     {

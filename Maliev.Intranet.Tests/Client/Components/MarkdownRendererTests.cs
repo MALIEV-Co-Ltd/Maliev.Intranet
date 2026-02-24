@@ -6,10 +6,12 @@ using Moq;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the MarkdownRenderer component.</summary>
 public class MarkdownRendererTests : BunitContext, IAsyncLifetime
 {
     private readonly Mock<IMarkdownService> _markdownServiceMock;
 
+    /// <summary>Initializes a new instance of the <see cref="MarkdownRendererTests"/> class.</summary>
     public MarkdownRendererTests()
     {
         _markdownServiceMock = new Mock<IMarkdownService>();
@@ -17,10 +19,13 @@ public class MarkdownRendererTests : BunitContext, IAsyncLifetime
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that HTML is rendered from the provided markdown input.</summary>
     public void ShouldRenderHtmlFromMarkdown()
     {
         var markdown = "# Hello";

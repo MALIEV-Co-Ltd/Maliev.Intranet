@@ -1,0 +1,10 @@
+@namespace Maliev.Intranet.Client.Components
+
+<div class="d-flex flex-row @(ChatPosition == ChatBubblePosition.End ? "flex-row-reverse" : "") gap-2 mb-4">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public ChatBubblePosition ChatPosition { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

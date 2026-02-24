@@ -414,13 +414,13 @@
                               @if (_includeNda)
                               {
                                   <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnNdaFilesSelected" Accept=".pdf,.doc,.docx" MaximumFileCount="100">
-                                      <ActivatorContent>
+                                      <CustomContent Context="_">
                                           <MudPaper Outlined="true" Class="pa-6 d-flex flex-column align-center justify-center cursor-pointer border-dashed border-2 mud-border-primary" Elevation="0" Style="background-color: var(--mud-palette-background-grey); min-height: 120px;">
                                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Medium" Color="Color.Primary" Class="mb-2" />
                                                <MudText Typo="Typo.body2" Align="Align.Center" Style="font-weight: 600;">Click to upload NDA</MudText>
                                                <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">or drag and drop files here</MudText>
                                           </MudPaper>
-                                      </ActivatorContent>
+                                      </CustomContent>
                                   </MudFileUpload>
                                   
                                   @if (_ndaFiles.Any())
@@ -469,9 +469,9 @@
                               <MudTextField T="string" Label="Category" @bind-Value="_customerDocCategory" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. Business Card" />
                               
                               <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnCustomerDocsSelected" Accept=".pdf,.jpg,.png,.doc" MaximumFileCount="100">
-                                  <ActivatorContent>
+                                  <CustomContent Context="_">
                                       <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true" StartIcon="@Icons.Material.Filled.Add">Select Files</MudButton>
-                                  </ActivatorContent>
+                                  </CustomContent>
                               </MudFileUpload>
 
                               @if (_customerDocFiles.Any())

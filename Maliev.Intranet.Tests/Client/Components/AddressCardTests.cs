@@ -7,8 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
+/// <summary>Tests for the AddressCard component.</summary>
 public class AddressCardTests : BunitContext, IAsyncLifetime
 {
+    /// <summary>Initializes a new instance of the <see cref="AddressCardTests"/> class.</summary>
     public AddressCardTests()
     {
         Services.AddMudServices();
@@ -16,10 +18,13 @@ public class AddressCardTests : BunitContext, IAsyncLifetime
         Render<MudPopoverProvider>();
     }
 
+    /// <summary>Initializes the test asynchronously.</summary>
     public Task InitializeAsync() => Task.CompletedTask;
+    /// <summary>Disposes resources used by the test asynchronously.</summary>
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    /// <summary>Verifies that the address details are rendered correctly.</summary>
     public void ShouldRenderAddressDetails()
     {
         var address = new CreateAddressRequest

@@ -1,0 +1,109 @@
+@using Maliev.Intranet.Shared
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Class="mr-3 mb-n1" />
+            Add Currency
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_code"
+                              Label="Code (ISO 4217)"
+                              Placeholder="e.g. USD"
+                              Required="true"
+                              RequiredError="Code is required"
+                              MaxLength="3"
+                              Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_name"
+                              Label="Name"
+                              Placeholder="e.g. US Dollar"
+                              Required="true"
+                              RequiredError="Name is required"
+                              Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_symbol"
+                              Label="Symbol"
+                              Placeholder="e.g. $"
+                              Required="true"
+                              RequiredError="Symbol is required"
+                              Variant="Variant.Outlined" />
+                <MudNumericField @bind-Value="_exchangeRate"
+                                 Label="Exchange Rate (to THB)"
+                                 Required="true"
+                                 Min="0.0001m"
+                                 Format="N4"
+                                 Variant="Variant.Outlined" />
+                <MudNumericField @bind-Value="_decimalPlaces"
+                                 Label="Decimal Places"
+                                 Min="0"
+                                 Max="8"
+                                 Variant="Variant.Outlined" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_isBusy">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!_isValid || _isBusy)">
+            @(_isBusy ? "Adding..." : "Add Currency")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _isValid;
+    private bool _isBusy;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private string _symbol = string.Empty;
+    private decimal _exchangeRate = 1.0m;
+    private int _decimalPlaces = 2;
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isBusy = true;
+        try
+        {
+            var payload = new
+            {
+                Code = _code.ToUpperInvariant().Trim(),
+                Name = _name.Trim(),
+                Symbol = _symbol.Trim(),
+                ExchangeRate = _exchangeRate,
+                DecimalPlaces = _decimalPlaces
+            };
+            var response = await Http.PostAsJsonAsync("api/reference-data/currencies", payload);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Currency added", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to add currency", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
