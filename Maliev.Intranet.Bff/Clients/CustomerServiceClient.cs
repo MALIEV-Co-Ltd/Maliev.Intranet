@@ -85,13 +85,14 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
-    /// Retrieves a paged list of customers, optionally filtered by a search query.
+    /// Retrieves a paged list of customers, optionally filtered by a search query or company ID.
     /// Sorted by creation date descending (newest first).
     /// </summary>
-    public virtual async Task<PagedResponse<CustomerSummaryDto>?> GetCustomersAsync(string? query = null, int page = 1, CancellationToken ct = default)
+    public virtual async Task<PagedResponse<CustomerSummaryDto>?> GetCustomersAsync(string? query = null, int page = 1, CancellationToken ct = default, Guid? companyId = null)
     {
         var url = $"/customer/v1/customers?page={page}&sortBy=createdAt&sortDirection=desc";
         if (!string.IsNullOrEmpty(query)) url += $"&query={Uri.EscapeDataString(query)}";
+        if (companyId.HasValue) url += $"&companyId={companyId.Value}";
 
         var response = await httpClient.GetFromJsonAsync<CustomerServicePaginatedResponse<CustomerSummaryDto>>(url, ct);
         if (response == null) return new PagedResponse<CustomerSummaryDto>();
@@ -204,6 +205,32 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
+    /// Gets activity history for a company with pagination or skip/take.
+    /// </summary>
+    public virtual async Task<PagedResponse<CustomerActivityResponse>> GetCompanyActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken ct = default)
+    {
+        var url = $"/customer/v1/companies/{id}/history?page={page}&pageSize={pageSize}";
+        if (skip.HasValue) url += $"&skip={skip.Value}";
+        if (take.HasValue) url += $"&take={take.Value}";
+
+        var response = await httpClient.GetFromJsonAsync<CustomerServicePaginatedResponse<CustomerActivityResponse>>(url, ct);
+        if (response == null) return new PagedResponse<CustomerActivityResponse>();
+
+        return new PagedResponse<CustomerActivityResponse>
+        {
+            Data = response.Items,
+            Meta = new PaginationMeta
+            {
+                CurrentPage = response.Page,
+                PageSize = response.PageSize,
+                TotalCount = response.TotalCount,
+                TotalItems = response.TotalCount,
+                TotalPages = response.TotalPages
+            }
+        };
+    }
+
+    /// <summary>
     /// Creates a new customer.
     /// </summary>
     public virtual async Task<CustomerResponse?> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct = default)
@@ -294,21 +321,24 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             }
         }
 
-        var existingAddresses = await httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Customer&ownerId={id}", ct) ?? [];
-        var requestAddressIds = request.Addresses.Where(a => a.Id.HasValue).Select(a => a.Id!.Value).ToList();
-        var addressesToDelete = existingAddresses.Where(a => !requestAddressIds.Contains(a.Id)).ToList();
-
-        foreach (var addr in addressesToDelete)
+        if (request.Addresses.Count > 0)
         {
-            var delReq = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addr.Id}") { Content = JsonContent.Create(new { version = addr.Version }) };
-            await httpClient.SendAsync(delReq, ct);
-        }
+            var existingAddresses = await httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Customer&ownerId={id}", ct) ?? [];
+            var requestAddressIds = request.Addresses.Where(a => a.Id.HasValue).Select(a => a.Id!.Value).ToList();
+            var addressesToDelete = existingAddresses.Where(a => !requestAddressIds.Contains(a.Id)).ToList();
 
-        foreach (var address in request.Addresses)
-        {
-            var addrReq = new { ownerType = "Customer", ownerId = id, type = address.Type, isDefault = address.IsDefault, addressLine1 = address.AddressLine1, addressLine2 = address.AddressLine2, addressLine3 = address.AddressLine3, district = address.District, city = address.City, stateProvince = address.StateProvince, postalCode = address.PostalCode, countryId = address.CountryId, recipientName = address.RecipientName, recipientPhone = address.RecipientPhone, version = address.Version };
-            if (address.Id.HasValue) await httpClient.PatchAsJsonAsync($"/customer/v1/addresses/{address.Id.Value}", addrReq, ct);
-            else await httpClient.PostAsJsonAsync("/customer/v1/addresses", addrReq, ct);
+            foreach (var addr in addressesToDelete)
+            {
+                var delReq = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addr.Id}") { Content = JsonContent.Create(new { version = addr.Version }) };
+                await httpClient.SendAsync(delReq, ct);
+            }
+
+            foreach (var address in request.Addresses)
+            {
+                var addrReq = new { ownerType = "Customer", ownerId = id, type = address.Type, isDefault = address.IsDefault, addressLine1 = address.AddressLine1, addressLine2 = address.AddressLine2, addressLine3 = address.AddressLine3, district = address.District, city = address.City, stateProvince = address.StateProvince, postalCode = address.PostalCode, countryId = address.CountryId, recipientName = address.RecipientName, recipientPhone = address.RecipientPhone, version = address.Version };
+                if (address.Id.HasValue) await httpClient.PatchAsJsonAsync($"/customer/v1/addresses/{address.Id.Value}", addrReq, ct);
+                else await httpClient.PostAsJsonAsync("/customer/v1/addresses", addrReq, ct);
+            }
         }
 
         return updatedCustomer;
@@ -377,6 +407,15 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
+    /// Promotes a customer to main contact.
+    /// </summary>
+    public virtual async Task<bool> PromoteToMainContactAsync(Guid customerId, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsync($"/customer/v1/customers/{customerId}/promote", null, ct);
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>
     /// Creates a paged list of countries.
     /// </summary>
     public virtual async Task<List<CountryDto>> GetCountriesAsync(CancellationToken ct = default)
@@ -391,6 +430,15 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     public virtual async Task<CompanyResponse?> GetCompanyByIdAsync(Guid id, CancellationToken ct = default)
     {
         return await httpClient.GetFromJsonAsync<CompanyResponse>($"/customer/v1/companies/{id}", ct);
+    }
+
+    /// <summary>
+    /// Updates editable fields of a company.
+    /// </summary>
+    public virtual async Task UpdateCompanyAsync(Guid id, CreateCompanyRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/companies/{id}", request, ct);
+        response.EnsureSuccessStatusCode();
     }
 
     /// <summary>

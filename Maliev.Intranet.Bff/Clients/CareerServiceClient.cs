@@ -26,7 +26,24 @@ public class CareerServiceClient(HttpClient httpClient)
     /// <returns>Recruitment statistics.</returns>
     public async Task<RecruitmentStatsDto?> GetRecruitmentStatsAsync(CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<RecruitmentStatsDto>("/career/v1/metrics/recruitment", ct);
+        try
+        {
+            var response = await httpClient.GetAsync("/career/v1/reports/recruitment-metrics", ct);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var element = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
+            return new RecruitmentStatsDto
+            {
+                Applied = element.TryGetProperty("totalApplications", out var ta) ? ta.GetInt32() : 0,
+                Screening = element.TryGetProperty("positionsOpen", out var po) ? po.GetInt32() : 0,
+                Interview = 0,
+                Offer = element.TryGetProperty("positionsFilled", out var pf) ? pf.GetInt32() : 0
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>

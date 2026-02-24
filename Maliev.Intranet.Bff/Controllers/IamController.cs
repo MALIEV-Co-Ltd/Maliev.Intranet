@@ -13,13 +13,15 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="client">The IAM service client.</param>
 /// <param name="authorizationService">The authorization service for manual checks.</param>
 /// <param name="env">The host environment.</param>
+/// <param name="logger">The logger.</param>
 [Authorize] // Require authentication at minimum
 [ApiController]
 [Route("api/[controller]")]
 public class IamController(
     IAMServiceClient client,
     IAuthorizationService authorizationService,
-    IWebHostEnvironment env) : ControllerBase
+    IWebHostEnvironment env,
+    ILogger<IamController> logger) : ControllerBase
 {
     private async Task<bool> IsAuthorizedAsync()
     {
@@ -33,8 +35,15 @@ public class IamController(
         // Calls promote directly — the IAM endpoint has its own guard (humanUsers.Count <= 1)
         if (env.IsDevelopment())
         {
-            var promoted = await client.PromoteCallerToAdminAsync();
-            if (promoted) return true;
+            try
+            {
+                var promoted = await client.PromoteCallerToAdminAsync();
+                if (promoted) return true;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to auto-promote caller to admin; IAMService may be unavailable");
+            }
         }
 
         return false;
@@ -49,8 +58,16 @@ public class IamController(
     {
         if (!await IsAuthorizedAsync()) return Forbid();
 
-        var principals = await client.GetPrincipalsAsync();
-        return Ok(principals);
+        try
+        {
+            var principals = await client.GetPrincipalsAsync();
+            return Ok(principals);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to retrieve principals from IAMService");
+            return StatusCode(503, "IAM service is temporarily unavailable.");
+        }
     }
 
     /// <summary>
@@ -61,8 +78,17 @@ public class IamController(
     public async Task<ActionResult<List<RoleDto>>> GetRoles()
     {
         if (!await IsAuthorizedAsync()) return Forbid();
-        var roles = await client.GetRolesAsync();
-        return Ok(roles);
+
+        try
+        {
+            var roles = await client.GetRolesAsync();
+            return Ok(roles);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to retrieve roles from IAMService");
+            return StatusCode(503, "IAM service is temporarily unavailable.");
+        }
     }
 
     /// <summary>
@@ -73,8 +99,17 @@ public class IamController(
     public async Task<ActionResult<List<PermissionDto>>> GetPermissions()
     {
         if (!await IsAuthorizedAsync()) return Forbid();
-        var permissions = await client.GetPermissionsAsync();
-        return Ok(permissions);
+
+        try
+        {
+            var permissions = await client.GetPermissionsAsync();
+            return Ok(permissions);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to retrieve permissions from IAMService");
+            return StatusCode(503, "IAM service is temporarily unavailable.");
+        }
     }
 
     /// <summary>
@@ -86,8 +121,17 @@ public class IamController(
     public async Task<ActionResult<List<RoleBindingDto>>> GetUserRoles(Guid principalId)
     {
         if (!await IsAuthorizedAsync()) return Forbid();
-        var roles = await client.GetPrincipalRolesAsync(principalId);
-        return Ok(roles);
+
+        try
+        {
+            var roles = await client.GetPrincipalRolesAsync(principalId);
+            return Ok(roles);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to retrieve roles for principal {PrincipalId}", principalId);
+            return StatusCode(503, "IAM service is temporarily unavailable.");
+        }
     }
 
     /// <summary>

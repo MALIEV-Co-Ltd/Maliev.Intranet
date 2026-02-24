@@ -114,6 +114,17 @@ public class EmployeesController(EmployeeServiceClient client) : ControllerBase
     }
 
     /// <summary>
+    /// Updates the current user's self-service profile fields (preferred name, personal email, mobile phone).
+    /// </summary>
+    [Authorize]
+    [HttpPatch("{id:guid}/profile")]
+    public async Task<IActionResult> UpdateProfile(Guid id, [FromBody] UpdateProfileRequest request, CancellationToken ct)
+    {
+        var success = await client.UpdateProfileAsync(id, request, ct);
+        return success ? Ok() : NotFound();
+    }
+
+    /// <summary>
     /// Adds an internal HR note to an employee.
     /// </summary>
     [RequirePermission(MalievPermissions.Employee.Write, AuthenticationSchemes = "Bearer,Cookies")]

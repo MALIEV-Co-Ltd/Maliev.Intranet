@@ -13,8 +13,18 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-public class TimeOffController(ILeaveServiceClient client) : ControllerBase
+public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient employeeClient) : ControllerBase
 {
+    private async Task<Guid> GetEmployeeIdAsync(CancellationToken ct)
+    {
+        var principalIdStr = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(principalIdStr, out var principalId))
+            return Guid.Empty;
+
+        var profile = await employeeClient.GetByPrincipalIdAsync(principalId, ct);
+        return profile?.Id ?? Guid.Empty;
+    }
+
     /// <summary>
     /// Gets leave balances for the current user.
     /// </summary>
@@ -22,15 +32,8 @@ public class TimeOffController(ILeaveServiceClient client) : ControllerBase
     [HttpGet("balances")]
     public async Task<ActionResult<List<LeaveBalanceDto>>> GetBalances(CancellationToken ct)
     {
-        // TODO: Get real employee ID from user context. For MVP, we might need a way to map User ID -> Employee ID.
-        // Assuming the JWT sub claim is the Employee ID for now, or we fetch it.
-        // For development, we'll use a hardcoded test ID if not found, or throw.
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-        if (!Guid.TryParse(userIdString, out var employeeId))
-        {
-            // Fallback for dev/testing if sub isn't a guid
-            employeeId = Guid.Empty;
-        }
+        var employeeId = await GetEmployeeIdAsync(ct);
+        if (employeeId == Guid.Empty) return Ok(new List<LeaveBalanceDto>());
 
         var result = await client.GetMyBalancesAsync(employeeId, ct);
         return Ok(result);
@@ -43,8 +46,9 @@ public class TimeOffController(ILeaveServiceClient client) : ControllerBase
     [HttpGet("requests")]
     public async Task<ActionResult<List<LeaveRequestSummaryDto>>> GetRequests(CancellationToken ct)
     {
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-        if (!Guid.TryParse(userIdString, out var employeeId)) employeeId = Guid.Empty;
+        var employeeId = await GetEmployeeIdAsync(ct);
+        if (employeeId == Guid.Empty) return Ok(new List<LeaveRequestSummaryDto>());
+
         var result = await client.GetMyRequestsAsync(employeeId, DateTime.UtcNow.Year, ct);
         return Ok(result);
     }
@@ -56,8 +60,8 @@ public class TimeOffController(ILeaveServiceClient client) : ControllerBase
     [HttpPost("requests")]
     public async Task<ActionResult<LeaveRequestDetailDto>> SubmitRequest([FromBody] SubmitLeaveRequestDto request, CancellationToken ct)
     {
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-        if (!Guid.TryParse(userIdString, out var employeeId)) employeeId = Guid.Empty;
+        var employeeId = await GetEmployeeIdAsync(ct);
+        if (employeeId == Guid.Empty) return BadRequest(new { message = "Current user is not linked to an employee record." });
 
         var result = await client.SubmitRequestAsync(employeeId, request, ct);
         return result != null ? Ok(result) : BadRequest();

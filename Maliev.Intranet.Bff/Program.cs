@@ -1,4 +1,4 @@
-using Maliev.Aspire.ServiceDefaults;
+﻿using Maliev.Aspire.ServiceDefaults;
 using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Extensions;
@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.JSInterop;
 using MudBlazor.Services;
 
 // Initialize bootstrap logging
@@ -40,7 +41,28 @@ try
     // Add services to the container.
     builder.Services.AddSingleton<BffMetrics>();
     builder.Services.AddHostedService<AlertBackgroundService>();
-    builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>(sp =>
+    {
+        var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+        var context = httpContextAccessor.HttpContext;
+        string? initialTheme = null;
+        bool? initialSystemDark = null;
+
+        if (context != null)
+        {
+            initialTheme = context.Request.Cookies["maliev_theme"];
+            if (bool.TryParse(context.Request.Cookies["maliev_system_dark"], out var isDark))
+            {
+                initialSystemDark = isDark;
+            }
+        }
+
+        return new Maliev.Intranet.Client.Services.LayoutService(
+            sp.GetRequiredService<IJSRuntime>(),
+            sp.GetRequiredService<ILogger<Maliev.Intranet.Client.Services.LayoutService>>(),
+            initialTheme,
+            initialSystemDark);
+    });
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
     builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
@@ -70,7 +92,8 @@ try
     {
         client.BaseAddress = new Uri("http://IAMService");
     })
-    .AddServiceDiscovery();
+    .AddServiceDiscovery()
+    .AddHttpMessageHandler<UserContextHandler>();
 
     // Named client for IAM bootstrap (no UserContextHandler - token attached manually)
     builder.Services.AddHttpClient("IAMServiceBootstrap", client =>
@@ -196,7 +219,47 @@ try
                                 iamHttp.DefaultRequestHeaders.Authorization =
                                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
-                                await iamHttp.PostAsync("/iam/v1/principals/bootstrap/promote", null);
+                                var promoteResponse = await iamHttp.PostAsync("/iam/v1/principals/bootstrap/promote", null);
+
+                                // T-RACE-FIX: If promote succeeded, re-issue the access token so it includes
+                                // roles.platform.owner. The original JWT was issued before the async
+                                // EmployeeCreatedConsumer had a chance to create the IAM principal and assign
+                                // the role, so it contains no roles. A second exchange call gets a fresh JWT
+                                // now that the role binding exists in IAM.
+                                if (promoteResponse.IsSuccessStatusCode && context.Properties != null)
+                                {
+                                    var freshResponse = await authClient.PostAsJsonAsync(
+                                        "/auth/v1/exchange/google",
+                                        new { email, full_name = fullName, google_user_id = googleUserId });
+
+                                    if (freshResponse.IsSuccessStatusCode)
+                                    {
+                                        var freshResult = await freshResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                                        var freshToken = freshResult.GetProperty("access_token").GetString();
+
+                                        if (!string.IsNullOrEmpty(freshToken))
+                                        {
+                                            // Replace the stale token (which has no roles) with the fresh one
+                                            context.Properties.StoreTokens(new[]
+                                            {
+                                                new AuthenticationToken { Name = "access_token", Value = freshToken }
+                                            });
+
+                                            // Also enrich the current cookie identity with the new role claims
+                                            // so that authorization works immediately for this request
+                                            var freshJwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
+                                                .ReadJwtToken(freshToken);
+
+                                            foreach (var roleClaim in freshJwt.Claims.Where(c => c.Type is "roles" or "role"))
+                                            {
+                                                if (identity != null && !identity.HasClaim(roleClaim.Type, roleClaim.Value))
+                                                    identity.AddClaim(new System.Security.Claims.Claim(roleClaim.Type, roleClaim.Value));
+                                                if (identity != null && !identity.HasClaim(System.Security.Claims.ClaimTypes.Role, roleClaim.Value))
+                                                    identity.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, roleClaim.Value));
+                                            }
+                                        }
+                                    }
+                                }
                             }
                             catch { /* Bootstrap is best-effort */ }
                         }
@@ -237,6 +300,18 @@ try
     .AddServiceDiscovery()
     .AddStandardResilienceHandler();
 
+    // Service-account-authenticated client for seed operations (actor: 'system')
+    builder.Services.AddTransient<Maliev.Intranet.Bff.Handlers.SeedServiceAccountHandler>();
+    builder.Services.AddHttpClient("CustomerServiceSeed", (sp, client) =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var url = config["Services:CustomerService:BaseUrl"];
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(url) ? url : "http://CustomerService");
+        client.Timeout = TimeSpan.FromSeconds(90);
+    })
+    .AddServiceDiscovery()
+    .AddHttpMessageHandler<Maliev.Intranet.Bff.Handlers.SeedServiceAccountHandler>();
+
     // BFF service clients with user context forwarding
     builder.AddBffServiceClient<CustomerServiceClient>("CustomerService");
     builder.AddBffServiceClient<CountryServiceClient>("CountryService");
@@ -251,7 +326,6 @@ try
     builder.AddBffServiceClient<UploadServiceClient>("UploadService");
     builder.AddBffServiceClient<ChatbotServiceClient>("ChatbotService");
     builder.AddBffServiceClient<CareerServiceClient>("CareerService");
-    builder.AddBffServiceClient<TimeOffServiceClient>("EmployeeService"); // TimeOff uses EmployeeService
     builder.AddBffServiceClient<ComplianceServiceClient>("ComplianceService");
     builder.AddBffServiceClient<PerformanceServiceClient>("PerformanceService");
     builder.AddBffServiceClient<CompensationServiceClient>("CompensationService");
@@ -263,6 +337,8 @@ try
     builder.AddBffServiceClient<ILeaveServiceClient, LeaveServiceClient>("LeaveService");
     builder.AddBffServiceClient<IPricingServiceClient, PricingServiceClient>("PricingService");
     builder.AddBffServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
+    builder.AddBffServiceClient<IJobServiceClient, JobServiceClient>("JobService");
+    builder.AddBffServiceClient<IInventoryServiceClient, InventoryServiceClient>("InventoryService");
 
     // Named HTTP client with service account authentication for reference data
     builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>
@@ -361,6 +437,9 @@ try
         .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
 
     app.MapHub<Maliev.Intranet.Bff.Hubs.ChatHub>("/hubs/chat")
+        .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
+
+    app.MapHub<Maliev.Intranet.Bff.Hubs.ProductionHub>("/hubs/production")
         .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
 
     app.MapControllers()

@@ -78,12 +78,13 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         // or we can just try /liveness or /readiness
         var servicePrefix = serviceName.Replace("Service", "").ToLower();
         if (serviceName == "PurchaseOrderService") servicePrefix = "purchase-order";
+        if (serviceName == "PredictionService") servicePrefix = "predictionservice";
 
         try
         {
             var client = httpClientFactory.CreateClient("ServiceHealthCheck");
             client.BaseAddress = new Uri(baseUrl);
-            client.Timeout = TimeSpan.FromSeconds(5);
+            client.Timeout = TimeSpan.FromSeconds(15);
 
             var sw = Stopwatch.StartNew();
             // Try the standard Aspire-mapped liveness endpoint

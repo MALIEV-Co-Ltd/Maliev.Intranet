@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Maliev.Intranet.Shared;
 
@@ -16,10 +17,20 @@ public class QuotationServiceClient(HttpClient httpClient)
     /// <param name="page">The page number to retrieve.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <param name="ct">The cancellation token.</param>
-    /// <returns>A paged response containing quotation summaries.</returns>
-    public async Task<PagedResponse<QuotationSummaryDto>?> GetQuotationsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
+    /// <returns>
+    /// A <see cref="DownstreamResponse{T}"/> containing the paged quotation summaries on success,
+    /// or a failed response preserving the downstream HTTP status code (e.g. 403, 404, 503).
+    /// </returns>
+    public async Task<DownstreamResponse<PagedResponse<QuotationSummaryDto>>> GetQuotationsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<QuotationSummaryDto>>($"/quotation/v1/quotations?page={page}&pageSize={pageSize}", ct);
+        var response = await httpClient.GetAsync($"/quotation/v1/quotations?page={page}&pageSize={pageSize}", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return DownstreamResponse<PagedResponse<QuotationSummaryDto>>.Fail(response.StatusCode);
+        }
+
+        var data = await response.Content.ReadFromJsonAsync<PagedResponse<QuotationSummaryDto>>(cancellationToken: ct);
+        return DownstreamResponse<PagedResponse<QuotationSummaryDto>>.Ok(data);
     }
 
     /// <summary>
@@ -27,10 +38,20 @@ public class QuotationServiceClient(HttpClient httpClient)
     /// </summary>
     /// <param name="id">The quotation ID.</param>
     /// <param name="ct">The cancellation token.</param>
-    /// <returns>The quotation detail DTO.</returns>
-    public async Task<QuotationDetailDto?> GetQuotationByIdAsync(Guid id, CancellationToken ct = default)
+    /// <returns>
+    /// A <see cref="DownstreamResponse{T}"/> containing the quotation detail on success,
+    /// or a failed response preserving the downstream HTTP status code (e.g. 403, 404, 503).
+    /// </returns>
+    public async Task<DownstreamResponse<QuotationDetailDto>> GetQuotationByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<QuotationDetailDto>($"/quotation/v1/quotations/{id}", ct);
+        var response = await httpClient.GetAsync($"/quotation/v1/quotations/{id}", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return DownstreamResponse<QuotationDetailDto>.Fail(response.StatusCode);
+        }
+
+        var data = await response.Content.ReadFromJsonAsync<QuotationDetailDto>(cancellationToken: ct);
+        return DownstreamResponse<QuotationDetailDto>.Ok(data);
     }
 
     /// <summary>

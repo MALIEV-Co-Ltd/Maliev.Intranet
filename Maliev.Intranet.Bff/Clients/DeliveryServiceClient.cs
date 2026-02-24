@@ -48,67 +48,53 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
     /// <inheritdoc />
     public async Task<PagedResponse<DeliveryNoteSummaryDto>?> GetDeliveryNotesAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        // Service not yet available in AppHost
-        // return await httpClient.GetFromJsonAsync<PagedResponse<DeliveryNoteSummaryDto>>($"/delivery/v1/delivery-notes?page={page}&pageSize={pageSize}", ct);
-        _ = httpClient;
-        return await Task.FromResult(new PagedResponse<DeliveryNoteSummaryDto>());
+        return await httpClient.GetFromJsonAsync<PagedResponse<DeliveryNoteSummaryDto>>($"/delivery/v1/delivery-notes?page={page}&pageSize={pageSize}", ct);
     }
 
     /// <inheritdoc />
     public async Task<DeliveryNoteDetailDto?> GetDeliveryNoteAsync(Guid id, CancellationToken ct = default)
     {
-        // return await httpClient.GetFromJsonAsync<DeliveryNoteDetailDto>($"/delivery/v1/delivery-notes/{id}", ct);
-        return await Task.FromResult<DeliveryNoteDetailDto?>(null);
+        return await httpClient.GetFromJsonAsync<DeliveryNoteDetailDto>($"/delivery/v1/delivery-notes/{id}", ct);
     }
 
     /// <inheritdoc />
     public async Task<DeliveryNoteDetailDto?> CreateDeliveryNoteAsync(CreateDeliveryNoteRequest request, CancellationToken ct = default)
     {
-        /*
         var response = await httpClient.PostAsJsonAsync("/delivery/v1/delivery-notes", request, ct);
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<DeliveryNoteDetailDto>(cancellationToken: ct);
         }
         return null;
-        */
-        throw new NotImplementedException("Delivery Service not yet available");
     }
 
     /// <inheritdoc />
     public async Task<DeliveryNoteDetailDto?> UpdateDeliveryStatusAsync(Guid id, UpdateDeliveryStatusRequest request, CancellationToken ct = default)
     {
-        /*
         var response = await httpClient.PatchAsJsonAsync($"/delivery/v1/delivery-notes/{id}/status", request, ct);
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<DeliveryNoteDetailDto>(cancellationToken: ct);
         }
         return null;
-        */
-        throw new NotImplementedException("Delivery Service not yet available");
     }
 
     /// <inheritdoc />
     public async Task<string?> GeneratePdfAsync(Guid id, CancellationToken ct = default)
     {
-        /*
         var response = await httpClient.PostAsync($"/delivery/v1/delivery-notes/{id}/generate-pdf", null, ct);
         if (response.IsSuccessStatusCode)
         {
-            var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+            var result = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
             return result.GetProperty("pdfUrl").GetString();
         }
         return null;
-        */
-        return await Task.FromResult<string?>(null);
     }
 
     /// <inheritdoc />
     public async Task<bool> DeleteDeliveryNoteAsync(Guid id, CancellationToken ct = default)
     {
-        // var response = await httpClient.DeleteAsync($"/delivery/v1/delivery-notes/{id}", ct);
-        // return response.IsSuccessStatusCode;
-        return await Task.FromResult(false);
+        var response = await httpClient.DeleteAsync($"/delivery/v1/delivery-notes/{id}", ct);
+        return response.IsSuccessStatusCode;
     }
 }

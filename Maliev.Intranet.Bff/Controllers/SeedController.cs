@@ -13,10 +13,13 @@ namespace Maliev.Intranet.Bff.Controllers;
 [Route("api/[controller]")]
 [AllowAnonymous]
 public class SeedController(
-    CustomerServiceClient customerClient,
-    ILogger<SeedController> logger) : ControllerBase
+    IHttpClientFactory httpClientFactory,
+    ILoggerFactory loggerFactory) : ControllerBase
 {
-    private static readonly Guid ThailandCountryId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private ILogger<SeedController> logger => loggerFactory.CreateLogger<SeedController>();
+    private CustomerServiceClient customerClient => new(httpClientFactory.CreateClient("CustomerServiceSeed"), loggerFactory.CreateLogger<CustomerServiceClient>());
+
+    private record CountryLookupResult { public Guid Id { get; init; } }
 
     /// <summary>
     /// Seeds the Maliev customer data. Idempotent - checks if data already exists.
@@ -40,13 +43,20 @@ public class SeedController(
                 });
             }
 
+            var countryClient = httpClientFactory.CreateClient("CountryServiceAccount");
+            var thailand = await countryClient.GetFromJsonAsync<CountryLookupResult>("/country/v1/countries/iso2/TH", ct);
+            if (thailand == null)
+            {
+                return StatusCode(500, new ApiErrorResponse { Message = "Failed to look up Thailand country ID." });
+            }
+
             var company = await CreateCompanyAsync(ct);
             if (company == null)
             {
                 return StatusCode(500, new ApiErrorResponse { Message = "Failed to create company." });
             }
 
-            var companyAddress = await CreateCompanyBillingAddressAsync(company.Id, ct);
+            var companyAddress = await CreateCompanyBillingAddressAsync(company.Id, thailand.Id, ct);
 
             var customer = await CreateCustomerAsync(company.Id, ct);
             if (customer == null)
@@ -54,21 +64,24 @@ public class SeedController(
                 return StatusCode(500, new ApiErrorResponse { Message = "Failed to create customer." });
             }
 
-            var shippingAddress = await CreateShippingAddressAsync(customer.Id, ct);
+            var shippingAddress = await CreateShippingAddressAsync(customer.Id, thailand.Id, ct);
+            var customerBillingAddress = await CreateCustomerBillingAddressAsync(customer.Id, thailand.Id, ct);
+            await SeedInternalNotesAsync(customer.Id, ct);
 
-            logger.LogInformation("Successfully seeded 1 company, 1 customer, and 2 addresses.");
+            logger.LogInformation("Successfully seeded 1 company, 1 customer, addresses, and internal notes.");
 
             return Ok(new MalievResponse<object>
             {
                 Success = true,
-                Message = "Successfully seeded 1 company, 1 customer, and 2 addresses.",
+                Message = "Successfully seeded 1 company, 1 customer, addresses, and internal notes.",
                 Data = new
                 {
                     company = new { company.Id, company.Name, company.VatNumber },
                     customer = new { customer.Id, customer.FirstName, customer.LastName, customer.Email },
                     addresses = new
                     {
-                        billing = companyAddress != null ? new { companyAddress.Id, companyAddress.Type, companyAddress.City } : null,
+                        companyBilling = companyAddress != null ? new { companyAddress.Id, companyAddress.Type, companyAddress.City } : null,
+                        customerBilling = customerBillingAddress != null ? new { customerBillingAddress.Id, customerBillingAddress.Type, customerBillingAddress.City } : null,
                         shipping = shippingAddress != null ? new { shippingAddress.Id, shippingAddress.Type, shippingAddress.City } : null
                     }
                 }
@@ -83,79 +96,54 @@ public class SeedController(
 
     private async Task<CompanyResponse?> CreateCompanyAsync(CancellationToken ct)
     {
-        var request = new CustomerOnboardingRequest
-        {
-            NewCompany = new CreateCompanyRequest
-            {
-                Name = "บริษัท มาลีฟ จำกัด",
-                VatNumber = "0125561001573",
-                ContactPhone = "028816002",
-                Segment = "Enterprise",
-                Tier = "Platinum",
-                IsVerifiedFromBdex = false
-            },
-            Customer = new CreateCustomerRequest
-            {
-                FirstName = "PLACEHOLDER",
-                LastName = "PLACEHOLDER",
-                Email = "placeholder@maliev.internal",
-                Segment = "Enterprise",
-                Tier = "Platinum"
-            }
-        };
+        var httpClient = httpClientFactory.CreateClient("CustomerServiceSeed");
 
-        var result = await customerClient.CreateCustomerBasicAsync(request, ct);
-
-        if (result == null)
+        var companyResponse = await httpClient.PostAsJsonAsync("/customer/v1/companies", new CreateCompanyRequest
         {
-            logger.LogError("Failed to create company via CreateCustomerBasicAsync.");
+            Name = "บริษัท มาลีฟ จำกัด",
+            VatNumber = "0125561001573",
+            ContactPhone = "028816002",
+            Segment = "Enterprise",
+            Tier = "Platinum",
+            IsVerifiedFromBdex = false
+        }, ct);
+
+        if (!companyResponse.IsSuccessStatusCode)
+        {
+            logger.LogError("Failed to create company. Status: {StatusCode}", companyResponse.StatusCode);
             return null;
         }
 
-        var companies = await customerClient.GetCompaniesAsync(query: "บริษัท มาลีฟ จำกัด", ct: ct);
-        var company = companies?.Data.FirstOrDefault(c => c.VatNumber == "0125561001573");
+        var company = await companyResponse.Content.ReadFromJsonAsync<CompanyResponse>(ct);
+        if (company == null) return null;
 
-        if (company != null)
-        {
-            logger.LogInformation("Created company: {CompanyId} - {Name}", company.Id, company.Name);
-            return new CompanyResponse
-            {
-                Id = company.Id,
-                Name = company.Name,
-                VatNumber = company.VatNumber,
-                ContactPhone = company.ContactPhone,
-                Segment = company.Segment,
-                Tier = company.Tier
-            };
-        }
-
-        return null;
+        logger.LogInformation("Created company: {CompanyId} - {Name}", company.Id, company.Name);
+        return company;
     }
 
-    private async Task<AddressResponse?> CreateCompanyBillingAddressAsync(Guid companyId, CancellationToken ct)
+    private async Task<AddressResponse?> CreateCompanyBillingAddressAsync(Guid companyId, Guid countryId, CancellationToken ct)
     {
-        var addresses = new List<CreateAddressRequest>
+        var httpClient = httpClientFactory.CreateClient("CustomerServiceSeed");
+
+        var response = await httpClient.PostAsJsonAsync("/customer/v1/addresses", new
         {
-            new()
-            {
-                Type = "Billing",
-                IsDefault = true,
-                AddressLine1 = "36/1 หมู่ 3",
-                District = "คลองอข่อย",
-                City = "ปากเกร็ด",
-                StateProvince = "นนทบุรี",
-                PostalCode = "11120",
-                CountryId = ThailandCountryId
-            }
-        };
+            ownerType = "Company",
+            ownerId = companyId,
+            type = "Billing",
+            isDefault = true,
+            addressLine1 = "36/1 หมู่ 3",
+            district = "คลองอข่อย",
+            city = "ปากเกร็ด",
+            stateProvince = "นนทบุรี",
+            postalCode = "11120",
+            countryId
+        }, ct);
 
-        var result = await customerClient.CreateAddressesAsync(companyId, addresses, ct);
-        var address = result.FirstOrDefault();
+        if (!response.IsSuccessStatusCode) return null;
 
+        var address = await response.Content.ReadFromJsonAsync<AddressResponse>(ct);
         if (address != null)
-        {
             logger.LogInformation("Created company billing address: {AddressId}", address.Id);
-        }
 
         return address;
     }
@@ -195,7 +183,52 @@ public class SeedController(
         return result;
     }
 
-    private async Task<AddressResponse?> CreateShippingAddressAsync(Guid customerId, CancellationToken ct)
+    private async Task<AddressResponse?> CreateCustomerBillingAddressAsync(Guid customerId, Guid countryId, CancellationToken ct)
+    {
+        var addresses = new List<CreateAddressRequest>
+        {
+            new()
+            {
+                Type = "Billing",
+                IsDefault = true,
+                AddressLine1 = "36/1 หมู่ 3",
+                District = "คลองอข่อย",
+                City = "ปากเกร็ด",
+                StateProvince = "นนทบุรี",
+                PostalCode = "11120",
+                CountryId = countryId
+            }
+        };
+
+        var result = await customerClient.CreateAddressesAsync(customerId, addresses, ct);
+        var address = result.FirstOrDefault();
+
+        if (address != null)
+            logger.LogInformation("Created customer billing address: {AddressId}", address.Id);
+
+        return address;
+    }
+
+    private async Task SeedInternalNotesAsync(Guid customerId, CancellationToken ct)
+    {
+        await customerClient.AddInternalNoteAsync(customerId, new CreateInternalNoteRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = customerId,
+            NoteText = "ลูกค้าระดับ Platinum ของ Maliev — ติดต่อผ่านอีเมลเป็นหลัก ไม่รับสาย SMS"
+        }, ct);
+
+        await customerClient.AddInternalNoteAsync(customerId, new CreateInternalNoteRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = customerId,
+            NoteText = "ใบเสนอราคาและเอกสารสัญญาส่งผ่านระบบ e-Document เท่านั้น กรุณาอย่าส่งเป็น hardcopy"
+        }, ct);
+
+        logger.LogInformation("Seeded 2 internal notes for customer {CustomerId}", customerId);
+    }
+
+    private async Task<AddressResponse?> CreateShippingAddressAsync(Guid customerId, Guid countryId, CancellationToken ct)
     {
         var addresses = new List<CreateAddressRequest>
         {
@@ -208,7 +241,7 @@ public class SeedController(
                 City = "ภาษีเจริญ",
                 StateProvince = "กรุงเทพมหานคร",
                 PostalCode = "10160",
-                CountryId = ThailandCountryId,
+                CountryId = countryId,
                 RecipientName = "ณัฐกานต์ วนาศรีวิไล",
                 RecipientPhone = "0818030404"
             }

@@ -37,12 +37,21 @@ public class EmployeeServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<EmployeeDetailDto?> CreateEmployeeAsync(CreateEmployeeRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/employee/v1/employees", request, ct);
+        var response = await httpClient.PostAsJsonAsync("/employee/v1/hr/employees", request, ct);
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<EmployeeDetailDto>(cancellationToken: ct);
         }
         return null;
+    }
+
+    /// <summary>
+    /// Updates an employee's self-service profile fields (preferred name, personal email, mobile phone).
+    /// </summary>
+    public virtual async Task<bool> UpdateProfileAsync(Guid employeeId, UpdateProfileRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/employee/v1/profile/{employeeId}/profile", request, ct);
+        return response.IsSuccessStatusCode;
     }
 
     /// <summary>

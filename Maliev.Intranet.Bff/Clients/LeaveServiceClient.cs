@@ -42,7 +42,7 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
     /// <inheritdoc />
     public async Task<List<LeaveBalanceDto>> GetMyBalancesAsync(Guid employeeId, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<List<LeaveBalanceDto>>($"/leave/v1/LeaveBalances/employee/{employeeId}", ct) ?? [];
+        return await httpClient.GetFromJsonAsync<List<LeaveBalanceDto>>($"/leave/v1/LeaveBalances/{employeeId}", ct) ?? [];
     }
 
     /// <inheritdoc />

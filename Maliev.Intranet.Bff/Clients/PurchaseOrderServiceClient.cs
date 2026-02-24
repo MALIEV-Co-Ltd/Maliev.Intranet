@@ -32,19 +32,19 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
     /// <inheritdoc />
     public async Task<PagedResponse<PurchaseOrderDto>?> GetPurchaseOrdersAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<PurchaseOrderDto>>($"/purchase-order/v1/orders?page={page}&pageSize={pageSize}", ct);
+        return await httpClient.GetFromJsonAsync<PagedResponse<PurchaseOrderDto>>($"/purchase-order/v1/purchase-orders?page={page}&pageSize={pageSize}", ct);
     }
 
     /// <inheritdoc />
     public async Task<PurchaseOrderDto?> GetPurchaseOrderByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PurchaseOrderDto>($"/purchase-order/v1/orders/{id}", ct);
+        return await httpClient.GetFromJsonAsync<PurchaseOrderDto>($"/purchase-order/v1/purchase-orders/{id}", ct);
     }
 
     /// <inheritdoc />
     public async Task<PurchaseOrderDto?> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/purchase-order/v1/orders", request, ct);
+        var response = await httpClient.PostAsJsonAsync("/purchase-order/v1/purchase-orders", request, ct);
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<PurchaseOrderDto>(cancellationToken: ct);

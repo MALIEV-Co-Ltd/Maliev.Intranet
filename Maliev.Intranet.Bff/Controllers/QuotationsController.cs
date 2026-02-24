@@ -25,7 +25,11 @@ public class QuotationsController(QuotationServiceClient client) : ControllerBas
     public async Task<ActionResult<PagedResponse<QuotationSummaryDto>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         var result = await client.GetQuotationsAsync(page, pageSize);
-        return result != null ? Ok(result) : Ok(new PagedResponse<QuotationSummaryDto>());
+        if (!result.IsSuccess)
+        {
+            return StatusCode((int)result.StatusCode);
+        }
+        return Ok(result.Data ?? new PagedResponse<QuotationSummaryDto>());
     }
 
     /// <summary>
@@ -38,7 +42,11 @@ public class QuotationsController(QuotationServiceClient client) : ControllerBas
     public async Task<ActionResult<QuotationDetailDto>> GetById(Guid id)
     {
         var result = await client.GetQuotationByIdAsync(id);
-        return result != null ? Ok(result) : NotFound();
+        if (!result.IsSuccess)
+        {
+            return StatusCode((int)result.StatusCode);
+        }
+        return result.Data != null ? Ok(result.Data) : NotFound();
     }
 
     /// <summary>

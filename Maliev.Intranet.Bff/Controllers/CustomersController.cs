@@ -28,9 +28,9 @@ public class CustomersController(
     /// <summary>Gets all customers</summary>
     [RequirePermission(MalievPermissions.Customer.Read)]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get(string? query = null, int page = 1, CancellationToken ct = default)
+    public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get(string? query = null, Guid? companyId = null, int page = 1, CancellationToken ct = default)
     {
-        var result = await client.GetCustomersAsync(query, page, ct);
+        var result = await client.GetCustomersAsync(query, page, ct, companyId);
         return Ok(result);
     }
 
@@ -41,6 +41,27 @@ public class CustomersController(
     {
         var result = await client.GetCustomerByIdAsync(id, ct);
         return result != null ? Ok(result) : NotFound();
+    }
+
+    /// <summary>Gets customer identity for billing</summary>
+    [RequirePermission(MalievPermissions.Customer.Read)]
+    [HttpGet("{id:guid}/identity")]
+    public async Task<ActionResult<CustomerIdentityDto>> GetIdentity(Guid id, CancellationToken ct)
+    {
+        var customer = await client.GetCustomerByIdAsync(id, ct);
+        if (customer == null) return NotFound();
+
+        return Ok(new CustomerIdentityDto
+        {
+            Id = customer.Id,
+            FirstName = customer.FirstName,
+            LastName = customer.LastName,
+            // ThaiNationalIdMasked is not directly in CustomerDetailDto, 
+            // but we can map from what's available or leave null if missing in this DTO
+            CompanyId = customer.CompanyId,
+            CompanyName = customer.CompanyName,
+            CompanyTaxId = customer.CompanyVatNumber
+        });
     }
 
     /// <summary>Gets customer history</summary>
@@ -317,6 +338,23 @@ public class CustomersController(
         {
             logger.LogError(ex, "Error searching companies with query: {Query}", query);
             return StatusCode(500, new ApiErrorResponse { Message = "Failed to search companies" });
+        }
+    }
+
+    /// <summary>Promotes a customer to be the main contact for their company</summary>
+    [RequirePermission(MalievPermissions.Customer.Write)]
+    [HttpPost("{id:guid}/promote")]
+    public async Task<IActionResult> PromoteToMainContact(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            var success = await client.PromoteToMainContactAsync(id, ct);
+            return success ? Ok() : BadRequest(new ApiErrorResponse { Message = "Failed to promote customer to main contact." });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error promoting customer {CustomerId} to main contact", id);
+            return StatusCode(500, new ApiErrorResponse { Message = "An error occurred while promoting the contact." });
         }
     }
 
