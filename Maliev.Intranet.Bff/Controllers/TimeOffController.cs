@@ -13,8 +13,31 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-public class TimeOffController(ILeaveServiceClient client) : ControllerBase
+public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient employeeServiceClient) : ControllerBase
 {
+    private async Task<Guid> GetEmployeeIdAsync(CancellationToken ct)
+    {
+        // Try to get explicit employee_id claim first (if enriched)
+        var employeeIdClaim = User.FindFirst("employee_id")?.Value;
+        if (Guid.TryParse(employeeIdClaim, out var employeeId))
+        {
+            return employeeId;
+        }
+
+        // Fallback: look up by Principal ID (sub)
+        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdString, out var principalId))
+        {
+            var employee = await employeeServiceClient.GetByPrincipalIdAsync(principalId, ct);
+            if (employee != null)
+            {
+                return employee.Id;
+            }
+        }
+
+        return Guid.Empty;
+    }
+
     /// <summary>
     /// Gets leave balances for the current user.
     /// </summary>
@@ -22,15 +45,8 @@ public class TimeOffController(ILeaveServiceClient client) : ControllerBase
     [HttpGet("balances")]
     public async Task<ActionResult<List<LeaveBalanceDto>>> GetBalances(CancellationToken ct)
     {
-        // TODO: Get real employee ID from user context. For MVP, we might need a way to map User ID -> Employee ID.
-        // Assuming the JWT sub claim is the Employee ID for now, or we fetch it.
-        // For development, we'll use a hardcoded test ID if not found, or throw.
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-        if (!Guid.TryParse(userIdString, out var employeeId))
-        {
-            // Fallback for dev/testing if sub isn't a guid
-            employeeId = Guid.Empty;
-        }
+        var employeeId = await GetEmployeeIdAsync(ct);
+        if (employeeId == Guid.Empty) return Unauthorized();
 
         var result = await client.GetMyBalancesAsync(employeeId, ct);
         return Ok(result);
@@ -43,8 +59,9 @@ public class TimeOffController(ILeaveServiceClient client) : ControllerBase
     [HttpGet("requests")]
     public async Task<ActionResult<List<LeaveRequestSummaryDto>>> GetRequests(CancellationToken ct)
     {
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-        if (!Guid.TryParse(userIdString, out var employeeId)) employeeId = Guid.Empty;
+        var employeeId = await GetEmployeeIdAsync(ct);
+        if (employeeId == Guid.Empty) return Unauthorized();
+
         var result = await client.GetMyRequestsAsync(employeeId, DateTime.UtcNow.Year, ct);
         return Ok(result);
     }
@@ -56,8 +73,8 @@ public class TimeOffController(ILeaveServiceClient client) : ControllerBase
     [HttpPost("requests")]
     public async Task<ActionResult<LeaveRequestDetailDto>> SubmitRequest([FromBody] SubmitLeaveRequestDto request, CancellationToken ct)
     {
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-        if (!Guid.TryParse(userIdString, out var employeeId)) employeeId = Guid.Empty;
+        var employeeId = await GetEmployeeIdAsync(ct);
+        if (employeeId == Guid.Empty) return Unauthorized();
 
         var result = await client.SubmitRequestAsync(employeeId, request, ct);
         return result != null ? Ok(result) : BadRequest();

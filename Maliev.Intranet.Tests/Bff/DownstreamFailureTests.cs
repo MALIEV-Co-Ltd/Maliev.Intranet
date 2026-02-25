@@ -27,15 +27,22 @@ public class DownstreamFailureTests : IClassFixture<BffTestWebApplicationFactory
         mockClient.Setup(x => x.GetMyBalancesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Service Unavailable"));
 
+        
+        var mockEmployeeClient = new Mock<EmployeeServiceClient>(new HttpClient { BaseAddress = new Uri("http://localhost") });
+        mockEmployeeClient.Setup(x => x.GetByPrincipalIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EmployeeDetailDto { Id = Guid.NewGuid() });
+
         var client = _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services =>
             {
                 services.AddScoped(_ => mockClient.Object);
+                services.AddScoped(_ => mockEmployeeClient.Object);
             });
         }).CreateClient();
 
-        var token = _factory.CreateTestToken("test-user", MalievPermissions.Leave.Read);
+        var principalId = Guid.NewGuid().ToString();
+        var token = _factory.CreateTestToken(principalId, MalievPermissions.Leave.Read);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
@@ -55,11 +62,17 @@ public class DownstreamFailureTests : IClassFixture<BffTestWebApplicationFactory
         mockClient.Setup(x => x.GetCompaniesAsync(null, 1, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Downstream error"));
 
+        
+        var mockEmployeeClient = new Mock<EmployeeServiceClient>(new HttpClient { BaseAddress = new Uri("http://localhost") });
+        mockEmployeeClient.Setup(x => x.GetByPrincipalIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EmployeeDetailDto { Id = Guid.NewGuid() });
+
         var client = _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services =>
             {
                 services.AddScoped(_ => mockClient.Object);
+                services.AddScoped(_ => mockEmployeeClient.Object);
             });
         }).CreateClient();
 
