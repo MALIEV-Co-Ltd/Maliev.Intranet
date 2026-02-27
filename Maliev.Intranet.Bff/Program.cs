@@ -263,6 +263,7 @@ try
     builder.AddBffServiceClient<ILeaveServiceClient, LeaveServiceClient>("LeaveService");
     builder.AddBffServiceClient<IPricingServiceClient, PricingServiceClient>("PricingService");
     builder.AddBffServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
+    builder.AddBffServiceClient<FacilityServiceClient>("FacilityService");
 
     // Named HTTP client with service account authentication for reference data
     builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>

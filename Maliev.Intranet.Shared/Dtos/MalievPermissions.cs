@@ -193,4 +193,19 @@ public static class MalievPermissions
         public const string UpdateStatus = "delivery.delivery-notes.update-status";
         public const string GeneratePdf = "delivery.delivery-notes.generate-pdf";
     }
+
+    public static class Facility
+    {
+        /// <summary>Read equipment information, notes, loans, maintenance logs and attachments.</summary>
+        public const string Read = "facility.equipments.read";
+
+        /// <summary>Create and update equipment, add notes, manage loans, log maintenance and manage attachments.</summary>
+        public const string Write = "facility.equipments.write";
+
+        /// <summary>Delete equipment and manage equipment lifecycle (decommission).</summary>
+        public const string Manage = "facility.equipments.manage";
+
+        /// <summary>Approve or reject equipment loan requests.</summary>
+        public const string LoansApprove = "facility.loans.approve";
+    }
 }

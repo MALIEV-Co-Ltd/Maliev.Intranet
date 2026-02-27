@@ -1,0 +1,684 @@
+@page "/mfg/equipment/{Id:guid}"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
+@inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@(_equipment?.Name ?? "Equipment") - Maliev Intranet</PageTitle>
+
+@if (_isLoading)
+{
+    <MudStack Spacing="3">
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="300px" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="300px" />
+    </MudStack>
+}
+else if (_equipment is null)
+{
+    <MudAlert Severity="Severity.Warning">Equipment not found.</MudAlert>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudTooltip Text="Back to Equipment">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                               Href="/mfg/equipment" />
+            </MudTooltip>
+            <div>
+                <MudText Typo="Typo.h5">@_equipment.Name</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary font-monospace">@_equipment.AssetCode</MudText>
+            </div>
+            <MudChip T="string" Color="@GetStatusColor(_equipment.Status)" Size="Size.Small">
+                @FormatStatus(_equipment.Status)
+            </MudChip>
+        </MudStack>
+
+        <MudStack Row="true" Spacing="1">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Warning"
+                       StartIcon="@Icons.Material.Filled.SwapHoriz"
+                       OnClick="OpenChangeStatusDialog"
+                       Size="Size.Small">
+                Change Status
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       Href="@($"/mfg/equipment/{Id}/edit")"
+                       Size="Size.Small">
+                Edit
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="DeleteEquipment"
+                       Size="Size.Small">
+                Delete
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true" Class="border mud-border-lines-default rounded-lg">
+
+        <!-- Overview Tab -->
+        <MudTabPanel Text="Overview" Icon="@Icons.Material.Outlined.Info">
+            <div class="pa-4">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                            <MudText Typo="Typo.subtitle1" Class="mb-3 mud-text-primary">General Information</MudText>
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Asset Code</MudText>
+                                    <MudText Typo="Typo.body2" Class="font-monospace">@_equipment.AssetCode</MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Category</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(_equipment.Category)" Variant="Variant.Outlined">
+                                        @FormatCategory(_equipment.Category)
+                                    </MudChip>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Brand</MudText>
+                                    <MudText Typo="Typo.body2">@(_equipment.Brand ?? "—")</MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Model</MudText>
+                                    <MudText Typo="Typo.body2">@(_equipment.ModelName ?? "—")</MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Serial Number</MudText>
+                                    <MudText Typo="Typo.body2" Class="font-monospace">@(_equipment.ManufacturerSerialNumber ?? "—")</MudText>
+                                </MudStack>
+                                @if (!string.IsNullOrEmpty(_equipment.SubCategory))
+                                {
+                                    <MudDivider />
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Sub-Category</MudText>
+                                        <MudText Typo="Typo.body2">@_equipment.SubCategory</MudText>
+                                    </MudStack>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                            <MudText Typo="Typo.subtitle1" Class="mb-3 mud-text-primary">Purchase &amp; Warranty</MudText>
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Purchase Date</MudText>
+                                    <MudText Typo="Typo.body2">@(_equipment.PurchaseDate?.ToString("dd MMM yyyy") ?? "—")</MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Purchase Price</MudText>
+                                    <MudText Typo="Typo.body2">
+                                        @(_equipment.PurchasePriceTHB.HasValue ? $"฿{_equipment.PurchasePriceTHB:N2}" : "—")
+                                    </MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Warranty Expiry</MudText>
+                                    <MudText Typo="Typo.body2" Color="@GetWarrantyColor(_equipment.WarrantyExpiryDate)">
+                                        @(_equipment.WarrantyExpiryDate?.ToString("dd MMM yyyy") ?? "—")
+                                    </MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Next Service</MudText>
+                                    <MudText Typo="Typo.body2" Color="@GetServiceDueColor(_equipment.NextServiceDueDate)">
+                                        @(_equipment.NextServiceDueDate?.ToString("dd MMM yyyy") ?? "—")
+                                    </MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Registered</MudText>
+                                    <MudText Typo="Typo.body2">@_equipment.CreatedAt.ToString("dd MMM yyyy")</MudText>
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </div>
+        </MudTabPanel>
+
+        <!-- Specifications Tab (manufacturing equipment only) -->
+        @if (_equipment.Spec is not null && _equipment.Spec.Count > 0)
+        {
+            <MudTabPanel Text="Specifications" Icon="@Icons.Material.Outlined.Settings">
+                <div class="pa-4">
+                    <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3 mud-text-primary">
+                            @FormatCategory(_equipment.Category) Specifications
+                        </MudText>
+                        <MudGrid Spacing="2">
+                            @foreach (var spec in _equipment.Spec)
+                            {
+                                <MudItem xs="12" sm="6" md="4">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                            @FormatSpecKey(spec.Key)
+                                        </MudText>
+                                        <MudText Typo="Typo.body2">@(spec.Value?.ToString() ?? "—")</MudText>
+                                    </MudStack>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    </MudPaper>
+                </div>
+            </MudTabPanel>
+        }
+
+        <!-- Notes Tab -->
+        <MudTabPanel Text="Notes" Icon="@Icons.Material.Outlined.Notes">
+            <div class="pa-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.subtitle1">Equipment Notes</MudText>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Size="Size.Small"
+                               OnClick="OpenAddNoteDialog">
+                        Add Note
+                    </MudButton>
+                </MudStack>
+
+                @if (_notes.Count == 0)
+                {
+                    <MudText Class="mud-text-secondary">No notes recorded for this equipment.</MudText>
+                }
+                else
+                {
+                    <MudTimeline TimelinePosition="TimelinePosition.Left">
+                        @foreach (var note in _notes)
+                        {
+                            <MudTimelineItem Color="Color.Default" Size="Size.Small">
+                                <ItemContent>
+                                    <MudPaper Elevation="0" Class="pa-3 border mud-border-lines-default rounded mb-2">
+                                        <MudText Typo="Typo.body2">@note.Content</MudText>
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary mt-1">
+                                            @note.CreatedAt.ToString("dd MMM yyyy, HH:mm")
+                                        </MudText>
+                                    </MudPaper>
+                                </ItemContent>
+                            </MudTimelineItem>
+                        }
+                    </MudTimeline>
+                }
+            </div>
+        </MudTabPanel>
+
+        <!-- Maintenance Tab -->
+        <MudTabPanel Text="Maintenance" Icon="@Icons.Material.Outlined.Build">
+            <div class="pa-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.subtitle1">Maintenance History</MudText>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Warning"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Size="Size.Small"
+                               OnClick="OpenAddMaintenanceDialog">
+                        Log Maintenance
+                    </MudButton>
+                </MudStack>
+
+                @if (_maintenanceLogs.Count == 0)
+                {
+                    <MudText Class="mud-text-secondary">No maintenance logs recorded for this equipment.</MudText>
+                }
+                else
+                {
+                    <MudTable Items="@_maintenanceLogs" Dense="true" Hover="true" Elevation="0" Class="border mud-border-lines-default rounded">
+                        <HeaderContent>
+                            <MudTh>Date</MudTh>
+                            <MudTh>Type</MudTh>
+                            <MudTh>Description</MudTh>
+                            <MudTh>Vendor</MudTh>
+                            <MudTh>Cost (THB)</MudTh>
+                            <MudTh>Next Service</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.OccurredAt.ToString("dd MMM yyyy")</MudTd>
+                            <MudTd>
+                                 <MudChip T="string" Size="Size.Small" Color="@GetMaintenanceTypeColor(context.Type)" Variant="Variant.Outlined">
+                                     @context.Type
+                                 </MudChip>
+                            </MudTd>
+                            <MudTd>@context.Description</MudTd>
+                            <MudTd>@(context.VendorName ?? "—")</MudTd>
+                            <MudTd>@(context.CostTHB.HasValue ? $"฿{context.CostTHB:N2}" : "—")</MudTd>
+                            <MudTd>@(context.NextServiceDueDate?.ToString("dd MMM yyyy") ?? "—")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </div>
+        </MudTabPanel>
+
+        <!-- Loans Tab -->
+        <MudTabPanel Text="Loans" Icon="@Icons.Material.Outlined.SwapHoriz">
+            <div class="pa-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.subtitle1">Loan History</MudText>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Info"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Size="Size.Small"
+                               OnClick="OpenCreateLoanDialog">
+                        Create Loan
+                    </MudButton>
+                </MudStack>
+
+                @if (_loans.Count == 0)
+                {
+                    <MudText Class="mud-text-secondary">No loans recorded for this equipment.</MudText>
+                }
+                else
+                {
+                    <MudTable Items="@_loans" Dense="true" Hover="true" Elevation="0" Class="border mud-border-lines-default rounded">
+                        <HeaderContent>
+                            <MudTh>Borrower</MudTh>
+                            <MudTh>Type</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh>Start Date</MudTh>
+                            <MudTh>Expected Return</MudTh>
+                            <MudTh>Actual Return</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.BorrowerId</MudTd>
+                            <MudTd>@context.BorrowerType</MudTd>
+                            <MudTd>
+                                 <MudChip T="string" Size="Size.Small" Color="@GetLoanStatusColor(context.LoanStatus)">
+                                     @context.LoanStatus
+                                 </MudChip>
+                            </MudTd>
+                            <MudTd>@context.LoanStartDate.ToString("dd MMM yyyy")</MudTd>
+                            <MudTd>@context.ExpectedReturnDate.ToString("dd MMM yyyy")</MudTd>
+                            <MudTd>@(context.ActualReturnDate?.ToString("dd MMM yyyy") ?? "—")</MudTd>
+                            <MudTd>
+                                <MudStack Row="true" Spacing="1">
+                                    @if (context.LoanStatus == "Pending")
+                                    {
+                                        <MudTooltip Text="Approve">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.CheckCircle"
+                                                           Size="Size.Small"
+                                                           Color="Color.Success"
+                                                           OnClick="@(() => OpenApproveLoanDialog(context))" />
+                                        </MudTooltip>
+                                        <MudTooltip Text="Reject">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.Cancel"
+                                                           Size="Size.Small"
+                                                           Color="Color.Error"
+                                                           OnClick="@(() => RejectLoan(context))" />
+                                        </MudTooltip>
+                                    }
+                                    @if (context.LoanStatus == "Active")
+                                    {
+                                        <MudTooltip Text="Record Return">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.AssignmentReturn"
+                                                           Size="Size.Small"
+                                                           Color="Color.Warning"
+                                                           OnClick="@(() => ReturnLoan(context))" />
+                                        </MudTooltip>
+                                    }
+                                </MudStack>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </div>
+        </MudTabPanel>
+
+        <!-- CNC Attachments Tab (CNC only) -->
+        @if (_equipment.Category == "CncMachine")
+        {
+            <MudTabPanel Text="Attachments" Icon="@Icons.Material.Outlined.Extension">
+                <div class="pa-4">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.subtitle1">CNC Attachments</MudText>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Secondary"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Size="Size.Small"
+                                   OnClick="OpenAddAttachmentDialog">
+                            Add Attachment
+                        </MudButton>
+                    </MudStack>
+
+                    @if (_attachments.Count == 0)
+                    {
+                        <MudText Class="mud-text-secondary">No attachments registered for this CNC machine.</MudText>
+                    }
+                    else
+                    {
+                        <MudTable Items="@_attachments" Dense="true" Hover="true" Elevation="0" Class="border mud-border-lines-default rounded">
+                            <HeaderContent>
+                                <MudTh>Name</MudTh>
+                                <MudTh>Type</MudTh>
+                                <MudTh>Serial</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Condition</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Name</MudTd>
+                                <MudTd>@context.AttachmentType</MudTd>
+                                <MudTd Class="font-monospace">@(context.SerialNumber ?? "—")</MudTd>
+                                <MudTd>
+                                     <MudChip T="string"
+                                              Size="Size.Small"
+                                              Color="@(context.IsActive ? Color.Success : Color.Default)"
+                                              Variant="Variant.Outlined">
+                                         @(context.IsActive ? "Active" : "Inactive")
+                                     </MudChip>
+                                </MudTd>
+                                <MudTd>@(context.ConditionNotes ?? "—")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </div>
+            </MudTabPanel>
+        }
+
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private EquipmentDetailDto? _equipment;
+    private List<EquipmentNoteDto> _notes = [];
+    private List<EquipmentLoanDto> _loans = [];
+    private List<MaintenanceLogDto> _maintenanceLogs = [];
+    private List<EquipmentAttachmentDto> _attachments = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+    }
+
+    private async Task LoadAll()
+    {
+        _isLoading = true;
+        try
+        {
+            _equipment = await Http.GetFromJsonAsync<EquipmentDetailDto>($"api/equipments/{Id}");
+
+            if (_equipment is not null)
+            {
+                var notesTask = Http.GetFromJsonAsync<List<EquipmentNoteDto>>($"api/equipments/{Id}/notes");
+                var loansTask = Http.GetFromJsonAsync<List<EquipmentLoanDto>>($"api/equipments/{Id}/loans");
+                var maintenanceTask = Http.GetFromJsonAsync<List<MaintenanceLogDto>>($"api/equipments/{Id}/maintenance");
+
+                await Task.WhenAll(notesTask, loansTask, maintenanceTask);
+
+                _notes = await notesTask ?? [];
+                _loans = await loansTask ?? [];
+                _maintenanceLogs = await maintenanceTask ?? [];
+
+                if (_equipment.Category == "CncMachine")
+                {
+                    _attachments = await Http.GetFromJsonAsync<List<EquipmentAttachmentDto>>(
+                        $"api/equipments/{Id}/attachments") ?? [];
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading equipment: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenChangeStatusDialog()
+    {
+        if (_equipment is null) return;
+
+        var parameters = new DialogParameters<ChangeEquipmentStatusDialog>
+        {
+            { x => x.EquipmentId, Id },
+            { x => x.CurrentStatus, _equipment.Status }
+        };
+        var dialog = await DialogService.ShowAsync<ChangeEquipmentStatusDialog>(
+            "Change Equipment Status",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAll();
+    }
+
+    private async Task OpenAddNoteDialog()
+    {
+        var parameters = new DialogParameters<AddEquipmentNoteDialog>
+        {
+            { x => x.EquipmentId, Id }
+        };
+        var dialog = await DialogService.ShowAsync<AddEquipmentNoteDialog>(
+            "Add Note",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAll();
+    }
+
+    private async Task OpenAddMaintenanceDialog()
+    {
+        var parameters = new DialogParameters<AddMaintenanceLogDialog>
+        {
+            { x => x.EquipmentId, Id }
+        };
+        var dialog = await DialogService.ShowAsync<AddMaintenanceLogDialog>(
+            "Log Maintenance",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAll();
+    }
+
+    private async Task OpenCreateLoanDialog()
+    {
+        var parameters = new DialogParameters<CreateLoanDialog>
+        {
+            { x => x.EquipmentId, Id }
+        };
+        var dialog = await DialogService.ShowAsync<CreateLoanDialog>(
+            "Create Equipment Loan",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAll();
+    }
+
+    private async Task OpenApproveLoanDialog(EquipmentLoanDto loan)
+    {
+        var parameters = new DialogParameters<ApproveLoanDialog>
+        {
+            { x => x.LoanId, loan.Id },
+            { x => x.RowVersion, 0u }
+        };
+        var dialog = await DialogService.ShowAsync<ApproveLoanDialog>(
+            "Approve Loan",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAll();
+    }
+
+    private async Task RejectLoan(EquipmentLoanDto loan)
+    {
+        bool? confirmed = await DialogService.ShowMessageBox(
+            "Reject Loan",
+            "Are you sure you want to reject this loan request?",
+            yesText: "Reject", cancelText: "Cancel");
+        if (confirmed != true) return;
+
+        var request = new RejectLoanRequest { RowVersion = 0u };
+        var response = await Http.PatchAsJsonAsync($"api/equipments/loans/{loan.Id}/reject", request);
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Loan rejected.", Severity.Success);
+            await LoadAll();
+        }
+        else
+        {
+            Snackbar.Add("Failed to reject loan.", Severity.Error);
+        }
+    }
+
+    private async Task ReturnLoan(EquipmentLoanDto loan)
+    {
+        var request = new ReturnLoanRequest
+        {
+            ActualReturnDate = DateOnly.FromDateTime(DateTime.Today),
+            RowVersion = 0u
+        };
+        var response = await Http.PatchAsJsonAsync($"api/equipments/loans/{loan.Id}/return", request);
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Equipment return recorded.", Severity.Success);
+            await LoadAll();
+        }
+        else
+        {
+            Snackbar.Add("Failed to record return.", Severity.Error);
+        }
+    }
+
+    private async Task OpenAddAttachmentDialog()
+    {
+        var parameters = new DialogParameters<AddAttachmentDialog>
+        {
+            { x => x.EquipmentId, Id }
+        };
+        var dialog = await DialogService.ShowAsync<AddAttachmentDialog>(
+            "Add CNC Attachment",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAll();
+    }
+
+    private async Task DeleteEquipment()
+    {
+        bool? confirmed = await DialogService.ShowMessageBox(
+            "Delete Equipment",
+            $"Are you sure you want to permanently delete '{_equipment?.Name}'? This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true) return;
+
+        var response = await Http.DeleteAsync($"api/equipments/{Id}");
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Equipment deleted.", Severity.Success);
+            Navigation.NavigateTo("/mfg/equipment");
+        }
+        else
+        {
+            var statusCode = (int)response.StatusCode;
+            Snackbar.Add(statusCode == 409
+                ? "Cannot delete: this equipment has job history."
+                : statusCode == 503
+                    ? "Cannot delete: Job Service is currently unavailable."
+                    : "Failed to delete equipment.",
+                Severity.Error);
+        }
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success,
+        "UnderMaintenance" => Color.Warning,
+        "OnLoan" => Color.Info,
+        "Lost" => Color.Error,
+        "Decommissioned" => Color.Dark,
+        _ => Color.Default
+    };
+
+    private static Color GetCategoryColor(string category) => category switch
+    {
+        "FdmPrinter" or "SlaPrinter" or "InjectionMolding" => Color.Secondary,
+        "CncMachine" => Color.Primary,
+        "Scanner3D" => Color.Tertiary,
+        _ => Color.Default
+    };
+
+    private static Color GetLoanStatusColor(string status) => status switch
+    {
+        "Pending" => Color.Warning,
+        "Approved" or "Active" => Color.Success,
+        "Rejected" => Color.Error,
+        "Returned" => Color.Default,
+        "Overdue" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static Color GetMaintenanceTypeColor(string type) => type switch
+    {
+        "Preventive" => Color.Info,
+        "Corrective" or "Repair" => Color.Warning,
+        "Calibration" => Color.Secondary,
+        "Inspection" => Color.Tertiary,
+        _ => Color.Default
+    };
+
+    private static Color GetWarrantyColor(DateOnly? date)
+    {
+        if (date is null) return Color.Default;
+        return date.Value < DateOnly.FromDateTime(DateTime.Today) ? Color.Error : Color.Success;
+    }
+
+    private static Color GetServiceDueColor(DateOnly? date)
+    {
+        if (date is null) return Color.Default;
+        var daysUntil = date.Value.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber;
+        return daysUntil < 0 ? Color.Error : daysUntil <= 14 ? Color.Warning : Color.Default;
+    }
+
+    private static string FormatStatus(string status) => status switch
+    {
+        "UnderMaintenance" => "Under Maintenance",
+        "OnLoan" => "On Loan",
+        _ => status
+    };
+
+    private static string FormatCategory(string category) => category switch
+    {
+        "FdmPrinter" => "FDM Printer",
+        "SlaPrinter" => "SLA/DLP Printer",
+        "CncMachine" => "CNC Machine",
+        "Scanner3D" => "3D Scanner",
+        "InjectionMolding" => "Injection Molding",
+        "OfficeEquipment" => "Office Equipment",
+        "MeasuringEquipment" => "Measuring Equipment",
+        "ITEquipment" => "IT Equipment",
+        "HandTool" => "Hand Tool",
+        _ => category
+    };
+
+    private static string FormatSpecKey(string key)
+    {
+        // Convert PascalCase/camelCase spec keys to readable labels
+        // e.g., "BuildVolumeX" → "Build Volume X", "NozzleDiameterMm" → "Nozzle Diameter (mm)"
+        var result = System.Text.RegularExpressions.Regex.Replace(key, "([A-Z])", " $1").Trim();
+        result = result.Replace(" Mm", " (mm)").Replace(" C", " (°C)").Replace(" Rpm", " (RPM)");
+        return result;
+    }
+}

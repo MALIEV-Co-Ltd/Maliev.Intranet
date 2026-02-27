@@ -1,0 +1,100 @@
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_request.Name"
+                              Label="Attachment Name"
+                              Required="true"
+                              Variant="Variant.Outlined"
+                              HelperText="e.g., 'Ø10mm End Mill', '125mm Chuck'" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value="_request.AttachmentType"
+                           Label="Attachment Type"
+                           Required="true"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Tool")">Tool</MudSelectItem>
+                    <MudSelectItem Value="@("Fixture")">Fixture</MudSelectItem>
+                    <MudSelectItem Value="@("Collet")">Collet</MudSelectItem>
+                    <MudSelectItem Value="@("Chuck")">Chuck</MudSelectItem>
+                    <MudSelectItem Value="@("Clamp")">Clamp</MudSelectItem>
+                    <MudSelectItem Value="@("Probe")">Probe</MudSelectItem>
+                    <MudSelectItem Value="@("Magazine")">Magazine</MudSelectItem>
+                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_request.SerialNumber"
+                              Label="Serial Number (optional)"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_request.ConditionNotes"
+                              Label="Condition Notes (optional)"
+                              Variant="Variant.Outlined"
+                              Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Secondary"
+                   OnClick="Submit"
+                   Disabled="@(_isSaving || string.IsNullOrWhiteSpace(_request.Name) || string.IsNullOrEmpty(_request.AttachmentType))">
+            @(_isSaving ? "Saving..." : "Add Attachment")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>Gets or sets the ID of the CNC equipment to attach to.</summary>
+    [Parameter] public Guid EquipmentId { get; set; }
+
+    private bool _isSaving;
+
+    private readonly AddAttachmentRequest _request = new()
+    {
+        Name = string.Empty,
+        AttachmentType = string.Empty
+    };
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_request.Name) || string.IsNullOrEmpty(_request.AttachmentType)) return;
+        _isSaving = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/equipments/{EquipmentId}/attachments", _request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Attachment added.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var statusCode = (int)response.StatusCode;
+                Snackbar.Add(statusCode == 422
+                    ? "Attachments can only be added to CNC machines."
+                    : "Failed to add attachment.",
+                    Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

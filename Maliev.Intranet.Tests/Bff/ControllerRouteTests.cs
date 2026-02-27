@@ -43,6 +43,7 @@ public class ControllerRouteTests(BffTestWebApplicationFactory factory) : IClass
     [InlineData("/api/credit-terms")]
     [InlineData("/api/permissions/available")]
     [InlineData("/api/onboarding")]
+    [InlineData("/api/equipments")]
     public async Task Get_Endpoints_ReturnSuccessOrUnauthorized(string url)
     {
         // Arrange

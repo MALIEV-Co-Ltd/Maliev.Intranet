@@ -1,0 +1,248 @@
+@page "/mfg/equipment"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Components
+@inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Equipment - Maliev Intranet</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Equipment</MudText>
+
+<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudTextField @bind-Value="_search"
+                          Placeholder="Search by name, brand, asset code..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Style="min-width: 280px;"
+                          DebounceInterval="400"
+                          OnDebounceIntervalElapsed="LoadEquipments" />
+
+            <MudSelect Value="_filterCategory"
+                       Label="Category"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="min-width: 160px;"
+                       ValueChanged="@((string v) => OnCategoryChanged(v))">
+                <MudSelectItem Value="@("")">All Categories</MudSelectItem>
+                <MudSelectItem Value="@("FdmPrinter")">FDM Printer</MudSelectItem>
+                <MudSelectItem Value="@("SlaPrinter")">SLA/DLP Printer</MudSelectItem>
+                <MudSelectItem Value="@("CncMachine")">CNC Machine</MudSelectItem>
+                <MudSelectItem Value="@("Scanner3D")">3D Scanner</MudSelectItem>
+                <MudSelectItem Value="@("InjectionMolding")">Injection Molding</MudSelectItem>
+                <MudSelectItem Value="@("OfficeEquipment")">Office Equipment</MudSelectItem>
+                <MudSelectItem Value="@("MeasuringEquipment")">Measuring Equipment</MudSelectItem>
+                <MudSelectItem Value="@("ITEquipment")">IT Equipment</MudSelectItem>
+                <MudSelectItem Value="@("HandTool")">Hand Tool</MudSelectItem>
+                <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect Value="_filterStatus"
+                       Label="Status"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="min-width: 160px;"
+                       ValueChanged="@((string v) => OnStatusChanged(v))">
+                <MudSelectItem Value="@("")">All Statuses</MudSelectItem>
+                <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+                <MudSelectItem Value="@("UnderMaintenance")">Under Maintenance</MudSelectItem>
+                <MudSelectItem Value="@("OnLoan")">On Loan</MudSelectItem>
+                <MudSelectItem Value="@("Lost")">Lost</MudSelectItem>
+                <MudSelectItem Value="@("Decommissioned")">Decommissioned</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Href="/mfg/equipment/new">
+            Register Equipment
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <div class="pa-4">
+        @for (int i = 0; i < 8; i++)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="64px" Class="mb-2 rounded" />
+        }
+    </div>
+}
+else
+{
+    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+        <MudDataGrid T="EquipmentSummaryDto"
+                     Items="@_equipments"
+                     Dense="true"
+                     Hover="true"
+                     RowsPerPage="20"
+                     Elevation="0"
+                     RowClick="@(row => Navigation.NavigateTo($"/mfg/equipment/{row.Item.Id}"))">
+            <Columns>
+                <TemplateColumn Title="Asset Code" SortBy="x => x.AssetCode">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2" Class="font-monospace">@context.Item.AssetCode</MudText>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.Name" Title="Name" />
+                <TemplateColumn Title="Brand / Model">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2">@context.Item.Brand</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.Item.ModelName</MudText>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Category">
+                    <CellTemplate>
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="@GetCategoryColor(context.Item.Category)"
+                                 Variant="Variant.Outlined">
+                            @FormatCategory(context.Item.Category)
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
+                            @FormatStatus(context.Item.Status)
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Actions" Sortable="false">
+                    <CellTemplate>
+                        <MudTooltip Text="View Details">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility"
+                                           Size="Size.Small"
+                                           Color="Color.Default"
+                                           Href="@($"/mfg/equipment/{context.Item.Id}")" />
+                        </MudTooltip>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <PagerContent>
+                <MudDataGridPager T="EquipmentSummaryDto" />
+            </PagerContent>
+            <NoRecordsContent>
+                <MudText Class="pa-4 mud-text-secondary">No equipment found matching your filters.</MudText>
+            </NoRecordsContent>
+        </MudDataGrid>
+    </MudPaper>
+
+    @if (_totalCount > 0)
+    {
+        <MudText Typo="Typo.caption" Class="mt-2 mud-text-secondary">
+            Showing @_equipments.Count of @_totalCount equipment records.
+        </MudText>
+    }
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _search = "";
+    private string _filterCategory = "";
+    private string _filterStatus = "";
+    private List<EquipmentSummaryDto> _equipments = [];
+    private int _totalCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEquipments();
+    }
+
+    private async Task LoadEquipments()
+    {
+        _isLoading = true;
+        try
+        {
+            var query = BuildQuery();
+            var response = await Http.GetFromJsonAsync<PagedResponse<EquipmentSummaryDto>>(
+                $"api/equipments{query}");
+
+            if (response is not null)
+            {
+                _equipments = response.Data.ToList();
+                _totalCount = response.Meta.TotalCount;
+            }
+            else
+            {
+                _equipments = [];
+                _totalCount = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading equipment: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnCategoryChanged(string value)
+    {
+        _filterCategory = value;
+        await LoadEquipments();
+    }
+
+    private async Task OnStatusChanged(string value)
+    {
+        _filterStatus = value;
+        await LoadEquipments();
+    }
+
+    private string BuildQuery()
+    {
+        var parts = new List<string> { "page=1", "pageSize=100" };
+        if (!string.IsNullOrEmpty(_filterCategory)) parts.Add($"category={Uri.EscapeDataString(_filterCategory)}");
+        if (!string.IsNullOrEmpty(_filterStatus)) parts.Add($"status={Uri.EscapeDataString(_filterStatus)}");
+        if (!string.IsNullOrEmpty(_search)) parts.Add($"search={Uri.EscapeDataString(_search)}");
+        return "?" + string.Join("&", parts);
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success,
+        "UnderMaintenance" => Color.Warning,
+        "OnLoan" => Color.Info,
+        "Lost" => Color.Error,
+        "Decommissioned" => Color.Dark,
+        _ => Color.Default
+    };
+
+    private static Color GetCategoryColor(string category) => category switch
+    {
+        "FdmPrinter" or "SlaPrinter" or "InjectionMolding" => Color.Secondary,
+        "CncMachine" => Color.Primary,
+        "Scanner3D" => Color.Tertiary,
+        _ => Color.Default
+    };
+
+    private static string FormatCategory(string category) => category switch
+    {
+        "FdmPrinter" => "FDM Printer",
+        "SlaPrinter" => "SLA/DLP Printer",
+        "CncMachine" => "CNC Machine",
+        "Scanner3D" => "3D Scanner",
+        "InjectionMolding" => "Injection Molding",
+        "OfficeEquipment" => "Office",
+        "MeasuringEquipment" => "Measuring",
+        "ITEquipment" => "IT",
+        "HandTool" => "Hand Tool",
+        _ => category
+    };
+
+    private static string FormatStatus(string status) => status switch
+    {
+        "UnderMaintenance" => "Maintenance",
+        "OnLoan" => "On Loan",
+        _ => status
+    };
+}
