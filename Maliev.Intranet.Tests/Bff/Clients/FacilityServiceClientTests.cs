@@ -416,7 +416,7 @@ public class FacilityServiceClientTests
         {
             Type = "Calibration",
             Description = "Bed levelled.",
-            OccurredAt = DateOnly.FromDateTime(DateTime.Today)
+            OccurredAt = DateTime.Today
         });
 
         Assert.NotNull(result);

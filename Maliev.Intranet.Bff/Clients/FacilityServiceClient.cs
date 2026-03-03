@@ -8,7 +8,7 @@ namespace Maliev.Intranet.Bff.Clients;
 /// Covers equipment lifecycle, notes, loans, maintenance logs, and CNC attachments.
 /// </summary>
 /// <param name="httpClient">The HTTP client instance.</param>
-public class FacilityServiceClient(HttpClient httpClient)
+public class FacilityServiceClient(HttpClient httpClient) : IFacilityServiceClient
 {
     // -----------------------------------------------------------------------
     // Equipment

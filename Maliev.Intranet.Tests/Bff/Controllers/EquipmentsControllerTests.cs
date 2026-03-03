@@ -9,13 +9,12 @@ namespace Maliev.Intranet.Tests.Bff.Controllers;
 
 public class EquipmentsControllerTests
 {
-    private readonly Mock<FacilityServiceClient> _clientMock;
+    private readonly Mock<IFacilityServiceClient> _clientMock;
     private readonly EquipmentsController _controller;
 
     public EquipmentsControllerTests()
     {
-        var httpClient = new HttpClient(new MockHttpMessageHandler());
-        _clientMock = new Mock<FacilityServiceClient>(httpClient);
+        _clientMock = new Mock<IFacilityServiceClient>();
         _controller = new EquipmentsController(_clientMock.Object);
     }
 
@@ -378,7 +377,7 @@ public class EquipmentsControllerTests
     public async Task AddMaintenanceLog_ShouldReturnOk_WhenSuccessful()
     {
         var id = Guid.NewGuid();
-        var request = new AddMaintenanceLogRequest { Type = "Calibration", Description = "Bed levelled.", OccurredAt = DateOnly.FromDateTime(DateTime.Today) };
+        var request = new AddMaintenanceLogRequest { Type = "Calibration", Description = "Bed levelled.", OccurredAt = DateTime.Today };
         var log = new MaintenanceLogDto { Type = "Calibration" };
         _clientMock.Setup(x => x.AddMaintenanceLogAsync(id, request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(log);

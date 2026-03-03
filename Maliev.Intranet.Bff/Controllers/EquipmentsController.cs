@@ -12,7 +12,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="client">The facility service client.</param>
 [ApiController]
 [Route("api/[controller]")]
-public class EquipmentsController(FacilityServiceClient client) : ControllerBase
+public class EquipmentsController(IFacilityServiceClient client) : ControllerBase
 {
     // -----------------------------------------------------------------------
     // Equipment CRUD
