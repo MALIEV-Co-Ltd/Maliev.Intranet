@@ -305,7 +305,6 @@ public class DocumentResponse
 
     public DateTime UpdatedAt { get; set; }
     public int Version { get; set; }
-    public byte[] RowVersion { get; set; } = [];
 }
 
 /// <summary>
