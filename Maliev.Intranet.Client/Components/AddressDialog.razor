@@ -286,7 +286,7 @@
 
     private async Task Submit()
     {
-        await _form.Validate();
+        await _form.ValidateAsync();
         if (_form.IsValid) MudDialog.Close(DialogResult.Ok(Address));
         else Snackbar.Add("Please fill in all required fields correctly.", Severity.Warning);
     }

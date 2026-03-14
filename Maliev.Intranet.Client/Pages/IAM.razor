@@ -10,7 +10,7 @@
 <MudText Typo="Typo.h4" Class="mb-4">IAM Console</MudText>
 
 <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-4" @bind-ActivePanelIndex="_activeTab">
+    <MudTabs Elevation="0" Rounded="false" TabPanelsClass="pa-4" @bind-ActivePanelIndex="_activeTab">
         <!-- Users Tab -->
         <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.People">
             @if (_isLoadingUsers)

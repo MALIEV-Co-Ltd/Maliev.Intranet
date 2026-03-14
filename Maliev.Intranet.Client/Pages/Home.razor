@@ -53,12 +53,12 @@ else
                                      var chartData = System.Text.Json.JsonSerializer.Deserialize<ChartData>(widget.Data.GetRawText());
                                      if(chartData != null)
                                      {
-                                        <MudChart Class="mini-chart" ChartType="ChartType.Line" XAxisLabels="@chartData.Labels" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = chartData.Values } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
+                                        <MudChart T="double" Class="mini-chart" ChartType="ChartType.Line" ChartLabels="@chartData.Labels" ChartSeries="@(new List<ChartSeries<double>> { new ChartSeries<double> { Data = chartData.Values } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
                                      }
                                 }
                                 else
                                 {
-                                    <MudChart Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries> { new ChartSeries { Data = new double[] { 0, 0, 0, 0 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
+                                    <MudChart T="double" Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries<double>> { new ChartSeries<double> { Data = new double[] { 0, 0, 0, 0 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
                                 }
                             </div>
                         </div>
@@ -121,7 +121,6 @@ else
     // CSS class handles legend hiding
     private ChartOptions _chartOptions = new ChartOptions 
     { 
-        LineStrokeWidth = 2,
         ChartPalette = new[] { "#3d7cf9", "#238636", "#a855f7" }
     };
 

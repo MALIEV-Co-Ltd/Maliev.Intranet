@@ -60,22 +60,38 @@
             {
                 @if (message.ThinkingSteps.Count == 0)
                 {
-                    <MudChat ChatPosition="ChatBubblePosition.Start">
-                        <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
+                    <div class="d-flex align-start gap-2 mb-3">
+                        <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px; flex-shrink: 0;">
                             <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
                         </MudAvatar>
-                        <MudChatBubble>
+                        <MudPaper Elevation="0" Class="pa-3 rounded-xl mud-secondary-text" Style="background: var(--mud-palette-surface); max-width: 80%;">
                             <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" Style="width: 120px;" />
-                        </MudChatBubble>
-                    </MudChat>
+                        </MudPaper>
+                    </div>
                 }
                 continue;
             }
 
-            <MudChat ChatPosition="@(message.IsUser ? ChatBubblePosition.End : ChatBubblePosition.Start)">
+            <div class="d-flex @(message.IsUser ? "justify-end" : "justify-start") align-start gap-2 mb-3">
+                @if (!message.IsUser)
+                {
+                    <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px; flex-shrink: 0;">
+                        <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
+                    </MudAvatar>
+                }
+                <MudPaper Elevation="0" Class="pa-3 rounded-xl" Style="@(message.IsUser ? "background: var(--mud-palette-primary); color: var(--mud-palette-primary-text); max-width: 80%;" : "background: var(--mud-palette-surface); max-width: 80%;")">
+                    @if (message.IsUser)
+                    {
+                        <div style="white-space: pre-wrap;">@message.Text</div>
+                    }
+                    else
+                    {
+                        <MarkdownRenderer Markdown="@message.Text" />
+                    }
+                </MudPaper>
                 @if (message.IsUser)
                 {
-                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Style="align-self: flex-start; margin-top: 4px;">
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Style="align-self: flex-start; margin-top: 4px; flex-shrink: 0;">
                         @if (!string.IsNullOrEmpty(_userPicture))
                         {
                             <MudImage Src="@_userPicture" />
@@ -86,24 +102,7 @@
                         }
                     </MudAvatar>
                 }
-                else
-                {
-                    <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
-                        <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
-                    </MudAvatar>
-                }
-                <MudChatBubble Color="@(message.IsUser ? Color.Primary : Color.Surface)"
-                               Variant="Variant.Filled" >
-                    @if (message.IsUser)
-                    {
-                        <div style="white-space: pre-wrap;">@message.Text</div>
-                    }
-                    else
-                    {
-                        <MarkdownRenderer Markdown="@message.Text" />
-                    }
-                </MudChatBubble>
-            </MudChat>
+            </div>
 
             @if (message.SuggestedActions != null && message.SuggestedActions.Count > 0)
             {
@@ -123,14 +122,14 @@
 
         @if (ChatService.IsLoading && !ChatService.Messages.Any(m => m.IsProcessing))
         {
-            <MudChat ChatPosition="ChatBubblePosition.Start">
-                <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px;">
+            <div class="d-flex align-start gap-2 mb-3">
+                <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px; flex-shrink: 0;">
                     <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
                 </MudAvatar>
-                <MudChatBubble>
+                <MudPaper Elevation="0" Class="pa-3 rounded-xl" Style="background: var(--mud-palette-surface); max-width: 80%;">
                     <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" Style="width: 120px;" />
-                </MudChatBubble>
-            </MudChat>
+                </MudPaper>
+            </div>
         }
 
         @if (!string.IsNullOrEmpty(_errorMessage))
@@ -160,7 +159,6 @@
                               Variant="Variant.Text"
                               Underline="false"
                               Lines="1"
-                              AutoGrow="true"
                               MaxLines="8"
                               OnKeyDown="@HandleKeyDown"
                               Immediate="true"
@@ -173,9 +171,9 @@
             <div class="d-flex align-center justify-space-between mt-1 px-1">
                 <div class="d-flex align-center gap-1">
                     <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="UploadFiles" Hidden="true">
-                        <ActivatorContent>
-                            <MudIconButton Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" Class="action-icon" />
-                        </ActivatorContent>
+                        <CustomContent>
+                            <MudIconButton Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" Class="action-icon" OnClick="@context.OpenFilePickerAsync" />
+                        </CustomContent>
                     </MudFileUpload>
                     <MudIconButton Icon="@Icons.Material.Outlined.Public" Size="Size.Small" Class="action-icon" />
                     <MudIconButton Icon="@Icons.Material.Outlined.Lightbulb" Size="Size.Small" Class="action-icon" />

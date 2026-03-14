@@ -186,7 +186,7 @@
         await SignalRService.StopAsync();
     }
 
-    private async Task<GridData<CustomerSummaryDto>> LoadGridData(GridState<CustomerSummaryDto> state)
+    private async Task<GridData<CustomerSummaryDto>> LoadGridData(GridState<CustomerSummaryDto> state, CancellationToken cancellationToken)
     {
         var page = state.Page + 1;
         var url = $"api/customers?page={page}&query={_searchString}";

@@ -306,7 +306,7 @@ else
 
     private async Task TerminateEmployee()
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Terminate Employment",
             $"Are you sure you want to terminate the employment of {_employee?.Name}?",
             yesText: "Terminate", cancelText: "Cancel");

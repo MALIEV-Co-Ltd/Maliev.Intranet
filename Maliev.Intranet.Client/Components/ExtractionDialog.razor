@@ -16,7 +16,7 @@
                 Upload documents (business card, form) or paste text to auto-fill customer information.
             </MudText>
 
-            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
                 <MudTabPanel Text="Paste Text" Icon="@Icons.Material.Filled.ContentPaste">
                     <MudTextField T="string" 
                                   Label="Customer Information" 
@@ -26,7 +26,6 @@
                                   Lines="10"
                                   Placeholder="Paste business card text, email signature, or raw data here..."
                                   Immediate="true"
-                                  AutoGrow="true"
                                   MaxLines="15"
                                   Class="rounded-xl" />
                 </MudTabPanel>
@@ -36,10 +35,11 @@
                                    FilesChanged="OnExtractionFilesSelected" 
                                    Accept=".pdf,.jpg,.jpeg,.png" 
                                    MaximumFileCount="100">
-                        <ActivatorContent>
+                        <CustomContent>
                             <MudPaper Outlined="true" 
+                                      @onclick="@context.OpenFilePickerAsync"
                                       Class="d-flex flex-column align-center justify-center py-12 px-6 cursor-pointer mud-theme-surface rounded-xl"
-                                      Style="border: 2px dashed var(--mud-palette-divider); min-height: 250px; width: 100%; transition: all 0.2s ease-in-out;"
+                                      Style="border: 2px dashed var(--mud-palette-divider); min-height: 250px; width: 100%; transition: all 0.2s ease-in-out; cursor: pointer;"
                                       Elevation="0">
                                  <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
                                  
@@ -61,7 +61,7 @@
                                      <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-6">Supports PDF, JPG, PNG (Max 10MB)</MudText>
                                  }
                             </MudPaper>
-                        </ActivatorContent>
+                        </CustomContent>
                     </MudFileUpload>
                 </MudTabPanel>
             </MudTabs>

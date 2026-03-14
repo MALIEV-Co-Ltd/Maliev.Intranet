@@ -16,12 +16,10 @@
                            FilesChanged="OnFilesSelected"
                            Accept=".stl,.obj,.step,.stp,.step.gz,.stp.gz"
                            MaximumFileCount="10"
-                           @ref="_fileUpload"
-                           Hidden="false"
-                           InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
-                           InputStyle="opacity:0">
-                <ActivatorContent>
+                           @ref="_fileUpload">
+                <CustomContent>
                     <MudPaper Outlined="true"
+                              @onclick="@context.OpenFilePickerAsync"
                               Class="@($"relative d-flex flex-column align-center justify-center py-12 px-6 border-dashed border-2 rounded-xl transition-all {(_dragOver ? "mud-border-primary mud-bg-primary-hover" : "mud-border-lines-default")}")"
                               Style="cursor: pointer;"
                               @ondragenter="@(() => _dragOver = true)"
@@ -32,7 +30,7 @@
                         <MudText Typo="Typo.h6">Click to upload or drag and drop</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">Upload 3D models up to 100MB each (STL, OBJ, STEP)</MudText>
                     </MudPaper>
-                </ActivatorContent>
+                </CustomContent>
             </MudFileUpload>
 
             @if (!string.IsNullOrEmpty(_fileCountWarning))

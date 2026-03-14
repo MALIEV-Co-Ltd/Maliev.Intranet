@@ -28,7 +28,7 @@
 </MudPaper>
 
     <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-    <MudTabs Elevation="0" Rounded="false" PanelClass="pa-0" Class="border-b mud-border-lines-default">
+    <MudTabs Elevation="0" Rounded="false" TabPanelsClass="pa-0" Class="border-b mud-border-lines-default">
         <MudTabPanel Text="Active" Icon="@Icons.Material.Outlined.LocalShipping" BadgeData="@(_purchaseOrders.Count(x => x.Status == "Ordered" || x.Status == "Approved") > 0 ? _purchaseOrders.Count(x => x.Status == "Ordered" || x.Status == "Approved") : null)" BadgeColor="Color.Primary" />
         <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="@(_purchaseOrders.Count(x => x.Status == "Draft") > 0 ? _purchaseOrders.Count(x => x.Status == "Draft") : null)" BadgeColor="Color.Default" />
         <MudTabPanel Text="History" Icon="@Icons.Material.Outlined.History" />

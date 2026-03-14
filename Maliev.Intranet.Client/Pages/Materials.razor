@@ -135,7 +135,7 @@ else
 
     private async Task DeleteMaterial(MaterialSummaryDto material)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Delete Material", 
             $"Are you sure you want to delete {material.Name}?", 
             yesText: "Delete", cancelText: "Cancel");
