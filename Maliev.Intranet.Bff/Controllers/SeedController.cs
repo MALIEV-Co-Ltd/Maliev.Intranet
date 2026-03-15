@@ -1,7 +1,6 @@
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Bff.Controllers;
@@ -26,22 +25,10 @@ public class SeedController(
     [HttpPost("customers")]
     public async Task<IActionResult> SeedCustomers(CancellationToken ct)
     {
-        // Check if user is logged in
-        var authHeader = Request.Headers.Authorization.FirstOrDefault();
-        if (string.IsNullOrEmpty(authHeader))
-        {
-            return StatusCode(401, new ApiErrorResponse
-            {
-                Message = "You must be logged in via the Intranet to seed data. Please authenticate first."
-            });
-        }
-
         logger.LogInformation("Starting customer data seeding...");
 
-        // Use the service-account client as base, then override with user's JWT
+        // Use the service-account authenticated client — no UserContextHandler on this one.
         var client = httpClientFactory.CreateClient("SeedCustomerClient");
-        // Replace service account token with user's token for permission checks
-        client.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
         // Look up Thailand's country ID first (requires country.countries.read)
         try
@@ -117,10 +104,6 @@ public class SeedController(
                     }
                 }
             });
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("Missing required permission"))
-        {
-            return StatusCode(403, new ApiErrorResponse { Message = ex.Message });
         }
         catch (Exception ex)
         {
