@@ -17,7 +17,7 @@ public class SeedController(
     IHttpClientFactory httpClientFactory,
     ILogger<SeedController> logger) : ControllerBase
 {
-    private static readonly Guid ThailandCountryId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private Guid _thailandCountryId;
 
     /// <summary>
     /// Seeds the Maliev customer data. Idempotent - checks if data already exists.
@@ -29,6 +29,14 @@ public class SeedController(
 
         // Use the service-account authenticated client — no UserContextHandler on this one.
         var client = httpClientFactory.CreateClient("SeedCustomerClient");
+
+        // Look up Thailand's country ID first
+        _thailandCountryId = await GetThailandCountryIdAsync(client, ct);
+        if (_thailandCountryId == Guid.Empty)
+        {
+            return StatusCode(500, new ApiErrorResponse { Message = "Thailand country not found in CountryService." });
+        }
+        logger.LogInformation("Using Thailand country ID: {CountryId}", _thailandCountryId);
 
         try
         {
@@ -150,11 +158,16 @@ public class SeedController(
             city = "ปากเกร็ด",
             stateProvince = "นนทบุรี",
             postalCode = "11120",
-            countryId = ThailandCountryId
+            countryId = _thailandCountryId
         };
 
         var response = await client.PostAsJsonAsync("/customer/v1/addresses", addressRequest, ct);
-        if (!response.IsSuccessStatusCode) return null;
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            logger.LogWarning("Failed to create company billing address: {StatusCode} - {Error}", response.StatusCode, error);
+            return null;
+        }
 
         var address = await response.Content.ReadFromJsonAsync<AddressResponse>(ct);
         if (address != null)
@@ -218,13 +231,18 @@ public class SeedController(
             city = "ภาษีเจริญ",
             stateProvince = "กรุงเทพมหานคร",
             postalCode = "10160",
-            countryId = ThailandCountryId,
+            countryId = _thailandCountryId,
             recipientName = "ณัฐกานต์ วนาศรีวิไล",
             recipientPhone = "0818030404"
         };
 
         var response = await client.PostAsJsonAsync("/customer/v1/addresses", addressRequest, ct);
-        if (!response.IsSuccessStatusCode) return null;
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            logger.LogWarning("Failed to create customer shipping address: {StatusCode} - {Error}", response.StatusCode, error);
+            return null;
+        }
 
         var address = await response.Content.ReadFromJsonAsync<AddressResponse>(ct);
         if (address != null)
@@ -302,5 +320,45 @@ public class SeedController(
     {
         public Guid Id { get; set; }
         public string NoteText { get; set; } = string.Empty;
+    }
+
+    private class CountryResponse
+    {
+        public Guid Id { get; set; }
+        public string Iso2 { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private async Task<Guid> GetThailandCountryIdAsync(HttpClient client, CancellationToken ct)
+    {
+        try
+        {
+            var response = await client.GetAsync("/country/v1/countries?query=TH&page=1", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Failed to fetch countries: {StatusCode}", response.StatusCode);
+                return Guid.Empty;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<CountryListResponse>(ct);
+            var thailand = result?.Items.FirstOrDefault(c => c.Iso2 == "TH");
+            if (thailand == null)
+            {
+                logger.LogWarning("Thailand country not found in CountryService");
+                return Guid.Empty;
+            }
+
+            return thailand.Id;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error fetching Thailand country ID");
+            return Guid.Empty;
+        }
+    }
+
+    private class CountryListResponse
+    {
+        public List<CountryResponse> Items { get; set; } = [];
     }
 }
