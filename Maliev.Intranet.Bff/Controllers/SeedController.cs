@@ -1,14 +1,14 @@
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
 /// <summary>
 /// Controller for database seeding operations. Internal use only.
-/// Uses a service-account authenticated HTTP client to call CustomerService directly,
-/// bypassing the BFF UserContextHandler (which requires an authenticated user session).
+/// Requires user authentication - uses the logged-in user's JWT token for API calls.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -21,17 +21,38 @@ public class SeedController(
 
     /// <summary>
     /// Seeds the Maliev customer data. Idempotent - checks if data already exists.
+    /// Requires user to be logged in with appropriate permissions.
     /// </summary>
     [HttpPost("customers")]
     public async Task<IActionResult> SeedCustomers(CancellationToken ct)
     {
+        // Check if user is logged in
+        var authHeader = Request.Headers.Authorization.FirstOrDefault();
+        if (string.IsNullOrEmpty(authHeader))
+        {
+            return StatusCode(401, new ApiErrorResponse
+            {
+                Message = "You must be logged in via the Intranet to seed data. Please authenticate first."
+            });
+        }
+
         logger.LogInformation("Starting customer data seeding...");
 
-        // Use the service-account authenticated client — no UserContextHandler on this one.
+        // Use the service-account client as base, then override with user's JWT
         var client = httpClientFactory.CreateClient("SeedCustomerClient");
+        // Replace service account token with user's token for permission checks
+        client.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
-        // Look up Thailand's country ID first
-        _thailandCountryId = await GetThailandCountryIdAsync(client, ct);
+        // Look up Thailand's country ID first (requires country.countries.read)
+        try
+        {
+            _thailandCountryId = await GetThailandCountryIdAsync(client, ct);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Missing required permission"))
+        {
+            return StatusCode(403, new ApiErrorResponse { Message = ex.Message });
+        }
+        
         if (_thailandCountryId == Guid.Empty)
         {
             return StatusCode(500, new ApiErrorResponse { Message = "Thailand country not found in CountryService." });
@@ -97,6 +118,10 @@ public class SeedController(
                 }
             });
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Missing required permission"))
+        {
+            return StatusCode(403, new ApiErrorResponse { Message = ex.Message });
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to seed customer data.");
@@ -123,6 +148,14 @@ public class SeedController(
         };
 
         var companyResponse = await client.PostAsJsonAsync("/customer/v1/companies", companyRequest, ct);
+        if (companyResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            companyResponse.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Missing required permission: customer.companies.manage. " +
+                "Please log in as a user with Platform Owner role.");
+        }
+
         CompanyResponse? company = null;
         if (companyResponse.IsSuccessStatusCode)
         {
@@ -162,6 +195,14 @@ public class SeedController(
         };
 
         var response = await client.PostAsJsonAsync("/customer/v1/addresses", addressRequest, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Missing required permission: customer.addresses.manage. " +
+                "Please log in as a user with Platform Owner role.");
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(ct);
@@ -202,6 +243,14 @@ public class SeedController(
         };
 
         var response = await client.PostAsJsonAsync("/customer/v1/customers", request, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Missing required permission: customer.customers.create. " +
+                "Please log in as a user with Platform Owner role.");
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(ct);
@@ -237,6 +286,14 @@ public class SeedController(
         };
 
         var response = await client.PostAsJsonAsync("/customer/v1/addresses", addressRequest, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Missing required permission: customer.addresses.manage. " +
+                "Please log in as a user with Platform Owner role.");
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(ct);
@@ -262,6 +319,14 @@ public class SeedController(
         };
 
         var response = await client.PostAsJsonAsync("/customer/v1/internal-notes", noteRequest, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Missing required permission: customer.notes.create. " +
+                "Please log in as a user with Platform Owner role.");
+        }
+
         if (!response.IsSuccessStatusCode) return null;
 
         var note = await response.Content.ReadFromJsonAsync<InternalNoteResponse>(ct);
@@ -335,6 +400,14 @@ public class SeedController(
         {
             // Use /iso2/{iso2} endpoint - returns single country by ISO code
             var response = await client.GetAsync("/country/v1/countries/iso2/TH", ct);
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                throw new InvalidOperationException(
+                    "Missing required permission: country.countries.read. " +
+                    "Please log in as a user with Platform Owner role.");
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("Failed to fetch Thailand by ISO2: {StatusCode}", response.StatusCode);
@@ -349,6 +422,10 @@ public class SeedController(
             }
 
             return thailand.Id;
+        }
+        catch (InvalidOperationException)
+        {
+            throw; // Re-throw permission errors
         }
         catch (Exception ex)
         {
