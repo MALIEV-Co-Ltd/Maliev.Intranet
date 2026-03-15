@@ -277,13 +277,24 @@ try
     .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
     .AddStandardResilienceHandler();
 
-    // Named HTTP client for SeedController — service account auth, no UserContextHandler
+    // Named HTTP clients for SeedController — service account auth, no UserContextHandler
     builder.Services.AddHttpClient("SeedCustomerClient", (sp, client) =>
     {
         var config = sp.GetRequiredService<IConfiguration>();
         var explicitUrl = config["Services:CustomerService:BaseUrl"];
         client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://CustomerService");
         client.Timeout = TimeSpan.FromSeconds(90);
+    })
+    .AddServiceDiscovery()
+    .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
+    .AddStandardResilienceHandler();
+
+    builder.Services.AddHttpClient("SeedCountryClient", (sp, client) =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var explicitUrl = config["Services:CountryService:BaseUrl"];
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://CountryService");
+        client.Timeout = TimeSpan.FromSeconds(30);
     })
     .AddServiceDiscovery()
     .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()

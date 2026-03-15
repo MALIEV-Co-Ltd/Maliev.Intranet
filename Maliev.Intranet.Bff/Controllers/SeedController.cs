@@ -27,19 +27,20 @@ public class SeedController(
     {
         logger.LogInformation("Starting customer data seeding...");
 
-        // Use the service-account authenticated client — no UserContextHandler on this one.
-        var client = httpClientFactory.CreateClient("SeedCustomerClient");
+        // Use separate clients per service — service account auth, no UserContextHandler
+        var customerClient = httpClientFactory.CreateClient("SeedCustomerClient");
+        var countryClient = httpClientFactory.CreateClient("SeedCountryClient");
 
         // Look up Thailand's country ID first (requires country.countries.read)
         try
         {
-            _thailandCountryId = await GetThailandCountryIdAsync(client, ct);
+            _thailandCountryId = await GetThailandCountryIdAsync(countryClient, ct);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Missing required permission"))
         {
             return StatusCode(403, new ApiErrorResponse { Message = ex.Message });
         }
-        
+
         if (_thailandCountryId == Guid.Empty)
         {
             return StatusCode(500, new ApiErrorResponse { Message = "Thailand country not found in CountryService." });
@@ -48,7 +49,7 @@ public class SeedController(
 
         try
         {
-            var existingCustomers = await GetCustomersAsync(client, ct);
+            var existingCustomers = await GetCustomersAsync(customerClient, ct);
             if (existingCustomers != null && existingCustomers.Items.Count != 0)
             {
                 logger.LogInformation("Customer database already contains data. Skipping seeding.");
@@ -60,26 +61,26 @@ public class SeedController(
                 });
             }
 
-            var company = await CreateCompanyAsync(client, ct);
+            var company = await CreateCompanyAsync(customerClient, ct);
             if (company == null)
             {
                 return StatusCode(500, new ApiErrorResponse { Message = "Failed to create company." });
             }
 
-            var companyAddress = await CreateCompanyBillingAddressAsync(client, company.Id, ct);
+            var companyAddress = await CreateCompanyBillingAddressAsync(customerClient, company.Id, ct);
 
-            var customer = await CreateCustomerAsync(client, company.Id, ct);
+            var customer = await CreateCustomerAsync(customerClient, company.Id, ct);
             if (customer == null)
             {
                 return StatusCode(500, new ApiErrorResponse { Message = "Failed to create customer." });
             }
 
-            var shippingAddress = await CreateShippingAddressAsync(client, customer.Id, ct);
+            var shippingAddress = await CreateShippingAddressAsync(customerClient, customer.Id, ct);
 
             // Create internal notes
-            var customerNote = await CreateInternalNoteAsync(client, "Customer", customer.Id,
+            var customerNote = await CreateInternalNoteAsync(customerClient, "Customer", customer.Id,
                 "Customer seeded via database seeder. Primary contact for enterprise account.", ct);
-            var companyNote = await CreateInternalNoteAsync(client, "Company", company.Id,
+            var companyNote = await CreateInternalNoteAsync(customerClient, "Company", company.Id,
                 "Company seeded via database seeder. Enterprise tier account with platinum status.", ct);
 
             logger.LogInformation("Successfully seeded 1 company, 1 customer, 2 addresses, and 2 internal notes.");
