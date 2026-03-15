@@ -333,15 +333,15 @@ public class SeedController(
     {
         try
         {
-            var response = await client.GetAsync("/country/v1/countries?query=TH&page=1", ct);
+            // Use /iso2/{iso2} endpoint - returns single country by ISO code
+            var response = await client.GetAsync("/country/v1/countries/iso2/TH", ct);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Failed to fetch countries: {StatusCode}", response.StatusCode);
+                logger.LogWarning("Failed to fetch Thailand by ISO2: {StatusCode}", response.StatusCode);
                 return Guid.Empty;
             }
 
-            var result = await response.Content.ReadFromJsonAsync<CountryListResponse>(ct);
-            var thailand = result?.Items.FirstOrDefault(c => c.Iso2 == "TH");
+            var thailand = await response.Content.ReadFromJsonAsync<CountryResponse>(ct);
             if (thailand == null)
             {
                 logger.LogWarning("Thailand country not found in CountryService");
