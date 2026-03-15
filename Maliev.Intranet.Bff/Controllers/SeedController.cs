@@ -60,12 +60,18 @@ public class SeedController(
 
             var shippingAddress = await CreateShippingAddressAsync(client, customer.Id, ct);
 
-            logger.LogInformation("Successfully seeded 1 company, 1 customer, and 2 addresses.");
+            // Create internal notes
+            var customerNote = await CreateInternalNoteAsync(client, "Customer", customer.Id,
+                "Customer seeded via database seeder. Primary contact for enterprise account.", ct);
+            var companyNote = await CreateInternalNoteAsync(client, "Company", company.Id,
+                "Company seeded via database seeder. Enterprise tier account with platinum status.", ct);
+
+            logger.LogInformation("Successfully seeded 1 company, 1 customer, 2 addresses, and 2 internal notes.");
 
             return Ok(new MalievResponse<object>
             {
                 Success = true,
-                Message = "Successfully seeded 1 company, 1 customer, and 2 addresses.",
+                Message = "Successfully seeded 1 company, 1 customer, 2 addresses, and 2 internal notes.",
                 Data = new
                 {
                     company = new { company.Id, company.Name, company.VatNumber },
@@ -74,6 +80,11 @@ public class SeedController(
                     {
                         billing = companyAddress != null ? new { companyAddress.Id, companyAddress.Type, companyAddress.City } : null,
                         shipping = shippingAddress != null ? new { shippingAddress.Id, shippingAddress.Type, shippingAddress.City } : null
+                    },
+                    notes = new
+                    {
+                        customerNote = customerNote != null ? new { customerNote.Id, customerNote.NoteText } : null,
+                        companyNote = companyNote != null ? new { companyNote.Id, companyNote.NoteText } : null
                     }
                 }
             });
@@ -121,18 +132,6 @@ public class SeedController(
         if (company != null)
         {
             logger.LogInformation("Created/found company: {CompanyId} - {Name}", company.Id, company.Name);
-
-            // Create a placeholder customer for the company if it was just created
-            var placeholderRequest = new
-            {
-                firstName = "PLACEHOLDER",
-                lastName = "PLACEHOLDER",
-                email = "placeholder@maliev.internal",
-                segment = "Enterprise",
-                tier = "Platinum",
-                companyId = company.Id
-            };
-            await client.PostAsJsonAsync("/customer/v1/customers", placeholderRequest, ct);
         }
 
         return company;
@@ -235,6 +234,26 @@ public class SeedController(
         return address;
     }
 
+    private async Task<InternalNoteResponse?> CreateInternalNoteAsync(HttpClient client, string ownerType, Guid ownerId, string noteText, CancellationToken ct)
+    {
+        var noteRequest = new
+        {
+            ownerType,
+            ownerId,
+            noteText
+        };
+
+        var response = await client.PostAsJsonAsync("/customer/v1/internal-notes", noteRequest, ct);
+        if (!response.IsSuccessStatusCode) return null;
+
+        var note = await response.Content.ReadFromJsonAsync<InternalNoteResponse>(ct);
+        if (note != null)
+        {
+            logger.LogInformation("Created internal note: {NoteId} for {OwnerType} {OwnerId}", note.Id, ownerType, ownerId);
+        }
+        return note;
+    }
+
     // Private DTOs for deserialization — only what the seeder needs
     private class CustomerPaginatedResponse
     {
@@ -277,5 +296,11 @@ public class SeedController(
         public Guid Id { get; set; }
         public string Type { get; set; } = string.Empty;
         public string City { get; set; } = string.Empty;
+    }
+
+    private class InternalNoteResponse
+    {
+        public Guid Id { get; set; }
+        public string NoteText { get; set; } = string.Empty;
     }
 }
