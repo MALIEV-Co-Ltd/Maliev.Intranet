@@ -11,14 +11,14 @@
 
 <PageTitle>Customers - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.False" Class="mt-8 px-4 px-sm-8">
+<div>
     <div class="mb-6">
         <MudText Typo="Typo.h4" Class="font-bold">Customers</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">Manage your client relationships and account balances.</MudText>
     </div>
 
     <MudDataGrid T="CustomerSummaryDto" ServerData="@LoadGridData" Filterable="true" SortMode="SortMode.Multiple" @ref="_grid"
-                 Dense="true" Hover="true" Striped="true" Elevation="2" Class="border mud-border-lines-default rounded-xl overflow-hidden">
+                 Dense="true" Hover="true" Striped="true" Elevation="0" Class="border mud-border-lines-default rounded-lg overflow-hidden">
         <ToolBarContent>
             <MudStack Row="true" AlignItems="AlignItems.Center" Class="w-100 pa-4 flex-grow-1">
                 <div class="d-flex align-center gap-4 flex-grow-1">
@@ -146,7 +146,7 @@
             <MudDataGridPager T="CustomerSummaryDto" />
         </PagerContent>
     </MudDataGrid>
-</MudContainer>
+</div>
 
 
 

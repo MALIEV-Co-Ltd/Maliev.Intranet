@@ -684,6 +684,20 @@ public class CompanyResponse
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public byte[] Version { get; set; } = [];
+    public uint xmin { get; set; }
+    public CompanyPrimaryContactDto? PrimaryContact { get; set; }
+}
+
+/// <summary>
+/// Lightweight primary contact info embedded in CompanyResponse.
+/// </summary>
+public class CompanyPrimaryContactDto
+{
+    public Guid Id { get; set; }
+    public string FullName { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string? Mobile { get; set; }
+    public bool IsPrimaryContact { get; set; }
 }
 
 /// <summary>
@@ -699,4 +713,21 @@ public class CompanySummaryDto
     public string? ContactPhone { get; set; }
     public string Segment { get; set; } = string.Empty;
     public string Tier { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Request to update company details.
+/// </summary>
+public class UpdateCompanyRequest
+{
+    public string? Name { get; set; }
+    public string? VatNumber { get; set; }
+    public string? RegistrationNumber { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public string? Segment { get; set; }
+    public string? Tier { get; set; }
+    public string? FullNameTh { get; set; }
+    public string? BusinessObjectives { get; set; }
+    public uint xmin { get; set; }
 }

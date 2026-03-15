@@ -35,4 +35,26 @@ public class CompaniesController(CustomerServiceClient client) : ControllerBase
         var result = await client.GetCompanyByIdAsync(id);
         return result != null ? Ok(result) : NotFound();
     }
+
+    /// <summary>
+    /// Promotes a customer to be the primary contact for their company.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{companyId:guid}/primary-contact/{customerId:guid}")]
+    public async Task<IActionResult> PromotePrimaryContact(Guid companyId, Guid customerId, CancellationToken ct = default)
+    {
+        var success = await client.PromotePrimaryContactAsync(companyId, customerId, ct);
+        return success ? NoContent() : NotFound();
+    }
+
+    /// <summary>
+    /// Updates a company by ID.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}")]
+    public async Task<ActionResult<CompanyResponse>> Update(Guid id, [FromBody] UpdateCompanyRequest request, CancellationToken ct = default)
+    {
+        var result = await client.UpdateCompanyAsync(id, request, ct);
+        return result != null ? Ok(result) : NotFound();
+    }
 }

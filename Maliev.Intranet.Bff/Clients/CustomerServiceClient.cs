@@ -480,4 +480,23 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     private static string ExtractErrorMessage(string errorBody, string fallback) => fallback;
+
+    /// <summary>
+    /// Promotes a customer to be the primary contact for their company.
+    /// </summary>
+    public virtual async Task<bool> PromotePrimaryContactAsync(Guid companyId, Guid customerId, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsync($"/customer/v1/companies/{companyId}/primary-contact/{customerId}", null, ct);
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>
+    /// Updates a company by ID.
+    /// </summary>
+    public virtual async Task<CompanyResponse?> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/companies/{id}", request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<CompanyResponse>(ct);
+    }
 }

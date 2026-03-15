@@ -1069,14 +1069,18 @@
 
                     var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CompanyId = _customer.CompanyId, CommunicationPreferences = _customer.CommunicationPreferences }, Addresses = updatedAddresses };
                     var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
-                    
+
                     if (response.IsSuccessStatusCode)
                     {
-                        Snackbar.Add("Address defaults updated", Severity.Success);
+                        Snackbar.Add("Address updated successfully", Severity.Success);
                         await LoadCustomerData();
                         await LoadInitialActivities();
                     }
-                    else Snackbar.Add("Failed to update addresses", Severity.Error);
+                    else
+                    {
+                        var errorBody = await response.Content.ReadAsStringAsync();
+                        Snackbar.Add($"Failed to update address ({(int)response.StatusCode}): {errorBody}", Severity.Error);
+                    }
                 }
                 else
                 {
@@ -1199,9 +1203,45 @@
         _isSaving = true;
         try
         {
-            var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _updateRequest.FirstName, LastName = _updateRequest.LastName, Email = _updateRequest.Email, Mobile = _updateRequest.Mobile, Landline = _updateRequest.Landline, Extension = _updateRequest.Extension, Segment = _updateRequest.Segment, Tier = _updateRequest.Tier, PreferredLanguage = _updateRequest.PreferredLanguage, Timezone = _updateRequest.Timezone, CompanyId = _customer?.CompanyId, CommunicationPreferences = _updateRequest.CommunicationPreferences } };
+            var onboardingRequest = new CustomerOnboardingRequest
+            {
+                Customer = new CreateCustomerRequest
+                {
+                    FirstName = _updateRequest.FirstName,
+                    LastName = _updateRequest.LastName,
+                    Email = _updateRequest.Email,
+                    Mobile = _updateRequest.Mobile,
+                    Landline = _updateRequest.Landline,
+                    Extension = _updateRequest.Extension,
+                    Segment = _updateRequest.Segment,
+                    Tier = _updateRequest.Tier,
+                    PreferredLanguage = _updateRequest.PreferredLanguage,
+                    Timezone = _updateRequest.Timezone,
+                    CompanyId = _customer?.CompanyId,
+                    CommunicationPreferences = _updateRequest.CommunicationPreferences
+                },
+                // Preserve existing addresses — omitting them causes BFF to delete all
+                Addresses = _customer?.Addresses?.Select(a => new CreateAddressRequest
+                {
+                    Id = a.Id,
+                    Type = a.Type,
+                    IsDefault = a.IsDefault,
+                    AddressLine1 = a.AddressLine1,
+                    AddressLine2 = a.AddressLine2,
+                    AddressLine3 = a.AddressLine3,
+                    District = a.District,
+                    City = a.City,
+                    StateProvince = a.StateProvince,
+                    PostalCode = a.PostalCode,
+                    CountryId = a.CountryId,
+                    RecipientName = a.RecipientName,
+                    RecipientPhone = a.RecipientPhone,
+                    Version = a.Version
+                }).ToList() ?? []
+            };
             var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
             if (response.IsSuccessStatusCode) { Snackbar.Add("Customer updated successfully!", Severity.Success); _isEditMode = false; await LoadCustomerData(); await LoadInitialActivities(); }
+            else { var err = await response.Content.ReadAsStringAsync(); Snackbar.Add($"Failed to save: {err}", Severity.Error); }
         }
         catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         finally { _isSaving = false; }

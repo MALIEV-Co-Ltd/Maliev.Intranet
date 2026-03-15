@@ -277,7 +277,8 @@ try
     .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
     .AddStandardResilienceHandler();
 
-    // Named HTTP clients for SeedController — service account auth, no UserContextHandler
+    // Named HTTP clients for SeedController — dedicated token with sub="system", no UserContextHandler
+    // Use a factory to create a token provider with sub overridden to "system" so notes/audit show "System" not "system:service:intranetbff"
     builder.Services.AddHttpClient("SeedCustomerClient", (sp, client) =>
     {
         var config = sp.GetRequiredService<IConfiguration>();
@@ -286,7 +287,13 @@ try
         client.Timeout = TimeSpan.FromSeconds(90);
     })
     .AddServiceDiscovery()
-    .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
+    .AddHttpMessageHandler(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff", subOverride: "system");
+        return new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler(tokenProvider, loggerFactory.CreateLogger<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>());
+    })
     .AddStandardResilienceHandler();
 
     builder.Services.AddHttpClient("SeedCountryClient", (sp, client) =>
@@ -297,7 +304,13 @@ try
         client.Timeout = TimeSpan.FromSeconds(30);
     })
     .AddServiceDiscovery()
-    .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
+    .AddHttpMessageHandler(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff", subOverride: "system");
+        return new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler(tokenProvider, loggerFactory.CreateLogger<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>());
+    })
     .AddStandardResilienceHandler();
 
     builder.Services.AddHttpClient("ServiceHealthCheck")
