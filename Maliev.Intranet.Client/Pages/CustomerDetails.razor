@@ -13,7 +13,6 @@
 @inject IJSRuntime JSRuntime
 @inject LayoutService LayoutService
 @inject ILogger<CustomerDetails> Logger
-@implements IAsyncDisposable
 
 <PageTitle>@(_customer?.Name ?? "Customer Details") - Maliev Intranet</PageTitle>
 
@@ -141,7 +140,7 @@
         <MudGrid Spacing="6" Class="px-4 px-md-8">
             <!-- Main Content -->
             <MudItem xs="12" lg="12">
-                <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
+                <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-6" Color="Color.Transparent" SliderColor="Color.Primary">
                     
                     @if (!_isEditMode)
                     {
@@ -468,15 +467,13 @@
                                                                    FilesChanged="OnNdaFilesSelected"
                                                                    Accept=".pdf"
                                                                    MaximumFileCount="100"
-                                                                   Hidden="false"
                                                                    Disabled="@_uploadingNda"
                                                                    Class="nda-upload-zone"
-                                                                   Style="width: 100%; min-height: 200px; position: relative;"
-                                                                   InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
-                                                                   InputStyle="opacity:0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
-                                                        <ActivatorContent>
+                                                                   Style="width: 100%; min-height: 200px; position: relative;">
+                                                        <CustomContent>
                                                             <div class="file-upload-dropzone @(_ndaDragOver ? "drag-over" : "")"
-                                                                 style="background-color: rgba(33, 150, 243, 0.05); border: 2px dashed var(--mud-palette-info); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;"
+                                                                 style="background-color: rgba(33, 150, 243, 0.05); border: 2px dashed var(--mud-palette-info); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; cursor: pointer;"
+                                                                 @onclick="@context.OpenFilePickerAsync"
                                                                  @ondragenter="@(() => _ndaDragOver = true)"
                                                                  @ondragleave="@(() => _ndaDragOver = false)"
                                                                  @ondragover:preventDefault
@@ -485,7 +482,7 @@
                                                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Drag & Drop or Click to Upload</MudText>
                                                                 <MudText Typo="Typo.body2" Color="Color.Secondary">PDF files only, up to 10MB each (max 20 files)</MudText>
                                                             </div>
-                                                        </ActivatorContent>
+                                                        </CustomContent>
                                                     </MudFileUpload>
                                                 </div>
 
@@ -661,15 +658,13 @@
                                                                    FilesChanged="OnCustomerDocFilesSelected"
                                                                    Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                                                                    MaximumFileCount="100"
-                                                                   Hidden="false"
                                                                    Disabled="@_uploadingCustomerDoc"
                                                                    Class="customer-docs-upload-zone"
-                                                                   Style="width: 100%; min-height: 200px; position: relative;"
-                                                                   InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
-                                                                   InputStyle="opacity:0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
-                                                        <ActivatorContent>
+                                                                   Style="width: 100%; min-height: 200px; position: relative;">
+                                                        <CustomContent>
                                                             <div class="file-upload-dropzone @(_customerDocDragOver ? "drag-over" : "")"
-                                                                 style="background-color: rgba(76, 175, 80, 0.05); border: 2px dashed var(--mud-palette-success); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;"
+                                                                 style="background-color: rgba(76, 175, 80, 0.05); border: 2px dashed var(--mud-palette-success); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; cursor: pointer;"
+                                                                 @onclick="@context.OpenFilePickerAsync"
                                                                  @ondragenter="@(() => _customerDocDragOver = true)"
                                                                  @ondragleave="@(() => _customerDocDragOver = false)"
                                                                  @ondragover:preventDefault
@@ -678,7 +673,7 @@
                                                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Drag & Drop or Click to Upload</MudText>
                                                                 <MudText Typo="Typo.body2" Color="Color.Secondary">PDF, Word, or Image files, up to 10MB each (max 20 files)</MudText>
                                                             </div>
-                                                        </ActivatorContent>
+                                                        </CustomContent>
                                                     </MudFileUpload>
                                                 </div>
 
@@ -1074,14 +1069,18 @@
 
                     var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CompanyId = _customer.CompanyId, CommunicationPreferences = _customer.CommunicationPreferences }, Addresses = updatedAddresses };
                     var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
-                    
+
                     if (response.IsSuccessStatusCode)
                     {
-                        Snackbar.Add("Address defaults updated", Severity.Success);
+                        Snackbar.Add("Address updated successfully", Severity.Success);
                         await LoadCustomerData();
                         await LoadInitialActivities();
                     }
-                    else Snackbar.Add("Failed to update addresses", Severity.Error);
+                    else
+                    {
+                        var errorBody = await response.Content.ReadAsStringAsync();
+                        Snackbar.Add($"Failed to update address ({(int)response.StatusCode}): {errorBody}", Severity.Error);
+                    }
                 }
                 else
                 {
@@ -1200,13 +1199,49 @@
 
     private async Task SaveChanges()
     {
-        if (_editForm != null) { await _editForm.Validate(); if (!_editForm.IsValid) { Snackbar.Add("Please correct validation errors first.", Severity.Warning); return; } }
+        if (_editForm != null) { await _editForm.ValidateAsync(); if (!_editForm.IsValid) { Snackbar.Add("Please correct validation errors first.", Severity.Warning); return; } }
         _isSaving = true;
         try
         {
-            var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _updateRequest.FirstName, LastName = _updateRequest.LastName, Email = _updateRequest.Email, Mobile = _updateRequest.Mobile, Landline = _updateRequest.Landline, Extension = _updateRequest.Extension, Segment = _updateRequest.Segment, Tier = _updateRequest.Tier, PreferredLanguage = _updateRequest.PreferredLanguage, Timezone = _updateRequest.Timezone, CompanyId = _customer?.CompanyId, CommunicationPreferences = _updateRequest.CommunicationPreferences } };
+            var onboardingRequest = new CustomerOnboardingRequest
+            {
+                Customer = new CreateCustomerRequest
+                {
+                    FirstName = _updateRequest.FirstName,
+                    LastName = _updateRequest.LastName,
+                    Email = _updateRequest.Email,
+                    Mobile = _updateRequest.Mobile,
+                    Landline = _updateRequest.Landline,
+                    Extension = _updateRequest.Extension,
+                    Segment = _updateRequest.Segment,
+                    Tier = _updateRequest.Tier,
+                    PreferredLanguage = _updateRequest.PreferredLanguage,
+                    Timezone = _updateRequest.Timezone,
+                    CompanyId = _customer?.CompanyId,
+                    CommunicationPreferences = _updateRequest.CommunicationPreferences
+                },
+                // Preserve existing addresses — omitting them causes BFF to delete all
+                Addresses = _customer?.Addresses?.Select(a => new CreateAddressRequest
+                {
+                    Id = a.Id,
+                    Type = a.Type,
+                    IsDefault = a.IsDefault,
+                    AddressLine1 = a.AddressLine1,
+                    AddressLine2 = a.AddressLine2,
+                    AddressLine3 = a.AddressLine3,
+                    District = a.District,
+                    City = a.City,
+                    StateProvince = a.StateProvince,
+                    PostalCode = a.PostalCode,
+                    CountryId = a.CountryId,
+                    RecipientName = a.RecipientName,
+                    RecipientPhone = a.RecipientPhone,
+                    Version = a.Version
+                }).ToList() ?? []
+            };
             var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
             if (response.IsSuccessStatusCode) { Snackbar.Add("Customer updated successfully!", Severity.Success); _isEditMode = false; await LoadCustomerData(); await LoadInitialActivities(); }
+            else { var err = await response.Content.ReadAsStringAsync(); Snackbar.Add($"Failed to save: {err}", Severity.Error); }
         }
         catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         finally { _isSaving = false; }
@@ -1262,7 +1297,7 @@
     private async Task DeleteAddress(AddressResponse address)
     {
         if (_customer == null) return;
-        var result = await DialogService.ShowMessageBox("Delete Address", "Are you sure you want to delete this address?", yesText: "Delete", noText: "Cancel");
+        var result = await DialogService.ShowMessageBoxAsync("Delete Address", "Are you sure you want to delete this address?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try
@@ -1464,12 +1499,12 @@
 
     private async Task DeleteNda(NDAResponse nda)
     {
-        var result = await DialogService.ShowMessageBox("Delete NDA", "Are you sure you want to delete this NDA record?", yesText: "Delete", noText: "Cancel");
+        var result = await DialogService.ShowMessageBoxAsync("Delete NDA", "Are you sure you want to delete this NDA record?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try
             {
-                var versionBase64 = Convert.ToBase64String(nda.Version);
+                var versionBase64 = Convert.ToBase64String(nda.Version ?? []);
                 var response = await Http.DeleteAsync($"api/customers/ndas/{nda.Id}?version={Uri.EscapeDataString(versionBase64)}");
                 if (response.IsSuccessStatusCode) { Snackbar.Add("NDA deleted", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); }
             } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
@@ -1478,13 +1513,12 @@
 
     private async Task HandleDeleteDocument(DocumentResponse doc)
     {
-        var result = await DialogService.ShowMessageBox("Delete Document", $"Are you sure you want to delete '{doc.FileName}'?", yesText: "Delete", noText: "Cancel");
+        var result = await DialogService.ShowMessageBoxAsync("Delete Document", $"Are you sure you want to delete '{doc.FileName}'?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try
             {
-                var versionBase64 = Convert.ToBase64String(doc.RowVersion);
-                var response = await Http.DeleteAsync($"api/customers/documents/{doc.Id}?version={Uri.EscapeDataString(versionBase64)}");
+                var response = await Http.DeleteAsync($"api/customers/documents/{doc.Id}?version={doc.Version}");
                 if (response.IsSuccessStatusCode) { Snackbar.Add("Document deleted", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); }
             } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
@@ -1585,7 +1619,7 @@
 
     private async Task DeleteInternalNote(InternalNoteResponse note)
     {
-        var result = await DialogService.ShowMessageBox("Delete Note", "Are you sure you want to delete this internal note?", yesText: "Delete", noText: "Cancel");
+        var result = await DialogService.ShowMessageBoxAsync("Delete Note", "Are you sure you want to delete this internal note?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
             try { var response = await Http.DeleteAsync($"api/customers/notes/{note.Id}"); if (response.IsSuccessStatusCode) { Snackbar.Add("Note deleted successfully", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); } }

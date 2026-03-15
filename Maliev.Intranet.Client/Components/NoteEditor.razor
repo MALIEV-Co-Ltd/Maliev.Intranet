@@ -44,7 +44,7 @@
                           Lines="@(Compact ? 6 : 10)"
                           Variant="Variant.Text"
                           Placeholder="Enter note content... Markdown is supported."
-                          AutoGrow="true"
+                          MaxLines="30"
                           Immediate="true"
                           Counter="5000"
                           MaxLength="5000"
@@ -335,6 +335,7 @@
     .note-editor-toolbar {
         background-color: var(--mud-palette-surface);
         border-bottom: 1px solid var(--mud-palette-divider);
+        padding-inline-start: 8px;
     }
 
     .note-editor-content {

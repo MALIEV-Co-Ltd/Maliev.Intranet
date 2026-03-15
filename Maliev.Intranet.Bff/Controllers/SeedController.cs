@@ -1,4 +1,3 @@
-using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,60 +7,88 @@ namespace Maliev.Intranet.Bff.Controllers;
 
 /// <summary>
 /// Controller for database seeding operations. Internal use only.
+/// Requires user authentication - uses the logged-in user's JWT token for API calls.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [AllowAnonymous]
 public class SeedController(
-    CustomerServiceClient customerClient,
+    IHttpClientFactory httpClientFactory,
     ILogger<SeedController> logger) : ControllerBase
 {
-    private static readonly Guid ThailandCountryId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private Guid _thailandCountryId;
 
     /// <summary>
     /// Seeds the Maliev customer data. Idempotent - checks if data already exists.
+    /// Requires user to be logged in with appropriate permissions.
     /// </summary>
     [HttpPost("customers")]
     public async Task<IActionResult> SeedCustomers(CancellationToken ct)
     {
         logger.LogInformation("Starting customer data seeding...");
 
+        // Use separate clients per service — service account auth, no UserContextHandler
+        var customerClient = httpClientFactory.CreateClient("SeedCustomerClient");
+        var countryClient = httpClientFactory.CreateClient("SeedCountryClient");
+
+        // Look up Thailand's country ID first (requires country.countries.read)
         try
         {
-            var existingCustomers = await customerClient.GetCustomersAsync(page: 1, ct: ct);
-            if (existingCustomers != null && existingCustomers.Data.Any())
+            _thailandCountryId = await GetThailandCountryIdAsync(countryClient, ct);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Missing required permission"))
+        {
+            return StatusCode(403, new ApiErrorResponse { Message = ex.Message });
+        }
+
+        if (_thailandCountryId == Guid.Empty)
+        {
+            return StatusCode(500, new ApiErrorResponse { Message = "Thailand country not found in CountryService." });
+        }
+        logger.LogInformation("Using Thailand country ID: {CountryId}", _thailandCountryId);
+
+        try
+        {
+            var existingCustomers = await GetCustomersAsync(customerClient, ct);
+            if (existingCustomers != null && existingCustomers.Items.Count != 0)
             {
                 logger.LogInformation("Customer database already contains data. Skipping seeding.");
                 return Ok(new MalievResponse<object>
                 {
                     Success = true,
                     Message = "Customer database already contains data. Seeding skipped.",
-                    Data = new { existingCount = existingCustomers.Meta.TotalCount }
+                    Data = new { existingCount = existingCustomers.TotalCount }
                 });
             }
 
-            var company = await CreateCompanyAsync(ct);
+            var company = await CreateCompanyAsync(customerClient, ct);
             if (company == null)
             {
                 return StatusCode(500, new ApiErrorResponse { Message = "Failed to create company." });
             }
 
-            var companyAddress = await CreateCompanyBillingAddressAsync(company.Id, ct);
+            var companyAddress = await CreateCompanyBillingAddressAsync(customerClient, company.Id, ct);
 
-            var customer = await CreateCustomerAsync(company.Id, ct);
+            var customer = await CreateCustomerAsync(customerClient, company.Id, ct);
             if (customer == null)
             {
                 return StatusCode(500, new ApiErrorResponse { Message = "Failed to create customer." });
             }
 
-            var shippingAddress = await CreateShippingAddressAsync(customer.Id, ct);
+            var shippingAddress = await CreateShippingAddressAsync(customerClient, customer.Id, ct);
 
-            logger.LogInformation("Successfully seeded 1 company, 1 customer, and 2 addresses.");
+            // Create internal notes
+            var customerNote = await CreateInternalNoteAsync(customerClient, "Customer", customer.Id,
+                "Customer seeded via database seeder. Primary contact for enterprise account.", ct);
+            var companyNote = await CreateInternalNoteAsync(customerClient, "Company", company.Id,
+                "Company seeded via database seeder. Enterprise tier account with platinum status.", ct);
+
+            logger.LogInformation("Successfully seeded 1 company, 1 customer, 2 addresses, and 2 internal notes.");
 
             return Ok(new MalievResponse<object>
             {
                 Success = true,
-                Message = "Successfully seeded 1 company, 1 customer, and 2 addresses.",
+                Message = "Successfully seeded 1 company, 1 customer, 2 addresses, and 2 internal notes.",
                 Data = new
                 {
                     company = new { company.Id, company.Name, company.VatNumber },
@@ -70,6 +97,11 @@ public class SeedController(
                     {
                         billing = companyAddress != null ? new { companyAddress.Id, companyAddress.Type, companyAddress.City } : null,
                         shipping = shippingAddress != null ? new { shippingAddress.Id, shippingAddress.Type, shippingAddress.City } : null
+                    },
+                    notes = new
+                    {
+                        customerNote = customerNote != null ? new { customerNote.Id, customerNote.NoteText } : null,
+                        companyNote = companyNote != null ? new { companyNote.Id, companyNote.NoteText } : null
                     }
                 }
             });
@@ -81,102 +113,112 @@ public class SeedController(
         }
     }
 
-    private async Task<CompanyResponse?> CreateCompanyAsync(CancellationToken ct)
+    private async Task<CustomerPaginatedResponse?> GetCustomersAsync(HttpClient client, CancellationToken ct)
     {
-        var request = new CustomerOnboardingRequest
+        return await client.GetFromJsonAsync<CustomerPaginatedResponse>(
+            "/customer/v1/customers?page=1&sortBy=createdAt&sortDirection=desc", ct);
+    }
+
+    private async Task<CompanyResponse?> CreateCompanyAsync(HttpClient client, CancellationToken ct)
+    {
+        var companyRequest = new
         {
-            NewCompany = new CreateCompanyRequest
-            {
-                Name = "บริษัท มาลีฟ จำกัด",
-                VatNumber = "0125561001573",
-                ContactPhone = "028816002",
-                Segment = "Enterprise",
-                Tier = "Platinum",
-                IsVerifiedFromBdex = false
-            },
-            Customer = new CreateCustomerRequest
-            {
-                FirstName = "PLACEHOLDER",
-                LastName = "PLACEHOLDER",
-                Email = "placeholder@maliev.internal",
-                Segment = "Enterprise",
-                Tier = "Platinum"
-            }
+            name = "บริษัท มาลีฟ จำกัด",
+            vatNumber = "0125561001573",
+            contactPhone = "028816002",
+            segment = "Enterprise",
+            tier = "Platinum",
+            isVerifiedFromBdex = false
         };
 
-        var result = await customerClient.CreateCustomerBasicAsync(request, ct);
-
-        if (result == null)
+        var companyResponse = await client.PostAsJsonAsync("/customer/v1/companies", companyRequest, ct);
+        if (companyResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            companyResponse.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
-            logger.LogError("Failed to create company via CreateCustomerBasicAsync.");
-            return null;
+            throw new InvalidOperationException(
+                "Missing required permission: customer.companies.manage. " +
+                "Please log in as a user with Platform Owner role.");
         }
 
-        var companies = await customerClient.GetCompaniesAsync(query: "บริษัท มาลีฟ จำกัด", ct: ct);
-        var company = companies?.Data.FirstOrDefault(c => c.VatNumber == "0125561001573");
+        CompanyResponse? company = null;
+        if (companyResponse.IsSuccessStatusCode)
+        {
+            company = await companyResponse.Content.ReadFromJsonAsync<CompanyResponse>(ct);
+        }
+
+        if (company == null)
+        {
+            // Company might already exist — search for it
+            var searchResponse = await client.GetFromJsonAsync<CustomerPaginatedCompanyResponse>(
+                "/customer/v1/companies?query=%E0%B8%9A%E0%B8%A3%E0%B8%B4%E0%B8%A9%E0%B8%B1%E0%B8%97+%E0%B8%A1%E0%B8%B2%E0%B8%A5%E0%B8%B5%E0%B8%9F+%E0%B8%88%E0%B8%B3%E0%B8%81%E0%B8%B1%E0%B8%94", ct);
+            company = searchResponse?.Items.FirstOrDefault(c => c.VatNumber == "0125561001573");
+        }
 
         if (company != null)
         {
-            logger.LogInformation("Created company: {CompanyId} - {Name}", company.Id, company.Name);
-            return new CompanyResponse
-            {
-                Id = company.Id,
-                Name = company.Name,
-                VatNumber = company.VatNumber,
-                ContactPhone = company.ContactPhone,
-                Segment = company.Segment,
-                Tier = company.Tier
-            };
+            logger.LogInformation("Created/found company: {CompanyId} - {Name}", company.Id, company.Name);
         }
 
-        return null;
+        return company;
     }
 
-    private async Task<AddressResponse?> CreateCompanyBillingAddressAsync(Guid companyId, CancellationToken ct)
+    private async Task<AddressResponse?> CreateCompanyBillingAddressAsync(HttpClient client, Guid companyId, CancellationToken ct)
     {
-        var addresses = new List<CreateAddressRequest>
+        var addressRequest = new
         {
-            new()
-            {
-                Type = "Billing",
-                IsDefault = true,
-                AddressLine1 = "36/1 หมู่ 3",
-                District = "คลองอข่อย",
-                City = "ปากเกร็ด",
-                StateProvince = "นนทบุรี",
-                PostalCode = "11120",
-                CountryId = ThailandCountryId
-            }
+            ownerType = "Company",
+            ownerId = companyId,
+            type = "Billing",
+            isDefault = true,
+            addressLine1 = "36/1 หมู่ 3",
+            district = "คลองอข่อย",
+            city = "ปากเกร็ด",
+            stateProvince = "นนทบุรี",
+            postalCode = "11120",
+            countryId = _thailandCountryId
         };
 
-        var result = await customerClient.CreateAddressesAsync(companyId, addresses, ct);
-        var address = result.FirstOrDefault();
+        var response = await client.PostAsJsonAsync("/customer/v1/addresses", addressRequest, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Missing required permission: customer.addresses.manage. " +
+                "Please log in as a user with Platform Owner role.");
+        }
 
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            logger.LogWarning("Failed to create company billing address: {StatusCode} - {Error}", response.StatusCode, error);
+            return null;
+        }
+
+        var address = await response.Content.ReadFromJsonAsync<AddressResponse>(ct);
         if (address != null)
         {
             logger.LogInformation("Created company billing address: {AddressId}", address.Id);
         }
-
         return address;
     }
 
-    private async Task<CustomerResponse?> CreateCustomerAsync(Guid companyId, CancellationToken ct)
+    private async Task<CustomerResponse?> CreateCustomerAsync(HttpClient client, Guid companyId, CancellationToken ct)
     {
-        var request = new CreateCustomerRequest
+        var request = new
         {
-            FirstName = "ณฐพล",
-            LastName = "วนาศรีวิไล",
-            Email = "natthapol.vanasrivilai@outlook.com",
-            Mobile = "0898950690",
-            Landline = "028816002",
-            Extension = "345",
-            Segment = "Enterprise",
-            Tier = "Platinum",
-            PreferredLanguage = "th",
-            Timezone = "Asia/Bangkok",
-            CompanyId = companyId,
-            UsesCompanyBillingAddress = true,
-            CommunicationPreferences = new Dictionary<string, bool>
+            firstName = "ณฐพล",
+            lastName = "วนาศรีวิไล",
+            email = "natthapol.vanasrivilai@outlook.com",
+            mobile = "0898950690",
+            landline = "028816002",
+            extension = "345",
+            segment = "Enterprise",
+            tier = "Platinum",
+            preferredLanguage = "th",
+            timezone = "Asia/Bangkok",
+            companyId,
+            usesCompanyBillingAddress = true,
+            communicationPreferences = new Dictionary<string, bool>
             {
                 { "email_opt_in", true },
                 { "sms_opt_in", false },
@@ -184,44 +226,200 @@ public class SeedController(
             }
         };
 
-        var result = await customerClient.CreateCustomerAsync(request, ct);
-
-        if (result != null)
+        var response = await client.PostAsJsonAsync("/customer/v1/customers", request, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
-            logger.LogInformation("Created customer: {CustomerId} - {FirstName} {LastName}",
-                result.Id, result.FirstName, result.LastName);
+            throw new InvalidOperationException(
+                "Missing required permission: customer.customers.create. " +
+                "Please log in as a user with Platform Owner role.");
         }
 
-        return result;
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            logger.LogWarning("Failed to create customer: {StatusCode} - {Error}", response.StatusCode, error);
+            return null;
+        }
+
+        var customer = await response.Content.ReadFromJsonAsync<CustomerResponse>(ct);
+        if (customer != null)
+        {
+            logger.LogInformation("Created customer: {CustomerId} - {FirstName} {LastName}",
+                customer.Id, customer.FirstName, customer.LastName);
+        }
+        return customer;
     }
 
-    private async Task<AddressResponse?> CreateShippingAddressAsync(Guid customerId, CancellationToken ct)
+    private async Task<AddressResponse?> CreateShippingAddressAsync(HttpClient client, Guid customerId, CancellationToken ct)
     {
-        var addresses = new List<CreateAddressRequest>
+        var addressRequest = new
         {
-            new()
-            {
-                Type = "Shipping",
-                IsDefault = true,
-                AddressLine1 = "36/2 หมู่ 4",
-                District = "บางจาก",
-                City = "ภาษีเจริญ",
-                StateProvince = "กรุงเทพมหานคร",
-                PostalCode = "10160",
-                CountryId = ThailandCountryId,
-                RecipientName = "ณัฐกานต์ วนาศรีวิไล",
-                RecipientPhone = "0818030404"
-            }
+            ownerType = "Customer",
+            ownerId = customerId,
+            type = "Shipping",
+            isDefault = true,
+            addressLine1 = "36/2 หมู่ 4",
+            district = "บางจาก",
+            city = "ภาษีเจริญ",
+            stateProvince = "กรุงเทพมหานคร",
+            postalCode = "10160",
+            countryId = _thailandCountryId,
+            recipientName = "ณัฐกานต์ วนาศรีวิไล",
+            recipientPhone = "0818030404"
         };
 
-        var result = await customerClient.CreateAddressesAsync(customerId, addresses, ct);
-        var address = result.FirstOrDefault();
+        var response = await client.PostAsJsonAsync("/customer/v1/addresses", addressRequest, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Missing required permission: customer.addresses.manage. " +
+                "Please log in as a user with Platform Owner role.");
+        }
 
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            logger.LogWarning("Failed to create customer shipping address: {StatusCode} - {Error}", response.StatusCode, error);
+            return null;
+        }
+
+        var address = await response.Content.ReadFromJsonAsync<AddressResponse>(ct);
         if (address != null)
         {
             logger.LogInformation("Created customer shipping address: {AddressId}", address.Id);
         }
-
         return address;
+    }
+
+    private async Task<InternalNoteResponse?> CreateInternalNoteAsync(HttpClient client, string ownerType, Guid ownerId, string noteText, CancellationToken ct)
+    {
+        var noteRequest = new
+        {
+            ownerType,
+            ownerId,
+            noteText
+        };
+
+        var response = await client.PostAsJsonAsync("/customer/v1/internal-notes", noteRequest, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+            response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                "Missing required permission: customer.notes.create. " +
+                "Please log in as a user with Platform Owner role.");
+        }
+
+        if (!response.IsSuccessStatusCode) return null;
+
+        var note = await response.Content.ReadFromJsonAsync<InternalNoteResponse>(ct);
+        if (note != null)
+        {
+            logger.LogInformation("Created internal note: {NoteId} for {OwnerType} {OwnerId}", note.Id, ownerType, ownerId);
+        }
+        return note;
+    }
+
+    // Private DTOs for deserialization — only what the seeder needs
+    private class CustomerPaginatedResponse
+    {
+        public List<CustomerSummaryItem> Items { get; set; } = [];
+        public int TotalCount { get; set; }
+    }
+
+    private class CustomerPaginatedCompanyResponse
+    {
+        public List<CompanyResponse> Items { get; set; } = [];
+        public int TotalCount { get; set; }
+    }
+
+    private class CustomerSummaryItem
+    {
+        public Guid Id { get; set; }
+        public string Email { get; set; } = string.Empty;
+    }
+
+    private class CompanyResponse
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string VatNumber { get; set; } = string.Empty;
+        public string ContactPhone { get; set; } = string.Empty;
+        public string Segment { get; set; } = string.Empty;
+        public string Tier { get; set; } = string.Empty;
+    }
+
+    private class CustomerResponse
+    {
+        public Guid Id { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+    }
+
+    private class AddressResponse
+    {
+        public Guid Id { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+    }
+
+    private class InternalNoteResponse
+    {
+        public Guid Id { get; set; }
+        public string NoteText { get; set; } = string.Empty;
+    }
+
+    private class CountryResponse
+    {
+        public Guid Id { get; set; }
+        public string Iso2 { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private async Task<Guid> GetThailandCountryIdAsync(HttpClient client, CancellationToken ct)
+    {
+        try
+        {
+            // Use /iso2/{iso2} endpoint - returns single country by ISO code
+            var response = await client.GetAsync("/country/v1/countries/iso2/TH", ct);
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                throw new InvalidOperationException(
+                    "Missing required permission: country.countries.read. " +
+                    "Please log in as a user with Platform Owner role.");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Failed to fetch Thailand by ISO2: {StatusCode}", response.StatusCode);
+                return Guid.Empty;
+            }
+
+            var thailand = await response.Content.ReadFromJsonAsync<CountryResponse>(ct);
+            if (thailand == null)
+            {
+                logger.LogWarning("Thailand country not found in CountryService");
+                return Guid.Empty;
+            }
+
+            return thailand.Id;
+        }
+        catch (InvalidOperationException)
+        {
+            throw; // Re-throw permission errors
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error fetching Thailand country ID");
+            return Guid.Empty;
+        }
+    }
+
+    private class CountryListResponse
+    {
+        public List<CountryResponse> Items { get; set; } = [];
     }
 }

@@ -1,0 +1,143 @@
+@using MudBlazor
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Business" Class="mr-3 mb-n1" />
+            Edit Company
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_request.Name" Label="Company Name" Variant="Variant.Outlined"
+                              Required="true" RequiredError="Company name is required" Immediate="true" />
+
+                <MudTextField @bind-Value="_request.FullNameTh" Label="Full Name (Thai)" Variant="Variant.Outlined" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_request.VatNumber" Label="Tax ID / VAT Number"
+                                      Variant="Variant.Outlined" HelperText="e.g. 0125561001573" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_request.RegistrationNumber" Label="Registration Number"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_request.ContactEmail" Label="Contact Email"
+                                      Variant="Variant.Outlined" InputType="InputType.Email" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_request.ContactPhone" Label="Contact Phone"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" @bind-Value="_request.Segment" Label="Segment"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("Retail")">Retail</MudSelectItem>
+                            <MudSelectItem Value="@("Wholesale")">Wholesale</MudSelectItem>
+                            <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
+                            <MudSelectItem Value="@("Government")">Government</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" @bind-Value="_request.Tier" Label="Tier"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("Classic")">Classic</MudSelectItem>
+                            <MudSelectItem Value="@("Silver")">Silver</MudSelectItem>
+                            <MudSelectItem Value="@("Gold")">Gold</MudSelectItem>
+                            <MudSelectItem Value="@("Platinum")">Platinum</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true">
+                    Changing Tier here updates the stored value only. To automatically recalculate based on
+                    purchase history, use the "Recalculate Tier" action.
+                </MudAlert>
+
+                <MudTextField @bind-Value="_request.BusinessObjectives" Label="Business Objectives"
+                              Variant="Variant.Outlined" Lines="3"
+                              HelperText="Semicolon-separated list of business objectives" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="@(!_isValid || _saving)" StartIcon="@Icons.Material.Filled.Save">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Save Changes
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public CompanyResponse Company { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _isValid;
+    private bool _saving;
+
+    private UpdateCompanyRequest _request = new();
+
+    protected override void OnParametersSet()
+    {
+        _request = new UpdateCompanyRequest
+        {
+            Name = Company.Name,
+            VatNumber = Company.VatNumber,
+            RegistrationNumber = Company.RegistrationNumber,
+            ContactEmail = Company.ContactEmail,
+            ContactPhone = Company.ContactPhone,
+            Segment = Company.Segment,
+            Tier = Company.Tier,
+            xmin = Company.xmin
+        };
+    }
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid) return;
+
+        _saving = true;
+        try
+        {
+            var response = await Http.PatchAsJsonAsync($"api/companies/{Company.Id}", _request);
+            if (response.IsSuccessStatusCode)
+            {
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to update company: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

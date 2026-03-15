@@ -523,7 +523,7 @@ else
 
     private async Task RejectLoan(EquipmentLoanDto loan)
     {
-        bool? confirmed = await DialogService.ShowMessageBox(
+        bool? confirmed = await DialogService.ShowMessageBoxAsync(
             "Reject Loan",
             "Are you sure you want to reject this loan request?",
             yesText: "Reject", cancelText: "Cancel");
@@ -578,7 +578,7 @@ else
 
     private async Task DeleteEquipment()
     {
-        bool? confirmed = await DialogService.ShowMessageBox(
+        bool? confirmed = await DialogService.ShowMessageBoxAsync(
             "Delete Equipment",
             $"Are you sure you want to permanently delete '{_equipment?.Name}'? This cannot be undone.",
             yesText: "Delete", cancelText: "Cancel");

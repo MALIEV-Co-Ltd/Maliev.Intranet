@@ -47,15 +47,16 @@
                    FilesChanged="OnFilesSelected"
                    Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                    MaximumFileCount="100">
-        <ActivatorContent>
+        <CustomContent>
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.AttachFile"
                        FullWidth="true"
-                       Disabled="@IsUploading">
+                       Disabled="@IsUploading"
+                       OnClick="@context.OpenFilePickerAsync">
                 Select Files
             </MudButton>
-        </ActivatorContent>
+        </CustomContent>
     </MudFileUpload>
 
     @if (SelectedFiles.Any())
