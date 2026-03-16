@@ -42,7 +42,9 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
     /// <inheritdoc />
     public async Task<List<LeaveBalanceDto>> GetMyBalancesAsync(Guid employeeId, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<List<LeaveBalanceDto>>($"/leave/v1/LeaveBalances/employee/{employeeId}", ct) ?? [];
+        var response = await httpClient.GetAsync($"/leave/v1/LeaveBalances/employee/{employeeId}", ct);
+        if (!response.IsSuccessStatusCode) return [];
+        return await response.Content.ReadFromJsonAsync<List<LeaveBalanceDto>>(cancellationToken: ct) ?? [];
     }
 
     /// <inheritdoc />
@@ -51,7 +53,9 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
         var url = $"/leave/v1/LeaveRequests/employee/{employeeId}";
         if (year.HasValue) url += $"?year={year.Value}";
 
-        return await httpClient.GetFromJsonAsync<List<LeaveRequestSummaryDto>>(url, ct) ?? [];
+        var response = await httpClient.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode) return [];
+        return await response.Content.ReadFromJsonAsync<List<LeaveRequestSummaryDto>>(cancellationToken: ct) ?? [];
     }
 
     /// <inheritdoc />

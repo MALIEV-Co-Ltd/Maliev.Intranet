@@ -3,6 +3,7 @@
 @using Maliev.Intranet.Shared.Constants
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Pricing AI - Maliev Intranet</PageTitle>
 
@@ -145,7 +146,7 @@
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="SaveSnapshot">
                         Save Snapshot
                     </MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportAnalysis">
                         Export Analysis
                     </MudButton>
                 </MudStack>
@@ -238,6 +239,57 @@
         finally
         {
             _isCalculating = false;
+        }
+    }
+
+    private async Task ExportAnalysis()
+    {
+        if (_pricingResult == null || _selectedMaterial == null) return;
+
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Maliev Pricing Analysis Export");
+            sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm}");
+            sb.AppendLine();
+            sb.AppendLine("INPUT PARAMETERS");
+            sb.AppendLine($"Material: {_selectedMaterial.Name} ({_selectedMaterial.SKU})");
+            sb.AppendLine($"Process: {ManufacturingProcesses.GetName(_selectedProcessId)}");
+            sb.AppendLine($"Dimensions: {_length} x {_width} x {_height} mm");
+            sb.AppendLine($"Quantity: {_quantity}");
+            sb.AppendLine();
+            sb.AppendLine("COST BREAKDOWN");
+            sb.AppendLine($"Material Cost: {_pricingResult.MaterialCost:N2} THB");
+            sb.AppendLine($"Support Cost: {_pricingResult.SupportMaterialCost:N2} THB");
+            sb.AppendLine($"Machine Time Cost: {_pricingResult.MachineTimeCost:N2} THB");
+            sb.AppendLine($"Setup Cost: {_pricingResult.SetupCost:N2} THB");
+            sb.AppendLine($"Complexity Surcharge: {_pricingResult.ComplexitySurcharge:N2} THB");
+            sb.AppendLine($"Subtotal: {_pricingResult.SubtotalBeforeMargin:N2} THB");
+            sb.AppendLine($"Margin: {_pricingResult.MarginAmount:N2} THB");
+            sb.AppendLine();
+            sb.AppendLine("SUMMARY");
+            sb.AppendLine($"Unit Price: {_pricingResult.TotalUnitPrice:N2} THB");
+            sb.AppendLine($"Total Price (Qty {_quantity}): {_pricingResult.TotalPrice:N2} THB");
+            sb.AppendLine($"Confidence: {_pricingResult.ConfidenceLevel * 100:N0}%");
+            sb.AppendLine($"Strategy: {_pricingResult.Strategy}");
+            sb.AppendLine($"Valid Until: {_pricingResult.ValidUntil:dd MMM yyyy}");
+
+            var csv = sb.ToString();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+            var base64 = Convert.ToBase64String(bytes);
+            var fileName = $"pricing-analysis-{DateTime.Now:yyyyMMdd-HHmm}.txt";
+
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+                const link = document.createElement('a');
+                link.href = 'data:text/plain;base64,{base64}';
+                link.download = '{fileName}';
+                link.click();
+            ");
+            Snackbar.Add("Analysis exported successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
         }
     }
 

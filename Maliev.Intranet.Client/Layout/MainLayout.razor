@@ -146,6 +146,9 @@
             <!-- Search Bar - Aligned with content area start -->
             <MudTextField @bind-Value="_searchString" Placeholder="Search" Variant="Variant.Outlined" 
                           Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          AdornmentAriaLabel="Search"
+                          OnAdornmentClick="@ExecuteSearch"
+                          OnKeyDown="@OnSearchKeyDown"
                           Class="rounded-lg d-none d-md-flex ml-6" Style="max-width: 320px; background-color: var(--mud-palette-surface);" Margin="Margin.Dense" />
 
             <MudSpacer />
@@ -203,8 +206,7 @@
                                         </MudAvatar>
                                          <MudStack Spacing="0" AlignItems="AlignItems.End" Class="d-none d-md-flex profile-name-stack pl-1">
                                             <MudText Typo="Typo.body2" Style="font-weight: 600;">@auth.User.Identity?.Name</MudText>
-                                            <!-- TODO: Repalce the Managing Director with actual job position -->
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Managing Director</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@(auth.User.FindFirst("job_title")?.Value ?? auth.User.FindFirst("title")?.Value ?? auth.User.FindFirst("position")?.Value ?? "Employee")</MudText>
                                          </MudStack>
                                         <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" Color="Color.Secondary" Class="d-none d-md-flex" />
                                     </MudStack>
@@ -344,7 +346,7 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => _searchDialogOpen = false)">Close</MudButton>
-        <MudButton Color="Color.Primary" OnClick="@(() => _searchDialogOpen = false)">Search</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@ExecuteSearch">Search</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -369,6 +371,24 @@
     private DialogOptions _searchDialogOptions = new() { FullWidth = true, MaxWidth = MaxWidth.Small };
 
     private void OpenSearchDialog() => _searchDialogOpen = true;
+
+    private void ExecuteSearch()
+    {
+        _searchDialogOpen = false;
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            // Navigate to the most relevant section based on search context
+            Navigation.NavigateTo($"/sales/customers?search={Uri.EscapeDataString(_searchString)}");
+        }
+    }
+
+    private void OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            ExecuteSearch();
+        }
+    }
 
     private void OnBreakpointChanged(Breakpoint breakpoint)
     {

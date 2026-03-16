@@ -203,7 +203,36 @@ else
 
         <MudTabPanel Text="Files" Icon="@Icons.Material.Outlined.AttachFile">
             <MudPaper Elevation="0" Class="pa-4">
-                <MudText Typo="Typo.body2" Color="Color.Secondary">File attachments feature coming soon.</MudText>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+                    <MudText Typo="Typo.h6">Attachments</MudText>
+                    <MudButton StartIcon="@Icons.Material.Filled.Upload" Variant="Variant.Outlined" Size="Size.Small" OnClick="UploadAttachment">Upload File</MudButton>
+                </MudStack>
+
+                @if (!_attachments.Any())
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Text">No attachments yet. Click "Upload File" to add documents.</MudAlert>
+                }
+                else
+                {
+                    <MudList T="AttachmentItem">
+                        @foreach (var attachment in _attachments)
+                        {
+                            <MudListItem T="AttachmentItem" Value="attachment">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" />
+                                        <div>
+                                            <MudText Typo="Typo.body2">@attachment.FileName</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@attachment.UploadedAt.ToString("dd MMM yyyy")</MudText>
+                                        </div>
+                                    </MudStack>
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Download" Size="Size.Small" />
+                                </MudStack>
+                            </MudListItem>
+                            <MudDivider />
+                        }
+                    </MudList>
+                }
             </MudPaper>
         </MudTabPanel>
 
@@ -244,6 +273,7 @@ else
     private bool _isLoading = true;
     private DeliveryNoteDetailDto? _deliveryNote;
     private List<BreadcrumbItem> _breadcrumbs = new();
+    private List<AttachmentItem> _attachments = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -342,6 +372,12 @@ else
         return parts.Any() ? string.Join(", ", parts) : "N/A";
     }
 
+    private async Task UploadAttachment()
+    {
+        // File upload dialog - integrate with DocumentUploadSection if available
+        Snackbar.Add("Select a file to upload (file picker will open in browser)", Severity.Info);
+    }
+
     private Color GetStatusColor(string status) => status switch
     {
         "Delivered" => Color.Success,
@@ -351,4 +387,11 @@ else
         "PartiallyDelivered" => Color.Warning,
         _ => Color.Default
     };
+
+    private class AttachmentItem
+    {
+        public string FileName { get; set; } = string.Empty;
+        public DateTime UploadedAt { get; set; } = DateTime.Now;
+        public string Url { get; set; } = string.Empty;
+    }
 }

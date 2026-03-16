@@ -1,15 +1,100 @@
 @page "/mfg/production-queue"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
 
 <PageTitle>Production Queue - Maliev Intranet</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
-    <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
-        <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
-        <MudText Typo="Typo.h4" Align="Align.Center">Production Queue</MudText>
-        <MudText Typo="Typo.h6" Color="Color.Secondary" Align="Align.Center" Class="mt-2">Coming Soon</MudText>
-        <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center" Class="mt-4" Style="max-width: 600px;">
-            The production queue will allow you to manage and schedule manufacturing jobs across all machines and processes.
-        </MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-8" Href="/">Back to Dashboard</MudButton>
-    </MudPaper>
-</MudContainer>
+<MudText Typo="Typo.h4" Class="mb-2">Production Queue</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+    Job scheduling, machine allocation, and production status tracking
+</MudText>
+
+<!-- Stats Row -->
+<MudGrid Class="mb-6">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Queued Jobs</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;">0</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Outlined.Queue" Size="Size.Large" Color="Color.Default" Style="opacity:0.3;" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">In Progress</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Primary">0</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Outlined.PlayCircle" Size="Size.Large" Color="Color.Primary" Style="opacity:0.3;" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Completed Today</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Success">0</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Size="Size.Large" Color="Color.Success" Style="opacity:0.3;" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Overdue</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Error">0</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Outlined.Warning" Size="Size.Large" Color="Color.Error" Style="opacity:0.3;" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Kanban Columns -->
+<MudGrid Spacing="4">
+    @foreach (var column in _columns)
+    {
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="0" Class="pa-3 border mud-border-lines-default rounded-lg" Style="min-height:400px; background-color: var(--mud-palette-background-grey);">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@column.Icon" Size="Size.Small" Color="@column.Color" />
+                        <MudText Typo="Typo.subtitle2" Style="font-weight:700;">@column.Title</MudText>
+                    </MudStack>
+                    <MudChip T="string" Size="Size.Small" Color="@column.Color">0</MudChip>
+                </MudStack>
+
+                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Class="rounded-lg">
+                    No jobs in this stage
+                </MudAlert>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+<MudAlert Severity="Severity.Info" Class="mt-6 rounded-lg">
+    <MudText Typo="Typo.body2">
+        Production Queue integrates with order management and machine scheduling.
+        Jobs will appear here once production workflows are configured.
+    </MudText>
+</MudAlert>
+
+@code {
+    private record KanbanColumn(string Title, string Icon, Color Color);
+
+    private readonly List<KanbanColumn> _columns = new()
+    {
+        new("Queued", Icons.Material.Outlined.Schedule, Color.Default),
+        new("In Progress", Icons.Material.Outlined.PlayCircle, Color.Primary),
+        new("Quality Check", Icons.Material.Outlined.FactCheck, Color.Warning),
+        new("Complete", Icons.Material.Outlined.CheckCircle, Color.Success)
+    };
+}

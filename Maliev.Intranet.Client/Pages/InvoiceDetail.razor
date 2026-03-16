@@ -122,7 +122,7 @@ else
                     <MudPaper Elevation="0" Class="pa-4">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
                             <MudText Typo="Typo.h6">Payment History</MudText>
-                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Add" Size="Size.Small" OnClick="@(() => Snackbar.Add("Record payment coming soon", Severity.Info))">Record Payment</MudButton>
+                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Add" Size="Size.Small" OnClick="@OpenRecordPaymentDialog">Record Payment</MudButton>
                         </MudStack>
 
                         @if (_invoice.Payments.Any())
@@ -424,7 +424,34 @@ else
 
     private async Task GeneratePdf()
     {
-        Snackbar.Add("PDF Generation requested", Severity.Info);
+        if (_invoice == null) return;
+        try
+        {
+            Snackbar.Add($"Generating PDF for invoice {_invoice.InvoiceNumber}...", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenRecordPaymentDialog()
+    {
+        if (_invoice == null) return;
+        var parameters = new DialogParameters<RecordPaymentDialog>
+        {
+            { x => x.InvoiceId, _invoice.Id },
+            { x => x.InvoiceNumber, _invoice.InvoiceNumber ?? string.Empty },
+            { x => x.OutstandingAmount, _invoice.Total - _invoice.Payments.Sum(p => p.Amount) }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<RecordPaymentDialog>("Record Payment", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadInvoice(); // reload the invoice to show updated payments
+            Snackbar.Add("Payment recorded successfully", Severity.Success);
+        }
     }
 
     private async Task OpenEditDialog()

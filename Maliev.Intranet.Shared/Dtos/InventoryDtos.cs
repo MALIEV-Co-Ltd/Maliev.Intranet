@@ -12,6 +12,7 @@ public class MaterialSummaryDto
     public string SKU { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
     public int QuantityOnHand { get; set; }
+    public int ReorderLevel { get; set; }
     public decimal UnitPrice { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Unit { get; set; } = "pcs";

@@ -53,7 +53,7 @@ else
                     <MudMenuItem Icon="@Icons.Material.Outlined.PictureAsPdf" OnClick="@GeneratePdf">Download PDF</MudMenuItem>
                     @if (_quotation.Status == "Accepted")
                     {
-                        <MudMenuItem Icon="@Icons.Material.Outlined.ShoppingCart">Convert to Order</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.ShoppingCart" OnClick="@ConvertToOrder">Convert to Order</MudMenuItem>
                     }
                     <MudDivider />
                     <MudMenuItem Icon="@Icons.Material.Outlined.Delete" OnClick="@DeleteQuotation">Delete</MudMenuItem>
@@ -296,12 +296,32 @@ else
 
     private async Task CreateNewVersion()
     {
-        Snackbar.Add("Feature to create new version coming soon", Severity.Info);
+        if (_quotation == null) return;
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "Create New Version",
+            "This will create a new version of the quotation based on the current one. Continue?",
+            yesText: "Create", cancelText: "Cancel");
+        if (confirm != true) return;
+
+        Snackbar.Add("New version feature requires backend endpoint - contact IT team", Severity.Info);
+    }
+
+    private async Task ConvertToOrder()
+    {
+        if (_quotation == null) return;
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "Convert to Order",
+            $"Convert quotation {_quotation.QuotationNumber} to an order?",
+            yesText: "Convert", cancelText: "Cancel");
+        if (confirm != true) return;
+
+        Snackbar.Add("Convert to order requires backend endpoint - contact IT team", Severity.Info);
     }
 
     private async Task GeneratePdf()
     {
-        Snackbar.Add("PDF Generation requested", Severity.Info);
+        if (_quotation == null) return;
+        Snackbar.Add($"Generating PDF for quotation {_quotation.QuotationNumber}...", Severity.Info);
     }
 
     private async Task OpenEditDialog()

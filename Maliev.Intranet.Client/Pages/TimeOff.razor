@@ -70,7 +70,7 @@ else
                     <CellTemplate>
                         @if (context.Item.Status == "Pending")
                         {
-                            <MudIconButton Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" Color="Color.Error" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" Color="Color.Error" OnClick="@(() => CancelRequest(context.Item))" />
                         }
                     </CellTemplate>
                 </TemplateColumn>
@@ -117,16 +117,42 @@ else
 
     private async Task OpenRequestDialog()
     {
-        var parameters = new DialogParameters();
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<LeaveRequestDialog>("Request Leave", new DialogParameters(), options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadData();
+            Snackbar.Add("Leave request submitted successfully", Severity.Success);
+        }
+    }
+
+    private async Task CancelRequest(LeaveRequestSummaryDto request)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "Cancel Leave Request",
+            $"Are you sure you want to cancel your {request.LeaveType} leave request?",
+            yesText: "Yes, Cancel", noText: "Keep");
         
-        // TODO: Create a LeaveRequestDialog component
-        // var dialog = await DialogService.ShowAsync<LeaveRequestDialog>("Request Leave", parameters, options);
-        // var result = await dialog.Result;
-        
-        // if (!result.Canceled) { await LoadData(); }
-        
-        Snackbar.Add("Leave Request Dialog coming soon", Severity.Info);
+        if (confirm != true) return;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/timeoff/requests/{request.Id}/cancel", new { });
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Leave request cancelled", Severity.Success);
+                await LoadData();
+            }
+            else
+            {
+                Snackbar.Add("Failed to cancel request", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
     }
 
     private Color GetStatusColor(string status) => status switch

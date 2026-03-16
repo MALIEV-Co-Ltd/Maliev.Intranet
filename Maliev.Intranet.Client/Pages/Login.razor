@@ -129,7 +129,7 @@
                 <MudStack Spacing="4">
                     <MudTextField T="string"
                                   Label="Username"
-                                  Value="@_usernameInputInput"
+                                  Value="@_usernameInput"
                                   ValueChanged="@((string value) => OnUsernameChanged(value))"
                                   Variant="Variant.Outlined"
                                   Adornment="Adornment.End"
@@ -153,9 +153,7 @@
                                   UserAttributes="@(new Dictionary<string, object> { {"autocomplete", "current-password"} })" />
 
                     <div class="d-flex justify-end mt-n2">
-                        <MudLink Href="forgot-password" Underline="Underline.Hover" Color="Color.Primary" Typo="Typo.caption" Style="font-weight: 600;">
-                            Forgot Password?
-                        </MudLink>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-weight: 600;">Forgot Password? Contact IT support.</MudText>
                     </div>
 
                     @if (!string.IsNullOrEmpty(_errorMessage))
@@ -224,7 +222,7 @@
     private bool _isProcessing;
     private bool _passwordVisible;
     private string? _errorMessage;
-    private string _usernameInputInput = string.Empty;
+    private string _usernameInput = string.Empty;
     private bool _usernameError = false;
     private string _usernameErrorText = string.Empty;
     private bool _isCheckingAuth = true;
@@ -294,7 +292,7 @@
         
         if (string.IsNullOrWhiteSpace(value))
         {
-            _usernameInputInput = string.Empty;
+            _usernameInput = string.Empty;
             _loginModel.Username = string.Empty;
             return;
         }
@@ -307,12 +305,12 @@
             var parts = cleanValue.Split('@');
             var usernamePart = parts[0].Trim();
             if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1])) hadDomain = true;
-            _usernameInputInput = usernamePart;
+            _usernameInput = usernamePart;
             cleanValue = usernamePart;
         }
         else
         {
-            _usernameInputInput = cleanValue;
+            _usernameInput = cleanValue;
         }
 
         if (!string.IsNullOrEmpty(cleanValue) && !System.Text.RegularExpressions.Regex.IsMatch(cleanValue, @"^[a-zA-Z0-9._-]+$"))
@@ -323,8 +321,6 @@
         else if (hadDomain)
         {
             _usernameErrorText = "Domain automatically removed";
-             _usernameError = true;
-             _usernameError = false;
         }
 
         _loginModel.Username = cleanValue;

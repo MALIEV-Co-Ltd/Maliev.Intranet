@@ -1,7 +1,112 @@
 @page "/finance/budget"
+@using Maliev.Intranet.Shared
+@inject ISnackbar Snackbar
 
-<PageTitle>Budget Planning - Maliev Intranet</PageTitle>
+<PageTitle>Budget - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Budget Planning</MudText>
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h4">Budget Planning</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Annual budget targets vs actual spending</MudText>
+    </div>
+    <MudStack Row="true" Spacing="2">
+        <MudSelect T="string" @bind-Value="_selectedYear" Label="Year" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:120px;">
+            <MudSelectItem Value="@("2026")">2026</MudSelectItem>
+            <MudSelectItem Value="@("2025")">2025</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => Snackbar.Add("Budget entry creation coming soon", Severity.Info))">
+            New Budget Entry
+        </MudButton>
+    </MudStack>
+</MudStack>
 
-<MudAlert Severity="Severity.Info">This feature is coming soon.</MudAlert>
+<!-- Summary Cards -->
+<MudGrid Class="mb-6">
+    <MudItem xs="12" sm="4">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Total Budget</MudText>
+            <MudText Typo="Typo.h4" Style="font-weight:600;">฿0</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">FY @_selectedYear</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Actual Spent</MudText>
+            <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Warning">฿0</MudText>
+            <MudProgressLinear Value="0" Color="Color.Warning" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Remaining</MudText>
+            <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Success">฿0</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">0% utilised</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Budget Categories Table -->
+<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudDataGrid T="BudgetCategory" Items="@_categories" Dense="true" Hover="true" Elevation="0">
+        <Columns>
+            <PropertyColumn Property="x => x.Category" Title="Category" />
+            <PropertyColumn Property="x => x.Department" Title="Department" />
+            <TemplateColumn Title="Budget (THB)">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2">฿@context.Item.BudgetAmount.ToString("N0")</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Actual (THB)">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2">฿@context.Item.ActualAmount.ToString("N0")</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Variance">
+                <CellTemplate>
+                    @{
+                        var variance = context.Item.BudgetAmount - context.Item.ActualAmount;
+                        var color = variance >= 0 ? Color.Success : Color.Error;
+                    }
+                    <MudText Typo="Typo.body2" Color="@color">฿@variance.ToString("N0")</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Utilisation">
+                <CellTemplate>
+                    @{
+                        var pct = context.Item.BudgetAmount > 0 ? context.Item.ActualAmount / context.Item.BudgetAmount * 100 : 0;
+                    }
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudProgressLinear Color="@(pct > 100 ? Color.Error : pct > 80 ? Color.Warning : Color.Success)" Value="@Math.Min(100, (double)pct)" Style="min-width:80px;" Size="Size.Small" />
+                        <MudText Typo="Typo.caption">@pct.ToString("N0")%</MudText>
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Actions" Sortable="false">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => Snackbar.Add("Budget editing coming soon", Severity.Info))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+                <MudIcon Icon="@Icons.Material.Outlined.AccountBalance" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No budget entries</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Budget data will appear here once configured</MudText>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" Class="mt-4" OnClick="@(() => Snackbar.Add("Budget entry creation coming soon", Severity.Info))">Add Budget Entry</MudButton>
+            </MudStack>
+        </NoRecordsContent>
+    </MudDataGrid>
+</MudPaper>
+
+@code {
+    private string _selectedYear = "2026";
+    private List<BudgetCategory> _categories = new();
+
+    private class BudgetCategory
+    {
+        public string Category { get; set; } = string.Empty;
+        public string Department { get; set; } = string.Empty;
+        public decimal BudgetAmount { get; set; }
+        public decimal ActualAmount { get; set; }
+    }
+}

@@ -5,6 +5,7 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
 
 <PageTitle>General Ledger - Maliev Intranet</PageTitle>
 
@@ -20,10 +21,10 @@
         
         <MudSpacer />
         
-        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Calculate" OnClick="@(() => Snackbar.Add("Trial Balance generation requested", Severity.Info))">
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Calculate" OnClick="@LoadTrialBalance">
             Trial Balance
         </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => Snackbar.Add("Excel export starting...", Severity.Info))">
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Download" OnClick="@ExportLedger">
             Export to Excel
         </MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenNewEntryDialog">
@@ -101,8 +102,11 @@
                         <TemplateColumn Title="Actions" Sortable="false">
                             <CellTemplate>
                                 <MudStack Row="true" Spacing="1">
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" />
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" OnClick="@(() => ViewJournalEntry(context.Item))" />
+                                    @if (context.Item.Status == "Draft")
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditJournalEntry(context.Item))" />
+                                    }
                                 </MudStack>
                             </CellTemplate>
                         </TemplateColumn>
@@ -121,6 +125,7 @@
     private string _selectedPeriod = "January 2026";
     private List<ChartOfAccountDto> _accountsTree = new();
     private List<JournalEntryDto> _entries = new();
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -153,7 +158,114 @@
 
     private async Task OpenNewEntryDialog()
     {
-        Snackbar.Add("New Journal Entry dialog coming soon", Severity.Info);
+        var parameters = new DialogParameters<JournalEntryDialog>
+        {
+            { x => x.Accounts, _accountsTree }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<JournalEntryDialog>("New Journal Entry", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadData();
+            Snackbar.Add("Journal entry created", Severity.Success);
+        }
+    }
+
+    private async Task ViewJournalEntry(JournalEntryDto entry)
+    {
+        var parameters = new DialogParameters<JournalEntryDialog>
+        {
+            { x => x.ExistingEntry, entry },
+            { x => x.Accounts, _accountsTree },
+            { x => x.IsReadOnly, true }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        await DialogService.ShowAsync<JournalEntryDialog>($"Journal Entry {entry.EntryNumber}", parameters, options);
+    }
+
+    private async Task EditJournalEntry(JournalEntryDto entry)
+    {
+        if (entry.Status != "Draft")
+        {
+            Snackbar.Add("Only Draft entries can be edited", Severity.Warning);
+            return;
+        }
+        var parameters = new DialogParameters<JournalEntryDialog>
+        {
+            { x => x.ExistingEntry, entry },
+            { x => x.Accounts, _accountsTree },
+            { x => x.IsReadOnly, false }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<JournalEntryDialog>($"Edit Entry {entry.EntryNumber}", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadData();
+            Snackbar.Add("Journal entry updated", Severity.Success);
+        }
+    }
+
+    private async Task LoadTrialBalance()
+    {
+        try
+        {
+            // Parse period to get date range
+            var now = DateTime.Today;
+            var start = new DateTime(now.Year, now.Month, 1);
+            var end = start.AddMonths(1).AddDays(-1);
+            var report = await Http.GetFromJsonAsync<FinancialReportDto>($"api/accounting/reports/TrialBalance?start={start:yyyy-MM-dd}&end={end:yyyy-MM-dd}");
+            if (report != null)
+            {
+                var parameters = new DialogParameters<TrialBalanceDialog>
+                {
+                    { x => x.Report, report }
+                };
+                var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+                await DialogService.ShowAsync<TrialBalanceDialog>("Trial Balance", parameters, options);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load trial balance: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ExportLedger()
+    {
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"MALIEV General Ledger - {_selectedPeriod}");
+            sb.AppendLine($"Exported: {DateTime.Now:f}");
+            sb.AppendLine();
+            sb.AppendLine("JOURNAL ENTRIES");
+            sb.AppendLine(new string('-', 80));
+            sb.AppendLine($"{"Entry #",-12} {"Date",-15} {"Description",-30} {"Debit",12} {"Credit",12} {"Status",-10}");
+            sb.AppendLine(new string('-', 80));
+            foreach (var entry in _entries)
+            {
+                sb.AppendLine($"{entry.EntryNumber,-12} {entry.Date:dd MMM yyyy,-15} {entry.Description,-30} {entry.TotalDebit,12:N2} {entry.TotalCredit,12:N2} {entry.Status,-10}");
+            }
+            sb.AppendLine(new string('-', 80));
+            sb.AppendLine($"{"TOTALS",-12} {"",-15} {"",-30} {_entries.Sum(e => e.TotalDebit),12:N2} {_entries.Sum(e => e.TotalCredit),12:N2}");
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+            var fileName = $"ledger-{DateTime.Now:yyyyMMdd}.csv";
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+                const link = document.createElement('a');
+                link.href = 'data:text/plain;charset=utf-8;base64,{base64}';
+                link.download = '{fileName}';
+                link.click();
+            ");
+            Snackbar.Add("Ledger exported successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
     }
 
     private Color GetStatusColor(string status) => status switch

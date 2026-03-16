@@ -1,7 +1,114 @@
 @page "/finance/report-builder"
+@using Maliev.Intranet.Shared
+@inject ISnackbar Snackbar
 
 <PageTitle>Report Builder - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Report Builder</MudText>
+<MudText Typo="Typo.h4" Class="mb-2">Report Builder</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+    Build custom financial reports by selecting metrics, dimensions, and date ranges
+</MudText>
 
-<MudAlert Severity="Severity.Info">This feature is coming soon.</MudAlert>
+<MudGrid>
+    <!-- Left Panel: Configuration -->
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-4">Report Configuration</MudText>
+            
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_reportName" Label="Report Name" Variant="Variant.Outlined" Placeholder="My Custom Report" />
+                
+                <MudSelect T="string" @bind-Value="_reportType" Label="Report Type" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("table")">Table</MudSelectItem>
+                    <MudSelectItem Value="@("chart")">Chart</MudSelectItem>
+                    <MudSelectItem Value="@("summary")">Summary Cards</MudSelectItem>
+                </MudSelect>
+
+                <MudText Typo="Typo.subtitle2">Date Range</MudText>
+                <MudDateRangePicker @bind-DateRange="_dateRange" Variant="Variant.Outlined" />
+
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Metrics</MudText>
+                @foreach (var metric in _availableMetrics)
+                {
+                    <MudCheckBox T="bool" Value="@_selectedMetrics.Contains(metric)" 
+                                 ValueChanged="@((v) => ToggleMetric(metric, v))"
+                                 Label="@metric" Color="Color.Primary" />
+                }
+
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Group By</MudText>
+                <MudSelect T="string" @bind-Value="_groupBy" Label="Dimension" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("")">None</MudSelectItem>
+                    <MudSelectItem Value="@("month")">Month</MudSelectItem>
+                    <MudSelectItem Value="@("quarter")">Quarter</MudSelectItem>
+                    <MudSelectItem Value="@("customer")">Customer</MudSelectItem>
+                    <MudSelectItem Value="@("department")">Department</MudSelectItem>
+                </MudSelect>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="RunReport">
+                    Run Report
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" StartIcon="@Icons.Material.Filled.Save" OnClick="@(() => Snackbar.Add("Save report template coming soon", Severity.Info))">
+                    Save Template
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Right Panel: Preview -->
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg" Style="min-height:500px;">
+            @if (!_hasRun)
+            {
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:400px;">
+                    <MudIcon Icon="@Icons.Material.Outlined.BarChart" Size="Size.Large" Color="Color.Secondary" Style="font-size:80px;" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">Configure and run your report</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Select metrics and click "Run Report" to see results</MudText>
+                </MudStack>
+            }
+            else
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+                    <MudText Typo="Typo.h6">@(_reportName.Length > 0 ? _reportName : "Custom Report")</MudText>
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.FileDownload" OnClick="@(() => Snackbar.Add("Export coming soon", Severity.Info))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Print" OnClick="@(() => Snackbar.Add("Print coming soon", Severity.Info))" />
+                    </MudStack>
+                </MudStack>
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="rounded-lg">
+                    Report preview requires backend integration. Selected metrics: @string.Join(", ", _selectedMetrics).
+                </MudAlert>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _reportName = string.Empty;
+    private string _reportType = "table";
+    private string _groupBy = "";
+    private bool _hasRun = false;
+    private DateRange _dateRange = new DateRange(DateTime.Today.AddMonths(-1), DateTime.Today);
+    private HashSet<string> _selectedMetrics = new() { "Revenue", "Orders" };
+
+    private readonly List<string> _availableMetrics = new()
+    {
+        "Revenue", "Orders", "Invoices", "Payments",
+        "Customers", "New Customers", "Headcount", "Materials Used"
+    };
+
+    private void ToggleMetric(string metric, bool selected)
+    {
+        if (selected) _selectedMetrics.Add(metric);
+        else _selectedMetrics.Remove(metric);
+    }
+
+    private void RunReport()
+    {
+        if (!_selectedMetrics.Any())
+        {
+            Snackbar.Add("Please select at least one metric", Severity.Warning);
+            return;
+        }
+        _hasRun = true;
+    }
+}

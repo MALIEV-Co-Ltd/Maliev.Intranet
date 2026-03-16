@@ -131,32 +131,8 @@
 
         try
         {
-            // TODO: Replace with actual BFF API call to get unpaid/partially paid invoices
-            // var invoices = await Http.GetFromJsonAsync<List<InvoiceDto>>($"api/invoices/unpaid?q={value}", cancellationToken);
-            // return invoices ?? Array.Empty<InvoiceDto>();
-
-            // Mock data for now
-            return new[]
-            {
-                new InvoiceDto
-                {
-                    Id = Guid.NewGuid(),
-                    InvoiceNumber = "INV-2026-001",
-                    CustomerName = "John Doe",
-                    TotalAmount = 10000.00m,
-                    PaidAmount = 0m,
-                    DueDate = DateTime.Today.AddDays(15)
-                },
-                new InvoiceDto
-                {
-                    Id = Guid.NewGuid(),
-                    InvoiceNumber = "INV-2026-002",
-                    CustomerName = "Jane Smith",
-                    TotalAmount = 25000.00m,
-                    PaidAmount = 10000.00m,
-                    DueDate = DateTime.Today.AddDays(20)
-                }
-            };
+            var invoices = await Http.GetFromJsonAsync<IEnumerable<InvoiceDto>>($"api/invoices/unpaid?q={Uri.EscapeDataString(value)}", cancellationToken);
+            return invoices ?? Array.Empty<InvoiceDto>();
         }
         catch
         {
@@ -191,9 +167,13 @@
                 Notes = _notes
             };
 
-            // TODO: Replace with actual BFF API call
-            // var response = await Http.PostAsJsonAsync("api/receipts", request);
-            // response.EnsureSuccessStatusCode();
+            var response = await Http.PostAsJsonAsync("api/receipts", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to create receipt: {error}", Severity.Error);
+                return;
+            }
 
             Snackbar.Add("Receipt issued successfully!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));

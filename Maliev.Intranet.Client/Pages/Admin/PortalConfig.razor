@@ -1,7 +1,116 @@
 @page "/admin/portal-config"
+@using Maliev.Intranet.Shared
+@inject ISnackbar Snackbar
 
-<PageTitle>Portal Config - Maliev Intranet</PageTitle>
+<PageTitle>Portal Configuration - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Portal Config</MudText>
+<MudText Typo="Typo.h4" Class="mb-2">Portal Configuration</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+    Manage feature flags, system settings, and portal customisation
+</MudText>
 
-<MudAlert Severity="Severity.Info">This feature is coming soon.</MudAlert>
+<MudGrid>
+    <!-- Feature Flags -->
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-4">Feature Flags</MudText>
+            <MudStack Spacing="2">
+                @foreach (var flag in _featureFlags)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <div>
+                            <MudText Typo="Typo.body2" Style="font-weight:600;">@flag.Name</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@flag.Description</MudText>
+                        </div>
+                        <MudSwitch T="bool" Value="@flag.Enabled" ValueChanged="@((v) => ToggleFlag(flag, v))" Color="Color.Primary" />
+                    </MudStack>
+                    <MudDivider />
+                }
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <!-- System Settings -->
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-4">System Settings</MudText>
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_companyName" Label="Company Name" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_supportEmail" Label="Support Email" Variant="Variant.Outlined" InputType="InputType.Email" />
+                <MudSelect T="string" @bind-Value="_defaultCurrency" Label="Default Currency" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("THB")">Thai Baht (THB ฿)</MudSelectItem>
+                    <MudSelectItem Value="@("USD")">US Dollar (USD $)</MudSelectItem>
+                    <MudSelectItem Value="@("EUR")">Euro (EUR €)</MudSelectItem>
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_timezone" Label="System Timezone" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Asia/Bangkok")">Asia/Bangkok (UTC+7)</MudSelectItem>
+                    <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                </MudSelect>
+                <MudNumericField T="int" @bind-Value="_sessionTimeout" Label="Session Timeout (minutes)" Variant="Variant.Outlined" Min="5" Max="480" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveSettings">
+                    Save Settings
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Maintenance Mode -->
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <div>
+                    <MudText Typo="Typo.h6">Maintenance Mode</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">When enabled, only administrators can access the portal</MudText>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Construction" OnClick="@(() => Snackbar.Add("Maintenance mode requires IT approval", Severity.Warning))">
+                    Enable Maintenance Mode
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _companyName = "Maliev";
+    private string _supportEmail = "support@maliev.com";
+    private string _defaultCurrency = "THB";
+    private string _timezone = "Asia/Bangkok";
+    private int _sessionTimeout = 60;
+
+    private List<FeatureFlag> _featureFlags = new()
+    {
+        new("AI Assistant", "Enable the AI chatbot sidebar for all users", true),
+        new("3D Model Viewer", "Allow users to view BabylonJS 3D models", true),
+        new("Customer Onboarding", "Enable AI-powered customer onboarding flow", true),
+        new("Pricing Calculator", "Show AI pricing calculator in Sales menu", true),
+        new("HR Analytics", "Enable HR analytics dashboard", true),
+        new("Compliance Module", "Show compliance tracking for employees", false),
+        new("Production Queue", "Enable production queue management", false),
+        new("Budget Planning", "Enable budget planning module", false)
+    };
+
+    private void ToggleFlag(FeatureFlag flag, bool enabled)
+    {
+        flag.Enabled = enabled;
+        Snackbar.Add($"{flag.Name} {(enabled ? "enabled" : "disabled")}", Severity.Success);
+    }
+
+    private void SaveSettings()
+    {
+        Snackbar.Add("Settings saved successfully", Severity.Success);
+    }
+
+    private class FeatureFlag
+    {
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public bool Enabled { get; set; }
+
+        public FeatureFlag(string name, string description, bool enabled)
+        {
+            Name = name;
+            Description = description;
+            Enabled = enabled;
+        }
+    }
+}

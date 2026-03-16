@@ -80,10 +80,10 @@ else
              <MudCard Elevation="0" Class="rounded-lg mt-4" Style="background-color: var(--mud-palette-surface);">
                 <MudCardHeader>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">All Orders</MudText>
+                        <MudText Typo="Typo.h6">Recent Orders</MudText>
                     </CardHeaderContent>
                     <CardHeaderActions>
-                        <MudTabs Rounded="true" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
+                        <MudTabs @bind-ActivePanelIndex="_activeOrderTab" Rounded="true" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
                             <MudTabPanel Text="All Orders" />
                             <MudTabPanel Text="Processing" />
                             <MudTabPanel Text="Shipped" />
@@ -91,22 +91,37 @@ else
                     </CardHeaderActions>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudTable Items="@(new List<string>())" Elevation="0" Hover="true" Loading="@_loading">
-                        <HeaderContent>
-                            <MudTh>Product</MudTh>
-                            <MudTh>Price</MudTh>
-                            <MudTh>Payment</MudTh>
-                            <MudTh>Status</MudTh>
-                        </HeaderContent>
-                        <LoadingContent>
-                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
-                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
-                             <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
-                        </LoadingContent>
-                        <NoRecordsContent>
-                            <MudText Class="pa-4 text-center" Color="Color.Secondary">No orders found</MudText>
-                        </NoRecordsContent>
-                    </MudTable>
+                    @if (_ordersLoading)
+                    {
+                        @for (int i = 0; i < 3; i++)
+                        {
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
+                        }
+                    }
+                    else
+                    {
+                        <MudTable T="OrderSummaryDto" Items="@FilteredOrders" Elevation="0" Hover="true" OnRowClick="@((TableRowClickEventArgs<OrderSummaryDto> args) => Navigation.NavigateTo($"/sales/orders/{args.Item!.Id}"))">
+                            <HeaderContent>
+                                <MudTh>Order #</MudTh>
+                                <MudTh>Customer</MudTh>
+                                <MudTh>Total</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Date</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Order #">@context.OrderNumber</MudTd>
+                                <MudTd DataLabel="Customer">@context.CustomerName</MudTd>
+                                <MudTd DataLabel="Total">฿@context.TotalAmount.ToString("N2")</MudTd>
+                                <MudTd DataLabel="Status">
+                                    <MudChip T="string" Size="Size.Small" Color="@GetOrderStatusColor(context.Status)">@context.Status</MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="Date">@context.CreatedAt.ToString("dd MMM yyyy")</MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <MudText Class="pa-4 text-center" Color="Color.Secondary">No orders found</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                    }
                 </MudCardContent>
              </MudCard>
         </MudItem>
@@ -117,6 +132,9 @@ else
     private UserInfo? _userInfo;
     private DashboardViewModel? _dashboard;
     private bool _loading = true;
+    private bool _ordersLoading = false;
+    private int _activeOrderTab = 0;
+    private List<OrderSummaryDto> _orders = new();
     
     // CSS class handles legend hiding
     private ChartOptions _chartOptions = new ChartOptions 
@@ -124,50 +142,50 @@ else
         ChartPalette = new[] { "#3d7cf9", "#238636", "#a855f7" }
     };
 
+    private IEnumerable<OrderSummaryDto> FilteredOrders => _activeOrderTab switch
+    {
+        1 => _orders.Where(o => o.Status == "Processing" || o.Status == "Confirmed"),
+        2 => _orders.Where(o => o.Status == "Shipped"),
+        _ => _orders
+    };
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-
-
         _userInfo = new UserInfo
         {
             Name = user.Identity?.Name ?? user.FindFirst("name")?.Value ?? "Unknown",
             Email = user.FindFirst("email")?.Value ?? "No email",
-            UserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value ?? "Unknown",
-            // Check both standard and literal claim types
-            Roles = user.Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "roles").Select(c => c.Value).Distinct().ToList(),
+            UserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value ?? "Unknown",
+            Roles = user.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role || c.Type == "roles").Select(c => c.Value).Distinct().ToList(),
             Permissions = user.Claims.Where(c => c.Type == "permissions" || c.Type == "permission").Select(c => c.Value).Distinct().ToList()
         };
 
         try
         {
-            // 1. Load User Preferences
             string widgetQuery = "";
             try
             {
                 var pref = await Http.GetFromJsonAsync<UserPreferenceDto>("api/preferences/dashboard");
-                if (pref != null && pref.PreferenceData != null)
+                if (pref?.PreferenceData != null && pref.PreferenceData.TryGetValue("Widgets", out var widgetsObj) && widgetsObj is System.Text.Json.JsonElement widgetsElement)
                 {
-                    // Map Dictionary to DashboardPreference
-                    if (pref.PreferenceData.TryGetValue("Widgets", out var widgetsObj) && widgetsObj is System.Text.Json.JsonElement widgetsElement)
-                    {
-                         var widgets = System.Text.Json.JsonSerializer.Deserialize<List<string>>(widgetsElement);
-                         if (widgets?.Any() == true)
-                         {
-                             widgetQuery = "?widgets=" + string.Join(",", widgets);
-                         }
-                    }
+                    var widgets = System.Text.Json.JsonSerializer.Deserialize<List<string>>(widgetsElement);
+                    if (widgets?.Any() == true)
+                        widgetQuery = "?widgets=" + string.Join(",", widgets);
                 }
             }
-            catch (Exception)
-            {
-                // Ignore preference load errors (404, etc), use defaults
-            }
+            catch { }
 
-            // 2. Load Dashboard Data
-            _dashboard = await Http.GetFromJsonAsync<DashboardViewModel>($"api/dashboard{widgetQuery}");
+            var dashboardTask = Http.GetFromJsonAsync<DashboardViewModel>($"api/dashboard{widgetQuery}");
+            var ordersTask = Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/orders?pageSize=20&sortBy=createdAt&sortDesc=true");
+            
+            await Task.WhenAll(dashboardTask, ordersTask);
+            
+            _dashboard = await dashboardTask;
+            var ordersResponse = await ordersTask;
+            _orders = ordersResponse?.Data.ToList() ?? new();
         }
         catch (Exception ex)
         {
@@ -178,6 +196,16 @@ else
             _loading = false;
         }
     }
+
+    private Color GetOrderStatusColor(string status) => status switch
+    {
+        "New" or "Draft" => Color.Default,
+        "Confirmed" or "Processing" => Color.Info,
+        "Shipped" => Color.Primary,
+        "Delivered" => Color.Success,
+        "Cancelled" => Color.Error,
+        _ => Color.Default
+    };
 
     private class DashboardPreference
     {

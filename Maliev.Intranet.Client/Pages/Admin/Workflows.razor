@@ -1,7 +1,67 @@
 @page "/admin/workflows"
+@using Maliev.Intranet.Shared
+@inject ISnackbar Snackbar
 
-<PageTitle>Workflow Automation - Maliev Intranet</PageTitle>
+<PageTitle>Workflows - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Workflow Automation</MudText>
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h4">Workflow Automation</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Approval chains, automated notifications, and process triggers</MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => Snackbar.Add("Create workflow coming soon", Severity.Info))">
+        New Workflow
+    </MudButton>
+</MudStack>
 
-<MudAlert Severity="Severity.Info">This feature is coming soon.</MudAlert>
+<!-- Workflow Templates -->
+<MudText Typo="Typo.h6" Class="mb-3">Available Templates</MudText>
+<MudGrid Class="mb-6">
+    @foreach (var template in _templates)
+    {
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="0" Class="border mud-border-lines-default rounded-lg h-100 cursor-pointer" @onclick="@(() => Snackbar.Add($"Configure {template.Name} workflow coming soon", Severity.Info))">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="@template.Color" Size="Size.Medium">
+                            <MudIcon Icon="@template.Icon" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.subtitle2">@template.Name</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@template.Description</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardActions>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default">@template.Status</MudChip>
+                    <MudSpacer />
+                    <MudButton Size="Size.Small" OnClick="@(() => Snackbar.Add($"Configure {template.Name} coming soon", Severity.Info))">Configure</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
+
+<!-- Active Workflows -->
+<MudText Typo="Typo.h6" Class="mb-3">Active Workflows</MudText>
+<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+    <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+        <MudIcon Icon="@Icons.Material.Outlined.AccountTree" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
+        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No active workflows</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Configure a template above to enable automated workflows</MudText>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private record WorkflowTemplate(string Name, string Description, string Icon, Color Color, string Status);
+
+    private readonly List<WorkflowTemplate> _templates = new()
+    {
+        new("Leave Approval", "Multi-level leave request approval chain", Icons.Material.Outlined.EventAvailable, Color.Info, "Not Configured"),
+        new("Purchase Order Approval", "PO approval with budget limit thresholds", Icons.Material.Outlined.ShoppingCart, Color.Warning, "Not Configured"),
+        new("Invoice Review", "Invoice verification and approval before payment", Icons.Material.Outlined.Receipt, Color.Success, "Not Configured"),
+        new("Onboarding Checklist", "New employee onboarding task assignment", Icons.Material.Outlined.PersonAdd, Color.Primary, "Not Configured"),
+        new("Quality Incident", "Defect reporting and escalation", Icons.Material.Outlined.BugReport, Color.Error, "Not Configured"),
+        new("Customer Onboarding", "KYC and account setup approval", Icons.Material.Outlined.Business, Color.Secondary, "Not Configured")
+    };
+}

@@ -3,6 +3,7 @@
 @using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Financial Reports - Maliev Intranet</PageTitle>
 
@@ -24,8 +25,12 @@
         
         <MudSpacer />
         
-        <MudIconButton Icon="@Icons.Material.Filled.FileDownload" />
-        <MudIconButton Icon="@Icons.Material.Filled.Print" />
+        <MudTooltip Text="Download Report">
+            <MudIconButton Icon="@Icons.Material.Filled.FileDownload" OnClick="DownloadReport" Disabled="@(_report == null)" />
+        </MudTooltip>
+        <MudTooltip Text="Print Report">
+            <MudIconButton Icon="@Icons.Material.Filled.Print" OnClick="PrintReport" Disabled="@(_report == null)" />
+        </MudTooltip>
     </MudStack>
 </MudPaper>
 
@@ -79,6 +84,48 @@ else
     private string _selectedReport = "ProfitAndLoss";
     private DateRange _dateRange = new DateRange(DateTime.Today.AddMonths(-1), DateTime.Today);
     private FinancialReportDto? _report;
+
+    private async Task DownloadReport()
+    {
+        if (_report == null) return;
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"MALIEV - {_report.ReportName}");
+            sb.AppendLine($"Period: {_dateRange.Start?.ToString("dd MMM yyyy")} to {_dateRange.End?.ToString("dd MMM yyyy")}");
+            sb.AppendLine($"Generated: {_report.GeneratedAt:f}");
+            sb.AppendLine();
+            foreach (var section in _report.Sections)
+            {
+                sb.AppendLine(section.Title.ToUpper());
+                sb.AppendLine(new string('-', 50));
+                foreach (var row in section.Rows)
+                    sb.AppendLine($"{row.Label,-40} {row.Amount,12:C2}");
+                sb.AppendLine($"{"Total " + section.Title,-40} {section.Total,12:C2}");
+                sb.AppendLine();
+            }
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+            var fileName = $"report-{_selectedReport}-{DateTime.Now:yyyyMMdd}.txt";
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+                const link = document.createElement('a');
+                link.href = 'data:text/plain;base64,{base64}';
+                link.download = '{fileName}';
+                link.click();
+            ");
+            Snackbar.Add("Report downloaded", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Download failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task PrintReport()
+    {
+        if (_report == null) return;
+        await JSRuntime.InvokeVoidAsync("print");
+    }
 
     private async Task LoadReport()
     {

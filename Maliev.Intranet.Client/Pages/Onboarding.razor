@@ -12,7 +12,7 @@
 <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
         <MudTextField @bind-Value="_searchString" Placeholder="Search employees..." Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 300px;" />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="@(() => Snackbar.Add("New onboarding flow coming soon", Severity.Info))">New Onboarding</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="@StartNewOnboarding">New Onboarding</MudButton>
     </MudStack>
 </MudPaper>
 
@@ -83,9 +83,40 @@ else
         }
     }
 
-    private void ViewChecklist(OnboardingSummaryDto onboarding)
+    private async Task ViewChecklist(OnboardingSummaryDto onboarding)
     {
-        Snackbar.Add($"Checklist for {onboarding.EmployeeName} coming soon", Severity.Info);
+        try
+        {
+            var checklist = await Http.GetFromJsonAsync<OnboardingChecklistDto>($"api/onboarding/{onboarding.EmployeeId}/checklist");
+            if (checklist == null)
+            {
+                Snackbar.Add("No checklist found", Severity.Warning);
+                return;
+            }
+            var parameters = new DialogParameters<OnboardingChecklistDialog>
+            {
+                { x => x.Checklist, checklist },
+                { x => x.EmployeeName, onboarding.EmployeeName }
+            };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+            await DialogService.ShowAsync<OnboardingChecklistDialog>($"{onboarding.EmployeeName} - Onboarding Checklist", parameters, options);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading checklist: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartNewOnboarding()
+    {
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<StartOnboardingDialog>("Start New Onboarding", new DialogParameters(), options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadData();
+            Snackbar.Add("Onboarding started successfully", Severity.Success);
+        }
     }
 
     private Color GetStatusColor(string status) => status switch

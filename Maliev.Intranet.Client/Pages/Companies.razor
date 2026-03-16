@@ -4,6 +4,7 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Companies - Maliev Intranet</PageTitle>
 
@@ -24,7 +25,7 @@
         <MudButton Variant="Variant.Filled" 
                    Color="Color.Primary" 
                    StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="@(() => Snackbar.Add("New company onboarding coming soon", Severity.Info))">
+                    OnClick="@OpenCreateCompanyDialog">
             New Company
         </MudButton>
     </MudStack>
@@ -114,6 +115,18 @@ else
     {
         _currentPage = page;
         await LoadData();
+    }
+
+    private async Task OpenCreateCompanyDialog()
+    {
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateCompanyDialog>("Create Company", options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadData();
+            Snackbar.Add("Company created successfully", Severity.Success);
+        }
     }
 
     private Color GetTierColor(string tier) => tier switch

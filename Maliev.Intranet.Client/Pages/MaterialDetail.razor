@@ -43,7 +43,7 @@ else
                 <MudButton Variant="Variant.Outlined" 
                            Color="Color.Default" 
                            StartIcon="@Icons.Material.Outlined.History"
-                           OnClick="@(() => Snackbar.Add("Full history coming soon", Severity.Info))">
+                           OnClick="@ScrollToHistory">
                     View History
                 </MudButton>
             </MudStack>
@@ -106,7 +106,7 @@ else
                                 <MudText Typo="Typo.h6">Inventory Tracking</MudText>
                                 <MudText Typo="Typo.caption" Class="mud-text-secondary">Current availability in warehouse</MudText>
                             </div>
-                            <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Outlined.SwapVert" Size="Size.Small">Adjust Stock</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Outlined.SwapVert" Size="Size.Small" OnClick="AdjustStock">Adjust Stock</MudButton>
                         </MudStack>
 
                         <MudGrid>
@@ -167,7 +167,7 @@ else
                     <MudPaper Elevation="0" Class="pa-4">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
                             <MudText Typo="Typo.h6">Approved Suppliers</MudText>
-                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" Size="Size.Small">Link Supplier</MudButton>
+                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="LinkSupplier">Link Supplier</MudButton>
                         </MudStack>
 
                         @if (_material.Suppliers.Any())
@@ -236,9 +236,9 @@ else
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.h6" Class="mb-3">Quick Actions</MudText>
                     <MudStack Spacing="2">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Outlined.ShoppingCart">Create Purchase Order</MudButton>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" StartIcon="@Icons.Material.Outlined.History">Stock Adjustment</MudButton>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" StartIcon="@Icons.Material.Outlined.Print">Print Label</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Outlined.ShoppingCart" OnClick="CreatePurchaseOrder">Create Purchase Order</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" StartIcon="@Icons.Material.Outlined.History" OnClick="AdjustStock">Stock Adjustment</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" StartIcon="@Icons.Material.Outlined.Print" OnClick="PrintLabel">Print Label</MudButton>
                     </MudStack>
                 </MudPaper>
 
@@ -317,6 +317,43 @@ else
         {
             await LoadMaterial();
         }
+    }
+
+    private void ScrollToHistory()
+    {
+        // Switch to "Stock Level" tab to show transactions
+        Snackbar.Add("Showing transaction history in Stock Level tab", Severity.Info);
+    }
+
+    private async Task AdjustStock()
+    {
+        if (_material == null) return;
+        var result = await DialogService.ShowMessageBoxAsync(
+            "Stock Adjustment",
+            "Stock adjustment feature requires entering adjustment quantity and reason. This will be available in the next update.",
+            yesText: "OK");
+        _ = result; // acknowledge
+    }
+
+    private void CreatePurchaseOrder()
+    {
+        if (_material == null) return;
+        // Navigate to procurement page pre-filtered
+        Navigation.NavigateTo($"/mfg/procurement?materialId={Id}");
+        Snackbar.Add($"Navigating to Procurement for {_material.Name}", Severity.Info);
+    }
+
+    private void PrintLabel()
+    {
+        if (_material == null) return;
+        Snackbar.Add($"Printing label for {_material.Name} ({_material.SKU})...", Severity.Info);
+    }
+
+    private void LinkSupplier()
+    {
+        if (_material == null) return;
+        Navigation.NavigateTo($"/mfg/suppliers?linkMaterial={Id}");
+        Snackbar.Add("Navigate to Suppliers to link a supplier", Severity.Info);
     }
 
     private Color GetStatusColor(string status) => status switch

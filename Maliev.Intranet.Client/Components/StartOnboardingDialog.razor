@@ -1,0 +1,74 @@
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_employeeId" Label="Employee ID" Variant="Variant.Outlined" Required="true"
+                              Placeholder="Enter employee ID or search..." />
+                <MudDatePicker @bind-Date="_startDate" Label="Start Date" Variant="Variant.Outlined" Required="true" />
+                <MudTextField @bind-Value="_buddyName" Label="Onboarding Buddy (optional)" Variant="Variant.Outlined" Placeholder="Assign an onboarding buddy" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_isSaving">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(_isSaving || !_isValid)">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Start Onboarding
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+    private string _employeeId = string.Empty;
+    private DateTime? _startDate = DateTime.Today;
+    private string _buddyName = string.Empty;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid || _startDate == null) return;
+
+        _isSaving = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/onboarding/start", new
+            {
+                EmployeeId = _employeeId,
+                StartDate = _startDate.Value,
+                Buddy = _buddyName
+            });
+            if (response.IsSuccessStatusCode)
+            {
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to start onboarding: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

@@ -40,7 +40,7 @@
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
                            Class="rounded-lg px-6" OnClick="OpenEditDialog">Edit Company</MudButton>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
-                           Class="rounded-lg px-6 shadow-none">New Transaction</MudButton>
+                           Class="rounded-lg px-6 shadow-none" OnClick="NewTransaction">New Transaction</MudButton>
             </MudStack>
         </MudStack>
 
@@ -120,7 +120,29 @@
                             <MudItem xs="12">
                                 <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
                                     <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Recent Transactions</MudText>
-                                    <MudAlert Severity="Severity.Info" Variant="Variant.Text">No transactions found for this company.</MudAlert>
+                                    @if (_recentInvoices.Any())
+                                    {
+                                        <MudTable Items="_recentInvoices" Dense="true" Hover="true" Elevation="0">
+                                            <HeaderContent>
+                                                <MudTh>Invoice #</MudTh>
+                                                <MudTh>Date</MudTh>
+                                                <MudTh>Amount</MudTh>
+                                                <MudTh>Status</MudTh>
+                                                <MudTh></MudTh>
+                                            </HeaderContent>
+                                            <RowTemplate>
+                                                <MudTd DataLabel="Invoice #">@context.InvoiceNumber</MudTd>
+                                                <MudTd DataLabel="Date">@context.IssueDate.ToString("dd MMM yyyy")</MudTd>
+                                                <MudTd DataLabel="Amount">฿@context.Total.ToString("N2")</MudTd>
+                                                <MudTd DataLabel="Status"><MudChip T="string" Size="Size.Small">@context.Status</MudChip></MudTd>
+                                                <MudTd><MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => Navigation.NavigateTo($"/finance/invoices/{context.Id}"))">View</MudButton></MudTd>
+                                            </RowTemplate>
+                                        </MudTable>
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Text">No invoices found for this company.</MudAlert>
+                                    }
                                 </MudCard>
                             </MudItem>
                         </MudGrid>
@@ -193,13 +215,14 @@
     [Parameter] public Guid Id { get; set; }
     private CompanyResponse? _company;
     private List<CustomerSummaryDto> _associatedCustomers = [];
+    private List<InvoiceSummaryDto> _recentInvoices = [];
     private bool _loading = true;
     private Guid _promotingContactId = Guid.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadCompany();
-        await LoadAssociatedCustomers();
+        await Task.WhenAll(LoadAssociatedCustomers(), LoadRecentInvoices());
     }
 
     private async Task LoadAssociatedCustomers()
@@ -210,6 +233,23 @@
             _associatedCustomers = response?.Data.ToList() ?? [];
         }
         catch { }
+    }
+
+    private async Task LoadRecentInvoices()
+    {
+        try
+        {
+            // Look for invoices linked to any customer in this company
+            var response = await Http.GetFromJsonAsync<PagedResponse<InvoiceSummaryDto>>($"api/invoices?companyId={Id}&pageSize=10");
+            _recentInvoices = response?.Data.ToList() ?? [];
+        }
+        catch { }
+    }
+
+    private void NewTransaction()
+    {
+        // Navigate to create invoice pre-filtered for this company
+        Navigation.NavigateTo($"/finance/invoices?companyId={Id}&action=create");
     }
 
     private async Task LoadCompany()

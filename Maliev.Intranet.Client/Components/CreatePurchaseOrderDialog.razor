@@ -1,0 +1,132 @@
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudStack Spacing="3">
+                <MudAutocomplete T="SupplierSummaryDto"
+                                 Label="Supplier"
+                                 @bind-Value="_selectedSupplier"
+                                 SearchFunc="SearchSuppliers"
+                                 ToStringFunc="@(s => s?.Name ?? "")"
+                                 Variant="Variant.Outlined"
+                                 Required="true"
+                                 RequiredError="Please select a supplier" />
+
+                <MudDatePicker @bind-Date="_orderDate" Label="Order Date" Variant="Variant.Outlined" Required="true" />
+                <MudDatePicker @bind-Date="_expectedDelivery" Label="Expected Delivery" Variant="Variant.Outlined" />
+
+                <MudText Typo="Typo.subtitle2">Line Items</MudText>
+
+                @for (int i = 0; i < _items.Count; i++)
+                {
+                    var idx = i;
+                    <MudGrid Spacing="2">
+                        <MudItem xs="5">
+                            <MudTextField @bind-Value="_items[idx].Description" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+                        </MudItem>
+                        <MudItem xs="3">
+                            <MudNumericField T="int" @bind-Value="_items[idx].Quantity" Label="Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+                        </MudItem>
+                        <MudItem xs="3">
+                            <MudNumericField T="decimal" @bind-Value="_items[idx].UnitPrice" Label="Unit Price" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Format="N2" />
+                        </MudItem>
+                        <MudItem xs="1">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => RemoveItem(idx))" Disabled="@(_items.Count <= 1)" />
+                        </MudItem>
+                    </MudGrid>
+                }
+
+                <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddItem" Size="Size.Small">Add Item</MudButton>
+
+                <MudDivider />
+                <MudStack Row="true" Justify="Justify.FlexEnd">
+                    <MudText Typo="Typo.subtitle1">Total: <strong>฿@(_items.Sum(i => i.Quantity * i.UnitPrice).ToString("N2"))</strong></MudText>
+                </MudStack>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_isSaving">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(_isSaving || !_isValid || _selectedSupplier == null)">
+            @if (_isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Create PO
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+    private SupplierSummaryDto? _selectedSupplier;
+    private DateTime? _orderDate = DateTime.Today;
+    private DateTime? _expectedDelivery = DateTime.Today.AddDays(14);
+    private List<PoLineItem> _items = new() { new PoLineItem() };
+
+    private void Cancel() => MudDialog.Cancel();
+    private void AddItem() => _items.Add(new PoLineItem());
+    private void RemoveItem(int idx) { if (_items.Count > 1) _items.RemoveAt(idx); }
+
+    private async Task<IEnumerable<SupplierSummaryDto>> SearchSuppliers(string value, CancellationToken token)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>($"api/suppliers?search={Uri.EscapeDataString(value ?? "")}&pageSize=20");
+            return response?.Data ?? [];
+        }
+        catch { return []; }
+    }
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid || _selectedSupplier == null || _orderDate == null) return;
+
+        _isSaving = true;
+        try
+        {
+            var request = new CreatePurchaseOrderRequest
+            {
+                SupplierId = _selectedSupplier.Id,
+                Date = _orderDate.Value,
+                Items = _items.Select(i => new PurchaseOrderLineItemDto
+                {
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice
+                }).ToList()
+            };
+
+            var response = await Http.PostAsJsonAsync("api/procurement", request);
+            if (response.IsSuccessStatusCode)
+            {
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to create PO: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private class PoLineItem
+    {
+        public string Description { get; set; } = string.Empty;
+        public int Quantity { get; set; } = 1;
+        public decimal UnitPrice { get; set; }
+    }
+}

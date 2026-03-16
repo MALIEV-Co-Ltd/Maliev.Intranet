@@ -34,10 +34,22 @@ public class NavigationTests(BffTestWebApplicationFactory factory) : IClassFixtu
     [InlineData("/admin/iam")]
     [InlineData("/admin/notifications")]
     [InlineData("/admin/reference-data")]
+    [InlineData("/admin/audit")]
+    [InlineData("/admin/content")]
+    [InlineData("/admin/workflows")]
+    [InlineData("/admin/portal-config")]
     [InlineData("/mfg/models")]
     [InlineData("/mfg/materials")]
     [InlineData("/mfg/procurement")]
     [InlineData("/mfg/suppliers")]
+    [InlineData("/mfg/inventory")]
+    [InlineData("/mfg/production-queue")]
+    [InlineData("/mfg/equipment")]
+    [InlineData("/mfg/equipment/new")]
+    [InlineData("/finance/budget")]
+    [InlineData("/finance/report-builder")]
+    [InlineData("/hr/training")]
+    [InlineData("/hr/profile")]
     public async Task FrontendRoutes_ReturnBlazorShell(string url)
     {
         // Arrange
