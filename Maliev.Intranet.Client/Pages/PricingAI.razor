@@ -1,6 +1,7 @@
 @page "/sales/pricing-ai"
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.Intranet.Shared.Constants
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
@@ -92,7 +93,7 @@
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.h6" Class="mb-4">Predicted Price</MudText>
                     <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
-                        <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">฿@_pricingResult.TotalUnitPrice.ToString("N2")</MudText>
+                        <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">@CurrencyFormatter.Format(_pricingResult.TotalUnitPrice, "THB", 2)</MudText>
                         <MudText Typo="Typo.h6" Color="Color.Secondary" Class="pb-1">THB per unit</MudText>
                     </MudStack>
                     <MudText Typo="Typo.body2" Color="Color.Info" Class="mt-2">
@@ -114,37 +115,37 @@
                     <MudStack Spacing="2">
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Material Cost</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.MaterialCost.ToString("N2")</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@CurrencyFormatter.Format(_pricingResult.MaterialCost, "THB", 2)</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Support Cost</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.SupportMaterialCost.ToString("N2")</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@CurrencyFormatter.Format(_pricingResult.SupportMaterialCost, "THB", 2)</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Machine Time Cost</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.MachineTimeCost.ToString("N2")</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@CurrencyFormatter.Format(_pricingResult.MachineTimeCost, "THB", 2)</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Setup Cost</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.SetupCost.ToString("N2")</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@CurrencyFormatter.Format(_pricingResult.SetupCost, "THB", 2)</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Complexity Surcharge</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">฿@_pricingResult.ComplexitySurcharge.ToString("N2")</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@CurrencyFormatter.Format(_pricingResult.ComplexitySurcharge, "THB", 2)</MudText>
                         </MudStack>
                         <MudDivider Class="my-2" />
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Subtotal</MudText>
-                            <MudText Typo="Typo.body2">฿@_pricingResult.SubtotalBeforeMargin.ToString("N2")</MudText>
+                            <MudText Typo="Typo.body2">@CurrencyFormatter.Format(_pricingResult.SubtotalBeforeMargin, "THB", 2)</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2">Margin</MudText>
-                            <MudText Typo="Typo.body2">฿@_pricingResult.MarginAmount.ToString("N2")</MudText>
+                            <MudText Typo="Typo.body2">@CurrencyFormatter.Format(_pricingResult.MarginAmount, "THB", 2)</MudText>
                         </MudStack>
                         <MudDivider Class="my-2" />
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">Total (Qty: @_quantity)</MudText>
-                            <MudText Typo="Typo.subtitle1" Color="Color.Primary" Style="font-weight: 700;">฿@_pricingResult.TotalPrice.ToString("N2")</MudText>
+                            <MudText Typo="Typo.subtitle1" Color="Color.Primary" Style="font-weight: 700;">@CurrencyFormatter.Format(_pricingResult.TotalPrice, "THB", 2)</MudText>
                         </MudStack>
                     </MudStack>
                 </MudPaper>

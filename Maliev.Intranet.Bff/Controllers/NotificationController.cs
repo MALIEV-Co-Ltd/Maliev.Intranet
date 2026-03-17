@@ -10,7 +10,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for managing notification templates, delivery logs, and preferences.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("api/notifications")]
 public class NotificationController(INotificationServiceClient notificationClient) : ControllerBase
 {

@@ -69,7 +69,7 @@ public class ProjectDetailDto
     public decimal TotalPrice { get; set; }
 
     /// <summary>Gets or sets the currency code (e.g. THB).</summary>
-    public string Currency { get; set; } = "THB";
+    public string Currency { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the associated quotation ID once generated.</summary>
     public Guid? QuotationId { get; set; }

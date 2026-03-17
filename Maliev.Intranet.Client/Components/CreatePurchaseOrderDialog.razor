@@ -1,5 +1,6 @@
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
@@ -44,7 +45,7 @@
 
                 <MudDivider />
                 <MudStack Row="true" Justify="Justify.FlexEnd">
-                    <MudText Typo="Typo.subtitle1">Total: <strong>฿@(_items.Sum(i => i.Quantity * i.UnitPrice).ToString("N2"))</strong></MudText>
+                    <MudText Typo="Typo.subtitle1">Total: <strong>@CurrencyFormatter.Format(_items.Sum(i => i.Quantity * i.UnitPrice), "THB", 2)</strong></MudText>
                 </MudStack>
             </MudStack>
         </MudForm>

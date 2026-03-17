@@ -35,7 +35,7 @@ public class InvoiceDetailDto
     public string? QuotationReference { get; set; }
     public string? PoNumber { get; set; }
     public string Status { get; set; } = string.Empty;
-    public string Currency { get; set; } = "THB";
+    public string Currency { get; set; } = string.Empty;
     public decimal? ExchangeRate { get; set; }
     public decimal SubTotal { get; set; }
     public decimal TaxAmount { get; set; }
@@ -86,7 +86,7 @@ public class PaymentDetailDto
     public string? InvoiceNumber { get; set; }
     public string? CustomerName { get; set; }
     public decimal Amount { get; set; }
-    public string Currency { get; set; } = "THB";
+    public string Currency { get; set; } = string.Empty;
     public string Method { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
@@ -141,7 +141,7 @@ public sealed record CreateInvoiceRequest
 
     public int PaymentTermsDays { get; set; }
 
-    public string Currency { get; set; } = "THB";
+    public string Currency { get; set; } = string.Empty;
 
     public List<InvoiceItemDto> Items { get; set; } = [];
 }

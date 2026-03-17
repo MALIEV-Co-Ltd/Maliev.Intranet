@@ -22,7 +22,7 @@
         <MudItem xs="12" md="4">
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Base Salary</MudText>
-                <MudText Typo="Typo.h5" Class="mt-2">@ThaiCurrency.Format(_compensation.BaseSalary, 2)</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">@CurrencyFormatter.Format(_compensation.BaseSalary, "THB", 2)</MudText>
                 <MudText Typo="Typo.caption" Color="@(_compensation.PercentageChange >= 0 ? Color.Success : Color.Error)">
                     @(_compensation.PercentageChange >= 0 ? "+" : "")@(_compensation.PercentageChange.ToString("P0")) from last year
                 </MudText>
@@ -31,14 +31,14 @@
         <MudItem xs="12" md="4">
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Annual Bonus</MudText>
-                <MudText Typo="Typo.h5" Class="mt-2">@ThaiCurrency.Format(_compensation.AnnualBonus, 2)</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">@CurrencyFormatter.Format(_compensation.AnnualBonus, "THB", 2)</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Last payout</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" md="4">
             <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Total Compensation</MudText>
-                <MudText Typo="Typo.h5" Class="mt-2">@ThaiCurrency.Format(_compensation.TotalCompensation, 2)</MudText>
+                <MudText Typo="Typo.h5" Class="mt-2">@CurrencyFormatter.Format(_compensation.TotalCompensation, "THB", 2)</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Current Year</MudText>
             </MudPaper>
         </MudItem>

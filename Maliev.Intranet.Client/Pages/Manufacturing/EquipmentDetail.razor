@@ -1,6 +1,7 @@
 @page "/mfg/equipment/{Id:guid}"
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Client.Components
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -122,7 +123,7 @@ else
                                 <MudStack Row="true" Justify="Justify.SpaceBetween">
                                     <MudText Typo="Typo.body2" Class="mud-text-secondary">Purchase Price</MudText>
                                     <MudText Typo="Typo.body2">
-                                        @(_equipment.PurchasePriceTHB.HasValue ? $"฿{_equipment.PurchasePriceTHB:N2}" : "—")
+                                        @(_equipment.PurchasePriceTHB.HasValue ? CurrencyFormatter.Format(_equipment.PurchasePriceTHB.Value, "THB", 2) : "—")
                                     </MudText>
                                 </MudStack>
                                 <MudDivider />
@@ -255,7 +256,7 @@ else
                             </MudTd>
                             <MudTd>@context.Description</MudTd>
                             <MudTd>@(context.VendorName ?? "—")</MudTd>
-                            <MudTd>@(context.CostTHB.HasValue ? $"฿{context.CostTHB:N2}" : "—")</MudTd>
+                            <MudTd>@(context.CostTHB.HasValue ? CurrencyFormatter.Format(context.CostTHB.Value, "THB", 2) : "—")</MudTd>
                             <MudTd>@(context.NextServiceDueDate?.ToString("dd MMM yyyy") ?? "—")</MudTd>
                         </RowTemplate>
                     </MudTable>

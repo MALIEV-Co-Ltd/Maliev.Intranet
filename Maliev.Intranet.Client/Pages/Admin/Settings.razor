@@ -1,5 +1,6 @@
 @page "/admin/settings"
 @using Maliev.Intranet.Shared
+@inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 
@@ -46,9 +47,10 @@
                         <MudTextField @bind-Value="_companyName" Label="Company Name" Variant="Variant.Outlined" />
                         <MudTextField @bind-Value="_supportEmail" Label="Support Email" Variant="Variant.Outlined" InputType="InputType.Email" />
                         <MudSelect T="string" @bind-Value="_defaultCurrency" Label="Default Currency" Variant="Variant.Outlined">
-                            <MudSelectItem Value="@("THB")">Thai Baht (THB ฿)</MudSelectItem>
-                            <MudSelectItem Value="@("USD")">US Dollar (USD $)</MudSelectItem>
-                            <MudSelectItem Value="@("EUR")">Euro (EUR €)</MudSelectItem>
+                            @foreach (var currency in _availableCurrencies)
+                            {
+                                <MudSelectItem Value="@currency.Code">@currency.Name (@currency.Code @currency.Symbol)</MudSelectItem>
+                            }
                         </MudSelect>
                         <MudSelect T="string" @bind-Value="_timezone" Label="System Timezone" Variant="Variant.Outlined">
                             <MudSelectItem Value="@("Asia/Bangkok")">Asia/Bangkok (UTC+7)</MudSelectItem>
@@ -254,8 +256,26 @@
     private string _companyName = "Maliev";
     private string _supportEmail = "support@maliev.com";
     private string _defaultCurrency = "THB";
+    private List<CurrencyDto> _availableCurrencies = [];
     private string _timezone = "Asia/Bangkok";
     private int _sessionTimeout = 60;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _availableCurrencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/ReferenceData/currencies") ?? [];
+            if (_availableCurrencies.Any())
+            {
+                var thb = _availableCurrencies.FirstOrDefault(c => c.Code.Equals("THB", StringComparison.OrdinalIgnoreCase));
+                _defaultCurrency = thb?.Code ?? _availableCurrencies.First().Code;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load currencies: {ex.Message}", Severity.Warning);
+        }
+    }
 
     private List<FeatureFlag> _featureFlags = new()
     {

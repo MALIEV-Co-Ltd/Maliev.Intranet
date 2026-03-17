@@ -47,7 +47,7 @@ public class PdfServiceClient(HttpClient httpClient)
             System.Text.Encoding.UTF8,
             "application/json");
 
-        var response = await httpClient.PostAsync("/pdf/v1.0/generations/generate", content, ct);
+        var response = await httpClient.PostAsync("/pdf/v1/generations/generate", content, ct);
 
         if (response.IsSuccessStatusCode)
         {

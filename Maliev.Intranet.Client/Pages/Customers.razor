@@ -125,7 +125,7 @@
         </TemplateColumn>
         <TemplateColumn Title="Balance" HeaderStyle="width: 120px; white-space: nowrap;" CellStyle="text-align: right;" HeaderClass="justify-end">
             <CellTemplate>
-                <MudText Typo="Typo.body2" Class="font-mono" Style="white-space: nowrap;">@ThaiCurrency.Format(context.Item.OutstandingBalance, 2)</MudText>
+                <MudText Typo="Typo.body2" Class="font-mono" Style="white-space: nowrap;">@CurrencyFormatter.Format(context.Item.OutstandingBalance, "THB", 2)</MudText>
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn CellClass="pr-6" HeaderClass="justify-end pr-6" HeaderStyle="width: 60px;">

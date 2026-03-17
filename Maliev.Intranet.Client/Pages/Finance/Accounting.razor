@@ -61,7 +61,7 @@
                                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@account.Children.Count sub-accounts</MudText>
                                             }
                                         </div>
-                                        <MudText Typo="Typo.subtitle2">@ThaiCurrency.Format(account.Balance, 0)</MudText>
+                                        <MudText Typo="Typo.subtitle2">@CurrencyFormatter.Format(account.Balance, "THB", 0)</MudText>
                                     </MudStack>
                                 </MudListItem>
                                 <MudDivider />
@@ -198,21 +198,21 @@
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Total Budget</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight:600;">฿0</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;">@CurrencyFormatter.Format(0m, "THB", 0)</MudText>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">FY @_selectedBudgetYear</MudText>
                 </MudPaper>
             </MudItem>
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Actual Spent</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Warning">฿0</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Warning">@CurrencyFormatter.Format(0m, "THB", 0)</MudText>
                     <MudProgressLinear Value="0" Color="Color.Warning" Class="mt-2" />
                 </MudPaper>
             </MudItem>
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Remaining</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Success">฿0</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Success">@CurrencyFormatter.Format(0m, "THB", 0)</MudText>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">0% utilised</MudText>
                 </MudPaper>
             </MudItem>
@@ -224,15 +224,15 @@
                     <PropertyColumn Property="x => x.Category" Title="Category" />
                     <PropertyColumn Property="x => x.Department" Title="Department" />
                     <TemplateColumn Title="Budget (THB)">
-                        <CellTemplate><MudText Typo="Typo.body2">฿@context.Item.BudgetAmount.ToString("N0")</MudText></CellTemplate>
+                        <CellTemplate><MudText Typo="Typo.body2">@CurrencyFormatter.Format(context.Item.BudgetAmount, "THB", 0)</MudText></CellTemplate>
                     </TemplateColumn>
                     <TemplateColumn Title="Actual (THB)">
-                        <CellTemplate><MudText Typo="Typo.body2">฿@context.Item.ActualAmount.ToString("N0")</MudText></CellTemplate>
+                        <CellTemplate><MudText Typo="Typo.body2">@CurrencyFormatter.Format(context.Item.ActualAmount, "THB", 0)</MudText></CellTemplate>
                     </TemplateColumn>
                     <TemplateColumn Title="Variance">
                         <CellTemplate>
                             @{ var variance = context.Item.BudgetAmount - context.Item.ActualAmount; }
-                            <MudText Typo="Typo.body2" Color="@(variance >= 0 ? Color.Success : Color.Error)">฿@variance.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2" Color="@(variance >= 0 ? Color.Success : Color.Error)">@CurrencyFormatter.Format(variance, "THB", 0)</MudText>
                         </CellTemplate>
                     </TemplateColumn>
                     <TemplateColumn Title="Utilisation">

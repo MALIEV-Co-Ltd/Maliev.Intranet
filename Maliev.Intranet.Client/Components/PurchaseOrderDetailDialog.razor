@@ -1,5 +1,6 @@
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 
 <MudDialog>
@@ -48,13 +49,13 @@
                         <RowTemplate>
                             <MudTd DataLabel="Material">@context.MaterialId</MudTd>
                             <MudTd DataLabel="Qty" Style="text-align:right">@context.Quantity</MudTd>
-                            <MudTd DataLabel="Unit Price" Style="text-align:right">฿@context.UnitPrice.ToString("N2")</MudTd>
-                            <MudTd DataLabel="Total" Style="text-align:right">฿@((context.Quantity * context.UnitPrice).ToString("N2"))</MudTd>
+                            <MudTd DataLabel="Unit Price" Style="text-align:right">@CurrencyFormatter.Format(context.UnitPrice, "THB", 2)</MudTd>
+                            <MudTd DataLabel="Total" Style="text-align:right">@CurrencyFormatter.Format(context.Quantity * context.UnitPrice, "THB", 2)</MudTd>
                         </RowTemplate>
                     </MudTable>
                     <MudDivider Class="mt-2" />
                     <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                        <MudText Typo="Typo.subtitle1">Total: <strong>฿@_po.TotalValue.ToString("N2")</strong></MudText>
+                        <MudText Typo="Typo.subtitle1">Total: <strong>@CurrencyFormatter.Format(_po.TotalValue, "THB", 2)</strong></MudText>
                     </MudStack>
                 </MudItem>
             </MudGrid>

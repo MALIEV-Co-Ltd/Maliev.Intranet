@@ -1,6 +1,7 @@
 @page "/sales/projects/{Id:guid}"
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -148,7 +149,7 @@ else
                                                Size="Size.Small"
                                                StartIcon="@Icons.Material.Outlined.CheckCircle"
                                                OnClick="@(() => ConfirmPriceAsync(part, part.EstimatedPrice!.Value))">
-                                        Confirm ฿@part.EstimatedPrice.Value.ToString("N2")
+                                        Confirm @CurrencyFormatter.Format(part.EstimatedPrice.Value, "THB", 2)
                                     </MudButton>
                                 }
                             </MudStack>
@@ -166,12 +167,12 @@ else
                                         </TitleContent>
                                         <ChildContent>
                                             <div class="mt-2" style="font-size: 13px;">
-                                                <div class="breakdown-row"><span>Material cost</span><span>฿@part.PriceBreakdown.MaterialCost.ToString("N2")</span></div>
-                                                <div class="breakdown-row"><span>Machine time (@part.PriceBreakdown.MachineTimeMinutes.ToString("N0") min)</span><span>฿@part.PriceBreakdown.MachineTimeCost.ToString("N2")</span></div>
-                                                <div class="breakdown-row"><span>Setup / operator</span><span>฿@part.PriceBreakdown.SetupCost.ToString("N2")</span></div>
-                                                <div class="breakdown-row"><span>Complexity</span><span>฿@part.PriceBreakdown.ComplexitySurcharge.ToString("N2")</span></div>
-                                                <div class="breakdown-row"><span>Margin</span><span>฿@part.PriceBreakdown.MarginAmount.ToString("N2")</span></div>
-                                                <div class="breakdown-row"><span><strong>Total per unit</strong></span><span><strong>฿@part.PriceBreakdown.TotalPerUnit.ToString("N2")</strong></span></div>
+                                                <div class="breakdown-row"><span>Material cost</span><span>@CurrencyFormatter.Format(part.PriceBreakdown.MaterialCost, "THB", 2)</span></div>
+                                                <div class="breakdown-row"><span>Machine time (@part.PriceBreakdown.MachineTimeMinutes.ToString("N0") min)</span><span>@CurrencyFormatter.Format(part.PriceBreakdown.MachineTimeCost, "THB", 2)</span></div>
+                                                <div class="breakdown-row"><span>Setup / operator</span><span>@CurrencyFormatter.Format(part.PriceBreakdown.SetupCost, "THB", 2)</span></div>
+                                                <div class="breakdown-row"><span>Complexity</span><span>@CurrencyFormatter.Format(part.PriceBreakdown.ComplexitySurcharge, "THB", 2)</span></div>
+                                                <div class="breakdown-row"><span>Margin</span><span>@CurrencyFormatter.Format(part.PriceBreakdown.MarginAmount, "THB", 2)</span></div>
+                                                <div class="breakdown-row"><span><strong>Total per unit</strong></span><span><strong>@CurrencyFormatter.Format(part.PriceBreakdown.TotalPerUnit, "THB", 2)</strong></span></div>
                                             </div>
                                         </ChildContent>
                                     </MudExpansionPanel>
@@ -232,7 +233,7 @@ else
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body2" Color="Color.Secondary">Total Price</MudText>
                             <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">
-                                ฿@TotalConfirmedPrice.ToString("N2")
+                                @CurrencyFormatter.Format(TotalConfirmedPrice, "THB", 2)
                             </MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
@@ -416,7 +417,7 @@ else
                 part.PriceBreakdown  = breakdown;
                 part.EstimatedPrice  = breakdown.TotalPerUnit;
                 part.Status          = "Priced";
-                Snackbar.Add($"AI price estimate: ฿{breakdown.TotalPerUnit:N2}/unit", Severity.Info);
+                Snackbar.Add($"AI price estimate: {CurrencyFormatter.Format(breakdown.TotalPerUnit, "THB", 2)}/unit", Severity.Info);
             }
         }
         else

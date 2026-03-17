@@ -76,7 +76,7 @@ else if (!_isTableView)
                     </MudStack>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">@context.CustomerName</MudText>
                     <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
-                        @ThaiCurrency.Format(context.TotalAmount, 2)
+                        @CurrencyFormatter.Format(context.TotalAmount, "THB", 2)
                     </MudText>
                 </MudCardContent>
             </MudCard>
@@ -101,7 +101,7 @@ else
             <TemplateColumn Title="Total" SortBy="x => x.TotalAmount">
                 <CellTemplate>
                     <MudText Typo="Typo.body2" Color="Color.Success">
-                        @ThaiCurrency.Format(context.Item.TotalAmount, 2)
+                        @CurrencyFormatter.Format(context.Item.TotalAmount, "THB", 2)
                     </MudText>
                 </CellTemplate>
             </TemplateColumn>

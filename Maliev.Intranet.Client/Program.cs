@@ -9,9 +9,8 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 builder.Services.AddAuthorizationCore();
 
-// Use PersistentAuthenticationStateProvider for instant auth state from prerendering
-// Falls back to BffAuthenticationStateProvider if persisted state is not available
-builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
+// Use BffAuthenticationStateProvider for WebAssembly to fetch auth state from BFF API
+builder.Services.AddScoped<AuthenticationStateProvider, BffAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<BreadcrumbService>();

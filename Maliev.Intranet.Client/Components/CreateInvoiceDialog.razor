@@ -1,4 +1,5 @@
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Client.Helpers
 @using MudBlazor
 @inject HttpClient Http
 @inject ISnackbar Snackbar
@@ -60,9 +61,10 @@
                                        Label="Currency"
                                        Variant="Variant.Outlined"
                                        Required="true">
-                                <MudSelectItem Value="@("THB")">THB - Thai Baht</MudSelectItem>
-                                <MudSelectItem Value="@("USD")">USD - US Dollar</MudSelectItem>
-                                <MudSelectItem Value="@("EUR")">EUR - Euro</MudSelectItem>
+                                @foreach (var currency in _availableCurrencies)
+                                {
+                                    <MudSelectItem Value="@currency.Code">@currency.Code - @currency.Name</MudSelectItem>
+                                }
                             </MudSelect>
                         </MudItem>
                     </MudGrid>
@@ -183,7 +185,25 @@
     private DateTime? _dueDate = DateTime.Today.AddDays(30);
     private int _paymentTermsDays = 30;
     private string _currency = "THB";
+    private List<CurrencyDto> _availableCurrencies = [];
     private List<InvoiceItemDto> _lineItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _availableCurrencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/ReferenceData/currencies") ?? [];
+            if (_availableCurrencies.Any())
+            {
+                var thb = _availableCurrencies.FirstOrDefault(c => c.Code.Equals("THB", StringComparison.OrdinalIgnoreCase));
+                _currency = thb?.Code ?? _availableCurrencies.First().Code;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load currencies: {ex.Message}", Severity.Warning);
+        }
+    }
 
     private async Task<IEnumerable<CustomerSummaryDto>> SearchCustomers(string value, CancellationToken cancellationToken)
     {

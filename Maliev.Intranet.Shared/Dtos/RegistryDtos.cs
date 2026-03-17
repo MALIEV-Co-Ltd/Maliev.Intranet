@@ -41,6 +41,33 @@ public class CountryDto
 }
 
 /// <summary>
+/// DTO representing a currency.
+/// </summary>
+public class CurrencyDto
+{
+    /// <summary>Gets or sets the unique identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the ISO 4217 currency code (e.g., THB, USD, EUR).</summary>
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the currency symbol (e.g., ฿, $, €).</summary>
+    public string Symbol { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the full currency name.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the number of decimal places.</summary>
+    public int DecimalPlaces { get; set; }
+
+    /// <summary>Gets or sets whether this currency is active.</summary>
+    public bool IsActive { get; set; }
+
+    /// <summary>Gets or sets whether this is the primary currency.</summary>
+    public bool IsPrimary { get; set; }
+}
+
+/// <summary>
 /// Represents a location in Thailand registry.
 /// </summary>
 public class RegistryThaiLocation

@@ -1,12 +1,13 @@
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
 <MudDialog>
     <DialogContent>
         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
-            Recording payment for Invoice @InvoiceNumber. Outstanding: ฿@OutstandingAmount.ToString("N2")
+            Recording payment for Invoice @InvoiceNumber. Outstanding: @CurrencyFormatter.Format(OutstandingAmount, "THB", 2)
         </MudText>
         <MudForm @ref="_form" @bind-IsValid="_isValid">
             <MudStack Spacing="3">

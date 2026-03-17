@@ -18,7 +18,7 @@ public class DashboardController(
     PaymentServiceClient paymentClient,
     EmployeeServiceClient employeeClient,
     InvoiceServiceClient invoiceClient,
-    LeaveServiceClient leaveClient,
+    ILeaveServiceClient leaveClient,
     ProjectServiceClient projectClient) : ControllerBase
 {
     /// <summary>
@@ -65,7 +65,7 @@ public class DashboardController(
                 Type = "Stat",
                 SourceService = "PaymentService",
                 NavigateTo = "/finance/payments",
-                Data = JsonSerializer.SerializeToElement($"฿{stats?.TodayTotal.ToString("N0") ?? "0"}")
+                Data = JsonSerializer.SerializeToElement($"THB {stats?.TodayTotal.ToString("N0") ?? "0"}")
             });
         }
 

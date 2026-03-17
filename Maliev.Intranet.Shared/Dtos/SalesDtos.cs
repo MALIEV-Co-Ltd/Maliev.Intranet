@@ -46,7 +46,7 @@ public class QuotationDetailDto
     public decimal SubTotal { get; set; }
     public decimal Tax { get; set; }
     public decimal Total { get; set; }
-    public string CurrencyCode { get; set; } = "THB";
+    public string CurrencyCode { get; set; } = string.Empty;
     public string? DeliveryExpectations { get; set; }
     public List<QuotationVersionDto> Versions { get; set; } = [];
     public List<InternalNoteDto> InternalNotes { get; set; } = [];
@@ -61,7 +61,7 @@ public class QuotationVersionDto
     public int VersionNumber { get; set; }
     public List<QuotationItemDto> LineItems { get; set; } = [];
     public decimal TotalPrice { get; set; }
-    public string CurrencyCode { get; set; } = "THB";
+    public string CurrencyCode { get; set; } = string.Empty;
     public string? DeliveryExpectations { get; set; }
     public string? ChangeSummary { get; set; }
     public string CreatedBy { get; set; } = string.Empty;

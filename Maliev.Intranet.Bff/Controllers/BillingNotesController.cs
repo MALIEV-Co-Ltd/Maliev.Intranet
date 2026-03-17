@@ -10,7 +10,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for billing notes.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("api/billing-notes")]
 public class BillingNotesController(InvoiceServiceClient invoiceClient) : ControllerBase
 {

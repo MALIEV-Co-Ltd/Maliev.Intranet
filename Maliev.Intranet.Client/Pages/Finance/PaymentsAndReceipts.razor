@@ -39,7 +39,7 @@
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudStack Spacing="2">
                             <MudText Typo="Typo.caption" Color="Color.Secondary">Today's Total</MudText>
-                            <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">@ThaiCurrency.Format(_paymentStats.TodayTotal, 2)</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">@CurrencyFormatter.Format(_paymentStats.TodayTotal, "THB", 2)</MudText>
                             <MudText Typo="Typo.caption" Color="@(_paymentStats.PercentageChangeFromYesterday >= 0 ? Color.Success : Color.Error)">
                                 <MudIcon Icon="@(_paymentStats.PercentageChangeFromYesterday >= 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" Size="Size.Small" />
                                 @Math.Abs(_paymentStats.PercentageChangeFromYesterday).ToString("P0") from yesterday
@@ -51,7 +51,7 @@
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudStack Spacing="2">
                             <MudText Typo="Typo.caption" Color="Color.Secondary">Pending</MudText>
-                            <MudText Typo="Typo.h5" Color="Color.Warning" Style="font-weight: 700;">@ThaiCurrency.Format(_paymentStats.PendingTotal, 2)</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Warning" Style="font-weight: 700;">@CurrencyFormatter.Format(_paymentStats.PendingTotal, "THB", 2)</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@_paymentStats.PendingCount transactions</MudText>
                         </MudStack>
                     </MudPaper>
@@ -60,7 +60,7 @@
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudStack Spacing="2">
                             <MudText Typo="Typo.caption" Color="Color.Secondary">This Month</MudText>
-                            <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">@ThaiCurrency.Format(_paymentStats.MonthTotal, 2)</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">@CurrencyFormatter.Format(_paymentStats.MonthTotal, "THB", 2)</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">Received</MudText>
                         </MudStack>
                     </MudPaper>
@@ -69,7 +69,7 @@
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudStack Spacing="2">
                             <MudText Typo="Typo.caption" Color="Color.Secondary">Failed</MudText>
-                            <MudText Typo="Typo.h5" Color="Color.Error" Style="font-weight: 700;">@ThaiCurrency.Format(_paymentStats.FailedTotal, 2)</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Error" Style="font-weight: 700;">@CurrencyFormatter.Format(_paymentStats.FailedTotal, "THB", 2)</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Error">@_paymentStats.FailedCount transactions</MudText>
                         </MudStack>
                     </MudPaper>

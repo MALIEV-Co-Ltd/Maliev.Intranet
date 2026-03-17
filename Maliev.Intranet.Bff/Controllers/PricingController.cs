@@ -9,7 +9,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for pricing features including snapshots and AI-driven calculations.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("api/pricing")]
 public class PricingController(IPricingServiceClient pricingClient) : ControllerBase
 {

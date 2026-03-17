@@ -2,6 +2,7 @@
 @using MudBlazor
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -142,7 +143,7 @@
                                                 </MudTd>
                                                 <MudTd DataLabel="Number">@context.Number</MudTd>
                                                 <MudTd DataLabel="Date">@context.Date.ToString("dd MMM yyyy")</MudTd>
-                                                <MudTd DataLabel="Amount">@(context.Amount > 0 ? $"฿{context.Amount:N2}" : "-")</MudTd>
+                                                <MudTd DataLabel="Amount">@(context.Amount > 0 ? CurrencyFormatter.Format(context.Amount, "THB", 2) : "-")</MudTd>
                                                 <MudTd DataLabel="Status"><MudChip T="string" Size="Size.Small">@context.Status</MudChip></MudTd>
                                                 <MudTd><MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="@context.Url">View</MudButton></MudTd>
                                             </RowTemplate>

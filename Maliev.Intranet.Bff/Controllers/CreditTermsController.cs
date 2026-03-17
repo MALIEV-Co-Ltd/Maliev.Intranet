@@ -9,7 +9,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// BFF Controller for Credit Terms.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("api/credit-terms")]
 public class CreditTermsController(InvoiceServiceClient invoiceClient) : ControllerBase
 {

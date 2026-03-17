@@ -3,6 +3,7 @@
 @using System.Security.Claims
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -175,7 +176,7 @@ else
                     </MudStack>
                     <MudGrid Spacing="2">
                         <MudItem xs="12" sm="4">
-                            <MudNumericField T="decimal" @bind-Value="_calcMaterialCost" Label="Material Cost (฿)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+                            <MudNumericField T="decimal" @bind-Value="_calcMaterialCost" Label="Material Cost (THB)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
                         </MudItem>
                         <MudItem xs="12" sm="4">
                             <MudNumericField T="decimal" @bind-Value="_calcMachineHours" Label="Machine Hours" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Step="0.5m" />
@@ -185,16 +186,16 @@ else
                         </MudItem>
                     </MudGrid>
                     @{
-                        var machineRate = 450.0m; // ฿/hr default
+                        var machineRate = 450.0m; // THB/hr default
                         var subtotal = _calcMaterialCost + (_calcMachineHours * machineRate);
                         var withMargin = subtotal * (1 + _calcMarginPct / 100m);
                     }
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-3" Wrap="Wrap.Wrap">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Machine rate: ฿@machineRate.ToString("N0")/hr</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Machine rate: @CurrencyFormatter.Format(machineRate, "THB", 0)/hr</MudText>
                         <MudDivider Vertical="true" FlexItem="true" Class="d-none d-sm-flex" />
-                        <MudText Typo="Typo.body2">Subtotal: <strong>฿@subtotal.ToString("N2")</strong></MudText>
+                        <MudText Typo="Typo.body2">Subtotal: <strong>@CurrencyFormatter.Format(subtotal, "THB", 2)</strong></MudText>
                         <MudDivider Vertical="true" FlexItem="true" Class="d-none d-sm-flex" />
-                        <MudText Typo="Typo.h6" Color="Color.Primary">Estimated Price: <strong>฿@withMargin.ToString("N2")</strong></MudText>
+                        <MudText Typo="Typo.h6" Color="Color.Primary">Estimated Price: <strong>@CurrencyFormatter.Format(withMargin, "THB", 2)</strong></MudText>
                     </MudStack>
                 </MudPaper>
             </MudItem>
@@ -268,8 +269,7 @@ else
                         <MudTabPanel Text="Shipped" />
                     </MudTabs>
                 </MudStack>
-                {
-                    <MudTable T="OrderSummaryDto" Items="@FilteredOrders" Hover="true" Elevation="0"
+                <MudTable T="OrderSummaryDto" Items="@FilteredOrders" Hover="true" Elevation="0"
                               Breakpoint="Breakpoint.Sm"
                               OnRowClick="@((TableRowClickEventArgs<OrderSummaryDto> args) => Navigation.NavigateTo($"/sales/orders/{args.Item!.Id}"))">
                         <HeaderContent>
@@ -282,7 +282,7 @@ else
                         <RowTemplate>
                             <MudTd DataLabel="Order #">@context.OrderNumber</MudTd>
                             <MudTd DataLabel="Customer">@context.CustomerName</MudTd>
-                            <MudTd DataLabel="Total">฿@context.TotalAmount.ToString("N2")</MudTd>
+                            <MudTd DataLabel="Total">@CurrencyFormatter.Format(context.TotalAmount, "THB", 2)</MudTd>
                             <MudTd DataLabel="Status">
                                 <MudChip T="string" Size="Size.Small" Color="@GetOrderStatusColor(context.Status)">@context.Status</MudChip>
                             </MudTd>
@@ -292,7 +292,6 @@ else
                             <MudText Class="pa-6 text-center" Color="Color.Secondary">No orders found</MudText>
                         </NoRecordsContent>
                     </MudTable>
-                }
             </MudPaper>
         </MudItem>
 

@@ -31,7 +31,7 @@ public class QuotationPdfData
     public DateTime QuotationDate { get; set; }
     public List<QuotationPdfItem> Items { get; set; } = [];
     public double TotalAmount { get; set; }
-    public string Currency { get; set; } = "THB";
+    public string Currency { get; set; } = string.Empty;
 }
 
 /// <summary>

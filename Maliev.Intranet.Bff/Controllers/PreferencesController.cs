@@ -9,7 +9,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for managing user preferences.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("api/preferences")]
 public class PreferencesController(EmployeeServiceClient employeeClient) : ControllerBase
 {

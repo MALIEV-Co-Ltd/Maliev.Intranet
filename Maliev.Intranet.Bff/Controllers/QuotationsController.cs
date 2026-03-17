@@ -136,7 +136,7 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             CustomerName = quotation.CustomerName,
             QuotationDate = quotation.CreatedAt,
             TotalAmount = (double)quotation.Total,
-            Currency = quotation.CurrencyCode ?? "THB",
+            Currency = !string.IsNullOrEmpty(quotation.CurrencyCode) ? quotation.CurrencyCode : "THB",
             Items = quotation.Versions?.FirstOrDefault()?.LineItems?.Select((item, index) => new QuotationPdfItem
             {
                 Index = index + 1,

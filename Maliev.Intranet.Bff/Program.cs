@@ -41,6 +41,7 @@ try
     builder.Services.AddSingleton<BffMetrics>();
     builder.Services.AddHostedService<AlertBackgroundService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.BreadcrumbService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ProductionHubService>();
@@ -267,6 +268,7 @@ try
     builder.AddBffServiceClient<IFacilityServiceClient, FacilityServiceClient>("FacilityService");
     builder.AddBffServiceClient<ProjectServiceClient>("ProjectService");
     builder.AddBffServiceClient<JobServiceClient>("JobService");
+    builder.AddBffServiceClient<CurrencyServiceClient>("CurrencyService");
 
     // Named HTTP client with service account authentication for reference data
     builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>

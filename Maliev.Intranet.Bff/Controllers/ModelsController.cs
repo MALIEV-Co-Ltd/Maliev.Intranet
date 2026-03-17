@@ -10,7 +10,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for managing 3D models.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("api/models")]
 public class ModelsController(UploadServiceClient uploadClient) : ControllerBase
 {
