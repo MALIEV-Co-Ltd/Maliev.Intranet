@@ -3,6 +3,8 @@ using Maliev.Intranet.Client.Pages.Admin;
 using Maliev.Intranet.Client.Pages.HR;
 using Maliev.Intranet.Client.Pages.Finance;
 using Maliev.Intranet.Client.Pages.Manufacturing;
+using Maliev.Intranet.Client.Services;
+using Maliev.Intranet.Tests.Testing;
 using MudBlazor;
 using MudBlazor.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +17,10 @@ public class PlaceholderPageTests : BunitContext, IAsyncLifetime
     {
         Services.AddMudServices();
         JSInterop.Mode = JSRuntimeMode.Loose;
+        var handler = new MockHttpMessageHandler();
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
+        Services.AddSingleton(client);
+        Services.AddScoped<ProductionHubService>();
         Render<MudPopoverProvider>();
     }
 

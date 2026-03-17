@@ -48,6 +48,7 @@ public class ResponsiveLayoutTests : BunitContext, IAsyncLifetime
 
         Services.AddSingleton<LayoutService>(layoutService);
         Services.AddSingleton<ChatService>();
+        Services.AddScoped<BreadcrumbService>();
 
         _authMock.Setup(x => x.GetAuthenticationStateAsync())
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")], "Test"))));

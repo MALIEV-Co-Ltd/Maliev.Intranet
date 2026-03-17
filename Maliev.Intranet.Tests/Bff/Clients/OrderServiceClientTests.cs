@@ -74,12 +74,9 @@ public class OrderServiceClientTests
         var handler = new MockHttpMessageHandler((req, ct) => Task.FromResult(httpResponse));
         var client = new OrderServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
 
-        // GetFromJsonAsync throws HttpRequestException on non-success non-404 codes
-        // For 404, it returns null since the HttpClient throws when reading JSON fails
-        var result = await Record.ExceptionAsync(async () => await client.GetOrderByIdAsync("nonexistent-id"));
+        var result = await client.GetOrderByIdAsync("nonexistent-id");
 
-        // The client uses GetFromJsonAsync which will throw on 404 — this verifies the behaviour
-        Assert.NotNull(result);
+        Assert.Null(result);
     }
 
     [Fact]

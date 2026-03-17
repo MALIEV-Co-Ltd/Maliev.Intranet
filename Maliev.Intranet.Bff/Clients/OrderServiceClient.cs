@@ -37,10 +37,13 @@ public class OrderServiceClient(HttpClient httpClient)
 
     /// <summary>
     /// Retrieves detailed information for a single order by ID.
+    /// Returns <c>null</c> when the order is not found (404).
     /// </summary>
     public async Task<OrderDetailDto?> GetOrderByIdAsync(string id, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<OrderDetailDto>($"/order/v1/orders/{id}", ct);
+        var response = await httpClient.GetAsync($"/order/v1/orders/{id}", ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<OrderDetailDto>(ct);
     }
 
     /// <summary>
