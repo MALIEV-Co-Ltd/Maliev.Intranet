@@ -15,6 +15,7 @@ public class ReferenceDataServiceTests
     private readonly Mock<HttpMessageHandler> _httpMessageHandlerMock;
     private readonly Mock<ILogger<ReferenceDataService>> _loggerMock;
     private readonly RegistryServiceClient _registryClient;
+    private readonly CurrencyServiceClient _currencyClient;
     private readonly ReferenceDataService _service;
 
     public ReferenceDataServiceTests()
@@ -32,7 +33,8 @@ public class ReferenceDataServiceTests
             .Returns(httpClient);
 
         _registryClient = new RegistryServiceClient(httpClient);
-        _service = new ReferenceDataService(_httpClientFactoryMock.Object, _registryClient, _loggerMock.Object);
+        _currencyClient = new CurrencyServiceClient(httpClient);
+        _service = new ReferenceDataService(_httpClientFactoryMock.Object, _registryClient, _currencyClient, _loggerMock.Object);
     }
 
     [Fact]
