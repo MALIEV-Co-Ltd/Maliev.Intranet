@@ -5,6 +5,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
+@inject IJSRuntime JS
 
 <PageTitle>Invoice Details - Maliev Intranet</PageTitle>
 
@@ -428,10 +429,38 @@ else
         try
         {
             Snackbar.Add($"Generating PDF for invoice {_invoice.InvoiceNumber}...", Severity.Info);
+            
+            var response = await Http.PostAsync($"api/invoices/{Id}/pdf", null);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("storageUrl", out var urlElement))
+                {
+                    var pdfUrl = urlElement.GetString();
+                    if (!string.IsNullOrEmpty(pdfUrl))
+                    {
+                        await JS.InvokeVoidAsync("open", pdfUrl, "_blank");
+                        Snackbar.Add("PDF generated successfully", Severity.Success);
+                    }
+                    else
+                    {
+                        Snackbar.Add("PDF generated but URL is empty", Severity.Warning);
+                    }
+                }
+                else
+                {
+                    Snackbar.Add("Invalid response from server", Severity.Error);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Failed to generate PDF", Severity.Error);
+            }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Error generating PDF: {ex.Message}", Severity.Error);
         }
     }
 

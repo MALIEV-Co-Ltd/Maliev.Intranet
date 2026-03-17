@@ -23,8 +23,11 @@ public class DashboardControllerTests
         var quotationClient = new QuotationServiceClient(httpClient);
         var paymentClient = new PaymentServiceClient(httpClient);
         var employeeClient = new EmployeeServiceClient(httpClient);
+        var invoiceClient = new InvoiceServiceClient(httpClient);
+        var leaveClient = new LeaveServiceClient(httpClient);
+        var projectClient = new ProjectServiceClient(httpClient);
 
-        return new DashboardController(orderClient, quotationClient, paymentClient, employeeClient);
+        return new DashboardController(orderClient, quotationClient, paymentClient, employeeClient, invoiceClient, leaveClient, projectClient);
     }
 
     [Fact]

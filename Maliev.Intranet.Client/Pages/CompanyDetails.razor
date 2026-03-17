@@ -1,6 +1,7 @@
 @page "/sales/companies/{Id:guid}"
 @using MudBlazor
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -39,8 +40,12 @@
             <MudStack Row="true" Spacing="2">
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
                            Class="rounded-lg px-6" OnClick="OpenEditDialog">Edit Company</MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
-                           Class="rounded-lg px-6 shadow-none" OnClick="NewTransaction">New Transaction</MudButton>
+                <MudMenu Label="New" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                         Class="rounded-lg px-6 shadow-none">
+                    <MudMenuItem Href="@($"/sales/projects/new?companyId={Id}")">New Project</MudMenuItem>
+                    <MudMenuItem Href="@($"/finance/invoices?companyId={Id}&action=create")">New Invoice</MudMenuItem>
+                    <MudMenuItem Href="@($"/sales/quotations/new?companyId={Id}")">New Quotation</MudMenuItem>
+                </MudMenu>
             </MudStack>
         </MudStack>
 
@@ -119,29 +124,33 @@
 
                             <MudItem xs="12">
                                 <MudCard Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default">
-                                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Recent Transactions</MudText>
-                                    @if (_recentInvoices.Any())
+                                    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Recent Activity</MudText>
+                                    @if (_recentActivity.Any())
                                     {
-                                        <MudTable Items="_recentInvoices" Dense="true" Hover="true" Elevation="0">
+                                        <MudTable Items="_recentActivity" Dense="true" Hover="true" Elevation="0">
                                             <HeaderContent>
-                                                <MudTh>Invoice #</MudTh>
+                                                <MudTh>Type</MudTh>
+                                                <MudTh>Number</MudTh>
                                                 <MudTh>Date</MudTh>
                                                 <MudTh>Amount</MudTh>
                                                 <MudTh>Status</MudTh>
                                                 <MudTh></MudTh>
                                             </HeaderContent>
                                             <RowTemplate>
-                                                <MudTd DataLabel="Invoice #">@context.InvoiceNumber</MudTd>
-                                                <MudTd DataLabel="Date">@context.IssueDate.ToString("dd MMM yyyy")</MudTd>
-                                                <MudTd DataLabel="Amount">฿@context.Total.ToString("N2")</MudTd>
+                                                <MudTd DataLabel="Type">
+                                                    <MudChip T="string" Size="Size.Small" Color="@GetActivityTypeColor(context.Type)">@context.Type</MudChip>
+                                                </MudTd>
+                                                <MudTd DataLabel="Number">@context.Number</MudTd>
+                                                <MudTd DataLabel="Date">@context.Date.ToString("dd MMM yyyy")</MudTd>
+                                                <MudTd DataLabel="Amount">@(context.Amount > 0 ? $"฿{context.Amount:N2}" : "-")</MudTd>
                                                 <MudTd DataLabel="Status"><MudChip T="string" Size="Size.Small">@context.Status</MudChip></MudTd>
-                                                <MudTd><MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => Navigation.NavigateTo($"/finance/invoices/{context.Id}"))">View</MudButton></MudTd>
+                                                <MudTd><MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="@context.Url">View</MudButton></MudTd>
                                             </RowTemplate>
                                         </MudTable>
                                     }
                                     else
                                     {
-                                        <MudAlert Severity="Severity.Info" Variant="Variant.Text">No invoices found for this company.</MudAlert>
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Text">No recent activity found for this company.</MudAlert>
                                     }
                                 </MudCard>
                             </MudItem>
@@ -215,14 +224,14 @@
     [Parameter] public Guid Id { get; set; }
     private CompanyResponse? _company;
     private List<CustomerSummaryDto> _associatedCustomers = [];
-    private List<InvoiceSummaryDto> _recentInvoices = [];
+    private List<ActivityItem> _recentActivity = [];
     private bool _loading = true;
     private Guid _promotingContactId = Guid.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadCompany();
-        await Task.WhenAll(LoadAssociatedCustomers(), LoadRecentInvoices());
+        await Task.WhenAll(LoadAssociatedCustomers(), LoadRecentActivity());
     }
 
     private async Task LoadAssociatedCustomers()
@@ -235,20 +244,145 @@
         catch { }
     }
 
-    private async Task LoadRecentInvoices()
+    private async Task LoadRecentActivity()
     {
+        if (!_associatedCustomers.Any()) return;
+
+        var customerIds = _associatedCustomers.Select(c => c.Id).ToList();
+        var allActivity = new List<ActivityItem>();
+
         try
         {
-            // Look for invoices linked to any customer in this company
-            var response = await Http.GetFromJsonAsync<PagedResponse<InvoiceSummaryDto>>($"api/invoices?companyId={Id}&pageSize=10");
-            _recentInvoices = response?.Data.ToList() ?? [];
+            foreach (var customerId in customerIds)
+            {
+                var tasks = new List<Task>
+                {
+                    LoadProjectsForCustomer(customerId, allActivity),
+                    LoadOrdersForCustomer(customerId, allActivity),
+                    LoadQuotationsForCustomer(customerId, allActivity),
+                    LoadInvoicesForCustomer(customerId, allActivity)
+                };
+                await Task.WhenAll(tasks);
+            }
+
+            _recentActivity = allActivity.OrderByDescending(a => a.Date).Take(20).ToList();
         }
         catch { }
     }
 
+    private async Task LoadProjectsForCustomer(Guid customerId, List<ActivityItem> list)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>($"api/projects?customerId={customerId}&pageSize=5");
+            if (response?.Data != null)
+            {
+                foreach (var p in response.Data)
+                {
+                    list.Add(new ActivityItem
+                    {
+                        Id = p.Id,
+                        Type = "Project",
+                        Number = p.ProjectNumber ?? p.Id.ToString(),
+                        Date = p.CreatedAt,
+                        Amount = 0,
+                        Status = p.Status,
+                        Url = $"/sales/projects/{p.Id}"
+                    });
+                }
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadOrdersForCustomer(Guid customerId, List<ActivityItem> list)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>($"api/orders?customerId={customerId}&pageSize=5");
+            if (response?.Data != null)
+            {
+                foreach (var o in response.Data)
+                {
+                    list.Add(new ActivityItem
+                    {
+                        Id = o.Id,
+                        Type = "Order",
+                        Number = o.OrderNumber ?? o.Id.ToString(),
+                        Date = o.CreatedAt,
+                        Amount = o.Total,
+                        Status = o.Status,
+                        Url = $"/sales/orders/{o.Id}"
+                    });
+                }
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadQuotationsForCustomer(Guid customerId, List<ActivityItem> list)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<QuotationSummaryDto>>($"api/quotations?customerId={customerId}&pageSize=5");
+            if (response?.Data != null)
+            {
+                foreach (var q in response.Data)
+                {
+                    list.Add(new ActivityItem
+                    {
+                        Id = q.Id,
+                        Type = "Quotation",
+                        Number = q.QuotationNumber ?? q.Id.ToString(),
+                        Date = q.CreatedAt,
+                        Amount = q.Total,
+                        Status = "N/A",
+                        Url = $"/sales/quotations/{q.Id}"
+                    });
+                }
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadInvoicesForCustomer(Guid customerId, List<ActivityItem> list)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<InvoiceSummaryDto>>($"api/invoices?customerId={customerId}&pageSize=5");
+            if (response?.Data != null)
+            {
+                foreach (var i in response.Data)
+                {
+                    list.Add(new ActivityItem
+                    {
+                        Id = i.Id,
+                        Type = "Invoice",
+                        Number = i.InvoiceNumber ?? i.Id.ToString(),
+                        Date = i.IssueDate,
+                        Amount = i.Total,
+                        Status = i.Status,
+                        Url = $"/finance/invoices/{i.Id}"
+                    });
+                }
+            }
+        }
+        catch { }
+    }
+
+    private class ActivityItem
+    {
+        public Guid Id { get; set; }
+        public string Type { get; set; } = "";
+        public string Number { get; set; } = "";
+        public DateTime Date { get; set; }
+        public decimal Amount { get; set; }
+        public string Status { get; set; } = "";
+        public string Url { get; set; } = "";
+    }
+
     private void NewTransaction()
     {
-        // Navigate to create invoice pre-filtered for this company
         Navigation.NavigateTo($"/finance/invoices?companyId={Id}&action=create");
     }
 
@@ -316,4 +450,13 @@
             _promotingContactId = Guid.Empty;
         }
     }
+
+    private Color GetActivityTypeColor(string type) => type switch
+    {
+        "Project" => Color.Primary,
+        "Order" => Color.Success,
+        "Quotation" => Color.Warning,
+        "Invoice" => Color.Info,
+        _ => Color.Default
+    };
 }

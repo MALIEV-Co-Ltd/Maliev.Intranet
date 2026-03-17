@@ -1,39 +1,10 @@
 @page "/admin/content"
-@using Maliev.Intranet.Shared
-@inject ISnackbar Snackbar
-
-<PageTitle>Content Management - Maliev Intranet</PageTitle>
-
-<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
-    <div>
-        <MudText Typo="Typo.h4">Content Management</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Manage blog posts, knowledge base articles, and announcements</MudText>
-    </div>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => Snackbar.Add("Create content coming soon", Severity.Info))">
-        Create Content
-    </MudButton>
-</MudStack>
-
-<MudTabs Elevation="0" Rounded="true" Border="true" ApplyEffectsToContainer="true" @bind-ActivePanelIndex="_activeTab">
-    <MudTabPanel Text="Blog Posts" Icon="@Icons.Material.Outlined.Article">
-        <ContentTypePanel TypeName="Blog Post" Icon="@Icons.Material.Outlined.Article" />
-    </MudTabPanel>
-    <MudTabPanel Text="Announcements" Icon="@Icons.Material.Outlined.Campaign">
-        <ContentTypePanel TypeName="Announcement" Icon="@Icons.Material.Outlined.Campaign" />
-    </MudTabPanel>
-    <MudTabPanel Text="Knowledge Base" Icon="@Icons.Material.Outlined.MenuBook">
-        <ContentTypePanel TypeName="KB Article" Icon="@Icons.Material.Outlined.MenuBook" />
-    </MudTabPanel>
-    <MudTabPanel Text="Media Library" Icon="@Icons.Material.Outlined.Photo">
-        <MudPaper Elevation="0" Class="pa-8 text-center">
-            <MudIcon Icon="@Icons.Material.Outlined.Photo" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
-            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">Media Library</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Upload and manage images and documents</MudText>
-            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" Class="mt-4" OnClick="@(() => Snackbar.Add("Media upload coming soon", Severity.Info))">Upload Media</MudButton>
-        </MudPaper>
-    </MudTabPanel>
-</MudTabs>
+@inject NavigationManager Navigation
 
 @code {
-    private int _activeTab = 0;
+    /// <summary>Redirects legacy /admin/content route to the consolidated Settings page (Content tab).</summary>
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/admin/settings?tab=content", replace: true);
+    }
 }

@@ -10,25 +10,35 @@ namespace Maliev.Intranet.Tests.Bff.Controllers;
 
 public class QuotationsControllerTests
 {
-    private static QuotationServiceClient CreateClient<T>(T response, HttpStatusCode status = HttpStatusCode.OK)
+    private static QuotationServiceClient CreateQuotationClient<T>(T response, HttpStatusCode status = HttpStatusCode.OK)
     {
         var handler = new MockHttpMessageHandler((req, ct) =>
             Task.FromResult(new HttpResponseMessage(status) { Content = JsonContent.Create(response) }));
         return new QuotationServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
     }
 
-    private static QuotationServiceClient CreateRawClient(HttpStatusCode status = HttpStatusCode.OK)
+    private static QuotationServiceClient CreateQuotationRawClient(HttpStatusCode status = HttpStatusCode.OK)
     {
         var handler = new MockHttpMessageHandler((req, ct) =>
             Task.FromResult(new HttpResponseMessage(status)));
         return new QuotationServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
     }
 
+    private static PdfServiceClient CreatePdfClient(string? pdfUrl = "http://test.pdf")
+    {
+        var handler = new MockHttpMessageHandler((req, ct) =>
+        {
+            var response = new { storageUrl = pdfUrl };
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) });
+        });
+        return new PdfServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+    }
+
     [Fact]
     public async Task Get_ShouldReturnOk_WhenSuccessful()
     {
         var response = new PagedResponse<QuotationSummaryDto> { Data = new List<QuotationSummaryDto>() };
-        var controller = new QuotationsController(CreateClient(response));
+        var controller = new QuotationsController(CreateQuotationClient(response), CreatePdfClient());
 
         var result = await controller.Get();
 
@@ -40,7 +50,7 @@ public class QuotationsControllerTests
     public async Task Get_WhenClientReturnsNull_ShouldReturnEmptyPagedResponse()
     {
         var response = new PagedResponse<QuotationSummaryDto>();
-        var controller = new QuotationsController(CreateClient(response));
+        var controller = new QuotationsController(CreateQuotationClient(response), CreatePdfClient());
 
         var result = await controller.Get();
 
@@ -52,7 +62,7 @@ public class QuotationsControllerTests
     public async Task GetById_WhenFound_ShouldReturnOk()
     {
         var quotation = new QuotationDetailDto { Id = Guid.NewGuid(), QuotationNumber = "QUO-001" };
-        var controller = new QuotationsController(CreateClient(quotation));
+        var controller = new QuotationsController(CreateQuotationClient(quotation), CreatePdfClient());
 
         var result = await controller.GetById(quotation.Id);
 
@@ -67,7 +77,7 @@ public class QuotationsControllerTests
         var handler = new MockHttpMessageHandler((req, ct) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("null") }));
         var client = new QuotationServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
-        var controller = new QuotationsController(client);
+        var controller = new QuotationsController(client, CreatePdfClient());
 
         var result = await controller.GetById(Guid.NewGuid());
 
@@ -78,7 +88,7 @@ public class QuotationsControllerTests
     public async Task Create_WhenSuccessful_ShouldReturnCreatedAtAction()
     {
         var created = new QuotationSummaryDto { Id = Guid.NewGuid(), QuotationNumber = "QUO-001" };
-        var controller = new QuotationsController(CreateClient(created));
+        var controller = new QuotationsController(CreateQuotationClient(created), CreatePdfClient());
 
         var request = new CreateQuotationRequest
         {
@@ -95,7 +105,7 @@ public class QuotationsControllerTests
     [Fact]
     public async Task Create_WhenClientFails_ShouldReturnBadRequest()
     {
-        var controller = new QuotationsController(CreateRawClient(HttpStatusCode.BadRequest));
+        var controller = new QuotationsController(CreateQuotationRawClient(HttpStatusCode.BadRequest), CreatePdfClient());
 
         var request = new CreateQuotationRequest
         {
@@ -113,7 +123,7 @@ public class QuotationsControllerTests
     public async Task Update_WhenSuccessful_ShouldReturnOk()
     {
         var updated = new QuotationDetailDto { Id = Guid.NewGuid(), QuotationNumber = "QUO-001" };
-        var controller = new QuotationsController(CreateClient(updated));
+        var controller = new QuotationsController(CreateQuotationClient(updated), CreatePdfClient());
 
         var result = await controller.Update(updated.Id, new UpdateQuotationRequest(), CancellationToken.None);
 
@@ -123,7 +133,7 @@ public class QuotationsControllerTests
     [Fact]
     public async Task Update_WhenNotFound_ShouldReturnNotFound()
     {
-        var controller = new QuotationsController(CreateRawClient(HttpStatusCode.NotFound));
+        var controller = new QuotationsController(CreateQuotationRawClient(HttpStatusCode.NotFound), CreatePdfClient());
 
         var result = await controller.Update(Guid.NewGuid(), new UpdateQuotationRequest(), CancellationToken.None);
 
@@ -133,7 +143,7 @@ public class QuotationsControllerTests
     [Fact]
     public async Task Delete_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new QuotationsController(CreateRawClient(HttpStatusCode.OK));
+        var controller = new QuotationsController(CreateQuotationRawClient(HttpStatusCode.OK), CreatePdfClient());
 
         var result = await controller.Delete(Guid.NewGuid(), CancellationToken.None);
 
@@ -143,7 +153,7 @@ public class QuotationsControllerTests
     [Fact]
     public async Task Delete_WhenNotFound_ShouldReturnNotFound()
     {
-        var controller = new QuotationsController(CreateRawClient(HttpStatusCode.NotFound));
+        var controller = new QuotationsController(CreateQuotationRawClient(HttpStatusCode.NotFound), CreatePdfClient());
 
         var result = await controller.Delete(Guid.NewGuid(), CancellationToken.None);
 
@@ -153,7 +163,7 @@ public class QuotationsControllerTests
     [Fact]
     public async Task UpdateStatus_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new QuotationsController(CreateRawClient(HttpStatusCode.OK));
+        var controller = new QuotationsController(CreateQuotationRawClient(HttpStatusCode.OK), CreatePdfClient());
 
         var result = await controller.UpdateStatus(Guid.NewGuid(), "Approved", CancellationToken.None);
 
@@ -163,7 +173,7 @@ public class QuotationsControllerTests
     [Fact]
     public async Task UpdateStatus_WhenFails_ShouldReturnBadRequest()
     {
-        var controller = new QuotationsController(CreateRawClient(HttpStatusCode.BadRequest));
+        var controller = new QuotationsController(CreateQuotationRawClient(HttpStatusCode.BadRequest), CreatePdfClient());
 
         var result = await controller.UpdateStatus(Guid.NewGuid(), "InvalidStatus", CancellationToken.None);
 

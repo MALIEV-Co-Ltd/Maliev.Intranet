@@ -3,10 +3,30 @@
 @using Maliev.Intranet.Client.Helpers
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageTitle>Orders - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Order Board</MudText>
+@* ── Page header ─────────────────────────────────────────────────────── *@
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Style="font-weight: 700;">Order Board</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">@_orders.Count order(s) loaded</MudText>
+    </div>
+
+    @* View toggle — mirrors the Models3D.razor pattern *@
+    <MudToggleGroup T="bool" Value="@_isTableView" ValueChanged="OnViewChanged"
+                    SelectionMode="SelectionMode.SingleSelection"
+                    Color="Color.Primary" CheckMark="false" Delimiters="false">
+        <MudToggleItem Value="false">
+            <MudIcon Icon="@Icons.Material.Outlined.ViewKanban" Size="Size.Small" />
+        </MudToggleItem>
+        <MudToggleItem Value="true">
+            <MudIcon Icon="@Icons.Material.Outlined.TableRows" Size="Size.Small" />
+        </MudToggleItem>
+    </MudToggleGroup>
+</MudStack>
 
 @if (_isLoading)
 {
@@ -25,103 +45,227 @@
         }
     </MudGrid>
 }
-else
+else if (!_isTableView)
 {
-    <MudDropContainer T="OrderSummaryDto" Items="@_orders" ItemsSelector="@((item,column) => item.Status == column)" ItemDropped="ItemUpdated" Class="d-flex flex-wrap flex-grow-1">
+    @* ── Kanban view ─────────────────────────────────────────────────── *@
+    <MudDropContainer T="OrderSummaryDto" Items="@_orders"
+                      ItemsSelector="@((item, col) => item.Status == col)"
+                      ItemDropped="ItemUpdated"
+                      Class="d-flex flex-wrap flex-grow-1">
         <ChildContent>
-            <MudPaper Elevation="0" Width="25%" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
-                    <MudText Typo="Typo.subtitle1"><b>New</b></MudText>
-                    <MudChip T="string" Size="Size.Small" Color="Color.Default">@_orders.Count(x => x.Status == "New")</MudChip>
-                </MudStack>
-                <MudDropZone T="OrderSummaryDto" Identifier="New" Class="flex-grow-1" />
-            </MudPaper>
-            <MudPaper Elevation="0" Width="25%" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
-                    <MudText Typo="Typo.subtitle1"><b>Processing</b></MudText>
-                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@_orders.Count(x => x.Status == "Processing")</MudChip>
-                </MudStack>
-                <MudDropZone T="OrderSummaryDto" Identifier="Processing" Class="flex-grow-1" />
-            </MudPaper>
-            <MudPaper Elevation="0" Width="25%" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
-                    <MudText Typo="Typo.subtitle1"><b>Shipped</b></MudText>
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info">@_orders.Count(x => x.Status == "Shipped")</MudChip>
-                </MudStack>
-                <MudDropZone T="OrderSummaryDto" Identifier="Shipped" Class="flex-grow-1" />
-            </MudPaper>
-            <MudPaper Elevation="0" Width="22%" MinHeight="400px" Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
-                    <MudText Typo="Typo.subtitle1"><b>Delivered</b></MudText>
-                    <MudChip T="string" Size="Size.Small" Color="Color.Success">@_orders.Count(x => x.Status == "Delivered")</MudChip>
-                </MudStack>
-                <MudDropZone T="OrderSummaryDto" Identifier="Delivered" Class="flex-grow-1" />
-            </MudPaper>
+            @foreach (var col in _columns)
+            {
+                <MudPaper Elevation="0" Width="23%" MinHeight="400px"
+                          Class="pa-4 ma-2 d-flex flex-column border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudText Typo="Typo.subtitle1"><b>@col.Label</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@col.Color">@_orders.Count(x => x.Status == col.Id)</MudChip>
+                    </MudStack>
+                    <MudDropZone T="OrderSummaryDto" Identifier="@col.Id" Class="flex-grow-1" />
+                </MudPaper>
+            }
         </ChildContent>
         <ItemRenderer>
-            <MudCard Elevation="0" Class="mb-2 border mud-border-lines-default" @onclick="@(() => ViewDetails(context.Id))" Style="cursor: pointer;">
+            <MudCard Elevation="0" Class="mb-2 border mud-border-lines-default"
+                     @onclick="@(() => NavigateTo(context.Id))"
+                     Style="cursor: pointer;">
                 <MudCardContent>
                     <MudStack Row="true" Justify="Justify.SpaceBetween">
                         <MudText Typo="Typo.body1" Style="font-weight: 600;">@context.OrderNumber</MudText>
                         <MudIcon Icon="@Icons.Material.Outlined.ArrowForward" Size="Size.Small" Color="Color.Default" />
                     </MudStack>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">@context.CustomerName</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">@ThaiCurrency.Format(context.TotalAmount, 2)</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
+                        @ThaiCurrency.Format(context.TotalAmount, 2)
+                    </MudText>
                 </MudCardContent>
             </MudCard>
         </ItemRenderer>
     </MudDropContainer>
 }
+else
+{
+    @* ── Table view ──────────────────────────────────────────────────── *@
+    <MudDataGrid T="OrderSummaryDto"
+                 Items="@_orders"
+                 Hover="true"
+                 Dense="true"
+                 Elevation="0"
+                 SortMode="SortMode.Single"
+                 Filterable="false"
+                 RowClick="@((DataGridRowClickEventArgs<OrderSummaryDto> args) => NavigateTo(args.Item.Id))"
+                 Style="cursor: pointer;">
+        <Columns>
+            <PropertyColumn Property="x => x.OrderNumber" Title="Order #" />
+            <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
+            <TemplateColumn Title="Total" SortBy="x => x.TotalAmount">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2" Color="Color.Success">
+                        @ThaiCurrency.Format(context.Item.TotalAmount, 2)
+                    </MudText>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Status">
+                <CellTemplate>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@GetStatusColor(context.Item.Status)">
+                        @context.Item.Status
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Created">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @context.Item.CreatedAt.ToString("dd MMM yyyy")
+                    </MudText>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="" CellClass="text-right">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowForward"
+                                   Size="Size.Small"
+                                   OnClick="@(() => NavigateTo(context.Item.Id))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+                <MudIcon Icon="@Icons.Material.Outlined.Inventory2" Style="font-size: 48px;" Color="Color.Secondary" />
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No orders found</MudText>
+            </MudStack>
+        </NoRecordsContent>
+    </MudDataGrid>
+
+    @* Pagination for table view *@
+    @if (_meta.TotalPages > 1)
+    {
+        <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
+            <MudPagination Color="Color.Primary"
+                           Count="@_meta.TotalPages"
+                           Selected="@_page"
+                           SelectedChanged="OnPageChanged"
+                           BoundaryCount="1"
+                           MiddleCount="5" />
+        </MudStack>
+    }
+}
 
 @code {
+    // ── State ─────────────────────────────────────────────────────────────────
+
     private bool _isLoading = true;
+    private bool _isTableView = false;
+    private int _page = 1;
     private List<OrderSummaryDto> _orders = new();
+    private PaginationMeta _meta = new();
+
+    private readonly record struct KanbanColumn(string Id, string Label, Color Color);
+    private readonly KanbanColumn[] _columns =
+    [
+        new("New",        "New",        Color.Default),
+        new("Processing", "Processing", Color.Primary),
+        new("Shipped",    "Shipped",    Color.Info),
+        new("Delivered",  "Delivered",  Color.Success),
+    ];
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
+        // Restore view preference from localStorage (fire-and-forget safe; defaults to kanban)
         try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/orders?page=1");
-            if (response?.Data != null)
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "orders.view");
+            _isTableView = stored == "table";
+        }
+        catch { /* localStorage unavailable during prerender */ }
+
+        await LoadOrdersAsync();
+    }
+
+    // ── Data loading ──────────────────────────────────────────────────────────
+
+    private async Task LoadOrdersAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            if (_isTableView)
             {
-                _orders = response.Data.ToList();
+                var result = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>(
+                    $"api/orders?page={_page}&pageSize=25");
+                _orders = result?.Data.ToList() ?? new();
+                _meta   = result?.Meta ?? new();
+            }
+            else
+            {
+                // Kanban loads a single large page (no paging needed for the board)
+                var result = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/orders?page=1&pageSize=200");
+                _orders = result?.Data.ToList() ?? new();
+                _meta   = new();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading orders: {ex.Message}");
+            Snackbar.Add($"Error loading orders: {ex.Message}", Severity.Error);
         }
-        finally
-        {
-            _isLoading = false;
-        }
+        finally { _isLoading = false; }
     }
+
+    // ── View toggle ───────────────────────────────────────────────────────────
+
+    private async Task OnViewChanged(bool isTable)
+    {
+        _isTableView = isTable;
+        _page = 1;
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "orders.view", isTable ? "table" : "kanban"); }
+        catch { }
+        await LoadOrdersAsync();
+    }
+
+    // ── Pagination (table) ────────────────────────────────────────────────────
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await LoadOrdersAsync();
+    }
+
+    // ── Kanban drag-and-drop ──────────────────────────────────────────────────
 
     private async Task ItemUpdated(MudItemDropInfo<OrderSummaryDto> dropItem)
     {
-        if (dropItem.Item is not null)
+        if (dropItem.Item is null) return;
+        var oldStatus = dropItem.Item.Status;
+        dropItem.Item.Status = dropItem.DropzoneIdentifier;
+        try
         {
-            var oldStatus = dropItem.Item.Status;
-            dropItem.Item.Status = dropItem.DropzoneIdentifier;
-            
-            try 
-            {
-                var response = await Http.PatchAsJsonAsync($"api/orders/{dropItem.Item.Id}/status", dropItem.DropzoneIdentifier);
-                if (!response.IsSuccessStatusCode)
-                {
-                    dropItem.Item.Status = oldStatus;
-                    // Snackbar not injected in original file, but I should add it
-                }
-            }
-            catch 
+            var response = await Http.PatchAsJsonAsync($"api/orders/{dropItem.Item.Id}/status", dropItem.DropzoneIdentifier);
+            if (!response.IsSuccessStatusCode)
             {
                 dropItem.Item.Status = oldStatus;
+                Snackbar.Add("Failed to update order status.", Severity.Error);
             }
+        }
+        catch
+        {
+            dropItem.Item.Status = oldStatus;
+            Snackbar.Add("Failed to update order status.", Severity.Error);
         }
     }
 
-    private void ViewDetails(Guid id)
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void NavigateTo(Guid id) => Navigation.NavigateTo($"/sales/orders/{id}");
+
+    private static Color GetStatusColor(string status) => status switch
     {
-        Navigation.NavigateTo($"/sales/orders/{id}");
-    }
+        "New"        => Color.Default,
+        "Processing" => Color.Primary,
+        "Shipped"    => Color.Info,
+        "Delivered"  => Color.Success,
+        "Cancelled"  => Color.Error,
+        "OnHold"     => Color.Warning,
+        _            => Color.Default
+    };
 }

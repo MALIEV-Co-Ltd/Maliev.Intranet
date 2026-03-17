@@ -13,9 +13,16 @@ public class InvoiceServiceClient(HttpClient httpClient)
     /// <summary>
     /// Retrieves a paged list of invoices.
     /// </summary>
-    public async Task<PagedResponse<InvoiceSummaryDto>?> GetInvoicesAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
+    /// <param name="customerId">Optional customer ID filter.</param>
+    /// <param name="page">The page number.</param>
+    /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A paged list of invoices.</returns>
+    public async Task<PagedResponse<InvoiceSummaryDto>?> GetInvoicesAsync(Guid? customerId = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<InvoiceSummaryDto>>($"/invoice/v1/invoices?page={page}&pageSize={pageSize}", ct);
+        var url = $"/invoice/v1/invoices?page={page}&pageSize={pageSize}";
+        if (customerId.HasValue) url += $"&customerId={customerId.Value}";
+        return await httpClient.GetFromJsonAsync<PagedResponse<InvoiceSummaryDto>>(url, ct);
     }
 
     /// <summary>
@@ -123,4 +130,32 @@ public class InvoiceServiceClient(HttpClient httpClient)
     {
         return await httpClient.GetFromJsonAsync<List<CreditTermDto>>("/invoice/v1/credit-terms", ct);
     }
+
+    /// <summary>
+    /// Retrieves the count of overdue invoices.
+    /// </summary>
+    public async Task<int> GetOverdueInvoiceCountAsync(CancellationToken ct = default)
+    {
+        var httpResponse = await httpClient.GetAsync("/invoice/v1/metrics/overdue-count", ct);
+        if (!httpResponse.IsSuccessStatusCode) return 0;
+        var response = await httpResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
+        return response.TryGetProperty("count", out var count) ? count.GetInt32() : 0;
+    }
+
+    /// <summary>
+    /// Returns the first invoice matching the given customer PO number, or <c>null</c> if none found.
+    /// Used by the order lifecycle aggregator to link an order to its invoice without a direct foreign key.
+    /// </summary>
+    /// <param name="poNumber">The customer PO number stored on the order.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The first matching invoice summary, or <c>null</c>.</returns>
+    public async Task<InvoiceSummaryDto?> GetFirstInvoiceByPoNumberAsync(string poNumber, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync(
+            $"/invoice/v1/invoices?poNumber={Uri.EscapeDataString(poNumber)}&pageSize=1", ct);
+        if (!response.IsSuccessStatusCode) return null;
+        var paged = await response.Content.ReadFromJsonAsync<PagedResponse<InvoiceSummaryDto>>(cancellationToken: ct);
+        return paged?.Data.FirstOrDefault();
+    }
 }
+

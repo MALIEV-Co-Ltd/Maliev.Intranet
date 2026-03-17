@@ -13,12 +13,15 @@ public class OrderServiceClient(HttpClient httpClient)
     /// <summary>
     /// Retrieves a paged list of orders.
     /// </summary>
+    /// <param name="customerId">Optional customer ID filter.</param>
     /// <param name="page">The page number to retrieve.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A paged response containing order summaries.</returns>
-    public async Task<PagedResponse<OrderSummaryDto>?> GetOrdersAsync(int page = 1, CancellationToken ct = default)
+    public async Task<PagedResponse<OrderSummaryDto>?> GetOrdersAsync(Guid? customerId = null, int page = 1, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>($"/order/v1/orders?page={page}", ct);
+        var url = $"/order/v1/orders?page={page}";
+        if (customerId.HasValue) url += $"&customerId={customerId.Value}";
+        return await httpClient.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>(url, ct);
     }
 
     /// <summary>
@@ -55,4 +58,16 @@ public class OrderServiceClient(HttpClient httpClient)
     {
         return await httpClient.PutAsJsonAsync($"/order/v1/orders/{id}", request, ct);
     }
+
+    /// <summary>
+    /// Retrieves the count of orders with status OnHold or Delayed.
+    /// </summary>
+    public async Task<int> GetOnHoldOrderCountAsync(CancellationToken ct = default)
+    {
+        var httpResponse = await httpClient.GetAsync("/order/v1/metrics/on-hold-count", ct);
+        if (!httpResponse.IsSuccessStatusCode) return 0;
+        var response = await httpResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
+        return response.TryGetProperty("count", out var count) ? count.GetInt32() : 0;
+    }
 }
+

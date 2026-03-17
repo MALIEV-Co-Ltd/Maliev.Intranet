@@ -14,6 +14,7 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<BreadcrumbService>();
 builder.Services.AddScoped<IReferenceDataService, ClientReferenceDataService>();
 builder.Services.AddSingleton<IMarkdownService, MarkdownService>();
 builder.Services.AddMudServices();
@@ -36,6 +37,7 @@ builder.Services.AddScoped(sp =>
 
 // SignalR services for real-time updates
 builder.Services.AddScoped<ISignalRCustomerService, SignalRCustomerService>();
+builder.Services.AddScoped<ProductionHubService>();
 
 // OpenTelemetry disabled for WebAssembly due to platform compatibility issues
 // Telemetry is handled by the BFF server-side instead

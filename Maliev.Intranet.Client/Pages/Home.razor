@@ -6,140 +6,318 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
 
 <PageTitle>Dashboard - Maliev Intranet</PageTitle>
 
 <style>
-    /* Hide legend for mini charts as requested */
-    .mini-chart .mud-chart-legend {
-        display: none !important;
+    .widget-card {
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        border: 1px solid var(--mud-palette-lines-default);
     }
+    .widget-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important;
+    }
+    .trend-up   { color: var(--mud-palette-success);  }
+    .trend-down { color: var(--mud-palette-error);    }
+    .quick-action-btn {
+        border: 1px solid var(--mud-palette-lines-default) !important;
+        transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .quick-action-btn:hover { transform: translateY(-1px); }
+    .action-item-row {
+        transition: background 0.1s ease;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    .action-item-row:hover { background: var(--mud-palette-action-default-hover); }
+    /* Mini chart legend hidden */
+    .sparkline-chart .mud-chart-legend { display: none !important; }
 </style>
 
 @if (_loading)
 {
-    <!-- Loading Skeletons State - Simplified for General Dashboard -->
     <MudGrid>
-        <!-- Stats Row Skeletons -->
-        <MudItem xs="12" md="4"><MudSkeleton Height="140px" Class="rounded-lg"/></MudItem>
-        <MudItem xs="12" md="4"><MudSkeleton Height="140px" Class="rounded-lg"/></MudItem>
-        <MudItem xs="12" md="4"><MudSkeleton Height="140px" Class="rounded-lg"/></MudItem>
-        
-        <!-- Table Skeleton -->
-        <MudItem xs="12" Class="mt-4"><MudSkeleton Height="400px" Class="rounded-lg"/></MudItem>
+        @for (int i = 0; i < 4; i++)
+        {
+            <MudItem xs="12" sm="6" md="3">
+                <MudSkeleton Height="120px" Class="rounded-lg" />
+            </MudItem>
+        }
+        <MudItem xs="12" Class="mt-2">
+            <MudSkeleton Height="60px" Class="rounded-lg" />
+        </MudItem>
+        <MudItem xs="12" md="8" Class="mt-2">
+            <MudSkeleton Height="320px" Class="rounded-lg" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="mt-2">
+            <MudSkeleton Height="320px" Class="rounded-lg" />
+        </MudItem>
     </MudGrid>
 }
 else
 {
-    <!-- General Dashboard View -->
-    <MudGrid>
-        <!-- Stats Widgets -->
+    <MudGrid Spacing="3">
+
+        @* ── WP-UIX-3.3: Improved Stat Widgets ──────────────────────────────── *@
         @if (_dashboard?.Widgets.Any() == true)
         {
-            @foreach (var widget in _dashboard.Widgets)
+            @foreach (var widget in _dashboard.Widgets.Where(w => w.Type == "Stat" || w.Type == "Chart"))
             {
-                <MudItem xs="12" sm="4">
-                    <MudCard Elevation="0" Class="rounded-lg pa-4" Style="background-color: var(--mud-palette-surface);">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@widget.Title</MudText>
-                        <div class="d-flex align-center justify-space-between mt-2">
-                            <MudText Typo="Typo.h4" Style="font-weight: 500;">
-                                @if(widget.Type == "Stat") { @widget.Data } else { <text>THB 0</text> }
-                            </MudText>
-                            
-                            <!-- Mini Chart Visualization -->
-                            <div style="width: 120px; height: 50px;">
-                                @if(widget.Type == "Chart" || widget.Type == "Graph")
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-4 rounded-lg widget-card"
+                              @onclick="@(() => { if (!string.IsNullOrEmpty(widget.NavigateTo)) Navigation.NavigateTo(widget.NavigateTo); })">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="text-transform: uppercase; letter-spacing: 0.05em;">@widget.Title</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.SpaceBetween" Class="mt-2">
+                            <div>
+                                <MudText Typo="Typo.h4" Style="font-weight: 600; line-height: 1;">
+                                    @if (widget.Type == "Stat")
+                                    {
+                                        // GetString() strips the surrounding JSON quotes that ToString() would preserve
+                                        @(widget.Data.GetString() ?? widget.Data.ToString())
+                                    }
+                                    else { <text>—</text> }
+                                </MudText>
+                                @if (widget.Trend != null)
                                 {
-                                     var chartData = System.Text.Json.JsonSerializer.Deserialize<ChartData>(widget.Data.GetRawText());
-                                     if(chartData != null)
-                                     {
-                                        <MudChart T="double" Class="mini-chart" ChartType="ChartType.Line" ChartLabels="@chartData.Labels" ChartSeries="@(new List<ChartSeries<double>> { new ChartSeries<double> { Data = chartData.Values } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
-                                     }
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-1">
+                                        <MudIcon Icon="@(widget.Trend == "up" ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)"
+                                                 Size="Size.Small"
+                                                 Class="@(widget.Trend == "up" ? "trend-up" : "trend-down")" />
+                                        <MudText Typo="Typo.caption"
+                                                 Class="@(widget.Trend == "up" ? "trend-up" : "trend-down")">
+                                            @widget.TrendPercent?.ToString("N1")%
+                                        </MudText>
+                                    </MudStack>
+                                }
+                            </div>
+                            @* Sparkline / mini chart — 200×80px as per spec *@
+                            <div style="width: 120px; height: 80px;" class="sparkline-chart">
+                                @if (widget.Type == "Chart")
+                                {
+                                    var chartData = System.Text.Json.JsonSerializer.Deserialize<ChartData>(widget.Data.GetRawText());
+                                    if (chartData != null)
+                                    {
+                                        <MudChart T="double" ChartType="ChartType.Line"
+                                                  ChartLabels="@chartData.Labels"
+                                                  ChartSeries="@(new List<ChartSeries<double>> { new ChartSeries<double> { Data = chartData.Values } })"
+                                                  Width="100%" Height="80px"
+                                                  ChartOptions="@_chartOptions" />
+                                    }
                                 }
                                 else
                                 {
-                                    <MudChart T="double" Class="mini-chart" ChartType="ChartType.Line" ChartSeries="@(new List<ChartSeries<double>> { new ChartSeries<double> { Data = new double[] { 0, 0, 0, 0 } } })" Width="100%" Height="50px" ChartOptions="@_chartOptions" />
+                                    <MudChart T="double" ChartType="ChartType.Line"
+                                              ChartSeries="@(new List<ChartSeries<double>> { new ChartSeries<double> { Data = new double[] { 0, 0, 0, 0 } } })"
+                                              Width="100%" Height="80px"
+                                              ChartOptions="@_chartOptions" />
                                 }
                             </div>
-                        </div>
-                    </MudCard>
+                        </MudStack>
+                    </MudPaper>
                 </MudItem>
             }
         }
-        else
+
+        @* ── WP-UIX-3.4: Quick Action Buttons ──────────────────────────────── *@
+        <MudItem xs="12">
+            <MudPaper Elevation="0" Class="pa-3 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="align-self-center mr-2" Style="white-space: nowrap;">Quick actions:</MudText>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Outlined.FolderSpecial"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Class="quick-action-btn rounded-lg"
+                               OnClick="@(() => Navigation.NavigateTo("/sales/projects/new"))">
+                        New Project
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Outlined.PersonAdd"
+                               Color="Color.Secondary"
+                               Size="Size.Small"
+                               Class="quick-action-btn rounded-lg"
+                               OnClick="@(() => Navigation.NavigateTo("/sales/customers/new"))">
+                        New Customer
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Outlined.Receipt"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               Class="quick-action-btn rounded-lg"
+                               OnClick="OpenCreateInvoiceDialog">
+                        Create Invoice
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Outlined.Calculate"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               Class="quick-action-btn rounded-lg"
+                               OnClick="@(() => _calculatorOpen = !_calculatorOpen)">
+                        Quick Calculator
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        @* Inline pricing calculator (collapsible) *@
+        @if (_calculatorOpen)
         {
             <MudItem xs="12">
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="rounded-lg">
-                    No active dashboard widgets available.
-                </MudAlert>
+                <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3" Wrap="Wrap.Wrap">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                            <MudIcon Icon="@Icons.Material.Outlined.Calculate" Class="mr-1" Style="vertical-align: middle;" /> Quick Price Calculator
+                        </MudText>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="@(() => _calculatorOpen = false)" />
+                    </MudStack>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="decimal" @bind-Value="_calcMaterialCost" Label="Material Cost (฿)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="decimal" @bind-Value="_calcMachineHours" Label="Machine Hours" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Step="0.5m" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="decimal" @bind-Value="_calcMarginPct" Label="Margin %" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="100" />
+                        </MudItem>
+                    </MudGrid>
+                    @{
+                        var machineRate = 450.0m; // ฿/hr default
+                        var subtotal = _calcMaterialCost + (_calcMachineHours * machineRate);
+                        var withMargin = subtotal * (1 + _calcMarginPct / 100m);
+                    }
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-3" Wrap="Wrap.Wrap">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Machine rate: ฿@machineRate.ToString("N0")/hr</MudText>
+                        <MudDivider Vertical="true" FlexItem="true" Class="d-none d-sm-flex" />
+                        <MudText Typo="Typo.body2">Subtotal: <strong>฿@subtotal.ToString("N2")</strong></MudText>
+                        <MudDivider Vertical="true" FlexItem="true" Class="d-none d-sm-flex" />
+                        <MudText Typo="Typo.h6" Color="Color.Primary">Estimated Price: <strong>฿@withMargin.ToString("N2")</strong></MudText>
+                    </MudStack>
+                </MudPaper>
             </MudItem>
         }
-        
-        <!-- Orders Table Area -->
-        <MudItem xs="12">
-             <MudCard Elevation="0" Class="rounded-lg mt-4" Style="background-color: var(--mud-palette-surface);">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Recent Orders</MudText>
-                    </CardHeaderContent>
-                    <CardHeaderActions>
-                        <MudTabs @bind-ActivePanelIndex="_activeOrderTab" Rounded="true" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
-                            <MudTabPanel Text="All Orders" />
-                            <MudTabPanel Text="Processing" />
-                            <MudTabPanel Text="Shipped" />
-                        </MudTabs>
-                    </CardHeaderActions>
-                </MudCardHeader>
-                <MudCardContent>
-                    @if (_ordersLoading)
+
+        @* ── WP-UIX-3.1: Action Items Panel ────────────────────────────────── *@
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="0" Class="pa-4 rounded-lg h-100" Style="border: 1px solid var(--mud-palette-lines-default);">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Action Items</MudText>
+                    @if (_actionItemsLoading)
                     {
-                        @for (int i = 0; i < 3; i++)
-                        {
-                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="50px" Class="mb-2"/>
-                        }
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
                     }
                     else
                     {
-                        <MudTable T="OrderSummaryDto" Items="@FilteredOrders" Elevation="0" Hover="true" OnRowClick="@((TableRowClickEventArgs<OrderSummaryDto> args) => Navigation.NavigateTo($"/sales/orders/{args.Item!.Id}"))">
-                            <HeaderContent>
-                                <MudTh>Order #</MudTh>
-                                <MudTh>Customer</MudTh>
-                                <MudTh>Total</MudTh>
-                                <MudTh>Status</MudTh>
-                                <MudTh>Date</MudTh>
-                            </HeaderContent>
-                            <RowTemplate>
-                                <MudTd DataLabel="Order #">@context.OrderNumber</MudTd>
-                                <MudTd DataLabel="Customer">@context.CustomerName</MudTd>
-                                <MudTd DataLabel="Total">฿@context.TotalAmount.ToString("N2")</MudTd>
-                                <MudTd DataLabel="Status">
-                                    <MudChip T="string" Size="Size.Small" Color="@GetOrderStatusColor(context.Status)">@context.Status</MudChip>
-                                </MudTd>
-                                <MudTd DataLabel="Date">@context.CreatedAt.ToString("dd MMM yyyy")</MudTd>
-                            </RowTemplate>
-                            <NoRecordsContent>
-                                <MudText Class="pa-4 text-center" Color="Color.Secondary">No orders found</MudText>
-                            </NoRecordsContent>
-                        </MudTable>
+                        <MudChip T="string" Size="Size.Small" Color="@(_actionItems?.Categories.Count > 0 ? Color.Error : Color.Success)">
+                            @(_actionItems?.Categories.Count > 0 ? $"{_actionItems.Categories.Sum(c => c.Count)} items" : "All clear")
+                        </MudChip>
                     }
-                </MudCardContent>
-             </MudCard>
+                </MudStack>
+
+                @if (_actionItemsLoading)
+                {
+                    @for (int i = 0; i < 3; i++)
+                    {
+                        <MudSkeleton Height="44px" Class="rounded-lg mb-2" />
+                    }
+                }
+                else if (_actionItems?.Categories.Count > 0)
+                {
+                    <MudStack Spacing="1">
+                        @foreach (var item in _actionItems.Categories)
+                        {
+                            <div class="action-item-row px-2 py-2" @onclick="@(() => Navigation.NavigateTo(item.NavigateTo))">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudBadge Content="@item.Count"
+                                              Color="@GetActionSeverityColor(item.Severity)"
+                                              Overlap="true" Bordered="true">
+                                        <MudIcon Icon="@GetActionIcon(item.Icon)"
+                                                 Color="@GetActionSeverityColor(item.Severity)"
+                                                 Size="Size.Small" />
+                                    </MudBadge>
+                                    <MudText Typo="Typo.body2" Style="flex: 1;">@item.Label</MudText>
+                                    <MudIcon Icon="@Icons.Material.Outlined.ChevronRight" Size="Size.Small" Color="Color.Secondary" />
+                                </MudStack>
+                            </div>
+                        }
+                    </MudStack>
+                }
+                else
+                {
+                    <MudStack AlignItems="AlignItems.Center" Class="pa-6">
+                        <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Style="font-size: 48px;" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2 text-center">
+                            No action items — everything is on track!
+                        </MudText>
+                    </MudStack>
+                }
+            </MudPaper>
         </MudItem>
+
+        @* ── Recent Orders (main table) ──────────────────────────────────── *@
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="0" Class="rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="px-4 pt-4 pb-2">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Recent Orders</MudText>
+                    <MudTabs @bind-ActivePanelIndex="_activeOrderTab" Rounded="true" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
+                        <MudTabPanel Text="All" />
+                        <MudTabPanel Text="Processing" />
+                        <MudTabPanel Text="Shipped" />
+                    </MudTabs>
+                </MudStack>
+                {
+                    <MudTable T="OrderSummaryDto" Items="@FilteredOrders" Hover="true" Elevation="0"
+                              Breakpoint="Breakpoint.Sm"
+                              OnRowClick="@((TableRowClickEventArgs<OrderSummaryDto> args) => Navigation.NavigateTo($"/sales/orders/{args.Item!.Id}"))">
+                        <HeaderContent>
+                            <MudTh>Order #</MudTh>
+                            <MudTh>Customer</MudTh>
+                            <MudTh>Total</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh>Date</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Order #">@context.OrderNumber</MudTd>
+                            <MudTd DataLabel="Customer">@context.CustomerName</MudTd>
+                            <MudTd DataLabel="Total">฿@context.TotalAmount.ToString("N2")</MudTd>
+                            <MudTd DataLabel="Status">
+                                <MudChip T="string" Size="Size.Small" Color="@GetOrderStatusColor(context.Status)">@context.Status</MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Date">@context.CreatedAt.ToString("dd MMM yyyy")</MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Class="pa-6 text-center" Color="Color.Secondary">No orders found</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+
     </MudGrid>
 }
 
 @code {
     private UserInfo? _userInfo;
     private DashboardViewModel? _dashboard;
+    private DashboardActionItemsDto? _actionItems;
     private bool _loading = true;
-    private bool _ordersLoading = false;
+    private bool _actionItemsLoading = true;
+    private bool _calculatorOpen = false;
     private int _activeOrderTab = 0;
     private List<OrderSummaryDto> _orders = new();
-    
-    // CSS class handles legend hiding
-    private ChartOptions _chartOptions = new ChartOptions 
-    { 
-        ChartPalette = new[] { "#3d7cf9", "#238636", "#a855f7" }
+
+    // Quick Calculator state
+    private decimal _calcMaterialCost = 0;
+    private decimal _calcMachineHours = 0;
+    private decimal _calcMarginPct = 30;
+
+    private readonly ChartOptions _chartOptions = new ChartOptions
+    {
+        ChartPalette = new[] { "#3d7cf9", "#238636", "#a855f7" },
+        ShowLegend = false,
     };
 
     private IEnumerable<OrderSummaryDto> FilteredOrders => _activeOrderTab switch
@@ -149,6 +327,9 @@ else
         _ => _orders
     };
 
+    /// <summary>
+    /// Initializes the dashboard by loading auth state, widgets, orders, and action items in parallel.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -156,15 +337,16 @@ else
 
         _userInfo = new UserInfo
         {
-            Name = user.Identity?.Name ?? user.FindFirst("name")?.Value ?? "Unknown",
-            Email = user.FindFirst("email")?.Value ?? "No email",
-            UserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value ?? "Unknown",
-            Roles = user.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role || c.Type == "roles").Select(c => c.Value).Distinct().ToList(),
+            Name        = user.Identity?.Name ?? user.FindFirst("name")?.Value ?? "Unknown",
+            Email       = user.FindFirst("email")?.Value ?? "No email",
+            UserId      = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value ?? "Unknown",
+            Roles       = user.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role || c.Type == "roles").Select(c => c.Value).Distinct().ToList(),
             Permissions = user.Claims.Where(c => c.Type == "permissions" || c.Type == "permission").Select(c => c.Value).Distinct().ToList()
         };
 
         try
         {
+            // Resolve widget preferences
             string widgetQuery = "";
             try
             {
@@ -178,46 +360,75 @@ else
             }
             catch { }
 
-            var dashboardTask = Http.GetFromJsonAsync<DashboardViewModel>($"api/dashboard{widgetQuery}");
-            var ordersTask = Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/orders?pageSize=20&sortBy=createdAt&sortDesc=true");
-            
-            await Task.WhenAll(dashboardTask, ordersTask);
-            
-            _dashboard = await dashboardTask;
+            // Parallel: widgets + orders + action items
+            var dashboardTask    = Http.GetFromJsonAsync<DashboardViewModel>($"api/dashboard{widgetQuery}");
+            var ordersTask       = Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/orders?pageSize=20&sortBy=createdAt&sortDesc=true");
+            var actionItemsTask  = Http.GetFromJsonAsync<DashboardActionItemsDto>("api/dashboard/action-items");
+
+            await Task.WhenAll(dashboardTask, ordersTask, actionItemsTask);
+
+            _dashboard   = await dashboardTask;
             var ordersResponse = await ordersTask;
-            _orders = ordersResponse?.Data.ToList() ?? new();
+            _orders      = ordersResponse?.Data.ToList() ?? new();
+            _actionItems = await actionItemsTask;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching dashboard: {ex.Message}");
+            Snackbar.Add("Some dashboard data could not be loaded", Severity.Warning);
         }
         finally
         {
-            _loading = false;
+            _loading             = false;
+            _actionItemsLoading  = false;
         }
+    }
+
+    private void OpenCreateInvoiceDialog()
+    {
+        Snackbar.Add("Invoice creation dialog will be implemented as part of the Finance module. Redirecting...", Severity.Info);
+        Navigation.NavigateTo("/finance/invoices");
     }
 
     private Color GetOrderStatusColor(string status) => status switch
     {
-        "New" or "Draft" => Color.Default,
+        "New" or "Draft"          => Color.Default,
         "Confirmed" or "Processing" => Color.Info,
-        "Shipped" => Color.Primary,
-        "Delivered" => Color.Success,
-        "Cancelled" => Color.Error,
-        _ => Color.Default
+        "Shipped"                 => Color.Primary,
+        "Delivered"               => Color.Success,
+        "OnHold" or "Delayed"     => Color.Warning,
+        "Cancelled"               => Color.Error,
+        _                         => Color.Default
     };
 
-    private class DashboardPreference
+    private Color GetActionSeverityColor(string severity) => severity switch
     {
-        public List<string> Widgets { get; set; } = new();
-    }
+        "Error"   => Color.Error,
+        "Warning" => Color.Warning,
+        _         => Color.Info
+    };
+
+    /// <summary>
+    /// Maps the string icon name stored in the DTO to the MudBlazor icon constant.
+    /// </summary>
+    private static string GetActionIcon(string icon) => icon switch
+    {
+        "Icons.Material.Outlined.PauseCircle"   => Icons.Material.Outlined.PauseCircle,
+        "Icons.Material.Outlined.HourglassBottom" => Icons.Material.Outlined.HourglassBottom,
+        "Icons.Material.Outlined.ReceiptLong"   => Icons.Material.Outlined.ReceiptLong,
+        "Icons.Material.Outlined.BeachAccess"   => Icons.Material.Outlined.BeachAccess,
+        "Icons.Material.Outlined.FolderSpecial" => Icons.Material.Outlined.FolderSpecial,
+        _                                       => Icons.Material.Outlined.Info
+    };
+
+
 
     private class UserInfo
     {
-        public string Name { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string UserId { get; set; } = string.Empty;
-        public List<string> Roles { get; set; } = new();
+        public string Name        { get; set; } = string.Empty;
+        public string Email       { get; set; } = string.Empty;
+        public string UserId      { get; set; } = string.Empty;
+        public List<string> Roles       { get; set; } = new();
         public List<string> Permissions { get; set; } = new();
     }
 

@@ -1,0 +1,391 @@
+@page "/admin/settings"
+@using Maliev.Intranet.Shared
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Settings - Maliev Intranet</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4" Wrap="Wrap.Wrap">
+    <div>
+        <MudText Typo="Typo.h4">Settings</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Portal configuration, notifications, reference data, content, and workflows</MudText>
+    </div>
+</MudStack>
+
+<MudTabs @bind-ActivePanelIndex="_activeTab" Elevation="0" Rounded="true" ApplyEffectsToContainer="true"
+         TabPanelsClass="pt-4" Color="Color.Primary">
+
+    <!-- TAB 0: Portal Config -->
+    <MudTabPanel Text="Portal Config" Icon="@Icons.Material.Outlined.Tune">
+        <MudGrid>
+            <!-- Feature Flags -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-4">Feature Flags</MudText>
+                    <MudStack Spacing="2">
+                        @foreach (var flag in _featureFlags)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <div>
+                                    <MudText Typo="Typo.body2" Style="font-weight:600;">@flag.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@flag.Description</MudText>
+                                </div>
+                                <MudSwitch T="bool" Value="@flag.Enabled" ValueChanged="@((v) => ToggleFlag(flag, v))" Color="Color.Primary" />
+                            </MudStack>
+                            <MudDivider />
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- System Settings -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-4">System Settings</MudText>
+                    <MudStack Spacing="3">
+                        <MudTextField @bind-Value="_companyName" Label="Company Name" Variant="Variant.Outlined" />
+                        <MudTextField @bind-Value="_supportEmail" Label="Support Email" Variant="Variant.Outlined" InputType="InputType.Email" />
+                        <MudSelect T="string" @bind-Value="_defaultCurrency" Label="Default Currency" Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("THB")">Thai Baht (THB ฿)</MudSelectItem>
+                            <MudSelectItem Value="@("USD")">US Dollar (USD $)</MudSelectItem>
+                            <MudSelectItem Value="@("EUR")">Euro (EUR €)</MudSelectItem>
+                        </MudSelect>
+                        <MudSelect T="string" @bind-Value="_timezone" Label="System Timezone" Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("Asia/Bangkok")">Asia/Bangkok (UTC+7)</MudSelectItem>
+                            <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                        </MudSelect>
+                        <MudNumericField T="int" @bind-Value="_sessionTimeout" Label="Session Timeout (minutes)" Variant="Variant.Outlined" Min="5" Max="480" />
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveSettings">
+                            Save Settings
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Maintenance Mode -->
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <div>
+                            <MudText Typo="Typo.h6">Maintenance Mode</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">When enabled, only administrators can access the portal</MudText>
+                        </div>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Construction"
+                                   OnClick="@(() => Snackbar.Add("Maintenance mode requires IT approval", Severity.Warning))">
+                            Enable Maintenance Mode
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+
+    <!-- TAB 1: Notifications -->
+    <MudTabPanel Text="Notifications" Icon="@Icons.Material.Outlined.Notifications">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+            <div>
+                <MudText Typo="Typo.h6">Notification Templates</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Manage email, SMS, and messaging templates for system notifications</MudText>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => Snackbar.Add("Create notification template coming soon", Severity.Info))">
+                New Template
+            </MudButton>
+        </MudStack>
+
+        @foreach (var category in _notificationCategories)
+        {
+            <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;" Class="mb-3">@category.Name</MudText>
+                @foreach (var template in category.Templates)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="py-2">
+                        <div>
+                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@template.Name</MudText>
+                            <MudStack Row="true" Spacing="1" Class="mt-1">
+                                @foreach (var channel in template.Channels)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default">@channel</MudChip>
+                                }
+                            </MudStack>
+                        </div>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary"
+                                           OnClick="@(() => Snackbar.Add($"Edit template {template.Name} coming soon", Severity.Info))" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Send" Size="Size.Small" Color="Color.Default"
+                                           OnClick="@(() => Snackbar.Add($"Test template {template.Name} coming soon", Severity.Info))" />
+                        </MudStack>
+                    </MudStack>
+                    <MudDivider />
+                }
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- TAB 2: Reference Data -->
+    <MudTabPanel Text="Reference Data" Icon="@Icons.Material.Outlined.Dataset">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+            <div>
+                <MudText Typo="Typo.h6">Reference Data Management</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Manage lookup values, categories, and configurable lists</MudText>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => Snackbar.Add("Add reference data entry coming soon", Severity.Info))">
+                Add Entry
+            </MudButton>
+        </MudStack>
+
+        <MudGrid>
+            @foreach (var dataset in _referenceDatasets)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:600;">@dataset.Name</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">@dataset.Count entries</MudChip>
+                        </MudStack>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">@dataset.Description</MudText>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" FullWidth="true"
+                                   OnClick="@(() => Snackbar.Add($"Manage {dataset.Name} coming soon", Severity.Info))">
+                            Manage
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudTabPanel>
+
+    <!-- TAB 3: Content -->
+    <MudTabPanel Text="Content" Icon="@Icons.Material.Outlined.Article">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+            <div>
+                <MudText Typo="Typo.h6">Content Management</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Manage announcements, help articles, and portal content</MudText>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => Snackbar.Add("Content editor coming soon", Severity.Info))">
+                New Content
+            </MudButton>
+        </MudStack>
+
+        <MudGrid>
+            @foreach (var item in _contentItems)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                        <MudStack Row="true" AlignItems="AlignItems.Start" Justify="Justify.SpaceBetween">
+                            <div style="flex: 1;">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-1">
+                                    <MudChip T="string" Size="Size.Small" Color="@GetContentTypeColor(item.Type)">@item.Type</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetContentStatusColor(item.Status)">@item.Status</MudChip>
+                                </MudStack>
+                                <MudText Typo="Typo.subtitle2">@item.Title</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Last updated: @item.UpdatedAt.ToString("dd MMM yyyy")</MudText>
+                            </div>
+                            <MudStack Row="true" Spacing="1">
+                                <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary"
+                                               OnClick="@(() => Snackbar.Add($"Edit '{item.Title}' coming soon", Severity.Info))" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default"
+                                               OnClick="@(() => Snackbar.Add($"Preview '{item.Title}' coming soon", Severity.Info))" />
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudTabPanel>
+
+    <!-- TAB 4: Workflows -->
+    <MudTabPanel Text="Workflows" Icon="@Icons.Material.Outlined.AccountTree">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+            <div>
+                <MudText Typo="Typo.h6">Workflow Automation</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Approval chains, automated notifications, and process triggers</MudText>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => Snackbar.Add("Create workflow coming soon", Severity.Info))">
+                New Workflow
+            </MudButton>
+        </MudStack>
+
+        <MudText Typo="Typo.h6" Class="mb-3">Available Templates</MudText>
+        <MudGrid Class="mb-6">
+            @foreach (var template in _workflowTemplates)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="0" Class="border mud-border-lines-default rounded-lg h-100 cursor-pointer"
+                             @onclick="@(() => Snackbar.Add($"Configure {template.Name} workflow coming soon", Severity.Info))">
+                        <MudCardHeader>
+                            <CardHeaderAvatar>
+                                <MudAvatar Color="@template.Color" Size="Size.Medium">
+                                    <MudIcon Icon="@template.Icon" />
+                                </MudAvatar>
+                            </CardHeaderAvatar>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.subtitle2">@template.Name</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@template.Description</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardActions>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">@template.Status</MudChip>
+                            <MudSpacer />
+                            <MudButton Size="Size.Small" OnClick="@(() => Snackbar.Add($"Configure {template.Name} coming soon", Severity.Info))">Configure</MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <MudText Typo="Typo.h6" Class="mb-3">Active Workflows</MudText>
+        <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+            <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+                <MudIcon Icon="@Icons.Material.Outlined.AccountTree" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No active workflows</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Configure a template above to enable automated workflows</MudText>
+            </MudStack>
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private int _activeTab = 0;
+
+    // ─── Portal Config ────────────────────────────────────────────────────────
+    private string _companyName = "Maliev";
+    private string _supportEmail = "support@maliev.com";
+    private string _defaultCurrency = "THB";
+    private string _timezone = "Asia/Bangkok";
+    private int _sessionTimeout = 60;
+
+    private List<FeatureFlag> _featureFlags = new()
+    {
+        new("AI Assistant", "Enable the AI chatbot sidebar for all users", true),
+        new("3D Model Viewer", "Allow users to view BabylonJS 3D models", true),
+        new("Customer Onboarding", "Enable AI-powered customer onboarding flow", true),
+        new("Pricing Calculator", "Show AI pricing calculator in Sales menu", true),
+        new("HR Analytics", "Enable HR analytics dashboard", true),
+        new("Compliance Module", "Show compliance tracking for employees", false),
+        new("Production Queue", "Enable production queue management", false),
+        new("Budget Planning", "Enable budget planning module", false)
+    };
+
+    private void ToggleFlag(FeatureFlag flag, bool enabled)
+    {
+        flag.Enabled = enabled;
+        Snackbar.Add($"{flag.Name} {(enabled ? "enabled" : "disabled")}", Severity.Success);
+    }
+
+    private void SaveSettings()
+    {
+        Snackbar.Add("Settings saved successfully", Severity.Success);
+    }
+
+    // ─── Notifications ────────────────────────────────────────────────────────
+    private readonly List<NotificationCategory> _notificationCategories = new()
+    {
+        new("Order & Sales", new()
+        {
+            new("Order Confirmation", new() { "Email", "LINE" }),
+            new("Payment Received", new() { "Email", "SMS" }),
+            new("Order Shipped", new() { "Email", "LINE", "WhatsApp" }),
+            new("Quotation Approved", new() { "Email" })
+        }),
+        new("HR & Operations", new()
+        {
+            new("Leave Request Approval", new() { "Email" }),
+            new("Onboarding Welcome", new() { "Email", "LINE" }),
+            new("Compliance Expiry Alert", new() { "Email", "SMS" })
+        })
+    };
+
+    // ─── Reference Data ───────────────────────────────────────────────────────
+    private readonly List<ReferenceDataset> _referenceDatasets = new()
+    {
+        new("Manufacturing Technologies", "FDM, SLA, CNC, 3D Scanning types", 5),
+        new("Material Categories", "Filament, Resin, Metal, Tooling", 4),
+        new("Job Statuses", "Pending, Queued, In Progress, Finishing, Completed", 5),
+        new("Leave Types", "Annual, Sick, Personal, Maternity, Paternity", 5),
+        new("Customer Segments", "Enterprise, SME, Individual, Educational", 4),
+        new("Countries", "Supported shipping and billing countries", 58)
+    };
+
+    // ─── Content ──────────────────────────────────────────────────────────────
+    private readonly List<ContentItem> _contentItems = new()
+    {
+        new("Welcome to Maliev Intranet", "Announcement", "Published", new DateTime(2026, 2, 1)),
+        new("3D Printing Design Guidelines", "Help Article", "Published", new DateTime(2026, 1, 15)),
+        new("Q1 2026 Company Update", "Announcement", "Draft", new DateTime(2026, 3, 10)),
+        new("How to use the Production Queue", "Help Article", "Published", new DateTime(2026, 2, 20))
+    };
+
+    // ─── Workflows ────────────────────────────────────────────────────────────
+    private record WorkflowTemplate(string Name, string Description, string Icon, Color Color, string Status);
+
+    private readonly List<WorkflowTemplate> _workflowTemplates = new()
+    {
+        new("Leave Approval", "Multi-level leave request approval chain", Icons.Material.Outlined.EventAvailable, Color.Info, "Not Configured"),
+        new("Purchase Order Approval", "PO approval with budget limit thresholds", Icons.Material.Outlined.ShoppingCart, Color.Warning, "Not Configured"),
+        new("Invoice Review", "Invoice verification and approval before payment", Icons.Material.Outlined.Receipt, Color.Success, "Not Configured"),
+        new("Onboarding Checklist", "New employee onboarding task assignment", Icons.Material.Outlined.PersonAdd, Color.Primary, "Not Configured"),
+        new("Quality Incident", "Defect reporting and escalation", Icons.Material.Outlined.BugReport, Color.Error, "Not Configured"),
+        new("Customer Onboarding", "KYC and account setup approval", Icons.Material.Outlined.Business, Color.Secondary, "Not Configured")
+    };
+
+    /// <summary>
+    /// Initializes the Settings page, activating the correct tab based on URL query parameter.
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        _activeTab = query["tab"] switch
+        {
+            "portal-config" => 0,
+            "notifications" => 1,
+            "reference-data" => 2,
+            "content" => 3,
+            "workflows" => 4,
+            _ => 0
+        };
+    }
+
+    private Color GetContentTypeColor(string type) => type switch
+    {
+        "Announcement" => Color.Info,
+        "Help Article" => Color.Primary,
+        _ => Color.Default
+    };
+
+    private Color GetContentStatusColor(string status) => status switch
+    {
+        "Published" => Color.Success,
+        "Draft" => Color.Warning,
+        "Archived" => Color.Default,
+        _ => Color.Default
+    };
+
+    // ─── Model classes ────────────────────────────────────────────────────────
+    /// <summary>Represents a UI feature toggle flag.</summary>
+    private class FeatureFlag
+    {
+        /// <summary>Gets or sets the flag name.</summary>
+        public string Name { get; set; }
+        /// <summary>Gets or sets the flag description.</summary>
+        public string Description { get; set; }
+        /// <summary>Gets or sets whether the flag is enabled.</summary>
+        public bool Enabled { get; set; }
+
+        /// <summary>Initializes a new instance of <see cref="FeatureFlag"/>.</summary>
+        public FeatureFlag(string name, string description, bool enabled)
+        {
+            Name = name;
+            Description = description;
+            Enabled = enabled;
+        }
+    }
+
+    private record NotificationTemplate(string Name, List<string> Channels);
+    private record NotificationCategory(string Name, List<NotificationTemplate> Templates);
+    private record ReferenceDataset(string Name, string Description, int Count);
+    private record ContentItem(string Title, string Type, string Status, DateTime UpdatedAt);
+}

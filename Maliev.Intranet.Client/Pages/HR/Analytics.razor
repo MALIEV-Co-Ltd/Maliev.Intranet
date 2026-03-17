@@ -1,103 +1,10 @@
 @page "/hr/analytics"
-@using Maliev.Intranet.Shared
-@using Maliev.Intranet.Shared.Dtos
-@inject HttpClient Http
-@inject ISnackbar Snackbar
-
-<PageTitle>HR Analytics - Maliev Intranet</PageTitle>
-
-<MudText Typo="Typo.h4" Class="mb-4">HR Analytics</MudText>
-
-@if (_isLoading)
-{
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
-}
-else if (_analytics == null)
-{
-    <MudAlert Severity="Severity.Error">Failed to load HR analytics.</MudAlert>
-}
-else
-{
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Headcount</MudText>
-                <MudText Typo="Typo.h4" Class="mt-2">@_analytics.TotalHeadcount</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Active Employees</MudText>
-                <MudText Typo="Typo.h4" Class="mt-2" Color="Color.Success">@_analytics.ActiveEmployees</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">In Onboarding</MudText>
-                <MudText Typo="Typo.h4" Class="mt-2" Color="Color.Info">@_analytics.OnboardingCount</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Turnover Rate</MudText>
-                <MudText Typo="Typo.h4" Class="mt-2" Color="Color.Warning">@_analytics.TurnoverRate.ToString("P1")</MudText>
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="6">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg" Style="height: 400px;">
-                <MudText Typo="Typo.h6" Class="mb-4">Department Distribution</MudText>
-                <MudChart T="double" ChartType="ChartType.Donut" 
-                          ChartSeries="@(_analytics.DepartmentDistribution.Select(d => new ChartSeries<double> { Name = d.Department, Data = new double[] { (double)d.Count } }).ToList())"
-                          ChartLabels="@(_analytics.DepartmentDistribution.Select(d => d.Department).ToArray())" 
-                          Width="100%" Height="300px" />
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="6">
-            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg" Style="height: 400px;">
-                <MudText Typo="Typo.h6" Class="mb-4">Hiring Trend (Last 6 Months)</MudText>
-                <MudChart T="double" ChartType="ChartType.Line" 
-                          ChartSeries="@_series" 
-                          ChartLabels="@(_analytics.HireTrend.Select(t => t.Month).ToArray())" 
-                          Width="100%" Height="300px" />
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-}
+@inject NavigationManager Navigation
 
 @code {
-    private bool _isLoading = true;
-    private HrAnalyticsDto? _analytics;
-    private List<ChartSeries<double>> _series = [];
-
-    protected override async Task OnInitializedAsync()
+    /// <summary>Redirects legacy /hr/analytics route to the consolidated Compliance and Analytics page (Analytics tab).</summary>
+    protected override void OnInitialized()
     {
-        await LoadData();
-    }
-
-    private async Task LoadData()
-    {
-        try
-        {
-            _isLoading = true;
-            _analytics = await Http.GetFromJsonAsync<HrAnalyticsDto>("api/employees/analytics");
-            
-            if (_analytics != null)
-            {
-                _series =
-                [
-                    new ChartSeries<double> { Name = "New Hires", Data = _analytics.HireTrend.Select(t => (double)t.Count).ToArray() }
-                ];
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error loading analytics: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _isLoading = false;
-        }
+        Navigation.NavigateTo("/hr/compliance?tab=analytics", replace: true);
     }
 }

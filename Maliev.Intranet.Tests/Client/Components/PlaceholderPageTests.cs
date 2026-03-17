@@ -21,13 +21,6 @@ public class PlaceholderPageTests : BunitContext, IAsyncLifetime
     public Task InitializeAsync() => Task.CompletedTask;
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
-    [Fact] public void Audit_ShouldRenderTitle() => Assert.Contains("Audit Log", Render<Audit>().Markup, StringComparison.OrdinalIgnoreCase);
-    [Fact] public void Content_ShouldRenderTitle() => Assert.Contains("Content Management", Render<Content>().Markup, StringComparison.OrdinalIgnoreCase);
-    [Fact] public void Workflows_ShouldRenderTitle() => Assert.Contains("Workflow Automation", Render<Workflows>().Markup, StringComparison.OrdinalIgnoreCase);
-    [Fact] public void PortalConfig_ShouldRenderTitle() => Assert.Contains("Portal Configuration", Render<PortalConfig>().Markup, StringComparison.OrdinalIgnoreCase);
-    [Fact] public void Training_ShouldRenderTitle() => Assert.Contains("Training", Render<Training>().Markup, StringComparison.OrdinalIgnoreCase);
-    [Fact] public void Budget_ShouldRenderTitle() => Assert.Contains("Budget Planning", Render<Budget>().Markup, StringComparison.OrdinalIgnoreCase);
-    [Fact] public void ReportBuilder_ShouldRenderTitle() => Assert.Contains("Report Builder", Render<ReportBuilder>().Markup, StringComparison.OrdinalIgnoreCase);
-    [Fact] public void Inventory_ShouldRenderTitle() => Assert.Contains("Inventory Management", Render<Inventory>().Markup, StringComparison.OrdinalIgnoreCase);
+    // Keep: Production Queue is now a real page
     [Fact] public void ProductionQueue_ShouldRenderTitle() => Assert.Contains("Production Queue", Render<ProductionQueue>().Markup, StringComparison.OrdinalIgnoreCase);
 }

@@ -24,6 +24,13 @@
                                OnClick="OpenExtractionDialog"
                                Disabled="@(!_chatbotServiceAvailable)" />
             </MudTooltip>
+            @* TODO: LINE OA Integration - Replace this button with actual LINE chat import once LINE Messaging API webhook is configured.
+               Flow: Customer sends message via LINE OA -> Webhook captures profile (displayName, pictureUrl, userId) -> Employee clicks "Import from LINE" -> BFF calls LINE Messaging API -> pre-fills form fields. *@
+            <MudTooltip Text="Import from LINE chat (Coming soon)">
+                <MudIconButton Color="Color.Success"
+                               Icon="@Icons.Material.Filled.Chat"
+                               Disabled="true" />
+            </MudTooltip>
         </MudStack>
     </MudStack>
 

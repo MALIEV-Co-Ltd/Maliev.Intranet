@@ -4,6 +4,7 @@ using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Mvc;
+using Maliev.Intranet.Tests.Testing;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
@@ -14,6 +15,7 @@ public class InvoicesControllerTests
 {
     private readonly Mock<HttpMessageHandler> _httpMessageHandlerMock;
     private readonly InvoiceServiceClient _client;
+    private readonly PdfServiceClient _pdfClient;
     private readonly InvoicesController _controller;
 
     public InvoicesControllerTests()
@@ -24,7 +26,17 @@ public class InvoicesControllerTests
             BaseAddress = new Uri("http://test")
         };
         _client = new InvoiceServiceClient(httpClient);
-        _controller = new InvoicesController(_client);
+        
+        var pdfHttpClient = new HttpClient(new MockHttpMessageHandler((req, ct) =>
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { storageUrl = "http://test.pdf" }) });
+        }))
+        {
+            BaseAddress = new Uri("http://test")
+        };
+        _pdfClient = new PdfServiceClient(pdfHttpClient);
+        
+        _controller = new InvoicesController(_client, _pdfClient);
     }
 
     [Fact]
@@ -42,7 +54,29 @@ public class InvoicesControllerTests
                 Content = JsonContent.Create(response)
             });
 
-        var result = await _controller.Get(1, 20, CancellationToken.None);
+        var result = await _controller.Get(null, 1, 20, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var actual = Assert.IsType<PagedResponse<InvoiceSummaryDto>>(okResult.Value);
+        Assert.NotNull(actual);
+    }
+
+    [Fact]
+    public async Task Get_ShouldReturnOk_WhenSuccessful_WithDefaultPageSize()
+    {
+        var response = new PagedResponse<InvoiceSummaryDto> { Data = new List<InvoiceSummaryDto>() };
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(response)
+            });
+
+        var result = await _controller.Get(null, 1, 20, CancellationToken.None);
 
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var actual = Assert.IsType<PagedResponse<InvoiceSummaryDto>>(okResult.Value);

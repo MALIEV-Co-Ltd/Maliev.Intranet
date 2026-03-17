@@ -43,6 +43,7 @@ try
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.ProductionHubService>();
     builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
     builder.Services.AddScoped<Maliev.Intranet.Bff.Services.IChatContextResolver, Maliev.Intranet.Bff.Services.ChatContextResolver>();
     builder.Services.AddSingleton<Maliev.Intranet.Bff.Services.ChatHubService>();
@@ -264,6 +265,8 @@ try
     builder.AddBffServiceClient<IPricingServiceClient, PricingServiceClient>("PricingService");
     builder.AddBffServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
     builder.AddBffServiceClient<IFacilityServiceClient, FacilityServiceClient>("FacilityService");
+    builder.AddBffServiceClient<ProjectServiceClient>("ProjectService");
+    builder.AddBffServiceClient<JobServiceClient>("JobService");
 
     // Named HTTP client with service account authentication for reference data
     builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>
@@ -398,6 +401,9 @@ try
         .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
 
     app.MapHub<Maliev.Intranet.Bff.Hubs.ChatHub>("/hubs/chat")
+        .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
+
+    app.MapHub<Maliev.Intranet.Bff.Hubs.ProductionHub>("/hubs/production")
         .RequireAuthorization(new AuthorizationPolicyBuilder("SmartScheme").RequireAuthenticatedUser().Build());
 
     app.MapControllers()

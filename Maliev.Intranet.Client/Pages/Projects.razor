@@ -1,0 +1,188 @@
+@page "/sales/projects"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Projects - Maliev Intranet</PageTitle>
+
+<style>
+    .status-tab-badge { font-size: 10px; margin-left: 4px; }
+</style>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4" Wrap="Wrap.Wrap">
+    <div>
+        <MudText Typo="Typo.h5" Style="font-weight: 700;">Projects</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Manage 3D printing & manufacturing projects</MudText>
+    </div>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Outlined.Add"
+               OnClick="@(() => Navigation.NavigateTo("/sales/projects/new"))">
+        New Project
+    </MudButton>
+</MudStack>
+
+@* Search bar *@
+<MudPaper Elevation="0" Class="pa-3 mb-3 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+    <MudTextField @bind-Value="_search"
+                  Placeholder="Search by project number, customer or title..."
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Outlined.Search"
+                  Immediate="true"
+                  DebounceInterval="400"
+                  OnDebounceIntervalElapsed="@(() => { _page = 1; _ = LoadProjectsAsync(); })"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Class="mb-0" />
+</MudPaper>
+
+@* Status tabs *@
+<MudTabs ActivePanelIndex="_activeTab"
+         ActivePanelIndexChanged="OnTabChanged"
+         Rounded="true"
+         SliderColor="Color.Primary"
+         ApplyEffectsToContainer="true"
+         TabPanelsClass="pt-3">
+    @foreach (var tab in _statusTabs)
+    {
+        <MudTabPanel Text="@tab" />
+    }
+</MudTabs>
+
+@if (_loading)
+{
+    @for (int i = 0; i < 5; i++)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="52px" Class="mb-2 rounded" />
+    }
+}
+else
+{
+    <MudDataGrid T="ProjectSummaryDto"
+                 Items="@_projects"
+                 Hover="true"
+                 Striped="false"
+                 Bordered="false"
+                 Dense="true"
+                 Elevation="0"
+                 Breakpoint="Breakpoint.Sm"
+                 RowClick="@((DataGridRowClickEventArgs<ProjectSummaryDto> args) => Navigation.NavigateTo($"/sales/projects/{args.Item.Id}"))"
+                 Style="cursor: pointer;">
+        <Columns>
+            <PropertyColumn Property="x => x.ProjectNumber" Title="Project #" />
+            <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
+            <PropertyColumn Property="x => x.Title" Title="Title" />
+            <TemplateColumn Title="Parts">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2">@context.Item.PartsCount part@(context.Item.PartsCount == 1 ? "" : "s")</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Total Price">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2">
+                        @(context.Item.TotalPrice > 0 ? $"฿{context.Item.TotalPrice:N2}" : "—")
+                    </MudText>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Status">
+                <CellTemplate>
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
+                        @context.Item.Status
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Created">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@context.Item.CreatedAt.ToString("dd MMM yyyy")</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+                <MudIcon Icon="@Icons.Material.Outlined.FolderOff" Style="font-size: 48px;" Color="Color.Secondary" />
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No projects found</MudText>
+                <MudButton Variant="Variant.Outlined" Class="mt-3"
+                           OnClick="@(() => Navigation.NavigateTo("/sales/projects/new"))">
+                    Create First Project
+                </MudButton>
+            </MudStack>
+        </NoRecordsContent>
+    </MudDataGrid>
+
+    @* Pagination *@
+    @if (_meta.TotalPages > 1)
+    {
+        <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
+            <MudPagination Color="Color.Primary"
+                           Count="@_meta.TotalPages"
+                           Selected="@_page"
+                           SelectedChanged="OnPageChanged"
+                           BoundaryCount="1"
+                           MiddleCount="3" />
+        </MudStack>
+    }
+}
+
+@code {
+    private string[] _statusTabs = ["All", "Draft", "Configuring", "Quoted", "In Production", "Completed"];
+    private int _activeTab = 0;
+    private string? _search;
+    private bool _loading = true;
+    private int _page = 1;
+    private List<ProjectSummaryDto> _projects = new();
+    private PaginationMeta _meta = new();
+
+    /// <summary>Loads projects on first render.</summary>
+    protected override async Task OnInitializedAsync() => await LoadProjectsAsync();
+
+    private async Task OnTabChanged(int index)
+    {
+        if (index == _activeTab) return;
+        _activeTab = index;
+        _page = 1;
+        await LoadProjectsAsync();
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await LoadProjectsAsync();
+    }
+
+    private string? ActiveStatus => _activeTab == 0 ? null : _statusTabs[_activeTab];
+
+    private async Task LoadProjectsAsync(CancellationToken ct = default)
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var url = $"api/projects?page={_page}&pageSize=20";
+            if (!string.IsNullOrEmpty(ActiveStatus)) url += $"&status={Uri.EscapeDataString(ActiveStatus)}";
+            if (!string.IsNullOrEmpty(_search))      url += $"&search={Uri.EscapeDataString(_search)}";
+
+            var result = await Http.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>(url, ct);
+            _projects = result?.Data.ToList() ?? new();
+            _meta     = result?.Meta ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load projects: {ex.Message}", Severity.Error);
+        }
+        finally { _loading = false; }
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Draft"         => Color.Default,
+        "Configuring"   => Color.Warning,
+        "Priced"        => Color.Info,
+        "Quoted"        => Color.Primary,
+        "In Production" => Color.Secondary,
+        "Completed"     => Color.Success,
+        "Cancelled"     => Color.Error,
+        _               => Color.Default
+    };
+}

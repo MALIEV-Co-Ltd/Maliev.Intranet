@@ -1,0 +1,332 @@
+@page "/sales/projects/new"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>New Project - Maliev Intranet</PageTitle>
+
+<style>
+    .upload-zone {
+        border: 2px dashed var(--mud-palette-lines-default);
+        border-radius: 12px;
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+        border-color: var(--mud-palette-primary);
+        background: color-mix(in srgb, var(--mud-palette-primary) 5%, transparent);
+    }
+    .file-chip { max-width: 260px; }
+</style>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-5">
+    <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                   OnClick="@(() => Navigation.NavigateTo("/sales/projects"))"
+                   Class="mr-1" />
+    <div>
+        <MudText Typo="Typo.h5" Style="font-weight: 700;">New Project</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Create a 3D printing / manufacturing project</MudText>
+    </div>
+</MudStack>
+
+<MudStepper @bind-ActiveIndex="_stepIndex" NonLinear="false" Class="mb-4">
+
+    @* ── Step 1: Select Customer ─────────────────────────────────────── *@
+    <MudStep Title="Select Customer">
+        <MudText Typo="Typo.subtitle2" Class="mb-3">Search for an existing customer or create a new one.</MudText>
+        <MudAutocomplete T="CustomerSummaryDto"
+                         Label="Customer"
+                         Placeholder="Type to search..."
+                         SearchFunc="SearchCustomersAsync"
+                         ToStringFunc="@(c => c?.Name ?? "")"
+                         @bind-Value="_selectedCustomer"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="@Icons.Material.Outlined.Search"
+                         ShowProgressIndicator="true"
+                         MinCharacters="2"
+                         Class="mb-3" />
+        @if (_selectedCustomer != null)
+        {
+            <MudCard Outlined="true" Class="pa-3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2">@_selectedCustomer.Name</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@_selectedCustomer.Email</MudText>
+                    </div>
+                </MudStack>
+            </MudCard>
+        }
+        <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@(_selectedCustomer == null)"
+                       OnClick="@(() => _stepIndex++)">Continue</MudButton>
+        </MudStack>
+    </MudStep>
+
+    @* ── Step 2: Project Details ─────────────────────────────────────── *@
+    <MudStep Title="Project Details">
+        <MudGrid Spacing="3">
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_title"
+                              Label="Project Title *"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              HelperText="Describe what the customer wants to manufacture"
+                              Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_description"
+                              Label="Description"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="3"
+                              HelperText="Optional scope or special requirements" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="int"
+                                 @bind-Value="_validityDays"
+                                 Label="Quotation valid for (days)"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Min="7" Max="90" />
+            </MudItem>
+        </MudGrid>
+        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-4">
+            <MudButton Variant="Variant.Text" OnClick="@(() => _stepIndex--)">Back</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@string.IsNullOrWhiteSpace(_title)"
+                       OnClick="@(() => _stepIndex++)">Continue</MudButton>
+        </MudStack>
+    </MudStep>
+
+    @* ── Step 3: Upload Files ────────────────────────────────────────── *@
+    <MudStep Title="Upload Files">
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Upload STL, STEP or 3MF files. Each file becomes a project part that you configure on the next screen.
+        </MudText>
+
+        @* Drop zone *@
+        <div class="upload-zone @(_dragOver ? "drag-over" : "")"
+             @ondragenter:preventDefault @ondragenter="@(() => _dragOver = true)"
+             @ondragleave="@(() => _dragOver = false)"
+             @ondrop:preventDefault @ondrop="HandleFileDrop"
+             @onclick="TriggerFilePickerAsync">
+            <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Style="font-size: 48px;" Color="Color.Secondary" Class="mb-2" />
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Drag &amp; drop files here or click to browse</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Tertiary">Accepted: STL, STEP, STP, 3MF</MudText>
+        </div>
+
+        @* File list *@
+        @if (_uploadedFiles.Any())
+        {
+            <MudStack Class="mt-3" Spacing="1">
+                @foreach (var file in _uploadedFiles)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@GetFileIcon(file.Name)" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Class="file-chip" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            @file.Name
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(file.Size)</MudText>
+                        <MudSpacer />
+                        @if (file.Uploading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                        }
+                        else if (file.Error != null)
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.Error" Color="Color.Error" Size="Size.Small" />
+                            <MudText Typo="Typo.caption" Color="Color.Error" Style="max-width: 120px; overflow: hidden; text-overflow: ellipsis;">
+                                @file.Error
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                        }
+                        <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                       Size="Size.Small"
+                                       OnClick="@(() => _uploadedFiles.Remove(file))"
+                                       Disabled="@file.Uploading" />
+                    </MudStack>
+                }
+            </MudStack>
+        }
+
+        <InputFile id="project-file-input" OnChange="HandleBrowserFileSelection"
+                   multiple accept=".stl,.step,.stp,.3mf"
+                   style="display:none;" />
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-4">
+            <MudButton Variant="Variant.Text" OnClick="@(() => _stepIndex--)">Back</MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Outlined.Rocket"
+                       Disabled="@(_saving || _uploadedFiles.Any(f => f.Uploading))"
+                       OnClick="CreateProjectAsync">
+                @if (_saving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <text>Creating...</text>
+                }
+                else
+                {
+                    <text>Create Project</text>
+                }
+            </MudButton>
+        </MudStack>
+    </MudStep>
+</MudStepper>
+
+@code {
+    private int _stepIndex = 0;
+    private CustomerSummaryDto? _selectedCustomer;
+    private string _title = string.Empty;
+    private string? _description;
+    private int _validityDays = 30;
+    private bool _saving = false;
+    private bool _dragOver = false;
+
+    private List<UploadedFileState> _uploadedFiles = new();
+
+    private async Task<IEnumerable<CustomerSummaryDto>> SearchCustomersAsync(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return Enumerable.Empty<CustomerSummaryDto>();
+        try
+        {
+            var result = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(
+                $"api/customers?query={Uri.EscapeDataString(value)}&pageSize=10", ct);
+            return result?.Data ?? Enumerable.Empty<CustomerSummaryDto>();
+        }
+        catch { return Enumerable.Empty<CustomerSummaryDto>(); }
+    }
+
+    private void HandleFileDrop(DragEventArgs e)
+    {
+        _dragOver = false;
+        // Browser drag-and-drop of actual files requires JS interop or InputFile;
+        // this visual feedback hook is intentionally kept lightweight.
+        // Real file handling goes through the InputFile component below.
+        Snackbar.Add("Please use the file picker – drag-and-drop requires browser file access via InputFile.", Severity.Info);
+    }
+
+    private async Task TriggerFilePickerAsync()
+    {
+        // Programmatically click the hidden InputFile element so the browser opens the file dialog
+        await JS.InvokeVoidAsync("eval", "document.getElementById('project-file-input').click()");
+    }
+
+    private async Task HandleBrowserFileSelection(InputFileChangeEventArgs e)
+    {
+        const long maxSize = 50 * 1024 * 1024; // 50 MB per file
+        foreach (var file in e.GetMultipleFiles(20))
+        {
+            if (_uploadedFiles.Any(f => f.Name == file.Name)) continue;
+            var state = new UploadedFileState { Name = file.Name, Size = file.Size, Uploading = true };
+            _uploadedFiles.Add(state);
+            StateHasChanged();
+
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                await using var stream = file.OpenReadStream(maxSize);
+                content.Add(new StreamContent(stream), "file", file.Name);
+
+                var response = await Http.PostAsync("api/uploads", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    var uploaded = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    state.FileId   = uploaded.TryGetProperty("fileId", out var fid) ? fid.GetGuid() : Guid.Empty;
+                    state.Uploading = false;
+                }
+                else
+                {
+                    state.Error = $"Upload failed ({(int)response.StatusCode})";
+                    state.Uploading = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                state.Error = ex.Message;
+                state.Uploading = false;
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateProjectAsync()
+    {
+        if (_selectedCustomer == null || string.IsNullOrWhiteSpace(_title)) return;
+        _saving = true;
+
+        try
+        {
+            // 1. Create the project
+            var createRequest = new CreateProjectRequest
+            {
+                CustomerId   = _selectedCustomer.Id,
+                Title        = _title,
+                Description  = _description,
+                ValidityDays = _validityDays
+            };
+            var response = await Http.PostAsJsonAsync("api/projects", createRequest);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Failed to create project. Please try again.", Severity.Error);
+                return;
+            }
+
+            var project = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
+            if (project == null) { Snackbar.Add("Unexpected response from server.", Severity.Error); return; }
+
+            // 2. Add parts for each successfully uploaded file
+            var uploadedParts = _uploadedFiles.Where(f => f.FileId != Guid.Empty && f.Error == null).ToList();
+            foreach (var file in uploadedParts)
+            {
+                var partRequest = new AddProjectPartRequest { FileId = file.FileId, FileName = file.Name };
+                await Http.PostAsJsonAsync($"api/projects/{project.Id}/parts", partRequest);
+            }
+
+            Snackbar.Add($"Project {project.ProjectNumber} created with {uploadedParts.Count} part(s).", Severity.Success);
+            Navigation.NavigateTo($"/sales/projects/{project.Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally { _saving = false; }
+    }
+
+    private static string GetFileIcon(string name) => System.IO.Path.GetExtension(name).ToLowerInvariant() switch
+    {
+        ".stl" or ".step" or ".stp" or ".3mf" => Icons.Material.Outlined.ViewInAr,
+        _ => Icons.Material.Outlined.InsertDriveFile
+    };
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:N1} KB";
+        return $"{bytes / 1024.0 / 1024.0:N1} MB";
+    }
+
+    private class UploadedFileState
+    {
+        public string Name     { get; set; } = string.Empty;
+        public long   Size     { get; set; }
+        public Guid   FileId   { get; set; }
+        public bool   Uploading { get; set; }
+        public string? Error   { get; set; }
+    }
+}

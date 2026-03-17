@@ -13,13 +13,16 @@ public class QuotationServiceClient(HttpClient httpClient)
     /// <summary>
     /// Retrieves a paged list of quotations.
     /// </summary>
+    /// <param name="customerId">Optional customer ID filter.</param>
     /// <param name="page">The page number to retrieve.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A paged response containing quotation summaries.</returns>
-    public async Task<PagedResponse<QuotationSummaryDto>?> GetQuotationsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
+    public async Task<PagedResponse<QuotationSummaryDto>?> GetQuotationsAsync(Guid? customerId = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<QuotationSummaryDto>>($"/quotation/v1/quotations?page={page}&pageSize={pageSize}", ct);
+        var url = $"/quotation/v1/quotations?page={page}&pageSize={pageSize}";
+        if (customerId.HasValue) url += $"&customerId={customerId.Value}";
+        return await httpClient.GetFromJsonAsync<PagedResponse<QuotationSummaryDto>>(url, ct);
     }
 
     /// <summary>
@@ -113,4 +116,19 @@ public class QuotationServiceClient(HttpClient httpClient)
     {
         return await httpClient.PostAsJsonAsync($"/quotation/v1/quotations/{id}/notes", request, ct);
     }
+
+    /// <summary>
+    /// Retrieves the count of sent quotations that have been awaiting customer response for more than <paramref name="minAgeDays"/> days.
+    /// </summary>
+    /// <param name="minAgeDays">Minimum age in days to consider a quotation aging.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The count of aging quotations.</returns>
+    public async Task<int> GetAgingQuotationCountAsync(int minAgeDays = 7, CancellationToken ct = default)
+    {
+        var httpResponse = await httpClient.GetAsync($"/quotation/v1/metrics/aging-count?minAgeDays={minAgeDays}", ct);
+        if (!httpResponse.IsSuccessStatusCode) return 0;
+        var response = await httpResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
+        return response.TryGetProperty("count", out var count) ? count.GetInt32() : 0;
+    }
 }
+

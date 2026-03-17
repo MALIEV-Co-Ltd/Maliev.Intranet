@@ -208,4 +208,23 @@ public static class MalievPermissions
         /// <summary>Approve or reject equipment loan requests.</summary>
         public const string LoansApprove = "facility.loans.approve";
     }
+
+    public static class Project
+    {
+        /// <summary>View projects, parts, pricing, and quotation status.</summary>
+        public const string Read = "project.projects.read";
+
+        /// <summary>Create and update projects, add parts, confirm prices, and generate quotations.</summary>
+        public const string Write = "project.projects.write";
+    }
+
+    /// <summary>Permissions for manufacturing job management.</summary>
+    public static class Job
+    {
+        /// <summary>View jobs in production queue, stats, and QR codes.</summary>
+        public const string Read = "job.jobs.read";
+
+        /// <summary>Update job status, assign machines, and modify job details.</summary>
+        public const string Write = "job.jobs.write";
+    }
 }

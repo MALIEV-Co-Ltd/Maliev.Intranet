@@ -1,0 +1,205 @@
+@using Maliev.Intranet.Shared.Dtos
+@inject NavigationManager Navigation
+
+@* ── Compact mode (horizontal icon strip, for embedding in lists) ── *@
+@if (Compact)
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="lifecycle-compact">
+        @foreach (var stage in _stages)
+        {
+            <MudTooltip Text="@stage.Label" Placement="Placement.Top">
+                <MudIconButton Icon="@stage.Icon"
+                               Size="Size.Small"
+                               Color="@GetStageColor(stage.Status)"
+                               Class="@($"lifecycle-icon {stage.Status.ToLowerInvariant()}")"
+                               OnClick="@(() => NavigateToStage(stage))"
+                               Disabled="@(stage.NavigateTo == null)" />
+            </MudTooltip>
+            @if (stage != _stages[^1])
+            {
+                <MudIcon Icon="@Icons.Material.Outlined.ChevronRight" Size="Size.Small" Color="Color.Default" Style="opacity:.3;" />
+            }
+        }
+    </MudStack>
+}
+else
+{
+    @* ── Expanded mode (full horizontal stepper with detail panel) ── *@
+    <MudPaper Elevation="0" Class="pa-4 rounded-lg lifecycle-tracker"
+              Style="border: 1px solid var(--mud-palette-lines-default);">
+
+        @* Stage strip *@
+        <div class="lifecycle-stages">
+            @for (int i = 0; i < _stages.Count; i++)
+            {
+                var stage = _stages[i];
+                var isLast = i == _stages.Count - 1;
+
+                <div class="lifecycle-stage @(stage.Status.ToLowerInvariant()) @(_selected == stage ? "active" : "")"
+                     @onclick="@(() => ToggleDetail(stage))">
+                    <div class="stage-icon-wrap">
+                        <div class="stage-pulse-ring @(stage.Status == "Current" ? "pulse" : "")"></div>
+                        <MudIcon Icon="@stage.Icon"
+                                 Size="Size.Small"
+                                 Color="@GetStageColor(stage.Status)"
+                                 Class="stage-icon" />
+                    </div>
+                    <MudText Typo="Typo.caption"
+                             Class="stage-label"
+                             Color="@(stage.Status == "Pending" ? Color.Secondary : Color.Default)">
+                        @stage.Label
+                    </MudText>
+                    @if (stage.CompletedAt.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="stage-date">
+                            @stage.CompletedAt.Value.ToString("dd MMM")
+                        </MudText>
+                    }
+                </div>
+
+                @if (!isLast)
+                {
+                    <div class="lifecycle-connector @(stage.Status == "Completed" ? "done" : "")"></div>
+                }
+            }
+        </div>
+
+        @* Detail panel (shown on click) *@
+        @if (_selected != null)
+        {
+            <MudPaper Elevation="0" Class="lifecycle-detail pa-3 mt-3 rounded"
+                      Style="background: var(--mud-palette-background-grey);">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@_selected.Icon" Color="@GetStageColor(_selected.Status)" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle2">@_selected.Label</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStageColor(_selected.Status)">@_selected.Status</MudChip>
+                    </MudStack>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small"
+                                   OnClick="@(() => _selected = null)" />
+                </MudStack>
+
+                @if (!string.IsNullOrEmpty(_selected.EntityReference))
+                {
+                    <MudText Typo="Typo.body2" Class="mt-1">
+                        Ref: <strong>@_selected.EntityReference</strong>
+                    </MudText>
+                }
+                @if (_selected.CompletedAt.HasValue)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @(_selected.Status == "Completed" ? "Completed" : "Updated"):
+                        @_selected.CompletedAt.Value.ToString("dd MMM yyyy HH:mm")
+                    </MudText>
+                }
+                @if (!string.IsNullOrEmpty(_selected.Note))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">@_selected.Note</MudText>
+                }
+                @if (!string.IsNullOrEmpty(_selected.NavigateTo))
+                {
+                    <MudButton Variant="Variant.Text"
+                               Size="Size.Small"
+                               EndIcon="@Icons.Material.Outlined.OpenInNew"
+                               Class="mt-2"
+                               OnClick="@(() => NavigateToStage(_selected))">
+                        View @_selected.Label
+                    </MudButton>
+                }
+            </MudPaper>
+        }
+    </MudPaper>
+}
+
+<style>
+    .lifecycle-tracker { overflow-x: auto; }
+    .lifecycle-stages {
+        display: flex;
+        align-items: flex-start;
+        gap: 0;
+        min-width: 0;
+    }
+    .lifecycle-stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+        min-width: 72px;
+        padding: 4px;
+        border-radius: 8px;
+        transition: background 0.15s ease;
+        position: relative;
+    }
+    .lifecycle-stage:hover       { background: var(--mud-palette-action-hover); }
+    .lifecycle-stage.active      { background: color-mix(in srgb, var(--mud-palette-primary) 8%, transparent); }
+    .lifecycle-stage.pending     { opacity: 0.45; }
+    .lifecycle-connector {
+        flex: 1;
+        height: 2px;
+        background: var(--mud-palette-lines-default);
+        margin-top: 18px;
+        min-width: 16px;
+    }
+    .lifecycle-connector.done    { background: var(--mud-palette-success); }
+    .stage-icon-wrap {
+        position: relative;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .stage-pulse-ring {
+        position: absolute;
+        inset: -4px;
+        border-radius: 50%;
+    }
+    .stage-pulse-ring.pulse {
+        border: 2px solid var(--mud-palette-primary);
+        animation: lifecycle-pulse 1.6s ease-in-out infinite;
+    }
+    @@keyframes lifecycle-pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.4; transform: scale(1.3); }
+    }
+    .stage-icon  { z-index: 1; }
+    .stage-label { margin-top: 4px; text-align: center; font-size: 11px; line-height: 1.2; }
+    .stage-date  { font-size: 10px; opacity: 0.6; }
+    .lifecycle-detail { border: 1px solid var(--mud-palette-lines-default); }
+    .lifecycle-compact .completed { opacity: 1; }
+    .lifecycle-compact .pending   { opacity: 0.35; }
+</style>
+
+@code {
+    /// <summary>Gets or sets the lifecycle DTO to visualize. When null a loading skeleton is shown.</summary>
+    [Parameter] public OrderLifecycleDto? Lifecycle { get; set; }
+
+    /// <summary>Gets or sets whether to render in compact (icon-strip) mode.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    private List<OrderLifecycleStageDto> _stages = new();
+    private OrderLifecycleStageDto? _selected;
+
+    protected override void OnParametersSet()
+    {
+        _stages = Lifecycle?.Stages ?? new();
+        _selected = null;
+    }
+
+    private void ToggleDetail(OrderLifecycleStageDto stage) =>
+        _selected = _selected == stage ? null : stage;
+
+    private void NavigateToStage(OrderLifecycleStageDto stage)
+    {
+        if (!string.IsNullOrEmpty(stage.NavigateTo))
+            Navigation.NavigateTo(stage.NavigateTo);
+    }
+
+    private static Color GetStageColor(string status) => status switch
+    {
+        "Completed" => Color.Success,
+        "Current"   => Color.Primary,
+        "Failed"    => Color.Error,
+        _           => Color.Default
+    };
+}

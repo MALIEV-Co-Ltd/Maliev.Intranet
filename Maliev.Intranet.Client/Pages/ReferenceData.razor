@@ -1,104 +1,10 @@
 @page "/admin/reference-data"
-@inject Maliev.Intranet.Shared.Services.IReferenceDataService ReferenceDataService
-
-<PageTitle>Reference Data - Maliev Intranet</PageTitle>
-
-<MudText Typo="Typo.h4" Class="mb-4">Reference Data Management</MudText>
-
-<MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-    <MudTabs Elevation="0" Rounded="false" TabPanelsClass="pa-4">
-        <!-- Countries Tab -->
-        <MudTabPanel Text="Countries" Icon="@Icons.Material.Outlined.Public">
-            @if (_isLoading)
-            {
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
-            }
-            else
-            {
-                <MudStack Spacing="3">
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudTextField @bind-Value="_searchString" Placeholder="Search countries..." Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 300px;" />
-                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Upload">Import CSV</MudButton>
-                    </MudStack>
-                    
-                    <MudDataGrid T="Maliev.Intranet.Shared.CountryDto" Items="@_countries" Dense="true" Hover="true" Elevation="0">
-                        <Columns>
-                            <PropertyColumn Property="x => x.Code" Title="Code" />
-                            <PropertyColumn Property="x => x.Name" Title="Name" />
-                            <TemplateColumn Title="Actions" Sortable="false">
-                                <CellTemplate>
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
-                                </CellTemplate>
-                            </TemplateColumn>
-                        </Columns>
-                    </MudDataGrid>
-                </MudStack>
-            }
-        </MudTabPanel>
-
-        <!-- Currencies Tab -->
-        <MudTabPanel Text="Currencies" Icon="@Icons.Material.Outlined.AttachMoney">
-            @if (_isLoading)
-            {
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Class="rounded" />
-            }
-            else
-            {
-                <MudStack Spacing="3">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Add Currency</MudButton>
-                    
-                    <MudDataGrid T="CurrencyDto" Items="@_currencies" Dense="true" Hover="true" Elevation="0">
-                        <Columns>
-                            <PropertyColumn Property="x => x.Code" Title="Code" />
-                            <PropertyColumn Property="x => x.Name" Title="Name" />
-                            <PropertyColumn Property="x => x.Symbol" Title="Symbol" />
-                            <PropertyColumn Property="x => x.ExchangeRate" Title="Exchange Rate" Format="N4" />
-                            <TemplateColumn Title="Actions" Sortable="false">
-                                <CellTemplate>
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
-                                </CellTemplate>
-                            </TemplateColumn>
-                        </Columns>
-                    </MudDataGrid>
-                </MudStack>
-            }
-        </MudTabPanel>
-
-        <!-- Tax Codes Tab -->
-        <MudTabPanel Text="Tax Codes" Icon="@Icons.Material.Outlined.Receipt">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Tax code configuration will appear here</MudText>
-        </MudTabPanel>
-    </MudTabs>
-</MudPaper>
+@inject NavigationManager Navigation
 
 @code {
-    private bool _isLoading = true;
-    private string _searchString = "";
-    private List<Maliev.Intranet.Shared.CountryDto> _countries = new();
-    private List<CurrencyDto> _currencies = new();
-
-    protected override async Task OnInitializedAsync()
+    /// <summary>Redirects legacy /admin/reference-data route to the consolidated Settings page (Reference Data tab).</summary>
+    protected override void OnInitialized()
     {
-        try
-        {
-            _countries = await ReferenceDataService.GetCountriesAsync();
-            _currencies = new();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading reference data: {ex.Message}");
-        }
-        finally
-        {
-            _isLoading = false;
-        }
-    }
-
-    public class CurrencyDto
-    {
-        public string Code { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Symbol { get; set; } = "";
-        public decimal ExchangeRate { get; set; }
+        Navigation.NavigateTo("/admin/settings?tab=reference-data", replace: true);
     }
 }

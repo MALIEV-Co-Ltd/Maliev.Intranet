@@ -4,136 +4,287 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject NavigationManager Navigation
 
-<PageTitle>Procurement - Maliev Intranet</PageTitle>
+<PageTitle>Procurement & Suppliers - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Purchase Orders</MudText>
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h4">Procurement &amp; Suppliers</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Purchase orders and supplier relationship management</MudText>
+    </div>
+</MudStack>
 
-<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-        <MudTextField @bind-Value="_searchString" 
-                      Placeholder="Search POs..." 
-                      Adornment="Adornment.Start" 
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Variant="Variant.Outlined" 
-                      Margin="Margin.Dense" 
-                      Style="max-width: 400px;" />
-        
-        <MudButton Variant="Variant.Filled" 
-                   Color="Color.Primary" 
-                   StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="@OpenCreatePoDialog">
-            Create PO
-        </MudButton>
-    </MudStack>
-</MudPaper>
+<MudTabs @bind-ActivePanelIndex="_activeMainTab" Elevation="0" Rounded="true" ApplyEffectsToContainer="true"
+         TabPanelsClass="pt-4" Color="Color.Primary">
 
-    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-    <MudTabs @bind-ActivePanelIndex="_activeTab" Elevation="0" Rounded="false" TabPanelsClass="pa-0" Class="border-b mud-border-lines-default">
-        <MudTabPanel Text="Active" Icon="@Icons.Material.Outlined.LocalShipping" BadgeData="@(_purchaseOrders.Count(x => x.Status == "Ordered" || x.Status == "Approved") > 0 ? _purchaseOrders.Count(x => x.Status == "Ordered" || x.Status == "Approved") : null)" BadgeColor="Color.Primary" />
-        <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit" BadgeData="@(_purchaseOrders.Count(x => x.Status == "Draft") > 0 ? _purchaseOrders.Count(x => x.Status == "Draft") : null)" BadgeColor="Color.Default" />
-        <MudTabPanel Text="History" Icon="@Icons.Material.Outlined.History" />
-    </MudTabs>
+    <!-- TAB 0: Purchase Orders -->
+    <MudTabPanel Text="Purchase Orders" Icon="@Icons.Material.Outlined.ShoppingCart">
+        <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudTextField @bind-Value="_searchString"
+                              Placeholder="Search POs..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Style="max-width: 400px;" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@OpenCreatePoDialog">
+                    Create PO
+                </MudButton>
+            </MudStack>
+        </MudPaper>
 
-    @if (_isLoading)
-    {
-        <div class="pa-4">
-            @for (int i = 0; i < 5; i++)
+        <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+            <MudTabs @bind-ActivePanelIndex="_poTab" Elevation="0" Rounded="false" TabPanelsClass="pa-0" Class="border-b mud-border-lines-default">
+                <MudTabPanel Text="Active" Icon="@Icons.Material.Outlined.LocalShipping"
+                             BadgeData="@(_purchaseOrders.Count(x => x.Status is "Ordered" or "Approved") is var c1 and > 0 ? c1 : null)"
+                             BadgeColor="Color.Primary" />
+                <MudTabPanel Text="Draft" Icon="@Icons.Material.Outlined.Edit"
+                             BadgeData="@(_purchaseOrders.Count(x => x.Status == "Draft") is var c2 and > 0 ? c2 : null)"
+                             BadgeColor="Color.Default" />
+                <MudTabPanel Text="History" Icon="@Icons.Material.Outlined.History" />
+            </MudTabs>
+
+            @if (_poLoading)
             {
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2 rounded" />
+                <div class="pa-4">
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2 rounded" />
+                    }
+                </div>
             }
-        </div>
-    }
-    else
-    {
-        <MudDataGrid T="PurchaseOrderDto" Items="@FilteredOrders" Dense="true" Hover="true" Elevation="0">
-            <Columns>
-                <PropertyColumn Property="x => x.PoNumber" Title="PO #" />
-                <PropertyColumn Property="x => x.SupplierName" Title="Supplier" />
-                <PropertyColumn Property="x => x.ItemsCount" Title="Items" />
-                <PropertyColumn Property="x => x.TotalValue" Title="Total" Format="C2" />
-                <TemplateColumn Title="Status">
-                    <CellTemplate>
-                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
-                            @context.Item.Status
-                        </MudChip>
-                    </CellTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="x => x.CreatedDate" Title="Created" Format="dd MMM yyyy" />
-                <PropertyColumn Property="x => x.ExpectedDelivery" Title="Expected" Format="dd MMM yyyy" />
-                <TemplateColumn Title="Actions" Sortable="false">
-                    <CellTemplate>
-                        <MudStack Row="true" Spacing="1">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Primary" OnClick="@(() => ViewDetails(context.Item))" />
-                            @if (context.Item.Status == "Draft")
+            else
+            {
+                <MudDataGrid T="PurchaseOrderDto" Items="@FilteredOrders" Dense="true" Hover="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.PoNumber" Title="PO #" />
+                        <PropertyColumn Property="x => x.SupplierName" Title="Supplier" />
+                        <PropertyColumn Property="x => x.ItemsCount" Title="Items" />
+                        <PropertyColumn Property="x => x.TotalValue" Title="Total" Format="C2" />
+                        <TemplateColumn Title="Status">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@GetPoStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.CreatedDate" Title="Created" Format="dd MMM yyyy" />
+                        <PropertyColumn Property="x => x.ExpectedDelivery" Title="Expected" Format="dd MMM yyyy" />
+                        <TemplateColumn Title="Actions" Sortable="false">
+                            <CellTemplate>
+                                <MudStack Row="true" Spacing="1">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Primary" OnClick="@(() => ViewDetails(context.Item))" />
+                                    @if (context.Item.Status == "Draft")
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Check" Size="Size.Small" Color="Color.Success" OnClick="@(() => ApprovePo(context.Item))" />
+                                    }
+                                </MudStack>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent>
+                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No purchase orders found</MudText>
+                    </NoRecordsContent>
+                </MudDataGrid>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- TAB 1: Suppliers -->
+    <MudTabPanel Text="Suppliers" Icon="@Icons.Material.Outlined.LocalShipping">
+        <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudTextField @bind-Value="_supplierSearch"
+                              Placeholder="Search suppliers..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Style="max-width: 400px;" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@(() => Snackbar.Add("Add supplier coming soon", Severity.Info))">
+                    Add Supplier
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        @if (_suppliersLoading)
+        {
+            <MudGrid>
+                @for (int i = 0; i < 5; i++)
+                {
+                    <MudItem xs="12" md="4">
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" Class="mb-2 rounded" />
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg" Style="max-height: 600px; overflow-y: auto;">
+                        <MudList T="SupplierSummaryDto" Dense="true" SelectedValue="_selectedSupplier">
+                            @foreach (var supplier in _suppliers)
                             {
-                                <MudIconButton Icon="@Icons.Material.Outlined.Check" Size="Size.Small" Color="Color.Success" OnClick="@(() => ApprovePo(context.Item))" />
+                                <MudListItem T="SupplierSummaryDto" Value="supplier" OnClick="@(() => OnSupplierSelected(supplier))">
+                                    <MudStack Spacing="1">
+                                        <MudText Typo="Typo.subtitle2">@supplier.Name</MudText>
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudRating SelectedValue="(int)supplier.Rating" Size="Size.Small" ReadOnly="true" />
+                                            <MudChip T="string" Size="Size.Small" Color="@GetSupplierStatusColor(supplier.Status)">@supplier.Status</MudChip>
+                                        </MudStack>
+                                    </MudStack>
+                                </MudListItem>
+                                <MudDivider />
                             }
+                            @if (!_suppliers.Any())
+                            {
+                                <MudText Class="pa-4 text-center" Color="Color.Secondary">No suppliers found</MudText>
+                            }
+                        </MudList>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" md="8">
+                    @if (_selectedSupplierDetails != null)
+                    {
+                        <MudStack Spacing="3">
+                            <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-4">
+                                    <div>
+                                        <MudText Typo="Typo.h5">@_selectedSupplierDetails.Name</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_selectedSupplierDetails.Country</MudText>
+                                    </div>
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Edit">Edit</MudButton>
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ShoppingCart">Create PO</MudButton>
+                                    </MudStack>
+                                </MudStack>
+                                <MudDivider Class="my-4" />
+                                <MudGrid>
+                                    <MudItem xs="6">
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Contact Information</MudText>
+                                        <MudStack Spacing="1">
+                                            <MudText Typo="Typo.body2"><strong>Email:</strong> @_selectedSupplierDetails.Email</MudText>
+                                            <MudText Typo="Typo.body2"><strong>Phone:</strong> @_selectedSupplierDetails.Phone</MudText>
+                                            <MudText Typo="Typo.body2"><strong>Address:</strong> @_selectedSupplierDetails.Address</MudText>
+                                        </MudStack>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Performance</MudText>
+                                        <MudStack Spacing="2">
+                                            <div>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">Rating</MudText>
+                                                <MudRating SelectedValue="@((int)_selectedSupplierDetails.Rating)" ReadOnly="true" />
+                                            </div>
+                                            <div>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                                                <MudChip T="string" Color="@GetSupplierStatusColor(_selectedSupplierDetails.Status)" Size="Size.Small">@_selectedSupplierDetails.Status</MudChip>
+                                            </div>
+                                        </MudStack>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                            <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                                <MudText Typo="Typo.h6" Class="mb-3">Recent Activity</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Activity history integration pending.</MudText>
+                            </MudPaper>
                         </MudStack>
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-            <NoRecordsContent>
-                <MudText Class="pa-4 text-center" Color="Color.Secondary">No purchase orders found</MudText>
-            </NoRecordsContent>
-        </MudDataGrid>
-    }
-</MudPaper>
+                    }
+                    else if (_isDetailsLoading)
+                    {
+                        <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Class="rounded-lg mb-4" />
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
+                            <MudText Typo="Typo.h6" Color="Color.Secondary">Select a supplier to view details</MudText>
+                        </MudPaper>
+                    }
+                </MudItem>
+            </MudGrid>
+        }
+    </MudTabPanel>
+</MudTabs>
 
 @code {
-    private bool _isLoading = true;
+    private int _activeMainTab = 0;
+
+    // ─── Purchase Orders ──────────────────────────────────────────────────────
+    private bool _poLoading = true;
     private string _searchString = "";
-    private int _activeTab = 0;
+    private int _poTab = 0;
     private List<PurchaseOrderDto> _purchaseOrders = new();
 
     private IEnumerable<PurchaseOrderDto> FilteredOrders
     {
         get
         {
-            IEnumerable<PurchaseOrderDto> tabFiltered = _activeTab switch
+            IEnumerable<PurchaseOrderDto> tabFiltered = _poTab switch
             {
-                0 => _purchaseOrders.Where(x => x.Status == "Ordered" || x.Status == "Approved"),
-                1 => _purchaseOrders.Where(x => x.Status == "Draft" || x.Status == "Pending Approval"),
-                2 => _purchaseOrders.Where(x => x.Status == "Received" || x.Status == "Cancelled"),
+                0 => _purchaseOrders.Where(x => x.Status is "Ordered" or "Approved"),
+                1 => _purchaseOrders.Where(x => x.Status is "Draft" or "Pending Approval"),
+                2 => _purchaseOrders.Where(x => x.Status is "Received" or "Cancelled"),
                 _ => _purchaseOrders
             };
-            if (string.IsNullOrEmpty(_searchString))
-                return tabFiltered;
+            if (string.IsNullOrEmpty(_searchString)) return tabFiltered;
             return tabFiltered.Where(x =>
                 x.PoNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
                 x.SupplierName.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
         }
     }
 
+    // ─── Suppliers ────────────────────────────────────────────────────────────
+    private bool _suppliersLoading = true;
+    private bool _isDetailsLoading = false;
+    private string _supplierSearch = "";
+    private List<SupplierSummaryDto> _suppliers = new();
+    private SupplierSummaryDto? _selectedSupplier;
+    private SupplierDetailDto? _selectedSupplierDetails;
+
+    /// <summary>
+    /// Initializes the Procurement and Suppliers page, loading PO and supplier data in parallel.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
-        await LoadData();
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        if (query["tab"] == "suppliers") _activeMainTab = 1;
+
+        await Task.WhenAll(LoadPurchaseOrders(), LoadSuppliers());
     }
 
-    private async Task LoadData()
+    private async Task LoadPurchaseOrders()
     {
         try
         {
-            _isLoading = true;
+            _poLoading = true;
             var response = await Http.GetFromJsonAsync<PagedResponse<PurchaseOrderDto>>("api/procurement");
             _purchaseOrders = response?.Data.ToList() ?? new();
         }
-        catch (Exception ex)
+        catch (Exception ex) { Snackbar.Add($"Error loading procurement data: {ex.Message}", Severity.Error); }
+        finally { _poLoading = false; }
+    }
+
+    private async Task LoadSuppliers()
+    {
+        try
         {
-            Snackbar.Add($"Error loading procurement data: {ex.Message}", Severity.Error);
+            _suppliersLoading = true;
+            var response = await Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>("api/suppliers");
+            _suppliers = response?.Data.ToList() ?? new();
         }
-        finally
-        {
-            _isLoading = false;
-        }
+        catch (Exception ex) { Console.WriteLine($"Error loading suppliers: {ex.Message}"); }
+        finally { _suppliersLoading = false; }
     }
 
     private async Task ViewDetails(PurchaseOrderDto po)
     {
-        var parameters = new DialogParameters<PurchaseOrderDetailDialog>
-        {
-            { x => x.PurchaseOrderId, po.Id }
-        };
+        var parameters = new DialogParameters<PurchaseOrderDetailDialog> { { x => x.PurchaseOrderId, po.Id } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true };
         await DialogService.ShowAsync<PurchaseOrderDetailDialog>($"PO {po.PoNumber}", parameters, options);
     }
@@ -143,11 +294,7 @@
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<CreatePurchaseOrderDialog>("Create Purchase Order", new DialogParameters(), options);
         var result = await dialog.Result;
-        if (result is { Canceled: false })
-        {
-            await LoadData();
-            Snackbar.Add("Purchase order created", Severity.Success);
-        }
+        if (result is { Canceled: false }) { await LoadPurchaseOrders(); Snackbar.Add("Purchase order created", Severity.Success); }
     }
 
     private async Task ApprovePo(PurchaseOrderDto po)
@@ -157,32 +304,30 @@
         try
         {
             var response = await Http.PatchAsync($"api/procurement/{po.Id}/approve", null);
-            if (response.IsSuccessStatusCode)
-            {
-                Snackbar.Add($"PO {po.PoNumber} approved", Severity.Success);
-                await LoadData();
-            }
-            else
-            {
-                Snackbar.Add("Approval failed", Severity.Error);
-            }
+            if (response.IsSuccessStatusCode) { Snackbar.Add($"PO {po.PoNumber} approved", Severity.Success); await LoadPurchaseOrders(); }
+            else { Snackbar.Add("Approval failed", Severity.Error); }
         }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
-        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
     }
 
-    private Color GetStatusColor(string status) => status switch
+    private async Task OnSupplierSelected(SupplierSummaryDto supplier)
     {
-        "Draft" => Color.Default,
-        "Pending Approval" => Color.Warning,
-        "Approved" => Color.Info,
-        "Ordered" => Color.Primary,
-        "Partial" => Color.Warning,
-        "Received" => Color.Success,
-        "Cancelled" => Color.Error,
-        _ => Color.Default
+        _selectedSupplier = supplier;
+        _isDetailsLoading = true;
+        _selectedSupplierDetails = null;
+        try { _selectedSupplierDetails = await Http.GetFromJsonAsync<SupplierDetailDto>($"api/suppliers/{supplier.Id}"); }
+        catch (Exception ex) { Console.WriteLine($"Error loading supplier details: {ex.Message}"); }
+        finally { _isDetailsLoading = false; }
+    }
+
+    private Color GetPoStatusColor(string status) => status switch
+    {
+        "Draft" => Color.Default, "Pending Approval" => Color.Warning, "Approved" => Color.Info,
+        "Ordered" => Color.Primary, "Partial" => Color.Warning, "Received" => Color.Success, "Cancelled" => Color.Error, _ => Color.Default
+    };
+
+    private Color GetSupplierStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success, "Inactive" => Color.Default, "Pending" => Color.Warning, _ => Color.Default
     };
 }
-

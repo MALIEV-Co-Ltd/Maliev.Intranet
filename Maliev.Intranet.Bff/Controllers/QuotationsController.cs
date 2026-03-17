@@ -1,6 +1,7 @@
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,21 +11,23 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for quotation-related operations, proxying to the Quotation Service.
 /// </summary>
 /// <param name="client">The quotation service client.</param>
+/// <param name="pdfClient">The PDF service client.</param>
 [ApiController]
 [Route("api/[controller]")]
-public class QuotationsController(QuotationServiceClient client) : ControllerBase
+public class QuotationsController(QuotationServiceClient client, PdfServiceClient pdfClient) : ControllerBase
 {
     /// <summary>
     /// Retrieves a paged list of quotations.
     /// </summary>
+    /// <param name="customerId">Optional customer ID filter.</param>
     /// <param name="page">The page number.</param>
     /// <param name="pageSize">The number of items per page.</param>
     /// <returns>A paged list of quotations.</returns>
     [RequirePermission(MalievPermissions.Quotation.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<QuotationSummaryDto>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<ActionResult<PagedResponse<QuotationSummaryDto>>> Get([FromQuery] Guid? customerId = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var result = await client.GetQuotationsAsync(page, pageSize);
+        var result = await client.GetQuotationsAsync(customerId, page, pageSize);
         return result != null ? Ok(result) : Ok(new PagedResponse<QuotationSummaryDto>());
     }
 
@@ -112,5 +115,44 @@ public class QuotationsController(QuotationServiceClient client) : ControllerBas
     {
         var response = await client.AddNoteAsync(id, request, ct);
         return response.IsSuccessStatusCode ? StatusCode(201) : StatusCode((int)response.StatusCode);
+    }
+
+    /// <summary>
+    /// Generates a PDF for a quotation.
+    /// </summary>
+    /// <param name="id">The quotation ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The PDF URL.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/pdf")]
+    public async Task<ActionResult<string>> GeneratePdf(Guid id, CancellationToken ct)
+    {
+        var quotation = await client.GetQuotationByIdAsync(id);
+        if (quotation == null) return NotFound();
+
+        var pdfData = new QuotationPdfData
+        {
+            QuotationNumber = quotation.QuotationNumber,
+            CustomerName = quotation.CustomerName,
+            QuotationDate = quotation.CreatedAt,
+            TotalAmount = (double)quotation.Total,
+            Currency = quotation.CurrencyCode ?? "THB",
+            Items = quotation.Versions?.FirstOrDefault()?.LineItems?.Select((item, index) => new QuotationPdfItem
+            {
+                Index = index + 1,
+                Description = item.Description,
+                Quantity = (double)item.Quantity,
+                UnitPrice = (double)item.UnitPrice,
+                TotalPrice = (double)(item.Quantity * item.UnitPrice)
+            }).ToList() ?? []
+        };
+
+        var pdfUrl = await pdfClient.GeneratePdfAsync(
+            PdfDocumentType.Quotation,
+            id.ToString(),
+            pdfData,
+            ct: ct);
+
+        return pdfUrl != null ? Ok(pdfUrl) : BadRequest("Failed to generate PDF");
     }
 }

@@ -69,7 +69,13 @@ public class QuotationsControllerExtendedTests
         var response = new QuotationSummaryDto { Id = Guid.NewGuid() };
         var handler = new MockHttpMessageHandler((req, ct) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) }));
         var client = new QuotationServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
-        var controller = new QuotationsController(client);
+        var pdfHandler = new MockHttpMessageHandler((req, ct) =>
+        {
+            var pdfResponse = new { storageUrl = "http://test.pdf" };
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(pdfResponse) });
+        });
+        var pdfClient = new PdfServiceClient(new HttpClient(pdfHandler) { BaseAddress = new Uri("http://test") });
+        var controller = new QuotationsController(client, pdfClient);
         var result = await controller.Create(new CreateQuotationRequest(), CancellationToken.None);
         Assert.IsType<CreatedAtActionResult>(result.Result);
     }

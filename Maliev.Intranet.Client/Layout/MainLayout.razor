@@ -7,9 +7,10 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LayoutService LayoutService
-    @inject ChatService ChatService
-    @inject IJSRuntime JSRuntime
-    @inject ILogger<MainLayout> Logger
+@inject ChatService ChatService
+@inject BreadcrumbService BreadcrumbService
+@inject IJSRuntime JSRuntime
+@inject ILogger<MainLayout> Logger
 @implements IAsyncDisposable
 
 <MudThemeProvider @ref="@_mudThemeProvider" 
@@ -169,6 +170,13 @@
                                        Size="Size.Medium"
                                        Class="d-none d-md-inline-flex" />
                     </MudTooltip>
+
+                    @* TODO: LINE OA Integration - Add a LINE Messages notification badge here alongside the bell.
+                       When LINE Messaging API webhook is configured:
+                       1. SignalR hub pushes new LINE message events to connected employees
+                       2. Render a separate MudBadge with LINE green (#06C755) colour for unread LINE OA messages
+                       3. Clicking navigates to a future /sales/line-inbox page (conversation list view)
+                       4. This _hubConnection below should also subscribe to "ReceiveLineMessage" events *@
 
                     <!-- Notification - Desktop Only -->
                     <MudTooltip Text="Notifications" Class="d-none d-md-flex">
@@ -430,7 +438,9 @@
         _breadcrumbs.Clear();
         _breadcrumbs.Add(new BreadcrumbItem("Dashboard", href: "/"));
 
-        var uri = Navigation.ToBaseRelativePath(Navigation.Uri);
+        // Strip query string before parsing segments
+        var uriWithoutQuery = Navigation.Uri.Split('?')[0];
+        var uri = Navigation.ToBaseRelativePath(uriWithoutQuery);
         if (string.IsNullOrWhiteSpace(uri))
         {
             return;
@@ -438,24 +448,31 @@
 
         var segments = uri.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var currentHref = "";
+        var lastSegment = segments.Length > 0 ? segments[^1] : "";
 
         foreach (var segment in segments)
         {
             currentHref += $"/{segment}";
-            
+
             if (Guid.TryParse(segment, out _))
             {
-                _breadcrumbs.Add(new BreadcrumbItem("Details", href: null, disabled: true));
+                // Use the entity name from BreadcrumbService if the page registered one,
+                // otherwise fall back to a generic "Details" label.
+                var entityLabel = BreadcrumbService.CurrentLabel ?? "Details";
+                _breadcrumbs.Add(new BreadcrumbItem(entityLabel, href: null, disabled: true));
                 continue;
             }
 
             var title = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(segment.Replace("-", " "));
-            
-            if (segment.Equals("mfg", StringComparison.OrdinalIgnoreCase)) title = "Manufacturing";
-            if (segment.Equals("hr", StringComparison.OrdinalIgnoreCase)) title = "HR";
-            if (segment.Equals("iam", StringComparison.OrdinalIgnoreCase)) title = "IAM";
 
-            var isLast = segment == segments.Last();
+            if (segment.Equals("mfg", StringComparison.OrdinalIgnoreCase)) title = "Manufacturing";
+            else if (segment.Equals("hr", StringComparison.OrdinalIgnoreCase)) title = "HR";
+            else if (segment.Equals("iam", StringComparison.OrdinalIgnoreCase)) title = "IAM";
+            else if (segment.Equals("admin", StringComparison.OrdinalIgnoreCase)) title = "Operations";
+            else if (segment.Equals("sales", StringComparison.OrdinalIgnoreCase)) title = "Sales & CRM";
+            else if (segment.Equals("finance", StringComparison.OrdinalIgnoreCase)) title = "Finance";
+
+            var isLast = segment == lastSegment;
             _breadcrumbs.Add(new BreadcrumbItem(title, href: isLast ? null : currentHref, disabled: isLast));
         }
     }
@@ -468,8 +485,16 @@
     {
         LayoutService.MajorUpdateOccurred += OnLayoutUpdate;
         Navigation.LocationChanged += OnLocationChanged;
+        // Subscribe to BreadcrumbService so pages can push entity names and get instant re-render
+        BreadcrumbService.OnChanged += OnBreadcrumbChanged;
         UpdateBreadcrumbs();
         // Note: Do NOT initialize LayoutService here - wait for OnAfterRenderAsync when JS is ready
+    }
+
+    private void OnBreadcrumbChanged()
+    {
+        UpdateBreadcrumbs();
+        InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -507,6 +532,15 @@
                         InvokeAsync(StateHasChanged);
                     });
 
+                    // TODO: LINE OA Integration - Register a "ReceiveLineMessage" hub handler here.
+                    // _hubConnection.On<LineMessageNotificationDto>("ReceiveLineMessage", (msg) =>
+                    // {
+                    //     _hasUnreadLineMessages = true;
+                    //     Snackbar.Add($"LINE: {msg.CustomerName} — {msg.Preview}", Severity.Normal, ...);
+                    //     InvokeAsync(StateHasChanged);
+                    // });
+                    // Requires: LINE webhook -> BFF LineWebhookController -> SignalR hub broadcast
+
                     await _hubConnection.StartAsync();
                 }
                 catch (Exception ex)
@@ -520,6 +554,8 @@
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         ChatService.CurrentContext = Navigation.Uri;
+        // Clear any entity label registered by the previous page before rebuilding breadcrumbs
+        BreadcrumbService.Clear();
         UpdateBreadcrumbs();
         StateHasChanged();
     }
@@ -581,7 +617,8 @@
     {
         LayoutService.MajorUpdateOccurred -= OnLayoutUpdate;
         Navigation.LocationChanged -= OnLocationChanged;
-        
+        BreadcrumbService.OnChanged -= OnBreadcrumbChanged;
+
         if (_hubConnection is not null)
         {
             await _hubConnection.DisposeAsync();

@@ -18,13 +18,14 @@ public class OrdersController(OrderServiceClient client) : ControllerBase
     /// <summary>
     /// Retrieves a paged list of orders.
     /// </summary>
+    /// <param name="customerId">Optional customer ID filter.</param>
     /// <param name="page">The page number.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A paged list of orders.</returns>
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<OrderSummaryDto>>> Get([FromQuery] int page = 1, CancellationToken ct = default)
+    public async Task<ActionResult<PagedResponse<OrderSummaryDto>>> Get([FromQuery] Guid? customerId = null, [FromQuery] int page = 1, CancellationToken ct = default)
     {
-        var result = await client.GetOrdersAsync(page, ct);
+        var result = await client.GetOrdersAsync(customerId, page, ct);
         return result != null ? Ok(result) : Ok(new PagedResponse<OrderSummaryDto>());
     }
 

@@ -4,121 +4,230 @@
 @inject HttpClient Http
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
-<PageTitle>Materials - Maliev Intranet</PageTitle>
+<PageTitle>Materials & Inventory - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Materials Catalog</MudText>
-
-<MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-        <MudTextField @bind-Value="_searchString" 
-                      Placeholder="Search materials..." 
-                      Adornment="Adornment.Start" 
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Variant="Variant.Outlined" 
-                      Margin="Margin.Dense" 
-                      Style="max-width: 400px;" />
-        
-        <MudStack Row="true" Spacing="2">
-            <MudSelect @bind-Value="_filterCategory" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 150px;">
-                <MudSelectItem Value="@("All")">All Categories</MudSelectItem>
-                <MudSelectItem Value="@("Plastics")">Plastics</MudSelectItem>
-                <MudSelectItem Value="@("Metals")">Metals</MudSelectItem>
-                <MudSelectItem Value="@("Composites")">Composites</MudSelectItem>
-            </MudSelect>
-            
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Primary" 
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenCreateDialog">
-                Add Material
-            </MudButton>
-        </MudStack>
-    </MudStack>
-</MudPaper>
-
-@if (_isLoading)
-{
-    <div class="pa-4">
-        @for (int i = 0; i < 6; i++)
-        {
-            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="70px" Class="mb-2 rounded" />
-        }
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h4">Materials &amp; Inventory</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Material catalog, stock levels, and reorder management</MudText>
     </div>
-}
-else
-{
-    <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
-        <MudDataGrid T="MaterialSummaryDto" 
-                     Items="@_materials" 
-                     Dense="true" 
-                     Hover="true"
-                     RowsPerPage="10"
-                     Elevation="0">
-            <Columns>
-                <PropertyColumn Property="x => x.Name" Title="Material Name" />
-                <PropertyColumn Property="x => x.Category" Title="Category" />
-                <TemplateColumn Title="Stock Level">
-                    <CellTemplate>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudText Typo="Typo.body2">@context.Item.QuantityOnHand @context.Item.Unit</MudText>
-                        </MudStack>
-                    </CellTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="x => x.UnitPrice" Title="Unit Price" Format="C2" />
-                <TemplateColumn Title="Status">
-                    <CellTemplate>
-                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
-                            @context.Item.Status
-                        </MudChip>
-                    </CellTemplate>
-                </TemplateColumn>
-                <TemplateColumn Title="Actions" Sortable="false">
-                    <CellTemplate>
-                        <MudStack Row="true" Spacing="1">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Visibility" 
-                                           Size="Size.Small" 
-                                           Color="Color.Default" 
-                                           Href="@($"/mfg/materials/{context.Item.Id}")" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" 
-                                           Size="Size.Small" 
-                                           Color="Color.Primary" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" 
-                                           Size="Size.Small" 
-                                           Color="Color.Error" 
-                                           OnClick="@(() => DeleteMaterial(context.Item))" />
-                        </MudStack>
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-        </MudDataGrid>
-    </MudPaper>
-}
+</MudStack>
 
-@code {
-    private bool _isLoading = true;
-    private string _searchString = "";
-    private string _filterCategory = "All";
-    private List<MaterialSummaryDto> _materials = new();
+<MudTabs @bind-ActivePanelIndex="_activeTab" Elevation="0" Rounded="true" ApplyEffectsToContainer="true"
+         TabPanelsClass="pt-4" Color="Color.Primary">
 
-    protected override async Task OnInitializedAsync()
-    {
-        try
+    <!-- TAB 0: Catalog -->
+    <MudTabPanel Text="Catalog" Icon="@Icons.Material.Outlined.Category">
+        <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudTextField @bind-Value="_catalogSearch"
+                              Placeholder="Search materials..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Style="max-width: 400px;" />
+                <MudStack Row="true" Spacing="2">
+                    <MudSelect @bind-Value="_filterCategory" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 150px;">
+                        <MudSelectItem Value="@("All")">All Categories</MudSelectItem>
+                        <MudSelectItem Value="@("Plastics")">Plastics</MudSelectItem>
+                        <MudSelectItem Value="@("Metals")">Metals</MudSelectItem>
+                        <MudSelectItem Value="@("Composites")">Composites</MudSelectItem>
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog">
+                        Add Material
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        @if (_catalogLoading)
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>("api/materials");
-            if (response?.Data != null)
+            <div class="pa-4">
+                @for (int i = 0; i < 6; i++)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="70px" Class="mb-2 rounded" />
+                }
+            </div>
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+                <MudDataGrid T="MaterialSummaryDto" Items="@_materials" Dense="true" Hover="true" RowsPerPage="10" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Name" Title="Material Name" />
+                        <PropertyColumn Property="x => x.Category" Title="Category" />
+                        <TemplateColumn Title="Stock Level">
+                            <CellTemplate>
+                                <MudText Typo="Typo.body2">@context.Item.QuantityOnHand @context.Item.Unit</MudText>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.UnitPrice" Title="Unit Price" Format="C2" />
+                        <TemplateColumn Title="Status">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@GetMaterialStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Actions" Sortable="false">
+                            <CellTemplate>
+                                <MudStack Row="true" Spacing="1">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Default" Href="@($"/mfg/materials/{context.Item.Id}")" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteMaterial(context.Item))" />
+                                </MudStack>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- TAB 1: Inventory -->
+    <MudTabPanel Text="Inventory" Icon="@Icons.Material.Outlined.Inventory2">
+        <!-- Stats Row -->
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total SKUs</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;">@_materials.Count</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Low Stock Alerts</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Warning">@_materials.Count(m => m.Status == "Low Stock")</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Out of Stock</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Error">@_materials.Count(m => m.Status == "Out of Stock")</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Active Materials</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Success">@_materials.Count(m => m.Status == "Active")</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Elevation="0" Class="pa-4 mb-4 border mud-border-lines-default rounded-lg">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudTextField @bind-Value="_inventorySearch"
+                                  Placeholder="Search materials..."
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Style="min-width: 250px;" />
+                    <MudSelect T="string" @bind-Value="_statusFilter" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 160px;">
+                        <MudSelectItem Value="@("")">All Statuses</MudSelectItem>
+                        <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+                        <MudSelectItem Value="@("Low Stock")">Low Stock</MudSelectItem>
+                        <MudSelectItem Value="@("Out of Stock")">Out of Stock</MudSelectItem>
+                    </MudSelect>
+                </MudStack>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.FileDownload" OnClick="@(() => Snackbar.Add("Inventory export started...", Severity.Info))">Export</MudButton>
+            </MudStack>
+        </MudPaper>
+
+        @if (_catalogLoading)
+        {
+            @for (int i = 0; i < 6; i++)
             {
-                _materials = response.Data.ToList();
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2 rounded" />
             }
         }
-        catch (Exception ex)
+        else
         {
-            Snackbar.Add($"Error loading materials: {ex.Message}", Severity.Error);
+            <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
+                <MudDataGrid T="MaterialSummaryDto" Items="@FilteredInventory" Dense="true" Hover="true" Elevation="0" SortMode="SortMode.Single">
+                    <Columns>
+                        <PropertyColumn Property="x => x.SKU" Title="SKU" />
+                        <PropertyColumn Property="x => x.Name" Title="Material Name" />
+                        <PropertyColumn Property="x => x.Category" Title="Category" />
+                        <TemplateColumn Title="Stock Level">
+                            <CellTemplate>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText Typo="Typo.body2" Style="min-width:80px;">@context.Item.QuantityOnHand @context.Item.Unit</MudText>
+                                    <MudProgressLinear Color="@GetStockColor(context.Item)" Value="@GetStockPercent(context.Item)" Style="min-width:80px;" Size="Size.Small" />
+                                </MudStack>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.ReorderLevel" Title="Reorder At" />
+                        <TemplateColumn Title="Status">
+                            <CellTemplate>
+                                <MudChip T="string" Size="Size.Small" Color="@GetMaterialStatusColor(context.Item.Status)">@context.Item.Status</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.UnitPrice" Title="Unit Price" Format="C2" />
+                        <TemplateColumn Title="Actions" Sortable="false">
+                            <CellTemplate>
+                                <MudStack Row="true" Spacing="1">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Primary" Href="@($"/mfg/materials/{context.Item.Id}")" />
+                                    @if (context.Item.Status is "Low Stock" or "Out of Stock")
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Outlined.ShoppingCart" Size="Size.Small" Color="Color.Warning"
+                                                       OnClick="@(() => Snackbar.Add($"Create PO for {context.Item.Name}", Severity.Info))" />
+                                    }
+                                </MudStack>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent>
+                        <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+                            <MudIcon Icon="@Icons.Material.Outlined.Inventory2" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
+                            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No inventory data</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Add materials to see inventory levels here</MudText>
+                        </MudStack>
+                    </NoRecordsContent>
+                </MudDataGrid>
+            </MudPaper>
         }
-        finally
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private int _activeTab = 0;
+    private bool _catalogLoading = true;
+
+    // Shared data
+    private List<MaterialSummaryDto> _materials = new();
+
+    // Catalog filters
+    private string _catalogSearch = "";
+    private string _filterCategory = "All";
+
+    // Inventory filters
+    private string _inventorySearch = "";
+    private string _statusFilter = "";
+
+    private IEnumerable<MaterialSummaryDto> FilteredInventory => _materials
+        .Where(m => (string.IsNullOrEmpty(_inventorySearch) || m.Name.Contains(_inventorySearch, StringComparison.OrdinalIgnoreCase) || m.SKU.Contains(_inventorySearch, StringComparison.OrdinalIgnoreCase))
+                 && (string.IsNullOrEmpty(_statusFilter) || m.Status == _statusFilter));
+
+    /// <summary>
+    /// Initializes the Materials and Inventory page, checking for tab URL param and loading data.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        if (query["tab"] == "inventory") _activeTab = 1;
+
+        try
         {
-            _isLoading = false;
+            _catalogLoading = true;
+            var response = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>("api/materials?pageSize=200");
+            _materials = response?.Data.ToList() ?? new();
         }
+        catch (Exception ex) { Snackbar.Add($"Error loading materials: {ex.Message}", Severity.Error); }
+        finally { _catalogLoading = false; }
     }
 
     private async Task OpenCreateDialog()
@@ -126,40 +235,34 @@ else
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<CreateMaterialDialog>("Create Material", options);
         var result = await dialog.Result;
-
-        if (result != null && !result.Canceled)
-        {
-            await OnInitializedAsync();
-        }
+        if (result != null && !result.Canceled) await OnInitializedAsync();
     }
 
     private async Task DeleteMaterial(MaterialSummaryDto material)
     {
-        bool? result = await DialogService.ShowMessageBoxAsync(
-            "Delete Material", 
-            $"Are you sure you want to delete {material.Name}?", 
-            yesText: "Delete", cancelText: "Cancel");
-
+        bool? result = await DialogService.ShowMessageBoxAsync("Delete Material",
+            $"Are you sure you want to delete {material.Name}?", yesText: "Delete", cancelText: "Cancel");
         if (result == true)
         {
             var response = await Http.DeleteAsync($"api/materials/{material.Id}");
-            if (response.IsSuccessStatusCode)
-            {
-                Snackbar.Add("Material deleted", Severity.Success);
-                await OnInitializedAsync();
-            }
-            else
-            {
-                Snackbar.Add("Failed to delete material", Severity.Error);
-            }
+            if (response.IsSuccessStatusCode) { Snackbar.Add("Material deleted", Severity.Success); await OnInitializedAsync(); }
+            else { Snackbar.Add("Failed to delete material", Severity.Error); }
         }
     }
 
-    private Color GetStatusColor(string status) => status switch
+    private double GetStockPercent(MaterialSummaryDto m)
     {
-        "Active" => Color.Success,
-        "Low Stock" => Color.Warning,
-        "Out of Stock" => Color.Error,
-        _ => Color.Default
+        if (m.ReorderLevel <= 0) return 100;
+        return Math.Min(100, m.QuantityOnHand / (double)(m.ReorderLevel * 3) * 100);
+    }
+
+    private Color GetStockColor(MaterialSummaryDto m) => m.Status switch
+    {
+        "Out of Stock" => Color.Error, "Low Stock" => Color.Warning, _ => Color.Success
+    };
+
+    private Color GetMaterialStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success, "Low Stock" => Color.Warning, "Out of Stock" => Color.Error, "Discontinued" => Color.Dark, _ => Color.Default
     };
 }

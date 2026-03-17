@@ -1,0 +1,154 @@
+using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
+
+namespace Maliev.Intranet.Bff.Clients;
+
+/// <summary>
+/// Typed HTTP client for interacting with the ProjectService downstream API.
+/// </summary>
+/// <param name="httpClient">The HTTP client configured by <c>AddBffServiceClient</c>.</param>
+public class ProjectServiceClient(HttpClient httpClient)
+{
+    // ── Query endpoints ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Retrieves a paged list of projects with optional filtering.
+    /// </summary>
+    /// <param name="status">Optional status filter (e.g. "Configuring").</param>
+    /// <param name="search">Optional text search (project number, title, or customer name).</param>
+    /// <param name="customerId">Optional customer ID filter.</param>
+    /// <param name="page">1-based page number.</param>
+    /// <param name="pageSize">Number of items per page.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A paged response of project summaries.</returns>
+    public async Task<PagedResponse<ProjectSummaryDto>> GetProjectsAsync(
+        string? status = null, string? search = null, Guid? customerId = null,
+        int page = 1, int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        var url = $"/project/v1/projects?page={page}&pageSize={pageSize}";
+        if (!string.IsNullOrEmpty(status)) url += $"&status={Uri.EscapeDataString(status)}";
+        if (!string.IsNullOrEmpty(search)) url += $"&search={Uri.EscapeDataString(search)}";
+        if (customerId.HasValue) url += $"&customerId={customerId.Value}";
+
+        var response = await httpClient.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>(url, ct);
+        return response ?? new PagedResponse<ProjectSummaryDto>();
+    }
+
+    /// <summary>
+    /// Retrieves full detail for a single project by ID.
+    /// </summary>
+    /// <param name="id">The project GUID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The project detail DTO, or <c>null</c> if not found.</returns>
+    public async Task<ProjectDetailDto?> GetProjectByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync($"/project/v1/projects/{id}", ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<ProjectDetailDto>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Returns project statistics for the dashboard action items panel.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Aggregated project counts by status.</returns>
+    public async Task<ProjectStatsDto?> GetProjectStatsAsync(CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync("/project/v1/projects/stats", ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<ProjectStatsDto>(cancellationToken: ct);
+    }
+
+    // ── Mutation endpoints ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates a new project.
+    /// </summary>
+    public async Task<ProjectDetailDto?> CreateProjectAsync(CreateProjectRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/project/v1/projects", request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<ProjectDetailDto>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Updates an existing project's metadata (title, description, notes, validity).
+    /// </summary>
+    public async Task<HttpResponseMessage> UpdateProjectAsync(Guid id, object request, CancellationToken ct = default)
+        => await httpClient.PutAsJsonAsync($"/project/v1/projects/{id}", request, ct);
+
+    /// <summary>
+    /// Deletes a project (only permitted when in Draft status).
+    /// </summary>
+    public async Task<HttpResponseMessage> DeleteProjectAsync(Guid id, CancellationToken ct = default)
+        => await httpClient.DeleteAsync($"/project/v1/projects/{id}", ct);
+
+    // ── Part endpoints ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Adds a new part to an existing project.
+    /// </summary>
+    public async Task<ProjectPartDto?> AddPartAsync(Guid projectId, AddProjectPartRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/project/v1/projects/{projectId}/parts", request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<ProjectPartDto>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Updates the configuration of an existing part.
+    /// </summary>
+    public async Task<HttpResponseMessage> UpdatePartAsync(Guid projectId, Guid partId, UpdateProjectPartRequest request, CancellationToken ct = default)
+        => await httpClient.PutAsJsonAsync($"/project/v1/projects/{projectId}/parts/{partId}", request, ct);
+
+    /// <summary>
+    /// Removes a part from a project.
+    /// </summary>
+    public async Task<HttpResponseMessage> DeletePartAsync(Guid projectId, Guid partId, CancellationToken ct = default)
+        => await httpClient.DeleteAsync($"/project/v1/projects/{projectId}/parts/{partId}", ct);
+
+    // ── Pricing endpoints ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Requests AI price estimation for a specific part. Returns the detailed price breakdown.
+    /// </summary>
+    public async Task<ProjectPriceBreakdownDto?> GetPartPriceAsync(Guid projectId, Guid partId, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsync($"/project/v1/projects/{projectId}/parts/{partId}/price", null, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<ProjectPriceBreakdownDto>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Confirms or overrides the price for a specific part.
+    /// </summary>
+    public async Task<HttpResponseMessage> ConfirmPartPriceAsync(Guid projectId, Guid partId, ConfirmPartPriceRequest request, CancellationToken ct = default)
+        => await httpClient.PostAsJsonAsync($"/project/v1/projects/{projectId}/parts/{partId}/confirm-price", request, ct);
+
+    // ── Quotation lifecycle endpoints ────────────────────────────────────────
+
+    /// <summary>
+    /// Generates a quotation PDF for the project. Only allowed when all parts have confirmed prices.
+    /// </summary>
+    public async Task<HttpResponseMessage> GenerateQuotationAsync(Guid projectId, CancellationToken ct = default)
+        => await httpClient.PostAsync($"/project/v1/projects/{projectId}/generate-quotation", null, ct);
+
+    /// <summary>
+    /// Marks a project's quotation as accepted by the customer.
+    /// </summary>
+    public async Task<HttpResponseMessage> AcceptQuotationAsync(Guid projectId, CancellationToken ct = default)
+        => await httpClient.PostAsync($"/project/v1/projects/{projectId}/accept-quotation", null, ct);
+
+    // ── Dashboard helpers ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the count of projects currently in Configuring status (waiting for pricing).
+    /// Used by the dashboard action items panel.
+    /// </summary>
+    public async Task<int> GetConfiguringCountAsync(CancellationToken ct = default)
+    {
+        var stats = await GetProjectStatsAsync(ct);
+        return stats?.ConfiguringCount ?? 0;
+    }
+}

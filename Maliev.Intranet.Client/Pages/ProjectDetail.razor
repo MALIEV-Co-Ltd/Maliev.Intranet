@@ -1,0 +1,510 @@
+@page "/sales/projects/{Id:guid}"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_project?.Title ?? "Project") - Maliev Intranet</PageTitle>
+
+<style>
+    .part-card { border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; transition: box-shadow 0.15s ease; }
+    .part-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    .breakdown-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--mud-palette-lines-default); }
+    .breakdown-row:last-child { border-bottom: none; font-weight: 600; }
+    .timeline-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .timeline-dot.done { background: var(--mud-palette-success); }
+    .timeline-dot.pending { background: var(--mud-palette-lines-default); }
+    .progress-bar-wrap { height: 6px; border-radius: 3px; background: var(--mud-palette-lines-default); overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 3px; background: var(--mud-palette-primary); transition: width 0.4s ease; }
+</style>
+
+@if (_loading)
+{
+    <MudGrid>
+        <MudItem xs="12"><MudSkeleton Height="60px" Class="rounded-lg" /></MudItem>
+        <MudItem xs="12" md="8"><MudSkeleton Height="400px" Class="rounded-lg" /></MudItem>
+        <MudItem xs="12" md="4"><MudSkeleton Height="400px" Class="rounded-lg" /></MudItem>
+    </MudGrid>
+}
+else if (_project == null)
+{
+    <MudAlert Severity="Severity.Error">Project not found or you do not have access.</MudAlert>
+    <MudButton Class="mt-3" OnClick="@(() => Navigation.NavigateTo("/sales/projects"))">Back to Projects</MudButton>
+}
+else
+{
+    @* ── Page Header ───────────────────────────────────────────────── *@
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+        <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                       OnClick="@(() => Navigation.NavigateTo("/sales/projects"))" />
+        <div style="flex: 1;">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">@_project.ProjectNumber</MudText>
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_project.Status)">@_project.Status</MudChip>
+            </MudStack>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                @_project.Title &nbsp;·&nbsp; @_project.CustomerName
+            </MudText>
+        </div>
+    </MudStack>
+
+    <MudGrid Spacing="3">
+
+        @* ── LEFT 8 cols: Parts ──────────────────────────────────────── *@
+        <MudItem xs="12" md="8">
+
+            @* Parts list *@
+            @if (!_project.Parts.Any())
+            {
+                <MudPaper Elevation="0" Class="pa-8 d-flex flex-column align-center rounded-lg"
+                          Style="border: 1px solid var(--mud-palette-lines-default);">
+                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Style="font-size: 56px;" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">No parts yet</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Upload 3D files to add parts to this project.</MudText>
+                </MudPaper>
+            }
+            else
+            {
+                <MudStack Spacing="2">
+                    @foreach (var part in _project.Parts)
+                    {
+                        <MudPaper Elevation="0" Class="pa-4 part-card">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Color="Color.Primary" />
+                                <MudText Typo="Typo.subtitle2" Style="flex: 1; font-weight: 600;">@part.FileName</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@GetPartStatusColor(part.Status)">@part.Status</MudChip>
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => DeletePartAsync(part.Id))"
+                                               Disabled="@IsProjectLocked()" />
+                            </MudStack>
+
+                            @* Dimensions *@
+                            @if (part.Dimensions != null)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                                    @part.Dimensions.X.ToString("N1") × @part.Dimensions.Y.ToString("N1") × @part.Dimensions.Z.ToString("N1") mm
+                                </MudText>
+                            }
+
+                            @* Configuration grid *@
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" sm="4">
+                                    <MudSelect T="string"
+                                               @bind-Value="part.ProcessType"
+                                               Label="Process"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense"
+                                               Dense="true">
+                                        <MudSelectItem Value="@("FDM")">FDM</MudSelectItem>
+                                        <MudSelectItem Value="@("SLA")">SLA</MudSelectItem>
+                                        <MudSelectItem Value="@("SLS")">SLS</MudSelectItem>
+                                        <MudSelectItem Value="@("CNC")">CNC Machining</MudSelectItem>
+                                        <MudSelectItem Value="@("MJF")">MJF</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudTextField @bind-Value="part.Finish"
+                                                  Label="Finish"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense" />
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudNumericField T="int"
+                                                     @bind-Value="part.Quantity"
+                                                     Label="Qty"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1" />
+                                </MudItem>
+                            </MudGrid>
+
+                            @* Save config + pricing buttons *@
+                            <MudStack Row="true" Spacing="2" Class="mt-3" Wrap="Wrap.Wrap">
+                                <MudButton Variant="Variant.Outlined"
+                                           Size="Size.Small"
+                                           StartIcon="@Icons.Material.Outlined.Save"
+                                           OnClick="@(() => SavePartConfigAsync(part))">
+                                    Save Config
+                                </MudButton>
+
+                                @if (part.Status == "Configuring" || part.EstimatedPrice == null)
+                                {
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Secondary"
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Outlined.AutoAwesome"
+                                               OnClick="@(() => GetAiPriceAsync(part))">
+                                        Get AI Price
+                                    </MudButton>
+                                }
+
+                                @if (part.EstimatedPrice.HasValue && part.Status == "Priced")
+                                {
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Success"
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Outlined.CheckCircle"
+                                               OnClick="@(() => ConfirmPriceAsync(part, part.EstimatedPrice!.Value))">
+                                        Confirm ฿@part.EstimatedPrice.Value.ToString("N2")
+                                    </MudButton>
+                                }
+                            </MudStack>
+
+                            @* Price breakdown *@
+                            @if (part.PriceBreakdown != null)
+                            {
+                                <MudExpansionPanels Elevation="0" Class="mt-3">
+                                    <MudExpansionPanel>
+                                        <TitleContent>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                <MudIcon Icon="@Icons.Material.Outlined.Receipt" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                                                Price Breakdown
+                                            </MudText>
+                                        </TitleContent>
+                                        <ChildContent>
+                                            <div class="mt-2" style="font-size: 13px;">
+                                                <div class="breakdown-row"><span>Material cost</span><span>฿@part.PriceBreakdown.MaterialCost.ToString("N2")</span></div>
+                                                <div class="breakdown-row"><span>Machine time (@part.PriceBreakdown.MachineTimeMinutes.ToString("N0") min)</span><span>฿@part.PriceBreakdown.MachineTimeCost.ToString("N2")</span></div>
+                                                <div class="breakdown-row"><span>Setup / operator</span><span>฿@part.PriceBreakdown.SetupCost.ToString("N2")</span></div>
+                                                <div class="breakdown-row"><span>Complexity</span><span>฿@part.PriceBreakdown.ComplexitySurcharge.ToString("N2")</span></div>
+                                                <div class="breakdown-row"><span>Margin</span><span>฿@part.PriceBreakdown.MarginAmount.ToString("N2")</span></div>
+                                                <div class="breakdown-row"><span><strong>Total per unit</strong></span><span><strong>฿@part.PriceBreakdown.TotalPerUnit.ToString("N2")</strong></span></div>
+                                            </div>
+                                        </ChildContent>
+                                    </MudExpansionPanel>
+                                </MudExpansionPanels>
+                            }
+
+                            @* Production progress (WP-UIX-4.7) *@
+                            @if (part.JobId.HasValue)
+                            {
+                                <MudDivider Class="my-2" />
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-1">
+                                    <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Small" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @part.MachineName &middot; @part.JobStatus
+                                    </MudText>
+                                    <MudSpacer />
+                                    <MudText Typo="Typo.caption">@(part.JobProgressPercent ?? 0)%</MudText>
+                                </MudStack>
+                                <div class="progress-bar-wrap mt-1">
+                                    <div class="progress-bar-fill" style="width: @(part.JobProgressPercent ?? 0)%;"></div>
+                                </div>
+                            }
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
+
+            @* Notes section *@
+            <MudPaper Elevation="0" Class="pa-4 mt-3 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Internal Notes</MudText>
+                <MudTextField @bind-Value="_notes"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              Placeholder="Add internal notes about this project..." />
+                <MudButton Variant="Variant.Text" Size="Size.Small" Class="mt-1"
+                           OnClick="SaveNotesAsync">Save Notes</MudButton>
+            </MudPaper>
+        </MudItem>
+
+        @* ── RIGHT 4 cols: Summary + Actions + Timeline ──────────────── *@
+        <MudItem xs="12" md="4">
+            <MudStack Spacing="3">
+
+                @* Project Summary card *@
+                <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                    <MudText Typo="Typo.subtitle2" Class="mb-3" Style="font-weight: 600;">Summary</MudText>
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Parts</MudText>
+                            <MudText Typo="Typo.body2">@_project.Parts.Count</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">All Confirmed</MudText>
+                            <MudText Typo="Typo.body2" Color="@(AllPartsConfirmed ? Color.Success : Color.Warning)">
+                                @(AllPartsConfirmed ? "Yes" : "No")
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Price</MudText>
+                            <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">
+                                ฿@TotalConfirmedPrice.ToString("N2")
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Currency</MudText>
+                            <MudText Typo="Typo.body2">@_project.Currency</MudText>
+                        </MudStack>
+                        @if (_project.ValidUntil.HasValue)
+                        {
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Valid Until</MudText>
+                                <MudText Typo="Typo.body2">@_project.ValidUntil.Value.ToString("dd MMM yyyy")</MudText>
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                @* Actions card *@
+                <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                    <MudText Typo="Typo.subtitle2" Class="mb-3" Style="font-weight: 600;">Actions</MudText>
+                    <MudStack Spacing="2">
+                        @if (_project.Status is "Configuring" or "Priced")
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       StartIcon="@Icons.Material.Outlined.RequestQuote"
+                                       Disabled="@(!AllPartsConfirmed || _actioning)"
+                                       OnClick="GenerateQuotationAsync">
+                                Generate Quotation
+                            </MudButton>
+                            @if (!AllPartsConfirmed)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Warning" Class="text-center">
+                                    Confirm all part prices first
+                                </MudText>
+                            }
+                        }
+                        @if (_project.QuotationId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       FullWidth="true"
+                                       StartIcon="@Icons.Material.Outlined.OpenInNew"
+                                       OnClick="@(() => Navigation.NavigateTo($"/sales/quotations/{_project.QuotationId}"))">
+                                View Quotation
+                            </MudButton>
+                        }
+                        @if (_project.Status == "Quoted")
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Success"
+                                       FullWidth="true"
+                                       StartIcon="@Icons.Material.Outlined.ThumbUp"
+                                       Disabled="@_actioning"
+                                       OnClick="AcceptQuotationAsync">
+                                Mark as Accepted
+                            </MudButton>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                @* Customer info card *@
+                <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">Customer</MudText>
+                        <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew"
+                                       Size="Size.Small"
+                                       OnClick="@(() => Navigation.NavigateTo($"/sales/customers/{_project.CustomerId}"))" />
+                    </MudStack>
+                    <MudText Typo="Typo.body2">@_project.CustomerName</MudText>
+                </MudPaper>
+
+                @* Status timeline card *@
+                @if (_project.Timeline.Any())
+                {
+                    <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600;" Class="mb-3">Timeline</MudText>
+                        @foreach (var evt in _project.Timeline)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                                <div class="timeline-dot @(evt.Completed ? "done" : "pending")"></div>
+                                <MudIcon Icon="@evt.Icon" Size="Size.Small"
+                                         Color="@(evt.Completed ? Color.Success : Color.Default)" />
+                                <div>
+                                    <MudText Typo="Typo.caption" Style="@(evt.Completed ? "" : "opacity: 0.5;")">@evt.Label</MudText>
+                                    @if (evt.Completed)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@evt.Timestamp.ToString("dd MMM yyyy")</MudText>
+                                    }
+                                </div>
+                            </MudStack>
+                        }
+                    </MudPaper>
+                }
+
+                @* Aggregate production progress (WP-UIX-4.7) *@
+                @if (_project.Parts.Any(p => p.JobId.HasValue))
+                {
+                    var avgProgress = (int)_project.Parts
+                        .Where(p => p.JobProgressPercent.HasValue)
+                        .Select(p => (double)p.JobProgressPercent!.Value)
+                        .DefaultIfEmpty(0)
+                        .Average();
+                    <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600;" Class="mb-2">Production Progress</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <div class="progress-bar-wrap" style="flex: 1;">
+                                <div class="progress-bar-fill" style="width: @avgProgress%;"></div>
+                            </div>
+                            <MudText Typo="Typo.caption">@avgProgress%</MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                            Average across @_project.Parts.Count(p => p.JobId.HasValue) part(s) in production
+                        </MudText>
+                    </MudPaper>
+                }
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private ProjectDetailDto? _project;
+    private bool _loading = true;
+    private bool _actioning = false;
+    private string? _notes;
+
+    private bool AllPartsConfirmed =>
+        _project?.Parts.Count > 0 && _project.Parts.All(p => p.Status == "Confirmed");
+
+    private decimal TotalConfirmedPrice =>
+        _project?.Parts.Sum(p => (p.ConfirmedPrice ?? p.EstimatedPrice ?? 0) * p.Quantity) ?? 0;
+
+    /// <summary>Returns true when the project is in a state where parts cannot be deleted.</summary>
+    private bool IsProjectLocked() =>
+        _project?.Status is "Quoted" or "In Production" or "Completed";
+
+    /// <summary>Loads the project detail on render.</summary>
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _project = await Http.GetFromJsonAsync<ProjectDetailDto>($"api/projects/{Id}");
+            if (_project != null) _notes = _project.Notes;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load project: {ex.Message}", Severity.Error);
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task SavePartConfigAsync(ProjectPartDto part)
+    {
+        var request = new UpdateProjectPartRequest
+        {
+            ProcessType = part.ProcessType,
+            MaterialId  = part.MaterialId,
+            Quantity    = part.Quantity,
+            Finish      = part.Finish,
+            Color       = part.Color,
+            Tolerance   = part.Tolerance
+        };
+        var response = await Http.PutAsJsonAsync($"api/projects/{Id}/parts/{part.Id}", request);
+        Snackbar.Add(response.IsSuccessStatusCode ? "Part configuration saved." : "Failed to save configuration.", response.IsSuccessStatusCode ? Severity.Success : Severity.Error);
+    }
+
+    private async Task GetAiPriceAsync(ProjectPartDto part)
+    {
+        var response = await Http.PostAsync($"api/projects/{Id}/parts/{part.Id}/price", null);
+        if (response.IsSuccessStatusCode)
+        {
+            var breakdown = await response.Content.ReadFromJsonAsync<ProjectPriceBreakdownDto>();
+            if (breakdown != null)
+            {
+                part.PriceBreakdown  = breakdown;
+                part.EstimatedPrice  = breakdown.TotalPerUnit;
+                part.Status          = "Priced";
+                Snackbar.Add($"AI price estimate: ฿{breakdown.TotalPerUnit:N2}/unit", Severity.Info);
+            }
+        }
+        else
+        {
+            Snackbar.Add("AI pricing request failed. Is the part fully configured?", Severity.Warning);
+        }
+        StateHasChanged();
+    }
+
+    private async Task ConfirmPriceAsync(ProjectPartDto part, decimal price)
+    {
+        var request = new ConfirmPartPriceRequest { ConfirmedPrice = price };
+        var response = await Http.PostAsJsonAsync($"api/projects/{Id}/parts/{part.Id}/confirm-price", request);
+        if (response.IsSuccessStatusCode)
+        {
+            part.ConfirmedPrice = price;
+            part.Status         = "Confirmed";
+            _project!.TotalPrice = TotalConfirmedPrice;
+            Snackbar.Add("Price confirmed.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Failed to confirm price.", Severity.Error);
+        }
+        StateHasChanged();
+    }
+
+    private async Task DeletePartAsync(Guid partId)
+    {
+        var response = await Http.DeleteAsync($"api/projects/{Id}/parts/{partId}");
+        if (response.IsSuccessStatusCode)
+        {
+            _project!.Parts.RemoveAll(p => p.Id == partId);
+            Snackbar.Add("Part removed.", Severity.Success);
+        }
+        else Snackbar.Add("Failed to remove part.", Severity.Error);
+        StateHasChanged();
+    }
+
+    private async Task GenerateQuotationAsync()
+    {
+        _actioning = true;
+        var response = await Http.PostAsync($"api/projects/{Id}/generate-quotation", null);
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Quotation generated successfully.", Severity.Success);
+            await LoadAsync();
+        }
+        else Snackbar.Add("Failed to generate quotation. Check that all parts have confirmed prices.", Severity.Error);
+        _actioning = false;
+    }
+
+    private async Task AcceptQuotationAsync()
+    {
+        _actioning = true;
+        var response = await Http.PostAsync($"api/projects/{Id}/accept-quotation", null);
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Quotation accepted — orders and jobs are being created.", Severity.Success);
+            await LoadAsync();
+        }
+        else Snackbar.Add("Failed to accept quotation.", Severity.Error);
+        _actioning = false;
+    }
+
+    private async Task SaveNotesAsync()
+    {
+        var response = await Http.PutAsJsonAsync($"api/projects/{Id}", new { notes = _notes });
+        Snackbar.Add(response.IsSuccessStatusCode ? "Notes saved." : "Failed to save notes.", response.IsSuccessStatusCode ? Severity.Success : Severity.Error);
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Draft"         => Color.Default,
+        "Configuring"   => Color.Warning,
+        "Priced"        => Color.Info,
+        "Quoted"        => Color.Primary,
+        "In Production" => Color.Secondary,
+        "Completed"     => Color.Success,
+        "Cancelled"     => Color.Error,
+        _               => Color.Default
+    };
+
+    private static Color GetPartStatusColor(string status) => status switch
+    {
+        "Configuring" => Color.Warning,
+        "Priced"      => Color.Info,
+        "Confirmed"   => Color.Success,
+        _             => Color.Default
+    };
+}

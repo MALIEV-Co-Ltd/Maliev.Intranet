@@ -16,7 +16,10 @@ public class DashboardController(
     OrderServiceClient orderClient,
     QuotationServiceClient quotationClient,
     PaymentServiceClient paymentClient,
-    EmployeeServiceClient employeeClient) : ControllerBase
+    EmployeeServiceClient employeeClient,
+    InvoiceServiceClient invoiceClient,
+    LeaveServiceClient leaveClient,
+    ProjectServiceClient projectClient) : ControllerBase
 {
     /// <summary>
     /// Gets the aggregated dashboard view model.
@@ -47,6 +50,12 @@ public class DashboardController(
 
         await Task.WhenAll(revenueTask, ordersTask, quotesTask, employeesTask);
 
+        // TODO: LINE OA Integration - Add a "LineInquiries" widget data source here.
+        // When LINE Messaging API webhook is active, a LineChatService (or dedicated endpoint) should expose:
+        //   GET /line/v1/inquiries/count?status=Unread   -> count of unread LINE messages awaiting employee response
+        // Include in the parallel task block above and render as a badge widget on the dashboard.
+        // This gives employees an at-a-glance count of pending LINE OA customer inquiries.
+
         if (requestedWidgets.Contains("Revenue"))
         {
             var stats = await revenueTask;
@@ -55,6 +64,7 @@ public class DashboardController(
                 Title = "Total Revenue (Today)",
                 Type = "Stat",
                 SourceService = "PaymentService",
+                NavigateTo = "/finance/payments",
                 Data = JsonSerializer.SerializeToElement($"฿{stats?.TodayTotal.ToString("N0") ?? "0"}")
             });
         }
@@ -67,6 +77,7 @@ public class DashboardController(
                 Title = "Active Orders",
                 Type = "Stat",
                 SourceService = "OrderService",
+                NavigateTo = "/sales/orders",
                 Data = JsonSerializer.SerializeToElement(count.ToString())
             });
         }
@@ -79,6 +90,7 @@ public class DashboardController(
                 Title = "Pending Quotes",
                 Type = "Stat",
                 SourceService = "QuotationService",
+                NavigateTo = "/sales/quotations",
                 Data = JsonSerializer.SerializeToElement(count.ToString())
             });
         }
@@ -91,6 +103,7 @@ public class DashboardController(
                 Title = "Total Headcount",
                 Type = "Stat",
                 SourceService = "EmployeeService",
+                NavigateTo = "/hr/directory",
                 Data = JsonSerializer.SerializeToElement(count.ToString())
             });
         }
@@ -102,10 +115,120 @@ public class DashboardController(
                 Title = "Order Trend",
                 Type = "Chart",
                 SourceService = "OrderService",
+                NavigateTo = "/sales/orders",
                 Data = JsonSerializer.SerializeToElement(new { Labels = new[] { "Jan", "Feb", "Mar" }, Values = new[] { 10.0, 25.0, 40.0 } })
             });
         }
 
         return Ok(model);
     }
+
+    /// <summary>
+    /// Gets aggregated action items requiring the current user's attention.
+    /// Each category is fetched in parallel with a 3-second per-source timeout.
+    /// Any individual source failure degrades gracefully to 0 without failing the whole response.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A list of action item categories with counts and navigation links.</returns>
+    [HttpGet("action-items")]
+    public async Task<ActionResult<DashboardActionItemsDto>> GetActionItems(CancellationToken ct = default)
+    {
+        // Helper: run a count call with a 3-second per-source timeout; return 0 on any failure
+        static async Task<int> SafeCount(Func<CancellationToken, Task<int>> fn, CancellationToken parentCt)
+        {
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(parentCt);
+                cts.CancelAfter(TimeSpan.FromSeconds(3));
+                return await fn(cts.Token);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        // Fire all available sources in parallel (4 of 6 spec items).
+        // Remaining 2 — "Projects needing pricing" and "Production jobs delayed" —
+        // depend on ProjectServiceClient and JobServiceClient which are added in Phase 4.
+        var onHoldOrdersTask      = SafeCount(t => orderClient.GetOnHoldOrderCountAsync(t), ct);
+        var agingQuotesTask       = SafeCount(t => quotationClient.GetAgingQuotationCountAsync(7, t), ct);
+        var overdueInvoicesTask   = SafeCount(t => invoiceClient.GetOverdueInvoiceCountAsync(t), ct);
+        var pendingLeaveTask      = SafeCount(t => leaveClient.GetPendingApprovalCountAsync(t), ct);
+        var configuringProjectsTask = SafeCount(t => projectClient.GetConfiguringCountAsync(t), ct);
+
+        await Task.WhenAll(onHoldOrdersTask, agingQuotesTask, overdueInvoicesTask, pendingLeaveTask, configuringProjectsTask);
+
+        var result = new DashboardActionItemsDto();
+
+        var onHoldOrders        = await onHoldOrdersTask;
+        var agingQuotes         = await agingQuotesTask;
+        var overdueInvoices     = await overdueInvoicesTask;
+        var pendingLeave        = await pendingLeaveTask;
+        var configuringProjects = await configuringProjectsTask;
+
+        if (onHoldOrders > 0)
+        {
+            result.Categories.Add(new ActionItemCategoryDto
+            {
+                Label      = $"{onHoldOrders} order{(onHoldOrders == 1 ? "" : "s")} on hold or delayed",
+                Icon       = "Icons.Material.Outlined.PauseCircle",
+                Count      = onHoldOrders,
+                NavigateTo = "/sales/orders?status=OnHold,Delayed",
+                Severity   = "Error"
+            });
+        }
+
+        if (agingQuotes > 0)
+        {
+            result.Categories.Add(new ActionItemCategoryDto
+            {
+                Label      = $"{agingQuotes} quotation{(agingQuotes == 1 ? "" : "s")} awaiting response (>7 days)",
+                Icon       = "Icons.Material.Outlined.HourglassBottom",
+                Count      = agingQuotes,
+                NavigateTo = "/sales/quotations?aging=true",
+                Severity   = "Warning"
+            });
+        }
+
+        if (overdueInvoices > 0)
+        {
+            result.Categories.Add(new ActionItemCategoryDto
+            {
+                Label      = $"{overdueInvoices} overdue invoice{(overdueInvoices == 1 ? "" : "s")}",
+                Icon       = "Icons.Material.Outlined.ReceiptLong",
+                Count      = overdueInvoices,
+                NavigateTo = "/finance/invoices?status=Overdue",
+                Severity   = "Error"
+            });
+        }
+
+        if (pendingLeave > 0)
+        {
+            result.Categories.Add(new ActionItemCategoryDto
+            {
+                Label       = $"{pendingLeave} leave request{(pendingLeave == 1 ? "" : "s")} pending your approval",
+                Icon        = "Icons.Material.Outlined.BeachAccess",
+                Count       = pendingLeave,
+                NavigateTo  = "/hr/leave?tab=approvals",
+                Severity    = "Info",
+                ManagerOnly = true
+            });
+        }
+
+        if (configuringProjects > 0)
+        {
+            result.Categories.Add(new ActionItemCategoryDto
+            {
+                Label      = $"{configuringProjects} project{(configuringProjects == 1 ? "" : "s")} waiting for pricing",
+                Icon       = "Icons.Material.Outlined.FolderSpecial",
+                Count      = configuringProjects,
+                NavigateTo = "/sales/projects?status=Configuring",
+                Severity   = "Warning"
+            });
+        }
+
+        return Ok(result);
+    }
 }
+

@@ -12,6 +12,7 @@
 @inject ISignalRCustomerService SignalRService
 @inject IJSRuntime JSRuntime
 @inject LayoutService LayoutService
+@inject BreadcrumbService BreadcrumbService
 @inject ILogger<CustomerDetails> Logger
 
 <PageTitle>@(_customer?.Name ?? "Customer Details") - Maliev Intranet</PageTitle>
@@ -83,16 +84,24 @@
                             Style="white-space: nowrap;">
                      @( _isEditMode ? "Cancel Editing" : "Edit Profile")
                  </MudButton>
-                 @if (!_isEditMode)
-                 {
-                     <MudButton Variant="Variant.Filled"
-                                Color="Color.Primary"
-                                StartIcon="@Icons.Material.Filled.Add"
-                                Class="px-4 px-md-6 rounded-lg shadow-none my-1"
-                                Style="white-space: nowrap;">
-                         Create Order
-                     </MudButton>
-                 }
+                  @if (!_isEditMode)
+                  {
+                      <MudButton Variant="Variant.Outlined"
+                                 Color="Color.Primary"
+                                 StartIcon="@Icons.Material.Filled.CreateNewFolder"
+                                 Href="@($"/sales/projects/new?customerId={Id}")"
+                                 Class="px-4 px-md-6 rounded-lg my-1"
+                                 Style="white-space: nowrap;">
+                          New Project
+                      </MudButton>
+                      <MudButton Variant="Variant.Filled"
+                                 Color="Color.Primary"
+                                 StartIcon="@Icons.Material.Filled.ShoppingCart"
+                                 Class="px-4 px-md-6 rounded-lg shadow-none my-1"
+                                 Style="white-space: nowrap;">
+                          Create Order
+                      </MudButton>
+                  }
                  else
                  {
                      <MudButton Variant="Variant.Filled"
@@ -1019,7 +1028,11 @@
         await LoadCountries();
         await LoadCustomerData();
         await LoadInitialActivities();
-        
+
+        // Push customer name into breadcrumb so it shows e.g. "Customers > Acme Corp" instead of "Customers > Details"
+        if (_customer is not null)
+            BreadcrumbService.SetPageLabel(_customer.Name);
+
         await SignalRService.StartAsync();
         SignalRService.OnCustomerChanged += HandleCustomerChanged;
     }

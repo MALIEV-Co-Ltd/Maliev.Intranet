@@ -8,9 +8,17 @@
 <PageTitle>Pricing AI - Maliev Intranet</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-2">Pricing AI</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
     AI-powered pricing predictions based on material, process, and historical data
 </MudText>
+
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-6 rounded-lg" Icon="@Icons.Material.Outlined.AutoAwesome">
+    <MudText Typo="Typo.body2">
+        <strong>AI-Powered Estimates:</strong> Prices are calculated using machine learning models trained on historical job data,
+        material costs, and process parameters. Results are indicative and should be reviewed by a sales engineer
+        before sending to customers. Confidence scores below 60% indicate limited historical data for this configuration.
+    </MudText>
+</MudAlert>
 
 <MudGrid>
     <!-- Input Form (Left Panel) -->

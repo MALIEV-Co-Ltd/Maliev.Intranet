@@ -6,6 +6,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Delivery Notes - Maliev Intranet</PageTitle>
 
@@ -157,13 +158,25 @@ else
             var response = await Http.PostAsync($"api/deliverynotes/{note.Id}/pdf", null);
             if (response.IsSuccessStatusCode)
             {
-                var url = await response.Content.ReadAsStringAsync();
-                // Open PDF in new tab
-                // Assuming url is a valid URL string or relative path
-                // Typically we'd use JS interop to open new tab, or just navigate
-                // Navigation.NavigateTo(url, true); // true for force load/new tab? No, NavigateTo replaces current.
-                // For PDF download, usually we use an anchor tag or JS.
-                Snackbar.Add("PDF Generated (Mock)", Severity.Success); 
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("storageUrl", out var urlElement))
+                {
+                    var pdfUrl = urlElement.GetString();
+                    if (!string.IsNullOrEmpty(pdfUrl))
+                    {
+                        await JS.InvokeVoidAsync("open", pdfUrl, "_blank");
+                        Snackbar.Add("PDF generated successfully", Severity.Success);
+                    }
+                    else
+                    {
+                        Snackbar.Add("PDF generated but URL is empty", Severity.Warning);
+                    }
+                }
+                else
+                {
+                    Snackbar.Add("Invalid response from server", Severity.Error);
+                }
             }
             else
             {

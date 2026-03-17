@@ -24,19 +24,29 @@ public class QuickControllerTests
         return new HttpClient(handler) { BaseAddress = new Uri("http://test") };
     }
 
+    private static PdfServiceClient CreatePdfClient()
+    {
+        var handler = new MockHttpMessageHandler((req, ct) =>
+        {
+            var response = new { storageUrl = "http://test.pdf" };
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) });
+        });
+        return new PdfServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+    }
+
     [Fact]
     public async Task Orders_Get_ReturnsOk()
     {
         var controller = new OrdersController(new OrderServiceClient(CreateClient(new PagedResponse<OrderSummaryDto>())));
-        var result = await controller.Get();
+        var result = await controller.Get(null, 1, CancellationToken.None);
         Assert.IsType<OkObjectResult>(result.Result);
     }
 
     [Fact]
     public async Task Quotations_Get_ReturnsOk()
     {
-        var controller = new QuotationsController(new QuotationServiceClient(CreateClient(new PagedResponse<QuotationSummaryDto>())));
-        var result = await controller.Get();
+        var controller = new QuotationsController(new QuotationServiceClient(CreateClient(new PagedResponse<QuotationSummaryDto>())), CreatePdfClient());
+        var result = await controller.Get(null, 1, 20);
         Assert.IsType<OkObjectResult>(result.Result);
     }
 
@@ -44,7 +54,14 @@ public class QuickControllerTests
     public async Task Dashboard_Get_ReturnsOk()
     {
         var client = CreateClient(new { count = 10 });
-        var controller = new DashboardController(new OrderServiceClient(client), new QuotationServiceClient(client), new PaymentServiceClient(client), new EmployeeServiceClient(client));
+        var controller = new DashboardController(
+            new OrderServiceClient(client),
+            new QuotationServiceClient(client),
+            new PaymentServiceClient(client),
+            new EmployeeServiceClient(client),
+            new InvoiceServiceClient(client),
+            new LeaveServiceClient(client),
+            new ProjectServiceClient(client));
         var result = await controller.Get();
         Assert.IsType<OkObjectResult>(result.Result);
     }
