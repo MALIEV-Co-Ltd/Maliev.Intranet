@@ -1,4 +1,5 @@
 @page "/sales/projects/{Id:guid}"
+@rendermode InteractiveAuto
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.Intranet.Client.Helpers
@@ -72,8 +73,17 @@ else
                     {
                         <MudPaper Elevation="0" Class="pa-4 part-card">
                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
-                                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Color="Color.Primary" />
-                                <MudText Typo="Typo.subtitle2" Style="flex: 1; font-weight: 600;">@part.FileName</MudText>
+                                @if (!string.IsNullOrEmpty(part.ModelPreviewUrl))
+                                {
+                                    <img src="@part.ModelPreviewUrl"
+                                         alt="@part.FileName"
+                                         style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Color="Color.Primary" />
+                                }
+                                <MudText Typo="Typo.subtitle2" Style="flex: 1; font-weight: 600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">@part.FileName</MudText>
                                 <MudChip T="string" Size="Size.Small" Color="@GetPartStatusColor(part.Status)">@part.Status</MudChip>
                                 <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                                Size="Size.Small"
@@ -302,7 +312,38 @@ else
                                        Size="Size.Small"
                                        OnClick="@(() => Navigation.NavigateTo($"/sales/customers/{_project.CustomerId}"))" />
                     </MudStack>
-                    <MudText Typo="Typo.body2">@_project.CustomerName</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight: 500;">@_project.CustomerName</MudText>
+                    @if (_customer != null)
+                    {
+                        @if (!string.IsNullOrEmpty(_customer.Email))
+                        {
+                            <MudLink Href="@($"mailto:{_customer.Email}")" Underline="Underline.None" Color="Color.Secondary" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
+                                <MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Small" />
+                                @_customer.Email
+                            </MudLink>
+                        }
+                        @if (!string.IsNullOrEmpty(_customer.Mobile))
+                        {
+                            <MudLink Href="@($"tel:{_customer.Mobile}")" Underline="Underline.None" Color="Color.Secondary" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
+                                <MudIcon Icon="@Icons.Material.Outlined.Phone" Size="Size.Small" />
+                                @_customer.Mobile @if (!string.IsNullOrEmpty(_customer.Extension)) { <text>ext. @_customer.Extension</text> }
+                            </MudLink>
+                        }
+                        @if (!string.IsNullOrEmpty(_customer.CompanyName))
+                        {
+                            <MudLink Href="@($"tel:{_customer.CompanyPhone}")" Underline="Underline.None" Color="Color.Secondary" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
+                                <MudIcon Icon="@Icons.Material.Outlined.Business" Size="Size.Small" />
+                                @_customer.CompanyName @if (!string.IsNullOrEmpty(_customer.CompanyPhone)) { <text>· @_customer.CompanyPhone</text> }
+                            </MudLink>
+                        }
+                        @if (!string.IsNullOrEmpty(_customer.Landline))
+                        {
+                            <MudLink Href="@($"tel:{_customer.Landline}")" Underline="Underline.None" Color="Color.Secondary" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
+                                <MudIcon Icon="@Icons.Material.Outlined.PhoneCallback" Size="Size.Small" />
+                                @_customer.Landline
+                            </MudLink>
+                        }
+                    }
                 </MudPaper>
 
                 @* Status timeline card *@
@@ -359,6 +400,7 @@ else
     public Guid Id { get; set; }
 
     private ProjectDetailDto? _project;
+    private CustomerDetailDto? _customer;
     private bool _loading = true;
     private bool _actioning = false;
     private string? _notes;
@@ -383,13 +425,29 @@ else
         try
         {
             _project = await Http.GetFromJsonAsync<ProjectDetailDto>($"api/projects/{Id}");
-            if (_project != null) _projectNotes = _project.Notes;
+            if (_project != null)
+            {
+                _projectNotes = _project.Notes;
+                await LoadCustomerAsync(_project.CustomerId);
+            }
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Failed to load project: {ex.Message}", Severity.Error);
         }
         finally { _loading = false; }
+    }
+
+    private async Task LoadCustomerAsync(Guid customerId)
+    {
+        try
+        {
+            _customer = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/customers/{customerId}");
+        }
+        catch
+        {
+            _customer = null;
+        }
     }
 
     private async Task SavePartConfigAsync(ProjectPartDto part)

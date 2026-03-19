@@ -13,25 +13,34 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
 
     private readonly IMemoryCache _cache;
+    private readonly ILogger<FileAnalysisStatusService> _logger;
 
     /// <summary>
     /// Initializes a new instance of <see cref="FileAnalysisStatusService"/>.
     /// </summary>
     /// <param name="cache">The singleton memory cache.</param>
-    public FileAnalysisStatusService(IMemoryCache cache)
+    /// <param name="logger">The logger instance.</param>
+    public FileAnalysisStatusService(IMemoryCache cache, ILogger<FileAnalysisStatusService> logger)
     {
         _cache = cache;
+        _logger = logger;
     }
 
     /// <inheritdoc />
     public Task SetProcessingAsync(string uploadId, CancellationToken cancellationToken = default)
     {
+        var existing = Get(uploadId);
         var status = new FileAnalysisStatusDto
         {
             UploadId = uploadId,
             Status = FileAnalysisStatus.Processing,
-            ProcessedAt = DateTimeOffset.UtcNow,
-            PreviewProcessingStatus = PreviewProcessingStatus.Pending,
+            Dimensions = existing?.Dimensions,
+            IsManifold = existing?.IsManifold,
+            ThumbnailUrl = existing?.ThumbnailUrl,
+            PreviewUrls = existing?.PreviewUrls,
+            PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
+            ErrorCode = existing?.ErrorCode,
+            ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
         };
         Set(uploadId, status);
         return Task.CompletedTask;
@@ -159,7 +168,14 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
 
     /// <inheritdoc />
     public Task<FileAnalysisStatusDto?> GetStatusAsync(string uploadId, CancellationToken cancellationToken = default)
-        => Task.FromResult(Get(uploadId));
+    {
+        var status = Get(uploadId);
+        if (status == null)
+        {
+            _logger.LogDebug("GetStatusAsync: no entry found for key={Key}", uploadId);
+        }
+        return Task.FromResult(status);
+    }
 
     private void Set(string uploadId, FileAnalysisStatusDto status)
     {

@@ -77,13 +77,20 @@ public class ProjectsController(ProjectServiceClient client, ILogger<ProjectsCon
         }
 
         _logger.LogError(
-            "ProjectService returned HTTP {StatusCode}: {ErrorContent} | Request: CustomerId={CustomerId}, CustomerName={CustomerName}, Title={Title}",
+            "ProjectService returned HTTP {StatusCode} for POST /project/v1/projects. ErrorContent={ErrorContent}. " +
+            "Request: CustomerId={CustomerId}, CustomerName={CustomerName}, Title={Title}. " +
+            "If StatusCode=404, check: (1) ProjectService is reachable, (2) route is /project/v1/projects, (3) auth token forwarded.",
             statusCode, errorContent, request.CustomerId, request.CustomerName, request.Title);
 
         var userMessage = statusCode switch
         {
+            0 when !string.IsNullOrEmpty(errorContent) && errorContent.Contains("no such host") =>
+                "ProjectService is unreachable. Check network connectivity and Aspire service discovery.",
+            0 =>
+                "ProjectService is unreachable or returned no response.",
             401 => "Not authorised — the BFF could not authenticate with ProjectService.",
             403 => "Permission denied — you may lack the 'project.projects.create' permission in IAM.",
+            404 => $"ProjectService returned HTTP 404 for POST /project/v1/projects. The downstream service may not have this endpoint, or the route is incorrect. Error: {errorContent}",
             _ when !string.IsNullOrEmpty(errorContent) => errorContent,
             _ => $"ProjectService returned HTTP {statusCode}."
         };

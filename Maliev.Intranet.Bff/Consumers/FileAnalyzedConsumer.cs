@@ -44,8 +44,8 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
 
         var payload = context.Message.Payload;
         _logger.LogInformation(
-            "Received FileAnalyzedEvent for file {FileId}, manifold={IsManifold}",
-            payload.FileId, payload.Metrics?.IsManifold);
+            "Received FileAnalyzedEvent for file {FileId}, manifold={IsManifold}, GlbPath={GlbPath}, ThumbPath={ThumbPath}",
+            payload.FileId, payload.Metrics?.IsManifold, payload.GlbStoragePath, payload.ThumbnailStoragePath);
 
         var dimensions = payload.Metrics?.BoundingBox is { } bb
             ? new FileAnalysisDimensionsDto
@@ -70,7 +70,7 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
         }
 
         _logger.LogInformation(
-            "Derived GCS storage path: {GcsStoragePath} from GlbPath={GlbPath}, ThumbPath={ThumbPath}",
+            "FileAnalyzedConsumer: derived cache key={CacheKey} from GlbPath={GlbPath}, ThumbPath={ThumbPath}",
             gcsStoragePath, payload.GlbStoragePath, payload.ThumbnailStoragePath);
 
         var isManifold = payload.Metrics?.IsManifold ?? true;
@@ -82,6 +82,9 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
             if (dimensions != null)
             {
                 await _analysisStatusService.SetDimensionsAsync(gcsStoragePath, dimensions, isManifold, context.CancellationToken);
+                _logger.LogInformation(
+                    "FileAnalyzedConsumer: stored dimensions for key={CacheKey}, manifold={IsManifold}",
+                    gcsStoragePath, isManifold);
             }
 
             var signalRPayload = new FileAnalysisCompletedPayload(
@@ -97,6 +100,12 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
                 "FileAnalysisCompleted",
                 signalRPayload,
                 context.CancellationToken);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "FileAnalyzedConsumer: could not derive storage path from GlbPath={GlbPath}, ThumbPath={ThumbPath}",
+                payload.GlbStoragePath, payload.ThumbnailStoragePath);
         }
     }
 }

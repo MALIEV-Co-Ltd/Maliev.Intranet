@@ -51,7 +51,7 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
 
         var payload = context.Message.Payload;
         _logger.LogInformation(
-            "Received PreviewImagesGeneratedEvent for path {StoragePath}, failed={Failed}",
+            "PreviewImagesGeneratedConsumer: received event for storagePath={StoragePath}, failed={Failed}",
             payload.StoragePath, payload.Failed);
 
         try

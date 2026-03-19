@@ -13,10 +13,11 @@
 <PageTitle>New Project - Maliev Intranet</PageTitle>
 
 <style>
-    .upload-zone {
+    /* ── Upload drop zone ── */
+    .upload-drop-zone {
         border: 2px dashed var(--mud-palette-lines-default);
-        border-radius: 12px;
-        min-height: 140px;
+        border-radius: 10px;
+        min-height: 70px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -24,24 +25,27 @@
         cursor: pointer;
         transition: border-color 0.2s, background 0.2s;
         user-select: none;
+        padding: 8px 16px;
+        gap: 4px;
     }
-    .upload-zone:hover, .upload-zone.drag-over {
+    .upload-drop-zone:hover, .upload-drop-zone.drag-over {
         border-color: var(--mud-palette-primary);
         background: color-mix(in srgb, var(--mud-palette-primary) 6%, transparent);
     }
-    /* ── Two-column responsive file card grid ── */
+    /* ── Responsive file card grid (3 cols desktop, 2 tablet, 1 mobile) ── */
     .file-cards-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 10px;
-        max-height: 620px;
+        max-height: 520px;
         overflow-y: auto;
-        padding-right: 2px; /* room for scrollbar */
+        padding-right: 2px;
     }
-    @@media (max-width: 959.95px) {
-        .file-cards-grid {
-            grid-template-columns: 1fr;
-        }
+    @@media (max-width 1280px) {
+        .file-cards-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @@media (max-width 600px) {
+        .file-cards-grid { grid-template-columns: 1fr; }
     }
     /* ── Vertical file card ── */
     .file-card {
@@ -52,18 +56,17 @@
         border: 1px solid var(--mud-palette-lines-default);
         background: var(--mud-palette-surface);
     }
-    /* Header row: filename (left) + trash icon (right) */
     .file-card-header {
         display: flex;
         align-items: center;
-        padding: 8px 4px 8px 10px;
+        padding: 6px 4px 6px 10px;
         gap: 4px;
         border-bottom: 1px solid var(--mud-palette-lines-default);
         min-width: 0;
     }
     .file-card-name {
         font-weight: 500;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -71,18 +74,18 @@
         min-width: 0;
         line-height: 1.3;
     }
-    /* Middle section: preview image (left 150px) + dims/volume (right) */
+    /* Middle: preview (left) + dims/volume (right) */
     .file-card-middle {
         display: flex;
         flex-direction: row;
-        padding: 10px;
-        gap: 10px;
-        min-height: 150px;
+        padding: 8px;
+        gap: 8px;
+        min-height: 100px;
     }
     .file-card-preview {
-        width: 150px;
-        min-width: 150px;
-        height: 150px;
+        width: 100px;
+        min-width: 100px;
+        height: 100px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -101,19 +104,20 @@
         min-width: 0;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 4px;
+        justify-content: flex-start;
+        gap: 3px;
+        padding-top: 2px;
     }
     .file-card-dim-value {
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         font-weight: 500;
         color: var(--mud-palette-text-primary);
     }
-    /* Footer row: status left + quantity right */
+    /* Footer row */
     .file-card-footer {
         display: flex;
         align-items: center;
-        padding: 6px 6px 6px 10px;
+        padding: 5px 6px 5px 10px;
         border-top: 1px solid var(--mud-palette-lines-default);
         gap: 4px;
     }
@@ -127,347 +131,360 @@
         white-space: nowrap;
         overflow: visible;
     }
-    .qty-field { flex-shrink: 0; margin-left: auto; }
-    .qty-field input { text-align: center; }
-    /* Left column: sticky so it stays visible while scrolling through files */
-    .project-details-sticky {
-        position: sticky;
-        top: 80px;
+    /* Global quantity bar */
+    .global-qty-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: var(--mud-palette-background-grey);
+        border-radius: 8px;
     }
     .customer-info-grid {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 3px;
     }
     .customer-info-field {
         display: flex;
         align-items: center;
         font-size: 0.8rem;
     }
-    /* Global quantity toolbar */
-    .global-qty-bar {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 10px;
-        padding: 6px 10px;
-        background: var(--mud-palette-background-grey);
-        border-radius: 8px;
-    }
 </style>
 
 <ErrorBoundary>
     <ChildContent>
-        <MudGrid Spacing="5">
-            @* ── LEFT COLUMN: Project Details ──────────────────────────────── *@
-            <MudItem xs="12" md="5">
-                <div class="project-details-sticky">
-                <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-3">Project Details</MudText>
+        <MudStack Spacing="4">
 
-        <MudAutocomplete T="CustomerSummaryDto"
-                         Label="Customer *"
-                         Placeholder="Type 2+ characters to search..."
-                         SearchFunc="SearchCustomersAsync"
-                         ToStringFunc="@(c => c?.Name ?? "")"
-                         @bind-Value="_selectedCustomer"
-                         Variant="Variant.Outlined"
-                         Margin="Margin.Dense"
-                         Adornment="Adornment.Start"
-                         AdornmentIcon="@Icons.Material.Outlined.Search"
-                         ShowProgressIndicator="true"
-                         MinCharacters="2"
-                         Class="mb-3" />
+            @* ── Page Title ── *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                               OnClick="@(() => Navigation.NavigateTo("/sales/projects"))" />
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">New Project</MudText>
+            </MudStack>
 
-        @if (_selectedCustomer != null)
-        {
-            <MudPaper Outlined="true" Class="mb-3 pa-3" Style="border-color: var(--mud-palette-success);">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Size="Size.Small" />
-                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;">@_selectedCustomer.Name</MudText>
-                    @if (!string.IsNullOrEmpty(_selectedCustomer.Status))
+            @* ── Section 1: Customer + Project Info (3-col grid) ── *@
+            <MudGrid Spacing="3">
+                @* Left: Customer selection *@
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="mb-2">Customer</MudText>
+
+                    @if (!_showCustomerSearch && _selectedCustomer != null)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Label="true">@_selectedCustomer.Status</MudChip>
-                    }
-                </div>
-                <div class="customer-info-grid">
-                    @if (!string.IsNullOrEmpty(_selectedCustomer.Email))
-                    {
-                        <MudLink Href="@($"mailto:{_selectedCustomer.Email}")" Underline="Underline.None" Color="Color.Secondary" Class="customer-info-field">
-                            <MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Small" Class="mr-1" />
-                            @_selectedCustomer.Email
-                        </MudLink>
-                    }
-                    @if (!string.IsNullOrEmpty(_selectedCustomer.Mobile))
-                    {
-                        <MudLink Href="@($"tel:{_selectedCustomer.Mobile}")" Underline="Underline.None" Color="Color.Secondary" Class="customer-info-field">
-                            <MudIcon Icon="@Icons.Material.Outlined.Phone" Size="Size.Small" Class="mr-1" />
-                            @_selectedCustomer.Mobile @if (!string.IsNullOrEmpty(_selectedCustomer.Extension)) { <text> ext. @_selectedCustomer.Extension</text> }
-                        </MudLink>
-                    }
-                    @if (!string.IsNullOrEmpty(_selectedCustomer.CompanyName))
-                    {
-                        <MudLink Href="@($"tel:{_selectedCustomer.CompanyPhone}")" Underline="Underline.None" Color="Color.Secondary" Class="customer-info-field">
-                            <MudIcon Icon="@Icons.Material.Outlined.Business" Size="Size.Small" Class="mr-1" />
-                            @_selectedCustomer.CompanyName @if (!string.IsNullOrEmpty(_selectedCustomer.CompanyPhone)) { <text>· @_selectedCustomer.CompanyPhone</text> }
-                        </MudLink>
-                    }
-                    @if (!string.IsNullOrEmpty(_selectedCustomer.Landline))
-                    {
-                        <MudLink Href="@($"tel:{_selectedCustomer.Landline}")" Underline="Underline.None" Color="Color.Secondary" Class="customer-info-field">
-                            <MudIcon Icon="@Icons.Material.Outlined.PhoneCallback" Size="Size.Small" Class="mr-1" />
-                            @_selectedCustomer.Landline
-                        </MudLink>
-                    }
-                </div>
-            </MudPaper>
-        }
-
-        <MudTextField @bind-Value="_title"
-                      Label="Project Title *"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      MaxLength="500"
-                      HelperText="@(_titleError ?? "Briefly describe what the customer wants manufactured")"
-                      HelperTextOnFocus="true"
-                      Error="@_titleHasError"
-                      ErrorText="@_titleError"
-                      OnBlur="ValidateTitle"
-                      Class="mb-3" />
-
-        <MudTextField @bind-Value="_description"
-                      Label="Description"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Lines="8"
-                      MaxLength="2000"
-                      HelperText="@(_descriptionError ?? "Optional scope notes or special requirements")"
-                      HelperTextOnFocus="true"
-                      Error="@_descriptionHasError"
-                      ErrorText="@_descriptionError"
-                      OnBlur="ValidateDescription"
-                      Class="mb-3" />
-
-        @* Action buttons *@
-        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
-            <MudButton Variant="Variant.Text"
-                       OnClick="@(() => Navigation.NavigateTo("/sales/projects"))">
-                Cancel
-            </MudButton>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Success"
-                       StartIcon="@Icons.Material.Outlined.RocketLaunch"
-                       Disabled="@(!CanSubmit)"
-                       OnClick="CreateProjectAsync">
-                @if (_saving)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    <text>Creating...</text>
-                }
-                else
-                {
-                    <text>Create Project</text>
-                }
-            </MudButton>
-        </MudStack>
-                </div>
-    </MudItem>
-
-    @* ── RIGHT COLUMN: File Upload ──────────────────────────────────── *@
-    <MudItem xs="12" md="7">
-        <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-3">
-            Files
-            @if (_uploadedFiles.Any())
-            {
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
-                    (@_uploadedFiles.Count file@(_uploadedFiles.Count == 1 ? "" : "s"))
-                </MudText>
-            }
-        </MudText>
-
-        @* Drop zone *@
-        <div class="upload-zone @(_dragOver ? "drag-over" : "") mb-4"
-             @ondragenter:preventDefault @ondragenter="@(() => _dragOver = true)"
-             @ondragleave="@(() => _dragOver = false)"
-             @ondrop:preventDefault @ondrop="HandleFileDrop"
-             @onclick="TriggerFilePickerAsync">
-            <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Style="font-size:38px;" Color="Color.Secondary" Class="mb-1" />
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Drag &amp; drop files here or <strong>click to browse</strong></MudText>
-            <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-1">3D: STL · STEP · 3MF · OBJ · IGES · FBX · GLTF · BLEND</MudText>
-            <MudText Typo="Typo.caption" Color="Color.Tertiary">Drawings: PDF · DXF · DWG &nbsp;|&nbsp; Images: PNG · JPG · TIFF &nbsp;|&nbsp; Docs: DOCX · XLSX &nbsp;|&nbsp; ZIP</MudText>
-        </div>
-
-        <InputFile id="new-project-file-input"
-                   OnChange="HandleFileSelected"
-                   multiple
-                   accept=".stl,.step,.stp,.3mf,.obj,.igs,.iges,.blend,.fbx,.gltf,.glb,.pdf,.dxf,.dwg,.png,.jpg,.jpeg,.tiff,.bmp,.webp,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z"
-                   style="display:none;" />
-
-        @* ── Global quantity selector (3D files only) ── *@
-        @if (_uploadedFiles.Any(f => Is3DFile(f.Name)))
-        {
-            var globalQtyFiles = _uploadedFiles.Where(f => Is3DFile(f.Name) && !f.Uploading && f.Error == null).ToList();
-            var allSameQty     = globalQtyFiles.Count > 0 && globalQtyFiles.Select(f => f.Quantity).Distinct().Count() == 1;
-            var globalQtyValue = allSameQty ? globalQtyFiles[0].Quantity : (int?)null;
-
-            <div class="global-qty-bar mb-3">
-                <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" Color="Color.Secondary" />
-                <MudText Typo="Typo.body2" Style="white-space:nowrap;">All parts quantity:</MudText>
-                <MudNumericField T="int?"
-                                 Value="@globalQtyValue"
-                                 ValueChanged="@SetGlobalQuantity"
-                                 Min="1" Max="999"
-                                 Variant="Variant.Outlined"
-                                 Margin="Margin.Dense"
-                                 HideSpinButtons="false"
-                                 Disabled="@(!allSameQty && globalQtyFiles.Count > 1)"
-                                 Placeholder="@(!allSameQty && globalQtyFiles.Count > 1 ? "—" : "")"
-                                 Style="width:80px; flex-shrink:0;" />
-                @if (!allSameQty && globalQtyFiles.Count > 1)
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="white-space:nowrap;">
-                        Set equal quantities to enable
-                    </MudText>
-                }
-            </div>
-        }
-
-        @* File cards *@
-        @if (_uploadedFiles.Any())
-        {
-            <div class="file-cards-grid">
-                @foreach (var file in _uploadedFiles.ToList())
-                {
-                    var is3D = Is3DFile(file.Name);
-
-                    <div class="file-card">
-
-                        @* ── Header: filename + trash icon ── *@
-                        <div class="file-card-header">
-                            <MudTooltip Text="@file.Name" Placement="Placement.Top">
-                                <div class="file-card-name">@file.Name</div>
-                            </MudTooltip>
-                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                           Size="Size.Small"
-                                           Color="Color.Default"
-                                           OnClick="@(() => RemoveFile(file))"
-                                           Disabled="@file.Uploading" />
-                        </div>
-
-                        @* ── Middle: preview image (left) + dims/volume (right) ── *@
-                        <div class="file-card-middle">
-
-                            @* Preview column: 150×150 image, skeleton while waiting, icon for non-3D *@
-                            <div class="file-card-preview">
-                                @if (file.PreviewLoadFailed)
+                        <MudPaper Outlined="true" Class="pa-3" Style="border-color: var(--mud-palette-success);">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600;">@_selectedCustomer.Name</MudText>
+                                @if (!string.IsNullOrEmpty(_selectedCustomer.Status))
                                 {
-                                    <MudIcon Icon="@Icons.Material.Outlined.BrokenImage" Size="Size.Large" Color="Color.Error" />
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Label="true">@_selectedCustomer.Status</MudChip>
                                 }
-                                else if (!string.IsNullOrEmpty(file.PreviewUrl))
+                                <MudSpacer />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                               Size="Size.Small"
+                                               OnClick="@(() => _showCustomerSearch = true)" />
+                            </div>
+                            <div class="customer-info-grid">
+                                @if (!string.IsNullOrEmpty(_selectedCustomer.Email))
                                 {
-                                    <img src="@file.PreviewUrl" alt="@file.Name" @onerror="@(() => { file.PreviewLoadFailed = true; file.PreviewUrl = null; StateHasChanged(); })" />
+                                    <MudLink Href="@($"mailto:{_selectedCustomer.Email}")" Underline="Underline.None" Color="Color.Secondary" Class="customer-info-field">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Small" Class="mr-1" />
+                                        @_selectedCustomer.Email
+                                    </MudLink>
                                 }
-                                else if (is3D && (file.Uploading || file.AwaitingPreview))
+                                @if (!string.IsNullOrEmpty(_selectedCustomer.Mobile))
                                 {
-                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle"
-                                                 Width="150px" Height="150px"
-                                                 Animation="Animation.Wave" />
+                                    <MudLink Href="@($"tel:{_selectedCustomer.Mobile}")" Underline="Underline.None" Color="Color.Secondary" Class="customer-info-field">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Phone" Size="Size.Small" Class="mr-1" />
+                                        @_selectedCustomer.Mobile @if (!string.IsNullOrEmpty(_selectedCustomer.Extension)) { <text> ext. @_selectedCustomer.Extension</text> }
+                                    </MudLink>
                                 }
-                                else
+                                @if (!string.IsNullOrEmpty(_selectedCustomer.CompanyName))
                                 {
-                                    <MudIcon Icon="@GetFileIcon(file.Name)" Size="Size.Large" Color="Color.Default" />
+                                    <MudLink Href="@($"tel:{_selectedCustomer.CompanyPhone}")" Underline="Underline.None" Color="Color.Secondary" Class="customer-info-field">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Business" Size="Size.Small" Class="mr-1" />
+                                        @_selectedCustomer.CompanyName @if (!string.IsNullOrEmpty(_selectedCustomer.CompanyPhone)) { <text>· @_selectedCustomer.CompanyPhone</text> }
+                                    </MudLink>
+                                }
+                                @if (!string.IsNullOrEmpty(_selectedCustomer.Landline))
+                                {
+                                    <MudLink Href="@($"tel:{_selectedCustomer.Landline}")" Underline="Underline.None" Color="Color.Secondary" Class="customer-info-field">
+                                        <MudIcon Icon="@Icons.Material.Outlined.PhoneCallback" Size="Size.Small" Class="mr-1" />
+                                        @_selectedCustomer.Landline
+                                    </MudLink>
                                 }
                             </div>
-
-                            @* Dimensions / volume column *@
-                            <div class="file-card-dims">
-                                @if (file.Dimensions != null)
-                                {
-                                    <div class="file-card-dim-value">
-                                        @($"{file.Dimensions.X:N1} × {file.Dimensions.Y:N1} × {file.Dimensions.Z:N1} mm")
-                                    </div>
-                                    @if (file.VolumeMm3.HasValue)
-                                    {
-                                        <div class="file-card-dim-value">
-                                            @($"{file.VolumeMm3.Value:N2} mm³")
-                                        </div>
-                                    }
-                                }
-                                else if (is3D && (file.Uploading || file.AwaitingPreview))
-                                {
-                                    @* Skeleton lines for dimensions while analysis is pending *@
-                                    <MudSkeleton Width="120px" Height="16px" Animation="Animation.Wave" Class="mb-1" />
-                                    <MudSkeleton Width="90px" Height="16px" Animation="Animation.Wave" />
-                                }
-                            </div>
-                        </div>
-
-                        @* ── Footer: status left + quantity right ── *@
-                        <div class="file-card-footer">
-
-                            @* Status *@
-                            <div class="file-card-status">
-                                @if (file.Uploading)
-                                {
-                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" Style="width:14px;height:14px;" />
-                                    <span style="color:var(--mud-palette-primary)">Uploading...</span>
-                                }
-                                else if (file.Error != null)
-                                {
-                                    <MudIcon Icon="@Icons.Material.Outlined.Error" Color="Color.Error" Size="Size.Small" />
-                                    <MudTooltip Text="@file.Error">
-                                        <span style="color:var(--mud-palette-error)">Upload failed</span>
-                                    </MudTooltip>
-                                }
-                                else if (file.AwaitingPreview)
-                                {
-                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Secondary" Style="width:14px;height:14px;" />
-                                    <span style="color:var(--mud-palette-text-secondary)">@file.StatusText</span>
-                                }
-                                else
-                                {
-                                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Size="Size.Small" />
-                                    <span style="color:var(--mud-palette-success)">Ready</span>
-                                    @if (file.IsManifold == false)
-                                    {
-                                        <MudIcon Icon="@Icons.Material.Outlined.Warning"
-                                                 Color="Color.Warning"
-                                                 Size="Size.Small"
-                                                 Style="margin-left:4px;" />
-                                        <MudTooltip Text="Non-manifold mesh — preview may be incomplete" Placement="Placement.Top">
-                                            <span />
-                                        </MudTooltip>
-                                    }
-                                }
-                            </div>
-
-                            @* Quantity selector — always right-aligned *@
-                            @if (!file.Uploading && file.Error == null)
-                            {
-                                <MudNumericField T="int"
-                                                 Value="@file.Quantity"
-                                                 ValueChanged="@((v) => OnFileQuantityChanged(file, v))"
-                                                 Min="1" Max="999"
-                                                 Variant="Variant.Outlined"
-                                                 Margin="Margin.Dense"
-                                                 HideSpinButtons="false"
-                                                 Style="width:76px; flex-shrink:0; margin-left:auto;" />
-                            }
-                        </div>
-
-                        @* Indeterminate progress bar during upload *@
-                        @if (file.Uploading)
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        <MudAutocomplete T="CustomerSummaryDto"
+                                        Label="Search customer..."
+                                        Placeholder="Type 2+ characters to search..."
+                                        SearchFunc="SearchCustomersAsync"
+                                        ToStringFunc="@(c => c?.Name ?? "")"
+                                        @bind-Value="_selectedCustomer"
+                                        Variant="Variant.Outlined"
+                                        Margin="Margin.Dense"
+                                        Adornment="Adornment.Start"
+                                        AdornmentIcon="@Icons.Material.Outlined.Search"
+                                        ShowProgressIndicator="true"
+                                        MinCharacters="2"
+                                        Clearable="true"
+                                        OnClearButtonClick="@(() => _selectedCustomer = null)" />
+                        @if (_selectedCustomer != null)
                         {
-                            <MudProgressLinear Indeterminate="true"
-                                               Color="Color.Primary"
-                                               Rounded="true"
-                                               Style="height:3px;" />
+                            <MudButton Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       Class="mt-1"
+                                       OnClick="@(() => _showCustomerSearch = false)">
+                                Done selecting
+                            </MudButton>
+                        }
+                    }
+                </MudItem>
+
+                @* Center: Project title *@
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="mb-2">Project Details</MudText>
+                    <MudTextField @bind-Value="_title"
+                                  Label="Project Title *"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  MaxLength="500"
+                                  Counter="500"
+                                  HelperText="Briefly describe what the customer wants manufactured"
+                                  HelperTextOnFocus="true"
+                                  Error="@_titleHasError"
+                                  ErrorText="@_titleError"
+                                  OnBlur="ValidateTitle"
+                                  Immediate="true"
+                                  Class="mb-3" />
+                </MudItem>
+
+                @* Right: Description + actions *@
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="mb-2">Scope & Notes</MudText>
+                    <MudTextField @bind-Value="_description"
+                                  Label="Description"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Lines="4"
+                                  MaxLength="2000"
+                                  Counter="2000"
+                                  HelperText="Optional scope notes or special requirements"
+                                  HelperTextOnFocus="true"
+                                  Error="@_descriptionHasError"
+                                  ErrorText="@_descriptionError"
+                                  OnBlur="ValidateDescription"
+                                  Immediate="true"
+                                  Class="mb-3" />
+
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+                        <MudButton Variant="Variant.Text"
+                                   OnClick="@(() => Navigation.NavigateTo("/sales/projects"))">
+                            Cancel
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   StartIcon="@Icons.Material.Outlined.RocketLaunch"
+                                   Disabled="@(!CanSubmit)"
+                                   OnClick="CreateProjectAsync">
+                            @if (_saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <text>Creating...</text>
+                            }
+                            else
+                            {
+                                <text>Create Project</text>
+                            }
+                        </MudButton>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+
+            @* ── Section 2: Upload zone + global qty (inline bar) ── *@
+            <MudStack Row="true" AlignItems="AlignItems.Stretch" Spacing="3">
+                <div class="upload-drop-zone @(_dragOver ? "drag-over" : "") flex-grow-1"
+                     @onclick="OpenFilePicker"
+                     @ondragenter:preventDefault @ondragenter="@(() => _dragOver = true)"
+                     @ondragleave="@(() => _dragOver = false)"
+                     @ondragover:preventDefault
+                     @ondrop:preventDefault @ondrop="@(() => _dragOver = false)">
+                    <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Size="Size.Small" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        <strong>Click to browse</strong> or drag &amp; drop files here
+                    </MudText>
+                </div>
+
+                @if (_uploadedFiles.Any(f => Is3DFile(f.Name)))
+                {
+                    var globalQtyFiles = _uploadedFiles.Where(f => Is3DFile(f.Name) && !f.Uploading && f.Error == null).ToList();
+                    var allSameQty = globalQtyFiles.Count > 0 && globalQtyFiles.Select(f => f.Quantity).Distinct().Count() == 1;
+                    var globalQtyValue = allSameQty ? globalQtyFiles[0].Quantity : (int?)null;
+
+                    <div class="global-qty-bar">
+                        <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body2" Style="white-space:nowrap;">Qty:</MudText>
+                        <MudNumericField T="int?"
+                                         Value="@globalQtyValue"
+                                         ValueChanged="@SetGlobalQuantity"
+                                         Min="1" Max="999"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         HideSpinButtons="false"
+                                         Disabled="@(!allSameQty && globalQtyFiles.Count > 1)"
+                                         Placeholder="@(!allSameQty && globalQtyFiles.Count > 1 ? "—" : "")"
+                                         Style="width:72px; flex-shrink:0;" />
+                        @if (!allSameQty && globalQtyFiles.Count > 1)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="white-space:nowrap;">
+                                Set equal qty
+                            </MudText>
                         }
                     </div>
                 }
-            </div>
-        }
-    </MudItem>
-</MudGrid>
+            </MudStack>
+
+            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                           @ref="_fileUpload"
+                           FilesChanged="HandleFileSelected"
+                           Accept=".stl,.step,.stp,.3mf,.obj,.igs,.iges,.blend,.fbx,.gltf,.glb,.pdf,.dxf,.dwg,.png,.jpg,.jpeg,.tiff,.bmp,.webp,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z"
+                           MaximumFileCount="20"
+                           Hidden="true" />
+
+            @* ── Section 3: File cards grid ── *@
+            @if (_uploadedFiles.Any())
+            {
+                <div class="file-cards-grid">
+                    @foreach (var file in _uploadedFiles.ToList())
+                    {
+                        var is3D = Is3DFile(file.Name);
+
+                        <div class="file-card">
+                            @* Header: filename + delete icon (red) *@
+                            <div class="file-card-header">
+                                <MudTooltip Text="@file.Name" Placement="Placement.Top">
+                                    <div class="file-card-name">@file.Name</div>
+                                </MudTooltip>
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => RemoveFile(file))"
+                                               Disabled="@file.Uploading" />
+                            </div>
+
+                            @* Middle: preview (100x100) + dims/volume *@
+                            <div class="file-card-middle">
+                                <div class="file-card-preview">
+                                    @if (file.PreviewLoadFailed)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Outlined.BrokenImage" Size="Size.Large" Color="Color.Error" />
+                                    }
+                                    else if (!string.IsNullOrEmpty(file.PreviewUrl))
+                                    {
+                                        <img src="@file.PreviewUrl"
+                                             alt="@file.Name"
+                                             @onerror="@(() => { file.PreviewLoadFailed = true; file.PreviewUrl = null; InvokeAsync(StateHasChanged); })" />
+                                    }
+                                    else if (is3D && (file.Uploading || file.AwaitingPreview))
+                                    {
+                                        <MudSkeleton SkeletonType="SkeletonType.Rectangle"
+                                                     Width="100px" Height="100px"
+                                                     Animation="Animation.Wave" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@GetFileIcon(file.Name)" Size="Size.Large" Color="Color.Default" />
+                                    }
+                                </div>
+
+                                @* Dims + volume — top-aligned *@
+                                <div class="file-card-dims">
+                                    @if (file.Dimensions != null)
+                                    {
+                                        <div class="file-card-dim-value">
+                                            @($"{file.Dimensions.X:N1} × {file.Dimensions.Y:N1} × {file.Dimensions.Z:N1} mm")
+                                        </div>
+                                        @if (file.VolumeMm3.HasValue)
+                                        {
+                                            <div class="file-card-dim-value">
+                                                @($"{file.VolumeMm3.Value:N2} mm³")
+                                            </div>
+                                        }
+                                    }
+                                    else if (is3D && (file.Uploading || file.AwaitingPreview))
+                                    {
+                                        <MudSkeleton Width="110px" Height="14px" Animation="Animation.Wave" Class="mb-1" />
+                                        <MudSkeleton Width="80px" Height="14px" Animation="Animation.Wave" />
+                                    }
+                                </div>
+                            </div>
+
+                            @* Footer: status + quantity *@
+                            <div class="file-card-footer">
+                                <div class="file-card-status">
+                                    @if (file.Uploading)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" Style="width:12px;height:12px;" />
+                                        <span style="color:var(--mud-palette-primary)">Uploading...</span>
+                                    }
+                                    else if (file.Error != null)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Outlined.Error" Color="Color.Error" Size="Size.Small" />
+                                        <MudTooltip Text="@file.Error">
+                                            <span style="color:var(--mud-palette-error)">Upload failed</span>
+                                        </MudTooltip>
+                                    }
+                                    else if (file.AwaitingPreview)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Secondary" Style="width:12px;height:12px;" />
+                                        <span style="color:var(--mud-palette-text-secondary)">@file.StatusText</span>
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                        <span style="color:var(--mud-palette-success)">Ready</span>
+                                        @if (file.IsManifold == false)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Outlined.Warning"
+                                                     Color="Color.Warning"
+                                                     Size="Size.Small"
+                                                     Style="margin-left:2px;" />
+                                            <MudTooltip Text="Non-manifold mesh — preview may be incomplete" Placement="Placement.Top">
+                                                <span />
+                                            </MudTooltip>
+                                        }
+                                    }
+                                </div>
+
+                                @if (!file.Uploading && file.Error == null)
+                                {
+                                    <MudNumericField T="int"
+                                                     Value="@file.Quantity"
+                                                     ValueChanged="@((v) => OnFileQuantityChanged(file, v))"
+                                                     Min="1" Max="999"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     HideSpinButtons="false"
+                                                     Style="width:68px; flex-shrink:0;" />
+                                }
+                            </div>
+
+                            @if (file.Uploading)
+                            {
+                                <MudProgressLinear Indeterminate="true"
+                                                   Color="Color.Primary"
+                                                   Rounded="true"
+                                                   Style="height:3px;" />
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+        </MudStack>
     </ChildContent>
     <ErrorContent>
         <MudAlert Severity="Severity.Error" Class="ma-4">
@@ -477,8 +494,8 @@
 </ErrorBoundary>
 
 @code {
-    // ── State ──────────────────────────────────────────────────────────
     private CustomerSummaryDto? _selectedCustomer;
+    private bool _showCustomerSearch = true;
     private string _title = string.Empty;
     private string? _description;
     private bool _saving;
@@ -487,30 +504,24 @@
     private readonly List<UploadedFileState> _uploadedFiles = [];
     private readonly Dictionary<string, CancellationTokenSource> _pollingTokens = new();
     private const int PollingIntervalMs = 2000;
+    private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
 
     private string? _titleError;
     private bool _titleHasError;
     private string? _descriptionError;
     private bool _descriptionHasError;
 
-    // 3D manufacturing / design formats — these enter the geometry analysis pipeline
     private static readonly HashSet<string> ThreeDExtensions =
         new(StringComparer.OrdinalIgnoreCase)
         { ".stl", ".step", ".stp", ".3mf", ".obj", ".igs", ".iges", ".blend", ".fbx", ".gltf", ".glb" };
 
-    // All accepted file types
     private static readonly HashSet<string> AllowedExtensions =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            // 3D
             ".stl", ".step", ".stp", ".3mf", ".obj", ".igs", ".iges", ".blend", ".fbx", ".gltf", ".glb",
-            // Drawings
             ".pdf", ".dxf", ".dwg",
-            // Images
             ".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".webp",
-            // Documents
             ".doc", ".docx", ".xls", ".xlsx",
-            // Archives
             ".zip", ".rar", ".7z",
         };
 
@@ -522,17 +533,13 @@
         !_descriptionHasError &&
         !_uploadedFiles.Any(f => f.Uploading);
 
-    // ── Lifecycle ──────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         if (authState.User.Identity?.IsAuthenticated != true)
-        {
             return;
-        }
     }
 
-    /// <summary>Cancels and disposes all active polling cancellation tokens.</summary>
     public async ValueTask DisposeAsync()
     {
         foreach (var cts in _pollingTokens.Values)
@@ -542,7 +549,6 @@
         }
     }
 
-    // ── Polling for analysis status ─────────────────────────────────────
     private async Task PollAnalysisStatusAsync(UploadedFileState file)
     {
         if (string.IsNullOrEmpty(file.StoragePath))
@@ -570,7 +576,7 @@
                             if (status.Dimensions != null)
                             {
                                 file.Dimensions = status.Dimensions;
-                                file.VolumeMm3  = status.Dimensions.VolumeMm3;
+                                file.VolumeMm3 = status.Dimensions.VolumeMm3;
                             }
                             if (string.IsNullOrEmpty(file.PreviewUrl))
                             {
@@ -578,7 +584,6 @@
                                                   ?? status.PreviewUrls?.Front
                                                   ?? status.ThumbnailUrl;
                             }
-                            // PreviewProcessingStatus tracks whether preview images are still being generated
                             if (status.PreviewProcessingStatus == PreviewProcessingStatus.Processing
                                 || status.PreviewProcessingStatus == PreviewProcessingStatus.Pending)
                             {
@@ -591,13 +596,12 @@
                             break;
 
                         case FileAnalysisStatus.Completed:
-                            file.Dimensions  = status.Dimensions;
-                            file.VolumeMm3  = status.Dimensions?.VolumeMm3;
-                            file.PreviewUrl  = status.PreviewUrls?.Iso
-                                               ?? status.PreviewUrls?.Front
-                                               ?? status.ThumbnailUrl;
-                            file.IsManifold  = status.IsManifold;
-                            // Stop polling only when preview generation is also complete (or failed)
+                            file.Dimensions = status.Dimensions;
+                            file.VolumeMm3 = status.Dimensions?.VolumeMm3;
+                            file.PreviewUrl = status.PreviewUrls?.Iso
+                                             ?? status.PreviewUrls?.Front
+                                             ?? status.ThumbnailUrl;
+                            file.IsManifold = status.IsManifold;
                             if (status.PreviewProcessingStatus == PreviewProcessingStatus.Completed)
                             {
                                 file.AwaitingPreview = false;
@@ -645,7 +649,6 @@
         }
     }
 
-    // ── Customer search ────────────────────────────────────────────────
     private async Task<IEnumerable<CustomerSummaryDto>> SearchCustomersAsync(string value, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(value)) return [];
@@ -658,18 +661,16 @@
         catch { return []; }
     }
 
-    // ── File selection ─────────────────────────────────────────────────
-    private void HandleFileDrop(DragEventArgs e) => _dragOver = false;
+    private Task OpenFilePicker()
+        => _fileUpload?.OpenFilePickerAsync() ?? Task.CompletedTask;
 
-    private async Task TriggerFilePickerAsync()
+    private async Task HandleFileSelected(IReadOnlyList<IBrowserFile> files)
     {
-        await JS.InvokeVoidAsync("eval", "document.getElementById('new-project-file-input').click()");
-    }
+        _dragOver = false;
+        if (files.Count == 0) return;
 
-    private async Task HandleFileSelected(InputFileChangeEventArgs e)
-    {
-        const long maxBytes = 200L * 1024 * 1024; // 200 MB
-        var newFiles = e.GetMultipleFiles(20)
+        const long maxBytes = 200L * 1024 * 1024;
+        var newFiles = files
             .Where(f =>
             {
                 var ext = Path.GetExtension(f.Name);
@@ -687,19 +688,17 @@
             })
             .ToList();
 
-        // Add cards immediately — before any upload starts (no UI freeze)
         var states = newFiles.Select(f => new UploadedFileState
         {
-            Name     = f.Name,
+            Name = f.Name,
             Uploading = true,
-            AwaitingPreview = false, // set to true only after upload succeeds (for 3D files)
+            AwaitingPreview = false,
             StatusText = "Processing...",
         }).ToList();
 
         _uploadedFiles.AddRange(states);
         StateHasChanged();
 
-        // Upload all files in parallel (streams, not buffered into memory)
         var tasks = newFiles.Zip(states, (browserFile, state) =>
             UploadFileAsync(browserFile, state, maxBytes));
 
@@ -711,7 +710,6 @@
     {
         try
         {
-            // Stream the file directly without loading it entirely into memory
             await using var stream = browserFile.OpenReadStream(maxBytes);
             using var content = new MultipartFormDataContent();
             content.Add(new StreamContent(stream), "file", browserFile.Name);
@@ -725,14 +723,12 @@
                 state.StoragePath = uploaded?.StoragePath;
                 state.Uploading = false;
 
-                // For 3D files, start polling for geometry analysis status
                 if (Is3DFile(browserFile.Name))
                 {
                     state.AwaitingPreview = true;
                     state.StatusText = "Processing 3D file...";
                     _ = PollAnalysisStatusAsync(state);
                 }
-                // Non-3D files are immediately ready — no geometry analysis needed
             }
             else
             {
@@ -762,20 +758,12 @@
         StateHasChanged();
     }
 
-    // ── Quantity management ────────────────────────────────────────────
-    /// <summary>
-    /// Sets the quantity for an individual 3D file and re-renders so the global selector updates.
-    /// </summary>
     private void OnFileQuantityChanged(UploadedFileState file, int value)
     {
         file.Quantity = value;
         StateHasChanged();
     }
 
-    /// <summary>
-    /// Applies a global quantity to all 3D files that have finished uploading without errors.
-    /// Called when the user changes the global quantity field.
-    /// </summary>
     private void SetGlobalQuantity(int? value)
     {
         if (value is null or < 1) return;
@@ -786,7 +774,6 @@
         StateHasChanged();
     }
 
-    // ── Project creation ───────────────────────────────────────────────
     private async Task CreateProjectAsync()
     {
         if (_selectedCustomer == null || string.IsNullOrWhiteSpace(_title)) return;
@@ -797,10 +784,10 @@
         {
             var createRequest = new CreateProjectRequest
             {
-                CustomerId   = _selectedCustomer.Id,
+                CustomerId = _selectedCustomer.Id,
                 CustomerName = _selectedCustomer.Name,
-                Title        = _title,
-                Description  = _description,
+                Title = _title,
+                Description = _description,
             };
 
             var response = await Http.PostAsJsonAsync("api/projects", createRequest);
@@ -818,13 +805,12 @@
             var project = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
             if (project == null) { Snackbar.Add("Unexpected response from server.", Severity.Error); return; }
 
-            // Attach uploaded parts to the project
             var validParts = _uploadedFiles.Where(f => f.FileId != Guid.Empty && f.Error == null).ToList();
             foreach (var file in validParts)
             {
                 var partRequest = new AddProjectPartRequest
                 {
-                    FileId   = file.FileId,
+                    FileId = file.FileId,
                     FileName = file.Name,
                     Quantity = file.Quantity,
                 };
@@ -844,7 +830,6 @@
         }
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────
     private void ValidateTitle()
     {
         if (string.IsNullOrWhiteSpace(_title))
@@ -887,45 +872,30 @@
             ".stl" or ".step" or ".stp" or ".3mf" or ".obj" or ".igs" or ".iges"
             or ".blend" or ".fbx" or ".gltf" or ".glb"
                 => Icons.Material.Outlined.ViewInAr,
-            ".pdf"                          => Icons.Material.Outlined.PictureAsPdf,
-            ".dxf" or ".dwg"                => Icons.Material.Outlined.Architecture,
-            ".png" or ".jpg" or ".jpeg"
-            or ".tiff" or ".bmp" or ".webp" => Icons.Material.Outlined.Image,
-            ".doc" or ".docx"               => Icons.Material.Outlined.Description,
-            ".xls" or ".xlsx"               => Icons.Material.Outlined.TableChart,
-            ".zip" or ".rar" or ".7z"       => Icons.Material.Outlined.FolderZip,
-            _                               => Icons.Material.Outlined.InsertDriveFile,
+            ".pdf" => Icons.Material.Outlined.PictureAsPdf,
+            ".dxf" or ".dwg" => Icons.Material.Outlined.Architecture,
+            ".png" or ".jpg" or ".jpeg" or ".tiff" or ".bmp" or ".webp"
+                => Icons.Material.Outlined.Image,
+            ".doc" or ".docx" => Icons.Material.Outlined.Description,
+            ".xls" or ".xlsx" => Icons.Material.Outlined.TableChart,
+            ".zip" or ".rar" or ".7z" => Icons.Material.Outlined.FolderZip,
+            _ => Icons.Material.Outlined.InsertDriveFile,
         };
 
-    // ── File state model ───────────────────────────────────────────────
     private sealed class UploadedFileState
     {
-        /// <summary>Original file name.</summary>
-        public string  Name            { get; set; } = string.Empty;
-        /// <summary>BFF-assigned upload identifier.</summary>
-        public Guid    FileId          { get; set; }
-        /// <summary>GCS storage path used as correlation key for analysis polling.</summary>
-        public string? StoragePath     { get; set; }
-        /// <summary>True while the file is being streamed to the BFF.</summary>
-        public bool    Uploading       { get; set; }
-        /// <summary>True after upload succeeds and while waiting for geometry analysis to complete.</summary>
-        public bool    AwaitingPreview { get; set; }
-        /// <summary>Human-readable status shown next to the spinner during analysis phases.</summary>
-        public string  StatusText      { get; set; } = "Processing...";
-        /// <summary>Signed URL for the front-view preview image once analysis completes.</summary>
-        public string? PreviewUrl      { get; set; }
-        /// <summary>True when the preview image URL resolved but the browser failed to load the image.</summary>
-        public bool    PreviewLoadFailed { get; set; }
-        /// <summary>Bounding box from geometry analysis (X/Y/Z in mm).</summary>
+        public string Name { get; set; } = string.Empty;
+        public Guid FileId { get; set; }
+        public string? StoragePath { get; set; }
+        public bool Uploading { get; set; }
+        public bool AwaitingPreview { get; set; }
+        public string StatusText { get; set; } = "Processing...";
+        public string? PreviewUrl { get; set; }
+        public bool PreviewLoadFailed { get; set; }
         public FileAnalysisDimensionsDto? Dimensions { get; set; }
-        /// <summary>Part volume in cubic millimetres, populated after analysis completes.</summary>
-        public double? VolumeMm3       { get; set; }
-        /// <summary>Null until analysis completes. False means non-manifold — show warning.</summary>
-        public bool?   IsManifold      { get; set; }
-        /// <summary>Number of units to produce for this part.</summary>
-        public int     Quantity        { get; set; } = 1;
-        /// <summary>Upload or analysis error message, if any.</summary>
-        public string? Error           { get; set; }
+        public double? VolumeMm3 { get; set; }
+        public bool? IsManifold { get; set; }
+        public int Quantity { get; set; } = 1;
+        public string? Error { get; set; }
     }
-
 }
