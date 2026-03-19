@@ -31,6 +31,7 @@ public class BffTestWebApplicationFactory : WebApplicationFactory<Program>
                 ["Services:AuthService:BaseUrl"] = "http://auth-service",
                 ["Services:CustomerService:BaseUrl"] = "http://customer-service",
                 ["Jwt:SecurityKey"] = "test-security-key-for-integration-tests-min32chars",
+                ["ConnectionStrings:rabbitmq"] = "amqp://guest:guest@localhost:5672",
             });
         });
 

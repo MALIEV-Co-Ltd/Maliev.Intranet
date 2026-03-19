@@ -5,6 +5,8 @@ using Maliev.Intranet.Tests.Testing;
 using MudBlazor;
 using MudBlazor.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components.Authorization;
+using System.Security.Claims;
 
 namespace Maliev.Intranet.Tests.Client.Pages;
 
@@ -22,6 +24,11 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);
         Services.AddScoped<BreadcrumbService>();
+
+        Services.AddLogging();
+        Services.AddAuthorization();
+        Services.AddScoped<AuthenticationStateProvider, TestAuthenticationStateProvider>();
+
         Render<MudPopoverProvider>();
     }
 
