@@ -18,16 +18,12 @@ jobs:
         with:
           dotnet-version: "10.x"
 
-      - name: Switch to PackageReference for CI build
+      - name: Add MessagingContracts PackageReference for CI build
         run: |
-          # Replace ProjectReference with PackageReference in all service csproj files
-          find . -name "*.csproj" -type f -exec sed -i \
-            's|<ProjectReference Include=".*Maliev.Aspire.ServiceDefaults.*.csproj" />|<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="1.0.1" />|g' \
-            {} \;
-          find . -name "*.csproj" -type f -exec sed -i \
-            's|<ProjectReference Include=".*Maliev.MessagingContracts.*.csproj" />|<PackageReference Include="Maliev.MessagingContracts" Version="1.0.79-alpha" />|g' \
-            {} \;
-          echo "Switched to PackageReference for ServiceDefaults and MessagingContracts"
+          # Add MessagingContracts PackageReference to Bff project for CI
+          # It doesn't have a local ProjectReference so we need to add the PackageReference
+          sed -i 's|<PackageReference Include="MudBlazor" Version="9.1.0" />|<PackageReference Include="Maliev.MessagingContracts" Version="1.0.79-alpha" />\n    <PackageReference Include="MudBlazor" Version="9.1.0" />|g' Maliev.Intranet.Bff/Maliev.Intranet.Bff.csproj
+          echo "Added MessagingContracts PackageReference to Bff project"
 
       - name: Restore dependencies
         run: dotnet restore Maliev.Intranet.slnx /p:TreatWarningsAsErrors=false /p:NoWarn=NU1903
