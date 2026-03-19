@@ -32,16 +32,19 @@
         border-color: var(--mud-palette-primary);
         background: color-mix(in srgb, var(--mud-palette-primary) 6%, transparent);
     }
-    /* ── Responsive file card grid (3 cols desktop, 2 tablet, 1 mobile) ── */
+    /* ── Responsive file card grid (4 cols desktop, 3 tablet, 2 small tablet, 1 mobile) ── */
     .file-cards-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 10px;
         max-height: 520px;
         overflow-y: auto;
         padding-right: 2px;
     }
-    @@media (max-width 1280px) {
+    @@media (max-width 1400px) {
+        .file-cards-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @@media (max-width 1100px) {
         .file-cards-grid { grid-template-columns: repeat(2, 1fr); }
     }
     @@media (max-width 600px) {
@@ -117,6 +120,7 @@
     .file-card-footer {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         padding: 5px 6px 5px 10px;
         border-top: 1px solid var(--mud-palette-lines-default);
         gap: 4px;
@@ -126,7 +130,6 @@
         align-items: center;
         gap: 4px;
         font-size: 0.75rem;
-        flex: 1;
         min-width: 0;
         white-space: nowrap;
         overflow: visible;
@@ -155,13 +158,6 @@
 <ErrorBoundary>
     <ChildContent>
         <MudStack Spacing="4">
-
-            @* ── Page Title ── *@
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
-                               OnClick="@(() => Navigation.NavigateTo("/sales/projects"))" />
-                <MudText Typo="Typo.h5" Style="font-weight: 700;">New Project</MudText>
-            </MudStack>
 
             @* ── Section 1: Customer + Project Info (3-col grid) ── *@
             <MudGrid Spacing="3">
@@ -223,7 +219,7 @@
                                         Placeholder="Type 2+ characters to search..."
                                         SearchFunc="SearchCustomersAsync"
                                         ToStringFunc="@(c => c?.Name ?? "")"
-                                        @bind-Value="_selectedCustomer"
+                                        ValueChanged="@(OnCustomerSelected)"
                                         Variant="Variant.Outlined"
                                         Margin="Margin.Dense"
                                         Adornment="Adornment.Start"
@@ -231,7 +227,7 @@
                                         ShowProgressIndicator="true"
                                         MinCharacters="2"
                                         Clearable="true"
-                                        OnClearButtonClick="@(() => _selectedCustomer = null)" />
+                                        OnClearButtonClick="@(() => { _selectedCustomer = null; _showCustomerSearch = true; })" />
                         @if (_selectedCustomer != null)
                         {
                             <MudButton Variant="Variant.Text"
@@ -244,7 +240,7 @@
                     }
                 </MudItem>
 
-                @* Center: Project title *@
+                @* Center: Project Title + Description (stacked) *@
                 <MudItem xs="12" md="4">
                     <MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="mb-2">Project Details</MudText>
                     <MudTextField @bind-Value="_title"
@@ -254,17 +250,12 @@
                                   MaxLength="500"
                                   Counter="500"
                                   HelperText="Briefly describe what the customer wants manufactured"
-                                  HelperTextOnFocus="true"
                                   Error="@_titleHasError"
                                   ErrorText="@_titleError"
                                   OnBlur="ValidateTitle"
                                   Immediate="true"
                                   Class="mb-3" />
-                </MudItem>
 
-                @* Right: Description + actions *@
-                <MudItem xs="12" md="4">
-                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="mb-2">Scope & Notes</MudText>
                     <MudTextField @bind-Value="_description"
                                   Label="Description"
                                   Variant="Variant.Outlined"
@@ -273,14 +264,56 @@
                                   MaxLength="2000"
                                   Counter="2000"
                                   HelperText="Optional scope notes or special requirements"
-                                  HelperTextOnFocus="true"
                                   Error="@_descriptionHasError"
                                   ErrorText="@_descriptionError"
                                   OnBlur="ValidateDescription"
-                                  Immediate="true"
-                                  Class="mb-3" />
+                                  Immediate="true" />
+                </MudItem>
 
-                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+                @* Right: File upload + actions *@
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="mb-2">Upload Files</MudText>
+                    <div class="upload-drop-zone @(_dragOver ? "drag-over" : "")"
+                         @onclick="OpenFilePicker"
+                         @ondragenter:preventDefault @ondragenter="@(() => _dragOver = true)"
+                         @ondragleave="@(() => _dragOver = false)"
+                         @ondragover:preventDefault
+                         @ondrop:preventDefault @ondrop="@(() => _dragOver = false)">
+                        <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Size="Size.Small" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            <strong>Click or drag &amp; drop</strong> files here
+                        </MudText>
+                    </div>
+
+                    @if (_uploadedFiles.Any(f => Is3DFile(f.Name)))
+                    {
+                        var globalQtyFiles = _uploadedFiles.Where(f => Is3DFile(f.Name) && !f.Uploading && f.Error == null).ToList();
+                        var allSameQty = globalQtyFiles.Count > 0 && globalQtyFiles.Select(f => f.Quantity).Distinct().Count() == 1;
+                        var globalQtyValue = allSameQty ? globalQtyFiles[0].Quantity : (int?)null;
+
+                        <div class="global-qty-bar mt-3">
+                            <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" Color="Color.Secondary" />
+                            <MudText Typo="Typo.body2" Style="white-space:nowrap;">Qty:</MudText>
+                            <MudNumericField T="int?"
+                                             Value="@globalQtyValue"
+                                             ValueChanged="@SetGlobalQuantity"
+                                             Min="1" Max="999"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             HideSpinButtons="false"
+                                             Disabled="@(!allSameQty && globalQtyFiles.Count > 1)"
+                                             Placeholder="@(!allSameQty && globalQtyFiles.Count > 1 ? "—" : "")"
+                                             Style="width:72px; flex-shrink:0;" />
+                            @if (!allSameQty && globalQtyFiles.Count > 1)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="white-space:nowrap;">
+                                    Set equal qty
+                                </MudText>
+                            }
+                        </div>
+                    }
+
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2" Class="mt-4">
                         <MudButton Variant="Variant.Text"
                                    OnClick="@(() => Navigation.NavigateTo("/sales/projects"))">
                             Cancel
@@ -304,55 +337,13 @@
                 </MudItem>
             </MudGrid>
 
-            @* ── Section 2: Upload zone + global qty (inline bar) ── *@
-            <MudStack Row="true" AlignItems="AlignItems.Stretch" Spacing="3">
-                <div class="upload-drop-zone @(_dragOver ? "drag-over" : "") flex-grow-1"
-                     @onclick="OpenFilePicker"
-                     @ondragenter:preventDefault @ondragenter="@(() => _dragOver = true)"
-                     @ondragleave="@(() => _dragOver = false)"
-                     @ondragover:preventDefault
-                     @ondrop:preventDefault @ondrop="@(() => _dragOver = false)">
-                    <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Size="Size.Small" Color="Color.Secondary" />
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        <strong>Click to browse</strong> or drag &amp; drop files here
-                    </MudText>
-                </div>
-
-                @if (_uploadedFiles.Any(f => Is3DFile(f.Name)))
-                {
-                    var globalQtyFiles = _uploadedFiles.Where(f => Is3DFile(f.Name) && !f.Uploading && f.Error == null).ToList();
-                    var allSameQty = globalQtyFiles.Count > 0 && globalQtyFiles.Select(f => f.Quantity).Distinct().Count() == 1;
-                    var globalQtyValue = allSameQty ? globalQtyFiles[0].Quantity : (int?)null;
-
-                    <div class="global-qty-bar">
-                        <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" Color="Color.Secondary" />
-                        <MudText Typo="Typo.body2" Style="white-space:nowrap;">Qty:</MudText>
-                        <MudNumericField T="int?"
-                                         Value="@globalQtyValue"
-                                         ValueChanged="@SetGlobalQuantity"
-                                         Min="1" Max="999"
-                                         Variant="Variant.Outlined"
-                                         Margin="Margin.Dense"
-                                         HideSpinButtons="false"
-                                         Disabled="@(!allSameQty && globalQtyFiles.Count > 1)"
-                                         Placeholder="@(!allSameQty && globalQtyFiles.Count > 1 ? "—" : "")"
-                                         Style="width:72px; flex-shrink:0;" />
-                        @if (!allSameQty && globalQtyFiles.Count > 1)
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="white-space:nowrap;">
-                                Set equal qty
-                            </MudText>
-                        }
-                    </div>
-                }
-            </MudStack>
-
             <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                            @ref="_fileUpload"
                            FilesChanged="HandleFileSelected"
                            Accept=".stl,.step,.stp,.3mf,.obj,.igs,.iges,.blend,.fbx,.gltf,.glb,.pdf,.dxf,.dwg,.png,.jpg,.jpeg,.tiff,.bmp,.webp,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z"
                            MaximumFileCount="20"
-                           Hidden="true" />
+                           Hidden="true"
+                           Style="display:none;" />
 
             @* ── Section 3: File cards grid ── *@
             @if (_uploadedFiles.Any())
@@ -580,9 +571,9 @@
                             }
                             if (string.IsNullOrEmpty(file.PreviewUrl))
                             {
-                                file.PreviewUrl = status.PreviewUrls?.Iso
-                                                  ?? status.PreviewUrls?.Front
-                                                  ?? status.ThumbnailUrl;
+                                file.PreviewUrl = ResolvePreviewUrl(status.PreviewUrls?.Iso)
+                                                  ?? ResolvePreviewUrl(status.PreviewUrls?.Front)
+                                                  ?? ResolvePreviewUrl(status.ThumbnailUrl);
                             }
                             if (status.PreviewProcessingStatus == PreviewProcessingStatus.Processing
                                 || status.PreviewProcessingStatus == PreviewProcessingStatus.Pending)
@@ -598,9 +589,9 @@
                         case FileAnalysisStatus.Completed:
                             file.Dimensions = status.Dimensions;
                             file.VolumeMm3 = status.Dimensions?.VolumeMm3;
-                            file.PreviewUrl = status.PreviewUrls?.Iso
-                                             ?? status.PreviewUrls?.Front
-                                             ?? status.ThumbnailUrl;
+                            file.PreviewUrl = ResolvePreviewUrl(status.PreviewUrls?.Iso)
+                                             ?? ResolvePreviewUrl(status.PreviewUrls?.Front)
+                                             ?? ResolvePreviewUrl(status.ThumbnailUrl);
                             file.IsManifold = status.IsManifold;
                             if (status.PreviewProcessingStatus == PreviewProcessingStatus.Completed)
                             {
@@ -659,6 +650,25 @@
             return result?.Data ?? [];
         }
         catch { return []; }
+    }
+
+    private void OnCustomerSelected(CustomerSummaryDto? customer)
+    {
+        _selectedCustomer = customer;
+        if (customer != null)
+        {
+            _showCustomerSearch = false;
+        }
+    }
+
+    private string? ResolvePreviewUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url))
+            return null;
+        if (url.StartsWith("http://") || url.StartsWith("https://"))
+            return url;
+        var baseUri = Navigation.BaseUri.TrimEnd('/');
+        return url.StartsWith("/") ? $"{baseUri}{url}" : $"{baseUri}/{url}";
     }
 
     private Task OpenFilePicker()

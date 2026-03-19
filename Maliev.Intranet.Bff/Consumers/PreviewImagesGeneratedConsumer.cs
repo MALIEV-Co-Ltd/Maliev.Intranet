@@ -59,10 +59,20 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             var previews = payload.PreviewImages;
             var uploadClient = CreateUploadClient();
 
-            async Task<string?> ResolveUrlAsync(string? path) =>
-                string.IsNullOrEmpty(path)
-                    ? null
-                    : await uploadClient.GetDownloadUrlByPathAsync(path, context.CancellationToken) ?? path;
+            async Task<string?> ResolveUrlAsync(string? path)
+            {
+                if (string.IsNullOrEmpty(path))
+                    return null;
+
+                var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(path, context.CancellationToken);
+                if (!string.IsNullOrEmpty(signedUrl))
+                    return signedUrl;
+
+                _logger.LogWarning(
+                    "Failed to generate signed URL for path={Path}, preview will not be available",
+                    path);
+                return null;
+            }
 
             var frontUrl = await ResolveUrlAsync(previews.Front);
             var isoUrl   = await ResolveUrlAsync(previews.Iso);
