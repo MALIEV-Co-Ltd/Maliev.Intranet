@@ -97,10 +97,10 @@
                                  <MudText Typo="Typo.h6" Style="font-weight: 700;">Company Information</MudText>
                              </MudStack>
                              <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                 @if (_newCompany.IsVerifiedFromBdex)
-                                 {
-                                     <MudChip T="string" Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" Size="Size.Small">Verified from DBD</MudChip>
-                                 }
+                                  @if (_newCompany.IsVerifiedFromBdex)
+                                  {
+                                      <MudChip T="string" Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" Size="Size.Small">Verified from Registry</MudChip>
+                                  }
                                  else if (_companyIsManualEntry)
                                  {
                                      <MudChip T="string" Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small">Manual Entry</MudChip>
@@ -114,52 +114,39 @@
                         @if (!string.IsNullOrWhiteSpace(_newCompany.VatNumber) || _showCompanyFields)
                         {
                             <MudGrid Spacing="4">
-                                <!-- Tax ID with Search -->
+                                <!-- Company Search (Tax ID or Name) -->
                                 <MudItem xs="12">
-                                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Start">
-                                        <MudTextField T="string"
-                                                      Label="Tax ID / Juristic ID"
-                                                      @bind-Value="_newCompany.VatNumber"
-                                                      Variant="Variant.Outlined"
-                                                      Placeholder="0105500002375 (13 digits)"
-                                                      ReadOnly="@_newCompany.IsVerifiedFromBdex"
-                                                      Class="flex-grow-1"
-                                                      Adornment="Adornment.Start"
-                                                      AdornmentIcon="@Icons.Material.Filled.Badge"
-                                                      HelperText="@(_newCompany.IsVerifiedFromBdex ? "" : "Enter 13-digit Thai Tax ID to verify from DBD registry")" />
-
-                                        @if (!_newCompany.IsVerifiedFromBdex)
-                                        {
-                                            <MudTooltip Text="@(_isLookingUpCompany ? "Searching..." : "Verify company from DBD registry")">
-                                                <MudButton Variant="Variant.Filled"
-                                                           Color="Color.Primary"
-                                                           OnClick="LookupCompanyByTaxId"
-                                                           Disabled="@(_isLookingUpCompany || string.IsNullOrWhiteSpace(_newCompany.VatNumber))"
-                                                           Style="margin-top: 4px; min-width: 120px;">
-                                                    @if (_isLookingUpCompany)
-                                                    {
-                                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                                                        <span>Verifying...</span>
-                                                    }
-                                                    else
-                                                    {
-                                                        <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" Class="mr-1" />
-                                                        <span>Verify</span>
-                                                    }
-                                                </MudButton>
-                                            </MudTooltip>
-                                        }
-                                        else
-                                        {
-                                            <MudButton Variant="Variant.Outlined"
-                                                       Color="Color.Primary"
-                                                       OnClick="ResetCompanyVerification"
-                                                       Style="margin-top: 4px; min-width: 120px;">
-                                                <MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Class="mr-1" />
-                                                <span>Re-verify</span>
-                                            </MudButton>
-                                        }
-                                    </MudStack>
+                                    <MudAutocomplete T="RegistryCompanyProfile"
+                                                    Value="_selectedCompany"
+                                                    ValueChanged="OnCompanySelected"
+                                                    Label="Search company by Tax ID or name"
+                                                    Placeholder="Enter 13-digit Tax ID or company name (min 2 characters)"
+                                                    SearchFunc="SearchCompaniesAsync"
+                                                    Variant="Variant.Outlined"
+                                                    Adornment="Adornment.Start"
+                                                    AdornmentIcon="@Icons.Material.Filled.Search"
+                                                    Clearable="true"
+                                                    DebounceInterval="300"
+                                                    MinCharacters="2"
+                                                    MaxItems="10"
+                                                    ToStringFunc="c => c?.CompanyNameTh ?? c?.TaxId ?? string.Empty"
+                                                    Disabled="@_newCompany.IsVerifiedFromBdex"
+                                                    HelperText="@(_newCompany.IsVerifiedFromBdex ? "" : "Enter 13-digit Tax ID or company name to search")">
+                                        <NoItemsTemplate>
+                                            <MudText>No companies found. You can enter details manually below.</MudText>
+                                        </NoItemsTemplate>
+                                    </MudAutocomplete>
+                                    
+                                    @if (_newCompany.IsVerifiedFromBdex)
+                                    {
+                                        <MudButton Variant="Variant.Text"
+                                                   Color="Color.Primary"
+                                                   OnClick="ResetCompanyVerification"
+                                                   StartIcon="@Icons.Material.Filled.Refresh"
+                                                   Class="mt-2">
+                                            Search again
+                                        </MudButton>
+                                    }
                                 </MudItem>
 
                                 <!-- Warning for manual entry -->
@@ -168,7 +155,7 @@
                                     <MudItem xs="12">
                                         <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="my-2">
                                             <MudText Typo="Typo.body2">
-                                                <strong>Manual Entry Mode:</strong> We recommend using the "Verify" button to automatically retrieve accurate company data from the DBD registry.
+                                                <strong>Manual Entry Mode:</strong> We recommend using the search field above to automatically retrieve accurate company data from the registry.
                                             </MudText>
                                         </MudAlert>
                                     </MudItem>
@@ -561,9 +548,9 @@
     private CreateCompanyRequest _newCompany = new() { Segment = "Retail", Tier = "Bronze" };
     private string _companyOfficeType = "head";
     private string _branchNumber = "00001";
-    private bool _isLookingUpCompany = false;
     private bool _showCompanyFields = false;
     private bool _companyIsManualEntry = false;
+    private RegistryCompanyProfile? _selectedCompany;
     
     // Address data
     private Dictionary<int, CountryDto?> _selectedCountries = new();
@@ -1133,87 +1120,48 @@
 
     #region Company Lookup
 
-    private async Task LookupCompanyByTaxId()
+    private async Task<IEnumerable<RegistryCompanyProfile>> SearchCompaniesAsync(string value, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(_newCompany.VatNumber)) return;
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+            return [];
 
-        _isLookingUpCompany = true;
+        var isTaxId = new string(value.Where(char.IsDigit).ToArray()).Length == 13;
+        var limit = isTaxId ? 1 : 10;
+
         try
         {
-            // Validate Tax ID format (13 digits for Thai companies)
-            var sanitizedTaxId = new string(_newCompany.VatNumber.Where(char.IsDigit).ToArray());
-            if (sanitizedTaxId.Length != 13)
-            {
-                Snackbar.Add("Tax ID must be exactly 13 digits", Severity.Warning);
-                _isLookingUpCompany = false;
-                return;
-            }
-
-            var httpResponse = await Http.GetAsync($"api/customers/companies/search?query={Uri.EscapeDataString(_newCompany.VatNumber)}&limit=1");
-
-            if (httpResponse.IsSuccessStatusCode)
-            {
-                var response = await httpResponse.Content.ReadFromJsonAsync<List<RegistryCompanyProfile>>();
-
-                if (response?.Any() == true)
-                {
-                    var company = response.First();
-
-                    // Populate all BDEX fields
-                    _newCompany.Name = company.CompanyNameTh;
-                    _newCompany.FullNameTh = company.FullNameTh;
-                    _newCompany.CompanyStatus = company.StatusCode;
-                    _newCompany.CompanyStatusNameTh = company.StatusNameTh;
-                    _newCompany.CompanyTypeCode = company.CompanyTypeCode;
-                    _newCompany.BusinessObjectives = company.BusinessObjectives;
-                    _newCompany.StockSymbol = company.StockName;
-                    _newCompany.IsVerifiedFromBdex = true;
-
-                    // Try to parse registration date if available (format may vary)
-                    // TODO: Check actual date format from BDEX API
-                    // _newCompany.RegistrationDate = ...
-
-                    _companyIsManualEntry = false;
-                    _showCompanyFields = true;
-
-                    // Extract business type from status
-                    var statusInfo = !string.IsNullOrWhiteSpace(company.StatusNameTh)
-                        ? $" - {company.StatusNameTh}"
-                        : string.Empty;
-
-                    Snackbar.Add($"✓ Company verified: {company.CompanyNameTh}{statusInfo}", Severity.Success);
-                }
-                else
-                {
-                    Snackbar.Add("No company found with this Tax ID. You can enter details manually.", Severity.Warning);
-                    _companyIsManualEntry = true;
-                    _showCompanyFields = true;
-                }
-            }
-            else
-            {
-                // Handle API error responses
-                var errorMessage = await GetBdexErrorMessage(httpResponse);
-                Snackbar.Add(errorMessage, Severity.Error);
-                _companyIsManualEntry = true;
-            }
+            var response = await Http.GetFromJsonAsync<List<RegistryCompanyProfile>>(
+                $"api/customers/companies/search?query={Uri.EscapeDataString(value)}&limit={limit}", ct);
+            return response ?? [];
         }
-        catch (HttpRequestException)
+        catch
         {
-            Snackbar.Add("Network error: Unable to connect to company registry service. You can enter details manually.", Severity.Warning);
-            _companyIsManualEntry = true;
-            _showCompanyFields = true;
+            return [];
         }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error looking up company: {ex.Message}", Severity.Error);
-            _companyIsManualEntry = true;
-            _showCompanyFields = true;
-        }
-        finally
-        {
-            _isLookingUpCompany = false;
-        }
+    }
+
+    private void OnCompanySelected(RegistryCompanyProfile? company)
+    {
+        if (company == null) return;
+
+        // Populate all company fields from the selected result
+        _newCompany.VatNumber = company.TaxId;
+        _newCompany.Name = company.CompanyNameTh;
+        _newCompany.FullNameTh = company.FullNameTh;
+        _newCompany.CompanyStatus = company.StatusCode;
+        _newCompany.CompanyStatusNameTh = company.StatusNameTh;
+        _newCompany.CompanyTypeCode = company.CompanyTypeCode;
+        _newCompany.BusinessObjectives = company.BusinessObjectives;
+        _newCompany.StockSymbol = company.StockName;
+        _newCompany.IsVerifiedFromBdex = true;
+        _companyIsManualEntry = false;
+        _showCompanyFields = true;
+        _selectedCompany = company;
+
+        var statusInfo = !string.IsNullOrWhiteSpace(company.StatusNameTh)
+            ? $" - {company.StatusNameTh}"
+            : string.Empty;
+        Snackbar.Add($"✓ Company verified: {company.CompanyNameTh}{statusInfo}", Severity.Success);
     }
 
     private void ResetCompanyVerification()
@@ -1225,9 +1173,10 @@
             Segment = _newCompany.Segment,
             Tier = _newCompany.Tier
         };
+        _selectedCompany = null;
         _companyIsManualEntry = false;
         _showCompanyFields = true;
-        Snackbar.Add("Company verification reset. Click 'Verify' to search again.", Severity.Info);
+        Snackbar.Add("Company verification reset. Search again to verify.", Severity.Info);
     }
 
     private async Task RemoveCompany()
@@ -1250,6 +1199,7 @@
             _branchNumber = "00001";
             _companyIsManualEntry = false;
             _showCompanyFields = false;
+            _selectedCompany = null;
             Snackbar.Add("Company information removed", Severity.Success);
         }
     }

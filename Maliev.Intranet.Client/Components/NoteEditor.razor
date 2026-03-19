@@ -10,6 +10,7 @@
     <MudToolBar Dense="true" Class="note-editor-toolbar gap-2">
         <MudIconButton Icon="@(_isEditing ? Icons.Material.Filled.Visibility : Icons.Material.Filled.Edit)"
                        Size="Size.Small"
+                       Class="ms-2"
                        OnClick="() => SetEditMode(!_isEditing)" />
         @if (_isEditing)
         {

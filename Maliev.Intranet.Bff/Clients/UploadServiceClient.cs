@@ -1,5 +1,6 @@
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
@@ -8,10 +9,26 @@ namespace Maliev.Intranet.Bff.Clients;
 /// <summary>
 /// Client for interacting with the Upload microservice.
 /// </summary>
-/// <param name="httpClient">The HTTP client instance.</param>
-public class UploadServiceClient(HttpClient httpClient)
+public class UploadServiceClient
 {
-    private readonly HttpClient _httpClient = httpClient;
+    private readonly HttpClient _httpClient;
+
+    /// <summary>
+    /// Creates a client using a typed HttpClient (used in HTTP pipeline contexts).
+    /// </summary>
+    public UploadServiceClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
+
+    /// <summary>
+    /// Creates a client from a named HttpClient via IHttpClientFactory (used in background
+    /// contexts such as MassTransit consumers where there is no HttpContext).
+    /// </summary>
+    public UploadServiceClient(string clientName, IHttpClientFactory factory)
+    {
+        _httpClient = factory.CreateClient(clientName);
+    }
 
     /// <summary>
     /// Uploads a file to the central upload service.
@@ -36,12 +53,32 @@ public class UploadServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
-    /// Gets a temporary signed download URL for a file.
+    /// Gets a temporary signed download URL for a file using its UUID uploadId.
     /// </summary>
     public async Task<string?> GetDownloadUrlAsync(string fileReference, CancellationToken ct = default)
     {
         var request = new { ExpirationMinutes = 60 };
         var response = await _httpClient.PostAsJsonAsync($"/upload/v1/files/{fileReference}/signed-url", request, ct);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
+            if (result.TryGetProperty("signedUrl", out var urlProp))
+            {
+                return urlProp.GetString();
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Gets a temporary signed download URL for a file using its GCS storage path.
+    /// Used by background consumers where there is no HttpContext for user-identity forwarding.
+    /// </summary>
+    public async Task<string?> GetDownloadUrlByPathAsync(string storagePath, CancellationToken ct = default)
+    {
+        var request = new { StoragePath = storagePath, ExpirationMinutes = 60 };
+        var response = await _httpClient.PostAsJsonAsync("/upload/v1/files/by-path/signed-url", request, ct);
 
         if (response.IsSuccessStatusCode)
         {

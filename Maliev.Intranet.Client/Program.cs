@@ -9,8 +9,9 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 builder.Services.AddAuthorizationCore();
 
-// Use BffAuthenticationStateProvider for WebAssembly to fetch auth state from BFF API
-builder.Services.AddScoped<AuthenticationStateProvider, BffAuthenticationStateProvider>();
+// Use PersistentAuthenticationStateProvider: reads claims persisted during SSR (fast path),
+// falls back to GET /api/auth/user only when persisted state is unavailable.
+builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<BreadcrumbService>();

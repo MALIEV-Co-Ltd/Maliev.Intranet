@@ -39,9 +39,10 @@ public static class BffHttpClientExtensions
         .AddServiceDiscovery()
         .AddStandardResilienceHandler(options =>
         {
-            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(70);
-            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(150);
-            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(90);
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(120);
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(300);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(180);
+            options.Retry.MaxRetryAttempts = 3;
         });
     }
 
@@ -76,9 +77,10 @@ public static class BffHttpClientExtensions
         .AddServiceDiscovery()
         .AddStandardResilienceHandler(options =>
         {
-            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(70);
-            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(150);
-            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(90);
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(120);
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(300);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(180);
+            options.Retry.MaxRetryAttempts = 3;
         });
     }
 }

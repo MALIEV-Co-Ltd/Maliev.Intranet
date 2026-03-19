@@ -11,6 +11,10 @@ This document provides essential information for agentic coding assistants opera
 - **Observability**: OpenTelemetry (OTLP) with business metrics (meters) and distributed tracing.
 - **Communication**: SignalR for real-time dashboard updates and alerts.
 - **Identity**: Google OAuth2 + JWT (Identity propagated via `X-User-Id` headers).
+- **Rendering Modes**: Always consider server-side vs client-side rendering trade-offs:
+  - `InteractiveServer`: Fast initial load, requires connection to server, good for data-heavy forms.
+  - `InteractiveWebAssembly`: True offline capability, faster subsequent loads, better for static content.
+  - `InteractiveAuto`: Best of both worlds but with added complexity. Default choice when uncertain.
 
 ## 🛠️ Build, Lint, and Test Commands
 
@@ -36,6 +40,8 @@ This document provides essential information for agentic coding assistants opera
 - ✅ **xUnit Assertions**: NO FluentAssertions. Use standard `Xunit.Assert`.
 - ✅ **Async Suffix**: All asynchronous methods must end with the `Async` suffix.
 - ✅ **Identity Propagation**: Ensure user context (JWT) is forwarded using `UserContextHandler`.
+- ✅ **Input Validation**: All input must have validation. Use immediate (client-side) validation when appropriate for responsiveness; always enforce validation server-side as the source of truth.
+- ✅ **Zero Dead BFF Endpoints**: Every BFF endpoint must have actual usage. Before committing, verify the endpoint is wired to a client component, handler, or integration test. Orphaned endpoints are not allowed.
 
 ## 🎨 Code Style & Conventions
 
@@ -59,15 +65,18 @@ This document provides essential information for agentic coding assistants opera
 - **Downstream Calls**: Use `DownstreamResponse<T>` to handle responses from domain services.
 - **Global Error Handling**: Use `ErrorBoundary` in Blazor and Exception Middleware in BFF.
 - **Logging**: Use `ILogger<T>` for structured logging. Do not use `Console.WriteLine`.
+- **User-Friendly Errors**: Never expose raw exceptions to the frontend. Always map exceptions to user-friendly messages. Use a standard `ErrorResponse` DTO structure that frontend components can parse and display meaningfully.
 
 ### 4. Blazor & MudBlazor Best Practices
 - **Component Parameters**: Use `[Parameter]` for public properties that are meant to be passed from parents.
 - **EventCallback**: Use `EventCallback` or `EventCallback<T>` for child-to-parent communication.
-- **RenderMode**: Most pages should use `@rendermode InteractiveAuto`.
+- **RenderMode**: Most pages should use `@rendermode InteractiveAuto`. Always consider the trade-offs between `InteractiveServer`, `InteractiveWebAssembly`, and `InteractiveAuto` based on the page's requirements (offline support, initial load speed, data complexity).
 - **MudBlazor**: 
     - Use `MudTable` with `ServerData` for large datasets.
     - Use `MudDialog` for modals and `ISnackbar` for transient notifications.
     - Prefer `MudStack` and `MudItem` for layouts over raw CSS/HTML where possible.
+- **Text Input with Live Counter**: For all `longtext` fields or any input that could potentially exceed the max length limit, display a live character counter (e.g., `50/2000` or `13/100`). Use immediate client-side validation to enforce the limit.
+- **Skeleton Loaders**: Always use skeleton components with animation when waiting for data to load. Never show blank spaces or spinner-only states.
 
 ### 5. Mapping Extensions (Manual)
 Since AutoMapper is banned, use static extension classes:
@@ -94,9 +103,10 @@ public static class CustomerExtensions
 ## 🧪 Testing Guidelines
 
 - **Unit Tests**: Place in `Maliev.Intranet.Tests`. Mock external dependencies using `Moq` or similar.
-- **Integration Tests**: Use `Testcontainers` for database or external service dependencies. Use `WebApplicationFactory` for BFF tests.
+- **Integration Tests**: Use **Testcontainers** for database or external service dependencies. Use `WebApplicationFactory` for BFF tests.
 - **Naming**: `[MethodName]_[Scenario]_[ExpectedResult]` (e.g., `GetCustomerAsync_WhenNotFound_ReturnsNull`).
 - **Assertions**: Stick to `Assert.Equal`, `Assert.NotNull`, etc.
+- **UX/UI Validation**: Always validate UI changes with tests. Component tests should verify rendered output, user interactions, and loading states. Never commit UI changes without corresponding test coverage.
 
 ## 📡 Communication & Identity
 

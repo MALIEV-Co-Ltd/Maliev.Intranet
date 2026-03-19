@@ -65,11 +65,23 @@ public class ProjectServiceClient(HttpClient httpClient)
     /// <summary>
     /// Creates a new project.
     /// </summary>
-    public async Task<ProjectDetailDto?> CreateProjectAsync(CreateProjectRequest request, CancellationToken ct = default)
+    public async Task<(ProjectDetailDto? Result, string? ErrorContent, int StatusCode)> CreateProjectAsync(CreateProjectRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/project/v1/projects", request, ct);
-        if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<ProjectDetailDto>(cancellationToken: ct);
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("/project/v1/projects", request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(ct);
+                return (null, errorContent, (int)response.StatusCode);
+            }
+            var result = await response.Content.ReadFromJsonAsync<ProjectDetailDto>(cancellationToken: ct);
+            return (result, null, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            return (null, $"Exception calling ProjectService: {ex.Message}", 0);
+        }
     }
 
     /// <summary>

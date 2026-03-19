@@ -1,9 +1,12 @@
 using Maliev.Aspire.ServiceDefaults;
 using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Consumers;
 using Maliev.Intranet.Bff.Extensions;
 using Maliev.Intranet.Bff.Middleware;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -51,6 +54,8 @@ try
     builder.Services.AddSingleton<Maliev.Intranet.Shared.Services.IMarkdownService, Maliev.Intranet.Shared.Services.MarkdownService>();
     builder.Services.AddSignalR();
     builder.Services.AddMudServices();
+    builder.AddStandardCache("IntranetBff");
+    builder.Services.AddSingleton<IFileAnalysisStatusService, FileAnalysisStatusService>();
 
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddTransient<UserContextHandler>();
@@ -282,8 +287,7 @@ try
     .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
     .AddStandardResilienceHandler();
 
-    // Named HTTP clients for SeedController — dedicated token with sub="system", no UserContextHandler
-    // Use a factory to create a token provider with sub overridden to "system" so notes/audit show "System" not "system:service:intranetbff"
+    // Named HTTP clients for SeedController — uses standard service account token
     builder.Services.AddHttpClient("SeedCustomerClient", (sp, client) =>
     {
         var config = sp.GetRequiredService<IConfiguration>();
@@ -296,7 +300,27 @@ try
     {
         var config = sp.GetRequiredService<IConfiguration>();
         var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff", subOverride: "system");
+        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff");
+        return new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler(tokenProvider, loggerFactory.CreateLogger<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>());
+    })
+    .AddStandardResilienceHandler();
+
+    // Named HttpClient for UploadServiceClient used inside MassTransit consumers.
+    // Consumers run outside the HTTP pipeline (no HttpContext), so this uses
+    // ServiceAccountAuthenticationHandler instead of UserContextHandler.
+    builder.Services.AddHttpClient("UploadServiceClient.Consumer", (sp, client) =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var explicitUrl = config["Services:UploadService:BaseUrl"];
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://UploadService");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    })
+    .AddServiceDiscovery()
+    .AddHttpMessageHandler(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff");
         return new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler(tokenProvider, loggerFactory.CreateLogger<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>());
     })
     .AddStandardResilienceHandler();
@@ -313,7 +337,7 @@ try
     {
         var config = sp.GetRequiredService<IConfiguration>();
         var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff", subOverride: "system");
+        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff");
         return new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler(tokenProvider, loggerFactory.CreateLogger<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>());
     })
     .AddStandardResilienceHandler();
@@ -340,6 +364,38 @@ try
     builder.Services.AddScoped<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider, PersistingRevalidatingAuthenticationStateProvider>();
     builder.Services.AddCascadingAuthenticationState();
 
+    // MassTransit + RabbitMQ — consume GeometryService events and push to SignalR
+    builder.AddMassTransitWithRabbitMq(
+        configure: mt =>
+        {
+            mt.AddConsumer<FileAnalyzedConsumer>();
+            mt.AddConsumer<PreviewImagesGeneratedConsumer>();
+        },
+        configureRabbitMq: (ctx, cfg) =>
+        {
+            cfg.ReceiveEndpoint("intranet-bff-geometry-analysis", ep =>
+            {
+                ep.ConfigureConsumer<FileAnalyzedConsumer>(ctx);
+                ep.Bind("maliev.events", b =>
+                {
+                    b.ExchangeType = "topic";
+                    b.RoutingKey = "maliev.geometryservice.v1.analysis.completed";
+                });
+            });
+
+            cfg.ReceiveEndpoint("intranet-bff-geometry-preview", ep =>
+            {
+                ep.ConfigureConsumer<PreviewImagesGeneratedConsumer>(ctx);
+                ep.Bind("maliev.events", b =>
+                {
+                    b.ExchangeType = "topic";
+                    b.RoutingKey = "maliev.geometryservice.v1.preview-images.generated";
+                });
+            });
+        });
+
+    builder.Services.AddExceptionHandler<UpstreamExceptionHandler>();
+    builder.Services.AddProblemDetails();
     builder.Services.AddControllersWithViews();
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents()
@@ -351,7 +407,9 @@ try
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.UseWebAssemblyDebugging();
     if (app.Environment.IsEnvironment("Testing"))
         app.UseExceptionHandler(exHandler => exHandler.Run(async ctx => ctx.Response.StatusCode = 500));
-    else if (!app.Environment.IsDevelopment())
+    else if (app.Environment.IsDevelopment())
+        app.UseExceptionHandler();
+    else
         { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }
 
     if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Maliev.Intranet.Shared.Dtos;
 
 /// <summary>
@@ -59,8 +61,8 @@ public class ProjectDetailDto
     /// <summary>Gets or sets the current lifecycle status.</summary>
     public string Status { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets optional internal notes about this project.</summary>
-    public string? Notes { get; set; }
+    /// <summary>Gets or sets internal notes about this project.</summary>
+    public List<ProjectNoteDto>? Notes { get; set; }
 
     /// <summary>Gets or sets the date until which the quotation is valid.</summary>
     public DateTime? ValidUntil { get; set; }
@@ -74,17 +76,53 @@ public class ProjectDetailDto
     /// <summary>Gets or sets the associated quotation ID once generated.</summary>
     public Guid? QuotationId { get; set; }
 
+    /// <summary>Gets or sets the human-readable quotation number once assigned.</summary>
+    public string? QuotationNumber { get; set; }
+
     /// <summary>Gets or sets the quotation status once the quotation has been generated.</summary>
     public string? QuotationStatus { get; set; }
 
+    /// <summary>Gets or sets the user ID who created this project.</summary>
+    public string? CreatedBy { get; set; }
+
+    /// <summary>Gets or sets the display name of the user who created this project.</summary>
+    public string? CreatedByName { get; set; }
+
     /// <summary>Gets or sets the date the project was created.</summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>Gets or sets the date the project was last updated.</summary>
+    public DateTime? UpdatedAt { get; set; }
 
     /// <summary>Gets or sets the list of parts belonging to this project.</summary>
     public List<ProjectPartDto> Parts { get; set; } = new();
 
     /// <summary>Gets or sets the status timeline events for this project.</summary>
     public List<ProjectTimelineEventDto> Timeline { get; set; } = new();
+}
+
+/// <summary>
+/// DTO for a project internal note.
+/// </summary>
+public class ProjectNoteDto
+{
+    /// <summary>Gets or sets the note unique identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the project ID.</summary>
+    public Guid ProjectId { get; set; }
+
+    /// <summary>Gets or sets the author display name.</summary>
+    public string AuthorName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the author principal ID.</summary>
+    public string AuthorId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the note content.</summary>
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the UTC timestamp of creation.</summary>
+    public DateTime CreatedAt { get; set; }
 }
 
 /// <summary>
@@ -222,16 +260,24 @@ public class ProjectTimelineEventDto
 public class CreateProjectRequest
 {
     /// <summary>Gets or sets the customer this project belongs to.</summary>
+    [Required]
     public Guid CustomerId { get; set; }
 
+    /// <summary>Gets or sets the customer name for display purposes.</summary>
+    [Required, MaxLength(500)]
+    public string CustomerName { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the project title.</summary>
+    [Required, MaxLength(500)]
     public string Title { get; set; } = string.Empty;
 
     /// <summary>Gets or sets an optional project description.</summary>
+    [MaxLength(2000)]
     public string? Description { get; set; }
 
-    /// <summary>Gets or sets how many days from today the quotation will be valid.</summary>
-    public int ValidityDays { get; set; } = 30;
+    /// <summary>Gets or sets the currency code. Defaults to THB.</summary>
+    [MaxLength(3)]
+    public string Currency { get; set; } = "THB";
 }
 
 /// <summary>

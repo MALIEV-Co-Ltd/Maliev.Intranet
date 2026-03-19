@@ -362,6 +362,7 @@ else
     private bool _loading = true;
     private bool _actioning = false;
     private string? _notes;
+    private List<ProjectNoteDto>? _projectNotes;
 
     private bool AllPartsConfirmed =>
         _project?.Parts.Count > 0 && _project.Parts.All(p => p.Status == "Confirmed");
@@ -382,7 +383,7 @@ else
         try
         {
             _project = await Http.GetFromJsonAsync<ProjectDetailDto>($"api/projects/{Id}");
-            if (_project != null) _notes = _project.Notes;
+            if (_project != null) _projectNotes = _project.Notes;
         }
         catch (Exception ex)
         {

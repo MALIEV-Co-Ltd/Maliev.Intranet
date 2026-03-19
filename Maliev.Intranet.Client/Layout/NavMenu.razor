@@ -12,113 +12,113 @@
 
         <!-- Sales & CRM -->
         <MudNavGroup Title="Sales & CRM" Icon="@Icons.Material.Outlined.Business" Expanded="false">
-            <MudTooltip Text="@(HasPermission("customer.customers.read") ? "Customers" : "Customers (requires customer.customers.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Customer.Read, "Customers", "You need customer read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="sales/customers" Icon="@Icons.Material.Outlined.People"
-                            Style="@(HasPermission("customer.customers.read") ? "" : "opacity: 0.4; pointer-events: none;")">Customers</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Customer.Read)">Customers</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("registry.companies.read") ? "Companies" : "Companies (requires registry.companies.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Registry.CompaniesRead, "Companies", "You need companies read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="sales/companies" Icon="@Icons.Material.Outlined.Business"
-                            Style="@(HasPermission("registry.companies.read") ? "" : "opacity: 0.4; pointer-events: none;")">Companies</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Registry.CompaniesRead)">Companies</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("project.projects.read") ? "Projects" : "Projects (requires project.projects.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Project.Read, "Projects", "You need project read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="sales/projects" Icon="@Icons.Material.Outlined.FolderSpecial"
-                            Style="@(HasPermission("project.projects.read") ? "" : "opacity: 0.4; pointer-events: none;")">Projects</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Project.Read)">Projects</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("quotation.quotations.read") ? "Quotations" : "Quotations (requires quotation.quotations.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Quotation.Read, "Quotations", "You need quotation read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="sales/quotations" Icon="@Icons.Material.Outlined.Description"
-                            Style="@(HasPermission("quotation.quotations.read") ? "" : "opacity: 0.4; pointer-events: none;")">Quotations</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Quotation.Read)">Quotations</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("order.orders.read") ? "Orders" : "Orders (requires order.orders.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Order.Read, "Orders", "You need order read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="sales/orders" Icon="@Icons.Material.Outlined.ShoppingCart"
-                            Style="@(HasPermission("order.orders.read") ? "" : "opacity: 0.4; pointer-events: none;")">Orders</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Order.Read)">Orders</MudNavLink>
             </MudTooltip>
         </MudNavGroup>
 
         <!-- Manufacturing -->
         <MudNavGroup Title="Manufacturing" Icon="@Icons.Material.Outlined.PrecisionManufacturing" Expanded="false">
-            <MudTooltip Text="@(HasPermission("material.materials.read") ? "Materials & Inventory" : "Materials & Inventory (requires material.materials.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Material.Read, "Materials & Inventory", "You need materials read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="mfg/materials" Icon="@Icons.Material.Outlined.Inventory2"
-                            Style="@(HasPermission("material.materials.read") ? "" : "opacity: 0.4; pointer-events: none;")">Materials &amp; Inventory</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Material.Read)">Materials &amp; Inventory</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("facility.equipments.read") ? "Equipment" : "Equipment (requires facility.equipments.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Facility.Read, "Equipment", "You need equipment read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="mfg/equipment" Icon="@Icons.Material.Outlined.PrecisionManufacturing"
-                            Style="@(HasPermission("facility.equipments.read") ? "" : "opacity: 0.4; pointer-events: none;")">Equipment</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Facility.Read)">Equipment</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("job.jobs.read") ? "Production Queue" : "Production Queue (requires job.jobs.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Job.Read, "Production Queue", "You need production queue read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="mfg/production-queue" Icon="@Icons.Material.Outlined.Factory"
-                            Style="@(HasPermission("job.jobs.read") ? "" : "opacity: 0.4; pointer-events: none;")">Production Queue</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Job.Read)">Production Queue</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("purchase-order.orders.read") ? "Procurement & Suppliers" : "Procurement & Suppliers (requires purchase-order.orders.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.PurchaseOrder.Read, "Procurement & Suppliers", "You need procurement read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="mfg/procurement" Icon="@Icons.Material.Outlined.ShoppingBag"
-                            Style="@(HasPermission("purchase-order.orders.read") ? "" : "opacity: 0.4; pointer-events: none;")">Procurement &amp; Suppliers</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.PurchaseOrder.Read)">Procurement &amp; Suppliers</MudNavLink>
             </MudTooltip>
         </MudNavGroup>
 
         <!-- Finance -->
         <MudNavGroup Title="Finance" Icon="@Icons.Material.Outlined.AccountBalanceWallet" Expanded="false">
-            <MudTooltip Text="@(HasPermission("invoice.invoices.read") ? "Invoices" : "Invoices (requires invoice.invoices.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Invoice.Read, "Invoices", "You need invoice read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="finance/invoices" Icon="@Icons.Material.Outlined.Receipt"
-                            Style="@(HasPermission("invoice.invoices.read") ? "" : "opacity: 0.4; pointer-events: none;")">Invoices</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Invoice.Read)">Invoices</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("payment.payments.read") ? "Payments & Receipts" : "Payments & Receipts (requires payment.payments.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Payment.Read, "Payments & Receipts", "You need payment read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="finance/payments" Icon="@Icons.Material.Outlined.Payments"
-                            Style="@(HasPermission("payment.payments.read") ? "" : "opacity: 0.4; pointer-events: none;")">Payments &amp; Receipts</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Payment.Read)">Payments &amp; Receipts</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("delivery.delivery-notes.read") ? "Delivery Notes" : "Delivery Notes (requires delivery.delivery-notes.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Delivery.Read, "Delivery Notes", "You need delivery notes read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="finance/delivery-notes" Icon="@Icons.Material.Outlined.LocalShipping"
-                            Style="@(HasPermission("delivery.delivery-notes.read") ? "" : "opacity: 0.4; pointer-events: none;")">Delivery Notes</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Delivery.Read)">Delivery Notes</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("accounting.accounts.read") ? "Accounting" : "Accounting (requires accounting.accounts.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Accounting.Read, "Accounting", "You need accounting read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="finance/accounting" Icon="@Icons.Material.Outlined.AccountBalance"
-                            Style="@(HasPermission("accounting.accounts.read") ? "" : "opacity: 0.4; pointer-events: none;")">Accounting</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Accounting.Read)">Accounting</MudNavLink>
             </MudTooltip>
         </MudNavGroup>
 
         <!-- HR & People -->
         <MudNavGroup Title="HR & People" Icon="@Icons.Material.Outlined.Groups" Expanded="false">
-            <MudTooltip Text="@(HasPermission("employee.employees.read") ? "People Directory" : "People Directory (requires employee.employees.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Employee.Read, "People Directory", "You need employee read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/directory" Icon="@Icons.Material.Outlined.ContactPage"
-                            Style="@(HasPermission("employee.employees.read") ? "" : "opacity: 0.4; pointer-events: none;")">People Directory</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Employee.Read)">People Directory</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("career.job-postings.read") ? "Recruitment" : "Recruitment (requires career.job-postings.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Career.Read, "Recruitment", "You need recruitment read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/recruitment" Icon="@Icons.Material.Outlined.WorkOutline"
-                            Style="@(HasPermission("career.job-postings.read") ? "" : "opacity: 0.4; pointer-events: none;")">Recruitment</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Career.Read)">Recruitment</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("leave.balances.read") ? "Leave & Onboarding" : "Leave & Onboarding (requires leave.balances.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Leave.Read, "Leave & Onboarding", "You need leave read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/leave" Icon="@Icons.Material.Outlined.EventBusy"
-                            Style="@(HasPermission("leave.balances.read") ? "" : "opacity: 0.4; pointer-events: none;")">Leave &amp; Onboarding</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Leave.Read)">Leave &amp; Onboarding</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("performance.reviews.read") ? "Training & Performance" : "Training & Performance (requires performance.reviews.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Performance.Read, "Training & Performance", "You need performance read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/training" Icon="@Icons.Material.Outlined.School"
-                            Style="@(HasPermission("performance.reviews.read") ? "" : "opacity: 0.4; pointer-events: none;")">Training &amp; Performance</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Performance.Read)">Training &amp; Performance</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("compensation.salaries.read") ? "Compensation" : "Compensation (requires compensation.salaries.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Compensation.Read, "Compensation", "You need compensation read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/compensation" Icon="@Icons.Material.Outlined.MonetizationOn"
-                            Style="@(HasPermission("compensation.salaries.read") ? "" : "opacity: 0.4; pointer-events: none;")">Compensation</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Compensation.Read)">Compensation</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("compliance.records.read") ? "Compliance & Analytics" : "Compliance & Analytics (requires compliance.records.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Compliance.Read, "Compliance & Analytics", "You need compliance read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="hr/compliance" Icon="@Icons.Material.Outlined.FactCheck"
-                            Style="@(HasPermission("compliance.records.read") ? "" : "opacity: 0.4; pointer-events: none;")">Compliance &amp; Analytics</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Compliance.Read)">Compliance &amp; Analytics</MudNavLink>
             </MudTooltip>
         </MudNavGroup>
 
         <!-- Operations -->
         <MudNavGroup Title="Operations" Icon="@Icons.Material.Outlined.AdminPanelSettings" Expanded="false">
-            <MudTooltip Text="@(HasPermission("iam.manage") ? "IAM Console" : "IAM Console (requires iam.manage)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Iam.Manage, "IAM Console", "You need IAM management access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="admin/iam" Icon="@Icons.Material.Outlined.Security"
-                            Style="@(HasPermission("iam.manage") ? "" : "opacity: 0.4; pointer-events: none;")">IAM Console</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Iam.Manage)">IAM Console</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("system.health.read") ? "System Health" : "System Health (requires system.health.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.System.HealthRead, "System Health", "You need system health read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="admin/system-health" Icon="@Icons.Material.Outlined.HealthAndSafety"
-                            Style="@(HasPermission("system.health.read") ? "" : "opacity: 0.4; pointer-events: none;")">System Health</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.System.HealthRead)">System Health</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("iam.read") ? "Audit Log" : "Audit Log (requires iam.read)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Iam.Read, "Audit Log", "You need audit log read access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="admin/audit" Icon="@Icons.Material.Outlined.History"
-                            Style="@(HasPermission("iam.read") ? "" : "opacity: 0.4; pointer-events: none;")">Audit Log</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Iam.Read)">Audit Log</MudNavLink>
             </MudTooltip>
-            <MudTooltip Text="@(HasPermission("iam.manage") ? "Settings" : "Settings (requires iam.manage)")" Placement="Placement.Right" Delay="300" Inline="false">
+            <MudTooltip Text="@NavTooltip(MalievPermissions.Iam.Manage, "Settings", "You need IAM management access")" Placement="Placement.Right" Delay="300" Inline="false">
                 <MudNavLink Href="admin/settings" Icon="@Icons.Material.Outlined.Settings"
-                            Style="@(HasPermission("iam.manage") ? "" : "opacity: 0.4; pointer-events: none;")">Settings</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.Iam.Manage)">Settings</MudNavLink>
             </MudTooltip>
         </MudNavGroup>
     </div>
@@ -127,8 +127,8 @@
         <MudDivider />
         <div class="pa-2">
             <MudTooltip Text="Logout" Placement="Placement.Right" Delay="300" Inline="false">
-                <MudNavLink OnClick="@HandleLogout" 
-                            Icon="@Icons.Material.Outlined.DoorBack" 
+                <MudNavLink OnClick="@HandleLogout"
+                            Icon="@Icons.Material.Outlined.DoorBack"
                             IconColor="Color.Inherit"
                             Class="rounded-lg logout-nav-link">
                     Logout
@@ -143,7 +143,7 @@
         background-color: var(--mud-palette-error) !important;
         color: white !important;
     }
-    
+
     .logout-nav-link:hover {
         background-color: var(--mud-palette-error-darken) !important;
     }
@@ -187,17 +187,84 @@
     }
 
     /// <summary>
-    /// Checks whether the current user has the specified permission claim.
-    /// Items without this permission are rendered visually disabled but remain visible (for debugging).
+    /// Checks whether the current user has the specified permission, mirroring the server-side
+    /// PermissionMatcher logic: platform owner bypass, wildcard support, and exact match fallback.
     /// </summary>
     /// <param name="permission">The GCP-style permission string to check.</param>
     /// <returns>True if the user holds the permission; otherwise false.</returns>
     private bool HasPermission(string permission)
     {
-        return _user?.Claims.Any(c =>
-            (c.Type == "permissions" || c.Type == "permission") &&
-            c.Value == permission) ?? false;
+        if (_user is null) return false;
+
+        var userPermissions = _user.Claims
+            .Where(c => c.Type is "permissions" or "permission")
+            .Select(c => c.Value)
+            .ToList();
+
+        if (userPermissions.Count == 0) return false;
+
+        // Platform owner bypass — mirrors PermissionMatcher.Match()
+        if (userPermissions.Any(p => string.Equals(p, "roles.platform.owner", StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        // Also check role claims for platform owner
+        if (_user.Claims.Any(c =>
+                c.Type is "roles" or System.Security.Claims.ClaimTypes.Role &&
+                string.Equals(c.Value, "roles.platform.owner", StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        // Wildcard "*" grants everything
+        if (userPermissions.Any(p => p == "*"))
+            return true;
+
+        // Wildcard suffix match (e.g. "customer.*" matches "customer.customers.read")
+        // and exact match — mirrors PermissionMatcher.IsMatch()
+        return userPermissions.Any(p => IsPermissionMatch(permission, p));
     }
+
+    /// <summary>
+    /// Mirrors PermissionMatcher.IsMatch() — supports exact and wildcard-suffix matching.
+    /// </summary>
+    private static bool IsPermissionMatch(string required, string claim)
+    {
+        if (string.IsNullOrWhiteSpace(required) || string.IsNullOrWhiteSpace(claim)) return false;
+
+        // Exact match (case-insensitive)
+        if (string.Equals(required, claim, StringComparison.OrdinalIgnoreCase)) return true;
+
+        var requiredParts = required.Split('.');
+        var claimParts = claim.Split('.');
+
+        // Single "*" was already handled above
+        for (int i = 0; i < claimParts.Length; i++)
+        {
+            if (claimParts[i] == "*")
+            {
+                // Wildcard must be the last segment
+                return i == claimParts.Length - 1;
+            }
+
+            if (i >= requiredParts.Length) return false;
+
+            if (!string.Equals(requiredParts[i], claimParts[i], StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return claimParts.Length == requiredParts.Length;
+    }
+
+    /// <summary>
+    /// Returns the tooltip text for a nav item — the label when permitted, a friendly
+    /// human-readable message when access is denied.
+    /// </summary>
+    private string NavTooltip(string permission, string label, string deniedMessage)
+        => HasPermission(permission) ? label : deniedMessage;
+
+    /// <summary>
+    /// Returns the inline style that visually disables a nav link when the user lacks the permission.
+    /// </summary>
+    private string NavStyle(string permission)
+        => HasPermission(permission) ? "" : "opacity: 0.4; pointer-events: none;";
 
     private void HandleLogout()
     {

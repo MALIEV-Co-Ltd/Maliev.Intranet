@@ -5,6 +5,8 @@ using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Maliev.Intranet.Tests.Testing;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
@@ -15,6 +17,9 @@ namespace Maliev.Intranet.Tests.Bff.Controllers;
 public class ProjectsControllerTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static readonly ILogger<ProjectsController> Logger =
+        NullLogger<ProjectsController>.Instance;
 
     private static ProjectServiceClient CreateClient<T>(T responseBody, HttpStatusCode status = HttpStatusCode.OK)
     {
@@ -36,7 +41,7 @@ public class ProjectsControllerTests
     public async Task Get_ShouldReturnOk_WithPagedResponse()
     {
         var paged = new PagedResponse<ProjectSummaryDto> { Data = new List<ProjectSummaryDto>() };
-        var controller = new ProjectsController(CreateClient(paged));
+        var controller = new ProjectsController(CreateClient(paged), Logger);
 
         var result = await controller.Get(ct: CancellationToken.None);
 
@@ -58,7 +63,7 @@ public class ProjectsControllerTests
             });
         });
         var client     = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
-        var controller = new ProjectsController(client);
+        var controller = new ProjectsController(client, Logger);
 
         await controller.Get(status: "Configuring", ct: CancellationToken.None);
 
@@ -72,7 +77,7 @@ public class ProjectsControllerTests
     public async Task GetById_WhenFound_ShouldReturnOk()
     {
         var project = new ProjectDetailDto { Id = Guid.NewGuid(), ProjectNumber = "PRJ-001" };
-        var controller = new ProjectsController(CreateClient(project));
+        var controller = new ProjectsController(CreateClient(project), Logger);
 
         var result = await controller.GetById(project.Id, CancellationToken.None);
 
@@ -83,7 +88,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task GetById_WhenNotFound_ShouldReturnNotFound()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.NotFound));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.NotFound), Logger);
 
         var result = await controller.GetById(Guid.NewGuid(), CancellationToken.None);
 
@@ -96,7 +101,7 @@ public class ProjectsControllerTests
     public async Task Create_WhenSuccessful_ShouldReturn201Created()
     {
         var created = new ProjectDetailDto { Id = Guid.NewGuid(), ProjectNumber = "PRJ-002" };
-        var controller = new ProjectsController(CreateClient(created, HttpStatusCode.OK));
+        var controller = new ProjectsController(CreateClient(created, HttpStatusCode.OK), Logger);
 
         var result = await controller.Create(new CreateProjectRequest
         {
@@ -110,7 +115,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task Create_WhenDownstreamFails_ShouldReturn502()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.InternalServerError));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.InternalServerError), Logger);
 
         var result = await controller.Create(new CreateProjectRequest
         {
@@ -127,7 +132,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task Update_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), Logger);
 
         var result = await controller.Update(Guid.NewGuid(), new { title = "Updated" }, CancellationToken.None);
 
@@ -137,7 +142,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task Update_WhenDownstreamFails_ShouldReturnErrorStatusCode()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.Conflict));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.Conflict), Logger);
 
         var result = await controller.Update(Guid.NewGuid(), new { title = "Conflict" }, CancellationToken.None);
 
@@ -150,7 +155,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task Delete_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.NoContent));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.NoContent), Logger);
 
         var result = await controller.Delete(Guid.NewGuid(), CancellationToken.None);
 
@@ -163,7 +168,7 @@ public class ProjectsControllerTests
     public async Task AddPart_WhenSuccessful_ShouldReturnOk()
     {
         var part       = new ProjectPartDto { Id = Guid.NewGuid(), FileName = "bracket.stl" };
-        var controller = new ProjectsController(CreateClient(part));
+        var controller = new ProjectsController(CreateClient(part), Logger);
 
         var result = await controller.AddPart(Guid.NewGuid(),
             new AddProjectPartRequest { FileId = Guid.NewGuid(), FileName = "bracket.stl" },
@@ -176,7 +181,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task UpdatePart_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), Logger);
 
         var result = await controller.UpdatePart(Guid.NewGuid(), Guid.NewGuid(),
             new UpdateProjectPartRequest { ProcessType = "FDM", Quantity = 2 },
@@ -188,7 +193,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task DeletePart_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.NoContent));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.NoContent), Logger);
 
         var result = await controller.DeletePart(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -201,7 +206,7 @@ public class ProjectsControllerTests
     public async Task GetPartPrice_WhenSuccessful_ShouldReturnBreakdown()
     {
         var breakdown  = new ProjectPriceBreakdownDto { TotalPerUnit = 250m };
-        var controller = new ProjectsController(CreateClient(breakdown));
+        var controller = new ProjectsController(CreateClient(breakdown), Logger);
 
         var result = await controller.GetPartPrice(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -213,7 +218,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task GetPartPrice_WhenDownstreamFails_ShouldReturn502()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.ServiceUnavailable));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.ServiceUnavailable), Logger);
 
         var result = await controller.GetPartPrice(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -224,7 +229,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task ConfirmPartPrice_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), Logger);
 
         var result = await controller.ConfirmPartPrice(
             Guid.NewGuid(), Guid.NewGuid(),
@@ -239,7 +244,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task GenerateQuotation_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), Logger);
 
         var result = await controller.GenerateQuotation(Guid.NewGuid(), CancellationToken.None);
 
@@ -249,7 +254,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task GenerateQuotation_WhenDownstreamFails_ShouldReturnErrorStatusCode()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.UnprocessableEntity));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.UnprocessableEntity), Logger);
 
         var result = await controller.GenerateQuotation(Guid.NewGuid(), CancellationToken.None);
 
@@ -260,7 +265,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task AcceptQuotation_WhenSuccessful_ShouldReturnNoContent()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK));
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), Logger);
 
         var result = await controller.AcceptQuotation(Guid.NewGuid(), CancellationToken.None);
 

@@ -10,11 +10,13 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// BFF controller that proxies all project lifecycle operations to the downstream ProjectService.
 /// </summary>
 /// <param name="client">The typed ProjectService HTTP client.</param>
+/// <param name="logger">The logger instance.</param>
 [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [Route("api/[controller]")]
-public class ProjectsController(ProjectServiceClient client) : ControllerBase
+public class ProjectsController(ProjectServiceClient client, ILogger<ProjectsController> logger) : ControllerBase
 {
+    private readonly ILogger<ProjectsController> _logger = logger;
     // ── Query endpoints ──────────────────────────────────────────────────────
 
     /// <summary>
@@ -65,10 +67,28 @@ public class ProjectsController(ProjectServiceClient client) : ControllerBase
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
     public async Task<ActionResult<ProjectDetailDto>> Create([FromBody] CreateProjectRequest request, CancellationToken ct)
     {
-        var result = await client.CreateProjectAsync(request, ct);
-        return result != null
-            ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result)
-            : StatusCode(502, "ProjectService returned an error.");
+        _logger.LogInformation("Creating project: CustomerId={CustomerId}, CustomerName={CustomerName}, Title={Title}",
+            request.CustomerId, request.CustomerName, request.Title);
+
+        var (result, errorContent, statusCode) = await client.CreateProjectAsync(request, ct);
+        if (result != null)
+        {
+            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+        }
+
+        _logger.LogError(
+            "ProjectService returned HTTP {StatusCode}: {ErrorContent} | Request: CustomerId={CustomerId}, CustomerName={CustomerName}, Title={Title}",
+            statusCode, errorContent, request.CustomerId, request.CustomerName, request.Title);
+
+        var userMessage = statusCode switch
+        {
+            401 => "Not authorised — the BFF could not authenticate with ProjectService.",
+            403 => "Permission denied — you may lack the 'project.projects.create' permission in IAM.",
+            _ when !string.IsNullOrEmpty(errorContent) => errorContent,
+            _ => $"ProjectService returned HTTP {statusCode}."
+        };
+
+        return StatusCode(502, userMessage);
     }
 
     /// <summary>
