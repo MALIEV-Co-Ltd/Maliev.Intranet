@@ -13,17 +13,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      - name: Checkout Maliev.Aspire
+        uses: actions/checkout@v5
+        with:
+          repository: MALIEV-Co-Ltd/Maliev.Aspire
+          path: Maliev.Aspire
+
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.x"
 
-      - name: Add MessagingContracts PackageReference for CI build
+      - name: Fix MessagingContracts PackageReference
         run: |
-          # Add MessagingContracts PackageReference to Bff project for CI
-          # It doesn't have a local ProjectReference so we need to add the PackageReference
-          sed -i 's|<PackageReference Include="MudBlazor" Version="9.1.0" />|<PackageReference Include="Maliev.MessagingContracts" Version="1.0.79-alpha" />\n    <PackageReference Include="MudBlazor" Version="9.1.0" />|g' Maliev.Intranet.Bff/Maliev.Intranet.Bff.csproj
-          echo "Added MessagingContracts PackageReference to Bff project"
+          # Remove any duplicate MessagingContracts references
+          sed -i 's|<PackageReference Include="Maliev.MessagingContracts" Version="1.0.79-alpha" />||g' Maliev.Intranet.Bff/Maliev.Intranet.Bff.csproj 2>/dev/null || true
+          # Ensure MessagingContracts is present
+          if ! grep -q "Maliev.MessagingContracts" Maliev.Intranet.Bff/Maliev.Intranet.Bff.csproj; then
+            sed -i 's|<PackageReference Include="MudBlazor" Version="9.1.0" />|<PackageReference Include="Maliev.MessagingContracts" Version="1.0.79-alpha" />\n    <PackageReference Include="MudBlazor" Version="9.1.0" />|g' Maliev.Intranet.Bff/Maliev.Intranet.Bff.csproj
+          fi
+          echo "Fixed MessagingContracts reference"
 
       - name: Restore dependencies
         run: dotnet restore Maliev.Intranet.slnx /p:TreatWarningsAsErrors=false /p:NoWarn=NU1903
