@@ -25,7 +25,12 @@ jobs:
           dotnet-version: "10.x"
 
       - name: Build Maliev.Aspire.ServiceDefaults
-        run: dotnet build Maliev.Aspire/Maliev.Aspire.ServiceDefaults/Maliev.Aspire.ServiceDefaults.csproj --no-restore /p:TreatWarningsAsErrors=false /p:NoWarn=NU1903
+        run: |
+          dotnet restore Maliev.Aspire/Maliev.Aspire.ServiceDefaults/Maliev.Aspire.ServiceDefaults.csproj /p:TreatWarningsAsErrors=false /p:NoWarn=NU1903
+          dotnet build Maliev.Aspire/Maliev.Aspire.ServiceDefaults/Maliev.Aspire.ServiceDefaults.csproj --no-restore /p:TreatWarningsAsErrors=false /p:NoWarn=NU1903
+        env:
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Fix MessagingContracts PackageReference
         run: |
