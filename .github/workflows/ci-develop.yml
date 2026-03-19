@@ -25,16 +25,16 @@ jobs:
           dotnet-version: "10.x"
 
       - name: Restore dependencies
-        run: dotnet restore Maliev.Intranet.slnx /p:TreatWarningsAsErrors=false /p:NoWarn=NU1903
+        run: dotnet restore Maliev.Intranet.slnx /p:GITHUB_ACTIONS=true
         env:
           NUGET_USERNAME: ${{ github.actor }}
           NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Build
-        run: dotnet build Maliev.Intranet.slnx --no-restore /p:TreatWarningsAsErrors=false /p:NoWarn=NU1903
+        run: dotnet build Maliev.Intranet.slnx --no-restore /p:GITHUB_ACTIONS=true
 
       - name: Test
-        run: dotnet test Maliev.Intranet.slnx --no-build --verbosity normal /p:TreatWarningsAsErrors=false /p:NoWarn=NU1903
+        run: dotnet test Maliev.Intranet.slnx --no-build --verbosity normal
         working-directory: ${{ github.workspace }}
 
       - name: Authenticate to Google Cloud
