@@ -42,6 +42,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
+            DfmReport = existing?.DfmReport,
         };
         Set(uploadId, status);
         return Task.CompletedTask;
@@ -63,6 +64,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
+            DfmReport = existing?.DfmReport,
         };
         Set(uploadId, status);
         return Task.CompletedTask;
@@ -84,13 +86,14 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             PreviewProcessingStatus = PreviewProcessingStatus.Processing,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
+            DfmReport = existing?.DfmReport,
         };
         Set(uploadId, status);
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, CancellationToken cancellationToken = default)
+    public Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, object? dfmReport = null, CancellationToken cancellationToken = default)
     {
         var existing = Get(uploadId);
         var status = new FileAnalysisStatusDto
@@ -106,6 +109,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = null,
             ProcessedAt = DateTimeOffset.UtcNow,
+            DfmReport = dfmReport ?? existing?.DfmReport,
         };
         Set(uploadId, status);
         return Task.CompletedTask;
@@ -127,6 +131,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             PreviewProcessingStatus = PreviewProcessingStatus.Completed,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = DateTimeOffset.UtcNow,
+            DfmReport = existing?.DfmReport,
         };
         Set(uploadId, status);
         return Task.CompletedTask;
@@ -148,6 +153,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             PreviewProcessingStatus = PreviewProcessingStatus.Failed,
             ErrorCode = "preview-generation-failed",
             ProcessedAt = DateTimeOffset.UtcNow,
+            DfmReport = existing?.DfmReport,
         };
         Set(uploadId, status);
         return Task.CompletedTask;
@@ -169,6 +175,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = errorCode,
             ProcessedAt = DateTimeOffset.UtcNow,
+            DfmReport = existing?.DfmReport,
         };
         Set(uploadId, status);
         return Task.CompletedTask;

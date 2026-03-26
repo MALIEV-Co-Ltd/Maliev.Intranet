@@ -89,6 +89,9 @@ public class PartViewModel
     /// <summary>Whether the part mesh is manifold (watertight), populated after file analysis.</summary>
     public bool? IsManifold { get; set; }
 
+    /// <summary>DFM analysis report embedded in FileAnalyzedEvent. Polymorphic — cast to FdmDfmReport, SlaDfmReport, or CncDfmReport as needed.</summary>
+    public object? DfmReport { get; set; }
+
     /// <summary>Error message if upload or analysis failed; null when healthy.</summary>
     public string? Error { get; set; }
 

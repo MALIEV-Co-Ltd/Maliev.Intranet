@@ -66,8 +66,15 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             {
                 if (string.IsNullOrEmpty(path))
                     return null;
-                return await CreateUploadClient().GetDownloadUrlByPathAsync(path, context.CancellationToken)
-                       ?? path;  // fallback: store raw storage path when signed URL fails
+                var url = await CreateUploadClient().GetDownloadUrlByPathAsync(path, context.CancellationToken);
+                if (string.IsNullOrEmpty(url))
+                {
+                    _logger.LogWarning(
+                        "PreviewImagesGeneratedConsumer: signed URL resolution failed for path={Path} — throwing to trigger retry",
+                        path);
+                    throw new InvalidOperationException($"Signed URL resolution failed for storage path: {path}");
+                }
+                return url;
             }
 
             var frontUrl           = await ResolveUrlAsync(previews.FrontSmall);

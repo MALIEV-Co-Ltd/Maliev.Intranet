@@ -4,6 +4,7 @@
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components
 @using System.Text.Json
+@using MudBlazor
 
 <div class="pdc-root">
     @* ── Left 60%: Viewer Column ──────────────────────────────────── *@
@@ -338,6 +339,7 @@
 
 @code {
     [Inject] private HttpClient Http { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
     [Parameter] public PartViewModel Part { get; set; } = null!;
     [Parameter] public List<ProcessDto> Processes { get; set; } = [];
@@ -400,13 +402,16 @@
                 {
                     _resolvedUrls[currentSrc] = resolved;
                     setUrl(resolved);
+                    Snackbar.Add($"Preview URL resolved for {Part.Name}", Severity.Success);
                     await OnPartChanged.InvokeAsync(Part);
+                    return;
                 }
             }
+            Snackbar.Add($"Preview URL resolution returned empty for {Part.Name} (raw path: {currentSrc})", Severity.Warning);
         }
-        catch
+        catch (Exception ex)
         {
-            // Resolution failed — leave the broken src, fallback will show on next render
+            Snackbar.Add($"Preview URL resolution failed for {Part.Name}: {ex.Message}", Severity.Error);
         }
     }
 

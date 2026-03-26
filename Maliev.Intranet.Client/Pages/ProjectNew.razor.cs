@@ -281,6 +281,7 @@ public partial class ProjectNew : IAsyncDisposable
                         }
 
                         part.GlbStoragePath = status.GlbStoragePath;
+                        part.DfmReport = status.DfmReport;
 
                         if (status.Status == FileAnalysisStatus.Completed)
                         {

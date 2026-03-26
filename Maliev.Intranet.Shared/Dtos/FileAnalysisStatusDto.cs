@@ -46,6 +46,12 @@ public sealed record FileAnalysisStatusDto
     /// regardless of this value.
     /// </summary>
     public PreviewProcessingStatus PreviewProcessingStatus { get; init; }
+
+    /// <summary>
+    /// DFM analysis report (FdmDfmReport, SlaDfmReport, or CncDfmReport) embedded in FileAnalyzedEvent.
+    /// Null until the DFM analysis event is consumed.
+    /// </summary>
+    public object? DfmReport { get; init; }
 }
 
 /// <summary>

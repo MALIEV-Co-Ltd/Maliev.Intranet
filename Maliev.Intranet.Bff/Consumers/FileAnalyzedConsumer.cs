@@ -63,11 +63,11 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
         {
             try
             {
-                await _analysisStatusService.SetAnalysisCompletedAsync(gcsStoragePath, payload.GlbStoragePath, context.CancellationToken);
+                await _analysisStatusService.SetAnalysisCompletedAsync(gcsStoragePath, payload.GlbStoragePath, payload.DfmReport, context.CancellationToken);
 
                 _logger.LogInformation(
-                    "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}",
-                    gcsStoragePath, payload.GlbStoragePath);
+                    "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}, hasDfmReport={HasDfmReport}",
+                    gcsStoragePath, payload.GlbStoragePath, payload.DfmReport != null);
 
                 string? glbUrl = null;
                 if (!string.IsNullOrEmpty(payload.GlbStoragePath))
