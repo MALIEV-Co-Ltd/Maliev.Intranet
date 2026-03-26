@@ -36,7 +36,10 @@
                 <ItemTemplate Context="customer">
                     <MudStack Row="false" Spacing="0">
                         <MudText Typo="Typo.body2">@customer.Name</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.Email</MudText>
+                        @if (!string.IsNullOrEmpty(customer.Email))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.Email</MudText>
+                        }
                     </MudStack>
                 </ItemTemplate>
             </MudAutocomplete>
@@ -84,6 +87,7 @@
              @ondragenter="@(() => OnDragEnter.InvokeAsync())"
              @ondragleave="@(() => OnDragLeave.InvokeAsync())"
              @ondragover:preventDefault="true"
+             @ondrop:preventDefault="true"
              @onclick="@(() => OnOpenFilePicker.InvokeAsync())">
             <MudIcon Icon="@Icons.Material.Outlined.CloudUpload"
                      Size="Size.Large"
