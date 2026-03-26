@@ -57,12 +57,15 @@
                 <div class="pn-center">
                     @if (_layoutMode == LayoutMode.Configurator)
                     {
-                        <PartCarousel
-                            Parts="@_parts"
-                            SelectedIndex="@_selectedPartIndex"
-                            OnSelectPart="@(i => _selectedPartIndex = i)"
-                            OnRemovePart="RemovePart"
-                            OnAddPart="OpenFilePicker" />
+                        @if (_parts.Count > 0)
+                        {
+                            <PartCarousel
+                                Parts="@_parts"
+                                SelectedIndex="@_selectedPartIndex"
+                                OnSelectPart="@(i => _selectedPartIndex = i)"
+                                OnRemovePart="RemovePart"
+                                OnAddPart="OpenFilePicker" />
+                        }
 
                         @if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)
                         {

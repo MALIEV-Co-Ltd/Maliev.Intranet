@@ -3,11 +3,9 @@
 
 <div class="pnl-left">
     @* ── Section 1: Customer ─────────────────────────────────────────── *@
-    <div class="pnl-section">
-        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Customer</MudText>
-
-        @if (SelectedCustomer != null && !ShowCustomerSearch)
-        {
+    @if (SelectedCustomer != null && !ShowCustomerSearch)
+    {
+        <div class="pnl-section pnl-section-customer">
             <div class="pnl-customer-card">
                 <div class="pnl-customer-info">
                     <MudText Typo="Typo.body2" Style="font-weight:600;">@SelectedCustomer.Name</MudText>
@@ -20,37 +18,39 @@
                         <MudText Typo="Typo.caption" Color="Color.Tertiary">@SelectedCustomer.CompanyName</MudText>
                     }
                 </div>
-                <div class="pnl-customer-actions">
-                    @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
-                    {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Email"
-                                       Size="Size.Small"
-                                       Color="Color.Default"
-                                       Href="@($"mailto:{SelectedCustomer.Email}")"
-                                       Target="_blank" />
-                    }
-                    @if (!string.IsNullOrEmpty(SelectedCustomer.Mobile))
-                    {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Phone"
-                                       Size="Size.Small"
-                                       Color="Color.Default"
-                                       Href="@($"tel:{SelectedCustomer.Mobile}")" />
-                    }
-                    else if (!string.IsNullOrEmpty(SelectedCustomer.Landline))
-                    {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Phone"
-                                       Size="Size.Small"
-                                       Color="Color.Default"
-                                       Href="@($"tel:{SelectedCustomer.Landline}")" />
-                    }
-                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                                   Size="Size.Small"
-                                   OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
-                </div>
             </div>
-        }
-        else
-        {
+            <div class="pnl-customer-actions">
+                @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.Email"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Href="@($"mailto:{SelectedCustomer.Email}")"
+                                   Target="_blank" />
+                }
+                @if (!string.IsNullOrEmpty(SelectedCustomer.Mobile))
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.Phone"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Href="@($"tel:{SelectedCustomer.Mobile}")" />
+                }
+                else if (!string.IsNullOrEmpty(SelectedCustomer.Landline))
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.Phone"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Href="@($"tel:{SelectedCustomer.Landline}")" />
+                }
+                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                               Size="Size.Small"
+                               OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="pnl-section">
             <MudAutocomplete T="CustomerSummaryDto"
                              Label="Search customers"
                              SearchFunc="@(SearchCustomersFunc ?? ((_,__) => Task.FromResult(Enumerable.Empty<CustomerSummaryDto>())))"
@@ -64,6 +64,10 @@
                 <ItemTemplate Context="customer">
                     <MudStack Row="false" Spacing="0">
                         <MudText Typo="Typo.body2">@customer.Name</MudText>
+                        @if (!string.IsNullOrEmpty(customer.CompanyName))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@customer.CompanyName</MudText>
+                        }
                         @if (!string.IsNullOrEmpty(customer.Email))
                         {
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.Email</MudText>
@@ -71,15 +75,11 @@
                     </MudStack>
                 </ItemTemplate>
             </MudAutocomplete>
-        }
-    </div>
+        </div>
+    }
 
-    <MudDivider />
-
-    @* ── Section 2: Project Details ──────────────────────────────────── *@
+    @* ── Section 2: Project Details (no divider, no gap) ────────────── *@
     <div class="pnl-section pnl-section-grow">
-        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Project Details</MudText>
-
         <MudTextField T="string"
                       Value="@Title"
                       ValueChanged="@OnTitleChanged"
@@ -106,7 +106,6 @@
     @* ── Section 3: Upload (only when ShowUploadSection is true) ────── *@
     @if (ShowUploadSection)
     {
-        <MudDivider />
         <div class="pnl-section pnl-upload-section">
             <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Parts</MudText>
 
@@ -122,14 +121,7 @@
                 <MudText Typo="Typo.body2"
                          Color="@(DragOver ? Color.Primary : Color.Secondary)"
                          Class="mt-1">
-                    @if (DragOver)
-                    {
-                        <text>Drop files here</text>
-                    }
-                    else
-                    {
-                        <text>Drag &amp; drop or click to upload</text>
-                    }
+                    @(DragOver ? "Drop files here" : "Drag & drop or click to upload")
                 </MudText>
                 <MudText Typo="Typo.caption" Color="Color.Tertiary">
                     STL, STEP, 3MF, OBJ, and more
@@ -153,6 +145,7 @@
     }
     .pnl-section {
         padding: 14px;
+        flex-shrink: 0;
     }
     .pnl-section-grow {
         flex: 1;
@@ -162,27 +155,38 @@
         margin-bottom: 8px;
         letter-spacing: 0.5px;
     }
+    .pnl-section-customer {
+        padding-bottom: 8px;
+    }
     .pnl-customer-card {
         display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
+        flex-direction: column;
+        gap: 2px;
         padding: 8px;
         border: 1px solid var(--mud-palette-lines-default);
         border-radius: 4px;
-        gap: 8px;
     }
     .pnl-customer-info {
         display: flex;
         flex-direction: column;
         gap: 2px;
-        flex: 1;
-        min-width: 0;
     }
     .pnl-customer-actions {
         display: flex;
-        gap: 2px;
-        flex-shrink: 0;
+        gap: 4px;
         align-items: center;
+        padding-top: 6px;
+        margin-top: 2px;
+        border-top: 1px solid var(--mud-palette-lines-default);
+    }
+    .pnl-customer-actions .mud-icon-button:hover {
+        background-color: transparent !important;
+    }
+    .pnl-customer-actions .mud-icon-button:focus-visible {
+        background-color: transparent !important;
+    }
+    .pnl-customer-actions .mud-icon-button:active {
+        background-color: transparent !important;
     }
     .pnl-upload-section {
         flex-shrink: 0;
@@ -209,8 +213,13 @@
     }
 
     .pnl-left .mud-input-control input,
-    .pnl-left .mud-input-control textarea,
-    .pnl-left .mud-select-input {
+    .pnl-left .mud-input-control textarea {
+        font-size: var(--mud-typography-body1-size);
+    }
+    .pnl-left .mud-floating-label .mud-floating-label-text {
+        font-size: var(--mud-typography-body1-size) !important;
+    }
+    .pnl-left .mud-input-helper-text {
         font-size: var(--mud-typography-body1-size);
     }
 </style>

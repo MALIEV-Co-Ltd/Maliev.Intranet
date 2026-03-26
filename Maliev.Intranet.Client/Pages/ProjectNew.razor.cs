@@ -118,7 +118,9 @@ public partial class ProjectNew : IAsyncDisposable
         var leadTimesResult = leadTimesTask.Result;
         if (leadTimesResult is { Count: > 0 })
         {
-            _leadTimeOptions = leadTimesResult;
+            _leadTimeOptions = leadTimesResult
+                .Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase))
+                .ToList();
             _selectedLeadTime ??= _leadTimeOptions.FirstOrDefault(lt => lt.IsDefault) ?? _leadTimeOptions.First();
         }
 
