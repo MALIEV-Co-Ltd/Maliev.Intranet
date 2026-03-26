@@ -1,6 +1,93 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
-@* Placeholder — implemented in Task 5 *@
+
+<div class="pn-topbar">
+    @* Back arrow *@
+    <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                   Href="/sales/projects"
+                   Size="Size.Small"
+                   Color="Color.Default" />
+
+    @* Inline-editable title *@
+    @if (_editingTitle)
+    {
+        <MudTextField T="string"
+                      Value="@Title"
+                      ValueChanged="@(async v => { await OnTitleChanged.InvokeAsync(v); _editingTitle = false; })"
+                      Immediate="true"
+                      AutoFocus="true"
+                      Variant="Variant.Text"
+                      Margin="Margin.Dense"
+                      @onblur="@(() => _editingTitle = false)"
+                      Style="font-weight:600; font-size:14px; min-width:200px;" />
+    }
+    else
+    {
+        <span class="pn-topbar-title" @onclick="@(() => _editingTitle = true)">
+            @(string.IsNullOrWhiteSpace(Title) ? "Untitled Project" : Title)
+        </span>
+    }
+    <MudChip T="string" Size="Size.Small" Color="Color.Default" Label="true" Class="ml-1">Draft</MudChip>
+
+    <MudSpacer />
+
+    @* Currency autocomplete *@
+    <MudAutocomplete T="CurrencyDto"
+                     Value="@SelectedCurrency"
+                     ValueChanged="@OnCurrencyChanged"
+                     SearchFunc="@SearchCurrencies"
+                     ToStringFunc="@(c => c == null ? "" : $"{c.Code} — {c.Name}")"
+                     Label="Currency"
+                     Variant="Variant.Outlined"
+                     Margin="Margin.Dense"
+                     Style="width:180px;"
+                     Clearable="false" />
+
+    @* Saved status *@
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mx-2" Style="white-space:nowrap;">
+        @if (AutoSaving) { <text>Saving...</text> }
+        else if (LastSavedAt.HasValue) { <text>Saved @LastSavedAt.Value.ToLocalTime().ToString("HH:mm")</text> }
+    </MudText>
+
+    @* Duplicate button *@
+    <MudTooltip Text="Duplicate project">
+        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+                       Size="Size.Small"
+                       OnClick="@OnDuplicate" />
+    </MudTooltip>
+
+    @* Layout toggle *@
+    <MudTooltip Text="@(LayoutMode == LayoutMode.Configurator ? "Switch to table view" : "Switch to configurator")">
+        <MudIconButton Icon="@(LayoutMode == LayoutMode.Configurator ? Icons.Material.Outlined.TableRows : Icons.Material.Outlined.GridView)"
+                       Size="Size.Small"
+                       OnClick="@ToggleLayout" />
+    </MudTooltip>
+</div>
+
+<style>
+    .pn-topbar {
+        height: 52px;
+        min-height: 52px;
+        background: var(--mud-palette-surface);
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+    .pn-topbar-title {
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+    .pn-topbar-title:hover { text-decoration: underline; }
+</style>
+
 @code {
     [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> OnTitleChanged { get; set; }
@@ -12,4 +99,19 @@
     [Parameter] public LayoutMode LayoutMode { get; set; }
     [Parameter] public EventCallback<LayoutMode> OnLayoutModeChanged { get; set; }
     [Parameter] public EventCallback OnDuplicate { get; set; }
+
+    private bool _editingTitle;
+
+    private Task<IEnumerable<CurrencyDto>> SearchCurrencies(string value, CancellationToken ct)
+    {
+        var results = string.IsNullOrWhiteSpace(value)
+            ? Currencies
+            : Currencies.Where(c => c.Code.Contains(value, StringComparison.OrdinalIgnoreCase)
+                                  || c.Name.Contains(value, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(results);
+    }
+
+    private void ToggleLayout() =>
+        OnLayoutModeChanged.InvokeAsync(
+            LayoutMode == LayoutMode.Configurator ? LayoutMode.SummaryTable : LayoutMode.Configurator);
 }
