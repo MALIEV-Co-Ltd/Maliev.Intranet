@@ -5,7 +5,7 @@
     @* ── Section 1: Customer ─────────────────────────────────────────── *@
     @if (SelectedCustomer != null && !ShowCustomerSearch)
     {
-        <div class="pnl-section pnl-section-customer">
+        <div class="pnl-section">
             <div class="pnl-customer-card">
                 <MudText Typo="Typo.body2" Style="font-weight:600;">@SelectedCustomer.Name</MudText>
                 @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
@@ -23,26 +23,30 @@
                                        Size="Size.Small"
                                        Color="Color.Default"
                                        Href="@($"mailto:{SelectedCustomer.Email}")"
-                                       Target="_blank" />
+                                       Target="_blank"
+                                       Class="padding: 0" />
                     }
                     @if (!string.IsNullOrEmpty(SelectedCustomer.Mobile))
                     {
                         <MudIconButton Icon="@Icons.Material.Outlined.Phone"
                                        Size="Size.Small"
                                        Color="Color.Default"
-                                       Href="@($"tel:{SelectedCustomer.Mobile}")" />
+                                       Href="@($"tel:{SelectedCustomer.Mobile}")"
+                                       Class="padding: 0" />
                     }
                     else if (!string.IsNullOrEmpty(SelectedCustomer.Landline))
                     {
                         <MudIconButton Icon="@Icons.Material.Outlined.Phone"
                                        Size="Size.Small"
                                        Color="Color.Default"
-                                       Href="@($"tel:{SelectedCustomer.Landline}")" />
+                                       Href="@($"tel:{SelectedCustomer.Landline}")"
+                                       Class="padding: 0" />
                     }
                     <MudSpacer />
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                    Size="Size.Small"
-                                   OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
+                                   OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))"
+                                   Class="padding: 0" />
                 </div>
             </div>
         </div>
@@ -157,9 +161,6 @@
         display: block;
         margin-bottom: 8px;
         letter-spacing: 0.5px;
-    }
-    .pnl-section-customer {
-        padding-bottom: 8px;
     }
     .pnl-customer-card {
         display: flex;
