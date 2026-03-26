@@ -124,7 +124,8 @@
     private string GetBadgeClass() =>
         Part.Uploading ? "pmc-badge-uploading" :
         Part.IsManifold == false ? "pmc-badge-warning" :
-        "pmc-badge-ok";
+        Part.IsManifold == true ? "pmc-badge-ok" :
+        "pmc-badge-uploading"; // null = analysis pending (neutral grey)
 
     private string GetBadgeText() =>
         Part.Uploading ? "↑" :
