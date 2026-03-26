@@ -1,6 +1,165 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
-@* Placeholder — implemented in Task 4 *@
+
+<div class="pnl-left">
+    @* ── Section 1: Customer ─────────────────────────────────────────── *@
+    <div class="pnl-section">
+        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Customer</MudText>
+
+        @if (SelectedCustomer != null && !ShowCustomerSearch)
+        {
+            <div class="pnl-customer-card">
+                <div>
+                    <MudText Typo="Typo.body2" Style="font-weight:600;">@SelectedCustomer.Name</MudText>
+                    @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@SelectedCustomer.Email</MudText>
+                    }
+                </div>
+                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                               Size="Size.Small"
+                               OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
+            </div>
+        }
+        else
+        {
+            <MudAutocomplete T="CustomerSummaryDto"
+                             Label="Search customers"
+                             SearchFunc="@(SearchCustomersFunc ?? ((_,__) => Task.FromResult(Enumerable.Empty<CustomerSummaryDto>())))"
+                             ValueChanged="@OnCustomerSelected"
+                             ToStringFunc="@(c => c?.Name ?? string.Empty)"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             Clearable="true"
+                             DebounceInterval="300"
+                             MinCharacters="2">
+                <ItemTemplate Context="customer">
+                    <MudStack Row="false" Spacing="0">
+                        <MudText Typo="Typo.body2">@customer.Name</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.Email</MudText>
+                    </MudStack>
+                </ItemTemplate>
+            </MudAutocomplete>
+        }
+    </div>
+
+    <MudDivider />
+
+    @* ── Section 2: Project Details ──────────────────────────────────── *@
+    <div class="pnl-section">
+        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Project Details</MudText>
+
+        <MudTextField T="string"
+                      Value="@Title"
+                      ValueChanged="@OnTitleChanged"
+                      Label="Project Title *"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Error="@TitleHasError"
+                      ErrorText="@TitleError"
+                      Immediate="true"
+                      MaxLength="500"
+                      Class="mb-2" />
+
+        <MudTextField T="string"
+                      Value="@Description"
+                      ValueChanged="@OnDescriptionChanged"
+                      Label="Description"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Error="@DescriptionHasError"
+                      ErrorText="@DescriptionError"
+                      Lines="3"
+                      Immediate="true"
+                      MaxLength="2000" />
+    </div>
+
+    <MudDivider />
+
+    @* ── Section 3: Upload ───────────────────────────────────────────── *@
+    <div class="pnl-section pnl-upload-section">
+        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Parts</MudText>
+
+        <div class="pnl-dropzone @(DragOver ? "pnl-dropzone-active" : "")"
+             @ondragenter="@(() => OnDragEnter.InvokeAsync())"
+             @ondragleave="@(() => OnDragLeave.InvokeAsync())"
+             @ondragover:preventDefault="true"
+             @onclick="@(() => OnOpenFilePicker.InvokeAsync())">
+            <MudIcon Icon="@Icons.Material.Outlined.CloudUpload"
+                     Size="Size.Large"
+                     Color="@(DragOver ? Color.Primary : Color.Default)" />
+            <MudText Typo="Typo.body2"
+                     Color="@(DragOver ? Color.Primary : Color.Secondary)"
+                     Class="mt-1">
+                @if (DragOver)
+                {
+                    <text>Drop files here</text>
+                }
+                else
+                {
+                    <text>Drag &amp; drop or click to upload</text>
+                }
+            </MudText>
+            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                STL, STEP, 3MF, OBJ, and more
+            </MudText>
+        </div>
+    </div>
+</div>
+
+<style>
+    .pnl-left {
+        width: 340px;
+        min-width: 340px;
+        height: 100%;
+        overflow-y: auto;
+        background: var(--mud-palette-surface);
+        border-right: 1px solid var(--mud-palette-lines-default);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+    }
+    .pnl-section {
+        padding: 14px;
+    }
+    .pnl-section-label {
+        display: block;
+        margin-bottom: 8px;
+        letter-spacing: 0.5px;
+    }
+    .pnl-customer-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px;
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 4px;
+    }
+    .pnl-upload-section {
+        flex: 1;
+    }
+    .pnl-dropzone {
+        border: 2px dashed var(--mud-palette-lines-default);
+        border-radius: 8px;
+        padding: 24px 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+        min-height: 120px;
+    }
+    .pnl-dropzone:hover {
+        border-color: var(--mud-palette-primary);
+        background: var(--mud-palette-primary-hover);
+    }
+    .pnl-dropzone-active {
+        border-color: var(--mud-palette-primary);
+        background: var(--mud-palette-primary-hover);
+    }
+</style>
+
 @code {
     [Parameter] public CustomerSummaryDto? SelectedCustomer { get; set; }
     [Parameter] public bool ShowCustomerSearch { get; set; }
