@@ -70,10 +70,12 @@
         @foreach (var part in Parts)
         {
             <div class="pqp-part-row">
-                <MudTooltip Text="@part.Name">
-                    <span class="pqp-part-name">@part.Name</span>
-                </MudTooltip>
-                <span class="pqp-part-qty">×@part.Quantity</span>
+                <div class="pqp-part-info">
+                    <MudTooltip Text="@part.Name">
+                        <span class="pqp-part-name">@part.Name</span>
+                    </MudTooltip>
+                    <span class="pqp-part-meta">×@part.Quantity@(string.IsNullOrEmpty(part.MaterialCode) ? "" : $" · {part.MaterialCode}")</span>
+                </div>
                 <span class="pqp-part-price">
                     @if (part.PricingLoading)
                     {
@@ -182,20 +184,27 @@
     .pqp-lt-price { font-size: 13px; font-weight: 500; }
     .pqp-part-row {
         display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 0;
-        font-size: 12px;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 4px 0;
     }
-    .pqp-part-name {
+    .pqp-part-info {
+        display: flex;
+        flex-direction: column;
         flex: 1;
         min-width: 0;
+        gap: 1px;
+    }
+    .pqp-part-name {
+        font-size: 12px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        display: block;
     }
-    .pqp-part-qty { color: var(--mud-palette-text-secondary); flex-shrink: 0; }
-    .pqp-part-price { flex-shrink: 0; font-weight: 500; }
+    .pqp-part-meta { font-size: 11px; color: var(--mud-palette-text-secondary); }
+    .pqp-part-price { font-size: 12px; font-weight: 500; flex-shrink: 0; }
     .pqp-totals { display: flex; flex-direction: column; gap: 4px; }
     .pqp-total-row { display: flex; justify-content: space-between; font-size: 12px; }
     .pqp-total-grand { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-top: 4px; }
