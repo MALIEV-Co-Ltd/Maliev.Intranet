@@ -71,6 +71,9 @@ public class PartViewModel
     /// <summary>GLB artifact for BabylonJS viewer. Source: status.GlbStoragePath</summary>
     public string? GlbStoragePath { get; set; }
 
+    /// <summary>Resolved signed viewer URL for BabylonJS inline rendering. Fetched on-demand when user opens 3D view.</summary>
+    public string? ViewerUrl { get; set; }
+
     /// <summary>True when the preview image failed to load.</summary>
     public bool PreviewLoadFailed { get; set; }
 

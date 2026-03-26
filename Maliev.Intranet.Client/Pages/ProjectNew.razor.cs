@@ -16,7 +16,7 @@ namespace Maliev.Intranet.Client.Pages;
 /// New project creation page — shell with stub state. Logic added in Tasks 4–17.</summary>
 public partial class ProjectNew : IAsyncDisposable
 {
-    [Inject] private IDialogService DialogService { get; set; } = null!;
+
 
     // ── Project-level state ───────────────────────────────────────────
     private Guid _tempProjectId = Guid.NewGuid();  // non-readonly; reassigned on Duplicate
@@ -783,15 +783,14 @@ public partial class ProjectNew : IAsyncDisposable
     private void OnCustomerSelected(CustomerSummaryDto? customer)
     { _selectedCustomer = customer; if (customer != null) _showCustomerSearch = false; }
 
-    // Task 16 — BabylonJS viewer
     private async Task OpenBabylonViewer(PartViewModel part)
     {
         if (string.IsNullOrEmpty(part.GlbStoragePath)) return;
-        var parameters = new DialogParameters<BabylonViewerDialog>();
-        parameters.Add(nameof(BabylonViewerDialog.StoragePath), part.GlbStoragePath);
-        parameters.Add(nameof(BabylonViewerDialog.Title), part.Name);
-        await DialogService.ShowAsync<BabylonViewerDialog>(part.Name, parameters,
-            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var resp = await Http.GetAsync($"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
+        if (!resp.IsSuccessStatusCode) return;
+        var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
+        part.ViewerUrl = json?.RootElement.GetProperty("url").GetString();
+        await InvokeAsync(StateHasChanged);
     }
 }
 

@@ -1,40 +1,71 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components
+@using System.Text.Json
 
 <div class="pdc-root">
     @* ── Left 60%: Viewer Column ──────────────────────────────────── *@
     <div class="pdc-viewer-col">
         <div class="pdc-thumb-area"
-             @onmouseenter="@(() => _showViewer3dBtn = true)"
+             @onmouseenter="@(() => _showViewer3dBtn = !_showViewer3d)"
              @onmouseleave="@(() => _showViewer3dBtn = false)">
 
-            @* Blurred small thumbnail while large is loading *@
-            @if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && Part.AwaitingPreview)
+            @* ── 3D Viewer Mode (inline, replaces thumbnail) ──────── *@
+            @if (_showViewer3d)
             {
-                <img src="@Part.ThumbnailSmallUrl" class="pdc-thumb-blurred" alt="@Part.Name" />
-            }
-
-            @* Sharp large thumbnail once ready *@
-            @if (!string.IsNullOrEmpty(Part.ThumbnailLargeUrl))
-            {
-                <img src="@Part.ThumbnailLargeUrl"
-                     class="pdc-thumb-sharp pdc-thumb-fade-in"
-                     alt="@Part.Name"
-                     @onerror="@(() => NotifyChanged(p => p.PreviewLoadFailed = true))" />
-            }
-
-            @* Fallback grey background — no preview *@
-            @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.AwaitingPreview)
-            {
-                <MudIcon Icon="@GetFileIcon()" Size="Size.Large" Color="Color.Default" />
-            }
-
-            @* AnimatedCubeIcon overlay — visible on hover when GLB available *@
-            @if (!string.IsNullOrEmpty(Part.GlbStoragePath) && _showViewer3dBtn)
-            {
-                <div class="pdc-cube-overlay">
-                    <AnimatedCubeIcon Size="48" OnClick="@(() => OnOpenViewer.InvokeAsync(Part))" />
+                <div class="pdc-3d-viewer-container">
+                    @if (!string.IsNullOrEmpty(Part.ViewerUrl))
+                    {
+                        <ModelViewer ViewerUrl="@Part.ViewerUrl" FileExtension=".glb" />
+                    }
+                    else
+                    {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                    <button class="pdc-3d-back-btn"
+                            @onclick="@CloseViewer"
+                            title="Back to thumbnail">
+                        <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
+                    </button>
                 </div>
+            }
+            else
+            {
+                @* ── Thumbnail Mode ────────────────────────────────── *@
+
+                @* Blurred small thumbnail while large is loading *@
+                @if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && Part.AwaitingPreview)
+                {
+                    <img src="@Part.ThumbnailSmallUrl"
+                         class="pdc-thumb-blurred"
+                         alt="@Part.Name"
+                         @onerror="@(async () => await OnImageErrorAsync(Part.ThumbnailSmallUrl, v => Part.ThumbnailSmallUrl = v))" />
+                }
+
+                @* Sharp large thumbnail once ready *@
+                @if (!string.IsNullOrEmpty(Part.ThumbnailLargeUrl))
+                {
+                    <img src="@Part.ThumbnailLargeUrl"
+                         class="pdc-thumb-sharp pdc-thumb-fade-in"
+                         alt="@Part.Name"
+                         @onerror="@(async () => await OnImageErrorAsync(Part.ThumbnailLargeUrl, v => Part.ThumbnailLargeUrl = v))" />
+                }
+
+                @* Fallback grey background — no preview *@
+                @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.AwaitingPreview)
+                {
+                    <MudIcon Icon="@GetFileIcon()" Size="Size.Large" Color="Color.Default" />
+                }
+
+                @* AnimatedCubeIcon overlay — visible on hover when GLB available *@
+                @if (!string.IsNullOrEmpty(Part.GlbStoragePath) && _showViewer3dBtn)
+                {
+                    <div class="pdc-cube-overlay">
+                        <AnimatedCubeIcon Size="48" OnClick="@OpenViewer" />
+                    </div>
+                }
             }
         </div>
 
@@ -265,6 +296,30 @@
         animation: fade-in 0.2s ease-in-out;
         z-index: 2;
     }
+    .pdc-3d-viewer-container {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        background: var(--mud-palette-background-grey);
+    }
+    .pdc-3d-back-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 10;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.5);
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+    }
+    .pdc-3d-back-btn:hover { background: rgba(0,0,0,0.7); }
     .pdc-viewer-meta {
         padding: 8px 12px;
         background: var(--mud-palette-surface);
@@ -282,13 +337,17 @@
 </style>
 
 @code {
+    [Inject] private HttpClient Http { get; set; } = null!;
+
     [Parameter] public PartViewModel Part { get; set; } = null!;
     [Parameter] public List<ProcessDto> Processes { get; set; } = [];
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
     [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
 
     private bool _showViewer3dBtn;
+    private bool _showViewer3d;
     private int _activeTab;
+    private readonly Dictionary<string, string> _resolvedUrls = [];
 
     private string GetFileIcon() =>
         Path.GetExtension(Part.Name).ToLowerInvariant() switch
@@ -303,6 +362,53 @@
             ".zip" or ".rar" or ".7z" => Icons.Material.Outlined.FolderZip,
             _ => Icons.Material.Outlined.InsertDriveFile,
         };
+
+    private async Task OpenViewer()
+    {
+        _showViewer3d = true;
+        _showViewer3dBtn = false;
+        await OnOpenViewer.InvokeAsync(Part);
+    }
+
+    private async Task CloseViewer()
+    {
+        _showViewer3d = false;
+        Part.ViewerUrl = null;
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task OnImageErrorAsync(string? currentSrc, Action<string?> setUrl)
+    {
+        if (string.IsNullOrEmpty(currentSrc))
+            return;
+
+        if (_resolvedUrls.TryGetValue(currentSrc, out var cached))
+        {
+            setUrl(cached);
+            await OnPartChanged.InvokeAsync(Part);
+            return;
+        }
+
+        try
+        {
+            var resp = await Http.GetAsync($"api/uploads/preview-url?storagePath={Uri.EscapeDataString(currentSrc)}");
+            if (resp.IsSuccessStatusCode)
+            {
+                var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
+                var resolved = json?.RootElement.GetProperty("url").GetString();
+                if (!string.IsNullOrEmpty(resolved))
+                {
+                    _resolvedUrls[currentSrc] = resolved;
+                    setUrl(resolved);
+                    await OnPartChanged.InvokeAsync(Part);
+                }
+            }
+        }
+        catch
+        {
+            // Resolution failed — leave the broken src, fallback will show on next render
+        }
+    }
 
     private void NotifyChanged(Action<PartViewModel> mutate)
     {
