@@ -9,16 +9,44 @@
         @if (SelectedCustomer != null && !ShowCustomerSearch)
         {
             <div class="pnl-customer-card">
-                <div>
+                <div class="pnl-customer-info">
                     <MudText Typo="Typo.body2" Style="font-weight:600;">@SelectedCustomer.Name</MudText>
                     @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
                     {
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@SelectedCustomer.Email</MudText>
                     }
+                    @if (!string.IsNullOrEmpty(SelectedCustomer.CompanyName))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">@SelectedCustomer.CompanyName</MudText>
+                    }
                 </div>
-                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                               Size="Size.Small"
-                               OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
+                <div class="pnl-customer-actions">
+                    @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Email"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Href="@($"mailto:{SelectedCustomer.Email}")"
+                                       Target="_blank" />
+                    }
+                    @if (!string.IsNullOrEmpty(SelectedCustomer.Mobile))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Phone"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Href="@($"tel:{SelectedCustomer.Mobile}")" />
+                    }
+                    else if (!string.IsNullOrEmpty(SelectedCustomer.Landline))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Phone"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Href="@($"tel:{SelectedCustomer.Landline}")" />
+                    }
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                   Size="Size.Small"
+                                   OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
+                </div>
             </div>
         }
         else
@@ -49,7 +77,7 @@
     <MudDivider />
 
     @* ── Section 2: Project Details ──────────────────────────────────── *@
-    <div class="pnl-section">
+    <div class="pnl-section pnl-section-grow">
         <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Project Details</MudText>
 
         <MudTextField T="string"
@@ -70,45 +98,45 @@
                       Label="Description"
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
-                      Error="@DescriptionHasError"
-                      ErrorText="@DescriptionError"
-                      Lines="3"
+                      Lines="8"
                       Immediate="true"
                       MaxLength="2000" />
     </div>
 
-    <MudDivider />
+    @* ── Section 3: Upload (only when ShowUploadSection is true) ────── *@
+    @if (ShowUploadSection)
+    {
+        <MudDivider />
+        <div class="pnl-section pnl-upload-section">
+            <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Parts</MudText>
 
-    @* ── Section 3: Upload ───────────────────────────────────────────── *@
-    <div class="pnl-section pnl-upload-section">
-        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pnl-section-label">Parts</MudText>
-
-        <div class="pnl-dropzone @(DragOver ? "pnl-dropzone-active" : "")"
-             @ondragenter="@(() => OnDragEnter.InvokeAsync())"
-             @ondragleave="@(() => OnDragLeave.InvokeAsync())"
-             @ondragover:preventDefault="true"
-             @ondrop:preventDefault="true"
-             @onclick="@(() => OnOpenFilePicker.InvokeAsync())">
-            <MudIcon Icon="@Icons.Material.Outlined.CloudUpload"
-                     Size="Size.Large"
-                     Color="@(DragOver ? Color.Primary : Color.Default)" />
-            <MudText Typo="Typo.body2"
-                     Color="@(DragOver ? Color.Primary : Color.Secondary)"
-                     Class="mt-1">
-                @if (DragOver)
-                {
-                    <text>Drop files here</text>
-                }
-                else
-                {
-                    <text>Drag &amp; drop or click to upload</text>
-                }
-            </MudText>
-            <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                STL, STEP, 3MF, OBJ, and more
-            </MudText>
+            <div class="pnl-dropzone @(DragOver ? "pnl-dropzone-active" : "")"
+                 @ondragenter="@(() => OnDragEnter.InvokeAsync())"
+                 @ondragleave="@(() => OnDragLeave.InvokeAsync())"
+                 @ondragover:preventDefault="true"
+                 @ondrop:preventDefault="true"
+                 @onclick="@(() => OnOpenFilePicker.InvokeAsync())">
+                <MudIcon Icon="@Icons.Material.Outlined.CloudUpload"
+                         Size="Size.Large"
+                         Color="@(DragOver ? Color.Primary : Color.Default)" />
+                <MudText Typo="Typo.body2"
+                         Color="@(DragOver ? Color.Primary : Color.Secondary)"
+                         Class="mt-1">
+                    @if (DragOver)
+                    {
+                        <text>Drop files here</text>
+                    }
+                    else
+                    {
+                        <text>Drag &amp; drop or click to upload</text>
+                    }
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                    STL, STEP, 3MF, OBJ, and more
+                </MudText>
+            </div>
         </div>
-    </div>
+    }
 </div>
 
 <style>
@@ -126,6 +154,9 @@
     .pnl-section {
         padding: 14px;
     }
+    .pnl-section-grow {
+        flex: 1;
+    }
     .pnl-section-label {
         display: block;
         margin-bottom: 8px;
@@ -133,14 +164,28 @@
     }
     .pnl-customer-card {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         padding: 8px;
         border: 1px solid var(--mud-palette-lines-default);
         border-radius: 4px;
+        gap: 8px;
+    }
+    .pnl-customer-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+        min-width: 0;
+    }
+    .pnl-customer-actions {
+        display: flex;
+        gap: 2px;
+        flex-shrink: 0;
+        align-items: center;
     }
     .pnl-upload-section {
-        flex: 1;
+        flex-shrink: 0;
     }
     .pnl-dropzone {
         border: 2px dashed var(--mud-palette-lines-default);
@@ -162,6 +207,12 @@
         border-color: var(--mud-palette-primary);
         background: var(--mud-palette-primary-hover);
     }
+
+    .pnl-left .mud-input-control input,
+    .pnl-left .mud-input-control textarea,
+    .pnl-left .mud-select-input {
+        font-size: var(--mud-typography-body1-size);
+    }
 </style>
 
 @code {
@@ -182,4 +233,5 @@
     [Parameter] public EventCallback OnDragLeave { get; set; }
     [Parameter] public EventCallback OnOpenFilePicker { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IEnumerable<CustomerSummaryDto>>>? SearchCustomersFunc { get; set; }
+    [Parameter] public bool ShowUploadSection { get; set; } = true;
 }
