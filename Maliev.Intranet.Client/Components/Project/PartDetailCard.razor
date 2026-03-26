@@ -1,9 +1,343 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
-@* Placeholder — implemented in Tasks 7-8 *@
+
+<div class="pdc-root">
+    @* ── Left 60%: Viewer Column ──────────────────────────────────── *@
+    <div class="pdc-viewer-col">
+        <div class="pdc-thumb-area"
+             @onmouseenter="@(() => _showViewer3dBtn = true)"
+             @onmouseleave="@(() => _showViewer3dBtn = false)">
+
+            @* Blurred small thumbnail while large is loading *@
+            @if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && Part.AwaitingPreview)
+            {
+                <img src="@Part.ThumbnailSmallUrl" class="pdc-thumb-blurred" alt="@Part.Name" />
+            }
+
+            @* Sharp large thumbnail once ready *@
+            @if (!string.IsNullOrEmpty(Part.ThumbnailLargeUrl))
+            {
+                <img src="@Part.ThumbnailLargeUrl"
+                     class="pdc-thumb-sharp pdc-thumb-fade-in"
+                     alt="@Part.Name"
+                     @onerror="@(() => { Part.PreviewLoadFailed = true; StateHasChanged(); })" />
+            }
+
+            @* Fallback grey background — no preview *@
+            @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.AwaitingPreview)
+            {
+                <MudIcon Icon="@GetFileIcon()" Size="Size.Large" Color="Color.Default" />
+            }
+
+            @* AnimatedCubeIcon overlay — visible on hover when GLB available *@
+            @if (!string.IsNullOrEmpty(Part.GlbStoragePath) && _showViewer3dBtn)
+            {
+                <div class="pdc-cube-overlay">
+                    <AnimatedCubeIcon Size="48" OnClick="@(() => OnOpenViewer.InvokeAsync(Part))" />
+                </div>
+            }
+        </div>
+
+        <div class="pdc-viewer-meta">
+            <MudText Typo="Typo.caption" Class="pdc-filename">@Part.Name</MudText>
+            @if (Part.Dimensions != null)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @($"{Part.Dimensions.X:N1} × {Part.Dimensions.Y:N1} × {Part.Dimensions.Z:N1} mm")
+                </MudText>
+            }
+        </div>
+    </div>
+
+    @* ── Right 40%: Configuration Column ─────────────────────────── *@
+    <div class="pdc-config-col">
+        <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="false" Border="true" TabPanelsClass="pa-3">
+
+            <MudTabPanel Text="Configuration">
+                @* Process — always shown first *@
+                <div class="pdc-field-group">
+                    <MudSelect T="Nullable<Guid>" Label="Process *"
+                               Value="@Part.ProcessId"
+                               ValueChanged="@OnProcessChanged"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense">
+                        @foreach (var p in Processes)
+                        {
+                            <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)p.Id)">@p.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+
+                @* Material *@
+                <div class="pdc-field-group">
+                    @if (Part.ProcessId == null)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
+                        <MudSkeleton Width="60%" Height="12px" Animation="Animation.Wave" Class="mt-1" />
+                    }
+                    else if (Part.CatalogLoading)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
+                    }
+                    else
+                    {
+                        <MudSelect T="Nullable<Guid>" Label="Material *"
+                                   Value="@Part.MaterialId"
+                                   ValueChanged="@OnMaterialChanged"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Disabled="@(Part.AvailableMaterials.Count == 0)">
+                            @foreach (var m in Part.AvailableMaterials)
+                            {
+                                <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)m.Id)">@m.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                </div>
+
+                @* Surface Finish *@
+                <div class="pdc-field-group">
+                    @if (Part.ProcessId == null || Part.CatalogLoading)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
+                    }
+                    else
+                    {
+                        <MudSelect T="Nullable<Guid>" Label="Surface Finish"
+                                   Value="@Part.FinishId"
+                                   ValueChanged="@OnFinishChanged"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense">
+                            <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)null)">None</MudSelectItem>
+                            @foreach (var f in Part.AvailableFinishes)
+                            {
+                                <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)f.Id)">@f.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                </div>
+
+                @* Tolerance *@
+                <div class="pdc-field-group">
+                    @if (Part.ProcessId == null || Part.CatalogLoading)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
+                    }
+                    else
+                    {
+                        <MudSelect T="Nullable<Guid>" Label="Tolerance"
+                                   Value="@Part.ToleranceId"
+                                   ValueChanged="@OnToleranceChanged"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense">
+                            <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)null)">Standard</MudSelectItem>
+                            @foreach (var t in Part.AvailableTolerances)
+                            {
+                                <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)t.Id)">@t.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                </div>
+
+                @* Quantity *@
+                <div class="pdc-field-group">
+                    <MudNumericField T="int" Label="Quantity"
+                                     Value="@Part.Quantity"
+                                     ValueChanged="@OnQuantityChanged"
+                                     Min="1" Max="999"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" />
+                </div>
+
+                @* Part Notes *@
+                <MudTextField T="string" Value="@Part.PartNotes"
+                              ValueChanged="@((string v) => NotifyChanged(p => p.PartNotes = v))"
+                              Label="Part Notes"
+                              Lines="3"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              MaxLength="1000" />
+
+                @* DFM panel — shown when non-manifold *@
+                @if (Part.IsManifold == false)
+                {
+                    <MudExpansionPanel Class="mt-2" Style="background:#fff7ed; border:1px solid #fed7aa;">
+                        <TitleContent>
+                            <MudText Color="Color.Warning" Typo="Typo.body2" Style="font-weight:600;">
+                                ⚠ Non-manifold mesh detected
+                            </MudText>
+                        </TitleContent>
+                        <ChildContent>
+                            <MudText Typo="Typo.body2">This mesh may have geometry issues affecting manufacturing.</MudText>
+                            <MudCheckBox T="bool" Value="@Part.DfmAcknowledged"
+                                         ValueChanged="@((bool v) => NotifyChanged(p => p.DfmAcknowledged = v))"
+                                         Label="I understand and want to proceed" />
+                        </ChildContent>
+                    </MudExpansionPanel>
+                }
+            </MudTabPanel>
+
+            <MudTabPanel Text="Drawings">
+                <MudText Color="Color.Secondary" Typo="Typo.body2">
+                    Drawing uploads for this part
+                </MudText>
+                @* TODO: wire to DocumentUploadSection when part ID is known (post-submission) *@
+            </MudTabPanel>
+
+            <MudTabPanel Text="Bulk Pricing">
+                <MudText Color="Color.Secondary" Typo="Typo.body2">
+                    Bulk pricing tiers — not yet available
+                </MudText>
+            </MudTabPanel>
+        </MudTabs>
+    </div>
+</div>
+
+<style>
+    @@keyframes blur-pulse {
+        0%   { filter: blur(8px); }
+        100% { filter: blur(3px); }
+    }
+    @@keyframes fade-in {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+    .pdc-root {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        background: var(--mud-palette-surface);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .pdc-viewer-col {
+        width: 60%;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--mud-palette-lines-default);
+    }
+    .pdc-config-col {
+        width: 40%;
+        min-width: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    .pdc-thumb-area {
+        position: relative;
+        flex: 1;
+        background: var(--mud-palette-background-grey);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        min-height: 200px;
+    }
+    .pdc-thumb-blurred {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        animation: blur-pulse 1.8s ease-in-out alternate infinite;
+    }
+    .pdc-thumb-sharp {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .pdc-thumb-fade-in {
+        animation: fade-in 0.4s ease-in-out forwards;
+    }
+    .pdc-cube-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        animation: fade-in 0.2s ease-in-out;
+        z-index: 2;
+    }
+    .pdc-viewer-meta {
+        padding: 8px 12px;
+        background: var(--mud-palette-surface);
+        border-top: 1px solid var(--mud-palette-lines-default);
+    }
+    .pdc-filename {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pdc-field-group {
+        margin-bottom: 12px;
+    }
+</style>
+
 @code {
     [Parameter] public PartViewModel Part { get; set; } = null!;
     [Parameter] public List<ProcessDto> Processes { get; set; } = [];
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
     [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
+
+    private bool _showViewer3dBtn;
+    private int _activeTab;
+
+    private string GetFileIcon() =>
+        Path.GetExtension(Part.Name).ToLowerInvariant() switch
+        {
+            ".stl" or ".step" or ".stp" or ".3mf" or ".obj" or ".igs" or ".iges"
+            or ".blend" or ".fbx" or ".gltf" or ".glb" => Icons.Material.Outlined.ViewInAr,
+            ".pdf" => Icons.Material.Outlined.PictureAsPdf,
+            ".dxf" or ".dwg" => Icons.Material.Outlined.Architecture,
+            ".png" or ".jpg" or ".jpeg" or ".tiff" or ".bmp" or ".webp" => Icons.Material.Outlined.Image,
+            ".doc" or ".docx" => Icons.Material.Outlined.Description,
+            ".xls" or ".xlsx" => Icons.Material.Outlined.TableChart,
+            ".zip" or ".rar" or ".7z" => Icons.Material.Outlined.FolderZip,
+            _ => Icons.Material.Outlined.InsertDriveFile,
+        };
+
+    private void NotifyChanged(Action<PartViewModel> mutate)
+    {
+        mutate(Part);
+        OnPartChanged.InvokeAsync(Part);
+    }
+
+    private void OnProcessChanged(Guid? processId)
+    {
+        NotifyChanged(p =>
+        {
+            p.ProcessId = processId;
+            p.ProcessCode = Processes.FirstOrDefault(x => x.Id == processId)?.Code;
+            p.MaterialId = null; p.MaterialCode = null;
+            p.FinishId = null; p.FinishCode = null;
+            p.ToleranceId = null; p.ToleranceCode = null;
+            p.DfmAcknowledged = false;
+            p.AvailableMaterials = [];
+            p.AvailableFinishes = [];
+            p.AvailableTolerances = [];
+        });
+    }
+
+    private void OnMaterialChanged(Guid? materialId) =>
+        NotifyChanged(p =>
+        {
+            p.MaterialId = materialId;
+            p.MaterialCode = p.AvailableMaterials.FirstOrDefault(x => x.Id == materialId)?.Code;
+        });
+
+    private void OnFinishChanged(Guid? finishId) =>
+        NotifyChanged(p =>
+        {
+            p.FinishId = finishId;
+            p.FinishCode = p.AvailableFinishes.FirstOrDefault(x => x.Id == finishId)?.Code;
+        });
+
+    private void OnToleranceChanged(Guid? toleranceId) =>
+        NotifyChanged(p =>
+        {
+            p.ToleranceId = toleranceId;
+            p.ToleranceCode = p.AvailableTolerances.FirstOrDefault(x => x.Id == toleranceId)?.Code;
+        });
+
+    private void OnQuantityChanged(int qty) =>
+        NotifyChanged(p => p.Quantity = Math.Max(1, qty));
 }
