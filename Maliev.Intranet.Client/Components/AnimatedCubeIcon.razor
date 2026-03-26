@@ -4,7 +4,16 @@
       style="cursor:pointer; --cube-size:@(Size)px;"
       title="View in 3D"
       @onclick="OnClickHandler">
-    <span class="cube-card"></span>
+    <span class="cube-card">
+        <span class="cube">
+            <span class="face face-top"></span>
+            <span class="face face-front"></span>
+            <span class="face face-back"></span>
+            <span class="face face-left"></span>
+            <span class="face face-right"></span>
+            <span class="face face-bottom"></span>
+        </span>
+    </span>
 </span>
 
 <style>
@@ -17,49 +26,58 @@
     .animated-cube-icon .cube-card {
         width: var(--cube-size);
         height: var(--cube-size);
-        background: linear-gradient(135deg, #ffffff 0%, #e8e8e8 100%);
-        border-radius: 3px;
-        transform: rotateX(51deg) rotateZ(43deg);
-        transform-style: preserve-3d;
-        transition: transform 0.4s ease-in-out, box-shadow 0.4s ease-in-out;
-        box-shadow:
-            calc(var(--cube-size) * 0.11) calc(var(--cube-size) * 0.11) 0 0 #d0d0d0,
-            calc(var(--cube-size) * 0.17) calc(var(--cube-size) * 0.17) 0 0 #c0c0c0,
-            calc(var(--cube-size) * 0.22) calc(var(--cube-size) * 0.22) calc(var(--cube-size) * 0.44) rgba(0,0,0,0.25),
-            calc(var(--cube-size) * 0.33) calc(var(--cube-size) * 0.33) calc(var(--cube-size) * 0.67) rgba(0,0,0,0.15);
-        position: relative;
+        perspective: 600px;
     }
 
-    .animated-cube-icon .cube-card::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: 3px;
-        background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%);
-        transform: translateZ(1px);
-    }
-
-    .animated-cube-icon .cube-card::after {
-        content: '';
-        position: absolute;
-        bottom: calc(var(--cube-size) * -0.22);
-        left: calc(var(--cube-size) * 0.22);
+    .animated-cube-icon .cube {
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.1);
-        border-radius: 3px;
-        transform: rotateX(-90deg) rotateZ(0deg);
-        transform-origin: bottom;
+        position: relative;
+        transform-style: preserve-3d;
+        transform: rotateX(-30deg) rotateY(-45deg);
+        transition: transform 0.4s ease-in-out;
     }
 
-    .animated-cube-icon:hover .cube-card {
-        transform: translate3d(0, calc(var(--cube-size) * -0.89), calc(var(--cube-size) * 0.44)) rotateX(51deg) rotateZ(43deg);
-        box-shadow:
-            calc(var(--cube-size) * 0.11) calc(var(--cube-size) * 0.11) 0 0 #d0d0d0,
-            calc(var(--cube-size) * 0.17) calc(var(--cube-size) * 0.17) 0 0 #c0c0c0,
-            calc(var(--cube-size) * 0.22) calc(var(--cube-size) * 0.22) calc(var(--cube-size) * 0.89) rgba(0,0,0,0.35),
-            calc(var(--cube-size) * 0.44) calc(var(--cube-size) * 0.67) calc(var(--cube-size) * 1.78) rgba(0,0,0,0.25),
-            calc(var(--cube-size) * 0.67) calc(var(--cube-size) * 1.11) calc(var(--cube-size) * 2.67) rgba(0,0,0,0.15);
+    .animated-cube-icon .face {
+        position: absolute;
+        width: var(--cube-size);
+        height: var(--cube-size);
+        border-radius: 3px;
+        backface-visibility: hidden;
+    }
+
+    .animated-cube-icon .face-top {
+        background: linear-gradient(135deg, #ffffff 0%, #e8e8e8 100%);
+        transform: rotateX(90deg) translateZ(calc(var(--cube-size) / 2));
+    }
+
+    .animated-cube-icon .face-bottom {
+        background: linear-gradient(135deg, #b0b0b0 0%, #909090 100%);
+        transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2));
+    }
+
+    .animated-cube-icon .face-front {
+        background: linear-gradient(180deg, #d8d8d8 0%, #c0c0c0 100%);
+        transform: translateZ(calc(var(--cube-size) / 2));
+    }
+
+    .animated-cube-icon .face-back {
+        background: linear-gradient(180deg, #a0a0a0 0%, #888888 100%);
+        transform: translateZ(calc(var(--cube-size) / -2));
+    }
+
+    .animated-cube-icon .face-left {
+        background: linear-gradient(90deg, #c8c8c8 0%, #b0b0b0 100%);
+        transform: rotateY(-90deg) translateZ(calc(var(--cube-size) / 2));
+    }
+
+    .animated-cube-icon .face-right {
+        background: linear-gradient(270deg, #b8b8b8 0%, #a0a0a0 100%);
+        transform: rotateY(90deg) translateZ(calc(var(--cube-size) / 2));
+    }
+
+    .animated-cube-icon:hover .cube {
+        transform: rotateX(-30deg) rotateY(-45deg) translate3d(0, calc(var(--cube-size) * -0.2), 0);
     }
 </style>
 
