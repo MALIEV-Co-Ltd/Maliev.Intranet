@@ -12,18 +12,18 @@
     @if (_editingTitle)
     {
         <MudTextField T="string"
-                      Value="@Title"
-                      ValueChanged="@(async v => { await OnTitleChanged.InvokeAsync(v); _editingTitle = false; })"
+                      Value="@_titleDraft"
+                      ValueChanged="@(v => _titleDraft = v)"
                       Immediate="true"
                       AutoFocus="true"
                       Variant="Variant.Text"
                       Margin="Margin.Dense"
-                      @onblur="@(() => _editingTitle = false)"
+                      @onblur="@CommitTitle"
                       Style="font-weight:600; font-size:14px; min-width:200px;" />
     }
     else
     {
-        <span class="pn-topbar-title" @onclick="@(() => _editingTitle = true)">
+        <span class="pn-topbar-title" @onclick="@(() => { _titleDraft = Title; _editingTitle = true; })">
             @(string.IsNullOrWhiteSpace(Title) ? "Untitled Project" : Title)
         </span>
     }
@@ -101,6 +101,14 @@
     [Parameter] public EventCallback OnDuplicate { get; set; }
 
     private bool _editingTitle;
+    private string _titleDraft = string.Empty;
+
+    private async Task CommitTitle()
+    {
+        _editingTitle = false;
+        if (_titleDraft != Title)
+            await OnTitleChanged.InvokeAsync(_titleDraft);
+    }
 
     private Task<IEnumerable<CurrencyDto>> SearchCurrencies(string value, CancellationToken ct)
     {
@@ -111,7 +119,7 @@
         return Task.FromResult(results);
     }
 
-    private void ToggleLayout() =>
+    private Task ToggleLayout() =>
         OnLayoutModeChanged.InvokeAsync(
             LayoutMode == LayoutMode.Configurator ? LayoutMode.SummaryTable : LayoutMode.Configurator);
 }
