@@ -26,7 +26,7 @@
                     <div class="pqp-lt-card-body">
                         <div class="pqp-lt-name">@opt.Name</div>
                         <div class="pqp-lt-days">
-                            @if (!HasPricedParts)
+                            @if (!_hasPricedParts)
                             {
                                 <MudSkeleton Width="60px" Height="11px" Animation="Animation.Wave" />
                             }
@@ -37,13 +37,13 @@
                         </div>
                     </div>
                     <div class="pqp-lt-price">
-                        @if (!HasPricedParts)
+                        @if (!_hasPricedParts)
                         {
                             <MudSkeleton Width="50px" Height="14px" Animation="Animation.Wave" />
                         }
                         else
                         {
-                            @FormatPrice(Subtotal * opt.PriceMultiplier)
+                            @FormatPrice(_subtotal * opt.PriceMultiplier)
                         }
                     </div>
                 </div>
@@ -104,7 +104,7 @@
     <div class="pqp-totals">
         <div class="pqp-total-row">
             <span>Subtotal</span>
-            <span>@FormatPrice(Subtotal)</span>
+            <span>@FormatPrice(_subtotal)</span>
         </div>
         @if (SelectedLeadTime != null && SelectedLeadTime.PriceMultiplier != 1.0m)
         {
@@ -115,15 +115,15 @@
         }
         <div class="pqp-total-grand">
             <span>Total</span>
-            <span>@FormatPrice(QuoteTotal)</span>
+            <span>@FormatPrice(_quoteTotal)</span>
         </div>
     </div>
 
     @* ── DFM warning banner ──────────────────────────────────────────── *@
-    @if (Parts.Any(p => p.IsManifold == false && !p.DfmAcknowledged))
+    @if (_unacknowledgedDfmCount > 0)
     {
         <MudAlert Severity="Severity.Warning" Class="mt-2" Dense="true">
-            ⚠ @(Parts.Count(p => p.IsManifold == false && !p.DfmAcknowledged)) part(s) have unacknowledged DFM warnings
+            ⚠ @_unacknowledgedDfmCount part(s) have unacknowledged DFM warnings
         </MudAlert>
     }
 
@@ -202,47 +202,70 @@
 </style>
 
 @code {
+    /// <summary>The list of parts in the current project quote.</summary>
     [Parameter] public List<PartViewModel> Parts { get; set; } = [];
+
+    /// <summary>Available lead time options to display and select from.</summary>
     [Parameter] public List<LeadTimeOptionDto> LeadTimeOptions { get; set; } = [];
+
+    /// <summary>The currently selected lead time option, or null if none selected.</summary>
     [Parameter] public LeadTimeOptionDto? SelectedLeadTime { get; set; }
+
+    /// <summary>Callback invoked when the user selects a lead time option.</summary>
     [Parameter] public EventCallback<LeadTimeOptionDto> OnLeadTimeChanged { get; set; }
+
+    /// <summary>The currency used to format all displayed prices.</summary>
     [Parameter] public CurrencyDto? SelectedCurrency { get; set; }
+
+    /// <summary>Whether the Quote button should be enabled.</summary>
     [Parameter] public bool CanQuote { get; set; }
+
+    /// <summary>Whether a quote save operation is currently in progress.</summary>
     [Parameter] public bool Saving { get; set; }
+
+    /// <summary>Callback invoked when the user clicks the Quote button.</summary>
     [Parameter] public EventCallback OnQuote { get; set; }
 
-    /// <summary>Maximum EstimatedLeadTimeDays across all priced parts.</summary>
-    private int MaxLeadTimeDays =>
-        Parts.Where(p => p.EstimatedTotalAmount.HasValue)
-             .Select(p => p.EstimatedLeadTimeDays)
-             .DefaultIfEmpty(0)
-             .Max();
+    private int _maxLeadTimeDays;
+    private bool _hasPricedParts;
+    private decimal _subtotal;
+    private decimal _quoteTotal;
+    private int _unacknowledgedDfmCount;
 
-    private bool HasPricedParts => Parts.Any(p => p.EstimatedTotalAmount.HasValue);
-
-    private decimal Subtotal => Parts.Sum(p => p.EstimatedTotalAmount ?? 0m);
-
-    private decimal QuoteTotal =>
-        SelectedLeadTime == null ? Subtotal : Subtotal * SelectedLeadTime.PriceMultiplier;
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        _maxLeadTimeDays = Parts.Where(p => p.EstimatedTotalAmount.HasValue)
+                                .Select(p => p.EstimatedLeadTimeDays)
+                                .DefaultIfEmpty(0)
+                                .Max();
+        _hasPricedParts = Parts.Any(p => p.EstimatedTotalAmount.HasValue);
+        _subtotal = Parts.Sum(p => p.EstimatedTotalAmount ?? 0m);
+        _quoteTotal = SelectedLeadTime == null ? _subtotal : _subtotal * SelectedLeadTime.PriceMultiplier;
+        _unacknowledgedDfmCount = Parts.Count(p => p.IsManifold == false && !p.DfmAcknowledged);
+    }
 
     /// <summary>
-    /// Derive displayed day range for a lead time option from MaxLeadTimeDays.
+    /// Derive displayed day range for a lead time option from _maxLeadTimeDays.
     /// Falls back to catalog min/max when no parts have been priced yet.
     /// </summary>
     private (int min, int max) GetDisplayDays(LeadTimeOptionDto option)
     {
-        if (MaxLeadTimeDays == 0)
+        if (_maxLeadTimeDays == 0)
             return (option.MinDays, option.MaxDays);
 
         return option.Code.ToUpperInvariant() switch
         {
             "EXPRESS" => (
-                Math.Max((int)Math.Ceiling(MaxLeadTimeDays * 0.6), option.MinDays),
-                Math.Max((int)Math.Ceiling(MaxLeadTimeDays * 0.75), option.MinDays + 1)),
+                Math.Max((int)Math.Ceiling(_maxLeadTimeDays * 0.6), option.MinDays),
+                Math.Max((int)Math.Ceiling(_maxLeadTimeDays * 0.75), option.MinDays + 1)),
             "ECONOMY" => (
-                MaxLeadTimeDays + (int)Math.Ceiling(MaxLeadTimeDays * 0.3),
-                Math.Min(MaxLeadTimeDays + (int)Math.Ceiling(MaxLeadTimeDays * 0.5), option.MaxDays)),
-            _ => (MaxLeadTimeDays, (int)Math.Ceiling(MaxLeadTimeDays * 1.2)) // STANDARD
+                _maxLeadTimeDays + (int)Math.Ceiling(_maxLeadTimeDays * 0.3),
+                Math.Max(
+                    _maxLeadTimeDays + (int)Math.Ceiling(_maxLeadTimeDays * 0.3) + 1,
+                    Math.Min(_maxLeadTimeDays + (int)Math.Ceiling(_maxLeadTimeDays * 0.5), option.MaxDays)
+                )),
+            _ => (_maxLeadTimeDays, (int)Math.Ceiling(_maxLeadTimeDays * 1.2)) // STANDARD
         };
     }
 
