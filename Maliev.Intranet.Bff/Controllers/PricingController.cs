@@ -71,7 +71,7 @@ public class PricingController(IPricingServiceClient pricingClient) : Controller
     public async Task<ActionResult<List<LeadTimeOptionDto>>> GetLeadTimes(CancellationToken ct)
     {
         var result = await pricingClient.GetLeadTimeOptionsAsync(ct);
-        return Ok(result ?? []);
+        return Ok((result ?? []).Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase)).ToList());
     }
 
     /// <summary>
