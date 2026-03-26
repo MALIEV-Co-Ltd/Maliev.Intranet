@@ -46,7 +46,7 @@
     @* Saved status *@
     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mx-2" Style="white-space:nowrap;">
         @if (AutoSaving) { <text>Saving...</text> }
-        else if (LastSavedAt.HasValue) { <text>Saved @LastSavedAt.Value.ToLocalTime().ToString("HH:mm")</text> }
+        else if (LastSavedAt.HasValue) { <text>@GetRelativeTime(LastSavedAt.Value)</text> }
     </MudText>
 
     @* Duplicate button *@
@@ -122,4 +122,13 @@
     private Task ToggleLayout() =>
         OnLayoutModeChanged.InvokeAsync(
             LayoutMode == LayoutMode.Configurator ? LayoutMode.SummaryTable : LayoutMode.Configurator);
+
+    private string GetRelativeTime(DateTimeOffset time)
+    {
+        var diff = DateTimeOffset.Now - time.ToLocalTime();
+        if (diff.TotalMinutes < 1) return "Saved just now";
+        if (diff.TotalMinutes < 60) return $"Saved {(int)diff.TotalMinutes} min ago";
+        if (diff.TotalHours < 24) return $"Saved {(int)diff.TotalHours}h ago";
+        return $"Saved {time.ToLocalTime():dd MMM HH:mm}";
+    }
 }
