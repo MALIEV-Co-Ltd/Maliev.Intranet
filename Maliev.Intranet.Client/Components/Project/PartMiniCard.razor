@@ -1,0 +1,150 @@
+@namespace Maliev.Intranet.Client.Components.Project
+
+<div class="pmc-card @(IsActive ? "pmc-active" : "")" @onclick="OnSelect">
+    <div class="pmc-thumb">
+        @if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && !Part.PreviewLoadFailed)
+        {
+            <img src="@Part.ThumbnailSmallUrl" alt="@Part.Name"
+                 @onerror="@(() => { Part.PreviewLoadFailed = true; StateHasChanged(); })" />
+        }
+        else
+        {
+            <MudIcon Icon="@GetFileIcon(Part.Name)" Size="Size.Medium" Color="Color.Default" />
+        }
+        @* DFM / status badge *@
+        <span class="pmc-badge @GetBadgeClass()">@GetBadgeText()</span>
+    </div>
+    <div class="pmc-info">
+        <MudTooltip Text="@Part.Name">
+            <div class="pmc-name">@Part.Name</div>
+        </MudTooltip>
+        <div class="pmc-qp">
+            ×@Part.Quantity
+            @if (Part.PricingLoading) { <MudSkeleton Width="50px" Height="12px" /> }
+            else if (Part.EstimatedTotalAmount.HasValue) { <text> · @FormatPrice(Part.EstimatedTotalAmount.Value)</text> }
+        </div>
+        @if (!string.IsNullOrEmpty(Part.ProcessCode))
+        {
+            <div class="pmc-process">@Part.ProcessCode</div>
+        }
+    </div>
+    <span class="pmc-remove" @onclick:stopPropagation="true">
+        <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                       Size="Size.Small"
+                       Color="Color.Error"
+                       OnClick="@(() => OnRemove.InvokeAsync())"
+                       Disabled="@Part.Uploading" />
+    </span>
+</div>
+
+<style>
+    .pmc-card {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        background: var(--mud-palette-surface);
+        cursor: pointer;
+        min-width: 200px;
+        max-width: 240px;
+        flex-shrink: 0;
+        position: relative;
+        transition: border-color 0.15s;
+    }
+    .pmc-card:hover { border-color: var(--mud-palette-primary-hover); }
+    .pmc-active { border-color: var(--mud-palette-primary) !important; }
+    .pmc-thumb {
+        width: 48px;
+        height: 48px;
+        border-radius: 4px;
+        background: var(--mud-palette-background-grey);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        flex-shrink: 0;
+        position: relative;
+    }
+    .pmc-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .pmc-badge {
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        font-size: 9px;
+        padding: 1px 3px;
+        border-radius: 3px;
+        line-height: 1.2;
+    }
+    .pmc-badge-uploading { background: #e0e0e0; color: #616161; }
+    .pmc-badge-warning { background: #fff3cd; color: #856404; }
+    .pmc-badge-ok { background: #d4edda; color: #155724; }
+    .pmc-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .pmc-name {
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pmc-qp {
+        font-size: 11px;
+        color: var(--mud-palette-text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .pmc-process {
+        font-size: 10px;
+        color: var(--mud-palette-text-disabled);
+    }
+    .pmc-remove {
+        opacity: 0;
+        transition: opacity 0.15s;
+        position: absolute;
+        top: 2px;
+        right: 2px;
+    }
+    .pmc-card:hover .pmc-remove { opacity: 1; }
+</style>
+
+@code {
+    [Parameter] public PartViewModel Part { get; set; } = null!;
+    [Parameter] public bool IsActive { get; set; }
+    [Parameter] public EventCallback OnSelect { get; set; }
+    [Parameter] public EventCallback OnRemove { get; set; }
+
+    private string GetBadgeClass() =>
+        Part.Uploading ? "pmc-badge-uploading" :
+        Part.IsManifold == false ? "pmc-badge-warning" :
+        "pmc-badge-ok";
+
+    private string GetBadgeText() =>
+        Part.Uploading ? "↑" :
+        Part.IsManifold == false ? "⚠" :
+        Part.ThumbnailSmallUrl != null ? "✓" :
+        "…";
+
+    private string FormatPrice(decimal amount) => $"฿{amount:N0}";
+
+    private static string GetFileIcon(string name) =>
+        Path.GetExtension(name).ToLowerInvariant() switch
+        {
+            ".stl" or ".step" or ".stp" or ".3mf" or ".obj" or ".igs" or ".iges"
+            or ".blend" or ".fbx" or ".gltf" or ".glb" => Icons.Material.Outlined.ViewInAr,
+            ".pdf" => Icons.Material.Outlined.PictureAsPdf,
+            ".dxf" or ".dwg" => Icons.Material.Outlined.Architecture,
+            ".png" or ".jpg" or ".jpeg" or ".tiff" or ".bmp" or ".webp" => Icons.Material.Outlined.Image,
+            ".doc" or ".docx" => Icons.Material.Outlined.Description,
+            ".xls" or ".xlsx" => Icons.Material.Outlined.TableChart,
+            ".zip" or ".rar" or ".7z" => Icons.Material.Outlined.FolderZip,
+            _ => Icons.Material.Outlined.InsertDriveFile,
+        };
+}
