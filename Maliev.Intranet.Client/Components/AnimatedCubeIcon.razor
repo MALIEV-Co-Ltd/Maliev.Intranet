@@ -1,0 +1,88 @@
+@namespace Maliev.Intranet.Client.Components
+
+<span class="animated-cube-icon @Class"
+      style="cursor:pointer; --cube-size:@(Size)px;"
+      title="View in 3D"
+      @onclick="OnClickHandler">
+    <span class="cube-card"></span>
+</span>
+
+<style>
+    .animated-cube-icon {
+        display: inline-flex;
+        align-items: center;
+        perspective: 600px;
+    }
+
+    .animated-cube-icon .cube-card {
+        width: var(--cube-size);
+        height: var(--cube-size);
+        background: linear-gradient(135deg, #ffffff 0%, #e8e8e8 100%);
+        border-radius: 3px;
+        transform: rotateX(51deg) rotateZ(43deg);
+        transform-style: preserve-3d;
+        transition: transform 0.4s ease-in-out, box-shadow 0.4s ease-in-out;
+        box-shadow:
+            calc(var(--cube-size) * 0.11) calc(var(--cube-size) * 0.11) 0 0 #d0d0d0,
+            calc(var(--cube-size) * 0.17) calc(var(--cube-size) * 0.17) 0 0 #c0c0c0,
+            calc(var(--cube-size) * 0.22) calc(var(--cube-size) * 0.22) calc(var(--cube-size) * 0.44) rgba(0,0,0,0.25),
+            calc(var(--cube-size) * 0.33) calc(var(--cube-size) * 0.33) calc(var(--cube-size) * 0.67) rgba(0,0,0,0.15);
+        position: relative;
+    }
+
+    .animated-cube-icon .cube-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 3px;
+        background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%);
+        transform: translateZ(1px);
+    }
+
+    .animated-cube-icon .cube-card::after {
+        content: '';
+        position: absolute;
+        bottom: calc(var(--cube-size) * -0.22);
+        left: calc(var(--cube-size) * 0.22);
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 3px;
+        transform: rotateX(-90deg) rotateZ(0deg);
+        transform-origin: bottom;
+    }
+
+    .animated-cube-icon:hover .cube-card {
+        transform: translate3d(0, calc(var(--cube-size) * -0.89), calc(var(--cube-size) * 0.44)) rotateX(51deg) rotateZ(43deg);
+        box-shadow:
+            calc(var(--cube-size) * 0.11) calc(var(--cube-size) * 0.11) 0 0 #d0d0d0,
+            calc(var(--cube-size) * 0.17) calc(var(--cube-size) * 0.17) 0 0 #c0c0c0,
+            calc(var(--cube-size) * 0.22) calc(var(--cube-size) * 0.22) calc(var(--cube-size) * 0.89) rgba(0,0,0,0.35),
+            calc(var(--cube-size) * 0.44) calc(var(--cube-size) * 0.67) calc(var(--cube-size) * 1.78) rgba(0,0,0,0.25),
+            calc(var(--cube-size) * 0.67) calc(var(--cube-size) * 1.11) calc(var(--cube-size) * 2.67) rgba(0,0,0,0.15);
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Icon size in pixels (default: 22 to match button context).
+    /// </summary>
+    [Parameter] public int Size { get; set; } = 22;
+
+    /// <summary>
+    /// Additional CSS classes for the container span.
+    /// </summary>
+    [Parameter] public string Class { get; set; } = "";
+
+    /// <summary>
+    /// Click event callback.
+    /// </summary>
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private Task OnClickHandler()
+    {
+        if (OnClick.HasDelegate)
+            return OnClick.InvokeAsync();
+        return Task.CompletedTask;
+    }
+}
