@@ -83,7 +83,10 @@ public partial class ProjectNew : IAsyncDisposable
         !_titleHasError &&
         !_descriptionHasError &&
         _selectedLeadTime != null &&
-        !_parts.Any(p => p.Uploading || p.PricingLoading);
+        _parts.Count > 0 &&
+        !_parts.Any(p => p.Uploading || p.PricingLoading) &&
+        _parts.All(p => p.IsFullyConfigured && !p.PricingFailed) &&
+        _parts.All(p => p.IsManifold != false || p.DfmAcknowledged);
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
@@ -118,9 +121,7 @@ public partial class ProjectNew : IAsyncDisposable
         var leadTimesResult = leadTimesTask.Result;
         if (leadTimesResult is { Count: > 0 })
         {
-            _leadTimeOptions = leadTimesResult
-                .Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            _leadTimeOptions = leadTimesResult;
             _selectedLeadTime ??= _leadTimeOptions.FirstOrDefault(lt => lt.IsDefault) ?? _leadTimeOptions.First();
         }
 

@@ -124,8 +124,14 @@
     @* ── DFM warning banner ──────────────────────────────────────────── *@
     @if (_unacknowledgedDfmCount > 0)
     {
-        <MudAlert Severity="Severity.Warning" Class="mt-2" Dense="true">
-            ⚠ @_unacknowledgedDfmCount part(s) have unacknowledged DFM warnings
+        <MudAlert Severity="Severity.Warning" Class="mt-2" Dense="true" Icon="@Icons.Material.Outlined.Warning">
+            @_unacknowledgedDfmCount part(s) have unacknowledged DFM warnings
+        </MudAlert>
+    }
+    else if (_dfmAcknowledgedCount > 0)
+    {
+        <MudAlert Severity="Severity.Success" Class="mt-2" Dense="true" Icon="@Icons.Material.Outlined.CheckCircle">
+            All DFM warnings acknowledged
         </MudAlert>
     }
 
@@ -240,6 +246,7 @@
     private decimal _subtotal;
     private decimal _quoteTotal;
     private int _unacknowledgedDfmCount;
+    private int _dfmAcknowledgedCount;
 
     /// <inheritdoc />
     protected override void OnParametersSet()
@@ -252,6 +259,7 @@
         _subtotal = Parts.Sum(p => p.EstimatedTotalAmount ?? 0m);
         _quoteTotal = SelectedLeadTime == null ? _subtotal : _subtotal * SelectedLeadTime.PriceMultiplier;
         _unacknowledgedDfmCount = Parts.Count(p => p.IsManifold == false && !p.DfmAcknowledged);
+        _dfmAcknowledgedCount = Parts.Count(p => p.IsManifold == false && p.DfmAcknowledged);
     }
 
     /// <summary>
