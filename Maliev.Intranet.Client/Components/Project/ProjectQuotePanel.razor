@@ -1,0 +1,13 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Shared.Dtos
+@* Placeholder — implemented in Task 9 *@
+@code {
+    [Parameter] public List<PartViewModel> Parts { get; set; } = [];
+    [Parameter] public List<LeadTimeOptionDto> LeadTimeOptions { get; set; } = [];
+    [Parameter] public LeadTimeOptionDto? SelectedLeadTime { get; set; }
+    [Parameter] public EventCallback<LeadTimeOptionDto> OnLeadTimeChanged { get; set; }
+    [Parameter] public CurrencyDto? SelectedCurrency { get; set; }
+    [Parameter] public bool CanQuote { get; set; }
+    [Parameter] public bool Saving { get; set; }
+    [Parameter] public EventCallback OnQuote { get; set; }
+}

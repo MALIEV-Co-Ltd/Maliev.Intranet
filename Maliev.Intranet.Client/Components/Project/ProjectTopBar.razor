@@ -1,0 +1,15 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Shared.Dtos
+@* Placeholder — implemented in Task 5 *@
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OnTitleChanged { get; set; }
+    [Parameter] public CurrencyDto? SelectedCurrency { get; set; }
+    [Parameter] public List<CurrencyDto> Currencies { get; set; } = [];
+    [Parameter] public EventCallback<CurrencyDto?> OnCurrencyChanged { get; set; }
+    [Parameter] public DateTimeOffset? LastSavedAt { get; set; }
+    [Parameter] public bool AutoSaving { get; set; }
+    [Parameter] public LayoutMode LayoutMode { get; set; }
+    [Parameter] public EventCallback<LayoutMode> OnLayoutModeChanged { get; set; }
+    [Parameter] public EventCallback OnDuplicate { get; set; }
+}

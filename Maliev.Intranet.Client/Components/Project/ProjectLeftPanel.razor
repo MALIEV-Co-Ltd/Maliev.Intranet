@@ -1,0 +1,22 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Shared.Dtos
+@* Placeholder — implemented in Task 4 *@
+@code {
+    [Parameter] public CustomerSummaryDto? SelectedCustomer { get; set; }
+    [Parameter] public bool ShowCustomerSearch { get; set; }
+    [Parameter] public EventCallback<CustomerSummaryDto?> OnCustomerSelected { get; set; }
+    [Parameter] public EventCallback<bool> OnShowSearchChanged { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OnTitleChanged { get; set; }
+    [Parameter] public bool TitleHasError { get; set; }
+    [Parameter] public string? TitleError { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public EventCallback<string?> OnDescriptionChanged { get; set; }
+    [Parameter] public bool DescriptionHasError { get; set; }
+    [Parameter] public string? DescriptionError { get; set; }
+    [Parameter] public bool DragOver { get; set; }
+    [Parameter] public EventCallback OnDragEnter { get; set; }
+    [Parameter] public EventCallback OnDragLeave { get; set; }
+    [Parameter] public EventCallback OnOpenFilePicker { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IEnumerable<CustomerSummaryDto>>>? SearchCustomersFunc { get; set; }
+}

@@ -1,0 +1,9 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@* Placeholder — implemented in Task 6 *@
+@code {
+    [Parameter] public List<PartViewModel> Parts { get; set; } = [];
+    [Parameter] public int SelectedIndex { get; set; }
+    [Parameter] public EventCallback<int> OnSelectPart { get; set; }
+    [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
+    [Parameter] public EventCallback OnAddPart { get; set; }
+}
