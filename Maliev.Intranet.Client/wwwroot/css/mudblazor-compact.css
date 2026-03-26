@@ -4,6 +4,16 @@
    Loaded AFTER MudBlazor.min.css, BEFORE app.css.
    Makes all MudBlazor components match the compact reference
    design for efficient, data-dense workspace.
+
+   IMPORTANT: Typography values use CSS variables from the
+   MudBlazor theme (ThemeConfiguration.cs):
+   - --mud-typography-default-size: 13px   (Body1, Default)
+   - --mud-typography-body1-size: 13px
+   - --mud-typography-body2-size: 12px
+   - --mud-typography-caption-size: 11px
+   - --mud-typography-subtitle1-size: 14px
+   - --mud-typography-subtitle2-size: 13px
+   - --mud-typography-button-size: 13px
    ============================================================ */
 
 /* ── Design Tokens ──────────────────────────────────────────── */
@@ -12,6 +22,7 @@
     --maliev-radius-md: 10px;
     --maliev-radius-lg: 14px;
     --maliev-shadow-card: 0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+    /* Typography micro/nano are intentional exceptions - tiny UI elements */
     --maliev-typography-micro-size: 10px; /* Sub-caption: badges, tertiary metadata */
     --maliev-typography-nano-size: 9px;   /* Tiny: ext badges, dfm zone labels */
 }
@@ -24,7 +35,8 @@
 
 .mud-input.mud-input-text .mud-input-slot {
     padding: 7px 9px;
-    font-size: 12px;
+    /* Typography: use theme default size (13px) instead of hardcoded value */
+    font-size: var(--mud-typography-default-size);
     min-height: unset;
 }
 
@@ -45,19 +57,23 @@
 }
 
 .mud-input-label {
-    font-size: 12px;
+    /* Typography: use theme default size (13px) instead of hardcoded value */
+    font-size: var(--mud-typography-default-size);
 }
 
 .mud-input-label-inputcontrol {
-    font-size: 12px;
+    /* Typography: use theme default size (13px) instead of hardcoded value */
+    font-size: var(--mud-typography-default-size);
 }
 
 .mud-shrink {
-    font-size: 11px;
+    /* Typography: use body2 size (12px) for floating label - slightly smaller than default */
+    font-size: var(--mud-typography-body2-size);
 }
 
 .mud-input-helper-text {
-    font-size: 10px;
+    /* Typography: use caption size (11px) for helper text - supporting info */
+    font-size: var(--mud-typography-caption-size);
     margin-top: 2px;
 }
 
@@ -69,12 +85,14 @@
 /* Select / Autocomplete dropdown items */
 .mud-list-item {
     padding: 5px 7px;
-    font-size: 12px;
+    /* Typography: use theme default size (13px) instead of hardcoded value */
+    font-size: var(--mud-typography-default-size);
     min-height: unset;
 }
 
 .mud-list-item .mud-list-item-text {
-    font-size: 12px;
+    /* Typography: use theme default size (13px) instead of hardcoded value */
+    font-size: var(--mud-typography-default-size);
 }
 
 /* ================================================================
@@ -84,7 +102,8 @@
 
 .mud-button-root {
     padding: 5px 12px;
-    font-size: 13px;
+    /* Typography: use theme button size instead of hardcoded value */
+    font-size: var(--mud-typography-button-size);
     font-weight: 600;
     border-radius: var(--maliev-radius-sm);
     min-width: unset;
@@ -94,12 +113,14 @@
 
 .mud-button-root.mud-button-size-small {
     padding: 3px 8px;
-    font-size: 11px;
+    /* Typography: use caption size for small buttons */
+    font-size: var(--mud-typography-caption-size);
 }
 
 .mud-button-root.mud-button-size-large {
     padding: 7px 16px;
-    font-size: 14px;
+    /* Typography: use subtitle1 size for large buttons */
+    font-size: var(--mud-typography-subtitle1-size);
 }
 
 .mud-icon-button-root {
@@ -130,7 +151,8 @@
 
 .mud-tab {
     padding: 9px 12px;
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
     min-width: unset;
     text-transform: none;
 }
@@ -141,24 +163,28 @@
    ================================================================ */
 
 .mud-table-root {
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
     border: 1px solid var(--mud-palette-lines-default);
 }
 
 .mud-table-head .mud-table-cell {
     padding: 6px 8px;
-    font-size: 11px;
+    /* Typography: use caption size for table headers */
+    font-size: var(--mud-typography-caption-size);
     font-weight: 600;
 }
 
 .mud-table-body .mud-table-cell {
     padding: 4px 8px;
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
 }
 
 .mud-table-foot .mud-table-cell {
     padding: 4px 8px;
-    font-size: 11px;
+    /* Typography: use caption size for table footers */
+    font-size: var(--mud-typography-caption-size);
 }
 
 .mud-table-row {
@@ -174,7 +200,8 @@
 }
 
 .mud-table-pagination {
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
     padding: 4px 8px;
 }
 
@@ -183,7 +210,8 @@
 }
 
 .mud-table-sort-label {
-    font-size: 11px;
+    /* Typography: use caption size for sort labels */
+    font-size: var(--mud-typography-caption-size);
 }
 
 /* ================================================================
@@ -223,7 +251,8 @@
 }
 
 .mud-alert-message {
-    font-size: 11px;
+    /* Typography: use caption size for alert messages */
+    font-size: var(--mud-typography-caption-size);
 }
 
 .mud-alert-icon {
@@ -239,7 +268,8 @@
 
 .mud-chip {
     padding: 2px 7px;
-    font-size: 10px;
+    /* Typography: use micro size for chips - intentional small size */
+    font-size: var(--maliev-typography-micro-size);
     height: auto;
     border-radius: 99px;
 }
@@ -263,7 +293,8 @@
 
 .mud-dialog .mud-dialog-title {
     padding: 12px 16px;
-    font-size: 14px;
+    /* Typography: use subtitle1 size (14px) instead of hardcoded value */
+    font-size: var(--mud-typography-subtitle1-size);
     font-weight: 600;
 }
 
@@ -285,11 +316,13 @@
 }
 
 .mud-breadcrumb-item {
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
 }
 
 .mud-breadcrumb-separator {
-    font-size: 11px;
+    /* Typography: use caption size for separators */
+    font-size: var(--mud-typography-caption-size);
 }
 
 /* ================================================================
@@ -299,7 +332,8 @@
 
 .mud-menu-item {
     padding: 5px 10px;
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
     min-height: unset;
 }
 
@@ -313,11 +347,13 @@
 }
 
 .mud-checkbox .mud-typography {
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
 }
 
 .mud-switch .mud-typography {
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
 }
 
 /* ================================================================
@@ -326,7 +362,8 @@
    ================================================================ */
 
 .mud-picker .mud-picker-input-text {
-    font-size: 12px;
+    /* Typography: use theme default size (13px) instead of hardcoded value */
+    font-size: var(--mud-typography-default-size);
 }
 
 /* ================================================================
@@ -336,7 +373,8 @@
 
 .mud-snackbar {
     padding: 8px 12px;
-    font-size: 12px;
+    /* Typography: use body2 size (12px) instead of hardcoded value */
+    font-size: var(--mud-typography-body2-size);
     border-radius: var(--maliev-radius-sm);
 }
 
@@ -346,7 +384,8 @@
    ================================================================ */
 
 .mud-badge-content {
-    font-size: 9px;
+    /* Typography: use nano size for badges - intentional tiny size */
+    font-size: var(--maliev-typography-nano-size);
 }
 
 /* ================================================================
@@ -363,7 +402,8 @@
    ================================================================ */
 
 .mud-tooltip {
-    font-size: 11px;
+    /* Typography: use caption size for tooltips */
+    font-size: var(--mud-typography-caption-size);
     padding: 4px 8px;
     border-radius: var(--maliev-radius-sm);
 }
@@ -374,7 +414,8 @@
 
 .mud-nav-link {
     padding: 6px 12px;
-    font-size: 13px;
+    /* Typography: use theme default size (13px) instead of hardcoded value */
+    font-size: var(--mud-typography-default-size);
 }
 
 /* ================================================================
@@ -383,7 +424,8 @@
    ================================================================ */
 
 .section-title {
-    font-size: 11px;
+    /* Typography: use caption size for section labels */
+    font-size: var(--mud-typography-caption-size);
     text-transform: uppercase;
     font-weight: 600;
     letter-spacing: 0.5px;

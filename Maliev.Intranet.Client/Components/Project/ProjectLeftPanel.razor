@@ -188,9 +188,11 @@
     .pnl-upload-section {
         flex-shrink: 0;
     }
+    /* MudBlazor autocomplete - use theme default typography size (13px) */
+    /* Ensures label and input text matches the compact design */
     .pnl-left .mud-autocomplete .mud-input-control-input-control,
     .pnl-left .mud-autocomplete .mud-input-label {
-        font-size: var(--mud-typography-body1-size, 1rem);
+        font-size: var(--mud-typography-default-size);
     }
     .pnl-dropzone {
         border: 2px dashed var(--mud-palette-lines-default);
