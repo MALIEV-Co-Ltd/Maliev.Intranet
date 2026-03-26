@@ -20,7 +20,7 @@
                 <img src="@Part.ThumbnailLargeUrl"
                      class="pdc-thumb-sharp pdc-thumb-fade-in"
                      alt="@Part.Name"
-                     @onerror="@(() => { Part.PreviewLoadFailed = true; StateHasChanged(); })" />
+                     @onerror="@(() => NotifyChanged(p => p.PreviewLoadFailed = true))" />
             }
 
             @* Fallback grey background — no preview *@
@@ -339,5 +339,5 @@
         });
 
     private void OnQuantityChanged(int qty) =>
-        NotifyChanged(p => p.Quantity = Math.Max(1, qty));
+        NotifyChanged(p => p.Quantity = Math.Clamp(qty, 1, 999));
 }
