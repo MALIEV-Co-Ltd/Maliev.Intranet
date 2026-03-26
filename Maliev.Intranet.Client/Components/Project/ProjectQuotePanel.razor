@@ -1,6 +1,206 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
-@* Placeholder — implemented in Task 9 *@
+
+<div class="pqp-root">
+    <MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="mb-2">Project Quote</MudText>
+
+    @* ── Lead Time Options ─────────────────────────────────────────── *@
+    <MudText Typo="Typo.caption" Color="Color.Secondary"
+             Style="text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">
+        Lead Time
+    </MudText>
+
+    @if (LeadTimeOptions.Count == 0)
+    {
+        <MudSkeleton Height="60px" Width="100%" Animation="Animation.Wave" Class="mt-1 mb-3" />
+    }
+    else
+    {
+        <div class="pqp-lt-options mt-1 mb-3">
+            @foreach (var opt in LeadTimeOptions)
+            {
+                var (dMin, dMax) = GetDisplayDays(opt);
+                var isSelected = SelectedLeadTime?.Code == opt.Code;
+                <div class="pqp-lt-card @(isSelected ? "pqp-lt-selected" : "")"
+                     @onclick="@(() => OnLeadTimeChanged.InvokeAsync(opt))">
+                    <div class="pqp-lt-card-body">
+                        <div class="pqp-lt-name">@opt.Name</div>
+                        <div class="pqp-lt-days">
+                            @if (!HasPricedParts)
+                            {
+                                <MudSkeleton Width="60px" Height="11px" Animation="Animation.Wave" />
+                            }
+                            else
+                            {
+                                <text>@dMin–@dMax business days</text>
+                            }
+                        </div>
+                    </div>
+                    <div class="pqp-lt-price">
+                        @if (!HasPricedParts)
+                        {
+                            <MudSkeleton Width="50px" Height="14px" Animation="Animation.Wave" />
+                        }
+                        else
+                        {
+                            @FormatPrice(Subtotal * opt.PriceMultiplier)
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <MudDivider Class="mb-2" />
+
+    @* ── Per-part summary rows ──────────────────────────────────────── *@
+    <MudText Typo="Typo.caption" Color="Color.Secondary"
+             Style="text-transform:uppercase;letter-spacing:0.5px;font-weight:600;" Class="mb-1">
+        Summary
+    </MudText>
+
+    @if (Parts.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="py-3" Style="text-align:center;">
+            Add and configure parts to see pricing
+        </MudText>
+    }
+    else
+    {
+        @foreach (var part in Parts)
+        {
+            <div class="pqp-part-row">
+                <MudTooltip Text="@part.Name">
+                    <span class="pqp-part-name">@part.Name</span>
+                </MudTooltip>
+                <span class="pqp-part-qty">×@part.Quantity</span>
+                <span class="pqp-part-price">
+                    @if (part.PricingLoading)
+                    {
+                        <MudSkeleton Width="55px" Height="12px" Animation="Animation.Wave" />
+                    }
+                    else if (part.PricingFailed)
+                    {
+                        <MudTooltip Text="Pricing failed — will retry on next config change">
+                            <MudIcon Icon="@Icons.Material.Outlined.Warning" Size="Size.Small" Color="Color.Warning" />
+                        </MudTooltip>
+                    }
+                    else if (part.EstimatedTotalAmount.HasValue)
+                    {
+                        @FormatPrice(part.EstimatedTotalAmount.Value)
+                    }
+                    else
+                    {
+                        <text>—</text>
+                    }
+                </span>
+            </div>
+        }
+    }
+
+    <MudDivider Class="my-2" />
+
+    @* ── Totals ──────────────────────────────────────────────────────── *@
+    <div class="pqp-totals">
+        <div class="pqp-total-row">
+            <span>Subtotal</span>
+            <span>@FormatPrice(Subtotal)</span>
+        </div>
+        @if (SelectedLeadTime != null && SelectedLeadTime.PriceMultiplier != 1.0m)
+        {
+            <div class="pqp-total-row">
+                <span>Lead time adjustment</span>
+                <span>×@SelectedLeadTime.PriceMultiplier.ToString("N2")</span>
+            </div>
+        }
+        <div class="pqp-total-grand">
+            <span>Total</span>
+            <span>@FormatPrice(QuoteTotal)</span>
+        </div>
+    </div>
+
+    @* ── DFM warning banner ──────────────────────────────────────────── *@
+    @if (Parts.Any(p => p.IsManifold == false && !p.DfmAcknowledged))
+    {
+        <MudAlert Severity="Severity.Warning" Class="mt-2" Dense="true">
+            ⚠ @(Parts.Count(p => p.IsManifold == false && !p.DfmAcknowledged)) part(s) have unacknowledged DFM warnings
+        </MudAlert>
+    }
+
+    @* ── Quote button ────────────────────────────────────────────────── *@
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               FullWidth="true"
+               Class="mt-3"
+               Disabled="@(!CanQuote)"
+               OnClick="OnQuote">
+        @if (Saving)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            <text>Creating...</text>
+        }
+        else
+        {
+            <text>Quote</text>
+        }
+    </MudButton>
+</div>
+
+<style>
+    .pqp-root {
+        width: 280px;
+        min-width: 280px;
+        height: 100%;
+        overflow-y: auto;
+        background: var(--mud-palette-surface);
+        border-left: 1px solid var(--mud-palette-lines-default);
+        display: flex;
+        flex-direction: column;
+        padding: 14px;
+        flex-shrink: 0;
+    }
+    .pqp-lt-options {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .pqp-lt-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .pqp-lt-card:hover { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-hover); }
+    .pqp-lt-selected { border-color: var(--mud-palette-primary) !important; background: var(--mud-palette-primary-hover); }
+    .pqp-lt-card-body { display: flex; flex-direction: column; gap: 2px; }
+    .pqp-lt-name { font-size: 13px; font-weight: 600; }
+    .pqp-lt-days { font-size: 11px; color: var(--mud-palette-text-secondary); }
+    .pqp-lt-price { font-size: 13px; font-weight: 500; }
+    .pqp-part-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 0;
+        font-size: 12px;
+    }
+    .pqp-part-name {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pqp-part-qty { color: var(--mud-palette-text-secondary); flex-shrink: 0; }
+    .pqp-part-price { flex-shrink: 0; font-weight: 500; }
+    .pqp-totals { display: flex; flex-direction: column; gap: 4px; }
+    .pqp-total-row { display: flex; justify-content: space-between; font-size: 12px; }
+    .pqp-total-grand { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-top: 4px; }
+</style>
+
 @code {
     [Parameter] public List<PartViewModel> Parts { get; set; } = [];
     [Parameter] public List<LeadTimeOptionDto> LeadTimeOptions { get; set; } = [];
@@ -10,4 +210,42 @@
     [Parameter] public bool CanQuote { get; set; }
     [Parameter] public bool Saving { get; set; }
     [Parameter] public EventCallback OnQuote { get; set; }
+
+    /// <summary>Maximum EstimatedLeadTimeDays across all priced parts.</summary>
+    private int MaxLeadTimeDays =>
+        Parts.Where(p => p.EstimatedTotalAmount.HasValue)
+             .Select(p => p.EstimatedLeadTimeDays)
+             .DefaultIfEmpty(0)
+             .Max();
+
+    private bool HasPricedParts => Parts.Any(p => p.EstimatedTotalAmount.HasValue);
+
+    private decimal Subtotal => Parts.Sum(p => p.EstimatedTotalAmount ?? 0m);
+
+    private decimal QuoteTotal =>
+        SelectedLeadTime == null ? Subtotal : Subtotal * SelectedLeadTime.PriceMultiplier;
+
+    /// <summary>
+    /// Derive displayed day range for a lead time option from MaxLeadTimeDays.
+    /// Falls back to catalog min/max when no parts have been priced yet.
+    /// </summary>
+    private (int min, int max) GetDisplayDays(LeadTimeOptionDto option)
+    {
+        if (MaxLeadTimeDays == 0)
+            return (option.MinDays, option.MaxDays);
+
+        return option.Code.ToUpperInvariant() switch
+        {
+            "EXPRESS" => (
+                Math.Max((int)Math.Ceiling(MaxLeadTimeDays * 0.6), option.MinDays),
+                Math.Max((int)Math.Ceiling(MaxLeadTimeDays * 0.75), option.MinDays + 1)),
+            "ECONOMY" => (
+                MaxLeadTimeDays + (int)Math.Ceiling(MaxLeadTimeDays * 0.3),
+                Math.Min(MaxLeadTimeDays + (int)Math.Ceiling(MaxLeadTimeDays * 0.5), option.MaxDays)),
+            _ => (MaxLeadTimeDays, (int)Math.Ceiling(MaxLeadTimeDays * 1.2)) // STANDARD
+        };
+    }
+
+    private string FormatPrice(decimal amount) =>
+        $"{SelectedCurrency?.Symbol ?? "฿"}{amount:N2}";
 }
