@@ -32,9 +32,9 @@
                             <div class="d-flex flex-column flex-grow-1 min-width-0">
                                 <MudText Typo="Typo.body2" Style="font-weight: 700;" Class="text-truncate">@doc.FileName</MudText>
                                 <div class="d-flex align-center gap-2">
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(doc.FileSize)</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">•</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(doc.FileSize)</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">•</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
                                 </div>
                             </div>
                             <div class="flex-none d-flex align-center">
@@ -68,7 +68,7 @@
                             <MudAvatar Size="Size.Small" Color="Color.Primary" Style="width: 16px; height: 16px; font-size: 0.6rem;">
                                 @((SelectedDocument.CreatedByName ?? "S")[0])
                             </MudAvatar>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <MudText Typo="Typo.caption" Color="Color.Default">
                                 Uploaded by @(SelectedDocument.CreatedByName ?? "System") • @SelectedDocument.CreatedAt.ToLocalTime().ToString("g")
                             </MudText>
                         </MudStack>
@@ -100,7 +100,7 @@
                         <div class="d-flex flex-column align-center justify-center pa-12 text-center">
                             <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Large" Color="Color.Default" Class="mb-4 opacity-50" />
                             <MudText Typo="Typo.h6">Preview not available</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">This file type (@Path.GetExtension(SelectedDocument.FileName)) cannot be previewed in the browser.</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-6">This file type (@Path.GetExtension(SelectedDocument.FileName)) cannot be previewed in the browser.</MudText>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => OnDownload.InvokeAsync(SelectedDocument.FileReference))">
                                 Download to View
                             </MudButton>

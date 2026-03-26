@@ -76,7 +76,7 @@
 {
     <MudPaper Elevation="0" Class="ma-4 border-solid border-1 mud-border-lines-default">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
-            <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" Color="Color.Secondary" />
+            <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" Color="Color.Default" />
             <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">Activity</MudText>
             @if (_noteActivity.Count > 0)
             {
@@ -115,9 +115,9 @@
                                     <MudStack Spacing="0">
                                         <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
                                             <MudText Typo="Typo.caption" Style="font-weight: 700;">@actorName</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@action</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">@action</MudText>
                                             <MudSpacer />
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatTimeAgo(timestamp)</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">@FormatTimeAgo(timestamp)</MudText>
                                         </MudStack>
                                         @if (type == "Comment")
                                         {

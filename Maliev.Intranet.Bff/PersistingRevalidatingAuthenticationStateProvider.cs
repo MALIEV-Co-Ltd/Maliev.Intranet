@@ -39,13 +39,7 @@ public class PersistingRevalidatingAuthenticationStateProvider : RevalidatingSer
         var user = authenticationState.User;
         if (user.Identity?.IsAuthenticated == true)
         {
-            // If authenticated but enrichment failed (no roles/permissions), 
-            // force revalidation/sign-out
-            var hasRoles = user.HasClaim(c => c.Type is "roles" or "role" or "permissions" or "permission");
-            if (!hasRoles)
-            {
-                return Task.FromResult(false);
-            }
+            return Task.FromResult(true);
         }
 
         return Task.FromResult(true);

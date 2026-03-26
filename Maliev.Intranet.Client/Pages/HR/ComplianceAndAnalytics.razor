@@ -9,8 +9,8 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
     <div>
-        <MudText Typo="Typo.h4">Compliance &amp; Analytics</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Work authorizations, document compliance, and HR analytics</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">Compliance &amp; Analytics</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Work authorizations, document compliance, and HR analytics</MudText>
     </div>
 </MudStack>
 
@@ -45,7 +45,7 @@
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total Active</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Total Active</MudText>
                         <MudText Typo="Typo.h5" Class="mt-2">@_complianceStats.TotalActive</MudText>
                     </MudPaper>
                 </MudItem>
@@ -80,7 +80,7 @@
                         </TemplateColumn>
                     </Columns>
                     <NoRecordsContent>
-                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No compliance records found</MudText>
+                        <MudText Class="pa-4 text-center" Color="Color.Default">No compliance records found</MudText>
                     </NoRecordsContent>
                 </MudDataGrid>
             </MudPaper>
@@ -102,25 +102,25 @@
             <MudGrid>
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total Headcount</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Total Headcount</MudText>
                         <MudText Typo="Typo.h4" Class="mt-2">@_analytics.TotalHeadcount</MudText>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Active Employees</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Active Employees</MudText>
                         <MudText Typo="Typo.h4" Class="mt-2" Color="Color.Success">@_analytics.ActiveEmployees</MudText>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">In Onboarding</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">In Onboarding</MudText>
                         <MudText Typo="Typo.h4" Class="mt-2" Color="Color.Info">@_analytics.OnboardingCount</MudText>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Turnover Rate</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Turnover Rate</MudText>
                         <MudText Typo="Typo.h4" Class="mt-2" Color="Color.Warning">@_analytics.TurnoverRate.ToString("P1")</MudText>
                     </MudPaper>
                 </MudItem>

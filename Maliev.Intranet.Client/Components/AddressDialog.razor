@@ -17,7 +17,7 @@
                     <MudGrid Spacing="2" Justify="Justify.Center">
                         <MudItem xs="12" sm="7">
                             <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Secondary">ADDRESS TYPE</MudText>
+                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Default">ADDRESS TYPE</MudText>
                                 <MudToggleGroup T="string" Value="@Address.Type" ValueChanged="@OnTypeChanged" 
                                                 SelectionMode="SelectionMode.SingleSelection" Color="Color.Primary" 
                                                 CheckMark="false" FixedContent="true" Class="rounded-lg">
@@ -28,7 +28,7 @@
                         </MudItem>
                         <MudItem xs="12" sm="5">
                             <MudStack AlignItems="AlignItems.Start" Spacing="0">
-                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Secondary">PRIMARY STATUS</MudText>
+                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Default">PRIMARY STATUS</MudText>
                                 <MudSwitch T="bool" @bind-Value="Address.IsDefault" Color="Color.Success" 
                                            Label="@(Address.IsDefault ? $"Default {Address.Type}" : "Set as Default")" />
                             </MudStack>
@@ -99,7 +99,7 @@
                             <ItemTemplate Context="loc">
                                 <div class="py-1">
                                     <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                                 </div>
                             </ItemTemplate>
                         </MudAutocomplete>
@@ -127,7 +127,7 @@
                             <ItemTemplate Context="loc">
                                 <div class="py-1">
                                     <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                                 </div>
                             </ItemTemplate>
                         </MudAutocomplete>
@@ -155,7 +155,7 @@
                             <ItemTemplate Context="loc">
                                 <div class="py-1">
                                     <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                                 </div>
                             </ItemTemplate>
                         </MudAutocomplete>
@@ -183,7 +183,7 @@
                             <ItemTemplate Context="loc">
                                 <div class="py-1">
                                     <MudText Typo="Typo.body2" Style="font-weight: 500;">@loc.PostalCode</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh}, {loc.DistrictTh}, {loc.ProvinceTh}")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictTh}, {loc.DistrictTh}, {loc.ProvinceTh}")</MudText>
                                 </div>
                             </ItemTemplate>
                         </MudAutocomplete>

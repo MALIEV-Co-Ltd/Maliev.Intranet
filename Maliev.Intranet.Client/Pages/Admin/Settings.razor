@@ -8,8 +8,8 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4" Wrap="Wrap.Wrap">
     <div>
-        <MudText Typo="Typo.h4">Settings</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Portal configuration, notifications, reference data, content, and workflows</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">Settings</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Portal configuration, notifications, reference data, content, and workflows</MudText>
     </div>
 </MudStack>
 
@@ -29,7 +29,7 @@
                             <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                                 <div>
                                     <MudText Typo="Typo.body2" Style="font-weight:600;">@flag.Name</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@flag.Description</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@flag.Description</MudText>
                                 </div>
                                 <MudSwitch T="bool" Value="@flag.Enabled" ValueChanged="@((v) => ToggleFlag(flag, v))" Color="Color.Primary" />
                             </MudStack>
@@ -70,7 +70,7 @@
                     <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                         <div>
                             <MudText Typo="Typo.h6">Maintenance Mode</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">When enabled, only administrators can access the portal</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">When enabled, only administrators can access the portal</MudText>
                         </div>
                         <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Construction"
                                    OnClick="@(() => Snackbar.Add("Maintenance mode requires IT approval", Severity.Warning))">
@@ -87,7 +87,7 @@
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
             <div>
                 <MudText Typo="Typo.h6">Notification Templates</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Manage email, SMS, and messaging templates for system notifications</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Manage email, SMS, and messaging templates for system notifications</MudText>
             </div>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                        OnClick="@(() => Snackbar.Add("Create notification template coming soon", Severity.Info))">
@@ -129,7 +129,7 @@
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
             <div>
                 <MudText Typo="Typo.h6">Reference Data Management</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Manage lookup values, categories, and configurable lists</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Manage lookup values, categories, and configurable lists</MudText>
             </div>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                        OnClick="@(() => Snackbar.Add("Add reference data entry coming soon", Severity.Info))">
@@ -146,7 +146,7 @@
                             <MudText Typo="Typo.subtitle2" Style="font-weight:600;">@dataset.Name</MudText>
                             <MudChip T="string" Size="Size.Small" Color="Color.Primary">@dataset.Count entries</MudChip>
                         </MudStack>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">@dataset.Description</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default" Class="mb-3">@dataset.Description</MudText>
                         <MudButton Size="Size.Small" Variant="Variant.Outlined" FullWidth="true"
                                    OnClick="@(() => Snackbar.Add($"Manage {dataset.Name} coming soon", Severity.Info))">
                             Manage
@@ -162,7 +162,7 @@
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
             <div>
                 <MudText Typo="Typo.h6">Content Management</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Manage announcements, help articles, and portal content</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Manage announcements, help articles, and portal content</MudText>
             </div>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                        OnClick="@(() => Snackbar.Add("Content editor coming soon", Severity.Info))">
@@ -182,7 +182,7 @@
                                     <MudChip T="string" Size="Size.Small" Color="@GetContentStatusColor(item.Status)">@item.Status</MudChip>
                                 </MudStack>
                                 <MudText Typo="Typo.subtitle2">@item.Title</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Last updated: @item.UpdatedAt.ToString("dd MMM yyyy")</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">Last updated: @item.UpdatedAt.ToString("dd MMM yyyy")</MudText>
                             </div>
                             <MudStack Row="true" Spacing="1">
                                 <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary"
@@ -202,7 +202,7 @@
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
             <div>
                 <MudText Typo="Typo.h6">Workflow Automation</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Approval chains, automated notifications, and process triggers</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Approval chains, automated notifications, and process triggers</MudText>
             </div>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                        OnClick="@(() => Snackbar.Add("Create workflow coming soon", Severity.Info))">
@@ -225,7 +225,7 @@
                             </CardHeaderAvatar>
                             <CardHeaderContent>
                                 <MudText Typo="Typo.subtitle2">@template.Name</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@template.Description</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">@template.Description</MudText>
                             </CardHeaderContent>
                         </MudCardHeader>
                         <MudCardActions>
@@ -241,9 +241,9 @@
         <MudText Typo="Typo.h6" Class="mb-3">Active Workflows</MudText>
         <MudPaper Elevation="0" Class="border mud-border-lines-default rounded-lg">
             <MudStack AlignItems="AlignItems.Center" Class="pa-8">
-                <MudIcon Icon="@Icons.Material.Outlined.AccountTree" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
-                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No active workflows</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Configure a template above to enable automated workflows</MudText>
+                <MudIcon Icon="@Icons.Material.Outlined.AccountTree" Size="Size.Large" Color="Color.Default" Style="font-size:60px;" />
+                <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">No active workflows</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Configure a template above to enable automated workflows</MudText>
             </MudStack>
         </MudPaper>
     </MudTabPanel>
@@ -348,7 +348,7 @@
         new("Invoice Review", "Invoice verification and approval before payment", Icons.Material.Outlined.Receipt, Color.Success, "Not Configured"),
         new("Onboarding Checklist", "New employee onboarding task assignment", Icons.Material.Outlined.PersonAdd, Color.Primary, "Not Configured"),
         new("Quality Incident", "Defect reporting and escalation", Icons.Material.Outlined.BugReport, Color.Error, "Not Configured"),
-        new("Customer Onboarding", "KYC and account setup approval", Icons.Material.Outlined.Business, Color.Secondary, "Not Configured")
+        new("Customer Onboarding", "KYC and account setup approval", Icons.Material.Outlined.Business, Color.Default, "Not Configured")
     };
 
     /// <summary>

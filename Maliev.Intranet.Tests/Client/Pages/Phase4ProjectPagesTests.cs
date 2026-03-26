@@ -1,12 +1,14 @@
 using Bunit;
 using Maliev.Intranet.Client.Pages;
 using Maliev.Intranet.Client.Services;
+using Maliev.Intranet.Shared;
 using Maliev.Intranet.Tests.Testing;
 using MudBlazor;
 using MudBlazor.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
+using Moq;
 
 namespace Maliev.Intranet.Tests.Client.Pages;
 
@@ -24,6 +26,12 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);
         Services.AddScoped<BreadcrumbService>();
+
+        var draftServiceMock = new Mock<IProjectDraftService>();
+        draftServiceMock.Setup(s => s.LoadDraftAsync(It.IsAny<string?>())).ReturnsAsync((DraftProjectState?)null);
+        draftServiceMock.Setup(s => s.SaveDraftAsync(It.IsAny<DraftProjectState>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+        draftServiceMock.Setup(s => s.ClearDraftAsync(It.IsAny<string?>())).Returns(Task.CompletedTask);
+        Services.AddSingleton(draftServiceMock.Object);
 
         Services.AddLogging();
         Services.AddAuthorization();

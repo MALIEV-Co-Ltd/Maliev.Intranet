@@ -12,7 +12,7 @@
     </TitleContent>
     <DialogContent>
         <div class="px-4">
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-6">
                 Upload documents (business card, form) or paste text to auto-fill customer information.
             </MudText>
 
@@ -49,7 +49,7 @@
                                          <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">@_extractionFiles.Count file(s) selected</MudChip>
                                          @foreach (var f in _extractionFiles)
                                          {
-                                             <MudText Typo="Typo.caption" Color="Color.Secondary">@f.Name</MudText>
+                                             <MudText Typo="Typo.caption" Color="Color.Default">@f.Name</MudText>
                                          }
                                          <MudText Typo="Typo.caption" Class="mt-1">Click to change</MudText>
                                      </MudStack>
@@ -57,8 +57,8 @@
                                  else
                                  {
                                      <MudText Typo="Typo.h6" Align="Align.Center" Style="font-weight: 700;">Drag and drop files here</MudText>
-                                     <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">or click to browse local storage</MudText>
-                                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-6">Supports PDF, JPG, PNG (Max 10MB)</MudText>
+                                     <MudText Typo="Typo.body2" Color="Color.Default" Align="Align.Center">or click to browse local storage</MudText>
+                                     <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-6">Supports PDF, JPG, PNG (Max 10MB)</MudText>
                                  }
                             </MudPaper>
                         </CustomContent>

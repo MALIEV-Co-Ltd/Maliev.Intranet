@@ -26,7 +26,7 @@
                                         <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">
                                             @(log.Status == "Signed" && log.Action == "Update" ? "Signed" : log.Action)
                                         </MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@log.Timestamp.ToLocalTime().ToString("g")</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">@log.Timestamp.ToLocalTime().ToString("g")</MudText>
                                     </MudStack>
                                     
                                     <MudText Typo="Typo.caption" Class="mt-1">
@@ -63,7 +63,7 @@
 
                                     @if (log.ExpiresAt.HasValue)
                                     {
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Expiration set to: @log.ExpiresAt.Value.ToLocalTime().ToString("d")</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">Expiration set to: @log.ExpiresAt.Value.ToLocalTime().ToString("d")</MudText>
                                     }
                                     
                                     @if (log.RevokedAt.HasValue)

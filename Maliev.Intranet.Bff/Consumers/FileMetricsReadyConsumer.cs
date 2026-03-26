@@ -1,0 +1,94 @@
+using Maliev.Intranet.Bff.Hubs;
+using Maliev.Intranet.Bff.Services;
+using Maliev.Intranet.Shared.Dtos;
+using Maliev.MessagingContracts.Contracts.Geometry;
+using MassTransit;
+using Microsoft.AspNetCore.SignalR;
+
+namespace Maliev.Intranet.Bff.Consumers;
+
+/// <summary>
+/// MassTransit consumer that handles <see cref="FileMetricsReadyEvent"/> messages published by GeometryService.
+/// Stores dimensions immediately after mesh metrics are computed — before preview images are generated.
+/// </summary>
+public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
+{
+    private readonly IHubContext<NotificationHub> _hub;
+    private readonly IFileAnalysisStatusService _analysisStatusService;
+    private readonly ILogger<FileMetricsReadyConsumer> _logger;
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="FileMetricsReadyConsumer"/>.
+    /// </summary>
+    public FileMetricsReadyConsumer(
+        IHubContext<NotificationHub> hub,
+        IFileAnalysisStatusService analysisStatusService,
+        ILogger<FileMetricsReadyConsumer> logger)
+    {
+        _hub = hub;
+        _analysisStatusService = analysisStatusService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Processes an incoming <see cref="FileMetricsReadyEvent"/> and immediately surfaces dimensions via SignalR.
+    /// </summary>
+    public async Task Consume(ConsumeContext<FileMetricsReadyEvent> context)
+    {
+        if (context.Message?.Payload == null)
+        {
+            _logger.LogWarning("FileMetricsReadyConsumer: received null message or payload");
+            return;
+        }
+
+        var payload = context.Message.Payload;
+        _logger.LogInformation(
+            "FileMetricsReadyConsumer: received event for file {FileId}, storagePath={StoragePath}",
+            payload.FileId, payload.StoragePath);
+
+        var dimensions = payload.Metrics?.BoundingBox is { } bb
+            ? new FileAnalysisDimensionsDto
+              {
+                  X         = bb.X,
+                  Y         = bb.Y,
+                  Z         = bb.Z,
+                  VolumeMm3 = payload.Metrics.VolumeCm3 * 1000,
+              }
+            : null;
+
+        var isManifold = payload.Metrics?.IsManifold ?? true;
+
+        await _analysisStatusService.SetProcessingAsync(payload.StoragePath, context.CancellationToken);
+
+        if (dimensions != null)
+        {
+            await _analysisStatusService.SetDimensionsAsync(
+                payload.StoragePath, dimensions, isManifold, context.CancellationToken);
+
+            _logger.LogInformation(
+                "FileMetricsReadyConsumer: stored dimensions for key={StoragePath}, manifold={IsManifold}",
+                payload.StoragePath, isManifold);
+        }
+
+        var signalRPayload = new FileAnalysisCompletedPayload(
+            StoragePath: payload.StoragePath,
+            UploadId: payload.FileId,
+            ThumbnailUrl: null,
+            HiResThumbnailUrl: null,
+            Dimensions: dimensions != null
+                ? new FileAnalysisDimensions(dimensions.X, dimensions.Y, dimensions.Z, dimensions.VolumeMm3)
+                : null,
+            PreviewUrls: null,
+            Failed: false,
+            ErrorCode: null);
+
+        await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
+            "FileAnalysisCompleted",
+            signalRPayload,
+            context.CancellationToken);
+
+        _logger.LogInformation(
+            "FileMetricsReadyConsumer: pushed dimensions via SignalR for {StoragePath}",
+            payload.StoragePath);
+    }
+}

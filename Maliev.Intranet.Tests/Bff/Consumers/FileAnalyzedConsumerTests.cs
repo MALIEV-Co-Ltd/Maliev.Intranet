@@ -1,21 +1,19 @@
-using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Consumers;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Bff.Services;
 using Maliev.MessagingContracts.Contracts.Geometry;
 using Maliev.MessagingContracts.Contracts.Shared;
+using Maliev.Intranet.Tests.Testing;
 using MassTransit;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using System.Net;
 
 namespace Maliev.Intranet.Tests.Bff.Consumers;
 
 /// <summary>
 /// Unit tests for <see cref="FileAnalyzedConsumer"/>.
-/// Verifies that geometry analysis results are pushed to SignalR clients
-/// with the correct event name and payload.
+/// Verifies that analysis completion is recorded in the status service.
 /// </summary>
 public class FileAnalyzedConsumerTests
 {
@@ -23,7 +21,8 @@ public class FileAnalyzedConsumerTests
 
     private static FileAnalyzedEvent BuildEvent(
         string fileId = "file-123",
-        double x = 10.0, double y = 20.0, double z = 30.0,
+        string storagePath = "projects/abc/model.stl",
+        string? glbPath = "projects/abc/model.stl_viewer.glb",
         string? thumbnailPath = "projects/abc/model.stl_thumb.png")
     {
         return new FileAnalyzedEvent(
@@ -44,14 +43,15 @@ public class FileAnalyzedConsumerTests
                     VolumeCm3: 100.0,
                     SupportVolumeCm3: 5.0,
                     SurfaceAreaCm2: 200.0,
-                    BoundingBox: new FileAnalyzedEventPayloadMetricsBoundingBox(x, y, z),
+                    BoundingBox: new FileAnalyzedEventPayloadMetricsBoundingBox(10, 20, 30),
                     IsManifold: true,
                     TriangleCount: 1024,
                     EulerNumber: 2),
-                GlbStoragePath: "projects/abc/model.stl_viewer.glb",
+                GlbStoragePath: glbPath,
                 ThumbnailStoragePath: thumbnailPath,
+                StoragePath: storagePath,
                 ProcessedAt: DateTimeOffset.UtcNow,
-                DfmReport: new FileAnalyzedEventPayloadDfmReport(0, [], 0, 0.0),
+                DfmReport: null!,
                 MaterialId: Guid.NewGuid(),
                 MaterialCode: "PLA",
                 ManufacturingProcessId: Guid.NewGuid(),
@@ -66,154 +66,70 @@ public class FileAnalyzedConsumerTests
         return mock;
     }
 
-    /// <summary>
-    /// Returns a mock <see cref="IHttpClientFactory"/> that produces an <see cref="HttpClient"/>
-    /// backed by a fake handler returning 404 for every request, causing the consumer to fall back
-    /// to the raw storage path when resolving thumbnail URLs.
-    /// </summary>
-    private static Mock<IHttpClientFactory> CreateNullHttpClientFactory()
-    {
-        var handler   = new FakeHttpMessageHandler(HttpStatusCode.NotFound);
-        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://upload-service") };
-        var factoryMock = new Mock<IHttpClientFactory>();
-        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(httpClient);
-        return factoryMock;
-    }
-
-    private static (FileAnalyzedConsumer consumer, Mock<IClientProxy> clientProxyMock)
+    private static (FileAnalyzedConsumer consumer, Mock<IFileAnalysisStatusService> statusMock)
         CreateConsumer()
     {
-        var clientProxyMock = new Mock<IClientProxy>();
-        var clientsMock = new Mock<IHubClients>();
-        clientsMock.Setup(c => c.All).Returns(clientProxyMock.Object);
-
         var hubMock = new Mock<IHubContext<NotificationHub>>();
-        hubMock.Setup(h => h.Clients).Returns(clientsMock.Object);
+        var clientsMock = new Mock<IClientProxy>();
+        var hubClientsMock = new Mock<IHubClients>();
+        hubClientsMock.Setup(c => c.All).Returns(clientsMock.Object);
+        hubMock.Setup(h => h.Clients).Returns(hubClientsMock.Object);
 
-        var analysisStatusMock = new Mock<IFileAnalysisStatusService>();
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        var mockHandler = new MockHttpMessageHandler((_, _) =>
+        {
+            var json = """{"signedUrl": "http://storage.test/model.glb"}""";
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = content });
+        });
+        var httpClient = new HttpClient(mockHandler) { BaseAddress = new Uri("http://test/") };
+        httpClientFactoryMock.Setup(f => f.CreateClient("UploadServiceClient.Consumer")).Returns(httpClient);
+        var statusMock = new Mock<IFileAnalysisStatusService>();
         var consumer = new FileAnalyzedConsumer(
             hubMock.Object,
-            analysisStatusMock.Object,
+            httpClientFactoryMock.Object,
+            statusMock.Object,
             NullLogger<FileAnalyzedConsumer>.Instance);
-        return (consumer, clientProxyMock);
-    }
-
-    /// <summary>Minimal HTTP handler that returns a fixed status code for every request.</summary>
-    private sealed class FakeHttpMessageHandler(HttpStatusCode statusCode) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(statusCode));
+        return (consumer, statusMock);
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Consume_ShouldSendFileAnalysisCompletedToAllClients()
+    public async Task Consume_ShouldCallSetAnalysisCompleted_WhenStoragePathPresent()
     {
-        var (consumer, clientProxyMock) = CreateConsumer();
-        await consumer.Consume(MakeCtx(BuildEvent()).Object);
+        var (consumer, statusMock) = CreateConsumer();
+        await consumer.Consume(MakeCtx(BuildEvent(storagePath: "projects/abc/model.stl")).Object);
 
-        clientProxyMock.Verify(x =>
-            x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None),
+        statusMock.Verify(s =>
+            s.SetAnalysisCompletedAsync(
+                "projects/abc/model.stl",
+                "projects/abc/model.stl_viewer.glb",
+                CancellationToken.None),
             Times.Once);
     }
 
     [Fact]
-    public async Task Consume_ShouldMapBoundingBoxToDimensions()
+    public async Task Consume_ShouldNotCallSetAnalysisCompleted_WhenStoragePathMissing()
     {
-        var (consumer, clientProxyMock) = CreateConsumer();
-        var evt = BuildEvent(x: 15.5, y: 25.0, z: 35.0);
-
-        FileAnalysisCompletedPayload? captured = null;
-        clientProxyMock
-            .Setup(x => x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None))
-            .Callback<string, object[], CancellationToken>((_, args, _) =>
-                captured = args[0] as FileAnalysisCompletedPayload)
-            .Returns(Task.CompletedTask);
-
+        var (consumer, statusMock) = CreateConsumer();
+        var evt = BuildEvent(storagePath: "");
         await consumer.Consume(MakeCtx(evt).Object);
 
-        Assert.NotNull(captured);
-        Assert.NotNull(captured.Dimensions);
-        Assert.Equal(15.5, captured.Dimensions.X);
-        Assert.Equal(25.0, captured.Dimensions.Y);
-        Assert.Equal(35.0, captured.Dimensions.Z);
+        statusMock.Verify(s =>
+            s.SetAnalysisCompletedAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task Consume_ShouldSetThumbnailUrlToNull()
+    public async Task Consume_ShouldNotThrow_WhenPayloadIsNull()
     {
-        const string thumbPath = "projects/abc/model_thumb.png";
-        var (consumer, clientProxyMock) = CreateConsumer();
+        var (consumer, _) = CreateConsumer();
+        var mock = new Mock<ConsumeContext<FileAnalyzedEvent>>();
+        mock.Setup(c => c.Message).Returns(new FileAnalyzedEvent());
+        mock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
 
-        FileAnalysisCompletedPayload? captured = null;
-        clientProxyMock
-            .Setup(x => x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None))
-            .Callback<string, object[], CancellationToken>((_, args, _) =>
-                captured = args[0] as FileAnalysisCompletedPayload)
-            .Returns(Task.CompletedTask);
-
-        await consumer.Consume(MakeCtx(BuildEvent(thumbnailPath: thumbPath)).Object);
-
-        Assert.NotNull(captured);
-        Assert.Null(captured.ThumbnailUrl);
-    }
-
-    [Fact]
-    public async Task Consume_ShouldSetStoragePathFromGcsPathAndFileIdAsUploadId()
-    {
-        const string fileId = "file-abc-999";
-        var (consumer, clientProxyMock) = CreateConsumer();
-
-        FileAnalysisCompletedPayload? captured = null;
-        clientProxyMock
-            .Setup(x => x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None))
-            .Callback<string, object[], CancellationToken>((_, args, _) =>
-                captured = args[0] as FileAnalysisCompletedPayload)
-            .Returns(Task.CompletedTask);
-
-        await consumer.Consume(MakeCtx(BuildEvent(fileId: fileId)).Object);
-
-        Assert.NotNull(captured);
-        Assert.Equal("projects/abc/model.stl", captured.StoragePath);
-        Assert.Equal(fileId, captured.UploadId);
-    }
-
-    [Fact]
-    public async Task Consume_ShouldNotSetFailed_OnSuccess()
-    {
-        var (consumer, clientProxyMock) = CreateConsumer();
-
-        FileAnalysisCompletedPayload? captured = null;
-        clientProxyMock
-            .Setup(x => x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None))
-            .Callback<string, object[], CancellationToken>((_, args, _) =>
-                captured = args[0] as FileAnalysisCompletedPayload)
-            .Returns(Task.CompletedTask);
-
-        await consumer.Consume(MakeCtx(BuildEvent()).Object);
-
-        Assert.NotNull(captured);
-        Assert.False(captured.Failed);
-        Assert.Null(captured.ErrorCode);
-    }
-
-    [Fact]
-    public async Task Consume_WhenNoThumbnail_ShouldLeaveUrlNull()
-    {
-        var (consumer, clientProxyMock) = CreateConsumer();
-
-        FileAnalysisCompletedPayload? captured = null;
-        clientProxyMock
-            .Setup(x => x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None))
-            .Callback<string, object[], CancellationToken>((_, args, _) =>
-                captured = args[0] as FileAnalysisCompletedPayload)
-            .Returns(Task.CompletedTask);
-
-        await consumer.Consume(MakeCtx(BuildEvent(thumbnailPath: null)).Object);
-
-        Assert.NotNull(captured);
-        Assert.Null(captured.ThumbnailUrl);
+        await consumer.Consume(mock.Object);
+        // Should complete without throwing
     }
 }

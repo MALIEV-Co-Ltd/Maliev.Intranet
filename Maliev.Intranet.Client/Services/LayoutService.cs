@@ -4,10 +4,24 @@ using Microsoft.JSInterop;
 
 namespace Maliev.Intranet.Client.Services;
 
+/// <summary>
+/// Specifies the display theme mode preference for the application.
+/// </summary>
 public enum ThemeMode
 {
+    /// <summary>
+    /// Follow the operating system or browser color scheme preference.
+    /// </summary>
     System,
+
+    /// <summary>
+    /// Always use the light theme regardless of system preferences.
+    /// </summary>
     Light,
+
+    /// <summary>
+    /// Always use the dark theme regardless of system preferences.
+    /// </summary>
     Dark
 }
 
@@ -29,9 +43,8 @@ public class LayoutService : IDisposable
     /// Initializes a new instance of the <see cref="LayoutService"/> class.
     /// </summary>
     /// <param name="jsRuntime">The JS runtime for theme persistence.</param>
-    /// <param name="state">The persistent component state to hydrate from server.</param>
-    /// <param name="logger">The logger instance.</param>
-    /// <param name="httpContextAccessor">HTTP context accessor for reading cookies during SSR (optional).</param>
+    /// <param name="logger">The logger instance for diagnostic output.</param>
+    /// <param name="httpContextAccessor">Optional HTTP context accessor for reading theme cookies during server-side rendering (SSR).</param>
     public LayoutService(
         IJSRuntime jsRuntime,
         ILogger<LayoutService> logger,

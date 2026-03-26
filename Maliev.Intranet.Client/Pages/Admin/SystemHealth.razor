@@ -9,8 +9,8 @@
 <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
     <div class="d-flex align-center justify-space-between mb-6">
         <div>
-            <MudText Typo="Typo.h4" Style="font-weight: 500;">System Health</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Real-time status of microservices and infrastructure</MudText>
+            <MudText Typo="Typo.h5" Style="font-weight: 600;">System Health</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Default">Real-time status of microservices and infrastructure</MudText>
         </div>
         <div class="d-flex align-center">
             <MudChip T="string" Color="@GetOverallStatusColor()" Icon="@GetOverallStatusIcon()" Variant="Variant.Text" Class="mr-4">
@@ -41,17 +41,17 @@
                         
                         <div class="d-flex flex-column gap-2">
                             <div class="d-flex justify-space-between">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">Status</MudText>
                                 <MudText Typo="Typo.caption" Color="@GetServiceStatusColor(service.Status)" Style="font-weight: 700;">
                                     @service.Status
                                 </MudText>
                             </div>
                             <div class="d-flex justify-space-between">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Latency</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">Latency</MudText>
                                 <MudText Typo="Typo.caption">@(service.Status == "Healthy" ? $"{service.ResponseTimeMs}ms" : "N/A")</MudText>
                             </div>
                             <div class="d-flex justify-space-between">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Last Check</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">Last Check</MudText>
                                 <MudText Typo="Typo.caption">@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</MudText>
                             </div>
                         </div>

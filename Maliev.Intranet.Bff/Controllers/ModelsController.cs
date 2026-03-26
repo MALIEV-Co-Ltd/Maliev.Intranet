@@ -47,7 +47,7 @@ public class ModelsController(UploadServiceClient uploadClient) : ControllerBase
         // Path starts with 'models/' to trigger GeometryService analysis in UploadService
         var path = $"models/{file.FileName}";
 
-        var result = await uploadClient.UploadFileAsync(file.FileName, stream, file.ContentType, path, ct);
+        var result = await uploadClient.UploadFileAsync(file.FileName, stream, file.ContentType, path, true, ct);
         if (result == null) return StatusCode(500, "Failed to upload model.");
 
         return Ok(result);

@@ -21,12 +21,13 @@ public interface IFileAnalysisStatusService
     /// <summary>
     /// Sets the preview URLs after preview images are generated.
     /// </summary>
-    Task SetPreviewUrlsAsync(string uploadId, FileAnalysisPreviewUrlsDto previewUrls, string? thumbnailUrl, CancellationToken cancellationToken = default);
+    Task SetPreviewUrlsAsync(string uploadId, FileAnalysisPreviewUrlsDto previewUrls, string? thumbnailUrl, string? hiResThumbnailUrl = null, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Marks the geometry analysis as completed. Preview URLs may still be pending.
+    /// Marks the geometry analysis as completed and stores the optional GLB storage path.
+    /// Preview URLs may still be pending.
     /// </summary>
-    Task SetAnalysisCompletedAsync(string uploadId, CancellationToken cancellationToken = default);
+    Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Marks the preview URLs as completed (independent of geometry analysis status).

@@ -33,10 +33,10 @@
                              border: 1px dashed var(--mud-palette-lines-default);
                              display: flex; align-items: center; justify-content: center;">
                             <MudIcon Icon="@Icons.Material.Outlined.QrCode2"
-                                     Style="font-size: 60px;" Color="Color.Secondary" />
+                                     Style="font-size: 60px;" Color="Color.Default" />
                         </div>
                     }
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 10px; word-break: break-all;">
+                    <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 10px; word-break: break-all;">
                         @_job.Url
                     </MudText>
                 </MudStack>
@@ -46,43 +46,43 @@
                 @* Ticket fields *@
                 <MudGrid Spacing="1">
                     <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Job #</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Job #</MudText>
                         <MudText Typo="Typo.subtitle1" Style="font-weight:700;">@_detail!.JobNumber</MudText>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Priority</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Priority</MudText>
                         <MudChip T="string" Size="Size.Small" Color="@GetPriorityColor(_detail!.Priority)">
                             @_detail!.Priority
                         </MudChip>
                     </MudItem>
                     <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Part</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Part</MudText>
                         <MudText Typo="Typo.body2" Style="font-weight:600;">@_detail!.PartDescription</MudText>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Process</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Process</MudText>
                         <MudText Typo="Typo.body2">@_detail!.ProcessType</MudText>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Material</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Material</MudText>
                         <MudText Typo="Typo.body2">@(_detail!.Material ?? "—")</MudText>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Quantity</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Quantity</MudText>
                         <MudText Typo="Typo.body2">@_detail!.Quantity.ToString("N0")</MudText>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Machine</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Machine</MudText>
                         <MudText Typo="Typo.body2">@(_detail!.MachineName ?? "—")</MudText>
                     </MudItem>
                     <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Customer</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Customer</MudText>
                         <MudText Typo="Typo.body2">@_detail!.CustomerName</MudText>
                     </MudItem>
                     @if (_detail!.EstimatedCompletionAt.HasValue)
                     {
                         <MudItem xs="12">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">ETA</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">ETA</MudText>
                             <MudText Typo="Typo.body2">@_detail!.EstimatedCompletionAt.Value.ToString("dd MMM yyyy HH:mm")</MudText>
                         </MudItem>
                     }
@@ -90,7 +90,7 @@
 
                 @* Company footer *@
                 <MudDivider Class="mt-3 mb-2" />
-                <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">
+                <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Default">
                     Maliev Co., Ltd. — Manufacturing Division — Printed @DateTime.Now.ToString("dd MMM yyyy HH:mm")
                 </MudText>
             </div>

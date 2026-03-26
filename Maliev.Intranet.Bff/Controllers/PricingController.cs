@@ -63,4 +63,24 @@ public class PricingController(IPricingServiceClient pricingClient) : Controller
         var result = await pricingClient.CalculatePriceAsync(request, ct);
         return Ok(result);
     }
+
+    /// <summary>
+    /// Returns all active lead time options with price multipliers.
+    /// </summary>
+    [HttpGet("lead-times")]
+    public async Task<ActionResult<List<LeadTimeOptionDto>>> GetLeadTimes(CancellationToken ct)
+    {
+        var result = await pricingClient.GetLeadTimeOptionsAsync(ct);
+        return Ok(result ?? []);
+    }
+
+    /// <summary>
+    /// Calculates bulk pricing for multiple quantities given a base unit price.
+    /// </summary>
+    [HttpPost("bulk")]
+    public async Task<ActionResult<List<BulkPriceTierDto>>> GetBulkPricing(BulkPricingRequestDto request, CancellationToken ct)
+    {
+        var result = await pricingClient.GetBulkPricingAsync(request, ct);
+        return Ok(result ?? []);
+    }
 }

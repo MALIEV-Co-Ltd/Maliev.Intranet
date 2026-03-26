@@ -5,35 +5,92 @@ using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Client.Services;
 
+/// <summary>
+/// Represents a single message in a chat conversation, including metadata such as thinking steps and suggested actions.
+/// </summary>
 public class ChatMessage
 {
+    /// <summary>
+    /// Gets or sets the text content of the message.
+    /// </summary>
     public string Text { get; set; } = "";
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the message was sent by the user.
+    /// </summary>
     public bool IsUser { get; set; }
+
+    /// <summary>
+    /// Gets or sets the context (e.g., page URL or resource ID) associated with this message.
+    /// </summary>
     public string? Context { get; set; }
+
+    /// <summary>
+    /// Gets or sets the timestamp when the message was created.
+    /// </summary>
     public DateTime Timestamp { get; set; } = DateTime.Now;
+
+    /// <summary>
+    /// Gets or sets the list of suggested actions provided by the chatbot for this message.
+    /// </summary>
     public List<BffSuggestedAction>? SuggestedActions { get; set; }
+
+    /// <summary>
+    /// Gets or sets the collection of thinking steps taken by the AI to generate the response.
+    /// </summary>
     public List<ThinkingStepDto> ThinkingSteps { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the message is currently being processed by the AI.
+    /// </summary>
     public bool IsProcessing { get; set; }
 }
 
+/// <summary>
+/// Manages the chat session and communication with the Backend-for-Frontend (BFF) and SignalR hub.
+/// </summary>
 public class ChatService : IAsyncDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly NavigationManager _navigationManager;
     private HubConnection? _hubConnection;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ChatService"/> class with required dependencies.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client for API requests.</param>
+    /// <param name="navigationManager">The navigation manager for resolving hub URLs.</param>
     public ChatService(HttpClient httpClient, NavigationManager navigationManager)
     {
         _httpClient = httpClient;
         _navigationManager = navigationManager;
     }
 
+    /// <summary>
+    /// Gets the list of messages in the current chat session.
+    /// </summary>
     public List<ChatMessage> Messages { get; } = new();
+
+    /// <summary>
+    /// Gets the unique identifier of the active chat session.
+    /// </summary>
     public Guid? SessionId { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether a message or session initialization is currently loading.
+    /// </summary>
     public bool IsLoading { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the SignalR hub connection is currently active.
+    /// </summary>
     public bool IsSignalRConnected => _hubConnection?.State == HubConnectionState.Connected;
 
     private string _currentContext = "/";
+
+    /// <summary>
+    /// Gets or sets the current navigation context used for new chat messages.
+    /// </summary>
     public string CurrentContext
     {
         get => _currentContext;
@@ -47,8 +104,17 @@ public class ChatService : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Raised when the service state changes, notifying UI components to re-render.
+    /// </summary>
     public event Action? OnChange;
 
+    /// <summary>
+    /// Adds a message to the local message list and notifies listeners of the state change.
+    /// </summary>
+    /// <param name="text">The text content of the message.</param>
+    /// <param name="isUser">True if the message is from the user; false if from the AI.</param>
+    /// <param name="suggestedActions">Optional list of suggested actions to display with the message.</param>
     public void AddMessage(string text, bool isUser, List<BffSuggestedAction>? suggestedActions = null)
     {
         Messages.Add(new ChatMessage
@@ -64,6 +130,7 @@ public class ChatService : IAsyncDisposable
     /// <summary>
     /// Connects to the ChatHub for real-time thinking step updates.
     /// </summary>
+    /// <returns>A task representing the asynchronous connection operation.</returns>
     public async Task ConnectSignalRAsync()
     {
         if (!OperatingSystem.IsBrowser() || _hubConnection != null) return;
@@ -129,6 +196,7 @@ public class ChatService : IAsyncDisposable
     /// <summary>
     /// Initializes a chat session with the BFF.
     /// </summary>
+    /// <returns>A task representing the asynchronous initialization operation.</returns>
     public async Task InitializeSessionAsync()
     {
         if (SessionId.HasValue) return;
@@ -159,6 +227,8 @@ public class ChatService : IAsyncDisposable
     /// Sends a message through the BFF to the ChatbotService.
     /// Uses the streaming endpoint when SignalR is connected.
     /// </summary>
+    /// <param name="text">The text content of the message to send.</param>
+    /// <returns>The response from the chatbot, or null if the message could not be sent.</returns>
     public async Task<BffChatMessageResponse?> SendMessageAsync(string text)
     {
         if (!SessionId.HasValue)
@@ -240,6 +310,7 @@ public class ChatService : IAsyncDisposable
 
     private void NotifyStateChanged() => OnChange?.Invoke();
 
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         if (_hubConnection != null)

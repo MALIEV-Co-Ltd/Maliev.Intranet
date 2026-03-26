@@ -7,9 +7,9 @@
         <div class="d-flex align-center pa-2 cursor-pointer" @onclick="ToggleExpanded"
              style="background-color: var(--mud-palette-background-grey); user-select: none;">
             <MudIcon Icon="@(IsExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
-                     Size="Size.Small" Color="Color.Secondary" Class="mr-1" />
-            <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" Color="Color.Secondary" Class="mr-2" />
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-weight: 500;">
+                     Size="Size.Small" Color="Color.Default" Class="mr-1" />
+            <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" Color="Color.Default" Class="mr-2" />
+            <MudText Typo="Typo.caption" Color="Color.Default" Style="font-weight: 500;">
                 @GetSummaryText()
             </MudText>
             @if (IsProcessing)
@@ -39,7 +39,7 @@
                             </MudText>
                             @if (!string.IsNullOrEmpty(step.Detail) && step.Type == "function_result")
                             {
-                                <MudText Typo="Typo.caption" Color="Color.Secondary"
+                                <MudText Typo="Typo.caption" Color="Color.Default"
                                          Style="font-size: 0.7rem; line-height: 1.2; white-space: pre-wrap; word-break: break-all; max-height: 60px; overflow: hidden;">
                                     @TruncateDetail(step.Detail)
                                 </MudText>

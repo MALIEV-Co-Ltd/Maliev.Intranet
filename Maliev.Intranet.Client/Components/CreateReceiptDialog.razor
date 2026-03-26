@@ -18,13 +18,14 @@
                                  Required="true"
                                  RequiredError="Invoice is required"
                                  SearchFunc="SearchInvoices"
+                                 DebounceInterval="300"
                                  ToStringFunc="@(i => i?.InvoiceNumber ?? string.Empty)"
                                  ValueChanged="OnInvoiceChanged"
                                  Variant="Variant.Outlined">
                     <ItemTemplate Context="invoice">
                         <MudStack Row="false" Spacing="0">
                             <MudText Typo="Typo.body1">@invoice.InvoiceNumber - @invoice.CustomerName</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            <MudText Typo="Typo.body2" Color="Color.Default">
                                 Amount: @invoice.TotalAmount.ToString("C2") | Due: @invoice.DueDate.ToString("dd MMM yyyy")
                             </MudText>
                         </MudStack>
@@ -39,23 +40,23 @@
                             <MudText Typo="Typo.h6">Invoice Details</MudText>
                             <MudGrid Spacing="1">
                                 <MudItem xs="6">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Customer</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Default">Customer</MudText>
                                     <MudText Typo="Typo.body1">@_selectedInvoice.CustomerName</MudText>
                                 </MudItem>
                                 <MudItem xs="6">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Invoice Number</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Default">Invoice Number</MudText>
                                     <MudText Typo="Typo.body1">@_selectedInvoice.InvoiceNumber</MudText>
                                 </MudItem>
                                 <MudItem xs="6">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Total Amount</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Default">Total Amount</MudText>
                                     <MudText Typo="Typo.body1">@_selectedInvoice.TotalAmount.ToString("C2")</MudText>
                                 </MudItem>
                                 <MudItem xs="6">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Already Paid</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Default">Already Paid</MudText>
                                     <MudText Typo="Typo.body1">@_selectedInvoice.PaidAmount.ToString("C2")</MudText>
                                 </MudItem>
                                 <MudItem xs="12">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Remaining Balance</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Default">Remaining Balance</MudText>
                                     <MudText Typo="Typo.h6" Color="Color.Primary">@(_selectedInvoice.TotalAmount - _selectedInvoice.PaidAmount).ToString("C2")</MudText>
                                 </MudItem>
                             </MudGrid>

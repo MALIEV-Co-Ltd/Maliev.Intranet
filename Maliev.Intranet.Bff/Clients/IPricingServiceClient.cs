@@ -31,4 +31,10 @@ public interface IPricingServiceClient
     /// Calculates the price for a given set of inputs.
     /// </summary>
     Task<PricingResultDto?> CalculatePriceAsync(PricingRequestDto request, CancellationToken ct = default);
+
+    /// <summary>Returns all active lead time options.</summary>
+    Task<List<LeadTimeOptionDto>?> GetLeadTimeOptionsAsync(CancellationToken ct = default);
+
+    /// <summary>Calculates bulk pricing for a range of quantities.</summary>
+    Task<List<BulkPriceTierDto>?> GetBulkPricingAsync(BulkPricingRequestDto request, CancellationToken ct = default);
 }

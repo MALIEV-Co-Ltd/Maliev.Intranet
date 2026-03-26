@@ -83,7 +83,10 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                logger.LogError("Downstream service returned 401 Unauthorized for {Url}. User: {UserId}", request.RequestUri, userId);
+                logger.LogError(
+                    "Downstream service returned 401 Unauthorized for {Url}. User: {UserId}. " +
+                    "This usually means the user lacks the required IAM permission (e.g. FilesDownload) on the upstream service.",
+                    request.RequestUri, userId);
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {

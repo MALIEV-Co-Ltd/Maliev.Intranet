@@ -14,70 +14,128 @@ public static class ThemeConfiguration
 
     private static MudTheme CreateTheme()
     {
-        var theme = new MudTheme()
-        {
-            PaletteDark = new PaletteDark()
-            {
-                Primary = "#2f81f7", // GitHub Blue
-                Secondary = "#8b949e", // GitHub Dimmed Text
-                Tertiary = "#238636", // GitHub Green
-                Background = "#0d1117", // GitHub Main Background
-                Surface = "#161b22", // GitHub Secondary Background (Cards)
-                AppbarBackground = "#010409", // Darker Header
-                DrawerBackground = "#010409", // Sidebar match header
-                TextPrimary = "#c9d1d9", // High Contrast Text
-                TextSecondary = "#8b949e", // Muted Text
-                Success = "#238636",
-                Warning = "#d29922",
-                Error = "#f85149",
-                Info = "#58a6ff",
-                Divider = "#30363d", // Subtle borders
-                ActionDefault = "#8b949e",
-                LinesDefault = "#30363d",
-                TableLines = "#30363d",
-                DrawerText = "#c9d1d9",
-                AppbarText = "#c9d1d9"
-            },
-            PaletteLight = new PaletteLight()
-            {
-                Primary = "#0969da",
-                Secondary = "#57606a",
-                Tertiary = "#1f883d",
-                Background = "#ffffff",
-                Surface = "#f6f8fa",
-                AppbarBackground = "#f6f8fa", // Light Header on Light Mode
-                DrawerBackground = "#f6f8fa",
-                TextPrimary = "#24292f",
-                TextSecondary = "#57606a",
-                Success = "#1a7f37",
-                Warning = "#9a6700",
-                Error = "#cf222e",
-                Info = "#0969da",
-                Divider = "#d0d7de",
-                ActionDefault = "#57606a",
-                LinesDefault = "#d0d7de",
-                TableLines = "#d0d7de",
-                DrawerText = "#24292f",
-                AppbarText = "#24292f" // Dark text on light header
-            }
-        };
+        var theme = new MudTheme();
 
-        string[] fontStack = ["Noto Sans", "Noto Sans Thai", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"];
+        // ── Font stack ───────────────────────────────────────────────────────────
+        string[] fontStack = ["Noto Sans", "Noto Sans Thai", "sans-serif"];
 
+        // ── Typography ───────────────────────────────────────────────────────────
+        // Body / Default
         theme.Typography.Default.FontFamily = fontStack;
-        theme.Typography.H1.FontFamily = fontStack;
-        theme.Typography.H2.FontFamily = fontStack;
-        theme.Typography.H3.FontFamily = fontStack;
-        theme.Typography.H4.FontFamily = fontStack;
-        theme.Typography.H5.FontFamily = fontStack;
-        theme.Typography.H6.FontFamily = fontStack;
-        theme.Typography.Subtitle1.FontFamily = fontStack;
-        theme.Typography.Subtitle2.FontFamily = fontStack;
+        theme.Typography.Default.FontSize = "13px";
+
         theme.Typography.Body1.FontFamily = fontStack;
+        theme.Typography.Body1.FontSize = "13px";
+
         theme.Typography.Body2.FontFamily = fontStack;
-        theme.Typography.Button.FontFamily = fontStack;
+        theme.Typography.Body2.FontSize = "12px";
+
+        // Headings
+        theme.Typography.H1.FontFamily = fontStack;
+        theme.Typography.H1.FontSize = "28px";
+
+        theme.Typography.H2.FontFamily = fontStack;
+        theme.Typography.H2.FontSize = "22px";
+
+        theme.Typography.H3.FontFamily = fontStack;
+        theme.Typography.H3.FontSize = "18px";
+
+        theme.Typography.H4.FontFamily = fontStack;
+        theme.Typography.H4.FontSize = "16px";
+
+        theme.Typography.H5.FontFamily = fontStack;
+        theme.Typography.H5.FontSize = "15px";
+
+        theme.Typography.H6.FontFamily = fontStack;
+        theme.Typography.H6.FontSize = "14px";
+
+        // Supporting text
+        theme.Typography.Subtitle1.FontFamily = fontStack;
+        theme.Typography.Subtitle1.FontSize = "14px";
+
+        theme.Typography.Subtitle2.FontFamily = fontStack;
+        theme.Typography.Subtitle2.FontSize = "13px";
+
         theme.Typography.Caption.FontFamily = fontStack;
+        theme.Typography.Caption.FontSize = "11px";
+
         theme.Typography.Overline.FontFamily = fontStack;
+        theme.Typography.Overline.FontSize = "11px";
+
+        // Interactive
+        theme.Typography.Button.FontFamily = fontStack;
+        theme.Typography.Button.FontSize = "13px";
+
+        // ── Layout Properties ────────────────────────────────────────────────────
+        theme.LayoutProperties.DefaultBorderRadius = "6px";
+
+        // ── Typography weights & line-heights ───────────────────────────────────
+        // Note: MudBlazor 9.x uses string for FontWeight and LineHeight
+        theme.Typography.Default.FontWeight = "400";
+        theme.Typography.Default.LineHeight = "1.4";
+
+        theme.Typography.Body1.FontWeight = "400";
+        theme.Typography.Body1.LineHeight = "1.4";
+
+        theme.Typography.Body2.FontWeight = "400";
+        theme.Typography.Body2.LineHeight = "1.4";
+
+        theme.Typography.H1.FontWeight = "700";
+        theme.Typography.H1.LineHeight = "1.2";
+
+        theme.Typography.H2.FontWeight = "700";
+        theme.Typography.H2.LineHeight = "1.25";
+
+        theme.Typography.H3.FontWeight = "600";
+        theme.Typography.H3.LineHeight = "1.3";
+
+        theme.Typography.H4.FontWeight = "600";
+        theme.Typography.H4.LineHeight = "1.35";
+
+        theme.Typography.H5.FontWeight = "600";
+        theme.Typography.H5.LineHeight = "1.35";
+
+        theme.Typography.H6.FontWeight = "600";
+        theme.Typography.H6.LineHeight = "1.4";
+
+        theme.Typography.Subtitle1.FontWeight = "500";
+        theme.Typography.Subtitle1.LineHeight = "1.4";
+
+        theme.Typography.Subtitle2.FontWeight = "500";
+        theme.Typography.Subtitle2.LineHeight = "1.4";
+
+        theme.Typography.Caption.FontWeight = "400";
+        theme.Typography.Caption.LineHeight = "1.3";
+
+        theme.Typography.Overline.FontWeight = "600";
+        theme.Typography.Overline.LineHeight = "1.3";
+        theme.Typography.Overline.LetterSpacing = "0.5px";
+
+        theme.Typography.Button.FontWeight = "600";
+        theme.Typography.Button.LineHeight = "1.4";
+        theme.Typography.Button.TextTransform = "none";
+
+        // ── Palette (light) ──────────────────────────────────────────────────────
+        theme.PaletteLight.Primary = "#1b6ec2";
+        theme.PaletteLight.PrimaryLighten = "#eef4fb";
+        theme.PaletteLight.Secondary = "#64748b";
+        theme.PaletteLight.SecondaryLighten = "#f1f5f9";
+
+        theme.PaletteDark.Secondary = "#94a3b8";
+        theme.PaletteDark.SecondaryLighten = "#1e293b";
+
+        theme.PaletteLight.Surface = "#ffffff";
+        theme.PaletteLight.Background = "#f5f6f8";
+        theme.PaletteLight.TextPrimary = "#1a1a1a";
+        theme.PaletteLight.TextSecondary = "#6b7280";
+
+        theme.PaletteLight.Divider = "#e2e4e9";
+        theme.PaletteLight.LinesDefault = "#e2e4e9";
+        theme.PaletteLight.LinesInputs = "#e2e4e9";
+
+        theme.PaletteLight.Success = "#16a34a";
+        theme.PaletteLight.Warning = "#d97706";
+        theme.PaletteLight.Error = "#dc2626";
 
         return theme;
     }

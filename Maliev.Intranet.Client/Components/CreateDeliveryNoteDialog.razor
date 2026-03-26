@@ -15,13 +15,14 @@
                                  Required="true"
                                  RequiredError="Order is required"
                                  SearchFunc="SearchOrders"
+                                 DebounceInterval="300"
                                  ToStringFunc="@(o => o != null ? $"{o.OrderNumber} - {o.CustomerName}" : string.Empty)"
                                  ValueChanged="OnOrderChanged"
                                  Variant="Variant.Outlined">
                     <ItemTemplate Context="order">
                         <MudStack Row="false" Spacing="0">
                             <MudText Typo="Typo.body1">@order.OrderNumber</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@order.CustomerName</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">@order.CustomerName</MudText>
                         </MudStack>
                     </ItemTemplate>
                 </MudAutocomplete>

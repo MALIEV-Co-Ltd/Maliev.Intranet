@@ -11,13 +11,14 @@
 
 <PageTitle>Customers - Maliev Intranet</PageTitle>
 
-<div>
-    <div class="mb-6">
-        <MudText Typo="Typo.h4" Class="font-bold">Customers</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Manage your client relationships and account balances.</MudText>
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">Customers</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Manage your client relationships and account balances.</MudText>
     </div>
+</MudStack>
 
-    <MudDataGrid T="CustomerSummaryDto" ServerData="@LoadGridData" Filterable="true" SortMode="SortMode.Multiple" @ref="_grid"
+<MudDataGrid T="CustomerSummaryDto" ServerData="@LoadGridData" Filterable="true" SortMode="SortMode.Multiple" @ref="_grid"
                  Dense="true" Hover="true" Striped="true" Elevation="0" Class="border mud-border-lines-default rounded-lg overflow-hidden">
         <ToolBarContent>
             <MudStack Row="true" AlignItems="AlignItems.Center" Class="w-100 pa-4 flex-grow-1">
@@ -65,7 +66,7 @@
                     }
                     else
                     {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Personal</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Personal</MudText>
                     }
                 </div>
             </CellTemplate>
@@ -77,7 +78,7 @@
                     @if (!string.IsNullOrEmpty(context.Item.CompanyPhone))
                     {
                         <div class="d-flex align-center gap-1">
-                            <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Color="Color.Secondary" Style="font-size: 1rem;" />
+                            <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Color="Color.Default" Style="font-size: 1rem;" />
                             <MudText Typo="Typo.body2">@context.Item.CompanyPhone</MudText>
                             @if (!string.IsNullOrEmpty(context.Item.Extension))
                             {
@@ -90,7 +91,7 @@
                     else if (!string.IsNullOrEmpty(context.Item.Landline))
                     {
                         <div class="d-flex align-center gap-1">
-                            <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Color="Color.Secondary" Style="font-size: 1rem;" />
+                            <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Color="Color.Default" Style="font-size: 1rem;" />
                             <MudText Typo="Typo.body2">@context.Item.Landline</MudText>
                         </div>
                     }
@@ -102,7 +103,7 @@
                 @if (!string.IsNullOrEmpty(context.Item.Mobile))
                 {
                     <div class="d-flex align-center gap-1" style="white-space: nowrap;">
-                        <MudIcon Icon="@Icons.Material.Filled.Smartphone" Size="Size.Small" Color="Color.Secondary" Style="font-size: 1rem;" />
+                        <MudIcon Icon="@Icons.Material.Filled.Smartphone" Size="Size.Small" Color="Color.Default" Style="font-size: 1rem;" />
                         <MudText Typo="Typo.body2">@context.Item.Mobile</MudText>
                     </div>
                 }
@@ -146,7 +147,6 @@
             <MudDataGridPager T="CustomerSummaryDto" />
         </PagerContent>
     </MudDataGrid>
-</div>
 
 
 

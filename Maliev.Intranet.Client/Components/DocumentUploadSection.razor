@@ -15,6 +15,7 @@
                          SearchFunc="@SearchCategories"
                          Variant="Variant.Outlined"
                          Margin="Margin.Dense"
+                         DebounceInterval="300"
                          CoerceText="false" CoerceValue="false"
                          Placeholder="Select or type a category"
                          HelperText="Specify what type of document this is"
@@ -69,7 +70,7 @@
                         <div class="d-flex justify-space-between align-center">
                             <div>
                                 <MudText Typo="Typo.body2">@file.Name</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <MudText Typo="Typo.caption" Color="Color.Default">
                                     @FormatFileSize(file.Size)
                                 </MudText>
                             </div>

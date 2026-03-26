@@ -14,13 +14,13 @@
         <div class="d-flex align-center justify-space-between">
             <MudStack Spacing="0">
                 <MudText Typo="Typo.h6" Style="line-height: 1.1;">Assistant</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Context: @ChatService.CurrentContext</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Default">Context: @ChatService.CurrentContext</MudText>
             </MudStack>
             @if (!IsMobile)
             {
                 <MudIconButton Icon="@(IsExpanded ? Icons.Material.Filled.CloseFullscreen : Icons.Material.Filled.OpenInFull)"
                                Size="Size.Small"
-                               Color="Color.Secondary"
+                               Color="Color.Default"
                                OnClick="@(() => IsExpandedChanged.InvokeAsync(!IsExpanded))" />
             }
         </div>
@@ -190,7 +190,7 @@
             </div>
         </MudPaper>
 
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="d-block mt-2" Style="font-size: 0.75rem;">
+        <MudText Typo="Typo.caption" Color="Color.Default" Align="Align.Center" Class="d-block mt-2" Style="font-size: 0.75rem;">
             AI can make mistakes. Please double-check responses.
         </MudText>
     </div>

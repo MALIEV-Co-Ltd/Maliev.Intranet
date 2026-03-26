@@ -6,14 +6,14 @@
             <MudAvatar Size="@(IsRoot ? Size.Large : Size.Medium)" Color="@GetColor()">@Node.Initials</MudAvatar>
             <div>
                 <MudText Typo="@(IsRoot ? Typo.h6 : Typo.subtitle2)">@Node.Name</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">@Node.Title</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Default">@Node.Title</MudText>
             </div>
         </MudStack>
         
         @if (Node.TeamCount > 0)
         {
             <MudDivider />
-            <MudText Typo="Typo.caption" Color="Color.Secondary">@Node.TeamCount team members</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Default">@Node.TeamCount team members</MudText>
         }
 
         @if (Node.Subordinates.Any())

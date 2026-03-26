@@ -57,40 +57,42 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
         try
         {
             var previews = payload.PreviewImages;
-            var uploadClient = CreateUploadClient();
+
+            _logger.LogInformation(
+                "RAW preview paths from GeometryService - FrontSmall: {Front}, ThumbnailSmall: {Iso}, TopSmall: {Top}, BottomSmall: {Bottom}, LeftSmall: {Left}, RightSmall: {Right}, BackSmall: {Back}",
+                previews.FrontSmall, previews.ThumbnailSmall, previews.TopSmall, previews.BottomSmall, previews.LeftSmall, previews.RightSmall, previews.BackSmall);
 
             async Task<string?> ResolveUrlAsync(string? path)
             {
                 if (string.IsNullOrEmpty(path))
                     return null;
-
-                var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(path, context.CancellationToken);
-                if (!string.IsNullOrEmpty(signedUrl))
-                    return signedUrl;
-
-                _logger.LogWarning(
-                    "Failed to generate signed URL for path={Path}, preview will not be available",
-                    path);
-                return null;
+                return await CreateUploadClient().GetDownloadUrlByPathAsync(path, context.CancellationToken)
+                       ?? path;  // fallback: store raw storage path when signed URL fails
             }
 
-            var frontUrl = await ResolveUrlAsync(previews.Front);
-            var isoUrl   = await ResolveUrlAsync(previews.Iso);
-            var thumbnailUrl = isoUrl ?? frontUrl;
+            var frontUrl           = await ResolveUrlAsync(previews.FrontSmall);
+            var thumbnailSmallUrl  = await ResolveUrlAsync(previews.ThumbnailSmall);
+            var thumbnailLargeUrl  = await ResolveUrlAsync(previews.ThumbnailLarge);
+            var thumbnailUrl       = thumbnailSmallUrl ?? frontUrl;
+
+            _logger.LogInformation(
+                "ResolveUrl results for storagePath={StoragePath} - FrontSmall: {FrontUrl}, ThumbnailSmall: {IsoUrl}, ThumbnailLarge: {Iso1000Url}, Thumbnail: {ThumbUrl}, RawFront: {RawFront}, RawThumbnailSmall: {RawIso}",
+                payload.StoragePath, frontUrl, thumbnailSmallUrl, thumbnailLargeUrl, thumbnailUrl, previews.FrontSmall, previews.ThumbnailSmall);
 
             var previewUrlsDto = new FileAnalysisPreviewUrlsDto
             {
-                Front  = frontUrl,
-                Back   = await ResolveUrlAsync(previews.Back),
-                Left   = await ResolveUrlAsync(previews.Left),
-                Right  = await ResolveUrlAsync(previews.Right),
-                Top    = await ResolveUrlAsync(previews.Top),
-                Bottom = await ResolveUrlAsync(previews.Bottom),
-                Iso    = isoUrl,
+                FrontSmall       = frontUrl,
+                BackSmall        = await ResolveUrlAsync(previews.BackSmall),
+                LeftSmall        = await ResolveUrlAsync(previews.LeftSmall),
+                RightSmall       = await ResolveUrlAsync(previews.RightSmall),
+                TopSmall         = await ResolveUrlAsync(previews.TopSmall),
+                BottomSmall      = await ResolveUrlAsync(previews.BottomSmall),
+                ThumbnailSmall   = thumbnailSmallUrl,
+                ThumbnailLargeUrl = thumbnailLargeUrl,
             };
 
             await _analysisStatusService.SetPreviewUrlsAsync(
-                payload.StoragePath, previewUrlsDto, thumbnailUrl, context.CancellationToken);
+                payload.StoragePath, previewUrlsDto, thumbnailUrl, thumbnailLargeUrl, context.CancellationToken);
 
             if (payload.Failed)
             {
@@ -108,19 +110,21 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                 StoragePath: payload.StoragePath,
                 UploadId: null,
                 ThumbnailUrl: thumbnailUrl,
+                HiResThumbnailUrl: thumbnailLargeUrl,
                 Dimensions: null,
                 PreviewUrls: new FileAnalysisPreviewUrls(
-                    Front: frontUrl,
-                    Back: previewUrlsDto.Back,
-                    Left: previewUrlsDto.Left,
-                    Right: previewUrlsDto.Right,
-                    Top: previewUrlsDto.Top,
-                    Bottom: previewUrlsDto.Bottom,
-                    Iso: isoUrl),
+                    FrontSmall: frontUrl,
+                    BackSmall: previewUrlsDto.BackSmall,
+                    LeftSmall: previewUrlsDto.LeftSmall,
+                    RightSmall: previewUrlsDto.RightSmall,
+                    TopSmall: previewUrlsDto.TopSmall,
+                    BottomSmall: previewUrlsDto.BottomSmall,
+                    ThumbnailSmall: thumbnailSmallUrl,
+                    ThumbnailLarge: thumbnailLargeUrl),
                 Failed: payload.Failed,
                 ErrorCode: payload.Failed ? "preview-generation-failed" : null);
 
-            await _hub.Clients.All.SendAsync(
+            await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
                 "FileAnalysisCompleted",
                 signalRPayload,
                 context.CancellationToken);

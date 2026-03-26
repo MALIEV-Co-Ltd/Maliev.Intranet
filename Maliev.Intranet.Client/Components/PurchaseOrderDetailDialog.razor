@@ -21,19 +21,19 @@
         {
             <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">PO Number</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">PO Number</MudText>
                     <MudText Typo="Typo.body1" Style="font-weight:600;">@_po.PoNumber</MudText>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">Status</MudText>
                     <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_po.Status)">@_po.Status</MudChip>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Supplier</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">Supplier</MudText>
                     <MudText Typo="Typo.body1">@_po.SupplierName</MudText>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Expected Delivery</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">Expected Delivery</MudText>
                     <MudText Typo="Typo.body1">@_po.ExpectedDelivery?.ToString("dd MMM yyyy")</MudText>
                 </MudItem>
                 <MudItem xs="12">

@@ -13,6 +13,7 @@ builder.Services.AddAuthorizationCore();
 // falls back to GET /api/auth/user only when persisted state is unavailable.
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
+builder.Services.AddScoped<IProjectDraftService, ProjectDraftService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<BreadcrumbService>();
 builder.Services.AddScoped<IReferenceDataService, ClientReferenceDataService>();

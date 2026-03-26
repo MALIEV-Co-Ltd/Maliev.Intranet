@@ -14,13 +14,14 @@
                                  Required="true"
                                  RequiredError="Customer is required"
                                  SearchFunc="SearchCustomers"
+                                 DebounceInterval="300"
                                  ToStringFunc="@(c => c?.Name ?? string.Empty)"
                                  ValueChanged="OnCustomerChanged"
                                  Variant="Variant.Outlined">
                     <ItemTemplate Context="customer">
                         <MudStack Row="false" Spacing="0">
                             <MudText Typo="Typo.body1">@customer.Name</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@customer.Email</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">@customer.Email</MudText>
                         </MudStack>
                     </ItemTemplate>
                 </MudAutocomplete>
@@ -53,7 +54,7 @@
 
                             @if (_lineItems.Count == 0)
                             {
-                                <MudText Color="Color.Secondary">No items added yet. Click "Add Item" to get started.</MudText>
+                                <MudText Color="Color.Default">No items added yet. Click "Add Item" to get started.</MudText>
                             }
                             else
                             {
@@ -86,7 +87,7 @@
                                                                  Required="true" />
                                             </MudItem>
                                             <MudItem xs="2">
-                                                <MudText Typo="Typo.body2" Color="Color.Secondary">Total</MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Default">Total</MudText>
                                                 <MudText Typo="Typo.h6">@((item.Quantity * item.UnitPrice).ToString("C2"))</MudText>
                                             </MudItem>
                                             <MudItem xs="1">

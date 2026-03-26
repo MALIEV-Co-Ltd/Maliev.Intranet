@@ -347,7 +347,7 @@ else
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
                         <MudText Typo="Typo.subtitle1">CNC Attachments</MudText>
                         <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Secondary"
+                                   Color="Color.Default"
                                    StartIcon="@Icons.Material.Filled.Add"
                                    Size="Size.Small"
                                    OnClick="OpenAddAttachmentDialog">
@@ -615,7 +615,7 @@ else
 
     private static Color GetCategoryColor(string category) => category switch
     {
-        "FdmPrinter" or "SlaPrinter" or "InjectionMolding" => Color.Secondary,
+        "FdmPrinter" or "SlaPrinter" or "InjectionMolding" => Color.Default,
         "CncMachine" => Color.Primary,
         "Scanner3D" => Color.Tertiary,
         _ => Color.Default
@@ -635,7 +635,7 @@ else
     {
         "Preventive" => Color.Info,
         "Corrective" or "Repair" => Color.Warning,
-        "Calibration" => Color.Secondary,
+        "Calibration" => Color.Default,
         "Inspection" => Color.Tertiary,
         _ => Color.Default
     };

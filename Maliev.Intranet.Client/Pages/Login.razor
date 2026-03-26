@@ -15,198 +15,531 @@
 @inject ILogger<Login> Logger
 @inject IJSRuntime JSRuntime
 
-<PageTitle>MALIEV - Customer Management Portal</PageTitle>
+<PageTitle>MALIEV | Intranet Gateway</PageTitle>
 
 <style>
-    .login-container {
+    .login-page {
         min-height: 100vh;
-        width: 100vw;
-        position: relative;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--mud-palette-background);
         overflow: hidden;
+    }
+
+    /* Header */
+    .login-header {
+        position: relative;
+        z-index: 50;
+        padding: 1rem 2rem;
+    }
+
+    .login-header-content {
+        max-width: 80rem;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .header-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .header-logo-img {
+        height: auto;
+        max-height: 20px;
+        width: auto;
+        display: block;
+    }
+
+    .header-nav {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .header-nav-link {
+        font-size: var(--mud-typography-overline-size);
+        font-weight: var(--mud-typography-overline-weight);
+        text-transform: uppercase;
+        letter-spacing: var(--mud-typography-overline-letterspacing);
+        color: var(--mud-palette-text-secondary);
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+    .header-nav-link:hover {
+        color: var(--mud-palette-primary);
+    }
+
+    /* Main content area */
+    .login-main {
+        flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: var(--mud-palette-background-grey);
-    }
-
-    #login-canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 0;
-    }
-
-    /* Glassmorphism Card */
-    .login-card {
+        padding: 2rem 1.5rem 6rem;
+        position: relative;
         z-index: 10;
+    }
+
+    /* Clean white card */
+    .glass-card {
         width: 100%;
-        max-width: 600px;
+        max-width: 440px;
         padding: 3rem;
-        border-radius: 24px;
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        transition: box-shadow 0.3s ease;
+        border-radius: 1rem;
+        background: var(--mud-palette-surface);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 24px 48px -12px rgba(0, 0, 0, 0.05);
+        position: relative;
+        text-align: center;
     }
 
-    .login-card:hover {
-        box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-    }
-    
-    /* Light mode specific overrides */
-    :root[data-theme="light"] #login-canvas {
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    .dark-theme .glass-card {
+        background: rgba(28, 27, 27, 0.7);
     }
 
-    :root[data-theme="light"] .login-card {
-        background: rgba(255, 255, 255, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+    /* Secure badge */
+    .secure-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.375rem 0.875rem;
+        background: rgba(30, 142, 62, 0.1);
+        color: #1e8e3e;
+        font-size: var(--mud-typography-overline-size);
+        font-weight: var(--mud-typography-overline-weight);
+        text-transform: uppercase;
+        letter-spacing: var(--mud-typography-overline-letterspacing);
+        border-radius: 9999px;
+        margin-bottom: 2rem;
     }
 
-    .premium-input .mud-input-slot {
-        background-color: transparent !important;
+    .dark-theme .secure-badge {
+        background: rgba(129, 201, 149, 0.2);
+        color: #81c995;
     }
 
-    .company-link {
-        color: var(--mud-palette-text-secondary);
-        transition: color 0.2s;
+    .secure-badge .material-symbols-outlined {
+        font-size: 1rem;
+        margin-right: 0.375rem;
     }
-    
-    .company-link:hover {
+
+    /* Form title */
+    .form-title {
+        font-size: var(--mud-typography-h1-size);
+        font-weight: var(--mud-typography-h1-weight);
+        line-height: var(--mud-typography-h1-lineheight);
+        letter-spacing: -0.025em;
+        color: var(--mud-palette-on-surface);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-subtitle {
+        font-size: var(--mud-typography-subtitle1-size);
+        font-weight: var(--mud-typography-subtitle1-weight);
+        line-height: var(--mud-typography-subtitle1-lineheight);
+        color: var(--mud-palette-on-surface-variant);
+        margin-bottom: 2.5rem;
+    }
+
+    /* Input groups */
+    .input-group {
+        margin-bottom: 1.5rem;
+        text-align: left;
+    }
+
+    .input-label {
+        display: block;
+        font-size: var(--mud-typography-overline-size);
+        font-weight: var(--mud-typography-overline-weight);
+        text-transform: uppercase;
+        letter-spacing: var(--mud-typography-overline-letterspacing);
+        color: var(--mud-palette-on-surface-variant);
+        margin-bottom: 0.5rem;
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-wrapper:focus-within .input-field {
+        outline: none;
+        border-color: var(--mud-palette-primary);
+        background: var(--mud-palette-surface);
+    }
+
+    .input-field {
+        width: 100%;
+        height: 3rem;
+        padding: 0 1rem;
+        font-family: var(--mud-typography-default-family);
+        font-size: var(--mud-typography-body1-size);
+        font-weight: var(--mud-typography-body1-weight);
+        background: rgba(0, 0, 0, 0.06);
+        border: 2px solid transparent;
+        border-radius: 0.5rem;
+        color: var(--mud-palette-on-surface);
+        transition: all 0.2s;
+    }
+
+    .dark-theme .input-field {
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .input-field::placeholder {
+        color: var(--mud-palette-outline);
+        opacity: 0.7;
+    }
+
+    .input-underline {
+        display: none;
+    }
+
+    /* Password field */
+    .password-label-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 0.5rem;
+    }
+
+    .forgot-link {
+        font-size: var(--mud-typography-overline-size);
+        font-weight: var(--mud-typography-overline-weight);
+        text-transform: uppercase;
+        letter-spacing: var(--mud-typography-overline-letterspacing);
+        color: var(--mud-palette-primary);
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .forgot-link:hover {
+        opacity: 0.8;
+    }
+
+    /* Primary button */
+    .btn-primary {
+        width: 100%;
+        height: 3rem;
+        background: var(--mud-palette-primary);
+        color: var(--mud-palette-on-primary);
+        font-family: var(--mud-typography-button-family);
+        font-size: var(--mud-typography-button-size);
+        font-weight: var(--mud-typography-button-weight);
+        letter-spacing: var(--mud-typography-button-letterspacing, 0.05em);
+        line-height: var(--mud-typography-button-lineheight);
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .btn-primary:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 112, 234, 0.3);
+    }
+
+    .btn-primary:active {
+        transform: scale(0.98);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    /* Divider */
+    .divider {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+
+    .divider-line {
+        flex: 1;
+        height: 1px;
+        background: var(--mud-palette-outline-variant);
+        opacity: 0.2;
+    }
+
+    .divider-text {
+        font-size: var(--mud-typography-overline-size);
+        font-weight: var(--mud-typography-overline-weight);
+        text-transform: uppercase;
+        letter-spacing: var(--mud-typography-overline-letterspacing);
+        color: var(--mud-palette-on-surface-variant);
+    }
+
+    /* Google button */
+    .btn-google {
+        width: 100%;
+        height: 3rem;
+        background: var(--mud-palette-surface);
+        color: var(--mud-palette-on-surface);
+        font-family: var(--mud-typography-button-family);
+        font-size: var(--mud-typography-button-size);
+        font-weight: var(--mud-typography-button-weight);
+        letter-spacing: var(--mud-typography-button-letterspacing, 0.025em);
+        line-height: var(--mud-typography-button-lineheight);
+        border: 1px solid var(--mud-palette-outline-variant);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        text-decoration: none;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-google:hover {
+        background: var(--mud-palette-surface-container-low);
+        text-decoration: none;
+    }
+
+    .btn-google:active {
+        transform: scale(0.98);
+    }
+
+    .google-logo {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    /* Footer */
+    .login-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
+        padding: 1.5rem 2rem;
+        border-top: 1px solid rgba(28, 27, 27, 0.1);
+    }
+
+    .dark-theme .login-footer {
+        border-top-color: rgba(252, 249, 248, 0.1);
+    }
+
+    .footer-content {
+        max-width: 80rem;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        md: flex-row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .footer-copyright {
+        font-size: var(--mud-typography-overline-size);
+        font-weight: var(--mud-typography-overline-weight);
+        text-transform: uppercase;
+        letter-spacing: var(--mud-typography-overline-letterspacing);
+        color: var(--mud-palette-on-surface);
+        opacity: 0.4;
+    }
+
+    .footer-link {
+        font-size: var(--mud-typography-overline-size);
+        font-weight: var(--mud-typography-overline-weight);
+        text-transform: uppercase;
+        letter-spacing: var(--mud-typography-overline-letterspacing);
+        color: var(--mud-palette-on-surface);
+        opacity: 0.4;
+        text-decoration: none;
+        cursor: pointer;
+        transition: opacity 0.2s, color 0.2s;
+    }
+
+    .footer-link:hover {
+        opacity: 1;
         color: var(--mud-palette-primary);
     }
-    
-    @@media (max-width: 600px) {
-        .login-card {
-            padding: 1.5rem !important;
-            margin: 1rem;
-            max-width: 100% !important;
+
+    /* Error message */
+    .error-alert {
+        padding: 0.75rem 1rem;
+        background: var(--mud-palette-error-container);
+        color: var(--mud-palette-on-error-container);
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Theme toggle in header */
+    .theme-toggle-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        color: var(--mud-palette-on-surface-variant);
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .theme-toggle-btn:hover {
+        background: var(--mud-palette-surface-container-high);
+        color: var(--mud-palette-primary);
+    }
+
+    /* Responsive */
+    @@media (max-width: 640px) {
+        .login-header {
+            padding: 1rem;
         }
-        
-        .login-container {
-            align-items: flex-start;
-            padding-top: 2rem;
+
+        .header-nav {
+            display: none;
+        }
+
+        .glass-card {
+            padding: 1.5rem;
+        }
+
+        .login-main {
+            padding: 1rem 1rem 5rem;
         }
     }
 </style>
 
-<div class="login-container">
-    @if (_isCheckingAuth)
-    {
-        <!-- Show nothing while checking authentication -->
-    }
-    else
-    {
-        <canvas id="login-canvas"></canvas>
-
-        <div class="login-card animated fadeIn">
-            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6 w-100">
-                <MudImage Src="@LogoUrl"
-                          Alt="MALIEV"
-                          Style="height: 20px;"
-                          Class="hover-scale" />
-                <MudTooltip Text="@GetThemeTooltip()">
-                    <MudIconButton Icon="@GetThemeIcon()"
-                                   Color="Color.Inherit"
-                                   OnClick="@ToggleThemeAsync" />
-                </MudTooltip>
-            </MudStack>
-
-            <div class="d-flex flex-column align-start mb-8">
-                <MudText Typo="Typo.h5" Style="font-weight: 700; letter-spacing: -0.5px;">Welcome Back</MudText>
-                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">Sign in to access your workspace</MudText>
+<div class="login-page @(_isDarkMode ? "dark-theme" : "")">
+    <!-- Header -->
+    <header class="login-header">
+        <div class="login-header-content">
+            <div class="header-logo">
+                <img src="@LogoUrl" alt="MALIEV Logo" class="header-logo-img" />
             </div>
+            <nav class="header-nav">
+                <span class="header-nav-link">Support</span>
+                <span class="header-nav-link">System Status</span>
+            </nav>
+            <button class="theme-toggle-btn" @onclick="ToggleThemeAsync" title="@GetThemeTooltip()">
+                <MudIcon Icon="@GetThemeIcon()" Size="Size.Small" />
+            </button>
+        </div>
+    </header>
 
-            <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin" FormName="LoginForm">
-                <DataAnnotationsValidator />
+    <!-- Main Content -->
+    <main class="login-main">
+        @if (_isCheckingAuth)
+        {
+            <!-- Show nothing while checking authentication -->
+        }
+        else
+        {
+            <div class="glass-card">
+                <!-- Secure badge -->
+                <div class="secure-badge">
+                    <span class="material-symbols-outlined">lock</span>
+                    Secure Terminal
+                </div>
 
-                <MudStack Spacing="4">
-                    <MudTextField T="string"
-                                  Label="Username"
-                                  Value="@_usernameInput"
-                                  ValueChanged="@((string value) => OnUsernameChanged(value))"
-                                  Variant="Variant.Outlined"
-                                  Adornment="Adornment.End"
-                                  AdornmentText="@("@maliev.com")"
-                                  Placeholder="john.doe"
-                                  Immediate="true"
-                                  Class="premium-input"
-                                  Error="@_usernameError"
-                                  ErrorText="@_usernameErrorText"
-                                  UserAttributes="@(new Dictionary<string, object> { {"autocomplete", "username"}, {"data-lpignore", "true"} })" />
+                <!-- Title -->
+                <h1 class="form-title">Sign In to Intranet</h1>
+                <p class="form-subtitle">Enter your corporate credentials to continue.</p>
 
-                    <MudTextField T="string"
-                                  Label="Password"
-                                  @bind-Value="_loginModel.Password"
-                                  InputType="@(_passwordVisible ? InputType.Text : InputType.Password)"
-                                  Variant="Variant.Outlined"
-                                  Adornment="Adornment.End"
-                                  AdornmentIcon="@(_passwordVisible ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                                  OnAdornmentClick="TogglePasswordVisibility"
-                                  Class="premium-input"
-                                  UserAttributes="@(new Dictionary<string, object> { {"autocomplete", "current-password"} })" />
+                <!-- Error message -->
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="error-alert">@_errorMessage</div>
+                }
 
-                    <div class="d-flex justify-end mt-n2">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-weight: 600;">Forgot Password? Contact IT support.</MudText>
+                <!-- Login Form -->
+                <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin" FormName="LoginForm">
+                    <DataAnnotationsValidator />
+
+                    <!-- Email field -->
+                    <div class="input-group">
+                        <label class="input-label">Email Address</label>
+                        <div class="input-wrapper">
+                            <input type="email" 
+                                   class="input-field"
+                                   placeholder="name@maliev.com"
+                                   @bind="_usernameInput"
+                                   @bind:event="oninput"
+                                   autocomplete="username" />
+                            <div class="input-underline"></div>
+                        </div>
                     </div>
 
-                    @if (!string.IsNullOrEmpty(_errorMessage))
-                    {
-                        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-2 rounded-lg" Dense="true">@_errorMessage</MudAlert>
-                    }
+                    <!-- Password field -->
+                    <div class="input-group">
+                        <div class="password-label-row">
+                            <label class="input-label">Password</label>
+                            <a class="forgot-link">Forgot Password?</a>
+                        </div>
+                        <div class="input-wrapper">
+                            <input type="password"
+                                   class="input-field"
+                                   placeholder="••••••••"
+                                   @bind="_loginModel.Password"
+                                   autocomplete="current-password" />
+                            <div class="input-underline"></div>
+                        </div>
+                    </div>
 
-                    <MudButton ButtonType="ButtonType.Submit"
-                               Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               Size="Size.Large"
-                               FullWidth="true"
-                               Disabled="@_isProcessing"
-                               Class="py-3 rounded-lg elevation-4 mt-2 hover-lift"
-                               Style="font-weight: 700; letter-spacing: 0.5px; text-transform: none;">
+                    <!-- Submit button -->
+                    <button class="btn-primary" type="submit" disabled="@_isProcessing">
                         @if (_isProcessing)
                         {
-                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                            <MudText Class="ms-2">Signing In...</MudText>
+                            <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
+                            <span>Signing In...</span>
                         }
                         else
                         {
-                            <MudText>Sign In</MudText>
+                            <span>SIGN IN</span>
                         }
-                    </MudButton>
-                    
-                    <div class="d-flex align-center my-4 w-100 gap-3">
-                        <div style="flex: 1; height: 1px; background-color: var(--mud-palette-lines-inputs);"></div>
-                        <MudText Typo="Typo.caption" Class="mud-text-secondary">OR</MudText>
-                        <div style="flex: 1; height: 1px; background-color: var(--mud-palette-lines-inputs);"></div>
+                    </button>
+
+                    <!-- Divider -->
+                    <div class="divider">
+                        <div class="divider-line"></div>
+                        <span class="divider-text">OR</span>
+                        <div class="divider-line"></div>
                     </div>
 
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Inherit"
-                               Size="Size.Large"
-                               FullWidth="true"
-                               Href="/api/auth/login"
-                               StartIcon="@Icons.Custom.Brands.Google"
-                               Class="py-3 rounded-lg"
-                               Style="font-weight: 600; text-transform: none; border-color: inherit; opacity: 0.8;">
-                        Sign in with Google
-                    </MudButton>
+                    <!-- Google button -->
+                    <a href="/api/auth/login?returnUrl=@Uri.EscapeDataString(ReturnUrl ?? "/")" class="btn-google">
+                        <svg class="google-logo" viewBox="0 0 24 24">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        <span>LOGIN WITH GOOGLE ACCOUNT</span>
+                    </a>
+                </EditForm>
 
-                </MudStack>
-            </EditForm>
-            
-            <div class="mt-8 text-center">
-                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                     Not an employee? Visit <a href="https://www.maliev.com" target="_blank" class="company-link" style="font-weight: 600; text-decoration: none;">maliev.com</a>
-                 </MudText>
+                <!-- Footer note -->
+                <div style="margin-top: 2rem; text-align: center;">
+                    <p style="font-size: 0.6875rem; color: var(--mud-palette-on-surface-variant);">
+                        Not an employee? Visit our main page at
+                        <a href="https://www.maliev.com" target="_blank" style="color: var(--mud-palette-primary); font-weight: 700;">www.maliev.com</a>
+                    </p>
+                </div>
             </div>
+        }
+    </main>
+
+    <!-- Footer -->
+    <footer class="login-footer">
+        <div class="footer-content">
+            <span class="footer-copyright">© 2024 MALIEV INC. ALL RIGHTS RESERVED.</span>
+            <a href="https://www.maliev.com" class="footer-link">www.maliev.com</a>
         </div>
-    }
+    </footer>
 </div>
 
 @code {
@@ -220,22 +553,21 @@
 
     private InternalLoginModel _loginModel = new();
     private bool _isProcessing;
-    private bool _passwordVisible;
     private string? _errorMessage;
     private string _usernameInput = string.Empty;
-    private bool _usernameError = false;
-    private string _usernameErrorText = string.Empty;
     private bool _isCheckingAuth = true;
-    private IJSObjectReference? _module;
+    private bool _isDarkMode;
 
     // Theme-aware logo URLs
-    private string LogoUrl => LayoutService.IsDarkMode
-        ? "https://storage.googleapis.com/maliev.com/web-contents/images/logo-white-20px.png"
-        : "https://storage.googleapis.com/maliev.com/web-contents/images/logo-black-20px.png";
+    private string LogoUrl => _isDarkMode
+        ? "images/logo-white.svg"
+        : "images/logo.svg";
 
     protected override async Task OnInitializedAsync()
     {
         ReturnUrl ??= "/";
+        _isDarkMode = LayoutService.IsDarkMode;
+        
         try
         {
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -258,114 +590,57 @@
                 _errorMessage = Error;
                 StateHasChanged();
             }
-            
-            try
-            {
-                _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/login-bg.js?v=4");
-                await _module.InvokeVoidAsync("initLoginBg");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to initialize login background animation");
-            }
         }
     }
 
-    async ValueTask IAsyncDisposable.DisposeAsync()
+    private async Task ToggleThemeAsync()
     {
-        if (_module is not null)
-        {
-            try
-            {
-                await _module.DisposeAsync();
-            }
-            catch (JSDisconnectedException)
-            {
-            }
-        }
+        await LayoutService.ToggleModeAsync();
+        _isDarkMode = LayoutService.IsDarkMode;
+        StateHasChanged();
     }
-
-    private void OnUsernameChanged(string value)
-    {
-        _usernameError = false;
-        _usernameErrorText = string.Empty;
-        
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            _usernameInput = string.Empty;
-            _loginModel.Username = string.Empty;
-            return;
-        }
-
-        var cleanValue = value.Trim();
-        bool hadDomain = false;
-
-        if (cleanValue.Contains("@"))
-        {
-            var parts = cleanValue.Split('@');
-            var usernamePart = parts[0].Trim();
-            if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1])) hadDomain = true;
-            _usernameInput = usernamePart;
-            cleanValue = usernamePart;
-        }
-        else
-        {
-            _usernameInput = cleanValue;
-        }
-
-        if (!string.IsNullOrEmpty(cleanValue) && !System.Text.RegularExpressions.Regex.IsMatch(cleanValue, @"^[a-zA-Z0-9._-]+$"))
-        {
-            _usernameError = true;
-            _usernameErrorText = "Only letters, numbers, dots, hyphens, and underscores allowed.";
-        }
-        else if (hadDomain)
-        {
-            _usernameErrorText = "Domain automatically removed";
-        }
-
-        _loginModel.Username = cleanValue;
-    }
-
-    private async Task ToggleThemeAsync() => await LayoutService.ToggleModeAsync();
 
     private string GetThemeIcon() => LayoutService.CurrentMode switch
     {
-        ThemeMode.Dark => Icons.Material.Filled.DarkMode,
-        ThemeMode.Light => Icons.Material.Filled.LightMode,
-        _ => Icons.Material.Filled.AutoMode
+        ThemeMode.Dark => Icons.Material.Filled.LightMode,
+        ThemeMode.Light => Icons.Material.Filled.DarkMode,
+        _ => Icons.Material.Filled.Brightness4
     };
 
     private string GetThemeTooltip() => LayoutService.CurrentMode switch
     {
-        ThemeMode.Dark => "Dark Mode",
-        ThemeMode.Light => "Light Mode",
-        _ => "Auto Mode"
+        ThemeMode.Dark => "Switch to Light Mode",
+        ThemeMode.Light => "Switch to Dark Mode",
+        _ => "Toggle Theme"
     };
-
-    private void TogglePasswordVisibility() => _passwordVisible = !_passwordVisible;
 
     private async Task HandleLogin()
     {
         _isProcessing = true;
         _errorMessage = null;
+        StateHasChanged();
 
         try
         {
-            if (string.IsNullOrWhiteSpace(_loginModel.Username))
+            if (string.IsNullOrWhiteSpace(_usernameInput))
             {
-                _usernameError = true;
-                _usernameErrorText = "Required";
+                _errorMessage = "Email address is required.";
                 _isProcessing = false;
+                StateHasChanged();
                 return;
             }
 
-            if (_usernameError)
+            if (string.IsNullOrWhiteSpace(_loginModel.Password))
             {
-               _isProcessing = false;
-               return;
+                _errorMessage = "Password is required.";
+                _isProcessing = false;
+                StateHasChanged();
+                return;
             }
 
-            var fullUsername = $"{_loginModel.Username}@maliev.com";
+            var fullUsername = _usernameInput.Contains("@") 
+                ? _usernameInput 
+                : $"{_usernameInput}@maliev.com";
 
             var response = await Http.PostAsJsonAsync("api/auth/login", new
             {
@@ -391,6 +666,7 @@
         finally
         {
             _isProcessing = false;
+            StateHasChanged();
         }
     }
 
@@ -403,5 +679,11 @@
         public string Password { get; set; } = string.Empty;
 
         public bool RememberMe { get; set; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // No async resources to dispose
+        await Task.CompletedTask;
     }
 }

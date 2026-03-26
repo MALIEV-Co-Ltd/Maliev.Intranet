@@ -15,7 +15,7 @@
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4" Wrap="Wrap.Wrap">
     <div>
         <MudText Typo="Typo.h5" Style="font-weight: 700;">Projects</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Manage 3D printing & manufacturing projects</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Manage 3D printing & manufacturing projects</MudText>
     </div>
     <MudButton Variant="Variant.Filled"
                Color="Color.Primary"
@@ -96,14 +96,14 @@ else
             </TemplateColumn>
             <TemplateColumn Title="Created">
                 <CellTemplate>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">@context.Item.CreatedAt.ToString("dd MMM yyyy")</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">@context.Item.CreatedAt.ToString("dd MMM yyyy")</MudText>
                 </CellTemplate>
             </TemplateColumn>
         </Columns>
         <NoRecordsContent>
             <MudStack AlignItems="AlignItems.Center" Class="pa-8">
-                <MudIcon Icon="@Icons.Material.Outlined.FolderOff" Style="font-size: 48px;" Color="Color.Secondary" />
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No projects found</MudText>
+                <MudIcon Icon="@Icons.Material.Outlined.FolderOff" Style="font-size: 48px;" Color="Color.Default" />
+                <MudText Typo="Typo.body2" Color="Color.Default" Class="mt-2">No projects found</MudText>
                 <MudButton Variant="Variant.Outlined" Class="mt-3"
                            OnClick="@(() => Navigation.NavigateTo("/sales/projects/new"))">
                     Create First Project
@@ -181,7 +181,7 @@ else
         "Configuring"   => Color.Warning,
         "Priced"        => Color.Info,
         "Quoted"        => Color.Primary,
-        "In Production" => Color.Secondary,
+        "In Production" => Color.Default,
         "Completed"     => Color.Success,
         "Cancelled"     => Color.Error,
         _               => Color.Default

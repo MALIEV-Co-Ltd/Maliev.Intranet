@@ -8,8 +8,8 @@
 
 <PageTitle>Pricing AI - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-2">Pricing AI</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+<MudText Typo="Typo.h5" Style="font-weight: 600;" Class="mb-2">Pricing AI</MudText>
+<MudText Typo="Typo.body2" Color="Color.Default" Class="mb-4">
     AI-powered pricing predictions based on material, process, and historical data
 </MudText>
 
@@ -36,6 +36,7 @@
                                  Variant="Variant.Outlined" 
                                  Margin="Margin.Dense"
                                  Required="true"
+                                 DebounceInterval="300"
                                  Placeholder="Search materials..." />
 
                 <MudSelect T="Guid" @bind-Value="_selectedProcessId" Label="Manufacturing Process" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true">
@@ -76,12 +77,52 @@
 
     <!-- Results (Right Panel) -->
     <MudItem xs="12" md="7">
-        @if (!_hasResults)
+        @if (_isCalculating)
+        {
+            <MudStack Spacing="3">
+                <!-- Skeleton: Predicted Price Card -->
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-4">Predicted Price</MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
+                        <MudSkeleton Width="180px" Height="52px" Animation="Animation.Wave" />
+                        <MudSkeleton Width="80px" Height="24px" Animation="Animation.Wave" Class="mb-2" />
+                    </MudStack>
+                    <MudSkeleton Width="200px" Height="20px" Animation="Animation.Wave" Class="mt-3" />
+                </MudPaper>
+
+                <!-- Skeleton: Confidence Meter -->
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Confidence Level</MudText>
+                    <MudSkeleton Height="16px" Animation="Animation.Wave" Class="mb-2" />
+                    <MudSkeleton Width="280px" Height="16px" Animation="Animation.Wave" />
+                </MudPaper>
+
+                <!-- Skeleton: Cost Breakdown -->
+                <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
+                    <MudText Typo="Typo.h6" Class="mb-3">Cost Breakdown</MudText>
+                    <MudStack Spacing="2">
+                        @for (int i = 0; i < 7; i++)
+                        {
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudSkeleton Width="120px" Height="20px" Animation="Animation.Wave" />
+                                <MudSkeleton Width="80px" Height="20px" Animation="Animation.Wave" />
+                            </MudStack>
+                        }
+                        <MudDivider Class="my-2" />
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudSkeleton Width="100px" Height="20px" Animation="Animation.Wave" />
+                            <MudSkeleton Width="100px" Height="20px" Animation="Animation.Wave" />
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        }
+        else if (!_hasResults)
         {
             <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 500px;">
-                <MudIcon Icon="@Icons.Material.Outlined.AutoGraph" Size="Size.Large" Color="Color.Secondary" Class="mb-4" Style="font-size: 80px;" />
-                <MudText Typo="Typo.h6" Color="Color.Secondary" Align="Align.Center">Enter parameters and click Calculate</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="mt-2">
+                <MudIcon Icon="@Icons.Material.Outlined.AutoGraph" Size="Size.Large" Color="Color.Default" Class="mb-4" Style="font-size: 80px;" />
+                <MudText Typo="Typo.h6" Color="Color.Default" Align="Align.Center">Enter parameters and click Calculate</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default" Align="Align.Center" Class="mt-2">
                     AI will analyze historical data and provide pricing recommendations
                 </MudText>
             </MudPaper>
@@ -94,7 +135,7 @@
                     <MudText Typo="Typo.h6" Class="mb-4">Predicted Price</MudText>
                     <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
                         <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">@CurrencyFormatter.Format(_pricingResult.TotalUnitPrice, "THB", 2)</MudText>
-                        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="pb-1">THB per unit</MudText>
+                        <MudText Typo="Typo.h6" Color="Color.Default" Class="pb-1">THB per unit</MudText>
                     </MudStack>
                     <MudText Typo="Typo.body2" Color="Color.Info" Class="mt-2">
                         <MudIcon Icon="@Icons.Material.Filled.AccessTime" Size="Size.Small" Class="mr-1" /> 
@@ -106,7 +147,7 @@
                 <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
                     <MudText Typo="Typo.h6" Class="mb-3">Confidence Level</MudText>
                     <MudProgressLinear Color="@GetConfidenceColor(_pricingResult.ConfidenceLevel)" Size="Size.Large" Value="@((double)_pricingResult.ConfidenceLevel * 100)" Class="mb-2" />
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(_pricingResult.ConfidenceLevel * 100)% confidence based on historical data and @_pricingResult.Strategy strategy</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">@(_pricingResult.ConfidenceLevel * 100)% confidence based on historical data and @_pricingResult.Strategy strategy</MudText>
                 </MudPaper>
 
                 <!-- Price Breakdown -->

@@ -1,4 +1,5 @@
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -75,4 +76,30 @@ public class MaterialServiceClient(HttpClient httpClient)
         var response = await httpClient.DeleteAsync($"/material/v1/materials/{id}", ct);
         return response.IsSuccessStatusCode;
     }
+
+    // ── Manufacturing Catalog ─────────────────────────────────────────────────
+
+    /// <summary>Returns all active manufacturing processes.</summary>
+    public Task<List<ProcessDto>?> GetProcessesAsync(CancellationToken ct = default) =>
+        httpClient.GetFromJsonAsync<List<ProcessDto>>("/material/v1/manufacturing/processes", ct);
+
+    /// <summary>Returns materials available for the given process code.</summary>
+    public Task<List<CatalogMaterialDto>?> GetMaterialsByProcessAsync(string processCode, CancellationToken ct = default) =>
+        httpClient.GetFromJsonAsync<List<CatalogMaterialDto>>($"/material/v1/manufacturing/processes/{Uri.EscapeDataString(processCode)}/materials", ct);
+
+    /// <summary>Returns surface finishes available for the given process code.</summary>
+    public Task<List<CatalogSurfaceFinishDto>?> GetFinishesByProcessAsync(string processCode, CancellationToken ct = default) =>
+        httpClient.GetFromJsonAsync<List<CatalogSurfaceFinishDto>>($"/material/v1/manufacturing/processes/{Uri.EscapeDataString(processCode)}/finishes", ct);
+
+    /// <summary>Returns tolerance classes available for the given process code.</summary>
+    public Task<List<CatalogToleranceDto>?> GetTolerancesByProcessAsync(string processCode, CancellationToken ct = default) =>
+        httpClient.GetFromJsonAsync<List<CatalogToleranceDto>>($"/material/v1/manufacturing/processes/{Uri.EscapeDataString(processCode)}/tolerances", ct);
+
+    /// <summary>Returns dynamic configuration options for the given process code.</summary>
+    public Task<List<ProcessConfigOptionDto>?> GetConfigOptionsByProcessAsync(string processCode, CancellationToken ct = default) =>
+        httpClient.GetFromJsonAsync<List<ProcessConfigOptionDto>>($"/material/v1/manufacturing/processes/{Uri.EscapeDataString(processCode)}/config-options", ct);
+
+    /// <summary>Returns surface finishes compatible with a specific material.</summary>
+    public Task<List<CatalogSurfaceFinishDto>?> GetFinishesByMaterialAsync(Guid materialId, CancellationToken ct = default) =>
+        httpClient.GetFromJsonAsync<List<CatalogSurfaceFinishDto>>($"/material/v1/manufacturing/materials/{materialId}/finishes", ct);
 }

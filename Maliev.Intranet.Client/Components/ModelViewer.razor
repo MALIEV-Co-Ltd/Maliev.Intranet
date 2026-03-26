@@ -1,13 +1,15 @@
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Services
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
+@inject LayoutService LayoutService
 
-<div class="model-viewer-container" style="position: relative; width: 100%; height: 600px; border-radius: 8px; overflow: hidden; background-color: #f5f5f5;">
-    <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none;"></canvas>
-    
+<div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; border-radius: 8px; overflow: hidden; background-color: var(--mud-palette-surface); contain: layout style;">
+    <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block;"></canvas>
+
     @if (Model != null)
     {
-        <div class="overlay-info" style="position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.6); color: white; padding: 12px; border-radius: 8px; backdrop-filter: blur(4px); pointer-events: none;">
+        <div class="overlay-info" style="position: absolute; top: 12px; left: 12px; background: var(--mud-palette-overlay-dark); color: var(--mud-palette-white); padding: 12px; border-radius: 8px; backdrop-filter: blur(4px); pointer-events: none;">
             <MudText Typo="Typo.subtitle1" Class="fw-bold">@Model.FileName</MudText>
             @if (Model.GeometryAnalyzed)
             {
@@ -25,23 +27,28 @@
         </div>
     }
 
-    <div class="viewer-controls" style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; justify-content: center; pointer-events: none;">
-        <MudPaper Elevation="4" Class="pa-1 rounded-pill" Style="background: rgba(255,255,255,0.8); backdrop-filter: blur(8px); pointer-events: auto; display: flex; gap: 4px;">
-            <MudToggleGroup T="string" Value="@_currentRenderMode" ValueChanged="OnRenderModeChanged" SelectionMode="SelectionMode.SingleSelection" Color="Color.Primary" CheckMark="false" Delimiters="false">
-                <MudToggleItem Value="@("solid")" UnselectedIcon="@Icons.Material.Outlined.Square" SelectedIcon="@Icons.Material.Filled.Square">Solid</MudToggleItem>
-                <MudToggleItem Value="@("wireframe")" UnselectedIcon="@Icons.Material.Outlined.Grid4x4" SelectedIcon="@Icons.Material.Filled.Grid4x4">Wireframe</MudToggleItem>
-                <MudToggleItem Value="@("xray")" UnselectedIcon="@Icons.Material.Outlined.FilterCenterFocus" SelectedIcon="@Icons.Material.Filled.FilterCenterFocus">X-Ray</MudToggleItem>
-            </MudToggleGroup>
-            <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
-            
-            <MudTooltip Text="Reset Camera">
-                <MudIconButton Icon="@Icons.Material.Outlined.CenterFocusStrong" OnClick="ResetCamera" Color="Color.Default" />
-            </MudTooltip>
-            
-            <MudTooltip Text="Fullscreen">
-                <MudIconButton Icon="@Icons.Material.Outlined.Fullscreen" OnClick="ToggleFullscreen" Color="Color.Default" />
-            </MudTooltip>
-        </MudPaper>
+    <div class="viewport-toolbar" style="position: absolute; bottom: 0; left: 0; right: 0;">
+        <button class="vp-btn @(_cameraPreset == "front" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("front"))'>Front</button>
+        <button class="vp-btn @(_cameraPreset == "back" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("back"))'>Back</button>
+        <button class="vp-btn @(_cameraPreset == "left" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("left"))'>Left</button>
+        <button class="vp-btn @(_cameraPreset == "right" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("right"))'>Right</button>
+        <button class="vp-btn @(_cameraPreset == "top" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("top"))'>Top</button>
+        <button class="vp-btn @(_cameraPreset == "bottom" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("bottom"))'>Bottom</button>
+        <button class="vp-btn @(_cameraPreset == "iso" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("iso"))'>Iso</button>
+        <span class="vp-sep">|</span>
+        <button class="vp-btn @(_renderMode == "solid" ? "vp-active" : "")" @onclick='@(() => SetRenderModeAsync("solid"))'>Solid</button>
+        <button class="vp-btn @(_renderMode == "wireframe" ? "vp-active" : "")" @onclick='@(() => SetRenderModeAsync("wireframe"))'>Wireframe</button>
+        <button class="vp-btn @(_renderMode == "transparent" ? "vp-active" : "")" @onclick='@(() => SetRenderModeAsync("transparent"))'>Transparent</button>
+        <button class="vp-btn @(_edgesEnabled ? "vp-active" : "")" @onclick="ToggleEdgesAsync">Edges</button>
+        <button class="vp-btn @(_bboxEnabled ? "vp-active" : "")" @onclick="ToggleBoundingBoxAsync">Bbox</button>
+        <span class="vp-sep">|</span>
+        <button class="vp-btn" @onclick="ResetCamera">Reset</button>
+    </div>
+
+    <div class="expand-btn-container" style="position: absolute; top: 10px; left: 10px; z-index: 10;">
+        <button class="vp-btn" @onclick="ToggleExpand" style="background: var(--mud-palette-overlay-dark); color: var(--mud-palette-white); padding: 6px 12px; font-size: 13px;">
+            @(_expanded ? (MarkupString)"&#9633; Collapse" : (MarkupString)"&#x2922; Expand")
+        </button>
     </div>
 </div>
 
@@ -52,18 +59,36 @@
     [Parameter]
     public string? ViewerUrl { get; set; }
 
+    [Parameter]
+    public string? FileExtension { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnExpandToggle { get; set; }
+
     private string _canvasId = $"babylon-canvas-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
-    private string _currentRenderMode = "solid";
+    private string _renderMode = "solid";
+    private string _cameraPreset = "iso";
+    private bool _edgesEnabled;
+    private bool _bboxEnabled;
+    private bool _expanded;
+    private string? _lastViewerUrl;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !string.IsNullOrEmpty(ViewerUrl))
+        if (!string.IsNullOrEmpty(ViewerUrl) && ViewerUrl != _lastViewerUrl)
         {
+            var previousUrl = _lastViewerUrl;
+            _lastViewerUrl = ViewerUrl;
             try
             {
-                _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/babylon-viewer.js");
-                await _module.InvokeVoidAsync("initialize", _canvasId, ViewerUrl);
+                _module ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/babylon-viewer.js");
+                if (previousUrl != null)
+                    await _module.InvokeVoidAsync("dispose", _canvasId);
+                _renderMode = "solid";
+                _edgesEnabled = false;
+                _bboxEnabled = false;
+                await _module.InvokeVoidAsync("initialize", _canvasId, ViewerUrl, FileExtension ?? string.Empty, LayoutService.IsDarkMode);
             }
             catch (Exception ex)
             {
@@ -72,26 +97,46 @@
         }
     }
 
-    private async Task OnRenderModeChanged(string mode)
+    private async Task SetCameraPreset(string preset)
     {
-        _currentRenderMode = mode;
+        _cameraPreset = preset;
         if (_module != null)
-        {
-            await _module.InvokeVoidAsync("setRenderMode", _canvasId, mode);
-        }
+            await _module.InvokeVoidAsync("setCameraPreset", _canvasId, preset);
+    }
+
+    private async Task SetRenderModeAsync(string mode)
+    {
+        var targetMode = _renderMode == mode ? "solid" : mode;
+        _renderMode = targetMode;
+        if (_module != null)
+            await _module.InvokeVoidAsync("setRenderMode", _canvasId, targetMode);
     }
 
     private async Task ResetCamera()
     {
+        _cameraPreset = "iso";
         if (_module != null)
-        {
             await _module.InvokeVoidAsync("resetCamera", _canvasId);
-        }
     }
 
-    private async Task ToggleFullscreen()
+    private async Task ToggleEdgesAsync()
     {
-        await JSRuntime.InvokeVoidAsync("eval", $"document.getElementById('{_canvasId}').requestFullscreen()");
+        _edgesEnabled = !_edgesEnabled;
+        if (_module != null)
+            await _module.InvokeVoidAsync("toggleEdges", _canvasId, _edgesEnabled);
+    }
+
+    private async Task ToggleBoundingBoxAsync()
+    {
+        _bboxEnabled = !_bboxEnabled;
+        if (_module != null)
+            await _module.InvokeVoidAsync("toggleBoundingBox", _canvasId, _bboxEnabled);
+    }
+
+    private async Task ToggleExpand()
+    {
+        _expanded = !_expanded;
+        await OnExpandToggle.InvokeAsync(_expanded);
     }
 
     public async ValueTask DisposeAsync()
@@ -110,3 +155,4 @@
         }
     }
 }
+

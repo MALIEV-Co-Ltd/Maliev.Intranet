@@ -1,6 +1,6 @@
+using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Bff.Services;
-using Maliev.Intranet.Shared.Dtos;
 using Maliev.MessagingContracts.Contracts.Geometry;
 using MassTransit;
 using Microsoft.AspNetCore.SignalR;
@@ -14,6 +14,7 @@ namespace Maliev.Intranet.Bff.Consumers;
 public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
 {
     private readonly IHubContext<NotificationHub> _hub;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IFileAnalysisStatusService _analysisStatusService;
     private readonly ILogger<FileAnalyzedConsumer> _logger;
 
@@ -22,13 +23,18 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
     /// </summary>
     public FileAnalyzedConsumer(
         IHubContext<NotificationHub> hub,
+        IHttpClientFactory httpClientFactory,
         IFileAnalysisStatusService analysisStatusService,
         ILogger<FileAnalyzedConsumer> logger)
     {
         _hub = hub;
+        _httpClientFactory = httpClientFactory;
         _analysisStatusService = analysisStatusService;
         _logger = logger;
     }
+
+    private UploadServiceClient CreateUploadClient() =>
+        new("UploadServiceClient.Consumer", _httpClientFactory);
 
     /// <summary>
     /// Processes an incoming <see cref="FileAnalyzedEvent"/> and stores status for polling.
@@ -47,65 +53,53 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
             "Received FileAnalyzedEvent for file {FileId}, manifold={IsManifold}, GlbPath={GlbPath}, ThumbPath={ThumbPath}",
             payload.FileId, payload.Metrics?.IsManifold, payload.GlbStoragePath, payload.ThumbnailStoragePath);
 
-        var dimensions = payload.Metrics?.BoundingBox is { } bb
-            ? new FileAnalysisDimensionsDto
-              {
-                  X         = bb.X,
-                  Y         = bb.Y,
-                  Z         = bb.Z,
-                  VolumeMm3 = payload.Metrics.VolumeCm3 * 1000,
-              }
-            : null;
-
-        string? gcsStoragePath = null;
-        if (!string.IsNullOrEmpty(payload.GlbStoragePath) &&
-            payload.GlbStoragePath.EndsWith("_viewer.glb", StringComparison.OrdinalIgnoreCase))
-        {
-            gcsStoragePath = payload.GlbStoragePath[..^"_viewer.glb".Length];
-        }
-        else if (!string.IsNullOrEmpty(payload.ThumbnailStoragePath) &&
-                 payload.ThumbnailStoragePath.EndsWith("_thumb.png", StringComparison.OrdinalIgnoreCase))
-        {
-            gcsStoragePath = payload.ThumbnailStoragePath[..^"_thumb.png".Length];
-        }
+        var gcsStoragePath = payload.StoragePath;
 
         _logger.LogInformation(
-            "FileAnalyzedConsumer: derived cache key={CacheKey} from GlbPath={GlbPath}, ThumbPath={ThumbPath}",
-            gcsStoragePath, payload.GlbStoragePath, payload.ThumbnailStoragePath);
+            "FileAnalyzedConsumer: storagePath={StoragePath}, GlbPath={GlbPath}",
+            gcsStoragePath, payload.GlbStoragePath);
 
-        var isManifold = payload.Metrics?.IsManifold ?? true;
-
-        if (gcsStoragePath != null)
+        if (!string.IsNullOrEmpty(gcsStoragePath))
         {
-            await _analysisStatusService.SetProcessingAsync(gcsStoragePath, context.CancellationToken);
-
-            if (dimensions != null)
+            try
             {
-                await _analysisStatusService.SetDimensionsAsync(gcsStoragePath, dimensions, isManifold, context.CancellationToken);
+                await _analysisStatusService.SetAnalysisCompletedAsync(gcsStoragePath, payload.GlbStoragePath, context.CancellationToken);
+
                 _logger.LogInformation(
-                    "FileAnalyzedConsumer: stored dimensions for key={CacheKey}, manifold={IsManifold}",
-                    gcsStoragePath, isManifold);
+                    "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}",
+                    gcsStoragePath, payload.GlbStoragePath);
+
+                string? glbUrl = null;
+                if (!string.IsNullOrEmpty(payload.GlbStoragePath))
+                {
+                    glbUrl = await CreateUploadClient()
+                        .GetDownloadUrlByPathAsync(payload.GlbStoragePath, context.CancellationToken);
+                    // No fallback — if signed URL resolution fails, Failed = true on the client
+                }
+
+                await _hub.Clients.Group($"file:{gcsStoragePath}").SendAsync("GlbReady", new GlbReadyPayload(
+                    StoragePath: gcsStoragePath,
+                    GlbUrl: glbUrl,
+                    Failed: string.IsNullOrEmpty(glbUrl)
+                ), context.CancellationToken);
             }
-
-            var signalRPayload = new FileAnalysisCompletedPayload(
-                StoragePath: gcsStoragePath,
-                UploadId: payload.FileId,
-                ThumbnailUrl: null,
-                Dimensions: dimensions != null ? new FileAnalysisDimensions(dimensions.X, dimensions.Y, dimensions.Z, dimensions.VolumeMm3) : null,
-                PreviewUrls: null,
-                Failed: false,
-                ErrorCode: null);
-
-            await _hub.Clients.All.SendAsync(
-                "FileAnalysisCompleted",
-                signalRPayload,
-                context.CancellationToken);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "FileAnalyzedConsumer failed for {StoragePath}", payload.StoragePath);
+                if (!string.IsNullOrEmpty(gcsStoragePath))
+                {
+                    await _analysisStatusService.SetAnalysisFailedAsync(
+                        gcsStoragePath, "glb-consumer-error", context.CancellationToken);
+                }
+                throw;
+            }
         }
         else
         {
             _logger.LogWarning(
-                "FileAnalyzedConsumer: could not derive storage path from GlbPath={GlbPath}, ThumbPath={ThumbPath}",
-                payload.GlbStoragePath, payload.ThumbnailStoragePath);
+                "FileAnalyzedConsumer: missing storagePath — skipping status update for FileId={FileId}",
+                payload.FileId);
         }
     }
 }

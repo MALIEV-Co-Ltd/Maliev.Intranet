@@ -54,84 +54,72 @@ public class JwtClaimsEnrichmentMiddleware
                     {
                         // Parse JWT and extract claims
                         var handler = new JwtSecurityTokenHandler();
-                        var jwtToken = handler.ReadJwtToken(accessToken);
 
-                        // Check if token is expired
-                        if (jwtToken.ValidTo < DateTime.UtcNow)
+                        try
                         {
-                            _logger.LogWarning("JWT token expired for user {UserId}. Forcing sign out.",
-                                context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+                            var jwtToken = handler.ReadJwtToken(accessToken);
 
-                            await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-                            if (IsApiRequest(context))
+                            // Check if token is expired - log warning but do NOT force signout
+                            // The access token is for downstream service calls, not session validity
+                            if (jwtToken.ValidTo < DateTime.UtcNow)
                             {
-                                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                                _logger.LogWarning(
+                                    "Access token expired for user {UserId}. Downstream calls will use no token. Session remains valid.",
+                                    context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+                                // Do NOT sign out - the user's session cookie is still valid
+                                // Downstream services will receive 401 and handle accordingly
                             }
                             else
                             {
-                                context.Response.Redirect("/login");
+                                var identity = context.User.Identity as ClaimsIdentity;
+
+                                if (identity != null)
+                                {
+                                    // Add roles and permissions from JWT to current identity
+                                    foreach (var claim in jwtToken.Claims.Where(c =>
+                                        c.Type is "roles" or "role" or "permissions" or "permission"))
+                                    {
+                                        // Only add if not already present
+                                        if (!identity.HasClaim(claim.Type, claim.Value))
+                                        {
+                                            identity.AddClaim(new Claim(claim.Type, claim.Value));
+                                        }
+
+                                        // Also add as ClaimTypes.Role for ASP.NET Core authorization
+                                        if (claim.Type is "roles" or "role" && !identity.HasClaim(ClaimTypes.Role, claim.Value))
+                                        {
+                                            identity.AddClaim(new Claim(ClaimTypes.Role, claim.Value));
+                                        }
+                                    }
+                                }
                             }
-                            return;
                         }
-
-                        var identity = context.User.Identity as ClaimsIdentity;
-
-                        if (identity != null)
+                        catch (Exception ex)
                         {
-                            // Add roles and permissions from JWT to current identity
-                            foreach (var claim in jwtToken.Claims.Where(c =>
-                                c.Type is "roles" or "role" or "permissions" or "permission"))
-                            {
-                                // Only add if not already present
-                                if (!identity.HasClaim(claim.Type, claim.Value))
-                                {
-                                    identity.AddClaim(new Claim(claim.Type, claim.Value));
-                                }
-
-                                // Also add as ClaimTypes.Role for ASP.NET Core authorization
-                                if (claim.Type is "roles" or "role" && !identity.HasClaim(ClaimTypes.Role, claim.Value))
-                                {
-                                    identity.AddClaim(new Claim(ClaimTypes.Role, claim.Value));
-                                }
-                            }
+                            // Token parsing failed - log but do NOT force signout
+                            // The user's session is valid, just skip claim enrichment
+                            _logger.LogWarning(ex,
+                                "Failed to parse access token for user {UserId}. Skipping claim enrichment.",
+                                context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
                         }
                     }
                     else
                     {
                         // No access token found - this is a stale cookie scenario
-                        _logger.LogWarning("No access token found for authenticated user {UserId}. Forcing sign out.",
+                        // Log warning but do NOT force signout - the session cookie may still be valid
+                        // Downstream services will receive requests without a token and handle accordingly
+                        _logger.LogWarning(
+                            "No access token found for authenticated user {UserId}. Downstream calls will use no token.",
                             context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
-
-                        await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-                        if (IsApiRequest(context))
-                        {
-                            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                        }
-                        else
-                        {
-                            context.Response.Redirect("/login");
-                        }
-                        return;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to enrich claims from JWT for user {UserId}. Forcing sign out.",
+                    // Unexpected error during token retrieval - log but do NOT force signout
+                    // The user's session may still be valid
+                    _logger.LogError(ex,
+                        "Failed to retrieve access token for user {UserId}. Skipping claim enrichment.",
                         context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
-
-                    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-                    if (IsApiRequest(context))
-                    {
-                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    }
-                    else
-                    {
-                        context.Response.Redirect("/login");
-                    }
-                    return;
                 }
 
                 // Mark as processed to avoid re-parsing

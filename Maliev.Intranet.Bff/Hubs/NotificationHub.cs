@@ -25,6 +25,22 @@ public class NotificationHub : Hub
     {
         await Clients.All.SendAsync("CustomerChanged");
     }
+
+    /// <summary>
+    /// Adds the current connection to the file-specific SignalR group.
+    /// Call this after uploading a 3D file to receive analysis events for that file only.
+    /// </summary>
+    /// <param name="storagePath">GCS storage path of the uploaded file (used as group key).</param>
+    public async Task JoinFileGroup(string storagePath)
+        => await Groups.AddToGroupAsync(Context.ConnectionId, $"file:{storagePath}");
+
+    /// <summary>
+    /// Removes the current connection from the file-specific SignalR group.
+    /// Call this when the file is removed or the page is left.
+    /// </summary>
+    /// <param name="storagePath">GCS storage path of the file to leave.</param>
+    public async Task LeaveFileGroup(string storagePath)
+        => await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"file:{storagePath}");
 }
 
 /// <summary>
@@ -33,6 +49,7 @@ public class NotificationHub : Hub
 /// <param name="StoragePath">The GCS storage path of the original 3D file (used as join key on the client).</param>
 /// <param name="UploadId">The upload ID of the file, if available.</param>
 /// <param name="ThumbnailUrl">Signed URL to the generated thumbnail image, or null if unavailable.</param>
+/// <param name="HiResThumbnailUrl">Signed URL to the 1000px ISO WebP thumbnail for hi-res display, or null if unavailable.</param>
 /// <param name="Dimensions">Bounding box dimensions in millimetres, or null if analysis failed.</param>
 /// <param name="PreviewUrls">Signed URLs for the six rendered preview images (front/back/left/right/top/bottom).</param>
 /// <param name="Failed">True when geometry analysis failed (no preview or dimensions available).</param>
@@ -41,6 +58,7 @@ public record FileAnalysisCompletedPayload(
     string StoragePath,
     string? UploadId,
     string? ThumbnailUrl,
+    string? HiResThumbnailUrl,
     FileAnalysisDimensions? Dimensions,
     FileAnalysisPreviewUrls? PreviewUrls,
     bool Failed,
@@ -56,20 +74,54 @@ public record FileAnalysisCompletedPayload(
 public record FileAnalysisDimensions(double X, double Y, double Z, double? VolumeMm3);
 
 /// <summary>
-/// Signed URLs for the six rendered preview images plus isometric view.
+/// Signed URLs for the six rendered preview images plus isometric views.
 /// </summary>
-/// <param name="Front">Front view URL.</param>
-/// <param name="Back">Back view URL.</param>
-/// <param name="Left">Left view URL.</param>
-/// <param name="Right">Right view URL.</param>
-/// <param name="Top">Top view URL.</param>
-/// <param name="Bottom">Bottom view URL.</param>
-/// <param name="Iso">Isometric view URL.</param>
+/// <param name="FrontSmall">Front view URL (small WebP).</param>
+/// <param name="BackSmall">Back view URL (small WebP).</param>
+/// <param name="LeftSmall">Left view URL (small WebP).</param>
+/// <param name="RightSmall">Right view URL (small WebP).</param>
+/// <param name="TopSmall">Top view URL (small WebP).</param>
+/// <param name="BottomSmall">Bottom view URL (small WebP).</param>
+/// <param name="ThumbnailSmall">Isometric thumbnail URL (small ~256px WebP).</param>
+/// <param name="ThumbnailLarge">Isometric thumbnail URL (large 1200px WebP, hi-res display).</param>
 public record FileAnalysisPreviewUrls(
-    string? Front,
-    string? Back,
-    string? Left,
-    string? Right,
-    string? Top,
-    string? Bottom,
-    string? Iso);
+    string? FrontSmall,
+    string? BackSmall,
+    string? LeftSmall,
+    string? RightSmall,
+    string? TopSmall,
+    string? BottomSmall,
+    string? ThumbnailSmall,
+    string? ThumbnailLarge = null);
+
+/// <summary>Payload pushed when the GLB 3D model file is ready for viewing.</summary>
+/// <param name="StoragePath">GCS path of the original file (join key).</param>
+/// <param name="GlbUrl">Signed URL to the GLB file, or null if generation failed.</param>
+/// <param name="Failed">True when GLB generation failed.</param>
+public record GlbReadyPayload(string StoragePath, string? GlbUrl, bool Failed);
+
+/// <summary>Payload pushed when DFM analysis results are ready for all process types.</summary>
+/// <param name="StoragePath">GCS path of the original file (join key).</param>
+/// <param name="FdmReport">FDM-specific DFM analysis data, or null if not applicable.</param>
+/// <param name="SlaReport">SLA-specific DFM analysis data, or null if not applicable.</param>
+/// <param name="CncReport">CNC-specific DFM analysis data, or null if not applicable.</param>
+public record DfmAnalysisReadyPayload(
+    string StoragePath,
+    Maliev.MessagingContracts.Contracts.Geometry.FdmDfmReportPayload? FdmReport,
+    Maliev.MessagingContracts.Contracts.Geometry.SlaDfmReportPayload? SlaReport,
+    Maliev.MessagingContracts.Contracts.Geometry.CncDfmReportPayload? CncReport);
+
+/// <summary>Payload pushed when a pricing calculation result is ready.</summary>
+/// <param name="StoragePath">GCS path of the original file (join key).</param>
+/// <param name="UnitPrice">Calculated unit price.</param>
+/// <param name="TotalPrice">Total price for the requested quantity.</param>
+/// <param name="Currency">ISO 4217 currency code.</param>
+/// <param name="EstimatedLeadTimeDays">Estimated days for production and shipping, or null if unknown.</param>
+/// <param name="ValidUntil">When this price quote expires.</param>
+public record PriceCalculatedPayload(
+    string StoragePath,
+    double UnitPrice,
+    double TotalPrice,
+    string Currency,
+    int? EstimatedLeadTimeDays,
+    DateTimeOffset ValidUntil);

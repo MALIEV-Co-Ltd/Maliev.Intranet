@@ -5,7 +5,7 @@
 
 <PageTitle>My Profile - Maliev Intranet</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">My Profile</MudText>
+<MudText Typo="Typo.h5" Style="font-weight: 600;" Class="mb-4">My Profile</MudText>
 
 @if (_isLoading)
 {
@@ -26,17 +26,17 @@ else
                 <MudText Typo="Typo.h6" Class="mb-3">Personal Information</MudText>
                 <MudGrid>
                     <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Full Name</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Full Name</MudText>
                         <MudText Typo="Typo.body1">@_profile.Name</MudText>
                     </MudItem>
                     <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Work Email</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Work Email</MudText>
                         <MudText Typo="Typo.body1">@_profile.Email</MudText>
                     </MudItem>
                     @if (!string.IsNullOrEmpty(_profile.Phone))
                     {
                         <MudItem xs="12">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Phone</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">Phone</MudText>
                             <MudText Typo="Typo.body1">@_profile.Phone</MudText>
                         </MudItem>
                     }
@@ -50,28 +50,28 @@ else
                 <MudText Typo="Typo.h6" Class="mb-3">Employment</MudText>
                 <MudGrid>
                     <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Title</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Title</MudText>
                         <MudText Typo="Typo.body1">@(_profile.Title.Length > 0 ? _profile.Title : "—")</MudText>
                     </MudItem>
                     <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Department</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Department</MudText>
                         <MudText Typo="Typo.body1">@(_profile.Department.Length > 0 ? _profile.Department : "—")</MudText>
                     </MudItem>
                     <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">Status</MudText>
                         <MudChip T="string" Size="Size.Small" Color="@(_profile.Status == "Active" ? Color.Success : Color.Default)">@_profile.Status</MudChip>
                     </MudItem>
                     @if (!string.IsNullOrEmpty(_profile.ManagerName))
                     {
                         <MudItem xs="12">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Manager</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">Manager</MudText>
                             <MudText Typo="Typo.body1">@_profile.ManagerName</MudText>
                         </MudItem>
                     }
                     @if (_profile.HireDate.HasValue)
                     {
                         <MudItem xs="12">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Start Date</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">Start Date</MudText>
                             <MudText Typo="Typo.body1">@_profile.HireDate.Value.ToString("d MMM yyyy")</MudText>
                         </MudItem>
                     }

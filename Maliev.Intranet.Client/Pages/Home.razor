@@ -19,7 +19,7 @@
     }
     .widget-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important;
+        box-shadow: var(--mud-elevation-4) !important;
     }
     .trend-up   { color: var(--mud-palette-success);  }
     .trend-down { color: var(--mud-palette-error);    }
@@ -70,7 +70,7 @@ else
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 rounded-lg widget-card"
                               @onclick="@(() => { if (!string.IsNullOrEmpty(widget.NavigateTo)) Navigation.NavigateTo(widget.NavigateTo); })">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="text-transform: uppercase; letter-spacing: 0.05em;">@widget.Title</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default" Style="text-transform: uppercase; letter-spacing: 0.05em;">@widget.Title</MudText>
                         <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.SpaceBetween" Class="mt-2">
                             <div>
                                 <MudText Typo="Typo.h4" Style="font-weight: 600; line-height: 1;">
@@ -126,7 +126,7 @@ else
         <MudItem xs="12">
             <MudPaper Elevation="0" Class="pa-3 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
                 <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="align-self-center mr-2" Style="white-space: nowrap;">Quick actions:</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default" Class="align-self-center mr-2" Style="white-space: nowrap;">Quick actions:</MudText>
                     <MudButton Variant="Variant.Outlined"
                                StartIcon="@Icons.Material.Outlined.FolderSpecial"
                                Color="Color.Primary"
@@ -137,7 +137,7 @@ else
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                                StartIcon="@Icons.Material.Outlined.PersonAdd"
-                               Color="Color.Secondary"
+                               Color="Color.Default"
                                Size="Size.Small"
                                Class="quick-action-btn rounded-lg"
                                OnClick="@(() => Navigation.NavigateTo("/sales/customers/new"))">
@@ -191,7 +191,7 @@ else
                         var withMargin = subtotal * (1 + _calcMarginPct / 100m);
                     }
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-3" Wrap="Wrap.Wrap">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Machine rate: @CurrencyFormatter.Format(machineRate, "THB", 0)/hr</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Machine rate: @CurrencyFormatter.Format(machineRate, "THB", 0)/hr</MudText>
                         <MudDivider Vertical="true" FlexItem="true" Class="d-none d-sm-flex" />
                         <MudText Typo="Typo.body2">Subtotal: <strong>@CurrencyFormatter.Format(subtotal, "THB", 2)</strong></MudText>
                         <MudDivider Vertical="true" FlexItem="true" Class="d-none d-sm-flex" />
@@ -240,7 +240,7 @@ else
                                                  Size="Size.Small" />
                                     </MudBadge>
                                     <MudText Typo="Typo.body2" Style="flex: 1;">@item.Label</MudText>
-                                    <MudIcon Icon="@Icons.Material.Outlined.ChevronRight" Size="Size.Small" Color="Color.Secondary" />
+                                    <MudIcon Icon="@Icons.Material.Outlined.ChevronRight" Size="Size.Small" Color="Color.Default" />
                                 </MudStack>
                             </div>
                         }
@@ -250,7 +250,7 @@ else
                 {
                     <MudStack AlignItems="AlignItems.Center" Class="pa-6">
                         <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Style="font-size: 48px;" />
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2 text-center">
+                        <MudText Typo="Typo.body2" Color="Color.Default" Class="mt-2 text-center">
                             No action items — everything is on track!
                         </MudText>
                     </MudStack>
@@ -289,7 +289,7 @@ else
                             <MudTd DataLabel="Date">@context.CreatedAt.ToString("dd MMM yyyy")</MudTd>
                         </RowTemplate>
                         <NoRecordsContent>
-                            <MudText Class="pa-6 text-center" Color="Color.Secondary">No orders found</MudText>
+                            <MudText Class="pa-6 text-center" Color="Color.Default">No orders found</MudText>
                         </NoRecordsContent>
                     </MudTable>
             </MudPaper>

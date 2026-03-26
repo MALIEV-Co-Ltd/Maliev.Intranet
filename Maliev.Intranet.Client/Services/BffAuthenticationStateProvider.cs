@@ -5,15 +5,23 @@ using System.Security.Claims;
 
 namespace Maliev.Intranet.Client.Services;
 
+/// <summary>
+/// Provides the authentication state for the application using the Backend-for-Frontend (BFF) security pattern.
+/// </summary>
 public class BffAuthenticationStateProvider : AuthenticationStateProvider
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BffAuthenticationStateProvider"/> class with the specified HTTP client.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client used for authentication requests.</param>
     public BffAuthenticationStateProvider(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
+    /// <inheritdoc />
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         try

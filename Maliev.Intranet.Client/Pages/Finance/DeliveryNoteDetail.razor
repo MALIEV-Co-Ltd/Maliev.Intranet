@@ -190,7 +190,7 @@ else
                         <MudTd DataLabel="Unit">@context.UnitOfMeasure</MudTd>
                     </RowTemplate>
                     <NoRecordsContent>
-                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No items found</MudText>
+                        <MudText Class="pa-4 text-center" Color="Color.Default">No items found</MudText>
                     </NoRecordsContent>
                 </MudTable>
 
@@ -223,7 +223,7 @@ else
                                         <MudIcon Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" />
                                         <div>
                                             <MudText Typo="Typo.body2">@attachment.FileName</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@attachment.UploadedAt.ToString("dd MMM yyyy")</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">@attachment.UploadedAt.ToString("dd MMM yyyy")</MudText>
                                         </div>
                                     </MudStack>
                                     <MudIconButton Icon="@Icons.Material.Outlined.Download" Size="Size.Small" />

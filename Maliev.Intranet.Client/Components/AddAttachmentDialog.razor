@@ -43,7 +43,7 @@
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
         <MudButton Variant="Variant.Filled"
-                   Color="Color.Secondary"
+                   Color="Color.Default"
                    OnClick="Submit"
                    Disabled="@(_isSaving || string.IsNullOrWhiteSpace(_request.Name) || string.IsNullOrEmpty(_request.AttachmentType))">
             @(_isSaving ? "Saving..." : "Add Attachment")

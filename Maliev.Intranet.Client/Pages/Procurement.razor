@@ -10,8 +10,8 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
     <div>
-        <MudText Typo="Typo.h4">Procurement &amp; Suppliers</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Purchase orders and supplier relationship management</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">Procurement &amp; Suppliers</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Purchase orders and supplier relationship management</MudText>
     </div>
 </MudStack>
 
@@ -83,7 +83,7 @@
                         </TemplateColumn>
                     </Columns>
                     <NoRecordsContent>
-                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No purchase orders found</MudText>
+                        <MudText Class="pa-4 text-center" Color="Color.Default">No purchase orders found</MudText>
                     </NoRecordsContent>
                 </MudDataGrid>
             }
@@ -140,7 +140,7 @@
                             }
                             @if (!_suppliers.Any())
                             {
-                                <MudText Class="pa-4 text-center" Color="Color.Secondary">No suppliers found</MudText>
+                                <MudText Class="pa-4 text-center" Color="Color.Default">No suppliers found</MudText>
                             }
                         </MudList>
                     </MudPaper>
@@ -154,7 +154,7 @@
                                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-4">
                                     <div>
                                         <MudText Typo="Typo.h5">@_selectedSupplierDetails.Name</MudText>
-                                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_selectedSupplierDetails.Country</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Default">@_selectedSupplierDetails.Country</MudText>
                                     </div>
                                     <MudStack Row="true" Spacing="2">
                                         <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Edit">Edit</MudButton>
@@ -175,11 +175,11 @@
                                         <MudText Typo="Typo.subtitle2" Class="mb-2">Performance</MudText>
                                         <MudStack Spacing="2">
                                             <div>
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">Rating</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Default">Rating</MudText>
                                                 <MudRating SelectedValue="@((int)_selectedSupplierDetails.Rating)" ReadOnly="true" />
                                             </div>
                                             <div>
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Default">Status</MudText>
                                                 <MudChip T="string" Color="@GetSupplierStatusColor(_selectedSupplierDetails.Status)" Size="Size.Small">@_selectedSupplierDetails.Status</MudChip>
                                             </div>
                                         </MudStack>
@@ -188,7 +188,7 @@
                             </MudPaper>
                             <MudPaper Elevation="0" Class="pa-6 border mud-border-lines-default rounded-lg">
                                 <MudText Typo="Typo.h6" Class="mb-3">Recent Activity</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Activity history integration pending.</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Default">Activity history integration pending.</MudText>
                             </MudPaper>
                         </MudStack>
                     }
@@ -201,8 +201,8 @@
                     else
                     {
                         <MudPaper Elevation="0" Class="pa-12 border mud-border-lines-default rounded-lg d-flex flex-column align-center justify-center" Style="min-height: 400px;">
-                            <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Large" Color="Color.Secondary" Style="font-size: 80px;" Class="mb-4" />
-                            <MudText Typo="Typo.h6" Color="Color.Secondary">Select a supplier to view details</MudText>
+                            <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Large" Color="Color.Default" Style="font-size: 80px;" Class="mb-4" />
+                            <MudText Typo="Typo.h6" Color="Color.Default">Select a supplier to view details</MudText>
                         </MudPaper>
                     }
                 </MudItem>

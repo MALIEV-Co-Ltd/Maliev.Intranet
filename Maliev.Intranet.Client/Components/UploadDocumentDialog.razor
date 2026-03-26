@@ -27,7 +27,7 @@
                               @ondrop="@(() => _dragOver = false)">
                         <MudIcon Icon="@Icons.Material.Filled.FileUpload" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
                         <MudText Typo="Typo.h6">Click to upload or drag and drop</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Upload documents up to 10MB each</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Upload documents up to 10MB each</MudText>
                     </MudPaper>
                 </CustomContent>
             </MudFileUpload>
@@ -50,7 +50,7 @@
                                         <MudIcon Icon="@GetFileIcon(file.Name)" Color="Color.Primary" Size="Size.Small" />
                                         <div class="d-flex flex-column">
                                             <MudText Typo="Typo.body2" Style="font-weight: 600;">@file.Name</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(file.Size)</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(file.Size)</MudText>
                                         </div>
                                     </div>
                                     @if (!file.IsUploading && !file.IsCompleted)
@@ -83,6 +83,7 @@
                 <MudAutocomplete T="string" Label="Document Category" @bind-Value="Category"
                                  SearchFunc="@SearchCategories"
                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                 DebounceInterval="300"
                                  CoerceText="false" CoerceValue="false"
                                  Placeholder="Select or type a category" />
             }
@@ -107,11 +108,11 @@
                         @if (_ndaSummary.KeyTerms.Count > 0)
                         {
                             <div>
-                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Secondary" Class="mb-1">Key Terms</MudText>
+                                <MudText Typo="Typo.caption" Style="font-weight: 700;" Color="Color.Default" Class="mb-1">Key Terms</MudText>
                                 @foreach (var term in _ndaSummary.KeyTerms)
                                 {
                                     <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Start" Class="mb-1">
-                                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Color="Color.Default" />
                                         <MudText Typo="Typo.body2">@term</MudText>
                                     </MudStack>
                                 }
@@ -123,14 +124,14 @@
                                 @if (!string.IsNullOrWhiteSpace(_ndaSummary.Duration))
                                 {
                                     <div>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Duration</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">Duration</MudText>
                                         <MudText Typo="Typo.body2" Style="font-weight: 600;">@_ndaSummary.Duration</MudText>
                                     </div>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(_ndaSummary.GoverningLaw))
                                 {
                                     <div>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Governing Law</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">Governing Law</MudText>
                                         <MudText Typo="Typo.body2" Style="font-weight: 600;">@_ndaSummary.GoverningLaw</MudText>
                                     </div>
                                 }

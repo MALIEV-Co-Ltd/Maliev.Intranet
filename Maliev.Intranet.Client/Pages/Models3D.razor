@@ -11,7 +11,7 @@
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-8">
     <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
-        <MudText Typo="Typo.h4">3D Models Library</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">3D Models Library</MudText>
         <MudButton Variant="Variant.Filled" 
                    Color="Color.Primary" 
                    StartIcon="@Icons.Material.Filled.CloudUpload"
@@ -76,14 +76,14 @@
                 {
                     <MudItem xs="12" sm="6" md="4" lg="3">
                         <MudCard Elevation="0" Class="border mud-border-lines-default rounded-lg hover-card" @onclick="() => NavigateToDetail(model.Id)">
-                            <div style="height: 180px; background-color: #f5f5f5; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+                            <div style="height: 180px; background-color: var(--mud-palette-background-grey); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
                                 @if (!string.IsNullOrEmpty(model.ThumbnailUrl))
                                 {
                                     <img src="@model.ThumbnailUrl" alt="@model.FileName" style="width: 100%; height: 100%; object-fit: cover;" />
                                 }
                                 else
                                 {
-                                    <MudIcon Icon="@Icons.Material.Filled.ViewInAr" Size="Size.Large" Color="Color.Secondary" Style="font-size: 4rem; opacity: 0.3;" />
+                                    <MudIcon Icon="@Icons.Material.Filled.ViewInAr" Size="Size.Large" Color="Color.Default" Style="font-size: 4rem; opacity: 0.3;" />
                                 }
                                 
                                 <div class="card-overlay">
@@ -92,10 +92,10 @@
                             </div>
                             <MudCardContent Class="pa-3">
                                 <MudText Typo="Typo.subtitle2" Class="mud-text-truncate fw-bold">@model.FileName</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Uploaded @model.UploadedAt.ToString("dd MMM yyyy")</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">Uploaded @model.UploadedAt.ToString("dd MMM yyyy")</MudText>
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-2">
                                     <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@Path.GetExtension(model.FileName).ToUpper().TrimStart('.')</MudChip>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(model.FileSize)</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(model.FileSize)</MudText>
                                 </MudStack>
                             </MudCardContent>
                             <MudCardActions Class="pa-2 border-top mud-border-lines-default">
@@ -129,7 +129,7 @@
                     <RowTemplate>
                         <MudTd DataLabel="File Name">
                             <MudStack Row="true" AlignItems="AlignItems.Center">
-                                <MudIcon Icon="@Icons.Material.Filled.ViewInAr" Size="Size.Small" Color="Color.Secondary" />
+                                <MudIcon Icon="@Icons.Material.Filled.ViewInAr" Size="Size.Small" Color="Color.Default" />
                                 <MudText Typo="Typo.body2" Class="fw-bold">@context.FileName</MudText>
                             </MudStack>
                         </MudTd>
@@ -175,13 +175,13 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0,0,0,0.2);
+        background: var(--mud-palette-overlay-dark);
         display: flex;
         align-items: center;
         justify-content: center;
         opacity: 0;
         transition: opacity 0.2s;
-        color: white;
+        color: var(--mud-palette-white);
     }
     .hover-card:hover .card-overlay {
         opacity: 1;

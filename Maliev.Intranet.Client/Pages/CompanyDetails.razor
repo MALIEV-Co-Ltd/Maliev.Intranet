@@ -35,7 +35,7 @@
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-8">
             <MudStack Spacing="0">
                 <MudText Typo="Typo.h3" Style="font-weight: 700;">@_company.Name</MudText>
-                <MudText Typo="Typo.body1" Color="Color.Secondary">Company ID: @_company.Id</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Default">Company ID: @_company.Id</MudText>
             </MudStack>
 
             <MudStack Row="true" Spacing="2">
@@ -60,19 +60,19 @@
                                     <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Registration Info</MudText>
                                     <MudStack Spacing="3">
                                         <div>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tax ID (เลขประจำตัวผู้เสียภาษี)</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">Tax ID (เลขประจำตัวผู้เสียภาษี)</MudText>
                                             <MudText Typo="Typo.body1">@(_company.VatNumber ?? "N/A")</MudText>
                                         </div>
                                         <div>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Registration Number (เลขทะเบียนนิติบุคคล)</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">Registration Number (เลขทะเบียนนิติบุคคล)</MudText>
                                             <MudText Typo="Typo.body1">@(_company.RegistrationNumber ?? "N/A")</MudText>
                                         </div>
                                         <div>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Industry Segment</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">Industry Segment</MudText>
                                             <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text" Class="ma-0">@_company.Segment</MudChip>
                                         </div>
                                         <div>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Customer Tier</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">Customer Tier</MudText>
                                             <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Class="ma-0">@_company.Tier</MudChip>
                                         </div>
                                     </MudStack>
@@ -84,7 +84,7 @@
                                     <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Company Contact</MudText>
                                     <MudStack Spacing="3">
                                         <div>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Email Address</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">Email Address</MudText>
                                             @{
                                                 var displayEmail = _company.ContactEmail
                                                     ?? _company.PrimaryContact?.Email
@@ -95,7 +95,7 @@
                                                 <MudText Typo="Typo.body1">@displayEmail</MudText>
                                                 @if (string.IsNullOrEmpty(_company.ContactEmail))
                                                 {
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                                    <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-1">
                                                         (from primary contact)
                                                     </MudText>
                                                 }
@@ -106,13 +106,13 @@
                                             }
                                         </div>
                                         <div>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Phone Number</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">Phone Number</MudText>
                                             <MudText Typo="Typo.body1">@(_company.ContactPhone ?? "N/A")</MudText>
                                         </div>
                                         @if (_company.PrimaryContact != null)
                                         {
                                             <div>
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">Primary Contact</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Default">Primary Contact</MudText>
                                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                                                     <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
                                                     <MudText Typo="Typo.body1">@_company.PrimaryContact.FullName</MudText>
@@ -206,11 +206,11 @@
                         <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">System Details</MudText>
                         <MudStack Spacing="2">
                             <div class="d-flex justify-space-between">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Created At</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Default">Created At</MudText>
                                 <MudText Typo="Typo.body2">@_company.CreatedAt.ToLocalTime().ToString("g")</MudText>
                             </div>
                             <div class="d-flex justify-space-between">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Last Updated</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Default">Last Updated</MudText>
                                 <MudText Typo="Typo.body2">@_company.UpdatedAt.ToLocalTime().ToString("g")</MudText>
                             </div>
                         </MudStack>

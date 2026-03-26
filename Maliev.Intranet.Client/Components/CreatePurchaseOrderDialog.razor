@@ -12,6 +12,7 @@
                                  Label="Supplier"
                                  @bind-Value="_selectedSupplier"
                                  SearchFunc="SearchSuppliers"
+                                 DebounceInterval="300"
                                  ToStringFunc="@(s => s?.Name ?? "")"
                                  Variant="Variant.Outlined"
                                  Required="true"

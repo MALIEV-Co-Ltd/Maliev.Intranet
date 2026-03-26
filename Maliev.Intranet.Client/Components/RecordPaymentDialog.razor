@@ -6,7 +6,7 @@
 
 <MudDialog>
     <DialogContent>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-4">
             Recording payment for Invoice @InvoiceNumber. Outstanding: @CurrencyFormatter.Format(OutstandingAmount, "THB", 2)
         </MudText>
         <MudForm @ref="_form" @bind-IsValid="_isValid">

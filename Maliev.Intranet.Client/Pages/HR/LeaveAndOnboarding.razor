@@ -10,8 +10,8 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
     <div>
-        <MudText Typo="Typo.h4">Leave &amp; Onboarding</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Time off requests, balances, and employee onboarding</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">Leave &amp; Onboarding</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Time off requests, balances, and employee onboarding</MudText>
     </div>
 </MudStack>
 
@@ -38,13 +38,13 @@
                         <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
                                 <div>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@balance.LeaveType</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@balance.LeaveType</MudText>
                                     <MudText Typo="Typo.h5" Class="mt-2" Color="Color.Primary" Style="font-weight: 700;">@balance.Available days</MudText>
                                 </div>
                                 <MudIcon Icon="@GetLeaveIcon(balance.LeaveType)" Size="Size.Large" Color="Color.Default" Style="opacity: 0.3;" />
                             </MudStack>
                             <MudProgressLinear Color="Color.Primary" Value="@((double)(balance.Used / balance.Entitlement * 100))" Class="mt-3" />
-                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">@balance.Used of @balance.Entitlement used</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-1">@balance.Used of @balance.Entitlement used</MudText>
                         </MudPaper>
                     </MudItem>
                 }
@@ -87,7 +87,7 @@
                         </TemplateColumn>
                     </Columns>
                     <NoRecordsContent>
-                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No leave requests found</MudText>
+                        <MudText Class="pa-4 text-center" Color="Color.Default">No leave requests found</MudText>
                     </NoRecordsContent>
                 </MudDataGrid>
             </MudPaper>
@@ -137,7 +137,7 @@
                         </TemplateColumn>
                     </Columns>
                     <NoRecordsContent>
-                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No onboarding records found</MudText>
+                        <MudText Class="pa-4 text-center" Color="Color.Default">No onboarding records found</MudText>
                     </NoRecordsContent>
                 </MudDataGrid>
             </MudPaper>

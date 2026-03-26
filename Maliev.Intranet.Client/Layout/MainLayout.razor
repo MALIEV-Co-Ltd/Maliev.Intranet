@@ -13,7 +13,7 @@
 @inject ILogger<MainLayout> Logger
 @implements IAsyncDisposable
 
-<MudThemeProvider @ref="@_mudThemeProvider" 
+<MudThemeProvider @ref="@_mudThemeProvider"
                   Theme="ThemeConfiguration.MalievTheme"
                   IsDarkMode="LayoutService.IsDarkMode" />
 <MudPopoverProvider />
@@ -21,424 +21,126 @@
 <MudSnackbarProvider />
 
 <style>
-    /* Fix left/right padding issue by targeting the toolbar gutters */
-    .mud-toolbar-gutters {
-        padding-left: 0 !important;
-        padding-right: 0 !important;
+    html, body {
+        height: 100vh;
+        overflow: hidden;
     }
 
-    
-    /* Enforce profile text stays on one line */
-    .profile-name-stack {
-        white-space: nowrap;
+    .mud-layout {
+        height: 100%;
     }
 
-    /* Account for bottom appbar on mobile */
-    @@media (max-width: 959.98px) {
-        .mud-main-content {
-            padding-bottom: 72px !important;
-            padding-top: 0 !important;
-        }
-        
-        /* Ensure breadcrumb is at the very top on mobile */
-        .breadcrumb-header {
-            top: 0 !important;
-        }
-
-        /* Ensure temporary drawer on mobile is full height and correctly positioned */
-        .mud-drawer-temporary {
-            height: 100% !important;
-            z-index: 1350 !important; /* Above content, below Bottom AppBar */
-        }
-
-        /* Give Sidebar higher priority than Chatbot on mobile */
-        .sidebar-drawer {
-            z-index: 1500 !important; 
-        }
-
-        .bottom-app-bar {
-            z-index: 1600 !important; /* Highest priority */
-        }
-
-        /* Ensure persistent drawer on mobile (like chatbot) also fills height and doesn't overlap header wrongly */
-        .mud-drawer-persistent {
-            height: 100% !important;
-            top: 0 !important;
-        }
+    .mud-main-content {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding-top: 0 !important;
     }
 
-    .chatbot-integrated-card {
-        background-color: var(--mud-palette-appbar-background) !important;
-        border: 1px solid var(--mud-palette-divider) !important;
-        height: calc(100vh - 110px) !important; /* Account for AppBar and spacing */
-        position: sticky !important;
-        top: 86px !important;
+    .breadcrumb-header {
+        flex-shrink: 0;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background-color: var(--mud-palette-surface);
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        padding: 8px 16px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
     }
 
-    /* SVG Gradient for Auto Mode icon - Target the path for reliable fill */
-    .auto-mode-icon svg path {
-        fill: url(#auto-mode-gradient) !important;
+    .body-scroll-area {
+        flex: 1;
+        overflow: auto;
+        padding: 20px 24px;
     }
-    
+
+    .full-bleed-page {
+        margin: -20px -24px;
+        width: calc(100% + 48px);
+        height: calc(100% + 40px);
+        max-width: none;
+    }
+
     /* Fix NavLink width issue caused by Tooltip wrapping */
-    .sidebar-drawer .mud-tooltip-root, 
+    .sidebar-drawer .mud-tooltip-root,
     .sidebar-drawer .mud-tooltip-inline {
         display: block !important;
         width: 100%;
     }
-
-    .mobile-appbar-grid {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
-        width: 100%;
-        align-items: center;
-    }
-
-    /* Main content area must shrink properly in flex layout */
-    .main-content-area {
-        min-width: 0;
-        container-type: inline-size;
-        container-name: main-content;
-    }
-
-    /* When content area is narrow (chat expanded), force MudGrid items to stack */
-    @@container main-content (max-width: 840px) {
-        .mud-grid-item-xs-12.mud-grid-item-sm-6,
-        .mud-grid-item-xs-12.mud-grid-item-md-6 {
-            flex-basis: 100% !important;
-            max-width: 100% !important;
-            flex-grow: 0 !important;
-        }
-    }
-
-    @@container main-content (max-width: 600px) {
-        .mud-grid-item-xs-12.mud-grid-item-sm-6,
-        .mud-grid-item-xs-12.mud-grid-item-sm-4,
-        .mud-grid-item-xs-12.mud-grid-item-md-4,
-        .mud-grid-item-xs-12.mud-grid-item-md-6,
-        .mud-grid-item-xs-12.mud-grid-item-lg-4 {
-            flex-basis: 100% !important;
-            max-width: 100% !important;
-            flex-grow: 0 !important;
-        }
-    }
 </style>
 
-<!-- SVG Gradient Definition for AutoMode Icon -->
-<svg width="0" height="0" style="position: absolute;">
-    <defs>
-        <linearGradient id="auto-mode-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#2196F3;stop-opacity:1" />
-        </linearGradient>
-    </defs>
-</svg>
-
 <MudLayout>
-    @if (!_isMobile)
-    {
-        <MudAppBar Elevation="0" Class="border-b border-solid mud-border-lines-default" Fixed="true">
-            <!-- Sidebar Toggle & Logo Area -->
-            <div class="d-flex align-center pl-3">
-                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" Class="mr-2" />
-                <MudImage Src="@LogoUrl" Alt="Maliev Logo" Height="22" />
-            </div>
-            
-            <!-- Search Bar - Aligned with content area start -->
-            <MudTextField @bind-Value="_searchString" Placeholder="Search" Variant="Variant.Outlined" 
-                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" 
-                          AdornmentAriaLabel="Search"
-                          OnAdornmentClick="@ExecuteSearch"
-                          OnKeyDown="@OnSearchKeyDown"
-                          Class="rounded-lg d-none d-md-flex ml-6" Style="max-width: 320px; background-color: var(--mud-palette-surface);" Margin="Margin.Dense" />
-
-            <MudSpacer />
-            
-            <!-- Right Side Actions -->
-            <div class="pr-4 d-flex align-center">
-                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                    <!-- Date - Desktop Only -->
-                    <MudText Typo="Typo.body2" Class="mr-2 d-none d-lg-flex" Style="white-space: nowrap;" Color="Color.Secondary">@DateTime.Now.ToString("dddd dd, MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</MudText>
-                    
-                    <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-lg-flex" />
-
-                    <!-- Chat Toggle - Desktop Only -->
-                    <MudTooltip Text="AI Assistant" Class="d-none d-md-flex">
-                        <MudIconButton Icon="@Icons.Material.Outlined.Chat" 
-                                       Color="@(_chatDrawerOpen ? Color.Primary : Color.Inherit)" 
-                                       OnClick="@(() => _chatDrawerOpen = !_chatDrawerOpen)" 
-                                       Size="Size.Medium"
-                                       Class="d-none d-md-inline-flex" />
-                    </MudTooltip>
-
-                    @* TODO: LINE OA Integration - Add a LINE Messages notification badge here alongside the bell.
-                       When LINE Messaging API webhook is configured:
-                       1. SignalR hub pushes new LINE message events to connected employees
-                       2. Render a separate MudBadge with LINE green (#06C755) colour for unread LINE OA messages
-                       3. Clicking navigates to a future /sales/line-inbox page (conversation list view)
-                       4. This _hubConnection below should also subscribe to "ReceiveLineMessage" events *@
-
-                    <!-- Notification - Desktop Only -->
-                    <MudTooltip Text="Notifications" Class="d-none d-md-flex">
-                        <MudBadge Visible="@_hasUnreadNotifications" Dot="true" Color="Color.Error" Overlap="true" Bordered="true" Class="d-none d-md-inline-flex">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" Size="Size.Medium" OnClick="@ClearNotifications" />
-                        </MudBadge>
-                    </MudTooltip>
-
-                     <!-- Theme Toggle -->
-                    <MudTooltip Text="@GetThemeTooltip()">
-                        <MudIconButton Icon="@GetThemeIcon()" 
-                                       Style="@(LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "")"
-                                       Class="@(LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "")"
-                                       Color="@GetThemeColor()" 
-                                       OnClick="@ToggleThemeAsync" Size="Size.Medium" />
-                    </MudTooltip>
-
-                    <MudDivider Vertical="true" FlexItem="true" Class="mx-2 d-none d-sm-flex" />
-
-                    <!-- User Profile -->
-                    <AuthorizeView Context="auth">
-                        <Authorized>
-                            <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" LockScroll="true">
-                                <ActivatorContent>
-                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="cursor-pointer ml-1">
-                                        <MudAvatar Style="height:40px; width:40px; font-size:1.1rem;">
-                                            @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
-                                            {
-                                                <MudImage Src="@auth.User.FindFirst("picture")?.Value" Alt="User Avatar" />
-                                            }
-                                            else
-                                            {
-                                                @((!string.IsNullOrEmpty(auth.User.Identity?.Name) && auth.User.Identity.Name.Length > 0) ? auth.User.Identity.Name[0] : 'U')
-                                            }
-                                        </MudAvatar>
-                                         <MudStack Spacing="0" AlignItems="AlignItems.End" Class="d-none d-md-flex profile-name-stack pl-1">
-                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@auth.User.Identity?.Name</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@(auth.User.FindFirst("job_title")?.Value ?? auth.User.FindFirst("title")?.Value ?? auth.User.FindFirst("position")?.Value ?? "Employee")</MudText>
-                                         </MudStack>
-                                        <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" Color="Color.Secondary" Class="d-none d-md-flex" />
-                                    </MudStack>
-                                </ActivatorContent>
-                                <ChildContent>
-                                    <MudMenuItem Href="/hr/profile">My Profile</MudMenuItem>
-                                    <MudMenuItem OnClick="@HandleLogout">Logout</MudMenuItem>
-                                </ChildContent>
-                            </MudMenu>
-                        </Authorized>
-                    </AuthorizeView>
-                </MudStack>
-            </div>
-        </MudAppBar>
-    }
-
     <!-- Sidebar -->
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="@(_isMobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" 
-               Variant="@GetDrawerVariant()" 
-               MiniWidth="72px"
-               OpenMiniOnHover="false"
+    <MudDrawer @bind-Open="_drawerOpen"
+               Variant="DrawerVariant.Responsive"
                Breakpoint="Breakpoint.Md"
+               Width="280px"
+               Elevation="0"
                Class="border-r border-solid mud-border-lines-default sidebar-drawer">
-        <NavMenu />
+        <NavMenu ChatDrawerOpen="_chatDrawerOpen"
+                 ChatDrawerOpenChanged="@(v => { _chatDrawerOpen = v; StateHasChanged(); })"
+                 OnToggleTheme="ToggleThemeAsync"
+                 OnClearNotifications="ClearNotifications"
+                 HasUnreadNotifications="_hasUnreadNotifications"
+                 ThemeIcon="@GetThemeIcon()"
+                 ThemeIconStyle="@GetThemeIconStyle()"
+                 ThemeIconClass="@GetThemeIconClass()" />
     </MudDrawer>
 
-    <!-- Unified Chatbot Drawer (Overlay for mobile, Integrated for desktop) -->
-    @if (_isMobile)
-    {
-        <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End" ClipMode="DrawerClipMode.Never" Elevation="3" Variant="@DrawerVariant.Temporary" Width="100%">
-            <ChatDrawer IsMobile="true" />
-        </MudDrawer>
-    }
+    <!-- Chat Drawer (right side) -->
+    <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End"
+               ClipMode="DrawerClipMode.Never"
+               Elevation="3"
+               Variant="DrawerVariant.Temporary"
+               Width="400px">
+        <ChatDrawer />
+    </MudDrawer>
 
-    <MudMainContent Class="@(_isMobile ? "pt-0" : "pt-16")">
-        <div class="d-flex flex-column">
-            <!-- Breadcrumb Header -->
-            <div class="breadcrumb-header border-b border-solid mud-border-lines-default px-4 py-2 d-flex align-center" style="@($"min-height: 48px; position: sticky; top: {(_isMobile ? "0" : "64px")}; z-index: 100; background-color: var(--mud-palette-surface);")">
-                @if (_breadcrumbs.Count > 1)
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" OnClick="HandleBack" Class="mr-2" />
-                    <MudDivider Vertical="true" FlexItem="true" Class="mx-2 my-2" Style="height: 20px;" />
-                }
-                <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 ml-2" Separator=">">
-                    <ItemTemplate Context="item">
-                        <MudLink Href="@item.Href" 
-                                 Typo="Typo.body2" 
-                                 Color="@(item.Disabled ? Color.Default : Color.Secondary)" 
-                                 Style="@(item.Disabled ? "font-weight: 600; color: var(--mud-palette-text-primary);" : "color: var(--mud-palette-text-secondary);")"
-                                 Underline="Underline.None">@item.Text</MudLink>
-                    </ItemTemplate>
-                </MudBreadcrumbs>
-            </div>
+    <MudMainContent>
+        <!-- Breadcrumb Header -->
+        <div class="breadcrumb-header">
+            @if (_breadcrumbs.Count > 1)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" OnClick="HandleBack" Class="mr-2" />
+                <MudDivider Vertical="true" FlexItem="true" Class="mx-2 my-2" Style="height: 20px;" />
+            }
+            <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 ml-2" Separator=">">
+                <ItemTemplate Context="item">
+                    <MudLink Href="@item.Href"
+                             Typo="Typo.body2"
+                             Color="@(item.Disabled ? Color.Default : Color.Primary)"
+                             Style="@(item.Disabled ? "font-weight: 600; color: var(--mud-palette-text-primary);" : "color: var(--mud-palette-text-secondary);")"
+                             Underline="Underline.None">@item.Text</MudLink>
+                </ItemTemplate>
+            </MudBreadcrumbs>
+        </div>
 
-            <div class="d-flex flex-row gap-6">
-                <!-- Main Application Content Area -->
-                <div class="flex-grow-1 main-content-area">
-                    <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="@(_isMobile ? "mt-0 mb-8 px-4" : "mt-4 mt-md-6 mb-8 mb-md-12 px-4 px-md-8")">
-                        @Body
-                    </MudContainer>
-                </div>
-
-                <!-- Integrated Desktop/Tablet Chatbot Section -->
-                @if (!_isMobile && _chatDrawerOpen)
-                {
-                    <div class="chatbot-integrated-section d-none d-md-flex flex-column py-6 pr-6" style="@(_chatExpanded ? "width: 50vw; min-width: 50vw;" : "width: 380px; min-width: 380px;") transition: width 0.1s ease-out, min-width 0.1s ease-out;">
-                        <MudPaper Elevation="3" Class="chatbot-integrated-card rounded-lg overflow-hidden d-flex flex-column">
-                            <ChatDrawer IsExpanded="_chatExpanded" IsExpandedChanged="@(v => { _chatExpanded = v; StateHasChanged(); })" />
-                        </MudPaper>
-                    </div>
-                }
-            </div>
+        <!-- Body scroll area -->
+        <div class="body-scroll-area">
+            @Body
         </div>
     </MudMainContent>
-
-    <!-- Mobile Bottom App Bar -->
-    @if (_isMobile)
-    {
-        <MudAppBar Bottom="true" Fixed="true" Elevation="4" Class="d-md-none border-t border-solid mud-border-lines-default px-2 bottom-app-bar" Style="height: 64px;">
-            <div class="mobile-appbar-grid">
-                <!-- Left Group: Hamburger, Search, Theme -->
-                <div class="d-flex align-center">
-                    <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="@((e) => DrawerToggle())" Size="Size.Medium" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" OnClick="@OpenSearchDialog" Size="Size.Medium" />
-                    <MudIconButton Icon="@GetThemeIcon()" 
-                                    Style="@(LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "")"
-                                    Class="@(LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "")"
-                                    Color="@GetThemeColor()" 
-                                    OnClick="@ToggleThemeAsync" Size="Size.Medium" />
-                </div>
-                
-                <!-- Center: Logo -->
-                <div class="d-flex justify-center">
-                    <MudImage Src="@LogoUrl" Alt="Maliev Logo" Height="18" />
-                </div>
-                
-                <!-- Right Group: Chatbot, Notification, Profile -->
-                <div class="d-flex align-center justify-end">
-                    <MudIconButton Icon="@Icons.Material.Outlined.Chat" 
-                                   Color="@(_chatDrawerOpen ? Color.Primary : Color.Inherit)" 
-                                   OnClick="@(() => _chatDrawerOpen = !_chatDrawerOpen)" Size="Size.Medium" />
-                                   
-                    <MudBadge Visible="@_hasUnreadNotifications" Dot="true" Color="Color.Error" Overlap="true" Bordered="true">
-                        <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" OnClick="@ClearNotifications" Size="Size.Medium" />
-                    </MudBadge>
-
-                    <AuthorizeView Context="auth">
-                        <Authorized>
-                            <div class="ml-1" @onclick="@(() => Navigation.NavigateTo("/hr/profile"))">
-                                <MudAvatar Style="height:32px; width:32px; font-size:0.9rem;" Class="cursor-pointer">
-                                    @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
-                                    {
-                                        <MudImage Src="@auth.User.FindFirst("picture")?.Value" Alt="User Avatar" />
-                                    }
-                                    else
-                                    {
-                                        @(auth.User.Identity?.Name?[0] ?? 'U')
-                                    }
-                                </MudAvatar>
-                            </div>
-                        </Authorized>
-                    </AuthorizeView>
-                </div>
-            </div>
-        </MudAppBar>
-    }
 </MudLayout>
-
-<MudDialog @bind-Visible="_searchDialogOpen" Options="_searchDialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Search</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudTextField @bind-Value="_searchString" Placeholder="Search anything..." Variant="Variant.Outlined" 
-                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" 
-                      FullWidth="true" AutoFocus="true" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _searchDialogOpen = false)">Close</MudButton>
-        <MudButton Color="Color.Primary" OnClick="@ExecuteSearch">Search</MudButton>
-    </DialogActions>
-</MudDialog>
-
-<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
 @code {
     [CascadingParameter]
     private Task<AuthenticationState> AuthStateTask { get; set; } = null!;
 
     private bool _drawerOpen = true;
-    private Breakpoint _currentBreakpoint = Breakpoint.Lg;
-    private bool _isMobile => _currentBreakpoint <= Breakpoint.Sm;
     private bool _chatDrawerOpen = false;
-    private bool _chatExpanded = false;
     private bool _hasUnreadNotifications = false;
-    private bool _searchDialogOpen = false;
     private HubConnection? _hubConnection;
     private MudThemeProvider _mudThemeProvider = null!;
-    private string _searchString = "";
     private List<BreadcrumbItem> _breadcrumbs = new();
-
-    private DialogOptions _searchDialogOptions = new() { FullWidth = true, MaxWidth = MaxWidth.Small };
-
-    private void OpenSearchDialog() => _searchDialogOpen = true;
-
-    private void ExecuteSearch()
-    {
-        _searchDialogOpen = false;
-        if (!string.IsNullOrWhiteSpace(_searchString))
-        {
-            // Navigate to the most relevant section based on search context
-            Navigation.NavigateTo($"/sales/customers?search={Uri.EscapeDataString(_searchString)}");
-        }
-    }
-
-    private void OnSearchKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            ExecuteSearch();
-        }
-    }
-
-    private void OnBreakpointChanged(Breakpoint breakpoint)
-    {
-        var oldBreakpoint = _currentBreakpoint;
-        _currentBreakpoint = breakpoint;
-
-        // Reset drawer state when switching major layout types
-        if (oldBreakpoint != breakpoint)
-        {
-            if (_isMobile)
-            {
-                _drawerOpen = false;
-            }
-            else if (_currentBreakpoint == Breakpoint.Md)
-            {
-                _drawerOpen = false; // Collapsed to Mini on Tablet
-            }
-            else if (_currentBreakpoint >= Breakpoint.Lg)
-            {
-                _drawerOpen = true; // Expanded on Desktop
-            }
-            StateHasChanged();
-        }
-    }
-
-    private DrawerVariant GetDrawerVariant()
-    {
-        if (_isMobile) return DrawerVariant.Temporary;
-        return DrawerVariant.Mini;
-    }
-
-    private void DrawerToggle()
-    {
-        _drawerOpen = !_drawerOpen;
-    }
 
     private void UpdateBreadcrumbs()
     {
         _breadcrumbs.Clear();
         _breadcrumbs.Add(new BreadcrumbItem("Dashboard", href: "/"));
 
-        // Strip query string before parsing segments
         var uriWithoutQuery = Navigation.Uri.Split('?')[0];
         var uri = Navigation.ToBaseRelativePath(uriWithoutQuery);
         if (string.IsNullOrWhiteSpace(uri))
@@ -456,8 +158,6 @@
 
             if (Guid.TryParse(segment, out _))
             {
-                // Use the entity name from BreadcrumbService if the page registered one,
-                // otherwise fall back to a generic "Details" label.
                 var entityLabel = BreadcrumbService.CurrentLabel ?? "Details";
                 _breadcrumbs.Add(new BreadcrumbItem(entityLabel, href: null, disabled: true));
                 continue;
@@ -477,18 +177,12 @@
         }
     }
 
-    private string LogoUrl => LayoutService.IsDarkMode
-        ? "https://storage.googleapis.com/maliev.com/web-contents/images/logo-white-20px.png"
-        : "https://storage.googleapis.com/maliev.com/web-contents/images/logo-black-20px.png";
-
     protected override void OnInitialized()
     {
         LayoutService.MajorUpdateOccurred += OnLayoutUpdate;
         Navigation.LocationChanged += OnLocationChanged;
-        // Subscribe to BreadcrumbService so pages can push entity names and get instant re-render
         BreadcrumbService.OnChanged += OnBreadcrumbChanged;
         UpdateBreadcrumbs();
-        // Note: Do NOT initialize LayoutService here - wait for OnAfterRenderAsync when JS is ready
     }
 
     private void OnBreadcrumbChanged()
@@ -501,13 +195,8 @@
     {
         if (firstRender)
         {
-            // CRITICAL: Initialize theme service after JS interop is available
             await LayoutService.InitializeAsync();
-            
-            // Watch for system dark mode changes (for Auto mode)
             await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemPreferenceChanged);
-
-            // CRITICAL FIX: Force re-render after theme initialization to sync MudThemeProvider
             StateHasChanged();
 
             var authState = await AuthStateTask;
@@ -532,15 +221,6 @@
                         InvokeAsync(StateHasChanged);
                     });
 
-                    // TODO: LINE OA Integration - Register a "ReceiveLineMessage" hub handler here.
-                    // _hubConnection.On<LineMessageNotificationDto>("ReceiveLineMessage", (msg) =>
-                    // {
-                    //     _hasUnreadLineMessages = true;
-                    //     Snackbar.Add($"LINE: {msg.CustomerName} — {msg.Preview}", Severity.Normal, ...);
-                    //     InvokeAsync(StateHasChanged);
-                    // });
-                    // Requires: LINE webhook -> BFF LineWebhookController -> SignalR hub broadcast
-
                     await _hubConnection.StartAsync();
                 }
                 catch (Exception ex)
@@ -554,7 +234,6 @@
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         ChatService.CurrentContext = Navigation.Uri;
-        // Clear any entity label registered by the previous page before rebuilding breadcrumbs
         BreadcrumbService.Clear();
         UpdateBreadcrumbs();
         StateHasChanged();
@@ -578,19 +257,9 @@
         _ => Icons.Material.Filled.AutoMode
     };
 
-    private Color GetThemeColor() => LayoutService.CurrentMode switch
-    {
-        ThemeMode.Dark => Color.Primary,
-        ThemeMode.Light => Color.Warning,
-        _ => Color.Inherit
-    };
+    private string GetThemeIconStyle() => LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "";
 
-    private string GetThemeTooltip() => LayoutService.CurrentMode switch
-    {
-        ThemeMode.Dark => "Dark theme",
-        ThemeMode.Light => "Light theme",
-        _ => "Auto"
-    };
+    private string GetThemeIconClass() => LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "";
 
     private void ClearNotifications()
     {
@@ -603,14 +272,8 @@
     }
 
     private void OnLayoutUpdate(object? sender, EventArgs e)
-
     {
         InvokeAsync(StateHasChanged);
-    }
-
-    private void HandleLogout()
-    {
-        Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
     }
 
     public async ValueTask DisposeAsync()

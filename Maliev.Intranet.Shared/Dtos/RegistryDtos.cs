@@ -8,109 +8,175 @@ namespace Maliev.Intranet.Shared;
 /// </summary>
 public class CreateCompanyRequest
 {
+    /// <summary>The display name of the company.</summary>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>The unique VAT registration number of the company.</summary>
     public string? VatNumber { get; set; }
+
+    /// <summary>The official registration number assigned by the commerce authority.</summary>
     public string? RegistrationNumber { get; set; }
+
+    /// <summary>The primary email address for company-wide correspondence.</summary>
     public string? ContactEmail { get; set; }
+
+    /// <summary>The primary phone number for company-wide correspondence.</summary>
     public string? ContactPhone { get; set; }
+
+    /// <summary>The industry or market segment of the company (e.g., "Retail", "Manufacturing").</summary>
     public string Segment { get; set; } = "Retail";
+
+    /// <summary>The service tier assigned to the company for internal ranking (e.g., "Bronze", "Gold").</summary>
     public string Tier { get; set; } = "Bronze";
 
     // BDEX fields
+    /// <summary>The full legal name of the company in Thai language.</summary>
     public string? FullNameTh { get; set; }
+
+    /// <summary>The date when the company was officially registered.</summary>
     public DateTime? RegistrationDate { get; set; }
+
+    /// <summary>The status code representing the current operational state of the company.</summary>
     public string? CompanyStatus { get; set; }
+
+    /// <summary>The display name for the company status in Thai language.</summary>
     public string? CompanyStatusNameTh { get; set; }
+
+    /// <summary>The official code for the company's legal entity type.</summary>
     public string? CompanyTypeCode { get; set; }
+
+    /// <summary>The business objectives or activities the company is authorized to perform.</summary>
     public string? BusinessObjectives { get; set; }
+
+    /// <summary>Indicates if the company profile has been verified against the BDEX registry.</summary>
     public bool IsVerifiedFromBdex { get; set; }
+
+    /// <summary>The stock exchange ticker symbol for the company, if publicly traded.</summary>
     public string? StockSymbol { get; set; }
 }
 
 /// <summary>
-/// DTO representing a country.
+/// Data representing a country in the global registry.
 /// </summary>
 public class CountryDto
 {
+    /// <summary>The unique identifier of the country record.</summary>
     public Guid Id { get; set; }
 
+    /// <summary>The ISO 3166-1 alpha-2 code of the country (e.g., "TH", "US").</summary>
     [JsonPropertyName("iso2")]
     public string Code { get; set; } = string.Empty;
 
+    /// <summary>The full display name of the country.</summary>
     public string Name { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// DTO representing a currency.
+/// Data representing a monetary currency in the global registry.
 /// </summary>
 public class CurrencyDto
 {
-    /// <summary>Gets or sets the unique identifier.</summary>
+    /// <summary>The unique identifier of the currency record.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Gets or sets the ISO 4217 currency code (e.g., THB, USD, EUR).</summary>
+    /// <summary>The ISO 4217 currency code used for transactions (e.g., "THB", "USD").</summary>
     public string Code { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the currency symbol (e.g., ฿, $, €).</summary>
+    /// <summary>The display symbol of the currency (e.g., "฿", "$").</summary>
     public string Symbol { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the full currency name.</summary>
+    /// <summary>The full display name of the currency.</summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the number of decimal places.</summary>
+    /// <summary>The number of decimal places used for financial calculations with this currency.</summary>
     public int DecimalPlaces { get; set; }
 
-    /// <summary>Gets or sets whether this currency is active.</summary>
+    /// <summary>Indicates if the currency is currently active and available for use in the system.</summary>
     public bool IsActive { get; set; }
 
-    /// <summary>Gets or sets whether this is the primary currency.</summary>
+    /// <summary>Indicates if this currency is the primary or base currency for system-wide accounting.</summary>
     public bool IsPrimary { get; set; }
 }
 
 /// <summary>
-/// Represents a location in Thailand registry.
+/// Represents a specific administrative location in the Thailand geographic registry.
 /// </summary>
 public class RegistryThaiLocation
 {
+    /// <summary>The unique identifier of the location record.</summary>
     public Guid Id { get; set; }
+
+    /// <summary>The five-digit postal code of the location.</summary>
     public string PostalCode { get; set; } = string.Empty;
+
+    /// <summary>The sub-district (Tambon) name in Thai language.</summary>
     public string SubDistrictTh { get; set; } = string.Empty;
+
+    /// <summary>The district (Amphoe) name in Thai language.</summary>
     public string DistrictTh { get; set; } = string.Empty;
+
+    /// <summary>The province (Changwat) name in Thai language.</summary>
     public string ProvinceTh { get; set; } = string.Empty;
+
+    /// <summary>The sub-district (Tambon) name in English language.</summary>
     public string SubDistrictEn { get; set; } = string.Empty;
+
+    /// <summary>The district (Amphoe) name in English language.</summary>
     public string DistrictEn { get; set; } = string.Empty;
+
+    /// <summary>The province (Changwat) name in English language.</summary>
     public string ProvinceEn { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// Company profile from Thailand registry.
+/// Detailed company profile information retrieved from the Thailand official registry.
 /// </summary>
 public class RegistryCompanyProfile
 {
+    /// <summary>The current status code for the company from the registry.</summary>
     public string StatusCode { get; set; } = string.Empty;
+
+    /// <summary>The display name for the company status in Thai language.</summary>
     public string StatusNameTh { get; set; } = string.Empty;
+
+    /// <summary>The unique tax identification number issued by the revenue department.</summary>
     public string TaxId { get; set; } = string.Empty;
+
+    /// <summary>The official name of the company in Thai language.</summary>
     public string CompanyNameTh { get; set; } = string.Empty;
+
+    /// <summary>The primary business objectives or industrial activities of the company.</summary>
     public string BusinessObjectives { get; set; } = string.Empty;
+
+    /// <summary>The legal entity type code of the company.</summary>
     public string CompanyTypeCode { get; set; } = string.Empty;
+
+    /// <summary>The stock exchange symbol name for the company, if applicable.</summary>
     public string? StockName { get; set; }
+
+    /// <summary>The full legal name of the company in Thai language.</summary>
     public string FullNameTh { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// Generic response from registry API.
+/// Represents a standardized wrapper for responses returned by external registry APIs.
 /// </summary>
+/// <typeparam name="T">The type of the primary data payload within the response.</typeparam>
 public class RegistryApiResponse<T>
 {
+    /// <summary>The primary data payload of the response, if the request was successful.</summary>
     [JsonPropertyName("data")]
     public T? Data { get; set; }
 
+    /// <summary>Indicates if the API request was completed successfully.</summary>
     [JsonPropertyName("success")]
     public bool Success { get; set; }
 
+    /// <summary>The primary error or status message returned by the API.</summary>
     [JsonPropertyName("message")]
     public string? ErrorMessage { get; set; }
 
+    /// <summary>A collection of detailed error descriptions if the request failed.</summary>
     [JsonPropertyName("errors")]
     public List<string>? Errors { get; set; }
 }

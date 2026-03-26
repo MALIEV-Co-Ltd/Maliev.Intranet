@@ -45,7 +45,7 @@ else
                 <MudText Typo="Typo.h5" Style="font-weight: 700;">@_project.ProjectNumber</MudText>
                 <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_project.Status)">@_project.Status</MudChip>
             </MudStack>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
+            <MudText Typo="Typo.body2" Color="Color.Default">
                 @_project.Title &nbsp;·&nbsp; @_project.CustomerName
             </MudText>
         </div>
@@ -61,9 +61,9 @@ else
             {
                 <MudPaper Elevation="0" Class="pa-8 d-flex flex-column align-center rounded-lg"
                           Style="border: 1px solid var(--mud-palette-lines-default);">
-                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Style="font-size: 56px;" Color="Color.Secondary" />
-                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">No parts yet</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">Upload 3D files to add parts to this project.</MudText>
+                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Style="font-size: 56px;" Color="Color.Default" />
+                    <MudText Typo="Typo.body1" Color="Color.Default" Class="mt-2">No parts yet</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">Upload 3D files to add parts to this project.</MudText>
                 </MudPaper>
             }
             else
@@ -95,7 +95,7 @@ else
                             @* Dimensions *@
                             @if (part.Dimensions != null)
                             {
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                                <MudText Typo="Typo.caption" Color="Color.Default" Class="mb-2">
                                     @part.Dimensions.X.ToString("N1") × @part.Dimensions.Y.ToString("N1") × @part.Dimensions.Z.ToString("N1") mm
                                 </MudText>
                             }
@@ -144,7 +144,7 @@ else
                                 @if (part.Status == "Configuring" || part.EstimatedPrice == null)
                                 {
                                     <MudButton Variant="Variant.Filled"
-                                               Color="Color.Secondary"
+                                               Color="Color.Default"
                                                Size="Size.Small"
                                                StartIcon="@Icons.Material.Outlined.AutoAwesome"
                                                OnClick="@(() => GetAiPriceAsync(part))">
@@ -170,7 +170,7 @@ else
                                 <MudExpansionPanels Elevation="0" Class="mt-3">
                                     <MudExpansionPanel>
                                         <TitleContent>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            <MudText Typo="Typo.caption" Color="Color.Default">
                                                 <MudIcon Icon="@Icons.Material.Outlined.Receipt" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
                                                 Price Breakdown
                                             </MudText>
@@ -194,8 +194,8 @@ else
                             {
                                 <MudDivider Class="my-2" />
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-1">
-                                    <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Small" Color="Color.Secondary" />
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Small" Color="Color.Default" />
+                                    <MudText Typo="Typo.caption" Color="Color.Default">
                                         @part.MachineName &middot; @part.JobStatus
                                     </MudText>
                                     <MudSpacer />
@@ -231,29 +231,29 @@ else
                     <MudText Typo="Typo.subtitle2" Class="mb-3" Style="font-weight: 600;">Summary</MudText>
                     <MudStack Spacing="1">
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Parts</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Parts</MudText>
                             <MudText Typo="Typo.body2">@_project.Parts.Count</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">All Confirmed</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">All Confirmed</MudText>
                             <MudText Typo="Typo.body2" Color="@(AllPartsConfirmed ? Color.Success : Color.Warning)">
                                 @(AllPartsConfirmed ? "Yes" : "No")
                             </MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Price</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Total Price</MudText>
                             <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">
                                 @CurrencyFormatter.Format(TotalConfirmedPrice, "THB", 2)
                             </MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Currency</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Currency</MudText>
                             <MudText Typo="Typo.body2">@_project.Currency</MudText>
                         </MudStack>
                         @if (_project.ValidUntil.HasValue)
                         {
                             <MudStack Row="true" Justify="Justify.SpaceBetween">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">Valid Until</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Default">Valid Until</MudText>
                                 <MudText Typo="Typo.body2">@_project.ValidUntil.Value.ToString("dd MMM yyyy")</MudText>
                             </MudStack>
                         }
@@ -317,28 +317,28 @@ else
                     {
                         @if (!string.IsNullOrEmpty(_customer.Email))
                         {
-                            <MudLink Href="@($"mailto:{_customer.Email}")" Underline="Underline.None" Color="Color.Secondary" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
+                            <MudLink Href="@($"mailto:{_customer.Email}")" Underline="Underline.None" Color="Color.Default" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
                                 <MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Small" />
                                 @_customer.Email
                             </MudLink>
                         }
                         @if (!string.IsNullOrEmpty(_customer.Mobile))
                         {
-                            <MudLink Href="@($"tel:{_customer.Mobile}")" Underline="Underline.None" Color="Color.Secondary" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
+                            <MudLink Href="@($"tel:{_customer.Mobile}")" Underline="Underline.None" Color="Color.Default" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
                                 <MudIcon Icon="@Icons.Material.Outlined.Phone" Size="Size.Small" />
                                 @_customer.Mobile @if (!string.IsNullOrEmpty(_customer.Extension)) { <text>ext. @_customer.Extension</text> }
                             </MudLink>
                         }
                         @if (!string.IsNullOrEmpty(_customer.CompanyName))
                         {
-                            <MudLink Href="@($"tel:{_customer.CompanyPhone}")" Underline="Underline.None" Color="Color.Secondary" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
+                            <MudLink Href="@($"tel:{_customer.CompanyPhone}")" Underline="Underline.None" Color="Color.Default" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
                                 <MudIcon Icon="@Icons.Material.Outlined.Business" Size="Size.Small" />
                                 @_customer.CompanyName @if (!string.IsNullOrEmpty(_customer.CompanyPhone)) { <text>· @_customer.CompanyPhone</text> }
                             </MudLink>
                         }
                         @if (!string.IsNullOrEmpty(_customer.Landline))
                         {
-                            <MudLink Href="@($"tel:{_customer.Landline}")" Underline="Underline.None" Color="Color.Secondary" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
+                            <MudLink Href="@($"tel:{_customer.Landline}")" Underline="Underline.None" Color="Color.Default" Class="d-flex align-items-center gap-1 mt-1" Style="font-size: 0.8rem;">
                                 <MudIcon Icon="@Icons.Material.Outlined.PhoneCallback" Size="Size.Small" />
                                 @_customer.Landline
                             </MudLink>
@@ -361,7 +361,7 @@ else
                                     <MudText Typo="Typo.caption" Style="@(evt.Completed ? "" : "opacity: 0.5;")">@evt.Label</MudText>
                                     @if (evt.Completed)
                                     {
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@evt.Timestamp.ToString("dd MMM yyyy")</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">@evt.Timestamp.ToString("dd MMM yyyy")</MudText>
                                     }
                                 </div>
                             </MudStack>
@@ -385,7 +385,7 @@ else
                             </div>
                             <MudText Typo="Typo.caption">@avgProgress%</MudText>
                         </MudStack>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                        <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-1">
                             Average across @_project.Parts.Count(p => p.JobId.HasValue) part(s) in production
                         </MudText>
                     </MudPaper>
@@ -554,7 +554,7 @@ else
         "Configuring"   => Color.Warning,
         "Priced"        => Color.Info,
         "Quoted"        => Color.Primary,
-        "In Production" => Color.Secondary,
+        "In Production" => Color.Default,
         "Completed"     => Color.Success,
         "Cancelled"     => Color.Error,
         _               => Color.Default

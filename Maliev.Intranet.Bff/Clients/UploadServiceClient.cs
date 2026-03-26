@@ -32,8 +32,9 @@ public class UploadServiceClient
 
     /// <summary>
     /// Uploads a file to the central upload service.
+    /// Overwrite is enabled by default to handle re-uploads of the same file within a project.
     /// </summary>
-    public async Task<BffUploadResponse?> UploadFileAsync(string fileName, Stream content, string contentType, string path, CancellationToken ct = default)
+    public async Task<BffUploadResponse?> UploadFileAsync(string fileName, Stream content, string contentType, string path, bool overwrite = true, CancellationToken ct = default)
     {
         using var requestContent = new MultipartFormDataContent();
         var fileContent = new StreamContent(content);
@@ -41,6 +42,7 @@ public class UploadServiceClient
 
         requestContent.Add(fileContent, "File", fileName);
         requestContent.Add(new StringContent(path), "Path");
+        requestContent.Add(new StringContent(overwrite.ToString().ToLower()), "Overwrite");
 
         var response = await _httpClient.PostAsync("/upload/v1/uploads", requestContent, ct);
 

@@ -9,6 +9,10 @@ namespace Maliev.Intranet.Client.Authorization;
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
 public class RequirePermissionAttribute : AuthorizeAttribute
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RequirePermissionAttribute"/> class with the specified permission policy.
+    /// </summary>
+    /// <param name="permission">The required permission name for this authorization policy.</param>
     public RequirePermissionAttribute(string permission)
     {
         Policy = $"Permission:{permission}";

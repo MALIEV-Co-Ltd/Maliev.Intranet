@@ -38,7 +38,7 @@
                            ValueChanged="@((string val) => OnTypeChanged?.Invoke(Index, val))"
                            Class="mt-2">
                 <MudRadio Value="@("Billing")" Color="Color.Primary" Size="Size.Small" Dense="true">Billing</MudRadio>
-                <MudRadio Value="@("Shipping")" Color="Color.Secondary" Size="Size.Small" Dense="true">Shipping</MudRadio>
+                <MudRadio Value="@("Shipping")" Color="Color.Default" Size="Size.Small" Dense="true">Shipping</MudRadio>
             </MudRadioGroup>
         </MudItem>
 
@@ -159,12 +159,12 @@
                         @if (IsThai(Address.District) || IsThai(loc.SubDistrictTh))
                         {
                             <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                         }
                         else
                         {
                             <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
                         }
                     </div>
                 </ItemTemplate>
@@ -194,12 +194,12 @@
                         @if (IsThai(Address.City) || IsThai(loc.DistrictTh))
                         {
                             <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                         }
                         else
                         {
                             <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
                         }
                     </div>
                 </ItemTemplate>
@@ -229,12 +229,12 @@
                         @if (IsThai(Address.StateProvince) || IsThai(loc.ProvinceTh))
                         {
                             <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
                         }
                         else
                         {
                             <MudText Typo="Typo.body2" Style="font-weight: 500;">@($"{loc.SubDistrictEn}, {loc.DistrictEn}, {loc.ProvinceEn} {loc.PostalCode}")</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictTh} {loc.DistrictTh} {loc.ProvinceTh} {loc.PostalCode}")</MudText>
                         }
                     </div>
                 </ItemTemplate>
@@ -262,7 +262,7 @@
                 <ItemTemplate Context="loc">
                     <div class="autocomplete-item py-1">
                         <MudText Typo="Typo.body2" Style="font-weight: 500;">@loc.PostalCode</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{loc.SubDistrictTh}, {loc.DistrictTh}, {loc.ProvinceTh}")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Default">@($"{loc.SubDistrictTh}, {loc.DistrictTh}, {loc.ProvinceTh}")</MudText>
                     </div>
                 </ItemTemplate>
             </MudAutocomplete>
@@ -276,6 +276,7 @@
                              ToStringFunc="@(c => c?.Name ?? string.Empty)"
                              Variant="Variant.Outlined"
                              Required="true"
+                             DebounceInterval="300"
                              ValueChanged="@((CountryDto? c) => OnCountrySelected?.Invoke(Index, c))"
                              />
         </MudItem>
@@ -341,7 +342,7 @@
     private Color GetTypeColor() => Address.Type switch
     {
         "Billing" => Color.Primary,
-        "Shipping" => Color.Secondary,
+        "Shipping" => Color.Default,
         _ => Color.Default
     };
 

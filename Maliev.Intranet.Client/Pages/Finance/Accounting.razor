@@ -12,8 +12,8 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4" Wrap="Wrap.Wrap">
     <div>
-        <MudText Typo="Typo.h4">Accounting</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Financial ledger, reports, and budget management</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">Accounting</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Financial ledger, reports, and budget management</MudText>
     </div>
 </MudStack>
 
@@ -58,7 +58,7 @@
                                             <MudText Typo="Typo.subtitle2">@account.Code - @account.Name</MudText>
                                             @if (account.Children.Count > 0)
                                             {
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@account.Children.Count sub-accounts</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Default">@account.Children.Count sub-accounts</MudText>
                                             }
                                         </div>
                                         <MudText Typo="Typo.subtitle2">@CurrencyFormatter.Format(account.Balance, "THB", 0)</MudText>
@@ -111,7 +111,7 @@
                                 </TemplateColumn>
                             </Columns>
                             <NoRecordsContent>
-                                <MudText Class="pa-4 text-center" Color="Color.Secondary">No journal entries found</MudText>
+                                <MudText Class="pa-4 text-center" Color="Color.Default">No journal entries found</MudText>
                             </NoRecordsContent>
                         </MudDataGrid>
                     }
@@ -150,7 +150,7 @@
             <MudPaper Elevation="0" Class="pa-8 border mud-border-lines-default rounded-lg" Style="max-width: 800px; margin: 0 auto;">
                 <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-2">Maliev Platform</MudText>
                 <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-1">@_financialReport.ReportName</MudText>
-                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mb-8">
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Default" Class="mb-8">
                     Period: @(_reportDateRange.Start?.ToString("dd MMM yyyy")) to @(_reportDateRange.End?.ToString("dd MMM yyyy"))
                 </MudText>
                 @foreach (var reportSection in _financialReport.Sections)
@@ -181,7 +181,7 @@
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
             <div>
                 <MudText Typo="Typo.h6">Budget Planning</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Annual budget targets vs actual spending</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Annual budget targets vs actual spending</MudText>
             </div>
             <MudStack Row="true" Spacing="2">
                 <MudSelect T="string" @bind-Value="_selectedBudgetYear" Label="Year" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:120px;">
@@ -197,23 +197,23 @@
         <MudGrid Class="mb-6">
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total Budget</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">Total Budget</MudText>
                     <MudText Typo="Typo.h4" Style="font-weight:600;">@CurrencyFormatter.Format(0m, "THB", 0)</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">FY @_selectedBudgetYear</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">FY @_selectedBudgetYear</MudText>
                 </MudPaper>
             </MudItem>
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Actual Spent</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">Actual Spent</MudText>
                     <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Warning">@CurrencyFormatter.Format(0m, "THB", 0)</MudText>
                     <MudProgressLinear Value="0" Color="Color.Warning" Class="mt-2" />
                 </MudPaper>
             </MudItem>
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Remaining</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">Remaining</MudText>
                     <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Success">@CurrencyFormatter.Format(0m, "THB", 0)</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">0% utilised</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">0% utilised</MudText>
                 </MudPaper>
             </MudItem>
         </MudGrid>
@@ -252,9 +252,9 @@
                 </Columns>
                 <NoRecordsContent>
                     <MudStack AlignItems="AlignItems.Center" Class="pa-8">
-                        <MudIcon Icon="@Icons.Material.Outlined.AccountBalance" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
-                        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No budget entries</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Budget data will appear here once configured</MudText>
+                        <MudIcon Icon="@Icons.Material.Outlined.AccountBalance" Size="Size.Large" Color="Color.Default" Style="font-size:60px;" />
+                        <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">No budget entries</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Budget data will appear here once configured</MudText>
                     </MudStack>
                 </NoRecordsContent>
             </MudDataGrid>
@@ -301,9 +301,9 @@
                     @if (!_builderHasRun)
                     {
                         <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:400px;">
-                            <MudIcon Icon="@Icons.Material.Outlined.BarChart" Size="Size.Large" Color="Color.Secondary" Style="font-size:80px;" />
-                            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">Configure and run your report</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Select metrics and click "Run Report" to see results</MudText>
+                            <MudIcon Icon="@Icons.Material.Outlined.BarChart" Size="Size.Large" Color="Color.Default" Style="font-size:80px;" />
+                            <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">Configure and run your report</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Select metrics and click "Run Report" to see results</MudText>
                         </MudStack>
                     }
                     else

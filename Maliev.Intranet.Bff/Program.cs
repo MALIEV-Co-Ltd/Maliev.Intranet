@@ -48,6 +48,7 @@ try
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ProductionHubService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.IProjectDraftService, Maliev.Intranet.Client.Services.ProjectDraftService>();
     builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
     builder.Services.AddScoped<Maliev.Intranet.Bff.Services.IChatContextResolver, Maliev.Intranet.Bff.Services.ChatContextResolver>();
     builder.Services.AddSingleton<Maliev.Intranet.Bff.Services.ChatHubService>();
@@ -119,7 +120,7 @@ try
         options.LoginPath = "/login";
         options.Cookie.Name = "Maliev.Intranet.Auth";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SameSite = SameSiteMode.Strict; // Strict provides stronger CSRF protection for intranet app
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 
         // Add cookie size limits to prevent 431 errors
@@ -134,7 +135,7 @@ try
 
         options.Scope.Add("profile");
         options.Scope.Add("email");
-        options.SaveTokens = false; // Don't store OAuth tokens in cookie - reduces cookie size
+        options.SaveTokens = true; // Required so UserContextHandler can retrieve access_token for downstream service calls
 
         options.Events.OnRedirectToAuthorizationEndpoint = context =>
         {
@@ -313,8 +314,9 @@ try
         var config = sp.GetRequiredService<IConfiguration>();
         var explicitUrl = config["Services:UploadService:BaseUrl"];
         client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://UploadService");
-        client.Timeout = TimeSpan.FromSeconds(30);
+        client.Timeout = TimeSpan.FromSeconds(120);
     })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { MaxConnectionsPerServer = 20 })
     .AddServiceDiscovery()
     .AddHttpMessageHandler(sp =>
     {
@@ -369,7 +371,11 @@ try
         configure: mt =>
         {
             mt.AddConsumer<FileAnalyzedConsumer>();
+            mt.AddConsumer<FileMetricsReadyConsumer>();
+            mt.AddConsumer<SmallThumbnailReadyConsumer>();
             mt.AddConsumer<PreviewImagesGeneratedConsumer>();
+            mt.AddConsumer<DfmAnalysisReadyConsumer>();
+            mt.AddConsumer<PriceCalculatedConsumer>();
         },
         configureRabbitMq: (ctx, cfg) =>
         {
@@ -383,6 +389,26 @@ try
                 });
             });
 
+            cfg.ReceiveEndpoint("intranet-bff-geometry-metrics", ep =>
+            {
+                ep.ConfigureConsumer<FileMetricsReadyConsumer>(ctx);
+                ep.Bind("maliev.events", b =>
+                {
+                    b.ExchangeType = "topic";
+                    b.RoutingKey = "maliev.geometryservice.v1.metrics.ready";
+                });
+            });
+
+            cfg.ReceiveEndpoint("intranet-bff-geometry-thumbnail-small", ep =>
+            {
+                ep.ConfigureConsumer<SmallThumbnailReadyConsumer>(ctx);
+                ep.Bind("maliev.events", b =>
+                {
+                    b.ExchangeType = "topic";
+                    b.RoutingKey = "maliev.geometryservice.v1.thumbnail.small.ready";
+                });
+            });
+
             cfg.ReceiveEndpoint("intranet-bff-geometry-preview", ep =>
             {
                 ep.ConfigureConsumer<PreviewImagesGeneratedConsumer>(ctx);
@@ -390,6 +416,26 @@ try
                 {
                     b.ExchangeType = "topic";
                     b.RoutingKey = "maliev.geometryservice.v1.preview-images.generated";
+                });
+            });
+
+            cfg.ReceiveEndpoint("intranet-bff-geometry-dfm", ep =>
+            {
+                ep.ConfigureConsumer<DfmAnalysisReadyConsumer>(ctx);
+                ep.Bind("maliev.events", b =>
+                {
+                    b.ExchangeType = "topic";
+                    b.RoutingKey = "maliev.geometryservice.v1.dfm.ready";
+                });
+            });
+
+            cfg.ReceiveEndpoint("intranet-bff-pricing-calculated", ep =>
+            {
+                ep.ConfigureConsumer<PriceCalculatedConsumer>(ctx);
+                ep.Bind("maliev.events", b =>
+                {
+                    b.ExchangeType = "topic";
+                    b.RoutingKey = "maliev.pricingservice.v1.price.calculated";
                 });
             });
         });

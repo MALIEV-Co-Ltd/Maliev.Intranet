@@ -12,8 +12,8 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
     <div>
-        <MudText Typo="Typo.h4">Payments &amp; Receipts</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Financial transaction records and payment receipts</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">Payments &amp; Receipts</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Financial transaction records and payment receipts</MudText>
     </div>
 </MudStack>
 
@@ -38,7 +38,7 @@
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudStack Spacing="2">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Today's Total</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">Today's Total</MudText>
                             <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">@CurrencyFormatter.Format(_paymentStats.TodayTotal, "THB", 2)</MudText>
                             <MudText Typo="Typo.caption" Color="@(_paymentStats.PercentageChangeFromYesterday >= 0 ? Color.Success : Color.Error)">
                                 <MudIcon Icon="@(_paymentStats.PercentageChangeFromYesterday >= 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" Size="Size.Small" />
@@ -50,25 +50,25 @@
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudStack Spacing="2">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Pending</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">Pending</MudText>
                             <MudText Typo="Typo.h5" Color="Color.Warning" Style="font-weight: 700;">@CurrencyFormatter.Format(_paymentStats.PendingTotal, "THB", 2)</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@_paymentStats.PendingCount transactions</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">@_paymentStats.PendingCount transactions</MudText>
                         </MudStack>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudStack Spacing="2">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">This Month</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">This Month</MudText>
                             <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight: 700;">@CurrencyFormatter.Format(_paymentStats.MonthTotal, "THB", 2)</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Received</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">Received</MudText>
                         </MudStack>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
                         <MudStack Spacing="2">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Failed</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">Failed</MudText>
                             <MudText Typo="Typo.h5" Color="Color.Error" Style="font-weight: 700;">@CurrencyFormatter.Format(_paymentStats.FailedTotal, "THB", 2)</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Error">@_paymentStats.FailedCount transactions</MudText>
                         </MudStack>
@@ -129,7 +129,7 @@
                         </TemplateColumn>
                     </Columns>
                     <NoRecordsContent>
-                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No transactions found</MudText>
+                        <MudText Class="pa-4 text-center" Color="Color.Default">No transactions found</MudText>
                     </NoRecordsContent>
                 </MudDataGrid>
             </MudPaper>
@@ -197,7 +197,7 @@
                         </TemplateColumn>
                     </Columns>
                     <NoRecordsContent>
-                        <MudText Class="pa-4 text-center" Color="Color.Secondary">No receipts found</MudText>
+                        <MudText Class="pa-4 text-center" Color="Color.Default">No receipts found</MudText>
                     </NoRecordsContent>
                 </MudDataGrid>
             </MudPaper>

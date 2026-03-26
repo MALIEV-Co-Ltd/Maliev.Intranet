@@ -9,8 +9,8 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
     <div>
-        <MudText Typo="Typo.h4">Training &amp; Performance</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Course catalog, enrollments, performance reviews, and goal tracking</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">Training &amp; Performance</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Default">Course catalog, enrollments, performance reviews, and goal tracking</MudText>
     </div>
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                OnClick="@(() => Snackbar.Add("Add course coming soon", Severity.Info))">
@@ -22,25 +22,25 @@
 <MudGrid Class="mb-4">
     <MudItem xs="12" sm="3">
         <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg text-center">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Total Courses</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Default">Total Courses</MudText>
             <MudText Typo="Typo.h4" Style="font-weight:600;">0</MudText>
         </MudPaper>
     </MudItem>
     <MudItem xs="12" sm="3">
         <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg text-center">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Active Enrollments</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Default">Active Enrollments</MudText>
             <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Primary">0</MudText>
         </MudPaper>
     </MudItem>
     <MudItem xs="12" sm="3">
         <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg text-center">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Reviews This Cycle</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Default">Reviews This Cycle</MudText>
             <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Warning">@_reviews.Count</MudText>
         </MudPaper>
     </MudItem>
     <MudItem xs="12" sm="3">
         <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg text-center">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Goals In Progress</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Default">Goals In Progress</MudText>
             <MudText Typo="Typo.h4" Style="font-weight:600;" Color="Color.Success">@_goals.Count</MudText>
         </MudPaper>
     </MudItem>
@@ -67,7 +67,7 @@
                                         </CardHeaderAvatar>
                                         <CardHeaderContent>
                                             <MudText Typo="Typo.subtitle2">@category.Name</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">0 courses available</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Default">0 courses available</MudText>
                                         </CardHeaderContent>
                                     </MudCardHeader>
                                     <MudCardActions>
@@ -81,15 +81,15 @@
             </MudTabPanel>
             <MudTabPanel Text="My Enrollments" Icon="@Icons.Material.Outlined.Assignment">
                 <MudPaper Elevation="0" Class="pa-8 text-center">
-                    <MudIcon Icon="@Icons.Material.Outlined.School" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
-                    <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No active enrollments</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">Browse the course catalog to enroll in training programs</MudText>
+                    <MudIcon Icon="@Icons.Material.Outlined.School" Size="Size.Large" Color="Color.Default" Style="font-size:60px;" />
+                    <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">No active enrollments</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">Browse the course catalog to enroll in training programs</MudText>
                 </MudPaper>
             </MudTabPanel>
             <MudTabPanel Text="Completion History" Icon="@Icons.Material.Outlined.EmojiEvents">
                 <MudPaper Elevation="0" Class="pa-8 text-center">
-                    <MudIcon Icon="@Icons.Material.Outlined.EmojiEvents" Size="Size.Large" Color="Color.Secondary" Style="font-size:60px;" />
-                    <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No completed courses yet</MudText>
+                    <MudIcon Icon="@Icons.Material.Outlined.EmojiEvents" Size="Size.Large" Color="Color.Default" Style="font-size:60px;" />
+                    <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">No completed courses yet</MudText>
                 </MudPaper>
             </MudTabPanel>
         </MudTabs>
@@ -123,7 +123,7 @@
                                 <PropertyColumn Property="x => x.CompletedDate" Title="Completed" Format="dd MMM yyyy" />
                             </Columns>
                             <NoRecordsContent>
-                                <MudText Class="pa-4 text-center" Color="Color.Secondary">No performance reviews found</MudText>
+                                <MudText Class="pa-4 text-center" Color="Color.Default">No performance reviews found</MudText>
                             </NoRecordsContent>
                         </MudDataGrid>
                     }
@@ -145,7 +145,7 @@
                                     <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded">
                                         <MudText Typo="Typo.subtitle2">@goal.Title</MudText>
                                         <MudProgressLinear Color="@(goal.Progress >= 100 ? Color.Success : Color.Primary)" Value="@goal.Progress" Size="Size.Small" Class="my-2" />
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@goal.Progress% complete</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">@goal.Progress% complete</MudText>
                                     </MudPaper>
                                 }
                             }
@@ -174,7 +174,7 @@
         new("Leadership", Icons.Material.Outlined.Groups, Color.Info),
         new("Software & Tools", Icons.Material.Outlined.Computer, Color.Success),
         new("Quality Management", Icons.Material.Outlined.VerifiedUser, Color.Warning),
-        new("Customer Service", Icons.Material.Outlined.SupportAgent, Color.Secondary)
+        new("Customer Service", Icons.Material.Outlined.SupportAgent, Color.Default)
     };
 
     // Performance state

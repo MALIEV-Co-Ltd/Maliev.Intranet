@@ -46,12 +46,12 @@ else
                     </div>
                     <MudText Typo="Typo.caption"
                              Class="stage-label"
-                             Color="@(stage.Status == "Pending" ? Color.Secondary : Color.Default)">
+                             Color="@(stage.Status == "Pending" ? Color.Default : Color.Default)">
                         @stage.Label
                     </MudText>
                     @if (stage.CompletedAt.HasValue)
                     {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="stage-date">
+                        <MudText Typo="Typo.caption" Color="Color.Default" Class="stage-date">
                             @stage.CompletedAt.Value.ToString("dd MMM")
                         </MudText>
                     }
@@ -87,14 +87,14 @@ else
                 }
                 @if (_selected.CompletedAt.HasValue)
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <MudText Typo="Typo.caption" Color="Color.Default">
                         @(_selected.Status == "Completed" ? "Completed" : "Updated"):
                         @_selected.CompletedAt.Value.ToString("dd MMM yyyy HH:mm")
                     </MudText>
                 }
                 @if (!string.IsNullOrEmpty(_selected.Note))
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">@_selected.Note</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-1">@_selected.Note</MudText>
                 }
                 @if (!string.IsNullOrEmpty(_selected.NavigateTo))
                 {

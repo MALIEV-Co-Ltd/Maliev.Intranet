@@ -5,18 +5,42 @@ namespace Maliev.Intranet.Shared.Dtos;
 /// </summary>
 public sealed record FileAnalysisStatusDto
 {
+    /// <summary>Gets or sets the unique identifier of the file upload.</summary>
     public required string UploadId { get; init; }
+
+    /// <summary>Gets or sets the current analysis status of the file.</summary>
     public required FileAnalysisStatus Status { get; init; }
+
+    /// <summary>Gets or sets the bounding box dimensions and volume if analysis is complete.</summary>
     public FileAnalysisDimensionsDto? Dimensions { get; init; }
+
+    /// <summary>Gets or sets the URL for a generated thumbnail image of the model.</summary>
     public string? ThumbnailUrl { get; init; }
+
+    /// <summary>Signed URL to the 1000px ISO WebP thumbnail. Preferred over ThumbnailUrl for detail card display.</summary>
+    public string? HiResThumbnailUrl { get; init; }
+
+    /// <summary>Gets or sets the collection of preview image URLs from different perspectives.</summary>
     public FileAnalysisPreviewUrlsDto? PreviewUrls { get; init; }
+
+    /// <summary>
+    /// GCS storage path of the GLB artifact produced by GeometryService.
+    /// Null until the file analysis event is consumed.
+    /// </summary>
+    public string? GlbStoragePath { get; init; }
+
+    /// <summary>Gets or sets the error code if the analysis failed.</summary>
     public string? ErrorCode { get; init; }
+
+    /// <summary>Gets or sets the UTC timestamp when the analysis was processed.</summary>
     public DateTimeOffset? ProcessedAt { get; init; }
+    
     /// <summary>
     /// Whether the mesh is manifold (watertight). False indicates potential geometry issues.
     /// Null if not yet determined.
     /// </summary>
     public bool? IsManifold { get; init; }
+
     /// <summary>
     /// Independent preview image generation status. File appears "Ready" when Status=Completed
     /// regardless of this value.
@@ -29,8 +53,11 @@ public sealed record FileAnalysisStatusDto
 /// </summary>
 public enum FileAnalysisStatus
 {
+    /// <summary>The file is currently being analyzed.</summary>
     Processing,
+    /// <summary>The file analysis has completed successfully.</summary>
     Completed,
+    /// <summary>The file analysis has failed.</summary>
     Failed
 }
 
@@ -65,16 +92,24 @@ public sealed record FileAnalysisDimensionsDto
 }
 
 /// <summary>
-/// Signed URLs for the six rendered preview images plus isometric view.
+/// Signed URLs for the six rendered preview images plus isometric views.
 /// </summary>
 public sealed record FileAnalysisPreviewUrlsDto
 {
-    public string? Front  { get; init; }
-    public string? Back   { get; init; }
-    public string? Left   { get; init; }
-    public string? Right  { get; init; }
-    public string? Top    { get; init; }
-    public string? Bottom { get; init; }
-    /// <summary>Isometric view preview image URL.</summary>
-    public string? Iso    { get; init; }
+    /// <summary>Gets or sets the front view preview image URL (small WebP).</summary>
+    public string? FrontSmall  { get; init; }
+    /// <summary>Gets or sets the back view preview image URL (small WebP).</summary>
+    public string? BackSmall   { get; init; }
+    /// <summary>Gets or sets the left view preview image URL (small WebP).</summary>
+    public string? LeftSmall   { get; init; }
+    /// <summary>Gets or sets the right view preview image URL (small WebP).</summary>
+    public string? RightSmall  { get; init; }
+    /// <summary>Gets or sets the top view preview image URL (small WebP).</summary>
+    public string? TopSmall    { get; init; }
+    /// <summary>Gets or sets the bottom view preview image URL (small WebP).</summary>
+    public string? BottomSmall { get; init; }
+    /// <summary>Isometric thumbnail WebP URL (~256px small).</summary>
+    public string? ThumbnailSmall { get; init; }
+    /// <summary>Isometric thumbnail WebP URL (1200px large, hi-res detail card display).</summary>
+    public string? ThumbnailLargeUrl { get; init; }
 }

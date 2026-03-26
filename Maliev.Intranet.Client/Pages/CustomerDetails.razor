@@ -159,19 +159,19 @@
                                 @* Top Metrics *@
                                 <MudItem xs="12" sm="4">
                                     <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
-                                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Total Spent</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-1">Total Spent</MudText>
                                         <MudText Typo="Typo.h4" Style="font-weight: 700;">@_customer.TotalSpent.ToString("C0", new CultureInfo("th-TH"))</MudText>
                                     </MudPaper>
                                 </MudItem>
                                 <MudItem xs="12" sm="4">
                                     <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
-                                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Active Orders</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-1">Active Orders</MudText>
                                         <MudText Typo="Typo.h4" Style="font-weight: 700;">@_customer.ActiveOrdersCount</MudText>
                                     </MudPaper>
                                 </MudItem>
                                 <MudItem xs="12" sm="4">
                                     <MudPaper Elevation="0" Class="pa-6 rounded-xl border-solid border-1 mud-border-lines-default h-100">
-                                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Open Quotations</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-1">Open Quotations</MudText>
                                         <MudText Typo="Typo.h4" Style="font-weight: 700;">@_customer.OpenQuotationsCount</MudText>
                                     </MudPaper>
                                 </MudItem>
@@ -192,18 +192,18 @@
                                                 
                                                 <MudGrid Spacing="4">
                                                     <MudItem xs="12">
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Company Name</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Default">Company Name</MudText>
                                                         <MudText Typo="Typo.body1" Style="font-weight: 600;">@_customer.CompanyName</MudText>
                                                     </MudItem>
                                                     @if (!string.IsNullOrEmpty(_customer.CompanyVatNumber))
                                                     {
                                                         <MudItem xs="12" sm="6">
-                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tax ID / VAT</MudText>
+                                                            <MudText Typo="Typo.caption" Color="Color.Default">Tax ID / VAT</MudText>
                                                             <MudText Typo="Typo.body2">@_customer.CompanyVatNumber</MudText>
                                                         </MudItem>
                                                     }
                                                     <MudItem xs="12" sm="6">
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Segment & Tier</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Default">Segment & Tier</MudText>
                                                         <MudStack Row="true" Spacing="2">
                                                             <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info" Class="ma-0">@_customer.CompanySegment</MudChip>
                                                             <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="ma-0">@_customer.CompanyTier</MudChip>
@@ -212,7 +212,7 @@
                                                     @if (_customer.CompanyBillingAddress != null)
                                                     {
                                                         <MudItem xs="12">
-                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Billing Address</MudText>
+                                                            <MudText Typo="Typo.caption" Color="Color.Default">Billing Address</MudText>
                                                             <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.AddressLine1</MudText>
                                                             <MudText Typo="Typo.body2">@_customer.CompanyBillingAddress.District, @_customer.CompanyBillingAddress.City, @_customer.CompanyBillingAddress.PostalCode</MudText>
                                                         </MudItem>
@@ -311,7 +311,7 @@
                                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
                                     <MudStack Spacing="0">
                                         <MudText Typo="Typo.h6" Style="font-weight: 700;">Delivery & Billing</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Drag and drop to set default addresses</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">Drag and drop to set default addresses</MudText>
                                     </MudStack>
                                     <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="AddAddressDialog">Add Address</MudButton>
                                 </MudStack>
@@ -325,7 +325,7 @@
                                                 </MudDropZone>
                                             </div>
                                             <div class="d-flex flex-column flex-grow-1" style="flex: 1 1 50%; min-width: 0;">
-                                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2 ml-1" Style="font-weight: 700;">DEFAULT SHIPPING</MudText>
+                                                <MudText Typo="Typo.subtitle2" Color="Color.Default" Class="mb-2 ml-1" Style="font-weight: 700;">DEFAULT SHIPPING</MudText>
                                                 <MudDropZone T="AddressResponse" Identifier="shipping-default" CanDropClass="mud-border-primary" Class="rounded-xl border-2 border-dashed mud-border-lines-default pa-4 d-flex flex-column gap-4 flex-grow-1" Style="background-color: var(--mud-palette-background-grey);">
                                                 </MudDropZone>
                                             </div>
@@ -346,8 +346,8 @@
                                                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
                                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                                                         <MudIcon Icon="@(context.Type == "Billing" ? Icons.Material.Filled.ReceiptLong : Icons.Material.Filled.LocalShipping)" 
-                                                                 Color="@(context.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" />
-                                                        <MudChip T="string" Color="@(context.Type == "Billing" ? Color.Primary : Color.Secondary)" Size="Size.Small" Variant="Variant.Filled">@context.Type</MudChip>
+                                                                 Color="@(context.Type == "Billing" ? Color.Primary : Color.Default)" Size="Size.Small" />
+                                                        <MudChip T="string" Color="@(context.Type == "Billing" ? Color.Primary : Color.Default)" Size="Size.Small" Variant="Variant.Filled">@context.Type</MudChip>
                                                     </MudStack>
                                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
                                                         @if (context.IsDefault)
@@ -465,7 +465,7 @@
                                             <!-- Title Zone -->
                                             <MudStack Spacing="1">
                                                 <MudText Typo="Typo.h5" Style="font-weight: 700;">NDA Agreement</MudText>
-                                                <MudText Typo="Typo.body2" Color="Color.Secondary">Non-Disclosure Agreement for this customer</MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Default">Non-Disclosure Agreement for this customer</MudText>
                                             </MudStack>
 
                                             <!-- NDA Upload Zone and Progress -->
@@ -481,7 +481,7 @@
                                                                    Style="width: 100%; min-height: 200px; position: relative;">
                                                         <CustomContent>
                                                             <div class="file-upload-dropzone @(_ndaDragOver ? "drag-over" : "")"
-                                                                 style="background-color: rgba(33, 150, 243, 0.05); border: 2px dashed var(--mud-palette-info); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; cursor: pointer;"
+                                                                 style="background-color: color-mix(in srgb, var(--mud-palette-info) 5%, transparent); border: 2px dashed var(--mud-palette-info); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; cursor: pointer;"
                                                                  @onclick="@context.OpenFilePickerAsync"
                                                                  @ondragenter="@(() => _ndaDragOver = true)"
                                                                  @ondragleave="@(() => _ndaDragOver = false)"
@@ -489,7 +489,7 @@
                                                                  @ondrop="@(() => _ndaDragOver = false)">
                                                                 <MudIcon Icon="@Icons.Material.Filled.Gavel" Style="font-size: 42px;" Color="Color.Info" Class="mb-2" />
                                                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Drag & Drop or Click to Upload</MudText>
-                                                                <MudText Typo="Typo.body2" Color="Color.Secondary">PDF files only, up to 10MB each (max 20 files)</MudText>
+                                                                <MudText Typo="Typo.body2" Color="Color.Default">PDF files only, up to 10MB each (max 20 files)</MudText>
                                                             </div>
                                                         </CustomContent>
                                                     </MudFileUpload>
@@ -568,7 +568,7 @@
                                                                                 <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Text" Class="ma-0">Current</MudChip>
                                                                             }
                                                                         </MudStack>
-                                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                        <MudText Typo="Typo.caption" Color="Color.Default">
                                                                             Expires: @(nda.ExpiresAt?.ToLocalTime().ToString("d") ?? "Never") • Created: @nda.CreatedAt.ToLocalTime().ToString("g")
                                                                         </MudText>
                                                                     </div>
@@ -591,7 +591,7 @@
                                                                         @if (nda.Status == "Draft")
                                                                         {
                                                                             <MudTooltip Text="Upload Revised Draft">
-                                                                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Secondary" Size="Size.Small" OnClick="@(() => OpenNdaRevisionUpload(nda))" />
+                                                                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" Size="Size.Small" OnClick="@(() => OpenNdaRevisionUpload(nda))" />
                                                                             </MudTooltip>
                                                                         }
                                                                     }
@@ -628,7 +628,7 @@
                                                                         <MudIcon Icon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" />
                                                                         <div class="d-flex flex-column">
                                                                             <MudText Typo="Typo.body2" Style="font-weight: 600;">@doc.FileName</MudText>
-                                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(doc.FileSize) • @doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
+                                                                            <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(doc.FileSize) • @doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
                                                                         </div>
                                                                     </MudStack>
                                                                     <MudStack Row="true" Spacing="0">
@@ -656,7 +656,7 @@
                                             <!-- Title Zone -->
                                             <MudStack Spacing="1">
                                                 <MudText Typo="Typo.h5" Style="font-weight: 700;">Customer Documents</MudText>
-                                                <MudText Typo="Typo.body2" Color="Color.Secondary">Supporting documents and identification</MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Default">Supporting documents and identification</MudText>
                                             </MudStack>
 
                                             <!-- Upload Zone and Progress -->
@@ -672,7 +672,7 @@
                                                                    Style="width: 100%; min-height: 200px; position: relative;">
                                                         <CustomContent>
                                                             <div class="file-upload-dropzone @(_customerDocDragOver ? "drag-over" : "")"
-                                                                 style="background-color: rgba(76, 175, 80, 0.05); border: 2px dashed var(--mud-palette-success); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; cursor: pointer;"
+                                                                 style="background-color: color-mix(in srgb, var(--mud-palette-success) 5%, transparent); border: 2px dashed var(--mud-palette-success); position: relative; height: 100%; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; cursor: pointer;"
                                                                  @onclick="@context.OpenFilePickerAsync"
                                                                  @ondragenter="@(() => _customerDocDragOver = true)"
                                                                  @ondragleave="@(() => _customerDocDragOver = false)"
@@ -680,7 +680,7 @@
                                                                  @ondrop="@(() => _customerDocDragOver = false)">
                                                                 <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Style="font-size: 42px;" Color="Color.Success" Class="mb-2" />
                                                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Drag & Drop or Click to Upload</MudText>
-                                                                <MudText Typo="Typo.body2" Color="Color.Secondary">PDF, Word, or Image files, up to 10MB each (max 20 files)</MudText>
+                                                                <MudText Typo="Typo.body2" Color="Color.Default">PDF, Word, or Image files, up to 10MB each (max 20 files)</MudText>
                                                             </div>
                                                         </CustomContent>
                                                     </MudFileUpload>
@@ -750,7 +750,7 @@
                                                                             <MudIcon Icon="@GetDocumentIcon(doc.MimeType)" Color="@GetDocumentIconColor(doc.MimeType)" />
                                                                             <div class="d-flex flex-column">
                                                                                 <MudText Typo="Typo.body2" Style="font-weight: 600;">@doc.FileName</MudText>
-                                                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatFileSize(doc.FileSize) • @doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
+                                                                                <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(doc.FileSize) • @doc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
                                                                             </div>
                                                                         </MudStack>
                                                                         <MudStack Row="true" Spacing="0">
@@ -790,7 +790,7 @@
 
                                                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="px-1">
                                                         <div style="min-width: 0;">
-                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            <MudText Typo="Typo.caption" Color="Color.Default">
                                                                 @FormatFileSize(_selectedPreviewDoc.FileSize) • @_selectedPreviewDoc.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")
                                                             </MudText>
                                                         </div>
@@ -833,7 +833,7 @@
                                         <MudHidden Breakpoint="Breakpoint.MdAndUp">
                                             <div class="d-flex align-center justify-center flex-column pa-6">
                                                 <MudIcon Icon="@Icons.Material.Filled.PhoneAndroid" Style="font-size: 48px; opacity: 0.3;" Color="Color.Default" Class="mb-3" />
-                                                <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">Preview is only available on larger screens</MudText>
+                                                <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Default">Preview is only available on larger screens</MudText>
                                                 <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => DownloadDocument(_selectedPreviewDoc.FileReference))" Class="mt-3">Download Document</MudButton>
                                             </div>
                                         </MudHidden>
@@ -848,7 +848,7 @@
                                     <MudText Typo="Typo.h6" Style="font-weight: 700;">Internal Notes</MudText>
                                     @if (!string.IsNullOrEmpty(_noteSearchString))
                                     {
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">(showing @FilteredNotes.Count() of @(_customer?.Notes?.Count ?? 0) notes)</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">(showing @FilteredNotes.Count() of @(_customer?.Notes?.Count ?? 0) notes)</MudText>
                                     }
                                 </MudStack>
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
@@ -879,7 +879,7 @@
                                                                 <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">
                                                                     @(note.CreatedByName ?? "Unknown User")
                                                                 </MudText>
-                                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@note.CreatedAt.ToLocalTime().ToString("g")</MudText>
+                                                                <MudText Typo="Typo.caption" Color="Color.Default">@note.CreatedAt.ToLocalTime().ToString("g")</MudText>
                                                             </MudStack>
                                                         </MudStack>
                                                         <div @onclick:stopPropagation>
@@ -2030,7 +2030,7 @@
     .file-upload-dropzone.drag-over {
         transform: scale(1.02);
         opacity: 1;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        box-shadow: var(--mud-elevation-4);
     }
 
     /* Force equal size for address cards in grid */

@@ -5,7 +5,7 @@
 
 <MudDialog>
     <DialogContent>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-4">
             @Checklist.Tasks.Count(t => t.IsCompleted) of @Checklist.Tasks.Count tasks completed
         </MudText>
         <MudProgressLinear Color="Color.Primary" Value="@ProgressPercent" Class="mb-4" />

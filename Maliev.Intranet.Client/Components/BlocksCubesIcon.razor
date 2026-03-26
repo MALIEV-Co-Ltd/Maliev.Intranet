@@ -1,0 +1,65 @@
+@using Maliev.Intranet.Client.Services
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<span class="@Class" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;"
+      @onclick="OnClickHandler"
+      title="View in 3D">
+    <canvas id="@_canvasId" width="@Size" height="@Size"
+            style="display:block;pointer-events:none;"></canvas>
+</span>
+
+@code {
+    [Parameter] public int Size { get; set; } = 28;
+    [Parameter] public string Class { get; set; } = "";
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private readonly string _canvasId = $"bc-icon-{Guid.NewGuid():N}";
+    private IJSObjectReference? _module;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            try
+            {
+                _module = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./js/blocks-cubes-icon.js");
+                await _module.InvokeVoidAsync("init", _canvasId, Size);
+            }
+            catch
+            {
+                // BabylonJS CDN unavailable or module failed to load — degrade gracefully
+                _initialized = false;
+            }
+        }
+    }
+
+    private Task OnClickHandler()
+    {
+        if (OnClick.HasDelegate)
+            return OnClick.InvokeAsync();
+        return Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module != null)
+        {
+            try
+            {
+                await _module.InvokeVoidAsync("dispose", _canvasId);
+            }
+            catch
+            {
+                // Ignore disposal errors
+            }
+            finally
+            {
+                try { await _module.DisposeAsync(); } catch { }
+            }
+        }
+    }
+}

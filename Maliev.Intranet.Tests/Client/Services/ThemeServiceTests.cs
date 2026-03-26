@@ -20,8 +20,10 @@ public class ThemeServiceTests
         Assert.NotNull(theme.PaletteLight);
 
         // MudColor.ToString() returns rgba(...)
-        Assert.Equal("rgba(47,129,247,1)", theme.PaletteDark.Primary.ToString());
-        Assert.Equal("rgba(9,105,218,1)", theme.PaletteLight.Primary.ToString());
+        // PaletteDark.Primary is not explicitly set, so it uses MudBlazor default
+        Assert.Equal("rgba(119,107,231,1)", theme.PaletteDark.Primary.ToString());
+        // PaletteLight.Primary = "#1b6ec2"
+        Assert.Equal("rgba(27,110,194,1)", theme.PaletteLight.Primary.ToString());
     }
 
     [Fact]

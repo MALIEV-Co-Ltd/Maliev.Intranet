@@ -37,6 +37,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
             ThumbnailUrl = existing?.ThumbnailUrl,
+            HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = existing?.ErrorCode,
@@ -57,6 +58,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Dimensions = dimensions,
             IsManifold = isManifold,
             ThumbnailUrl = existing?.ThumbnailUrl,
+            HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = existing?.ErrorCode,
@@ -67,7 +69,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     }
 
     /// <inheritdoc />
-    public Task SetPreviewUrlsAsync(string uploadId, FileAnalysisPreviewUrlsDto previewUrls, string? thumbnailUrl, CancellationToken cancellationToken = default)
+    public Task SetPreviewUrlsAsync(string uploadId, FileAnalysisPreviewUrlsDto previewUrls, string? thumbnailUrl, string? hiResThumbnailUrl = null, CancellationToken cancellationToken = default)
     {
         var existing = Get(uploadId);
         var status = new FileAnalysisStatusDto
@@ -77,6 +79,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
             ThumbnailUrl = thumbnailUrl ?? existing?.ThumbnailUrl,
+            HiResThumbnailUrl = hiResThumbnailUrl ?? existing?.HiResThumbnailUrl,
             PreviewUrls = previewUrls,
             PreviewProcessingStatus = PreviewProcessingStatus.Processing,
             ErrorCode = existing?.ErrorCode,
@@ -87,7 +90,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     }
 
     /// <inheritdoc />
-    public Task SetAnalysisCompletedAsync(string uploadId, CancellationToken cancellationToken = default)
+    public Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, CancellationToken cancellationToken = default)
     {
         var existing = Get(uploadId);
         var status = new FileAnalysisStatusDto
@@ -97,7 +100,9 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
             ThumbnailUrl = existing?.ThumbnailUrl,
+            HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
+            GlbStoragePath = glbStoragePath ?? existing?.GlbStoragePath,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = null,
             ProcessedAt = DateTimeOffset.UtcNow,
@@ -117,6 +122,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
             ThumbnailUrl = existing?.ThumbnailUrl,
+            HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
             PreviewProcessingStatus = PreviewProcessingStatus.Completed,
             ErrorCode = existing?.ErrorCode,
@@ -137,6 +143,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
             ThumbnailUrl = existing?.ThumbnailUrl,
+            HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
             PreviewProcessingStatus = PreviewProcessingStatus.Failed,
             ErrorCode = "preview-generation-failed",
@@ -157,6 +164,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
             ThumbnailUrl = existing?.ThumbnailUrl,
+            HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = errorCode,
