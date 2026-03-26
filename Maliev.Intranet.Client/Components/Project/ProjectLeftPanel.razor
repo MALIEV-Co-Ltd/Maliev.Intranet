@@ -7,44 +7,43 @@
     {
         <div class="pnl-section pnl-section-customer">
             <div class="pnl-customer-card">
-                <div class="pnl-customer-info">
-                    <MudText Typo="Typo.body2" Style="font-weight:600;">@SelectedCustomer.Name</MudText>
-                    @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@SelectedCustomer.Email</MudText>
-                    }
-                    @if (!string.IsNullOrEmpty(SelectedCustomer.CompanyName))
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Tertiary">@SelectedCustomer.CompanyName</MudText>
-                    }
-                </div>
-            </div>
-            <div class="pnl-customer-actions">
+                <MudText Typo="Typo.body2" Style="font-weight:600;">@SelectedCustomer.Name</MudText>
                 @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
                 {
-                    <MudIconButton Icon="@Icons.Material.Outlined.Email"
-                                   Size="Size.Small"
-                                   Color="Color.Default"
-                                   Href="@($"mailto:{SelectedCustomer.Email}")"
-                                   Target="_blank" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@SelectedCustomer.Email</MudText>
                 }
-                @if (!string.IsNullOrEmpty(SelectedCustomer.Mobile))
+                @if (!string.IsNullOrEmpty(SelectedCustomer.CompanyName))
                 {
-                    <MudIconButton Icon="@Icons.Material.Outlined.Phone"
-                                   Size="Size.Small"
-                                   Color="Color.Default"
-                                   Href="@($"tel:{SelectedCustomer.Mobile}")" />
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@SelectedCustomer.CompanyName</MudText>
                 }
-                else if (!string.IsNullOrEmpty(SelectedCustomer.Landline))
-                {
-                    <MudIconButton Icon="@Icons.Material.Outlined.Phone"
+                <div class="pnl-customer-actions">
+                    @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Email"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Href="@($"mailto:{SelectedCustomer.Email}")"
+                                       Target="_blank" />
+                    }
+                    @if (!string.IsNullOrEmpty(SelectedCustomer.Mobile))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Phone"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Href="@($"tel:{SelectedCustomer.Mobile}")" />
+                    }
+                    else if (!string.IsNullOrEmpty(SelectedCustomer.Landline))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Phone"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Href="@($"tel:{SelectedCustomer.Landline}")" />
+                    }
+                    <MudSpacer />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                    Size="Size.Small"
-                                   Color="Color.Default"
-                                   Href="@($"tel:{SelectedCustomer.Landline}")" />
-                }
-                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                               Size="Size.Small"
-                               OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
+                                   OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
+                </div>
             </div>
         </div>
     }
@@ -78,8 +77,12 @@
         </div>
     }
 
-    @* ── Section 2: Project Details (no divider, no gap) ────────────── *@
-    <div class="pnl-section pnl-section-grow">
+    <div style="margin: 0; padding: 0;">
+        <MudDivider Class="my-0" />
+    </div>
+
+    @* ── Section 2: Project Details ──────────────────────────────────── *@
+    <div class="pnl-section pnl-section-grow" style="padding-top: 0;">
         <MudTextField T="string"
                       Value="@Title"
                       ValueChanged="@OnTitleChanged"
@@ -166,18 +169,11 @@
         border: 1px solid var(--mud-palette-lines-default);
         border-radius: 4px;
     }
-    .pnl-customer-info {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-    }
     .pnl-customer-actions {
         display: flex;
         gap: 4px;
         align-items: center;
-        padding-top: 6px;
-        margin-top: 2px;
-        border-top: 1px solid var(--mud-palette-lines-default);
+        padding-top: 4px;
     }
     .pnl-customer-actions .mud-icon-button:hover {
         background-color: transparent !important;
@@ -210,17 +206,6 @@
     .pnl-dropzone-active {
         border-color: var(--mud-palette-primary);
         background: var(--mud-palette-primary-hover);
-    }
-
-    .pnl-left .mud-input-control input,
-    .pnl-left .mud-input-control textarea {
-        font-size: var(--mud-typography-body1-size);
-    }
-    .pnl-left .mud-floating-label .mud-floating-label-text {
-        font-size: var(--mud-typography-body1-size) !important;
-    }
-    .pnl-left .mud-input-helper-text {
-        font-size: var(--mud-typography-body1-size);
     }
 </style>
 
