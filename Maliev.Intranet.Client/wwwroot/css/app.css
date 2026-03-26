@@ -113,3 +113,10 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+.mud-autocomplete .mud-input-control-input-control,
+.mud-autocomplete .mud-input-label,
+.mud-text-field .mud-input-control-input-control,
+.mud-text-field .mud-input-label {
+    font-size: var(--mud-typography-body1-size, 1rem);
+}
