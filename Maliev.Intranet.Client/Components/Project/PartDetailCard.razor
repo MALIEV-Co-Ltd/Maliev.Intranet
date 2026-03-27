@@ -94,25 +94,69 @@
         <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="false" Border="true" TabPanelsClass="pa-3">
 
             <MudTabPanel Text="Configuration">
+                @* Selection mode toggle *@
+                <div class="pdc-selection-mode mb-3">
+                    <MudToggleGroup T="string" Value="@_selectionMode" ValueChanged="OnSelectionModeChanged" Style="width:fit-content;">
+                        <MudToggleItem Value="@("rich")">Rich</MudToggleItem>
+                        <MudToggleItem Value="@("basic")">Basic</MudToggleItem>
+                    </MudToggleGroup>
+                </div>
+
                 @* Process — always shown first *@
                 <div class="pdc-field-group">
-                    <MudSelect T="Nullable<Guid>" Label="Process *"
-                               Value="@Part.ProcessId"
-                               ValueChanged="@OnProcessChanged"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense">
-                        @foreach (var p in Processes)
-                        {
-                            <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)p.Id)">@p.Name</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <MudText Typo="Typo.overline" Class="mb-1">Process *</MudText>
+
+                    @if (_selectionMode == "rich")
+                    {
+                        <MudStack Row="true" Spacing="2" Style="overflow-x: auto; flex-wrap: nowrap;">
+                            @foreach (var p in Processes)
+                            {
+                                <CatalogCard Title="@p.Name"
+                                            Subtitle="@(p.Description ?? "")"
+                                            IsSelected="@(Part.ProcessId == p.Id)"
+                                            OnClick="@(() => OnProcessChanged(p.Id))" />
+                            }
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudSelect T="Nullable<Guid>" Label="Process *"
+                                   Value="@Part.ProcessId"
+                                   ValueChanged="@OnProcessChanged"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense">
+                            @foreach (var p in Processes)
+                            {
+                                <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)p.Id)">@p.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
                 </div>
 
                 @* Material *@
                 <div class="pdc-field-group">
+                    <MudText Typo="Typo.overline" Class="mb-1">Material *</MudText>
+
                     @if (Part.CatalogLoading)
                     {
-                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
+                        <MudStack Row="true" Spacing="2">
+                            @for (var i = 0; i < 4; i++)
+                            {
+                                <MudSkeleton Width="120px" Height="100px" Style="flex-shrink:0;" />
+                            }
+                        </MudStack>
+                    }
+                    else if (_selectionMode == "rich")
+                    {
+                        <MudStack Row="true" Spacing="2" Style="overflow-x: auto; flex-wrap: nowrap;">
+                            @foreach (var m in Part.AvailableMaterials)
+                            {
+                                <CatalogCard Title="@m.Name"
+                                            Subtitle="@m.Category"
+                                            IsSelected="@(Part.MaterialId == m.Id)"
+                                            OnClick="@(() => OnMaterialChanged(m.Id))" />
+                            }
+                        </MudStack>
                     }
                     else
                     {
@@ -132,9 +176,32 @@
 
                 @* Surface Finish *@
                 <div class="pdc-field-group">
+                    <MudText Typo="Typo.overline" Class="mb-1">Surface Finish</MudText>
+
                     @if (Part.CatalogLoading)
                     {
-                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
+                        <MudStack Row="true" Spacing="2">
+                            @for (var i = 0; i < 3; i++)
+                            {
+                                <MudSkeleton Width="120px" Height="100px" Style="flex-shrink:0;" />
+                            }
+                        </MudStack>
+                    }
+                    else if (_selectionMode == "rich")
+                    {
+                        <MudStack Row="true" Spacing="2" Style="overflow-x: auto; flex-wrap: nowrap;">
+                            <CatalogCard Title="None"
+                                        Subtitle=""
+                                        IsSelected="@(!Part.FinishId.HasValue)"
+                                        OnClick="@(() => OnFinishChanged(null))" />
+                            @foreach (var f in Part.AvailableFinishes)
+                            {
+                                <CatalogCard Title="@f.Name"
+                                            Subtitle="@(f.RaValueUm.HasValue ? $"Ra {f.RaValueUm:N1} µm" : (f.Description ?? ""))"
+                                            IsSelected="@(Part.FinishId == f.Id)"
+                                            OnClick="@(() => OnFinishChanged(f.Id))" />
+                            }
+                        </MudStack>
                     }
                     else
                     {
@@ -155,9 +222,32 @@
 
                 @* Tolerance *@
                 <div class="pdc-field-group">
+                    <MudText Typo="Typo.overline" Class="mb-1">Tolerance</MudText>
+
                     @if (Part.CatalogLoading)
                     {
-                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
+                        <MudStack Row="true" Spacing="2">
+                            @for (var i = 0; i < 3; i++)
+                            {
+                                <MudSkeleton Width="120px" Height="100px" Style="flex-shrink:0;" />
+                            }
+                        </MudStack>
+                    }
+                    else if (_selectionMode == "rich")
+                    {
+                        <MudStack Row="true" Spacing="2" Style="overflow-x: auto; flex-wrap: nowrap;">
+                            <CatalogCard Title="Standard"
+                                        Subtitle=""
+                                        IsSelected="@(!Part.ToleranceId.HasValue)"
+                                        OnClick="@(() => OnToleranceChanged(null))" />
+                            @foreach (var t in Part.AvailableTolerances)
+                            {
+                                <CatalogCard Title="@t.Name"
+                                            Subtitle="@(t.Grade)"
+                                            IsSelected="@(Part.ToleranceId == t.Id)"
+                                            OnClick="@(() => OnToleranceChanged(t.Id))" />
+                            }
+                        </MudStack>
                     }
                     else
                     {
@@ -389,6 +479,7 @@
 
     private bool _showViewer3d;
     private int _activeTab;
+    private string _selectionMode = "rich";
     private readonly Dictionary<string, string> _resolvedUrls = [];
 
     private string GetFileIcon() =>
@@ -458,6 +549,12 @@
     {
         mutate(Part);
         OnPartChanged.InvokeAsync(Part);
+    }
+
+    private Task OnSelectionModeChanged(string mode)
+    {
+        _selectionMode = mode;
+        return Task.CompletedTask;
     }
 
     private void OnProcessChanged(Guid? processId)
