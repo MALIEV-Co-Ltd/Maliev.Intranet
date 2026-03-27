@@ -55,15 +55,16 @@
     {
         <div class="pnl-section">
             <MudAutocomplete T="CustomerSummaryDto"
+                             @bind-Value="_searchCustomer"
                              Label="Search customers"
                              SearchFunc="@(SearchCustomersFunc ?? ((_,__) => Task.FromResult(Enumerable.Empty<CustomerSummaryDto>())))"
-                             ValueChanged="@OnCustomerSelected"
                              ToStringFunc="@(c => c?.Name ?? string.Empty)"
                              Variant="Variant.Outlined"
                              Margin="Margin.Dense"
                              Clearable="true"
                              DebounceInterval="300"
-                             MinCharacters="2">
+                             MinCharacters="2"
+                             @bind-Value:after="OnCustomerSelectedFromAutocomplete">
                 <ItemTemplate Context="customer">
                     <MudStack Row="false" Spacing="0">
                         <MudText Typo="Typo.body2">@customer.Name</MudText>
@@ -86,26 +87,14 @@
     </div>
 
     @* ── Section 2: Project Details ──────────────────────────────────── *@
-    <div class="pnl-section pnl-section-grow" style="padding-top: 0;">
-        <MudTextField T="string"
-                      Value="@Title"
-                      ValueChanged="@OnTitleChanged"
-                      Label="Project Title *"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Error="@TitleHasError"
-                      ErrorText="@TitleError"
-                      Immediate="true"
-                      MaxLength="500"
-                      Class="mb-4" />
-
+    <div class="pnl-section pnl-section-grow">
         <MudTextField T="string"
                       Value="@Description"
                       ValueChanged="@OnDescriptionChanged"
                       Label="Description"
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
-                      Lines="8"
+                      Lines="12"
                       Immediate="true"
                       MaxLength="2000" />
     </div>
@@ -204,7 +193,7 @@
         justify-content: center;
         cursor: pointer;
         transition: border-color 0.2s, background 0.2s;
-        min-height: 120px;
+        min-height: 160px;
     }
     .pnl-dropzone:hover {
         border-color: var(--mud-palette-primary);
@@ -217,14 +206,12 @@
 </style>
 
 @code {
+    private CustomerSummaryDto? _searchCustomer;
+
     [Parameter] public CustomerSummaryDto? SelectedCustomer { get; set; }
     [Parameter] public bool ShowCustomerSearch { get; set; }
     [Parameter] public EventCallback<CustomerSummaryDto?> OnCustomerSelected { get; set; }
     [Parameter] public EventCallback<bool> OnShowSearchChanged { get; set; }
-    [Parameter] public string Title { get; set; } = string.Empty;
-    [Parameter] public EventCallback<string> OnTitleChanged { get; set; }
-    [Parameter] public bool TitleHasError { get; set; }
-    [Parameter] public string? TitleError { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public EventCallback<string?> OnDescriptionChanged { get; set; }
     [Parameter] public bool DescriptionHasError { get; set; }
@@ -235,4 +222,18 @@
     [Parameter] public EventCallback OnOpenFilePicker { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IEnumerable<CustomerSummaryDto>>>? SearchCustomersFunc { get; set; }
     [Parameter] public bool ShowUploadSection { get; set; } = true;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (!ShowCustomerSearch && SelectedCustomer != null)
+        {
+            _searchCustomer = SelectedCustomer;
+        }
+    }
+
+    private Task OnCustomerSelectedFromAutocomplete()
+    {
+        return OnCustomerSelected.InvokeAsync(_searchCustomer);
+    }
 }
