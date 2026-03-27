@@ -18,15 +18,25 @@
         <MudTooltip Text="@Part.Name">
             <div class="pmc-name">@Part.Name</div>
         </MudTooltip>
+        @if (Part.Dimensions != null)
+        {
+            <div class="pmc-dim">
+                @($"{Part.Dimensions.X:N0}×{Part.Dimensions.Y:N0}×{Part.Dimensions.Z:N0} mm")
+                @if (Part.VolumeMm3.HasValue)
+                {
+                    <text> · @FormatVolume(Part.VolumeMm3.Value)</text>
+                }
+            </div>
+        }
         <div class="pmc-qp">
             ×@Part.Quantity
-            @if (Part.PricingLoading) { <MudSkeleton Width="50px" Height="12px" /> }
-            else if (Part.EstimatedTotalAmount.HasValue) { <text> · @FormatPrice(Part.EstimatedTotalAmount.Value)</text> }
+            @if (!string.IsNullOrEmpty(Part.ProcessCode)) { <text> · @Part.ProcessCode</text> }
+            @if (!string.IsNullOrEmpty(Part.MaterialCode)) { <text> · @Part.MaterialCode</text> }
         </div>
-        @if (!string.IsNullOrEmpty(Part.ProcessCode))
-        {
-            <div class="pmc-process">@Part.ProcessCode</div>
-        }
+        <div class="pmc-price">
+            @if (Part.PricingLoading) { <MudSkeleton Width="50px" Height="12px" /> }
+            else if (Part.EstimatedTotalAmount.HasValue) { <text>@FormatPrice(Part.EstimatedTotalAmount.Value)</text> }
+        </div>
     </div>
     <span class="pmc-remove" @onclick:stopPropagation="true">
         <MudIconButton Icon="@Icons.Material.Outlined.Delete"
@@ -47,7 +57,7 @@
         cursor: pointer;
         min-width: 200px;
         max-width: 240px;
-        height: 60px;
+        height: 100px;
         flex-shrink: 0;
         position: relative;
         transition: border-color 0.15s, background 0.15s;
@@ -56,9 +66,9 @@
     .pmc-card:hover { border-color: var(--mud-palette-primary-hover); background: var(--mud-palette-surface); }
     .pmc-active { border-color: var(--mud-palette-primary) !important; background: var(--mud-palette-surface) !important; }
     .pmc-thumb {
-        width: 56px;
-        min-width: 56px;
-        height: 56px;
+        width: 100px;
+        min-width: 100px;
+        height: 100%;
         border-radius: 4px 0 0 4px;
         background: var(--mud-palette-background-grey);
         display: flex;
@@ -97,16 +107,24 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
+    .pmc-dim {
+        font-size: 10px;
+        color: var(--mud-palette-text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
     .pmc-qp {
         font-size: 11px;
         color: var(--mud-palette-text-secondary);
-        display: flex;
-        align-items: center;
-        gap: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .pmc-process {
-        font-size: 10px;
-        color: var(--mud-palette-text-disabled);
+    .pmc-price {
+        font-size: 11px;
+        color: var(--mud-palette-text-primary);
+        font-weight: 500;
     }
     .pmc-remove {
         opacity: 0;
@@ -144,6 +162,12 @@
         "…";
 
     private string FormatPrice(decimal amount) => $"฿{amount:N0}";
+
+    private static string FormatVolume(double volumeMm3)
+    {
+        var cm3 = volumeMm3 / 1000.0;
+        return cm3 >= 1000 ? $"{cm3 / 1000:N1} L" : $"{cm3:N1} cm³";
+    }
 
     private static string GetFileIcon(string name) =>
         Path.GetExtension(name).ToLowerInvariant() switch

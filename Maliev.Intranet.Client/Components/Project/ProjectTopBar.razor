@@ -32,18 +32,21 @@
 
     <MudSpacer />
 
-    @* Currency autocomplete *@
-    <MudAutocomplete T="CurrencyDto"
-                     Value="@SelectedCurrency"
-                     ValueChanged="@OnCurrencyChanged"
-                     SearchFunc="@SearchCurrencies"
-                     ToStringFunc="@(c => c == null ? "" : $"{c.Code} — {c.Name}")"
-                     Label="Currency"
-                     Variant="Variant.Outlined"
-                     Margin="Margin.Dense"
-                     Style="width:180px;"
-                     MinCharacters="0"
-                     Clearable="false" />
+    @* Currency select *@
+    <MudSelect T="CurrencyDto"
+               Value="@SelectedCurrency"
+               ValueChanged="@OnCurrencyChanged"
+               ToStringFunc="@(c => c == null ? "" : $"{c.Code} — {c.Name}")"
+               Label="Currency"
+               Variant="Variant.Outlined"
+               Margin="Margin.Dense"
+               Style="width:180px;"
+               Clearable="false">
+        @foreach (var c in Currencies)
+        {
+            <MudSelectItem T="CurrencyDto" Value="@c">@c.Code — @c.Name</MudSelectItem>
+        }
+    </MudSelect>
 
     @* Saved status *@
     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mx-2" Style="white-space:nowrap;">
@@ -126,15 +129,6 @@
         _editingTitle = false;
         if (_titleDraft != Title)
             await OnTitleChanged.InvokeAsync(_titleDraft);
-    }
-
-    private Task<IEnumerable<CurrencyDto>> SearchCurrencies(string value, CancellationToken ct)
-    {
-        var results = string.IsNullOrWhiteSpace(value)
-            ? Currencies
-            : Currencies.Where(c => c.Code.Contains(value, StringComparison.OrdinalIgnoreCase)
-                                  || c.Name.Contains(value, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult(results);
     }
 
     private Task ToggleLayout() =>

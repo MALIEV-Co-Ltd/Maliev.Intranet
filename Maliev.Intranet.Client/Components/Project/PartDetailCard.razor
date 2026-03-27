@@ -9,9 +9,7 @@
 <div class="pdc-root">
     @* ── Left 60%: Viewer Column ──────────────────────────────────── *@
     <div class="pdc-viewer-col">
-        <div class="pdc-thumb-area"
-             @onmouseenter="@(() => _showViewer3dBtn = true)"
-             @onmouseleave="@(() => _showViewer3dBtn = false)">
+        <div class="pdc-thumb-area">
 
             @* ── 3D Viewer Mode (inline, replaces thumbnail) ──────── *@
             @if (_showViewer3d)
@@ -69,8 +67,8 @@
                     <MudIcon Icon="@GetFileIcon()" Size="Size.Large" Color="Color.Default" />
                 }
 
-                @* AnimatedCubeIcon overlay — visible on hover when GLB available *@
-                @if ((!string.IsNullOrEmpty(Part.GlbStoragePath) || !string.IsNullOrEmpty(Part.GlbSignedUrl)) && _showViewer3dBtn)
+                @* AnimatedCubeIcon overlay — always visible when GLB available *@
+                @if (!string.IsNullOrEmpty(Part.GlbStoragePath) || !string.IsNullOrEmpty(Part.GlbSignedUrl))
                 {
                     <div class="pdc-cube-overlay pdc-cube-active">
                         <AnimatedCubeIcon Size="48" OnClick="@OpenViewer" />
@@ -323,9 +321,11 @@
         gap: 6px;
         cursor: pointer;
     }
-    /* Force cube visible + spinning when the overlay is active */
-    .pdc-cube-active .animated-cube-icon .cube {
+    /* Cube always visible; animate only on hover */
+    .pdc-cube-overlay .animated-cube-icon .cube {
         opacity: 1 !important;
+    }
+    .pdc-cube-overlay:hover .animated-cube-icon .cube {
         animation: cubeRotate 6s linear infinite !important;
     }
     .pdc-cube-label {
@@ -387,7 +387,6 @@
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
     [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
 
-    private bool _showViewer3dBtn;
     private bool _showViewer3d;
     private int _activeTab;
     private readonly Dictionary<string, string> _resolvedUrls = [];
@@ -409,7 +408,6 @@
     private async Task OpenViewer()
     {
         _showViewer3d = true;
-        _showViewer3dBtn = false;
         await OnOpenViewer.InvokeAsync(Part);
     }
 

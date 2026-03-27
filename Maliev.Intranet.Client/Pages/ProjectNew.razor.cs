@@ -48,9 +48,8 @@ public partial class ProjectNew : IAsyncDisposable
     private readonly List<PartViewModel> _parts = [];
     private int _selectedPartIndex;
 
-    // ── Upload / polling ───────────────────────────────────────────────
-    private readonly Dictionary<string, CancellationTokenSource> _pollingTokens = new();
-    private const int PollingIntervalMs = 2000;
+    // ── Upload catch-up ────────────────────────────────────────────────
+    private const int CatchUpDelayMs = 5000; // one-shot fetch after SignalR group join
 
     // ── Pricing debounce ───────────────────────────────────────────────
     private readonly Dictionary<Guid, CancellationTokenSource> _pricingTokens = new();
@@ -97,7 +96,6 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        foreach (var cts in _pollingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         foreach (var cts in _pricingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         _autoSaveDebounceTimer?.Dispose();
         if (_hubConnection != null)
@@ -299,7 +297,8 @@ public partial class ProjectNew : IAsyncDisposable
             if (_hubConnection?.State == HubConnectionState.Connected)
                 await _hubConnection.InvokeAsync("JoinFileGroup", storagePath);
 
-            await PollAnalysisStatusAsync(part, storagePath);
+            // One-shot catch-up: in case SignalR event arrives before the hub join completes
+            _ = Task.Delay(CatchUpDelayMs).ContinueWith(_ => FetchCurrentStatusAsync(part, storagePath));
         }
         catch (OperationCanceledException)
         {
@@ -314,101 +313,65 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
-    private async Task PollAnalysisStatusAsync(PartViewModel part, string storagePath)
+    /// <summary>
+    /// Single catch-up fetch: applied once after upload to handle the case where the
+    /// SignalR event fired before the hub group join completed.
+    /// Live updates arrive via SignalR; this is only a safety net.
+    /// </summary>
+    private async Task FetchCurrentStatusAsync(PartViewModel part, string storagePath)
     {
-        var cts = new CancellationTokenSource();
-        _pollingTokens[storagePath] = cts;
-
         try
         {
-            const int maxAttempts = 60;
-            for (var attempt = 0; attempt < maxAttempts; attempt++)
+            var statusResponse = await Http.GetAsync(
+                $"api/uploads/analysis-status?storagePath={Uri.EscapeDataString(storagePath)}");
+
+            if (!statusResponse.IsSuccessStatusCode) return;
+
+            var status = await statusResponse.Content.ReadFromJsonAsync<FileAnalysisStatusDto>();
+            if (status == null) return;
+
+            part.Dimensions = status.Dimensions;
+            part.VolumeMm3 = status.Dimensions?.VolumeMm3;
+            part.IsManifold = status.IsManifold;
+            part.GlbStoragePath = status.GlbStoragePath;
+            part.DfmReport = status.DfmReport;
+
+            if (status.PreviewUrls != null)
             {
-                if (cts.Token.IsCancellationRequested) return;
-
-                await Task.Delay(PollingIntervalMs, cts.Token);
-
-                if (cts.Token.IsCancellationRequested) return;
-
-                var statusResponse = await Http.GetAsync(
-                    $"api/uploads/analysis-status?storagePath={Uri.EscapeDataString(storagePath)}",
-                    cts.Token);
-
-                if (statusResponse.IsSuccessStatusCode)
-                {
-                    var status = await statusResponse.Content.ReadFromJsonAsync<FileAnalysisStatusDto>(cancellationToken: cts.Token);
-                    if (status != null)
-                    {
-                        part.Dimensions = status.Dimensions;
-                        part.VolumeMm3 = status.Dimensions?.VolumeMm3;
-                        part.IsManifold = status.IsManifold;
-
-                        if (status.PreviewUrls != null)
-                        {
-                            part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall
-                                ?? status.ThumbnailUrl
-                                ?? status.PreviewUrls.ThumbnailLargeUrl
-                                ?? status.HiResThumbnailUrl;
-                            part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl
-                                ?? status.HiResThumbnailUrl;
-                        }
-                        else
-                        {
-                            part.ThumbnailSmallUrl = status.ThumbnailUrl ?? status.HiResThumbnailUrl;
-                            part.ThumbnailLargeUrl = status.HiResThumbnailUrl ?? status.ThumbnailUrl;
-                        }
-
-                        part.GlbStoragePath = status.GlbStoragePath;
-                        part.DfmReport = status.DfmReport;
-
-                        if (status.Status == FileAnalysisStatus.Completed)
-                        {
-                            if (status.PreviewProcessingStatus == PreviewProcessingStatus.Completed ||
-                                status.PreviewProcessingStatus == PreviewProcessingStatus.Failed)
-                            {
-                                part.AwaitingPreview = false;
-                                part.StatusText = "Ready";
-                                _pollingTokens.Remove(storagePath);
-                                TriggerAutoSave();
-                                await InvokeAsync(StateHasChanged);
-                                return;
-                            }
-                            // Geometry done but preview still generating — keep polling
-                            part.StatusText = "Generating preview...";
-                            await InvokeAsync(StateHasChanged);
-                            continue;
-                        }
-
-                        if (status.Status == FileAnalysisStatus.Failed)
-                        {
-                            part.AwaitingPreview = false;
-                            part.Error = $"Geometry analysis failed: {status.ErrorCode}";
-                            part.StatusText = "Analysis failed";
-                            _pollingTokens.Remove(storagePath);
-                            await InvokeAsync(StateHasChanged);
-                            return;
-                        }
-
-                        var pct = (attempt * 100) / maxAttempts;
-                        part.StatusText = pct < 50 ? "Analysing geometry..." : "Generating preview...";
-                        await InvokeAsync(StateHasChanged);
-                    }
-                }
+                part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall
+                    ?? status.ThumbnailUrl
+                    ?? status.PreviewUrls.ThumbnailLargeUrl
+                    ?? status.HiResThumbnailUrl;
+                part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl
+                    ?? status.HiResThumbnailUrl;
+            }
+            else if (!string.IsNullOrEmpty(status.ThumbnailUrl))
+            {
+                part.ThumbnailSmallUrl = status.ThumbnailUrl;
+                part.ThumbnailLargeUrl = status.HiResThumbnailUrl ?? status.ThumbnailUrl;
             }
 
-            part.AwaitingPreview = false;
-            part.Error = "Analysis timed out.";
-            part.StatusText = "Timeout";
+            if (status.Status == FileAnalysisStatus.Completed &&
+                (status.PreviewProcessingStatus == PreviewProcessingStatus.Completed ||
+                 status.PreviewProcessingStatus == PreviewProcessingStatus.Failed))
+            {
+                part.AwaitingPreview = false;
+                part.StatusText = "Ready";
+                TriggerAutoSave();
+            }
+            else if (status.Status == FileAnalysisStatus.Failed)
+            {
+                part.AwaitingPreview = false;
+                part.Error = $"Geometry analysis failed: {status.ErrorCode}";
+                part.StatusText = "Analysis failed";
+            }
+
             await InvokeAsync(StateHasChanged);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex)
         {
-            // Expected on removal or timeout
-        }
-        finally
-        {
-            _pollingTokens.Remove(storagePath);
-            cts.Dispose();
+            // Catch-up fetch is a safety net — failures are non-fatal; SignalR will deliver the final state
+            await InvokeAsync(() => Snackbar.Add($"Status fetch failed for {part.Name}: {ex.Message}", Severity.Warning));
         }
     }
 
@@ -417,13 +380,6 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private void RemovePart(PartViewModel part)
     {
-        if (!string.IsNullOrEmpty(part.StoragePath) && _pollingTokens.TryGetValue(part.StoragePath, out var cts))
-        {
-            cts.Cancel();
-            cts.Dispose();
-            _pollingTokens.Remove(part.StoragePath);
-        }
-
         if (!string.IsNullOrEmpty(part.StoragePath) && _hubConnection?.State == HubConnectionState.Connected)
             _ = _hubConnection.InvokeAsync("LeaveFileGroup", part.StoragePath);
 
@@ -676,6 +632,11 @@ public partial class ProjectNew : IAsyncDisposable
                 var partVm = PartViewModel.FromDraftPartState(partState);
                 if (partVm.ProcessId.HasValue && !string.IsNullOrEmpty(partVm.ProcessCode))
                     _ = ReloadPartCatalogAsync(partVm);
+
+                // Catch-up fetch for any part that is still missing its thumbnail (analysis completed
+                // while the page was closed, SignalR event was missed).
+                if (!string.IsNullOrEmpty(partVm.StoragePath) && string.IsNullOrEmpty(partVm.ThumbnailSmallUrl))
+                    _ = Task.Delay(CatchUpDelayMs).ContinueWith(_ => FetchCurrentStatusAsync(partVm, partVm.StoragePath!));
 
                 _parts.Add(partVm);
             }
