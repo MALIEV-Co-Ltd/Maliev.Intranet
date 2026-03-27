@@ -48,6 +48,9 @@ public partial class ProjectNew : IAsyncDisposable
     private readonly List<PartViewModel> _parts = [];
     private int _selectedPartIndex;
 
+    // ── Customer search ────────────────────────────────────────────────
+    private CancellationTokenSource? _searchCts;
+
     // ── Upload catch-up ────────────────────────────────────────────────
     private const int CatchUpDelayMs = 5000; // one-shot fetch after SignalR group join
 
@@ -98,6 +101,8 @@ public partial class ProjectNew : IAsyncDisposable
     {
         foreach (var cts in _pricingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         _autoSaveDebounceTimer?.Dispose();
+        await _searchCts?.CancelAsync()!;
+        _searchCts?.Dispose();
         if (_hubConnection != null)
             await _hubConnection.DisposeAsync();
     }
@@ -121,31 +126,49 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         // ── Load reference data ────────────────────────────────────────
+        // Start all three tasks concurrently but handle failures independently —
+        // a single service failure (e.g. pricing 401) must not prevent currencies
+        // and processes from loading.
         var currenciesTask = Http.GetFromJsonAsync<List<CurrencyDto>>("api/referenceData/currencies");
-        var processesTask = Http.GetFromJsonAsync<List<ProcessDto>>("api/catalog/processes");
-        var leadTimesTask = Http.GetFromJsonAsync<List<LeadTimeOptionDto>>("api/pricing/lead-times");
+        var processesTask  = Http.GetFromJsonAsync<List<ProcessDto>>("api/catalog/processes");
+        var leadTimesTask  = Http.GetFromJsonAsync<List<LeadTimeOptionDto>>("api/pricing/lead-times");
 
-        await Task.WhenAll(currenciesTask, processesTask, leadTimesTask);
+        await Task.WhenAll(
+            currenciesTask.ContinueWith(_ => { }),
+            processesTask.ContinueWith(_ => { }),
+            leadTimesTask.ContinueWith(_ => { }));
 
-        var currenciesResult = currenciesTask.Result;
-        if (currenciesResult is { Count: > 0 })
+        try
         {
-            _currencies = currenciesResult;
-            _selectedCurrency ??= _currencies.FirstOrDefault(c => c.IsPrimary) ?? _currencies.First();
+            var result = await currenciesTask;
+            if (result is { Count: > 0 })
+            {
+                _currencies = result;
+                _selectedCurrency ??= _currencies.FirstOrDefault(c => c.IsPrimary) ?? _currencies.First();
+            }
         }
+        catch (Exception ex) { Snackbar.Add($"Failed to load currencies: {ex.Message}", Severity.Warning); }
 
-        var processesResult = processesTask.Result;
-        if (processesResult is { Count: > 0 })
-            _processes = processesResult;
-
-        var leadTimesResult = leadTimesTask.Result;
-        if (leadTimesResult is { Count: > 0 })
+        try
         {
-            _leadTimeOptions = leadTimesResult
-                .Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            _selectedLeadTime ??= _leadTimeOptions.FirstOrDefault(lt => lt.IsDefault) ?? _leadTimeOptions.First();
+            var result = await processesTask;
+            if (result is { Count: > 0 })
+                _processes = result;
         }
+        catch (Exception ex) { Snackbar.Add($"Failed to load processes: {ex.Message}", Severity.Warning); }
+
+        try
+        {
+            var result = await leadTimesTask;
+            if (result is { Count: > 0 })
+            {
+                _leadTimeOptions = result
+                    .Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                _selectedLeadTime ??= _leadTimeOptions.FirstOrDefault(lt => lt.IsDefault) ?? _leadTimeOptions.FirstOrDefault();
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"Failed to load lead times: {ex.Message}", Severity.Warning); }
 
         await RestoreDraftAsync();
 
@@ -210,11 +233,23 @@ public partial class ProjectNew : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
             return [];
 
+        // Cancel any in-flight search request so debounced keystrokes don't
+        // leave stale HTTP calls running in the background.
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
         try
         {
             var result = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(
-                $"api/customers?query={Uri.EscapeDataString(value)}&page=1&pageSize=10", ct);
+                $"api/customers?query={Uri.EscapeDataString(value)}&page=1&pageSize=10",
+                _searchCts.Token);
             return result?.Data ?? [];
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Debounce cancelled this request — not a real error.
+            return [];
         }
         catch (Exception)
         {
