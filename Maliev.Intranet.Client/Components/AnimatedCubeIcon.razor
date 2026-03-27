@@ -2,7 +2,6 @@
 
 <span class="animated-cube-icon @Class"
       style="--cube-size:@(Size)px; cursor:pointer;"
-      title="View in 3D"
       @onclick="OnClickHandler">
     <span class="cube-card">
         <div class="cube">
@@ -47,33 +46,39 @@
         backface-visibility: hidden;
     }
 
+    .animated-cube-icon .face {
+        background: transparent;
+        border: 1.5px solid;
+        box-sizing: border-box;
+    }
+
     .animated-cube-icon .face-front {
-        background: linear-gradient(135deg, #ffffff 0%, #e8e8e8 100%);
+        border-color: rgba(255, 255, 255, 0.9);
         transform: translateZ(calc(var(--cube-size) / 2));
     }
 
     .animated-cube-icon .face-back {
-        background: linear-gradient(135deg, #b0b0b0 0%, #909090 100%);
+        border-color: rgba(150, 150, 150, 0.8);
         transform: rotateY(180deg) translateZ(calc(var(--cube-size) / 2));
     }
 
     .animated-cube-icon .face-right {
-        background: linear-gradient(90deg, #c8c8c8 0%, #b0b0b0 100%);
+        border-color: rgba(180, 180, 180, 0.8);
         transform: rotateY(90deg) translateZ(calc(var(--cube-size) / 2));
     }
 
     .animated-cube-icon .face-left {
-        background: linear-gradient(270deg, #c8c8c8 0%, #b0b0b0 100%);
+        border-color: rgba(180, 180, 180, 0.8);
         transform: rotateY(-90deg) translateZ(calc(var(--cube-size) / 2));
     }
 
     .animated-cube-icon .face-top {
-        background: linear-gradient(180deg, #ffffff 0%, #d8d8d8 100%);
+        border-color: rgba(220, 220, 220, 0.9);
         transform: rotateX(90deg) translateZ(calc(var(--cube-size) / 2));
     }
 
     .animated-cube-icon .face-bottom {
-        background: linear-gradient(0deg, #a0a0a0 0%, #888888 100%);
+        border-color: rgba(120, 120, 120, 0.8);
         transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2));
     }
 
@@ -91,9 +96,9 @@
 
 @code {
     /// <summary>
-    /// Icon size in pixels (default: 22 to match button context).
+    /// Icon size in pixels (default: 80).
     /// </summary>
-    [Parameter] public int Size { get; set; } = 22;
+    [Parameter] public int Size { get; set; } = 80;
 
     /// <summary>
     /// Additional CSS classes for the container span.

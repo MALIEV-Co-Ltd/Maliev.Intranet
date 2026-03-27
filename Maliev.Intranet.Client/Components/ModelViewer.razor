@@ -45,11 +45,6 @@
         <button class="vp-btn" @onclick="ResetCamera">Reset</button>
     </div>
 
-    <div class="expand-btn-container" style="position: absolute; top: 10px; left: 10px; z-index: 10;">
-        <button class="vp-btn" @onclick="ToggleExpand" style="background: var(--mud-palette-overlay-dark); color: var(--mud-palette-white); padding: 6px 12px; font-size: 13px;">
-            @(_expanded ? (MarkupString)"&#9633; Collapse" : (MarkupString)"&#x2922; Expand")
-        </button>
-    </div>
 </div>
 
 @code {
@@ -62,8 +57,7 @@
     [Parameter]
     public string? FileExtension { get; set; }
 
-    [Parameter]
-    public EventCallback<bool> OnExpandToggle { get; set; }
+
 
     private string _canvasId = $"babylon-canvas-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
@@ -71,7 +65,7 @@
     private string _cameraPreset = "iso";
     private bool _edgesEnabled;
     private bool _bboxEnabled;
-    private bool _expanded;
+
     private string? _lastViewerUrl;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -131,12 +125,6 @@
         _bboxEnabled = !_bboxEnabled;
         if (_module != null)
             await _module.InvokeVoidAsync("toggleBoundingBox", _canvasId, _bboxEnabled);
-    }
-
-    private async Task ToggleExpand()
-    {
-        _expanded = !_expanded;
-        await OnExpandToggle.InvokeAsync(_expanded);
     }
 
     public async ValueTask DisposeAsync()

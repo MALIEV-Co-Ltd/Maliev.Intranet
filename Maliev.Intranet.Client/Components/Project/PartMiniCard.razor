@@ -11,14 +11,7 @@
         {
             <MudIcon Icon="@GetFileIcon(Part.Name)" Size="Size.Medium" Color="Color.Default" />
         }
-        @* DFM / status badge *@
         <span class="pmc-badge @GetBadgeClass()">@GetBadgeText()</span>
-        @if (Part.Uploading)
-        {
-            <div class="pmc-progress-overlay">
-                <MudProgressLinear Value="Part.ProgressPercent" Color="Color.Primary" Size="Size.Small" Class="pmc-progress-bar" />
-            </div>
-        }
     </div>
     <div class="pmc-info">
         <MudTooltip Text="@Part.Name">
@@ -27,23 +20,37 @@
         @if (Part.Dimensions != null)
         {
             <div class="pmc-dim">
-                @($"{Part.Dimensions.X:N0}×{Part.Dimensions.Y:N0}×{Part.Dimensions.Z:N0} mm")
+                @($"{Part.Dimensions.X:N1} × {Part.Dimensions.Y:N1} × {Part.Dimensions.Z:N1} mm")
                 @if (Part.VolumeMm3.HasValue)
                 {
                     <text> · @FormatVolume(Part.VolumeMm3.Value)</text>
                 }
             </div>
         }
-        <div class="pmc-qp">
-            ×@Part.Quantity
-            @if (!string.IsNullOrEmpty(Part.ProcessCode)) { <text> · @Part.ProcessCode</text> }
-            @if (!string.IsNullOrEmpty(Part.MaterialCode)) { <text> · @Part.MaterialCode</text> }
+        <div class="pmc-meta">
+            <MudBadge Content="@Part.Quantity"
+                      Color="Color.Primary"
+                      border="true"
+                      Overlap="false"
+                      Class="pmc-qty-badge">
+                <span class="pmc-process-material">
+                    @if (!string.IsNullOrEmpty(Part.ProcessCode)) { <text>@Part.ProcessCode</text> }
+                    @if (!string.IsNullOrEmpty(Part.ProcessCode) && !string.IsNullOrEmpty(Part.MaterialCode)) { <text> · </text> }
+                    @if (!string.IsNullOrEmpty(Part.MaterialCode)) { <text>@Part.MaterialCode</text> }
+                </span>
+            </MudBadge>
         </div>
         <div class="pmc-price">
             @if (Part.PricingLoading) { <MudSkeleton Width="50px" Height="12px" /> }
             else if (Part.EstimatedTotalAmount.HasValue) { <text>@FormatPrice(Part.EstimatedTotalAmount.Value)</text> }
         </div>
     </div>
+    @if (Part.Uploading)
+    {
+        <div class="pmc-progress">
+            <MudProgressLinear Value="Part.ProgressPercent" Color="Color.Primary" />
+        </div>
+    }
     <span class="pmc-remove" @onclick:stopPropagation="true">
         <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                        Size="Size.Small"
@@ -56,14 +63,14 @@
 <style>
     .pmc-card {
         display: flex;
-        align-items: flex-start;
+        align-items: stretch;
         border: 2px solid var(--mud-palette-lines-default);
         border-radius: 8px;
         background: var(--mud-palette-background);
         cursor: pointer;
-        min-width: 200px;
-        max-width: 240px;
-        height: 100px;
+        min-width: 280px;
+        max-width: 300px;
+        height: 80px;
         flex-shrink: 0;
         position: relative;
         transition: border-color 0.15s, background 0.15s;
@@ -72,8 +79,8 @@
     .pmc-card:hover { border-color: var(--mud-palette-primary-hover); background: var(--mud-palette-surface); }
     .pmc-active { border-color: var(--mud-palette-primary) !important; background: var(--mud-palette-surface) !important; }
     .pmc-thumb {
-        width: 100px;
-        min-width: 100px;
+        width: 80px;
+        min-width: 80px;
         height: 100%;
         border-radius: 4px 0 0 4px;
         background: var(--mud-palette-background-grey);
@@ -83,7 +90,6 @@
         overflow: hidden;
         flex-shrink: 0;
         position: relative;
-        align-self: stretch;
     }
     .pmc-thumb img { width: 100%; height: 100%; object-fit: cover; }
     .pmc-badge {
@@ -92,28 +98,20 @@
         right: 2px;
         font-size: var(--mud-typography-default-size);
     }
-    .pmc-progress-overlay {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        padding: 4px 4px 0;
-        z-index: 2;
-    }
-    .pmc-progress-bar { border-radius: 2px; }
-    .pmc-badge-uploading { background: #e0e0e0; color: #616161; }
+    .pmc-badge-uploading { background: rgba(var(--mud-palette-black-rgb), 0.2); color: rgba(var(--mud-palette-black-rgb), 0.6); }
     .pmc-badge-warning { color: var(--mud-palette-warning); }
-    .pmc-badge-ok { background: #d4edda; color: #155724; }
+    .pmc-badge-ok { background: rgba(var(--mud-palette-success-rgb), 0.15); color: var(--mud-palette-success); }
     .pmc-info {
         flex: 1;
         min-width: 0;
         display: flex;
         flex-direction: column;
-        gap: 2px;
-        padding: 8px 30px 8px 8px;
+        gap: 1px;
+        padding: 6px 30px 6px 8px;
+        overflow: hidden;
     }
     .pmc-name {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 500;
         white-space: nowrap;
         overflow: hidden;
@@ -126,17 +124,38 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .pmc-qp {
-        font-size: 11px;
+    .pmc-meta {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 18px;
+    }
+    .pmc-process-material {
+        font-size: 10px;
         color: var(--mud-palette-text-secondary);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
+    .pmc-qty-badge .mud-badge-badge {
+        font-size: 9px;
+        height: 16px;
+        min-width: 16px;
+        padding: 0 4px;
+    }
     .pmc-price {
         font-size: 11px;
         color: var(--mud-palette-text-primary);
         font-weight: 500;
+        margin-top: auto;
+    }
+    .pmc-progress {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        z-index: 3;
     }
     .pmc-remove {
         opacity: 0;
@@ -147,7 +166,6 @@
         transform: translateX(15%);
     }
     .pmc-card:hover .pmc-remove { opacity: 1; }
-    /* Remove MudIconButton hover background rectangle */
     .pmc-remove .mud-icon-button:hover,
     .pmc-remove .mud-icon-button:focus {
         background-color: transparent !important;
@@ -165,7 +183,7 @@
         Part.Uploading ? "pmc-badge-uploading" :
         Part.IsManifold == false ? "pmc-badge-warning" :
         Part.IsManifold == true ? "pmc-badge-ok" :
-        "pmc-badge-uploading"; // null = analysis pending (neutral grey)
+        "pmc-badge-uploading";
 
     private string GetBadgeText() =>
         Part.Uploading ? "↑" :
