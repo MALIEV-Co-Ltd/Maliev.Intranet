@@ -17,7 +17,11 @@ namespace Maliev.Intranet.Client.Pages;
 /// New project creation page — shell with stub state. Logic added in Tasks 4–17.</summary>
 public partial class ProjectNew : IAsyncDisposable
 {
-
+    /// <summary>
+    /// Holds a live DotNetObjectReference to a callback instance so JS Interop can
+    /// invoke OnUploadProgress and update the part's progress bar.
+    /// </summary>
+    private readonly Dictionary<Guid, DotNetObjectReference<UploadProgressCallback>> _uploadCallbacks = [];
 
     // ── Project-level state ───────────────────────────────────────────
     private Guid _tempProjectId = Guid.NewGuid();  // non-readonly; reassigned on Duplicate
@@ -300,30 +304,33 @@ public partial class ProjectNew : IAsyncDisposable
     private async Task UploadAndPollAsync(PartViewModel part, IBrowserFile file)
     {
         string? storagePath = null;
+        var uploadId = Guid.NewGuid();
+        DotNetObjectReference<UploadProgressCallback>? callbackRef = null;
+
         try
         {
+            var callback = new UploadProgressCallback(part, () => InvokeAsync(StateHasChanged));
+            callbackRef = DotNetObjectReference.Create(callback);
+            _uploadCallbacks[uploadId] = callbackRef;
+
             using var memoryStream = new MemoryStream();
             await using var readStream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
             await readStream.CopyToAsync(memoryStream);
-            memoryStream.Position = 0;
+            var fileBytes = memoryStream.ToArray();
 
-            using var content = new MultipartFormDataContent();
-            var streamContent = new StreamContent(memoryStream, (int)memoryStream.Length);
-            var mediaType = string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType;
-            streamContent.Headers.ContentType = new MediaTypeHeaderValue(mediaType);
-            content.Add(streamContent, "file", file.Name);
+            var url = $"api/uploads?projectId={_tempProjectId}";
+            var result = await JS.InvokeAsync<UploadResult>($"window.uploadWithProgress", url, fileBytes, file.Name, callbackRef);
 
-            using var response = await Http.PostAsync($"api/uploads?projectId={_tempProjectId}", content);
-            if (!response.IsSuccessStatusCode)
+            if (result.Status != 200)
             {
                 part.Uploading = false;
                 part.AwaitingPreview = false;
-                part.Error = $"Upload failed ({response.StatusCode})";
+                part.Error = $"Upload failed ({result.Status})";
                 Snackbar.Add($"Failed to upload {file.Name}.", Severity.Error);
                 return;
             }
 
-            var uploadResult = await response.Content.ReadFromJsonAsync<BffUploadResponse>();
+            var uploadResult = JsonSerializer.Deserialize<BffUploadResponse>(result.Body);
             if (uploadResult == null || string.IsNullOrEmpty(uploadResult.StoragePath))
             {
                 part.Uploading = false;
@@ -337,12 +344,12 @@ public partial class ProjectNew : IAsyncDisposable
             part.StoragePath = storagePath;
             part.FileId = Guid.TryParse(uploadResult.UploadId, out var fid) ? fid : Guid.NewGuid();
             part.Uploading = false;
+            part.ProgressPercent = 0;
             part.StatusText = "Processing geometry...";
 
             if (_hubConnection?.State == HubConnectionState.Connected)
                 await _hubConnection.InvokeAsync("JoinFileGroup", storagePath);
 
-            // One-shot catch-up: in case SignalR event arrives before the hub join completes
             _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(part, storagePath); });
         }
         catch (OperationCanceledException)
@@ -356,7 +363,17 @@ public partial class ProjectNew : IAsyncDisposable
             part.Error = $"Upload error: {ex.Message}";
             Snackbar.Add($"Error uploading {file.Name}: {ex.Message}", Severity.Error);
         }
+        finally
+        {
+            if (callbackRef != null)
+            {
+                _uploadCallbacks.Remove(uploadId);
+                callbackRef.Dispose();
+            }
+        }
     }
+
+    private sealed record UploadResult(int Status, string Body);
 
     /// <summary>
     /// Single catch-up fetch: applied once after upload to handle the case where the
@@ -908,6 +925,30 @@ public partial class ProjectNew : IAsyncDisposable
         var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
         part.ViewerUrl = json?.RootElement.GetProperty("url").GetString();
         await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// JS Interop callback for upload progress. Created per-file and kept alive via DotNetObjectReference
+    /// so that window.uploadWithProgress can invoke OnUploadProgress on it.
+    /// </summary>
+    private sealed class UploadProgressCallback
+    {
+        private readonly PartViewModel _part;
+        private readonly Action _stateHasChanged;
+
+        public UploadProgressCallback(PartViewModel part, Action stateHasChanged)
+        {
+            _part = part;
+            _stateHasChanged = stateHasChanged;
+        }
+
+        /// <summary>Called by JS Interop as the upload progresses.</summary>
+        [JSInvokable]
+        public void OnUploadProgress(int percent)
+        {
+            _part.ProgressPercent = percent;
+            _stateHasChanged();
+        }
     }
 }
 

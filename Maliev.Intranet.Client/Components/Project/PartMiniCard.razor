@@ -13,6 +13,12 @@
         }
         @* DFM / status badge *@
         <span class="pmc-badge @GetBadgeClass()">@GetBadgeText()</span>
+        @if (Part.Uploading)
+        {
+            <div class="pmc-progress-overlay">
+                <MudProgressLinear Value="Part.ProgressPercent" Color="Color.Primary" Size="Size.Small" Class="pmc-progress-bar" />
+            </div>
+        }
     </div>
     <div class="pmc-info">
         <MudTooltip Text="@Part.Name">
@@ -86,6 +92,15 @@
         right: 2px;
         font-size: var(--mud-typography-default-size);
     }
+    .pmc-progress-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 4px 4px 0;
+        z-index: 2;
+    }
+    .pmc-progress-bar { border-radius: 2px; }
     .pmc-badge-uploading { background: #e0e0e0; color: #616161; }
     .pmc-badge-warning { color: var(--mud-palette-warning); }
     .pmc-badge-ok { background: #d4edda; color: #155724; }

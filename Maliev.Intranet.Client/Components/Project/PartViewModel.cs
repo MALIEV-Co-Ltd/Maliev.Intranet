@@ -59,6 +59,12 @@ public class PartViewModel
     /// <summary>True while the file is being uploaded.</summary>
     public bool Uploading { get; set; }
 
+    /// <summary>
+    /// Upload progress percentage (0-100). Updated by JS Interop during HTTP upload.
+    /// Resets to 0 when upload completes or fails.
+    /// </summary>
+    public int ProgressPercent { get; set; }
+
     /// <summary>True while waiting for the preview to be generated.</summary>
     public bool AwaitingPreview { get; set; }
 
