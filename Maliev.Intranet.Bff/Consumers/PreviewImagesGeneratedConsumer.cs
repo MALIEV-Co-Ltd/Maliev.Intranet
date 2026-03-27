@@ -62,51 +62,61 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                 "RAW preview paths from GeometryService - FrontSmall: {Front}, ThumbnailSmall: {Iso}, TopSmall: {Top}, BottomSmall: {Bottom}, LeftSmall: {Left}, RightSmall: {Right}, BackSmall: {Back}",
                 previews.FrontSmall, previews.ThumbnailSmall, previews.TopSmall, previews.BottomSmall, previews.LeftSmall, previews.RightSmall, previews.BackSmall);
 
-            async Task<string?> ResolveUrlAsync(string? path)
+            async Task<(string? Url, bool Failed)> ResolveUrlAsync(string? path)
             {
                 if (string.IsNullOrEmpty(path))
-                    return null;
+                    return (null, false);
                 var url = await CreateUploadClient().GetDownloadUrlByPathAsync(path, context.CancellationToken);
                 if (string.IsNullOrEmpty(url))
                 {
                     _logger.LogWarning(
-                        "PreviewImagesGeneratedConsumer: signed URL resolution failed for path={Path} — throwing to trigger retry",
+                        "PreviewImagesGeneratedConsumer: signed URL resolution failed for path={Path}",
                         path);
-                    throw new InvalidOperationException($"Signed URL resolution failed for storage path: {path}");
+                    return (null, true);
                 }
-                return url;
+                return (url, false);
             }
 
-            var frontUrl           = await ResolveUrlAsync(previews.FrontSmall);
-            var thumbnailSmallUrl  = await ResolveUrlAsync(previews.ThumbnailSmall);
-            var thumbnailLargeUrl  = await ResolveUrlAsync(previews.ThumbnailLarge);
+            var frontResult          = await ResolveUrlAsync(previews.FrontSmall);
+            var thumbnailSmallResult = await ResolveUrlAsync(previews.ThumbnailSmall);
+            var thumbnailLargeResult = await ResolveUrlAsync(previews.ThumbnailLarge);
+            var backResult           = await ResolveUrlAsync(previews.BackSmall);
+            var leftResult           = await ResolveUrlAsync(previews.LeftSmall);
+            var rightResult          = await ResolveUrlAsync(previews.RightSmall);
+            var topResult            = await ResolveUrlAsync(previews.TopSmall);
+            var bottomResult         = await ResolveUrlAsync(previews.BottomSmall);
+
+            bool anyUrlFailed = frontResult.Failed || thumbnailSmallResult.Failed || thumbnailLargeResult.Failed
+                || backResult.Failed || leftResult.Failed || rightResult.Failed || topResult.Failed || bottomResult.Failed;
 
             _logger.LogInformation(
-                "ResolveUrl results for storagePath={StoragePath} - FrontSmall: {FrontUrl}, ThumbnailSmall: {IsoUrl}, ThumbnailLarge: {Iso1000Url}, RawFront: {RawFront}, RawThumbnailSmall: {RawIso}",
-                payload.StoragePath, frontUrl, thumbnailSmallUrl, thumbnailLargeUrl, previews.FrontSmall, previews.ThumbnailSmall);
+                "ResolveUrl results for storagePath={StoragePath} - FrontSmall: {FrontUrl}, ThumbnailSmall: {IsoUrl}, ThumbnailLarge: {Iso1000Url}, anyFailed={AnyFailed}",
+                payload.StoragePath, frontResult.Url, thumbnailSmallResult.Url, thumbnailLargeResult.Url, anyUrlFailed);
 
             var previewUrlsDto = new FileAnalysisPreviewUrlsDto
             {
-                FrontSmall       = frontUrl,
-                BackSmall        = await ResolveUrlAsync(previews.BackSmall),
-                LeftSmall        = await ResolveUrlAsync(previews.LeftSmall),
-                RightSmall       = await ResolveUrlAsync(previews.RightSmall),
-                TopSmall         = await ResolveUrlAsync(previews.TopSmall),
-                BottomSmall      = await ResolveUrlAsync(previews.BottomSmall),
-                ThumbnailSmall   = thumbnailSmallUrl,
-                ThumbnailLargeUrl = thumbnailLargeUrl,
+                FrontSmall       = frontResult.Url,
+                BackSmall        = backResult.Url,
+                LeftSmall        = leftResult.Url,
+                RightSmall       = rightResult.Url,
+                TopSmall         = topResult.Url,
+                BottomSmall      = bottomResult.Url,
+                ThumbnailSmall   = thumbnailSmallResult.Url,
+                ThumbnailLargeUrl = thumbnailLargeResult.Url,
             };
+
+            bool overallFailed = payload.Failed || anyUrlFailed;
 
             // Pass thumbnailUrl: null so SetPreviewUrlsAsync preserves the isometric URL
             // already stored by SmallThumbnailReadyConsumer (uses existing ?? fallback internally).
             await _analysisStatusService.SetPreviewUrlsAsync(
-                payload.StoragePath, previewUrlsDto, thumbnailUrl: null, thumbnailLargeUrl, context.CancellationToken);
+                payload.StoragePath, previewUrlsDto, thumbnailUrl: null, thumbnailLargeResult.Url, context.CancellationToken);
 
-            if (payload.Failed)
+            if (overallFailed)
             {
                 _logger.LogWarning(
-                    "Preview image generation failed for {StoragePath} - transitioning to preview-failed state",
-                    payload.StoragePath);
+                    "Preview image generation failed for {StoragePath} - transitioning to preview-failed state (payloadFailed={PayloadFailed}, urlFailed={UrlFailed})",
+                    payload.StoragePath, payload.Failed, anyUrlFailed);
                 await _analysisStatusService.SetPreviewUrlsFailedAsync(payload.StoragePath, context.CancellationToken);
             }
             else
@@ -117,20 +127,20 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             var signalRPayload = new FileAnalysisCompletedPayload(
                 StoragePath: payload.StoragePath,
                 UploadId: null,
-                ThumbnailUrl: null, // SmallThumbnailReadyConsumer already pushed the isometric small URL
-                HiResThumbnailUrl: thumbnailLargeUrl,
+                ThumbnailUrl: null,
+                HiResThumbnailUrl: thumbnailLargeResult.Url,
                 Dimensions: null,
                 PreviewUrls: new FileAnalysisPreviewUrls(
-                    FrontSmall: frontUrl,
+                    FrontSmall: frontResult.Url,
                     BackSmall: previewUrlsDto.BackSmall,
                     LeftSmall: previewUrlsDto.LeftSmall,
                     RightSmall: previewUrlsDto.RightSmall,
                     TopSmall: previewUrlsDto.TopSmall,
                     BottomSmall: previewUrlsDto.BottomSmall,
-                    ThumbnailSmall: thumbnailSmallUrl,
-                    ThumbnailLarge: thumbnailLargeUrl),
-                Failed: payload.Failed,
-                ErrorCode: payload.Failed ? "preview-generation-failed" : null);
+                    ThumbnailSmall: thumbnailSmallResult.Url,
+                    ThumbnailLarge: thumbnailLargeResult.Url),
+                Failed: overallFailed,
+                ErrorCode: overallFailed ? (payload.Failed ? "preview-generation-failed" : "preview-url-resolution-failed") : null);
 
             await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
                 "FileAnalysisCompleted",

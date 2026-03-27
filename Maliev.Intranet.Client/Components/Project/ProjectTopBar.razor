@@ -36,15 +36,16 @@
     <MudSelect T="CurrencyDto"
                Value="@SelectedCurrency"
                ValueChanged="@OnCurrencyChanged"
-               ToStringFunc="@(c => c == null ? "" : $"{c.Code} — {c.Name}")"
+               ToStringFunc="@(c => c?.Code ?? "")"
                Label="Currency"
                Variant="Variant.Outlined"
                Margin="Margin.Dense"
-               Style="width:180px;"
+               Dense="true"
+               Style="width:90px; max-width:100%;"
                Clearable="false">
         @foreach (var c in Currencies)
         {
-            <MudSelectItem T="CurrencyDto" Value="@c">@c.Code — @c.Name</MudSelectItem>
+            <MudSelectItem T="CurrencyDto" Value="@c">@c.Code</MudSelectItem>
         }
     </MudSelect>
 

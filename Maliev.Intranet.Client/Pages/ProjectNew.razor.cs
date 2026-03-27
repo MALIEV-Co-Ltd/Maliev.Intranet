@@ -186,6 +186,15 @@ public partial class ProjectNew : IAsyncDisposable
                 var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
                 if (part == null) return;
 
+                if (payload.Failed)
+                {
+                    part.AwaitingPreview = false;
+                    part.StatusText = string.IsNullOrEmpty(payload.ErrorCode) ? "Preview unavailable" : $"Preview failed: {payload.ErrorCode}";
+                    TriggerAutoSave();
+                    await InvokeAsync(StateHasChanged);
+                    return;
+                }
+
                 // Small thumbnail arrives first (ThumbnailUrl only, PreviewUrls null)
                 if (!string.IsNullOrEmpty(payload.ThumbnailUrl) && string.IsNullOrEmpty(part.ThumbnailSmallUrl))
                 {
