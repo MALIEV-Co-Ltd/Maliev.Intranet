@@ -10,7 +10,7 @@ This document provides essential information for agentic coding assistants opera
 - **UI Components**: MudBlazor (Material Design components).
 - **Observability**: OpenTelemetry (OTLP) with business metrics (meters) and distributed tracing.
 - **Communication**: SignalR for real-time dashboard updates and alerts.
-- **Identity**: Google OAuth2 + JWT (Identity propagated via `X-User-Id` headers).
+- **Identity**: Google OAuth2 + JWT (User identity propagated to downstream services via the JWT Bearer token — the `sub` claim carries the user's GUID).
 - **Rendering Modes**: Always consider server-side vs client-side rendering trade-offs:
   - `InteractiveServer`: Fast initial load, requires connection to server, good for data-heavy forms.
   - `InteractiveWebAssembly`: True offline capability, faster subsequent loads, better for static content.
@@ -111,7 +111,7 @@ public static class CustomerExtensions
 ## 📡 Communication & Identity
 
 - **SignalR**: Hubs should be located in `Maliev.Intranet.Bff/Hubs`. Use typed hubs if possible.
-- **Identity**: Identity is propagated to downstream services via `UserContextHandler`. Always ensure `X-User-Id` is present in downstream calls.
+- **Identity**: Identity is propagated to downstream services via `UserContextHandler`, which forwards the user's platform JWT as a Bearer token. The JWT `sub` claim contains the user's GUID. No separate `X-User-Id` header is forwarded.
 - **Permissions**: Follow GCP-style naming: `{service}.{resource}.{action}` (e.g., `orders.shipments.create`).
 
 ## 🔄 Frontend-to-Backend Wiring

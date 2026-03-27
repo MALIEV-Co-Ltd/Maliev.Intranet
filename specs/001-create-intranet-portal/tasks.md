@@ -75,7 +75,7 @@ graph TD
 
 ## Phase 6: User Story 4 - Transaction Audit Trail (P2)
 *Goal: Ensure user identity is propagated to downstream services.*
-*Independent Test: Downstream services receive `X-User-Id` headers.*
+*Independent Test: Downstream services receive user JWT with `sub` claim via Bearer token.*
 
 - [x] T025 [US4] Implement `UserContextHandler` delegating handler in BFF to attach identity headers to downstream requests
 - [x] T026 [US4] Verify audit context propagation via integration tests (checking WireMock request headers)

@@ -64,8 +64,6 @@ public class UserContextHandlerTests
         var invoker = new HttpMessageInvoker(_handler);
         await invoker.SendAsync(request, CancellationToken.None);
 
-        Assert.True(request.Headers.Contains("X-User-Id"));
-        Assert.Equal(userId, request.Headers.GetValues("X-User-Id").First());
         Assert.Equal($"Bearer {accessToken}", request.Headers.Authorization?.ToString());
     }
 
@@ -88,7 +86,7 @@ public class UserContextHandlerTests
 
         await new HttpMessageInvoker(_handler).SendAsync(request, CancellationToken.None);
 
-        Assert.Equal(sub, request.Headers.GetValues("X-User-Id").First());
+        Assert.Equal($"Bearer {sub}", request.Headers.Authorization?.ToString());
     }
 
     [Fact]
@@ -110,7 +108,6 @@ public class UserContextHandlerTests
         var invoker = new HttpMessageInvoker(_handler);
         await invoker.SendAsync(request, CancellationToken.None);
 
-        Assert.False(request.Headers.Contains("X-User-Id"));
         Assert.Null(request.Headers.Authorization);
     }
 
@@ -131,7 +128,6 @@ public class UserContextHandlerTests
         var invoker = new HttpMessageInvoker(_handler);
         await invoker.SendAsync(request, CancellationToken.None);
 
-        Assert.False(request.Headers.Contains("X-User-Id"));
         Assert.Null(request.Headers.Authorization);
     }
 

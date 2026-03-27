@@ -38,9 +38,6 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
             ?? user.FindFirst("sub")?.Value
             ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        if (!string.IsNullOrEmpty(userId) && !request.Headers.Contains("X-User-Id"))
-            request.Headers.Add("X-User-Id", userId);
-
         // Resolve token — AuthProperties (step 2) is where OnTicketReceived stores it
         var accessToken = user.FindFirst("access_token")?.Value;
         if (string.IsNullOrEmpty(accessToken))
