@@ -15,7 +15,7 @@
 @inject BreadcrumbService BreadcrumbService
 @inject ILogger<CustomerDetails> Logger
 
-<PageTitle>@(_customer?.Name ?? "Customer Details") - Maliev Intranet</PageTitle>
+<PageTitle>@(_customer?.Name ?? "Customer Details") | Intranet Gateway</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pb-16" Gutters="false">
     @if (_customer == null && !_loading)
