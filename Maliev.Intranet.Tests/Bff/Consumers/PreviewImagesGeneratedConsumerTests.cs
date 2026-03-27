@@ -82,7 +82,7 @@ public class PreviewImagesGeneratedConsumerTests
     {
         var clientProxyMock = new Mock<IClientProxy>();
         var clientsMock = new Mock<IHubClients>();
-        clientsMock.Setup(c => c.All).Returns(clientProxyMock.Object);
+        clientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(clientProxyMock.Object);
 
         var hubMock = new Mock<IHubContext<NotificationHub>>();
         hubMock.Setup(h => h.Clients).Returns(clientsMock.Object);
@@ -147,7 +147,7 @@ public class PreviewImagesGeneratedConsumerTests
     {
         var clientProxyMock = new Mock<IClientProxy>();
         var clientsMock = new Mock<IHubClients>();
-        clientsMock.Setup(c => c.All).Returns(clientProxyMock.Object);
+        clientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(clientProxyMock.Object);
 
         var hubMock = new Mock<IHubContext<NotificationHub>>();
         hubMock.Setup(h => h.Clients).Returns(clientsMock.Object);
@@ -166,7 +166,7 @@ public class PreviewImagesGeneratedConsumerTests
     [Fact]
     public async Task Consume_ShouldSendFileAnalysisCompletedToAllClients()
     {
-        var (consumer, clientProxyMock) = CreateConsumer();
+        var (consumer, clientProxyMock) = CreateConsumerWithPassthrough();
         await consumer.Consume(MakeCtx(BuildEvent()).Object);
 
         clientProxyMock.Verify(x =>
@@ -241,7 +241,7 @@ public class PreviewImagesGeneratedConsumerTests
     [Fact]
     public async Task Consume_ShouldSetStoragePath()
     {
-        var (consumer, clientProxyMock) = CreateConsumer();
+        var (consumer, clientProxyMock) = CreateConsumerWithPassthrough();
 
         FileAnalysisCompletedPayload? captured = null;
         clientProxyMock
@@ -259,7 +259,7 @@ public class PreviewImagesGeneratedConsumerTests
     [Fact]
     public async Task Consume_ShouldNotSetFailedOrDimensions()
     {
-        var (consumer, clientProxyMock) = CreateConsumer();
+        var (consumer, clientProxyMock) = CreateConsumerWithPassthrough();
 
         FileAnalysisCompletedPayload? captured = null;
         clientProxyMock
@@ -305,7 +305,7 @@ public class PreviewImagesGeneratedConsumerTests
     public async Task Consume_WhenThumbnailLargePresent_ShouldPopulateHiResThumbnailUrl()
     {
         const string thumbnailLargePath = "projects/abc/model.stl_thumbnail_large.webp";
-        var (consumer, clientProxyMock) = CreateConsumer();
+        var (consumer, clientProxyMock) = CreateConsumerWithPassthrough();
 
         FileAnalysisCompletedPayload? captured = null;
         clientProxyMock
@@ -317,16 +317,13 @@ public class PreviewImagesGeneratedConsumerTests
         await consumer.Consume(MakeCtx(BuildEvent(iso1000: thumbnailLargePath)).Object);
 
         Assert.NotNull(captured);
-        // HiResThumbnailUrl and PreviewUrls.ThumbnailLarge carry the resolved URL
-        // (ResolveUrlAsync returns null for 404 in the test harness)
-        // — the field is wired; actual URL resolution is covered by integration tests.
         Assert.Equal(captured.HiResThumbnailUrl, captured.PreviewUrls?.ThumbnailLarge);
     }
 
     [Fact]
     public async Task Consume_WhenThumbnailLargeNull_HiResThumbnailUrlShouldBeNull()
     {
-        var (consumer, clientProxyMock) = CreateConsumer();
+        var (consumer, clientProxyMock) = CreateConsumerWithPassthrough();
 
         FileAnalysisCompletedPayload? captured = null;
         clientProxyMock

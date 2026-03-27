@@ -72,7 +72,7 @@ public class FileAnalyzedConsumerTests
         var hubMock = new Mock<IHubContext<NotificationHub>>();
         var clientsMock = new Mock<IClientProxy>();
         var hubClientsMock = new Mock<IHubClients>();
-        hubClientsMock.Setup(c => c.All).Returns(clientsMock.Object);
+        hubClientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(clientsMock.Object);
         hubMock.Setup(h => h.Clients).Returns(hubClientsMock.Object);
 
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
@@ -105,6 +105,7 @@ public class FileAnalyzedConsumerTests
             s.SetAnalysisCompletedAsync(
                 "projects/abc/model.stl",
                 "projects/abc/model.stl_viewer.glb",
+                null,
                 CancellationToken.None),
             Times.Once);
     }
