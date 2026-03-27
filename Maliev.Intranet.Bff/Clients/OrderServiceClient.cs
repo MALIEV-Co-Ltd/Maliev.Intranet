@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Maliev.Intranet.Shared;
-
+using Maliev.Intranet.Shared.Dtos;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -60,6 +60,17 @@ public class OrderServiceClient(HttpClient httpClient)
     public async Task<HttpResponseMessage> UpdateOrderAsync(string id, UpdateOrderRequest request, CancellationToken ct = default)
     {
         return await httpClient.PutAsJsonAsync($"/order/v1/orders/{id}", request, ct);
+    }
+
+    /// <summary>
+    /// Retrieves the 6-sided preview images stored by OrderService for the given order.
+    /// Returns an empty list if the order has no previews yet.
+    /// </summary>
+    public async Task<List<OrderPreviewImageDto>> GetPreviewImagesAsync(Guid orderId, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync($"/order/v1/orders/{orderId}/preview-images", ct);
+        if (!response.IsSuccessStatusCode) return [];
+        return await response.Content.ReadFromJsonAsync<List<OrderPreviewImageDto>>(ct) ?? [];
     }
 
     /// <summary>

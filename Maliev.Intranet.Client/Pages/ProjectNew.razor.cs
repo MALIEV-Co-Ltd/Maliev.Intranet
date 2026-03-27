@@ -120,9 +120,10 @@ public partial class ProjectNew : IAsyncDisposable
         if (string.IsNullOrEmpty(sessionParam) || !Guid.TryParse(sessionParam, out _sessionId))
         {
             _sessionId = Guid.NewGuid();
-            // Redirect to URL with session param — return immediately; OnInitializedAsync will re-run
+            // Redirect to URL with session param. In SSR this throws NavigationException (stops execution).
+            // In WASM, NavigateTo updates the URL in-place without recreating the component, so we must
+            // NOT return — data loading must continue immediately with the newly assigned _sessionId.
             Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}", replace: true);
-            return;
         }
 
         // ── Load reference data ────────────────────────────────────────
@@ -333,7 +334,7 @@ public partial class ProjectNew : IAsyncDisposable
                 await _hubConnection.InvokeAsync("JoinFileGroup", storagePath);
 
             // One-shot catch-up: in case SignalR event arrives before the hub join completes
-            _ = Task.Delay(CatchUpDelayMs).ContinueWith(_ => FetchCurrentStatusAsync(part, storagePath));
+            _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(part, storagePath); });
         }
         catch (OperationCanceledException)
         {
@@ -671,7 +672,10 @@ public partial class ProjectNew : IAsyncDisposable
                 // Catch-up fetch for any part that is still missing its thumbnail (analysis completed
                 // while the page was closed, SignalR event was missed).
                 if (!string.IsNullOrEmpty(partVm.StoragePath) && string.IsNullOrEmpty(partVm.ThumbnailSmallUrl))
-                    _ = Task.Delay(CatchUpDelayMs).ContinueWith(_ => FetchCurrentStatusAsync(partVm, partVm.StoragePath!));
+                {
+                    var p = partVm; var path = partVm.StoragePath!;
+                    _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(p, path); });
+                }
 
                 _parts.Add(partVm);
             }

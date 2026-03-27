@@ -12,10 +12,12 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for manufacturing job operations, proxying to the JobService.
 /// </summary>
 /// <param name="client">The typed JobService client.</param>
+/// <param name="orderClient">The typed OrderService client, used to enrich job details with 6-sided previews.</param>
+/// <param name="uploadClient">The typed UploadService client, used to resolve GCS storage paths to signed URLs.</param>
 [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [Route("api/[controller]")]
-public class JobsController(JobServiceClient client) : ControllerBase
+public class JobsController(JobServiceClient client, OrderServiceClient orderClient, UploadServiceClient uploadClient) : ControllerBase
 {
     // ── Queue ─────────────────────────────────────────────────────────────────
 
@@ -73,7 +75,7 @@ public class JobsController(JobServiceClient client) : ControllerBase
     // ── Job detail ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns detailed information for a single job.
+    /// Returns detailed information for a single job, including 6-sided part preview URLs resolved from OrderService.
     /// </summary>
     /// <param name="id">The job GUID.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -82,7 +84,29 @@ public class JobsController(JobServiceClient client) : ControllerBase
     public async Task<ActionResult<JobDetailDto>> GetById(Guid id, CancellationToken ct)
     {
         var result = await client.GetJobByIdAsync(id, ct);
-        return result != null ? Ok(result) : NotFound();
+        if (result == null) return NotFound();
+
+        // Enrich with 6-sided preview URLs from OrderService if the job has an associated order
+        if (result.OrderId.HasValue)
+        {
+            var previews = await orderClient.GetPreviewImagesAsync(result.OrderId.Value, ct);
+            foreach (var preview in previews)
+            {
+                var url = await uploadClient.GetDownloadUrlByPathAsync(preview.StoragePath, ct);
+                if (string.IsNullOrEmpty(url)) continue;
+                switch (preview.Side)
+                {
+                    case "Front":  result.PreviewFrontUrl  = url; break;
+                    case "Back":   result.PreviewBackUrl   = url; break;
+                    case "Left":   result.PreviewLeftUrl   = url; break;
+                    case "Right":  result.PreviewRightUrl  = url; break;
+                    case "Top":    result.PreviewTopUrl    = url; break;
+                    case "Bottom": result.PreviewBottomUrl = url; break;
+                }
+            }
+        }
+
+        return Ok(result);
     }
 
     // ── QR code ───────────────────────────────────────────────────────────────

@@ -88,6 +88,36 @@
                     }
                 </MudGrid>
 
+                @* 6-sided part preview grid — shown when previews are available *@
+                @if (!string.IsNullOrEmpty(_detail!.PreviewFrontUrl))
+                {
+                    <MudDivider Class="mt-3 mb-2" />
+                    <MudText Typo="Typo.caption" Color="Color.Default" Class="mb-1">Part Views</MudText>
+                    <MudGrid Spacing="1">
+                        @foreach (var (label, url) in new[]
+                        {
+                            ("Front",  _detail.PreviewFrontUrl),
+                            ("Back",   _detail.PreviewBackUrl),
+                            ("Left",   _detail.PreviewLeftUrl),
+                            ("Right",  _detail.PreviewRightUrl),
+                            ("Top",    _detail.PreviewTopUrl),
+                            ("Bottom", _detail.PreviewBottomUrl),
+                        })
+                        {
+                            if (!string.IsNullOrEmpty(url))
+                            {
+                                <MudItem xs="4">
+                                    <MudPaper Elevation="0" Class="pa-1" Style="text-align:center;">
+                                        <img src="@url" alt="@label view"
+                                             style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;" />
+                                        <MudText Typo="Typo.caption">@label</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                            }
+                        }
+                    </MudGrid>
+                }
+
                 @* Company footer *@
                 <MudDivider Class="mt-3 mb-2" />
                 <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Default">

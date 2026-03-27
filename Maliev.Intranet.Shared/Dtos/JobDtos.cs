@@ -73,6 +73,26 @@ public class JobDetailDto : JobSummaryDto
 
     /// <summary>Gets or sets when the job was last updated.</summary>
     public DateTime UpdatedAt { get; set; }
+
+    // ── 6-sided part previews for the job ticket (resolved to signed URLs by BFF) ──
+
+    /// <summary>Signed URL for the front-face small preview. Null until GeometryService processes the file.</summary>
+    public string? PreviewFrontUrl { get; set; }
+
+    /// <summary>Signed URL for the back-face small preview.</summary>
+    public string? PreviewBackUrl { get; set; }
+
+    /// <summary>Signed URL for the left-face small preview.</summary>
+    public string? PreviewLeftUrl { get; set; }
+
+    /// <summary>Signed URL for the right-face small preview.</summary>
+    public string? PreviewRightUrl { get; set; }
+
+    /// <summary>Signed URL for the top-face small preview.</summary>
+    public string? PreviewTopUrl { get; set; }
+
+    /// <summary>Signed URL for the bottom-face small preview.</summary>
+    public string? PreviewBottomUrl { get; set; }
 }
 
 /// <summary>A single timeline entry for a job status transition.</summary>

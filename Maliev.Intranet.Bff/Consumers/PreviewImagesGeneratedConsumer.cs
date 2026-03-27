@@ -80,11 +80,10 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             var frontUrl           = await ResolveUrlAsync(previews.FrontSmall);
             var thumbnailSmallUrl  = await ResolveUrlAsync(previews.ThumbnailSmall);
             var thumbnailLargeUrl  = await ResolveUrlAsync(previews.ThumbnailLarge);
-            var thumbnailUrl = thumbnailSmallUrl ?? frontUrl ?? thumbnailLargeUrl;
 
             _logger.LogInformation(
-                "ResolveUrl results for storagePath={StoragePath} - FrontSmall: {FrontUrl}, ThumbnailSmall: {IsoUrl}, ThumbnailLarge: {Iso1000Url}, Thumbnail: {ThumbUrl}, RawFront: {RawFront}, RawThumbnailSmall: {RawIso}",
-                payload.StoragePath, frontUrl, thumbnailSmallUrl, thumbnailLargeUrl, thumbnailUrl, previews.FrontSmall, previews.ThumbnailSmall);
+                "ResolveUrl results for storagePath={StoragePath} - FrontSmall: {FrontUrl}, ThumbnailSmall: {IsoUrl}, ThumbnailLarge: {Iso1000Url}, RawFront: {RawFront}, RawThumbnailSmall: {RawIso}",
+                payload.StoragePath, frontUrl, thumbnailSmallUrl, thumbnailLargeUrl, previews.FrontSmall, previews.ThumbnailSmall);
 
             var previewUrlsDto = new FileAnalysisPreviewUrlsDto
             {
@@ -98,8 +97,10 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                 ThumbnailLargeUrl = thumbnailLargeUrl,
             };
 
+            // Pass thumbnailUrl: null so SetPreviewUrlsAsync preserves the isometric URL
+            // already stored by SmallThumbnailReadyConsumer (uses existing ?? fallback internally).
             await _analysisStatusService.SetPreviewUrlsAsync(
-                payload.StoragePath, previewUrlsDto, thumbnailUrl, thumbnailLargeUrl, context.CancellationToken);
+                payload.StoragePath, previewUrlsDto, thumbnailUrl: null, thumbnailLargeUrl, context.CancellationToken);
 
             if (payload.Failed)
             {
@@ -116,7 +117,7 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             var signalRPayload = new FileAnalysisCompletedPayload(
                 StoragePath: payload.StoragePath,
                 UploadId: null,
-                ThumbnailUrl: thumbnailUrl,
+                ThumbnailUrl: null, // SmallThumbnailReadyConsumer already pushed the isometric small URL
                 HiResThumbnailUrl: thumbnailLargeUrl,
                 Dimensions: null,
                 PreviewUrls: new FileAnalysisPreviewUrls(
