@@ -16,7 +16,7 @@
                 {
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">@SelectedCustomer.CompanyName</MudText>
                 }
-                <div class="pnl-customer-actions">
+                <div class="pnl-customer-actions gap-3">
                     @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
                     {
                         <MudIconButton Icon="@Icons.Material.Outlined.Email"
@@ -24,7 +24,7 @@
                                        Color="Color.Default"
                                        Href="@($"mailto:{SelectedCustomer.Email}")"
                                        Target="_blank"
-                                       Class="padding: 0" />
+                                       Class="pa-0" />
                     }
                     @if (!string.IsNullOrEmpty(SelectedCustomer.Mobile))
                     {
@@ -32,7 +32,7 @@
                                        Size="Size.Small"
                                        Color="Color.Default"
                                        Href="@($"tel:{SelectedCustomer.Mobile}")"
-                                       Class="padding: 0" />
+                                       Class="pa-0" />
                     }
                     else if (!string.IsNullOrEmpty(SelectedCustomer.Landline))
                     {
@@ -40,13 +40,13 @@
                                        Size="Size.Small"
                                        Color="Color.Default"
                                        Href="@($"tel:{SelectedCustomer.Landline}")"
-                                       Class="padding: 0" />
+                                       Class="pa-0" />
                     }
                     <MudSpacer />
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                    Size="Size.Small"
                                    OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))"
-                                   Class="padding: 0" />
+                                   Class="pa-0" />
                 </div>
             </div>
         </div>
@@ -70,7 +70,7 @@
                         <MudText Typo="Typo.body2">@customer.Name</MudText>
                         @if (!string.IsNullOrEmpty(customer.CompanyName))
                         {
-                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@customer.CompanyName</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.CompanyName</MudText>
                         }
                         @if (!string.IsNullOrEmpty(customer.Email))
                         {
@@ -161,7 +161,6 @@
     }
     .pnl-customer-actions {
         display: flex;
-        gap: 4px;
         align-items: center;
         padding-top: 4px;
     }
