@@ -80,7 +80,7 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             var frontUrl           = await ResolveUrlAsync(previews.FrontSmall);
             var thumbnailSmallUrl  = await ResolveUrlAsync(previews.ThumbnailSmall);
             var thumbnailLargeUrl  = await ResolveUrlAsync(previews.ThumbnailLarge);
-            var thumbnailUrl       = thumbnailSmallUrl ?? frontUrl;
+            var thumbnailUrl = thumbnailSmallUrl ?? frontUrl ?? thumbnailLargeUrl;
 
             _logger.LogInformation(
                 "ResolveUrl results for storagePath={StoragePath} - FrontSmall: {FrontUrl}, ThumbnailSmall: {IsoUrl}, ThumbnailLarge: {Iso1000Url}, Thumbnail: {ThumbUrl}, RawFront: {RawFront}, RawThumbnailSmall: {RawIso}",

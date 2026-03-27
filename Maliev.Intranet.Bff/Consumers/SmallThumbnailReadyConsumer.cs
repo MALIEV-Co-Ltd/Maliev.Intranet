@@ -50,8 +50,12 @@ public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
             payload.FileId, payload.StoragePath);
 
         var thumbnailUrl = await CreateUploadClient()
-            .GetDownloadUrlByPathAsync(payload.ThumbnailStoragePath, context.CancellationToken)
-            ?? payload.ThumbnailStoragePath;
+            .GetDownloadUrlByPathAsync(payload.ThumbnailStoragePath, context.CancellationToken);
+        if (string.IsNullOrEmpty(thumbnailUrl))
+        {
+            throw new InvalidOperationException(
+                $"Failed to generate signed URL for small thumbnail: {payload.ThumbnailStoragePath}");
+        }
 
         var signalRPayload = new FileAnalysisCompletedPayload(
             StoragePath: payload.StoragePath,
