@@ -2,11 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Moq;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
@@ -31,7 +27,10 @@ public class BffTestWebApplicationFactory : WebApplicationFactory<Program>
                 ["Services:AuthService:BaseUrl"] = "http://auth-service",
                 ["Services:CustomerService:BaseUrl"] = "http://customer-service",
                 ["Jwt:SecurityKey"] = "test-security-key-for-integration-tests-min32chars",
-                ["ConnectionStrings:rabbitmq"] = "amqp://guest:guest@localhost:5672",
+                // In-memory MassTransit for future use when integration tests are re-enabled
+                // Currently skipped due to service discovery and IAM token provider blocking
+                ["MassTransit:UseInMemory"] = "true",
+                ["MassTransit:SkipBusWait"] = "true",
             });
         });
 

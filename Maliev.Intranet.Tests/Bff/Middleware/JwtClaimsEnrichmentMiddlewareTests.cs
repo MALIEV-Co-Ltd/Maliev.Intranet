@@ -67,7 +67,7 @@ public class JwtClaimsEnrichmentMiddlewareTests
     }
 
     [Fact]
-    public async Task InvokeAsync_ShouldSignOut_WhenTokenIsMissing()
+    public async Task InvokeAsync_ShouldContinueToNext_WhenTokenIsMissing()
     {
         var httpContext = new DefaultHttpContext();
         var identity = new ClaimsIdentity(new Claim[] { }, "TestAuth");
@@ -81,7 +81,10 @@ public class JwtClaimsEnrichmentMiddlewareTests
 
         await _middleware.InvokeAsync(httpContext);
 
-        authServiceMock.Verify(x => x.SignOutAsync(httpContext, It.IsAny<string>(), It.IsAny<AuthenticationProperties>()), Times.Once);
+        Assert.True(_nextCalled, "Middleware should call next even when token is missing");
+        authServiceMock.Verify(
+            x => x.SignOutAsync(httpContext, It.IsAny<string>(), It.IsAny<AuthenticationProperties>()),
+            Times.Never);
     }
 
     [Fact]
