@@ -50,7 +50,7 @@
 <style>
     .pmc-card {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         border: 2px solid var(--mud-palette-lines-default);
         border-radius: 8px;
         background: var(--mud-palette-background);
@@ -84,13 +84,10 @@
         position: absolute;
         bottom: 2px;
         right: 2px;
-        font-size: 9px;
-        padding: 1px 3px;
-        border-radius: 3px;
-        line-height: 1.2;
+        font-size: var(--mud-typography-default-size);
     }
     .pmc-badge-uploading { background: #e0e0e0; color: #616161; }
-    .pmc-badge-warning { background: #fff3cd; color: #856404; }
+    .pmc-badge-warning { color: var(--mud-palette-warning); }
     .pmc-badge-ok { background: #d4edda; color: #155724; }
     .pmc-info {
         flex: 1;
@@ -130,9 +127,9 @@
         opacity: 0;
         transition: opacity 0.15s;
         position: absolute;
-        top: 50%;
-        right: 4px;
-        transform: translateY(-50%);
+        top: 0;
+        right: 0;
+        transform: translateX(15%);
     }
     .pmc-card:hover .pmc-remove { opacity: 1; }
     /* Remove MudIconButton hover background rectangle */
