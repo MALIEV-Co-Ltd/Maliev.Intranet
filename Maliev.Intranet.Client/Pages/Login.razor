@@ -106,8 +106,8 @@
         align-items: center;
         justify-content: center;
         padding: 0.375rem 0.875rem;
-        background: rgba(30, 142, 62, 0.1);
-        color: #1e8e3e;
+        background: rgba(var(--mud-palette-success-rgb), 0.1);
+        color: var(--mud-palette-success);
         font-size: var(--mud-typography-overline-size);
         font-weight: var(--mud-typography-overline-weight);
         text-transform: uppercase;
@@ -117,8 +117,7 @@
     }
 
     .dark-theme .secure-badge {
-        background: rgba(129, 201, 149, 0.2);
-        color: #81c995;
+        background: rgba(var(--mud-palette-success-rgb), 0.2);
     }
 
     .secure-badge .material-symbols-outlined {
@@ -177,7 +176,7 @@
         font-family: var(--mud-typography-default-family);
         font-size: var(--mud-typography-body1-size);
         font-weight: var(--mud-typography-body1-weight);
-        background: rgba(0, 0, 0, 0.06);
+        background: rgba(var(--mud-palette-black-rgb), 0.06);
         border: 2px solid transparent;
         border-radius: 0.5rem;
         color: var(--mud-palette-on-surface);
@@ -185,7 +184,7 @@
     }
 
     .dark-theme .input-field {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(var(--mud-palette-white-rgb), 0.08);
     }
 
     .input-field::placeholder {
@@ -244,7 +243,7 @@
     .btn-primary:hover {
         opacity: 0.9;
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0, 112, 234, 0.3);
+        box-shadow: 0 4px 12px rgba(var(--mud-palette-primary-rgb), 0.3);
     }
 
     .btn-primary:active {
@@ -324,11 +323,11 @@
         right: 0;
         z-index: 50;
         padding: 1.5rem 2rem;
-        border-top: 1px solid rgba(28, 27, 27, 0.1);
+        border-top: 1px solid rgba(var(--mud-palette-black-rgb), 0.1);
     }
 
     .dark-theme .login-footer {
-        border-top-color: rgba(252, 249, 248, 0.1);
+        border-top-color: rgba(var(--mud-palette-white-rgb), 0.1);
     }
 
     .footer-content {
@@ -368,13 +367,20 @@
         color: var(--mud-palette-primary);
     }
 
+    /* Footer note */
+    .footer-note {
+        font-size: var(--mud-typography-caption-size);
+        color: var(--mud-palette-on-surface-variant);
+        text-align: center;
+    }
+
     /* Error message */
     .error-alert {
         padding: 0.75rem 1rem;
         background: var(--mud-palette-error-container);
         color: var(--mud-palette-on-error-container);
         border-radius: 0.5rem;
-        font-size: 0.875rem;
+        font-size: var(--mud-typography-body2-size);
         margin-bottom: 1rem;
     }
 
@@ -523,11 +529,9 @@
                 </EditForm>
 
                 <!-- Footer note -->
-                <div style="margin-top: 2rem; text-align: center;">
-                    <p style="font-size: 0.6875rem; color: var(--mud-palette-on-surface-variant);">
-                        Not an employee? Visit our main page at
-                        <a href="https://www.maliev.com" target="_blank" style="color: var(--mud-palette-primary); font-weight: 700;">www.maliev.com</a>
-                    </p>
+                <div class="footer-note" style="margin-top: 2rem;">
+                    Not an employee? Visit our main page at
+                    <a href="https://www.maliev.com" target="_blank" style="color: var(--mud-palette-primary); font-weight: 700;">www.maliev.com</a>
                 </div>
             </div>
         }
