@@ -18,7 +18,7 @@
         <ChildContent>
             <ProjectTopBar
                 Title="@_title"
-                OnTitleChanged="@(v => { _title = v; TriggerAutoSave(); })"
+                OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
                 SelectedCurrency="@_selectedCurrency"
                 Currencies="@_currencies"
                 OnCurrencyChanged="@(c => { _selectedCurrency = c; TriggerAutoSave(); })"
@@ -36,10 +36,6 @@
                             ShowCustomerSearch="@_showCustomerSearch"
                             OnCustomerSelected="OnCustomerSelected"
                             OnShowSearchChanged="@(v => _showCustomerSearch = v)"
-                            Title="@_title"
-                            OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
-                            TitleHasError="@_titleHasError"
-                            TitleError="@_titleError"
                             Description="@_description"
                             OnDescriptionChanged="@(v => { _description = v; ValidateDescription(); TriggerAutoSave(); })"
                             DescriptionHasError="@_descriptionHasError"
@@ -110,18 +106,24 @@
                                 <TemplateColumn Title="Part" HeaderStyle="width:40%">
                                     <CellTemplate>
                                         <div style="display:flex;align-items:center;gap:8px;">
-                                            @if (!string.IsNullOrEmpty(context.Item.ThumbnailSmallUrl))
-                                            {
-                                                <img src="@context.Item.ThumbnailSmallUrl" style="width:32px;height:32px;object-fit:cover;border-radius:4px;" />
-                                            }
+                                            <img src="@(!string.IsNullOrEmpty(context.Item.ThumbnailSmallUrl) ? context.Item.ThumbnailSmallUrl : "/images/image-placeholder.svg")"
+                                                 style="width:32px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0;" />
                                             <span>@context.Item.Name</span>
                                         </div>
                                     </CellTemplate>
                                 </TemplateColumn>
-                                <PropertyColumn Property="p => p.ProcessCode" Title="Process" />
-                                <PropertyColumn Property="p => p.MaterialCode" Title="Material" />
-                                <PropertyColumn Property="p => p.FinishCode" Title="Finish" />
-                                <PropertyColumn Property="p => p.ToleranceCode" Title="Tolerance" />
+                                <TemplateColumn Title="Process">
+                                    <CellTemplate>@(context.Item.ProcessCode ?? "—")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Material">
+                                    <CellTemplate>@(context.Item.MaterialCode ?? "—")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Finish">
+                                    <CellTemplate>@(context.Item.FinishCode ?? "—")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Tolerance">
+                                    <CellTemplate>@(context.Item.ToleranceCode ?? "—")</CellTemplate>
+                                </TemplateColumn>
                                 <PropertyColumn Property="p => p.Quantity" Title="Qty" />
                                 <TemplateColumn Title="Unit Price">
                                     <CellTemplate>

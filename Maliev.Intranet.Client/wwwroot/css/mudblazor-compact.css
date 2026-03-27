@@ -57,18 +57,24 @@
 }
 
 .mud-input-label {
-    /* Typography: use theme default size (13px) instead of hardcoded value */
-    font-size: var(--mud-typography-default-size);
+    /* !important required: MudBlazor 9 generates higher-specificity selectors like
+       .mud-input.mud-input-outlined .mud-input-label that would otherwise win */
+    font-size: var(--mud-typography-default-size) !important;
 }
 
 .mud-input-label-inputcontrol {
-    /* Typography: use theme default size (13px) instead of hardcoded value */
-    font-size: var(--mud-typography-default-size);
+    font-size: var(--mud-typography-default-size) !important;
 }
 
-.mud-shrink {
-    /* Typography: use body2 size (12px) for floating label - slightly smaller than default */
-    font-size: var(--mud-typography-body2-size);
+.mud-input-label.mud-shrink {
+    /* Floating/shrunk label is slightly smaller than the placeholder position */
+    font-size: var(--mud-typography-body2-size) !important;
+}
+
+/* HTML placeholder attribute text (when Placeholder="" is set, not Label="") */
+.mud-input-slot::placeholder {
+    font-size: var(--mud-typography-default-size);
+    opacity: 0.6;
 }
 
 .mud-input-helper-text {

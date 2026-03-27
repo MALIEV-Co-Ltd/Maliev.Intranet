@@ -10,7 +10,7 @@
     @* ── Left 60%: Viewer Column ──────────────────────────────────── *@
     <div class="pdc-viewer-col">
         <div class="pdc-thumb-area"
-             @onmouseenter="@(() => _showViewer3dBtn = !_showViewer3d)"
+             @onmouseenter="@(() => _showViewer3dBtn = true)"
              @onmouseleave="@(() => _showViewer3dBtn = false)">
 
             @* ── 3D Viewer Mode (inline, replaces thumbnail) ──────── *@
@@ -54,17 +54,27 @@
                          @onerror="@(async () => await OnImageErrorAsync(Part.ThumbnailLargeUrl, v => Part.ThumbnailLargeUrl = v))" />
                 }
 
+                @* Upload / processing progress overlay *@
+                @if ((Part.Uploading || Part.AwaitingPreview) && string.IsNullOrEmpty(Part.ThumbnailSmallUrl))
+                {
+                    <div class="pdc-upload-progress">
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mb-2" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@Part.StatusText</MudText>
+                    </div>
+                }
+
                 @* Fallback grey background — no preview *@
-                @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.AwaitingPreview)
+                @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.AwaitingPreview && !Part.Uploading)
                 {
                     <MudIcon Icon="@GetFileIcon()" Size="Size.Large" Color="Color.Default" />
                 }
 
                 @* AnimatedCubeIcon overlay — visible on hover when GLB available *@
-                @if (!string.IsNullOrEmpty(Part.GlbStoragePath) && _showViewer3dBtn)
+                @if ((!string.IsNullOrEmpty(Part.GlbStoragePath) || !string.IsNullOrEmpty(Part.GlbSignedUrl)) && _showViewer3dBtn)
                 {
-                    <div class="pdc-cube-overlay">
+                    <div class="pdc-cube-overlay pdc-cube-active">
                         <AnimatedCubeIcon Size="48" OnClick="@OpenViewer" />
+                        <span class="pdc-cube-label">View in 3D</span>
                     </div>
                 }
             }
@@ -102,12 +112,7 @@
 
                 @* Material *@
                 <div class="pdc-field-group">
-                    @if (Part.ProcessId == null)
-                    {
-                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
-                        <MudSkeleton Width="60%" Height="12px" Animation="Animation.Wave" Class="mt-1" />
-                    }
-                    else if (Part.CatalogLoading)
+                    @if (Part.CatalogLoading)
                     {
                         <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
                     }
@@ -118,7 +123,7 @@
                                    ValueChanged="@OnMaterialChanged"
                                    Variant="Variant.Outlined"
                                    Margin="Margin.Dense"
-                                   Disabled="@(Part.AvailableMaterials.Count == 0)">
+                                   Disabled="@(Part.ProcessId == null || Part.AvailableMaterials.Count == 0)">
                             @foreach (var m in Part.AvailableMaterials)
                             {
                                 <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)m.Id)">@m.Name</MudSelectItem>
@@ -129,7 +134,7 @@
 
                 @* Surface Finish *@
                 <div class="pdc-field-group">
-                    @if (Part.ProcessId == null || Part.CatalogLoading)
+                    @if (Part.CatalogLoading)
                     {
                         <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
                     }
@@ -139,7 +144,8 @@
                                    Value="@Part.FinishId"
                                    ValueChanged="@OnFinishChanged"
                                    Variant="Variant.Outlined"
-                                   Margin="Margin.Dense">
+                                   Margin="Margin.Dense"
+                                   Disabled="@(Part.ProcessId == null)">
                             <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)null)">None</MudSelectItem>
                             @foreach (var f in Part.AvailableFinishes)
                             {
@@ -151,7 +157,7 @@
 
                 @* Tolerance *@
                 <div class="pdc-field-group">
-                    @if (Part.ProcessId == null || Part.CatalogLoading)
+                    @if (Part.CatalogLoading)
                     {
                         <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="40px" Width="100%" Animation="Animation.Wave" />
                     }
@@ -161,7 +167,8 @@
                                    Value="@Part.ToleranceId"
                                    ValueChanged="@OnToleranceChanged"
                                    Variant="Variant.Outlined"
-                                   Margin="Margin.Dense">
+                                   Margin="Margin.Dense"
+                                   Disabled="@(Part.ProcessId == null)">
                             <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)null)">Standard</MudSelectItem>
                             @foreach (var t in Part.AvailableTolerances)
                             {
@@ -185,7 +192,7 @@
                 <MudTextField T="string" Value="@Part.PartNotes"
                               ValueChanged="@((string v) => NotifyChanged(p => p.PartNotes = v))"
                               Label="Part Notes"
-                              Lines="3"
+                              Lines="6"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
                               MaxLength="1000" />
@@ -193,12 +200,15 @@
                 @* DFM panel — shown when non-manifold *@
                 @if (Part.IsManifold == false)
                 {
-                    <MudExpansionPanel Class="mt-2" Style="background:#fff7ed; border:1px solid #fed7aa;">
+                    <MudExpansionPanel Class="mt-2"
+                                       Style="@(Part.DfmAcknowledged ? "background:#f0fdf4; border:1px solid #bbf7d0;" : "background:#fff7ed; border:1px solid #fed7aa;")">
                         <TitleContent>
                             <div style="display:flex;align-items:center;gap:4px;">
-                                <MudIcon Icon="@Icons.Material.Outlined.Warning" Size="Size.Small" Color="Color.Warning" />
-                                <MudText Color="Color.Warning" Typo="Typo.body2" Style="font-weight:600;">
-                                    Non-manifold mesh detected
+                                <MudIcon Icon="@(Part.DfmAcknowledged ? Icons.Material.Outlined.CheckCircle : Icons.Material.Outlined.Warning)"
+                                         Size="Size.Small"
+                                         Color="@(Part.DfmAcknowledged ? Color.Success : Color.Warning)" />
+                                <MudText Color="@(Part.DfmAcknowledged ? Color.Success : Color.Warning)" Typo="Typo.body2" Style="font-weight:600;">
+                                    @(Part.DfmAcknowledged ? "Non-manifold mesh — acknowledged" : "Non-manifold mesh detected")
                                 </MudText>
                             </div>
                         </TitleContent>
@@ -289,6 +299,17 @@
     .pdc-thumb-fade-in {
         animation: fade-in 0.4s ease-in-out forwards;
     }
+    .pdc-upload-progress {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        z-index: 1;
+    }
     .pdc-cube-overlay {
         position: absolute;
         top: 50%;
@@ -296,6 +317,26 @@
         transform: translate(-50%, -50%);
         animation: fade-in 0.2s ease-in-out;
         z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+    }
+    /* Force cube visible + spinning when the overlay is active */
+    .pdc-cube-active .animated-cube-icon .cube {
+        opacity: 1 !important;
+        animation: cubeRotate 6s linear infinite !important;
+    }
+    .pdc-cube-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+        background: rgba(0,0,0,0.55);
+        padding: 2px 8px;
+        border-radius: 10px;
+        white-space: nowrap;
+        pointer-events: none;
     }
     .pdc-3d-viewer-container {
         position: absolute;

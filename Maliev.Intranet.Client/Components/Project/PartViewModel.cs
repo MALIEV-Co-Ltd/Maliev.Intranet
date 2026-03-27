@@ -74,6 +74,9 @@ public class PartViewModel
     /// <summary>Resolved signed viewer URL for BabylonJS inline rendering. Fetched on-demand when user opens 3D view.</summary>
     public string? ViewerUrl { get; set; }
 
+    /// <summary>Pre-resolved signed URL for the GLB file, delivered by the GlbReady SignalR event. Bypasses API round-trip on cube click.</summary>
+    public string? GlbSignedUrl { get; set; }
+
     /// <summary>True when the preview image failed to load.</summary>
     public bool PreviewLoadFailed { get; set; }
 
@@ -151,6 +154,10 @@ public class PartViewModel
         DfmAcknowledged = DfmAcknowledged,
         VolumeMm3 = VolumeMm3,
         Dimensions = Dimensions,
+        IsManifold = IsManifold,
+        ThumbnailSmallUrl = ThumbnailSmallUrl,
+        ThumbnailLargeUrl = ThumbnailLargeUrl,
+        GlbStoragePath = GlbStoragePath,
     };
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
@@ -172,5 +179,13 @@ public class PartViewModel
         DfmAcknowledged = s.DfmAcknowledged,
         VolumeMm3 = s.VolumeMm3,
         Dimensions = s.Dimensions,
+        IsManifold = s.IsManifold,
+        ThumbnailSmallUrl = s.ThumbnailSmallUrl,
+        ThumbnailLargeUrl = s.ThumbnailLargeUrl,
+        GlbStoragePath = s.GlbStoragePath,
+        AwaitingPreview = false,
+        StatusText = string.IsNullOrEmpty(s.ThumbnailSmallUrl) && string.IsNullOrEmpty(s.StoragePath)
+            ? "Processing..."
+            : "Ready",
     };
 }

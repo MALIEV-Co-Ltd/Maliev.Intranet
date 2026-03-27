@@ -114,11 +114,11 @@ code {
     text-align: start;
 }
 
-/* MudBlazor input controls - use default typography size (13px) */
-/* This ensures input hint/label text matches the theme's default font size */
+/* MudBlazor input controls - use default typography size (13px).
+   .mud-text-field is NOT a real DOM ancestor in MudBlazor 9 — label lives inside .mud-input. */
 .mud-autocomplete .mud-input-control-input-control,
-.mud-autocomplete .mud-input-label,
-.mud-text-field .mud-input-control-input-control,
-.mud-text-field .mud-input-label {
+.mud-input .mud-input-label,
+.mud-input-control .mud-input-label,
+.mud-input-slot::placeholder {
     font-size: var(--mud-typography-default-size);
 }

@@ -25,6 +25,7 @@
     {
         <span class="pn-topbar-title" @onclick="@(() => { _titleDraft = Title; _editingTitle = true; })">
             @(string.IsNullOrWhiteSpace(Title) ? "Untitled Project" : Title)
+            <MudIcon Icon="@Icons.Material.Outlined.Edit" Class="pn-title-edit-icon" Size="Size.Small" />
         </span>
     }
     <MudChip T="string" Size="Size.Small" Color="Color.Default" Label="true" Class="ml-1">Draft</MudChip>
@@ -41,6 +42,7 @@
                      Variant="Variant.Outlined"
                      Margin="Margin.Dense"
                      Style="width:180px;"
+                     MinCharacters="0"
                      Clearable="false" />
 
     @* Saved status *@
@@ -48,6 +50,13 @@
         @if (AutoSaving) { <text>Saving...</text> }
         else if (LastSavedAt.HasValue) { <text>@GetRelativeTime(LastSavedAt.Value)</text> }
     </MudText>
+
+    @* New project button *@
+    <MudTooltip Text="New project">
+        <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                       Size="Size.Small"
+                       Href="/sales/projects/new" />
+    </MudTooltip>
 
     @* Duplicate button *@
     <MudTooltip Text="Duplicate project">
@@ -86,6 +95,15 @@
         max-width: 300px;
     }
     .pn-topbar-title:hover { text-decoration: underline; }
+    .pn-title-edit-icon {
+        font-size: 14px !important;
+        opacity: 0;
+        transition: opacity 0.15s;
+        vertical-align: middle;
+        margin-left: 3px;
+        color: var(--mud-palette-text-secondary);
+    }
+    .pn-topbar-title:hover .pn-title-edit-icon { opacity: 0.7; }
 </style>
 
 @code {

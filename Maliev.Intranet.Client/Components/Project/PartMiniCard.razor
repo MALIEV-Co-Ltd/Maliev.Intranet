@@ -29,7 +29,7 @@
         }
     </div>
     <span class="pmc-remove" @onclick:stopPropagation="true">
-        <MudIconButton Icon="@Icons.Material.Outlined.Close"
+        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                        Size="Size.Small"
                        Color="Color.Error"
                        OnClick="@(() => OnRemove.InvokeAsync())"
@@ -41,24 +41,25 @@
     .pmc-card {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 8px;
-        border: 2px solid transparent;
+        border: 2px solid var(--mud-palette-lines-default);
         border-radius: 8px;
-        background: var(--mud-palette-surface);
+        background: var(--mud-palette-background);
         cursor: pointer;
         min-width: 200px;
         max-width: 240px;
+        height: 60px;
         flex-shrink: 0;
         position: relative;
-        transition: border-color 0.15s;
+        transition: border-color 0.15s, background 0.15s;
+        overflow: hidden;
     }
-    .pmc-card:hover { border-color: var(--mud-palette-primary-hover); }
-    .pmc-active { border-color: var(--mud-palette-primary) !important; }
+    .pmc-card:hover { border-color: var(--mud-palette-primary-hover); background: var(--mud-palette-surface); }
+    .pmc-active { border-color: var(--mud-palette-primary) !important; background: var(--mud-palette-surface) !important; }
     .pmc-thumb {
-        width: 48px;
-        height: 48px;
-        border-radius: 4px;
+        width: 56px;
+        min-width: 56px;
+        height: 56px;
+        border-radius: 4px 0 0 4px;
         background: var(--mud-palette-background-grey);
         display: flex;
         align-items: center;
@@ -66,6 +67,7 @@
         overflow: hidden;
         flex-shrink: 0;
         position: relative;
+        align-self: stretch;
     }
     .pmc-thumb img { width: 100%; height: 100%; object-fit: cover; }
     .pmc-badge {
@@ -86,6 +88,7 @@
         display: flex;
         flex-direction: column;
         gap: 2px;
+        padding: 8px 30px 8px 8px;
     }
     .pmc-name {
         font-size: 12px;
@@ -109,10 +112,17 @@
         opacity: 0;
         transition: opacity 0.15s;
         position: absolute;
-        top: 2px;
-        right: 2px;
+        top: 50%;
+        right: 4px;
+        transform: translateY(-50%);
     }
     .pmc-card:hover .pmc-remove { opacity: 1; }
+    /* Remove MudIconButton hover background rectangle */
+    .pmc-remove .mud-icon-button:hover,
+    .pmc-remove .mud-icon-button:focus {
+        background-color: transparent !important;
+    }
+    .pmc-remove .mud-icon-button::after { display: none !important; }
 </style>
 
 @code {

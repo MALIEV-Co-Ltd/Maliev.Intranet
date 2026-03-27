@@ -103,4 +103,16 @@ public sealed class DraftPartState
 
     /// <summary>The bounding box dimensions of the part.</summary>
     public FileAnalysisDimensionsDto? Dimensions { get; set; }
+
+    /// <summary>Whether the part mesh is manifold (watertight). Null until analysis completes.</summary>
+    public bool? IsManifold { get; set; }
+
+    /// <summary>Signed URL to the small (~256px) isometric thumbnail. Restored to avoid re-fetching on reload.</summary>
+    public string? ThumbnailSmallUrl { get; set; }
+
+    /// <summary>Signed URL to the large (~1200px) isometric thumbnail. Restored to avoid re-fetching on reload.</summary>
+    public string? ThumbnailLargeUrl { get; set; }
+
+    /// <summary>GCS storage path of the GLB artifact. Non-null when analysis produced a 3D model.</summary>
+    public string? GlbStoragePath { get; set; }
 }

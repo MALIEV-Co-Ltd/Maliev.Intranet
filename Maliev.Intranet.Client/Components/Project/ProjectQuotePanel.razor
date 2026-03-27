@@ -14,7 +14,10 @@
 
         @if (LeadTimeOptions.Count == 0)
         {
-            <MudSkeleton Height="60px" Width="100%" Animation="Animation.Wave" Class="mt-1 mb-3" />
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1 mb-3"
+                     Style="text-align:center; padding:12px 0;">
+                Available after parts are configured
+            </MudText>
         }
         else
         {
@@ -28,22 +31,22 @@
                         <div class="pqp-lt-card-body">
                             <div class="pqp-lt-name">@opt.Name</div>
                             <div class="pqp-lt-days">
-                                @if (!_hasPricedParts)
+                                @if (Parts.Count > 0 && !_hasPricedParts)
                                 {
                                     <MudSkeleton Width="60px" Height="11px" Animation="Animation.Wave" />
                                 }
-                                else
+                                else if (_hasPricedParts)
                                 {
                                     <text>@dMin–@dMax business days</text>
                                 }
                             </div>
                         </div>
                         <div class="pqp-lt-price">
-                            @if (!_hasPricedParts)
+                            @if (Parts.Count > 0 && !_hasPricedParts)
                             {
                                 <MudSkeleton Width="50px" Height="14px" Animation="Animation.Wave" />
                             }
-                            else
+                            else if (_hasPricedParts)
                             {
                                 @FormatPrice(_subtotal * opt.PriceMultiplier)
                             }

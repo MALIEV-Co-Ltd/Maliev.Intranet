@@ -7,6 +7,7 @@ using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using MudBlazor;
 
@@ -20,7 +21,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     // ── Project-level state ───────────────────────────────────────────
     private Guid _tempProjectId = Guid.NewGuid();  // non-readonly; reassigned on Duplicate
-    private string _title = string.Empty;
+    private string _title = $"Project {DateTime.Today:yyyy-MM-dd}";
     private string? _description;
     private CustomerSummaryDto? _selectedCustomer;
     private bool _showCustomerSearch = true;
@@ -39,7 +40,6 @@ public partial class ProjectNew : IAsyncDisposable
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
 
     // ── Validation ────────────────────────────────────────────────────
-    private string? _titleError;
     private bool _titleHasError;
     private string? _descriptionError;
     private bool _descriptionHasError;
@@ -56,10 +56,16 @@ public partial class ProjectNew : IAsyncDisposable
     private readonly Dictionary<Guid, CancellationTokenSource> _pricingTokens = new();
     private const int PricingDebounceMs = 300;
 
+    // ── Session ────────────────────────────────────────────────────────
+    private Guid _sessionId;
+
     // ── Auto-save debounce ─────────────────────────────────────────────
     private const int AutoSaveDebounceMs = 1000;
-    private const string DraftStorageKey = "project-new-draft";
+    private string DraftStorageKey => $"project-draft-{_sessionId}";
     private Timer? _autoSaveDebounceTimer;
+
+    // ── SignalR ────────────────────────────────────────────────────────
+    private HubConnection? _hubConnection;
 
     // ── File type sets ────────────────────────────────────────────────
     private static readonly HashSet<string> ThreeDExtensions =
@@ -94,6 +100,8 @@ public partial class ProjectNew : IAsyncDisposable
         foreach (var cts in _pollingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         foreach (var cts in _pricingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         _autoSaveDebounceTimer?.Dispose();
+        if (_hubConnection != null)
+            await _hubConnection.DisposeAsync();
     }
 
     // ── Task 4: Initialize ─────────────────────────────────────────────
@@ -101,6 +109,20 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     {
+        // ── Session management: parse or assign ?session= GUID ─────────
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var sessionParam = query["session"];
+
+        if (string.IsNullOrEmpty(sessionParam) || !Guid.TryParse(sessionParam, out _sessionId))
+        {
+            _sessionId = Guid.NewGuid();
+            // Redirect to URL with session param — return immediately; OnInitializedAsync will re-run
+            Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}", replace: true);
+            return;
+        }
+
+        // ── Load reference data ────────────────────────────────────────
         var currenciesTask = Http.GetFromJsonAsync<List<CurrencyDto>>("api/referenceData/currencies");
         var processesTask = Http.GetFromJsonAsync<List<ProcessDto>>("api/catalog/processes");
         var leadTimesTask = Http.GetFromJsonAsync<List<LeadTimeOptionDto>>("api/pricing/lead-times");
@@ -127,10 +149,59 @@ public partial class ProjectNew : IAsyncDisposable
             _selectedLeadTime ??= _leadTimeOptions.FirstOrDefault(lt => lt.IsDefault) ?? _leadTimeOptions.First();
         }
 
-        if (string.IsNullOrWhiteSpace(_title))
-            _title = $"Project {DateTime.Now:yyyy-MM-dd}";
-
         await RestoreDraftAsync();
+
+        // ── SignalR hub connection ─────────────────────────────────────
+        if (OperatingSystem.IsBrowser()) // client-side only; skip on SSR prerender
+        {
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/notifications"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hubConnection.On<SignalRFileAnalysisPayload>("FileAnalysisCompleted", async payload =>
+            {
+                var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
+                if (part == null) return;
+
+                // Small thumbnail arrives first (ThumbnailUrl only, PreviewUrls null)
+                if (!string.IsNullOrEmpty(payload.ThumbnailUrl) && string.IsNullOrEmpty(part.ThumbnailSmallUrl))
+                {
+                    part.ThumbnailSmallUrl = payload.ThumbnailUrl;
+                    await InvokeAsync(StateHasChanged);
+                }
+
+                // Full preview from PreviewImagesGeneratedConsumer
+                if (payload.PreviewUrls != null)
+                {
+                    part.ThumbnailSmallUrl = payload.PreviewUrls.ThumbnailSmall ?? part.ThumbnailSmallUrl;
+                    part.ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge ?? payload.HiResThumbnailUrl;
+                    part.AwaitingPreview = false;
+                    part.StatusText = "Ready";
+                    TriggerAutoSave();
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            _hubConnection.On<SignalRGlbReadyPayload>("GlbReady", async payload =>
+            {
+                var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
+                if (part == null) return;
+
+                if (!payload.Failed)
+                {
+                    part.GlbSignedUrl = payload.GlbUrl;
+                    part.GlbStoragePath ??= payload.StoragePath;
+                }
+                await InvokeAsync(StateHasChanged);
+            });
+
+            await _hubConnection.StartAsync();
+
+            // Join groups for any parts already in the list (restored from draft)
+            foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
+                await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
+        }
     }
 
     // ── Task 4: Customer search ────────────────────────────────────────
@@ -225,6 +296,9 @@ public partial class ProjectNew : IAsyncDisposable
             part.Uploading = false;
             part.StatusText = "Processing geometry...";
 
+            if (_hubConnection?.State == HubConnectionState.Connected)
+                await _hubConnection.InvokeAsync("JoinFileGroup", storagePath);
+
             await PollAnalysisStatusAsync(part, storagePath);
         }
         catch (OperationCanceledException)
@@ -271,8 +345,12 @@ public partial class ProjectNew : IAsyncDisposable
 
                         if (status.PreviewUrls != null)
                         {
-                            part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall ?? status.ThumbnailUrl;
-                            part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl ?? status.HiResThumbnailUrl;
+                            part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall
+                                ?? status.ThumbnailUrl
+                                ?? status.PreviewUrls.ThumbnailLargeUrl
+                                ?? status.HiResThumbnailUrl;
+                            part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl
+                                ?? status.HiResThumbnailUrl;
                         }
                         else
                         {
@@ -285,11 +363,20 @@ public partial class ProjectNew : IAsyncDisposable
 
                         if (status.Status == FileAnalysisStatus.Completed)
                         {
-                            part.AwaitingPreview = false;
-                            part.StatusText = "Ready";
-                            _pollingTokens.Remove(storagePath);
-                            TriggerAutoSave();
-                            return;
+                            if (status.PreviewProcessingStatus == PreviewProcessingStatus.Completed ||
+                                status.PreviewProcessingStatus == PreviewProcessingStatus.Failed)
+                            {
+                                part.AwaitingPreview = false;
+                                part.StatusText = "Ready";
+                                _pollingTokens.Remove(storagePath);
+                                TriggerAutoSave();
+                                await InvokeAsync(StateHasChanged);
+                                return;
+                            }
+                            // Geometry done but preview still generating — keep polling
+                            part.StatusText = "Generating preview...";
+                            await InvokeAsync(StateHasChanged);
+                            continue;
                         }
 
                         if (status.Status == FileAnalysisStatus.Failed)
@@ -298,11 +385,13 @@ public partial class ProjectNew : IAsyncDisposable
                             part.Error = $"Geometry analysis failed: {status.ErrorCode}";
                             part.StatusText = "Analysis failed";
                             _pollingTokens.Remove(storagePath);
+                            await InvokeAsync(StateHasChanged);
                             return;
                         }
 
                         var pct = (attempt * 100) / maxAttempts;
                         part.StatusText = pct < 50 ? "Analysing geometry..." : "Generating preview...";
+                        await InvokeAsync(StateHasChanged);
                     }
                 }
             }
@@ -310,6 +399,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.AwaitingPreview = false;
             part.Error = "Analysis timed out.";
             part.StatusText = "Timeout";
+            await InvokeAsync(StateHasChanged);
         }
         catch (OperationCanceledException)
         {
@@ -334,6 +424,9 @@ public partial class ProjectNew : IAsyncDisposable
             _pollingTokens.Remove(part.StoragePath);
         }
 
+        if (!string.IsNullOrEmpty(part.StoragePath) && _hubConnection?.State == HubConnectionState.Connected)
+            _ = _hubConnection.InvokeAsync("LeaveFileGroup", part.StoragePath);
+
         _parts.Remove(part);
 
         if (_selectedPartIndex >= _parts.Count)
@@ -345,9 +438,10 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Task 12: Cascading dropdowns ──────────────────────────────────
 
     /// <inheritdoc />
-    private async void OnPartChanged(PartViewModel part)
+    private async Task OnPartChanged(PartViewModel part)
     {
-        if (part.ProcessId.HasValue && !string.IsNullOrEmpty(part.ProcessCode))
+        if (part.ProcessId.HasValue && !string.IsNullOrEmpty(part.ProcessCode)
+            && part.AvailableMaterials.Count == 0) // only reload catalog on process change (OnProcessChanged clears AvailableMaterials before invoking this)
         {
             part.CatalogLoading = true;
             try
@@ -373,9 +467,10 @@ public partial class ProjectNew : IAsyncDisposable
             finally
             {
                 part.CatalogLoading = false;
+                await InvokeAsync(StateHasChanged);
             }
         }
-        else
+        else if (!part.ProcessId.HasValue || string.IsNullOrEmpty(part.ProcessCode))
         {
             part.AvailableMaterials = [];
             part.AvailableFinishes = [];
@@ -488,6 +583,7 @@ public partial class ProjectNew : IAsyncDisposable
         {
             part.PricingLoading = false;
             TriggerAutoSave();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -538,6 +634,7 @@ public partial class ProjectNew : IAsyncDisposable
         finally
         {
             _autoSaving = false;
+            StateHasChanged();
         }
     }
 
@@ -770,9 +867,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     private void ValidateTitle()
     {
-        if (string.IsNullOrWhiteSpace(_title)) { _titleError = "Project title is required"; _titleHasError = true; }
-        else if (_title.Length > 500) { _titleError = "Must be 500 characters or fewer"; _titleHasError = true; }
-        else { _titleError = null; _titleHasError = false; }
+        _titleHasError = string.IsNullOrWhiteSpace(_title) || _title.Length > 500;
     }
 
     private void ValidateDescription()
@@ -786,9 +881,21 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task OpenBabylonViewer(PartViewModel part)
     {
+        // Use pre-resolved signed URL from GlbReady SignalR event when available
+        if (!string.IsNullOrEmpty(part.GlbSignedUrl))
+        {
+            part.ViewerUrl = part.GlbSignedUrl;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
         if (string.IsNullOrEmpty(part.GlbStoragePath)) return;
         var resp = await Http.GetAsync($"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
-        if (!resp.IsSuccessStatusCode) return;
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Failed to load 3D viewer URL.", Severity.Error);
+            return;
+        }
         var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
         part.ViewerUrl = json?.RootElement.GetProperty("url").GetString();
         await InvokeAsync(StateHasChanged);
