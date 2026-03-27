@@ -11,7 +11,14 @@
         {
             <MudIcon Icon="@GetFileIcon(Part.Name)" Size="Size.Medium" Color="Color.Default" />
         }
-        <span class="pmc-badge @GetBadgeClass()">@GetBadgeText()</span>
+        @if (Part.IsManifold == false)
+        {
+            <MudIcon Icon="@Icons.Material.Filled.WarningAmber" Size="Size.Small" Color="Color.Warning" Class="pmc-badge" />
+        }
+        else if (!Part.PreviewLoadFailed && !string.IsNullOrEmpty(Part.ThumbnailSmallUrl))
+        {
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" Class="pmc-badge" />
+        }
     </div>
     <div class="pmc-info">
         <MudTooltip Text="@Part.Name">
@@ -28,17 +35,15 @@
             </div>
         }
         <div class="pmc-meta">
-            <MudBadge Content="@Part.Quantity"
-                      Color="Color.Primary"
-                      border="true"
-                      Overlap="false"
-                      Class="pmc-qty-badge">
-                <span class="pmc-process-material">
-                    @if (!string.IsNullOrEmpty(Part.ProcessCode)) { <text>@Part.ProcessCode</text> }
-                    @if (!string.IsNullOrEmpty(Part.ProcessCode) && !string.IsNullOrEmpty(Part.MaterialCode)) { <text> · </text> }
-                    @if (!string.IsNullOrEmpty(Part.MaterialCode)) { <text>@Part.MaterialCode</text> }
-                </span>
-            </MudBadge>
+            <span class="pmc-process-material">
+                @if (!string.IsNullOrEmpty(Part.ProcessCode)) { <text>@Part.ProcessCode</text> }
+                @if (!string.IsNullOrEmpty(Part.ProcessCode) && !string.IsNullOrEmpty(Part.MaterialCode)) { <text> · </text> }
+                @if (!string.IsNullOrEmpty(Part.MaterialCode)) { <text>@Part.MaterialCode</text> }
+            </span>
+            @if (Part.Quantity > 1)
+            {
+                <span class="pmc-qty">×@Part.Quantity</span>
+            }
         </div>
         <div class="pmc-price">
             @if (Part.PricingLoading) { <MudSkeleton Width="50px" Height="12px" /> }
@@ -137,11 +142,12 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .pmc-qty-badge .mud-badge-badge {
-        font-size: 9px;
-        height: 16px;
-        min-width: 16px;
-        padding: 0 4px;
+    .pmc-qty {
+        font-size: 10px;
+        color: var(--mud-palette-primary);
+        font-weight: 600;
+        margin-left: auto;
+        flex-shrink: 0;
     }
     .pmc-price {
         font-size: 11px;
@@ -178,18 +184,6 @@
     [Parameter] public bool IsActive { get; set; }
     [Parameter] public EventCallback OnSelect { get; set; }
     [Parameter] public EventCallback OnRemove { get; set; }
-
-    private string GetBadgeClass() =>
-        Part.Uploading ? "pmc-badge-uploading" :
-        Part.IsManifold == false ? "pmc-badge-warning" :
-        Part.IsManifold == true ? "pmc-badge-ok" :
-        "pmc-badge-uploading";
-
-    private string GetBadgeText() =>
-        Part.Uploading ? "↑" :
-        Part.IsManifold == false ? "⚠" :
-        Part.ThumbnailSmallUrl != null ? "✓" :
-        "…";
 
     private string FormatPrice(decimal amount) => $"฿{amount:N0}";
 

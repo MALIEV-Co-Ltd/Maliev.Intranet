@@ -63,7 +63,12 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
         {
             try
             {
-                await _analysisStatusService.SetAnalysisCompletedAsync(gcsStoragePath, payload.GlbStoragePath, payload.DfmReport, context.CancellationToken);
+                var existing = await _analysisStatusService.GetStatusAsync(gcsStoragePath, context.CancellationToken);
+                await _analysisStatusService.SetAnalysisCompletedAsync(
+                    gcsStoragePath,
+                    payload.GlbStoragePath ?? existing?.GlbStoragePath,
+                    payload.DfmReport ?? existing?.DfmReport,
+                    context.CancellationToken);
 
                 _logger.LogInformation(
                     "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}, hasDfmReport={HasDfmReport}",

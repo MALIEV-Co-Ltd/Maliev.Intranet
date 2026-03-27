@@ -292,7 +292,7 @@
                                        Style="@(Part.DfmAcknowledged ? "background:#f0fdf4; border:1px solid #bbf7d0;" : "background:#fff7ed; border:1px solid #fed7aa;")">
                         <TitleContent>
                             <div style="display:flex;align-items:center;gap:4px;">
-                                <MudIcon Icon="@(Part.DfmAcknowledged ? Icons.Material.Outlined.CheckCircle : Icons.Material.Outlined.Warning)"
+                                <MudIcon Icon="@(Part.DfmAcknowledged ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.WarningAmber)"
                                          Size="Size.Small"
                                          Color="@(Part.DfmAcknowledged ? Color.Success : Color.Warning)" />
                                 <MudText Color="@(Part.DfmAcknowledged ? Color.Success : Color.Warning)" Typo="Typo.body2" Style="font-weight:600;">
@@ -308,7 +308,7 @@
                                        Class="mt-1"
                                        Disabled="@Part.DfmAcknowledged"
                                        OnClick="@(() => NotifyChanged(p => p.DfmAcknowledged = true))"
-                                       StartIcon="@(Part.DfmAcknowledged ? Icons.Material.Outlined.CheckCircle : Icons.Material.Outlined.Warning)">
+                                       StartIcon="@(Part.DfmAcknowledged ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.WarningAmber)">
                                 @(Part.DfmAcknowledged ? "Acknowledged" : "I understand — proceed")
                             </MudButton>
                         </ChildContent>
@@ -481,6 +481,17 @@
     private int _activeTab;
     private string _selectionMode = "rich";
     private readonly Dictionary<string, string> _resolvedUrls = [];
+    private Guid _lastPartId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_lastPartId != Guid.Empty && _lastPartId != Part.FileId && _showViewer3d)
+        {
+            await CloseViewer();
+        }
+        _lastPartId = Part.FileId;
+        await base.OnParametersSetAsync();
+    }
 
     private string GetFileIcon() =>
         Path.GetExtension(Part.Name).ToLowerInvariant() switch
