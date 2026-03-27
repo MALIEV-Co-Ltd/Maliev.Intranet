@@ -32,8 +32,10 @@ public static class MalievPermissions
     /// </summary>
     public static class Customer
     {
-        /// <summary>Permission to read customer records.</summary>
+        /// <summary>Permission to read individual customer records.</summary>
         public const string Read = "customer.customers.read";
+        /// <summary>Permission to list and search customers.</summary>
+        public const string List = "customer.customers.list";
         /// <summary>Permission to create or update customer records.</summary>
         public const string Write = "customer.customers.write";
 

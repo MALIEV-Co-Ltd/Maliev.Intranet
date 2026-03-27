@@ -26,7 +26,7 @@ public class CustomersController(
     private readonly IHubContext<NotificationHub> _hubContext = hubContext;
 
     /// <summary>Gets all customers</summary>
-    [RequirePermission(MalievPermissions.Customer.Read)]
+    [RequirePermission(MalievPermissions.Customer.List)]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get(string? query = null, int page = 1, CancellationToken ct = default)
     {
