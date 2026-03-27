@@ -14,14 +14,22 @@ namespace Maliev.Intranet.Bff.Controllers;
 public class PreferencesController(EmployeeServiceClient employeeClient) : ControllerBase
 {
     /// <summary>
-    /// Gets preferences for a scope.
+    /// Gets preferences for a scope. Returns a default empty preference if none exists,
+    /// preventing 404 errors for new users who have never saved preferences.
     /// </summary>
     [HttpGet("{scope}")]
     public async Task<ActionResult<UserPreferenceDto>> GetPreference(string scope, CancellationToken ct)
     {
         var result = await employeeClient.GetPreferenceAsync(scope, ct);
-        if (result == null) return NotFound();
-        return Ok(result);
+        if (result != null) return Ok(result);
+
+        // No preference exists for this scope — return a default one rather than 404.
+        // This prevents console errors for new users who have never saved preferences.
+        var principalId = User.FindFirst("sub") is { } subClaim && Guid.TryParse(subClaim.Value, out var id)
+            ? id
+            : Guid.Empty;
+
+        return Ok(new UserPreferenceDto { PrincipalId = principalId, Scope = scope, PreferenceData = [] });
     }
 
     /// <summary>

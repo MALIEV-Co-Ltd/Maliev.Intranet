@@ -1,9 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Maliev.Intranet.Tests.Testing;
@@ -53,6 +55,35 @@ public class PreferencesControllerTests
         _clientMock.Setup(x => x.GetPreferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new UserPreferenceDto());
         var result = await _controller.GetPreference("UI", CancellationToken.None);
         Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Get_ShouldReturnDefaultPreference_WhenDownstreamReturnsNull()
+    {
+        var userId = Guid.NewGuid();
+        var controller = new PreferencesController(_clientMock.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                    {
+                        new Claim("sub", userId.ToString())
+                    }, "TestAuth"))
+                }
+            }
+        };
+
+        _clientMock.Setup(x => x.GetPreferenceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((UserPreferenceDto?)null);
+
+        var result = await controller.GetPreference("dashboard", CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<UserPreferenceDto>(okResult.Value);
+        Assert.Equal(userId, dto.PrincipalId);
+        Assert.Equal("dashboard", dto.Scope);
+        Assert.Empty(dto.PreferenceData);
     }
 }
 

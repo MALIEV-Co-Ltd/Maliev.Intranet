@@ -1,5 +1,7 @@
 @page "/hr/profile"
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@using System.Text.Json
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
@@ -107,12 +109,63 @@ else
                 </MudPaper>
             </MudItem>
         }
+
+        <!-- Dashboard Preferences -->
+        <MudItem xs="12" id="dashboard-preferences">
+            <MudPaper Elevation="0" Class="pa-4 border mud-border-lines-default rounded-lg">
+                <div class="d-flex align-items-center justify-space-between mb-3">
+                    <MudText Typo="Typo.h6">Dashboard Preferences</MudText>
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               Size="Size.Small"
+                               Disabled="@(_isSaving || !_hasChanged)"
+                               OnClick="@SavePreferencesAsync">
+                        @if (_isSaving)
+                        {
+                            <MudProgressLinear Indeterminate="true" Color="Color.Inherit" Class="mr-2" Style="width: 60px;" />
+                        }
+                        Save Preferences
+                    </MudButton>
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                    Select which widgets to display on your dashboard.
+                </MudText>
+                <div class="d-flex gap-2 flex-wrap">
+                    @foreach (var widget in _availableWidgets)
+                    {
+                        var isSelected = _selectedWidgets.Contains(widget.Key);
+                        <MudChip T="string"
+                                 Color="@(isSelected ? Color.Primary : Color.Default)"
+                                 Variant="@(isSelected ? Variant.Filled : Variant.Outlined)"
+                                 OnClick="@(() => ToggleWidget(widget.Key))"
+                                 Class="pref-chip">
+                            @widget.Value
+                        </MudChip>
+                    }
+                </div>
+            </MudPaper>
+        </MudItem>
     </MudGrid>
 }
 
 @code {
+    private static readonly Dictionary<string, string> _availableWidgets = new()
+    {
+        { "Revenue",       "Revenue" },
+        { "ActiveOrders", "Active Orders" },
+        { "PendingQuotes","Pending Quotes" },
+        { "Headcount",    "Headcount" },
+        { "OrderTrend",   "Order Trend" },
+    };
+
     private bool _isLoading = true;
     private EmployeeDetailDto? _profile;
+
+    // Dashboard preferences state
+    private bool _isSaving;
+    private List<string> _selectedWidgets = [];
+    private List<string> _savedWidgets = [];
+    private bool _hasChanged => !_selectedWidgets.SequenceEqual(_savedWidgets);
 
     protected override async Task OnInitializedAsync()
     {
@@ -132,6 +185,68 @@ else
         finally
         {
             _isLoading = false;
+        }
+
+        // Load dashboard widget preferences
+        try
+        {
+            var pref = await Http.GetFromJsonAsync<UserPreferenceDto>("api/preferences/dashboard");
+            if (pref?.PreferenceData != null && pref.PreferenceData.TryGetValue("Widgets", out var widgetsObj) && widgetsObj is System.Text.Json.JsonElement widgetsElement)
+            {
+                _selectedWidgets = System.Text.Json.JsonSerializer.Deserialize<List<string>>(widgetsElement) ?? _availableWidgets.Keys.ToList();
+            }
+            else
+            {
+                _selectedWidgets = _availableWidgets.Keys.ToList();
+            }
+        }
+        catch
+        {
+            _selectedWidgets = _availableWidgets.Keys.ToList();
+        }
+        _savedWidgets = new List<string>(_selectedWidgets);
+    }
+
+    private void ToggleWidget(string widgetKey)
+    {
+        if (_selectedWidgets.Contains(widgetKey))
+            _selectedWidgets.Remove(widgetKey);
+        else
+            _selectedWidgets.Add(widgetKey);
+    }
+
+    private async Task SavePreferencesAsync()
+    {
+        _isSaving = true;
+        try
+        {
+            var request = new UpsertPreferenceRequest
+            {
+                Scope = "dashboard",
+                PreferenceData = new Dictionary<string, object>
+                {
+                    { "Widgets", JsonSerializer.SerializeToElement(_selectedWidgets) }
+                }
+            };
+            var result = await Http.PutAsJsonAsync("api/preferences/dashboard", request);
+            if (result.IsSuccessStatusCode)
+            {
+                _savedWidgets = new List<string>(_selectedWidgets);
+                Snackbar.Add("Dashboard preferences saved.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to save preferences.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to save preferences.", Severity.Error);
+            Console.WriteLine($"Error saving preferences: {ex.Message}");
+        }
+        finally
+        {
+            _isSaving = false;
         }
     }
 }
