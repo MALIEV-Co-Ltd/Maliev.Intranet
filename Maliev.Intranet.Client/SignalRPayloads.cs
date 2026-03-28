@@ -1,3 +1,5 @@
+using Maliev.MessagingContracts.Contracts.Geometry;
+
 namespace Maliev.Intranet.Client;
 
 /// <summary>
@@ -25,7 +27,9 @@ public sealed class SignalRFileAnalysisPayload
     public string? ErrorCode { get; set; }
 }
 
-/// <summary>Client-side mirror of FileAnalysisPreviewUrls from NotificationHub.</summary>
+/// <summary>
+/// Client-side mirror of FileAnalysisPreviewUrls from NotificationHub.
+/// </summary>
 public sealed class SignalRPreviewUrls
 {
     /// <summary>Small (~256px) isometric thumbnail URL.</summary>
@@ -59,7 +63,9 @@ public sealed class SignalRPreviewUrls
     public string? ThumbnailLargeGcsPath { get; set; }
 }
 
-/// <summary>Client-side mirror of GlbReadyPayload from NotificationHub.</summary>
+/// <summary>
+/// Client-side mirror of GlbReadyPayload from NotificationHub.
+/// </summary>
 public sealed class SignalRGlbReadyPayload
 {
     /// <summary>GCS storage path of the source file.</summary>
@@ -70,4 +76,23 @@ public sealed class SignalRGlbReadyPayload
 
     /// <summary>True when GLB generation failed.</summary>
     public bool Failed { get; set; }
+}
+
+/// <summary>
+/// Client-side mirror of DfmAnalysisReadyPayload from NotificationHub.
+/// Carries process-specific DFM analysis results for FDM, SLA, and CNC.
+/// </summary>
+public sealed class SignalRDfmAnalysisPayload
+{
+    /// <summary>GCS storage path of the original file (join key).</summary>
+    public string StoragePath { get; set; } = string.Empty;
+
+    /// <summary>FDM-specific DFM analysis data, or null if not applicable.</summary>
+    public FdmDfmReportPayload? FdmReport { get; set; }
+
+    /// <summary>SLA/DLP-specific DFM analysis data, or null if not applicable.</summary>
+    public SlaDfmReportPayload? SlaReport { get; set; }
+
+    /// <summary>CNC-specific DFM analysis data, or null if not applicable.</summary>
+    public CncDfmReportPayload? CncReport { get; set; }
 }

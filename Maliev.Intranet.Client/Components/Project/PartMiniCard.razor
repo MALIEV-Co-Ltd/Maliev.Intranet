@@ -45,7 +45,7 @@
                             Style="min-width:220px; max-width:280px;">
                     <MudStack Spacing="1" Class="pa-2">
                         @* DFM issue summary *@
-                        @if (GetDfmIssueSummary() is { } summary && summary.Count > 0)
+                        @if (GetDfmIssueSummary(Part.DfmReport) is { } summary && summary.Count > 0)
                         {
                             @foreach (var item in summary)
                             {
@@ -376,45 +376,45 @@
     /// <summary>
     /// Extracts a human-readable list of DFM issue summaries from the embedded DfmReport.
     /// </summary>
-    private List<(string Icon, string Text)> GetDfmIssueSummary()
+    private static List<(string Icon, string Text)> GetDfmIssueSummary(object? dfmReport)
     {
         var issues = new List<(string Icon, string Text)>();
-        if (Part.DfmReport == null) return issues;
+        if (dfmReport == null) return issues;
 
-        switch (Part.DfmReport)
+        switch (dfmReport)
         {
-            case FdmDfmReport fdm:
-                if (fdm.Payload.ThinWallCount > 0)
-                    issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.Payload.ThinWallCount} thin wall region(s)"));
-                if (fdm.Payload.OverhangFaceCount > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.Payload.OverhangFaceCount} overhang face(s)"));
-                if (fdm.Payload.SupportRequired)
+            case FdmDfmReportPayload fdm:
+                if (fdm.ThinWallCount > 0)
+                    issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.ThinWallCount} thin wall region(s)"));
+                if (fdm.OverhangFaceCount > 0)
+                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang face(s)"));
+                if (fdm.SupportRequired)
                     issues.Add((Icons.Material.Filled.AddHome, "Support structures required"));
-                if (fdm.Payload.SmallDetailCount > 0)
-                    issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.Payload.SmallDetailCount} small detail(s) may be lost"));
+                if (fdm.SmallDetailCount > 0)
+                    issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost"));
                 break;
 
-            case SlaDfmReport sla:
-                if (sla.Payload.ThinWallCount > 0)
-                    issues.Add((Icons.Material.Filled.Rectangle, $"{sla.Payload.ThinWallCount} thin wall region(s)"));
-                if (sla.Payload.ResinTrappingRisk)
+            case SlaDfmReportPayload sla:
+                if (sla.ThinWallCount > 0)
+                    issues.Add((Icons.Material.Filled.Rectangle, $"{sla.ThinWallCount} thin wall region(s)"));
+                if (sla.ResinTrappingRisk)
                     issues.Add((Icons.Material.Filled.Water, "Resin trapping risk"));
-                if (sla.Payload.SuctionRisk)
+                if (sla.SuctionRisk)
                     issues.Add((Icons.Material.Filled.Opacity, "Suction risk during peeling"));
-                if (sla.Payload.HollowRegions.Count > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{sla.Payload.HollowRegions.Count} hollow region(s)"));
+                if (sla.HollowRegions.Count > 0)
+                    issues.Add((Icons.Material.Filled.Layers, $"{sla.HollowRegions.Count} hollow region(s)"));
                 break;
 
-            case CncDfmReport cnc:
-                if (cnc.Payload.SharpCornerCount > 0)
-                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.Payload.SharpCornerCount} sharp corner(s)"));
-                if (cnc.Payload.HasUndercuts)
+            case CncDfmReportPayload cnc:
+                if (cnc.SharpCornerCount > 0)
+                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)"));
+                if (cnc.HasUndercuts)
                     issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected"));
-                if (cnc.Payload.HasDrillHoles && cnc.Payload.DrillHoleCount > 0)
-                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.Payload.DrillHoleCount} drill hole(s)"));
-                if (cnc.Payload.RequiresEdm)
+                if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0)
+                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)"));
+                if (cnc.RequiresEdm)
                     issues.Add((Icons.Material.Filled.Build, "EDM required for complex features"));
-                if (cnc.Payload.RequiresGrinding)
+                if (cnc.RequiresGrinding)
                     issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces"));
                 break;
         }

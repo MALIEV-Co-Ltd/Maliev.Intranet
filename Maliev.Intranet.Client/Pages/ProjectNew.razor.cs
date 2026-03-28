@@ -239,6 +239,21 @@ public partial class ProjectNew : IAsyncDisposable
                 await InvokeAsync(StateHasChanged);
             });
 
+            _hubConnection.On<SignalRDfmAnalysisPayload>("DfmAnalysisReady", async payload =>
+            {
+                var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
+                if (part == null) return;
+
+                part.DfmReport = part.ProcessCode?.ToUpperInvariant() switch
+                {
+                    "SLA" or "DLP" => payload.SlaReport,
+                    "CNC" => payload.CncReport,
+                    _ => payload.FdmReport,
+                };
+
+                await InvokeAsync(StateHasChanged);
+            });
+
             await _hubConnection.StartAsync();
 
             // Join groups for any parts already in the list (restored from draft)

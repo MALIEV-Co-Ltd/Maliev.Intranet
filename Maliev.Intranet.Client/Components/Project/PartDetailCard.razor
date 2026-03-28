@@ -1,5 +1,6 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.MessagingContracts.Contracts.Geometry
 @using System.Net.Http
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components
@@ -302,10 +303,22 @@
                         </TitleContent>
                         <ChildContent>
                             <MudText Typo="Typo.body2">This mesh may have geometry issues affecting manufacturing.</MudText>
+                            @{
+                                var detailIssues = GetDfmIssueDetailSummary(Part.DfmReport);
+                                if (detailIssues.Count > 0)
+                                {
+                                    <MudList T="string" Dense="true" Class="mt-2" Style="max-height:200px;overflow-y:auto;">
+                                        @foreach (var issue in detailIssues)
+                                        {
+                                            <MudListItem Icon="@issue.Icon" Text="@issue.Text" />
+                                        }
+                                    </MudList>
+                                }
+                            }
                             <MudButton Variant="Variant.Outlined"
                                        Color="Color.Warning"
                                        Size="Size.Small"
-                                       Class="mt-1"
+                                       Class="mt-2"
                                        Disabled="@Part.DfmAcknowledged"
                                        OnClick="@(() => NotifyChanged(p => p.DfmAcknowledged = true))"
                                        StartIcon="@(Part.DfmAcknowledged ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.WarningAmber)">
@@ -573,6 +586,55 @@
     {
         mutate(Part);
         OnPartChanged.InvokeAsync(Part);
+    }
+
+    /// <summary>
+    /// Extracts a human-readable list of DFM issue details from a DFM report payload.
+    /// </summary>
+    private static List<(string Icon, string Text)> GetDfmIssueDetailSummary(object? dfmReport)
+    {
+        var issues = new List<(string Icon, string Text)>();
+        if (dfmReport == null) return issues;
+
+        switch (dfmReport)
+        {
+            case FdmDfmReportPayload fdm:
+                if (fdm.ThinWallCount > 0)
+                    issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.ThinWallCount} thin wall region(s)"));
+                if (fdm.OverhangFaceCount > 0)
+                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang face(s)"));
+                if (fdm.SupportRequired)
+                    issues.Add((Icons.Material.Filled.AddHome, "Support structures required"));
+                if (fdm.SmallDetailCount > 0)
+                    issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost"));
+                break;
+
+            case SlaDfmReportPayload sla:
+                if (sla.ThinWallCount > 0)
+                    issues.Add((Icons.Material.Filled.Rectangle, $"{sla.ThinWallCount} thin wall region(s)"));
+                if (sla.ResinTrappingRisk)
+                    issues.Add((Icons.Material.Filled.Water, "Resin trapping risk"));
+                if (sla.SuctionRisk)
+                    issues.Add((Icons.Material.Filled.Opacity, "Suction risk during peeling"));
+                if (sla.HollowRegions.Count > 0)
+                    issues.Add((Icons.Material.Filled.Layers, $"{sla.HollowRegions.Count} hollow region(s)"));
+                break;
+
+            case CncDfmReportPayload cnc:
+                if (cnc.SharpCornerCount > 0)
+                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)"));
+                if (cnc.HasUndercuts)
+                    issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected"));
+                if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0)
+                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)"));
+                if (cnc.RequiresEdm)
+                    issues.Add((Icons.Material.Filled.Build, "EDM required for complex features"));
+                if (cnc.RequiresGrinding)
+                    issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces"));
+                break;
+        }
+
+        return issues;
     }
 
     private Task OnSelectionModeChanged(string mode)
