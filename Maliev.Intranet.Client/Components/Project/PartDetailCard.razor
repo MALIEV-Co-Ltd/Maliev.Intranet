@@ -317,10 +317,21 @@
             </MudTabPanel>
 
             <MudTabPanel Text="Drawings">
-                <MudText Color="Color.Secondary" Typo="Typo.body2">
-                    Drawing uploads for this part
-                </MudText>
-                @* TODO: wire to DocumentUploadSection when part ID is known (post-submission) *@
+                <div class="pa-3">
+                    <DrawingUploadSection PartId="Part.FileId"
+                                         ProjectId="TempProjectId"
+                                         Attachments="Part.DrawingFiles"
+                                         AttachmentsChanged="OnDrawingAttachmentsChanged" />
+                </div>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Files">
+                <div class="pa-3">
+                    <SupplementaryUploadSection PartId="Part.FileId"
+                                                ProjectId="TempProjectId"
+                                                Attachments="Part.SupplementaryFiles"
+                                                AttachmentsChanged="OnSupplementaryAttachmentsChanged" />
+                </div>
             </MudTabPanel>
 
             <MudTabPanel Text="Bulk Pricing">
@@ -476,6 +487,7 @@
     [Parameter] public List<ProcessDto> Processes { get; set; } = [];
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
     [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
+    [Parameter] public Guid TempProjectId { get; set; }
 
     private bool _showViewer3d;
     private int _activeTab;
@@ -608,4 +620,16 @@
 
     private void OnQuantityChanged(int qty) =>
         NotifyChanged(p => p.Quantity = Math.Clamp(qty, 1, 999));
+
+    private Task OnDrawingAttachmentsChanged(List<DraftProjectAttachmentDto> attachments)
+    {
+        Part.DrawingFiles = attachments;
+        return OnPartChanged.InvokeAsync(Part);
+    }
+
+    private Task OnSupplementaryAttachmentsChanged(List<DraftProjectAttachmentDto> attachments)
+    {
+        Part.SupplementaryFiles = attachments;
+        return OnPartChanged.InvokeAsync(Part);
+    }
 }

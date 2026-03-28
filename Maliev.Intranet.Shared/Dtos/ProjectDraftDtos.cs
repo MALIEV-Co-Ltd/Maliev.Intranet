@@ -121,4 +121,45 @@ public sealed class DraftPartState
 
     /// <summary>GCS storage path of the GLB artifact. Non-null when analysis produced a 3D model.</summary>
     public string? GlbStoragePath { get; set; }
+
+    /// <summary>Technical drawing files attached to this part (PDF, DXF, DWG, images).</summary>
+    public List<DraftProjectAttachmentDto> DrawingFiles { get; set; } = [];
+
+    /// <summary>Supplementary files attached to this part (images, documents, archives).</summary>
+    public List<DraftProjectAttachmentDto> SupplementaryFiles { get; set; } = [];
+}
+
+/// <summary>
+/// The kind of project attachment.
+/// </summary>
+public enum DraftAttachmentKind
+{
+    /// <summary>Technical drawing files (PDF, DXF, DWG, images).</summary>
+    Drawing,
+    /// <summary>Supplementary files (images, documents, archives).</summary>
+    Supplementary
+}
+
+/// <summary>
+/// A file attachment associated with a project part, stored in session draft state.
+/// </summary>
+public sealed class DraftProjectAttachmentDto
+{
+    /// <summary>The unique file identifier assigned by the UploadService.</summary>
+    public Guid FileId { get; set; }
+
+    /// <summary>GCS storage path of the file.</summary>
+    public string StoragePath { get; set; } = string.Empty;
+
+    /// <summary>The original file name.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The MIME type of the file (e.g. "application/pdf", "image/png").</summary>
+    public string FileType { get; set; } = string.Empty;
+
+    /// <summary>The file size in bytes.</summary>
+    public long FileSizeBytes { get; set; }
+
+    /// <summary>The kind of attachment (Drawing or Supplementary).</summary>
+    public DraftAttachmentKind Kind { get; set; }
 }

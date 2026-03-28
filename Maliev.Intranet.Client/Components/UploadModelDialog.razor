@@ -14,7 +14,7 @@
         <MudStack Spacing="4">
             <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                            FilesChanged="OnFilesSelected"
-                           Accept=".stl,.obj,.step,.stp,.step.gz,.stp.gz"
+                           Accept=".stl,.obj,.3mf,.step,.stp,.igs,.iges"
                            MaximumFileCount="10"
                            @ref="_fileUpload">
                 <CustomContent>
@@ -28,7 +28,7 @@
                               @ondrop="@(() => _dragOver = false)">
                         <MudIcon Icon="@Icons.Material.Filled.ViewInAr" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
                         <MudText Typo="Typo.h6">Click to upload or drag and drop</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Default">Upload 3D models up to 100MB each (STL, OBJ, STEP)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Upload 3D models up to 100MB each (STL, OBJ, STEP, 3MF, IGES)</MudText>
                     </MudPaper>
                 </CustomContent>
             </MudFileUpload>

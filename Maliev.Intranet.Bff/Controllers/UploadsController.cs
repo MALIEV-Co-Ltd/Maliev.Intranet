@@ -126,6 +126,100 @@ public class UploadsController(
     }
 
     /// <summary>
+    /// Uploads one or more drawing or supplementary files attached to a specific part.
+    /// Files are stored at <c>projects/{projectId}/parts/{partId}/{kind}/{fileName}</c>.
+    /// Only the file extensions listed for each kind are accepted.
+    /// </summary>
+    /// <param name="files">The files to upload.</param>
+    /// <param name="projectId">The project GUID.</param>
+    /// <param name="partId">The parent part FileId.</param>
+    /// <param name="kind">The attachment kind: "Drawing" or "Supplementary".</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of attachment DTOs with FileId, StoragePath, Name, FileType, and FileSizeBytes.</returns>
+    [HttpPost("attachments")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<ActionResult<List<DraftProjectAttachmentDto>>> UploadAttachmentsAsync(
+        List<IFormFile> files,
+        [FromQuery] Guid projectId,
+        [FromQuery] Guid partId,
+        [FromQuery] string kind,
+        CancellationToken ct)
+    {
+        if (files == null || files.Count == 0)
+            return BadRequest("No files uploaded.");
+
+        if (projectId == Guid.Empty)
+            return BadRequest("projectId is required.");
+
+        if (partId == Guid.Empty)
+            return BadRequest("partId is required.");
+
+        if (string.IsNullOrWhiteSpace(kind) ||
+            (kind != "Drawing" && kind != "Supplementary"))
+            return BadRequest("kind must be 'Drawing' or 'Supplementary'.");
+
+        var allowedDrawing = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { ".pdf", ".dxf", ".dwg", ".png", ".jpg", ".jpeg" };
+        var allowedSupplementary = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { ".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar", ".7z" };
+        var allowed = kind == "Drawing" ? allowedDrawing : allowedSupplementary;
+
+        var results = new List<DraftProjectAttachmentDto>();
+
+        foreach (var file in files)
+        {
+            var ext = Path.GetExtension(file.FileName);
+            if (!allowed.Contains(ext))
+            {
+                return BadRequest($"File type '{ext}' is not allowed for {kind} attachments. Allowed: {string.Join(", ", allowed)}.");
+            }
+
+            var contentType = file.ContentType;
+            if (string.IsNullOrWhiteSpace(contentType))
+                contentType = GetMimeTypeFromExtension(ext) ?? "application/octet-stream";
+
+            var storagePath = $"projects/{projectId}/parts/{partId}/{kind}/{file.FileName}";
+            using var stream = file.OpenReadStream();
+            var uploadResult = await uploadClient.UploadFileAsync(file.FileName, stream, contentType, storagePath, true, ct);
+
+            if (uploadResult == null)
+                return StatusCode(500, $"Upload failed for {file.FileName}.");
+
+            results.Add(new DraftProjectAttachmentDto
+            {
+                FileId = Guid.TryParse(uploadResult.UploadId, out var fid) ? fid : Guid.NewGuid(),
+                StoragePath = uploadResult.StoragePath ?? storagePath,
+                Name = file.FileName,
+                FileType = contentType,
+                FileSizeBytes = file.Length,
+                Kind = kind == "Drawing" ? DraftAttachmentKind.Drawing : DraftAttachmentKind.Supplementary,
+            });
+        }
+
+        return Ok(results);
+    }
+
+    /// <summary>
+    /// Deletes a drawing or supplementary attachment by its FileId.
+    /// </summary>
+    /// <param name="fileId">The attachment FileId.</param>
+    /// <param name="ct">Cancellation token.</param>
+    [HttpDelete("attachments/{fileId:guid}")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<IActionResult> DeleteAttachmentAsync(Guid fileId, CancellationToken ct)
+    {
+        try
+        {
+            await uploadClient.DeleteFileAsync(fileId, ct);
+            return NoContent();
+        }
+        catch (HttpRequestException ex)
+        {
+            return NotFound($"Attachment {fileId} not found or could not be deleted: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Gets a short-lived (60 min) signed GCS download URL for an uploaded file by its ID.
     /// Used by the BabylonJS viewer to stream the original 3D file directly from GCS.
     /// </summary>

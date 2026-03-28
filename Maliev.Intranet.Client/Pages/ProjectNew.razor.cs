@@ -448,10 +448,16 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Task 10: Remove part ───────────────────────────────────────────
 
     /// <inheritdoc />
-    private void RemovePart(PartViewModel part)
+    private async Task RemovePart(PartViewModel part)
     {
         if (!string.IsNullOrEmpty(part.StoragePath) && _hubConnection?.State == HubConnectionState.Connected)
-            _ = _hubConnection.InvokeAsync("LeaveFileGroup", part.StoragePath);
+            await _hubConnection.InvokeAsync("LeaveFileGroup", part.StoragePath);
+
+        // Cascade delete all attachment files before removing the part
+        foreach (var att in part.DrawingFiles.Concat(part.SupplementaryFiles))
+        {
+            try { await Http.DeleteAsync($"api/uploads/attachments/{att.FileId}"); } catch { /* non-fatal */ }
+        }
 
         _parts.Remove(part);
 

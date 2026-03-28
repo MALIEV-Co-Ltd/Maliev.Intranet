@@ -1,0 +1,193 @@
+@using Maliev.Intranet.Shared
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudStack Spacing="3">
+    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                   FilesChanged="OnFilesSelected"
+                   Accept=".pdf,.dxf,.dwg,.png,.jpg,.jpeg"
+                   MaximumFileCount="20">
+        <CustomContent>
+            <MudPaper Outlined="true"
+                      Class="d-flex flex-column align-center justify-center py-8 px-4 border-dashed border-2 rounded-xl cursor-pointer"
+                      Style="cursor: pointer;"
+                      @onclick="@context.OpenFilePickerAsync">
+                <MudIcon Icon="@Icons.Material.Filled.Architecture" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                <MudText Typo="Typo.body2" Color="Color.Primary">Click to upload drawings</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">PDF, DXF, DWG, PNG, JPG — max 50 MB each</MudText>
+            </MudPaper>
+        </CustomContent>
+    </MudFileUpload>
+
+    @if (SelectedFiles.Count != 0)
+    {
+        <div style="max-height: 300px; overflow-y: auto;">
+            <MudList T="string" Dense="true">
+                @foreach (var file in SelectedFiles)
+                {
+                    <MudListItem T="string">
+                        <div class="d-flex justify-space-between align-center">
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@GetFileIcon(file.Name)" Size="Size.Small" Color="Color.Default" />
+                                <div class="d-flex flex-column">
+                                    <MudText Typo="Typo.body2">@file.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(file.Size)</MudText>
+                                </div>
+                            </div>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                           Size="Size.Small"
+                                           OnClick="@(() => RemoveFile(file))" />
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        </div>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Upload"
+                   OnClick="UploadFiles"
+                   Disabled="@IsUploading"
+                   FullWidth="true">
+            @(IsUploading ? "Uploading..." : $"Upload {SelectedFiles.Count} Drawing(s)")
+        </MudButton>
+    }
+
+    @if (Attachments.Count != 0)
+    {
+        <MudDivider />
+        <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">Attached Drawings</MudText>
+        <MudList T="string" Dense="true">
+            @foreach (var att in Attachments)
+            {
+                <MudListItem T="string">
+                    <div class="d-flex justify-space-between align-center">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@GetFileIcon(att.Name)" Size="Size.Small" Color="Color.Default" />
+                            <div class="d-flex flex-column">
+                                <MudText Typo="Typo.body2">@att.Name</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(att.FileSizeBytes)</MudText>
+                            </div>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => DeleteAttachment(att))" />
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+    }
+</MudStack>
+
+@code {
+    /// <summary>The parent part file identifier, used as the attachment scope key.</summary>
+    [Parameter] public Guid PartId { get; set; }
+
+    /// <summary>The temporary project identifier.</summary>
+    [Parameter] public Guid ProjectId { get; set; }
+
+    /// <summary>Existing drawing attachments to display.</summary>
+    [Parameter] public List<DraftProjectAttachmentDto> Attachments { get; set; } = [];
+
+    /// <summary>Notifies the parent when attachments are added or removed.</summary>
+    [Parameter] public EventCallback<List<DraftProjectAttachmentDto>> AttachmentsChanged { get; set; }
+
+    private List<IBrowserFile> SelectedFiles { get; set; } = [];
+    private bool IsUploading { get; set; }
+
+    private void OnFilesSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        SelectedFiles.Clear();
+        foreach (var f in files)
+            SelectedFiles.Add(f);
+    }
+
+    private void RemoveFile(IBrowserFile file) => SelectedFiles.Remove(file);
+
+    private async Task UploadFiles()
+    {
+        if (SelectedFiles.Count == 0) return;
+
+        IsUploading = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            foreach (var file in SelectedFiles)
+            {
+                var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var url = $"api/uploads/attachments?projectId={ProjectId}&partId={PartId}&kind=Drawing";
+            var response = await Http.PostAsync(url, content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var uploaded = await response.Content.ReadFromJsonAsync<List<DraftProjectAttachmentDto>>();
+                if (uploaded != null)
+                {
+                    foreach (var a in uploaded)
+                        Attachments.Add(a);
+
+                    await AttachmentsChanged.InvokeAsync(Attachments);
+                    Snackbar.Add($"Uploaded {uploaded.Count} drawing(s).", Severity.Success);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Drawing upload failed.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsUploading = false;
+            SelectedFiles.Clear();
+        }
+    }
+
+    private async Task DeleteAttachment(DraftProjectAttachmentDto att)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/uploads/attachments/{att.FileId}");
+            if (response.IsSuccessStatusCode)
+            {
+                Attachments.Remove(att);
+                await AttachmentsChanged.InvokeAsync(Attachments);
+                Snackbar.Add($"Removed {att.Name}.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Failed to remove {att.Name}.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static string GetFileIcon(string name) =>
+        Path.GetExtension(name).ToLowerInvariant() switch
+        {
+            ".pdf" => Icons.Material.Outlined.PictureAsPdf,
+            ".dxf" or ".dwg" => Icons.Material.Outlined.Architecture,
+            ".png" or ".jpg" or ".jpeg" => Icons.Material.Outlined.Image,
+            _ => Icons.Material.Outlined.InsertDriveFile,
+        };
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+}

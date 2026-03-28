@@ -110,6 +110,14 @@ public class PartViewModel
     /// <summary>Error message if upload or analysis failed; null when healthy.</summary>
     public string? Error { get; set; }
 
+    // ── Per-part attachments ───────────────────────────────────────────
+
+    /// <summary>Technical drawing files attached to this part (PDF, DXF, DWG, images).</summary>
+    public List<DraftProjectAttachmentDto> DrawingFiles { get; set; } = [];
+
+    /// <summary>Supplementary files attached to this part (images, documents, archives).</summary>
+    public List<DraftProjectAttachmentDto> SupplementaryFiles { get; set; } = [];
+
     // ── Pricing (UI-only, not persisted) ──────────────────────────────
 
     /// <summary>Estimated unit price from the last pricing calculation.</summary>
@@ -172,6 +180,8 @@ public class PartViewModel
         ThumbnailSmallGcsPath = ThumbnailSmallGcsPath,
         ThumbnailLargeGcsPath = ThumbnailLargeGcsPath,
         GlbStoragePath = GlbStoragePath,
+        DrawingFiles = DrawingFiles,
+        SupplementaryFiles = SupplementaryFiles,
     };
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
@@ -199,6 +209,8 @@ public class PartViewModel
         ThumbnailSmallGcsPath = s.ThumbnailSmallGcsPath,
         ThumbnailLargeGcsPath = s.ThumbnailLargeGcsPath,
         GlbStoragePath = s.GlbStoragePath,
+        DrawingFiles = s.DrawingFiles,
+        SupplementaryFiles = s.SupplementaryFiles,
         AwaitingPreview = false,
         StatusText = string.IsNullOrEmpty(s.ThumbnailSmallUrl) && string.IsNullOrEmpty(s.StoragePath)
             ? "Processing..."
