@@ -179,16 +179,14 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark) {
                     }
 
                     // ── Create ground grid on XZ plane (Y is up in Y-up) ──
+                    // Grid is always 10mm × 10mm cells. Grid extends 15% beyond the largest part dimension.
                     const partW = centeredBb.max.x - centeredBb.min.x;
                     const partD = centeredBb.max.z - centeredBb.min.z;
                     const partH = centeredBb.max.y - centeredBb.min.y;
-                    const maxDim = Math.max(partW, partD, partH, 1e-6);
-                    const rawCell = maxDim / 10;
-                    const mag = Math.pow(10, Math.floor(Math.log10(rawCell)));
-                    const gridRatio = rawCell >= 5 * mag ? 5 * mag : rawCell >= 2 * mag ? 2 * mag : mag;
-                    const majorStep = gridRatio * 5;
-                    const halfSpan = Math.max(majorStep * 3, maxDim * 1.5);
-                    const gridSize = halfSpan * 2;
+                    const maxDim = Math.max(partW, partD, 1e-6);
+                    const gridRatio = 10; // Always 10mm cells
+                    const rawGridSize = Math.max(maxDim * 1.15, 20); // 15% margin, min 20mm
+                    const gridSize = Math.ceil(rawGridSize / 10) * 10; // Round up to nearest 10mm
                     const subdivisions = Math.max(Math.round(gridSize / gridRatio), 2);
 
                     const ground = BABYLON.MeshBuilder.CreateGround('__grid__',
@@ -469,20 +467,20 @@ export function resetCamera(canvasId) {
     if (cam instanceof BABYLON.ArcRotateCamera) {
         cam.useFramingBehavior = false;
         cam.alpha = Math.PI / 4;
-        cam.beta = Math.PI / 3; // 60° from horizontal (looking down)
+        cam.beta = 0.8; // ~46° from vertical (~44° from horizontal) — eye-level
         if (bb && meshCenter) {
             const w = bb.max.x - bb.min.x; // width (X)
             const d = bb.max.y - bb.min.y; // depth (Y)
             const h = bb.max.z - bb.min.z; // height (Z)
-            const meshRadius = Math.max(Math.sqrt(w * w + d * d + h * h) * 1.2, 5);
+            const meshRadius = Math.max(Math.sqrt(w * w + d * d + h * h) * 0.7, 5);
             cam.minZ = meshRadius * 0.001;
             cam.maxZ = meshRadius * 1000;
             cam.target = new BABYLON.Vector3(0, meshCenter.y, 0); // look at mesh bounding box center
             cam.radius = meshRadius;
-            cam.lowerRadiusLimit = meshRadius * 0.01;
+            cam.lowerRadiusLimit = meshRadius * 0.1;
             cam.upperRadiusLimit = meshRadius * 20;
-            cam.wheelPrecision = Math.max(5, Math.round(meshRadius * 0.3));
-            cam.pinchPrecision = cam.wheelPrecision * 10;
+            cam.wheelPrecision = Math.max(50, Math.round(meshRadius * 0.8));
+            cam.pinchPrecision = cam.wheelPrecision * 8;
         }
         if (!cam.inputs.attached.keyboard) {
             cam.attachControl(document.getElementById(canvasId), true);
@@ -552,12 +550,28 @@ export function setCameraPreset(canvasId, preset) {
         left:   { alpha: -Math.PI / 2, beta: Math.PI / 2 },  // looking at X- (left)
         top:    { alpha: 0,            beta: 0.01 },           // looking at Y+ from above
         bottom: { alpha: 0,            beta: Math.PI - 0.01 }, // looking at Y- from below
-        iso:    { alpha: Math.PI / 4,  beta: Math.PI / 3 },   // isometric 60° elevation (Y-up)
+        iso:    { alpha: Math.PI / 4,  beta: 0.8 },   // ~46° from vertical (~44° from horizontal) — eye-level
     };
     const p = presets[preset];
     if (p) {
         cam.alpha = p.alpha;
         cam.beta = p.beta;
+
+        // Reset zoom and target so camera frames the model at default distance
+        const bb = sceneBoundingBoxes[canvasId];
+        const meshCenter = meshCenters[canvasId];
+        if (bb && meshCenter) {
+            const w = bb.max.x - bb.min.x;
+            const d = bb.max.y - bb.min.y;
+            const h = bb.max.z - bb.min.z;
+            const meshRadius = Math.max(Math.sqrt(w * w + d * d + h * h) * 0.7, 5);
+            cam.target = new BABYLON.Vector3(0, meshCenter.y, 0);
+            cam.radius = meshRadius;
+            cam.lowerRadiusLimit = meshRadius * 0.1;
+            cam.upperRadiusLimit = meshRadius * 20;
+            cam.wheelPrecision = Math.max(50, Math.round(meshRadius * 0.8));
+            cam.pinchPrecision = cam.wheelPrecision * 8;
+        }
     }
 }
 
