@@ -74,9 +74,9 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
             var response = await base.SendAsync(request, cancellationToken);
 
             // ── Reactive fallback: token may have been stale despite the proactive check ──
-            if (response.StatusCode == HttpStatusCode.Unauthorized && request.Method == HttpMethod.Get)
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                logger.LogWarning("Downstream 401 for GET {Url} despite proactive check; attempting one-shot re-exchange for user {UserId}", request.RequestUri, userId);
+                logger.LogWarning("Downstream 401 for {Method} {Url} despite proactive check; attempting one-shot re-exchange for user {UserId}", request.Method, request.RequestUri, userId);
                 var retryToken = await TryReExchangePlatformJwtAsync(httpContext, userId, cancellationToken);
                 if (!string.IsNullOrEmpty(retryToken))
                 {

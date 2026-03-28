@@ -60,7 +60,8 @@
                                 SelectedIndex="@_selectedPartIndex"
                                 OnSelectPart="@(i => _selectedPartIndex = i)"
                                 OnRemovePart="RemovePart"
-                                OnAddPart="OpenFilePicker" />
+                                OnAddPart="OpenFilePicker"
+                                OnThumbnailRefreshed="TriggerAutoSave" />
                         }
 
                         @if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)

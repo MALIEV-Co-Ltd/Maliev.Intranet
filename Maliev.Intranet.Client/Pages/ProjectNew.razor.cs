@@ -185,6 +185,12 @@ public partial class ProjectNew : IAsyncDisposable
                 .WithAutomaticReconnect()
                 .Build();
 
+            _hubConnection.Reconnected += async _ =>
+            {
+                foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
+                    await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
+            };
+
             _hubConnection.On<SignalRFileAnalysisPayload>("FileAnalysisCompleted", async payload =>
             {
                 var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
@@ -909,15 +915,8 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task OpenBabylonViewer(PartViewModel part)
     {
-        // Use pre-resolved signed URL from GlbReady SignalR event when available
-        if (!string.IsNullOrEmpty(part.GlbSignedUrl))
-        {
-            part.ViewerUrl = part.GlbSignedUrl;
-            await InvokeAsync(StateHasChanged);
-            return;
-        }
-
         if (string.IsNullOrEmpty(part.GlbStoragePath)) return;
+
         var resp = await Http.GetAsync($"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
         if (!resp.IsSuccessStatusCode)
         {

@@ -7,7 +7,8 @@
         <PartMiniCard Part="@Parts[idx]"
                       IsActive="@(idx == SelectedIndex)"
                       OnSelect="@(() => OnSelectPart.InvokeAsync(idx))"
-                      OnRemove="@(() => OnRemovePart.InvokeAsync(Parts[idx]))" />
+                      OnRemove="@(() => OnRemovePart.InvokeAsync(Parts[idx]))"
+                      OnThumbnailRefreshed="OnThumbnailRefreshed" />
     }
     <div class="pc-add" @onclick="OnAddPart">
         <MudIcon Icon="@Icons.Material.Outlined.Add" Size="Size.Large" Color="Color.Default" />
@@ -51,4 +52,5 @@
     [Parameter] public EventCallback<int> OnSelectPart { get; set; }
     [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
     [Parameter] public EventCallback OnAddPart { get; set; }
+    [Parameter] public EventCallback OnThumbnailRefreshed { get; set; }
 }

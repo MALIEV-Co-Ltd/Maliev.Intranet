@@ -1,11 +1,13 @@
 @namespace Maliev.Intranet.Client.Components.Project
+@using System.Text.Json
+@inject HttpClient Http
 
 <div class="pmc-card @(IsActive ? "pmc-active" : "")" @onclick="OnSelect">
     <div class="pmc-thumb">
         @if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && !Part.PreviewLoadFailed)
         {
             <img src="@Part.ThumbnailSmallUrl" alt="@Part.Name"
-                 @onerror="@(() => { Part.PreviewLoadFailed = true; StateHasChanged(); })" />
+                 @onerror="OnThumbnailErrorAsync" />
         }
         else
         {
@@ -184,6 +186,7 @@
     [Parameter] public bool IsActive { get; set; }
     [Parameter] public EventCallback OnSelect { get; set; }
     [Parameter] public EventCallback OnRemove { get; set; }
+    [Parameter] public EventCallback OnThumbnailRefreshed { get; set; }
 
     private string FormatPrice(decimal amount) => $"฿{amount:N0}";
 
@@ -206,4 +209,40 @@
             ".zip" or ".rar" or ".7z" => Icons.Material.Outlined.FolderZip,
             _ => Icons.Material.Outlined.InsertDriveFile,
         };
+
+    private async Task OnThumbnailErrorAsync()
+    {
+        if (string.IsNullOrEmpty(Part.ThumbnailSmallGcsPath))
+        {
+            Part.PreviewLoadFailed = true;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            var resp = await Http.GetAsync(
+                $"api/uploads/preview-url?storagePath={Uri.EscapeDataString(Part.ThumbnailSmallGcsPath)}");
+            if (resp.IsSuccessStatusCode)
+            {
+                var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
+                var resolved = json?.RootElement.GetProperty("url").GetString();
+                if (!string.IsNullOrEmpty(resolved))
+                {
+                    Part.ThumbnailSmallUrl = resolved;
+                    Part.PreviewLoadFailed = false;
+                    await OnThumbnailRefreshed.InvokeAsync();
+                    StateHasChanged();
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // fall through to failure state
+        }
+
+        Part.PreviewLoadFailed = true;
+        StateHasChanged();
+    }
 }
