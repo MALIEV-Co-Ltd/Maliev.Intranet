@@ -39,8 +39,8 @@
                                             <MudText Typo="Typo.caption">Status:</MudText>
                                             @if (!string.IsNullOrEmpty(log.PreviousStatus))
                                             {
-                                                <span style="text-decoration: line-through; color: var(--mud-palette-text-secondary); font-size: 0.75rem;" class="mr-1">@log.PreviousStatus</span>
-                                                <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" Class="mx-1" style="font-size: 1rem;" />
+                                                <span style="text-decoration: line-through; color: var(--mud-palette-text-secondary); font-size: var(--mud-typography-body2-size);" class="mr-1">@log.PreviousStatus</span>
+                                                <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" Class="mx-1" style="font-size: var(--maliev-icon-size-small);" />
                                             }
                                             <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(log.Status)" Variant="Variant.Text" Class="ma-0" Style="height: 20px;">@log.Status</MudChip>
                                         </MudStack>
@@ -49,14 +49,14 @@
                                     @if (log.DocumentReferenceId.HasValue && log.PreviousDocumentReferenceId.HasValue && log.DocumentReferenceId != log.PreviousDocumentReferenceId)
                                     {
                                         <MudText Typo="Typo.caption" Class="mt-1 d-flex align-center">
-                                            <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Class="mr-1" Color="Color.Info" style="font-size: 1rem;" />
+                                            <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Class="mr-1" Color="Color.Info" style="font-size: var(--maliev-icon-size-small);" />
                                             Document updated: <strong class="ms-2">@log.DocumentName</strong>
                                         </MudText>
                                     }
                                     else if (log.DocumentReferenceId.HasValue && !log.PreviousDocumentReferenceId.HasValue && log.Action == "Create")
                                     {
                                          <MudText Typo="Typo.caption" Class="mt-1 d-flex align-center">
-                                            <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Class="mr-1" Color="Color.Info" style="font-size: 1rem;" />
+                                             <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Class="mr-1" Color="Color.Info" style="font-size: var(--maliev-icon-size-small);" />
                                             Document: <strong class="ms-2">@log.DocumentName</strong>
                                         </MudText>
                                     }

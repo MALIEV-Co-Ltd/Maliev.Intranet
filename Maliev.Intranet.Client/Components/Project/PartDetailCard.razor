@@ -19,7 +19,8 @@
                 <div class="pdc-3d-viewer-container">
                     @if (!string.IsNullOrEmpty(Part.ViewerUrl))
                     {
-                        <ModelViewer ViewerUrl="@Part.ViewerUrl" FileExtension=".glb" />
+                        <ModelViewer ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
+                                     KnownDimensions="@Part.Dimensions" />
                     }
                     else
                     {
@@ -446,7 +447,7 @@
         animation: cubeRotate 6s linear infinite !important;
     }
     .pdc-cube-label {
-        font-size: 11px;
+        font-size: var(--mud-typography-caption-size);
         font-weight: 600;
         color: white;
         background: rgba(0,0,0,0.55);

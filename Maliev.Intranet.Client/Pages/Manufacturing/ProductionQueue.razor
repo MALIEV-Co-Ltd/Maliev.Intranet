@@ -22,7 +22,7 @@
             {
                 <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small"
                          Color="Color.Success" Style="vertical-align: middle; margin-left: 6px;" />
-                <span style="font-size: 11px; color: var(--mud-palette-success);">Live</span>
+                <span style="font-size: var(--mud-typography-caption-size); color: var(--mud-palette-success);">Live</span>
             }
         </MudText>
     </div>
@@ -139,7 +139,7 @@ else
                     </MudStack>
 
                     @* Part description *@
-                    <MudText Typo="Typo.body2" Style="font-size:12px; font-weight:600;" Class="mb-1"
+                    <MudText Typo="Typo.body2" Style="font-size:var(--mud-typography-body2-size); font-weight:600;" Class="mb-1"
                              title="@job.PartDescription">
                         @Truncate(job.PartDescription, 40)
                     </MudText>
@@ -160,7 +160,7 @@ else
                     @if (job.ProgressPercent > 0)
                     {
                         <MudProgressLinear Value="@job.ProgressPercent" Color="Color.Primary" Rounded="true" Class="mb-1" />
-                        <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size:10px;">
+                        <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size:var(--maliev-typography-micro-size);">
                             @job.ProgressPercent% complete
                         </MudText>
                     }
@@ -172,7 +172,7 @@ else
                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
                                 <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing"
                                          Size="Size.Small" Color="Color.Default" />
-                                <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size:10px;">
+                                <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size:var(--maliev-typography-micro-size);">
                                     @job.MachineName
                                 </MudText>
                             </MudStack>
@@ -181,7 +181,7 @@ else
                         {
                             <MudText Typo="Typo.caption"
                                      Color="@(job.IsOverdue ? Color.Error : Color.Default)"
-                                     Style="font-size:10px;">
+                                     Style="font-size:var(--maliev-typography-micro-size);">
                                 @(job.IsOverdue ? "OVERDUE" : job.EstimatedCompletionAt.Value.ToString("dd MMM HH:mm"))
                             </MudText>
                         }

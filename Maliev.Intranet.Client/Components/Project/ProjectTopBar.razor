@@ -19,7 +19,7 @@
                       Variant="Variant.Text"
                       Margin="Margin.Dense"
                       @onblur="@CommitTitle"
-                      Style="font-weight:600; font-size:14px; min-width:200px;" />
+                      Style="font-weight:600; font-size:var(--mud-typography-subtitle1-size); min-width:200px;" />
     }
     else
     {
@@ -92,7 +92,7 @@
     }
     .pn-topbar-title {
         font-weight: 600;
-        font-size: 14px;
+        font-size: var(--mud-typography-subtitle1-size);
         cursor: pointer;
         white-space: nowrap;
         overflow: hidden;
@@ -101,7 +101,7 @@
     }
     .pn-topbar-title:hover { text-decoration: underline; }
     .pn-title-edit-icon {
-        font-size: 14px !important;
+        font-size: var(--maliev-icon-size-small) !important;
         opacity: 0;
         transition: opacity 0.15s;
         vertical-align: middle;

@@ -176,7 +176,7 @@ else
                                             </MudText>
                                         </TitleContent>
                                         <ChildContent>
-                                            <div class="mt-2" style="font-size: 13px;">
+                                            <div class="mt-2" style="font-size: var(--mud-typography-default-size);">
                                                 <div class="breakdown-row"><span>Material cost</span><span>@CurrencyFormatter.Format(part.PriceBreakdown.MaterialCost, "THB", 2)</span></div>
                                                 <div class="breakdown-row"><span>Machine time (@part.PriceBreakdown.MachineTimeMinutes.ToString("N0") min)</span><span>@CurrencyFormatter.Format(part.PriceBreakdown.MachineTimeCost, "THB", 2)</span></div>
                                                 <div class="breakdown-row"><span>Setup / operator</span><span>@CurrencyFormatter.Format(part.PriceBreakdown.SetupCost, "THB", 2)</span></div>

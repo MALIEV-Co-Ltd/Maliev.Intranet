@@ -4,8 +4,7 @@
 <div class="pqp-root">
 
     <div class="pqp-section pqp-leadtime">
-        <MudText Typo="Typo.caption" Color="Color.Secondary"
-                 Style="text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">
+        <MudText Typo="Typo.overline" Color="Color.Secondary">
             Lead Time
         </MudText>
 
@@ -55,8 +54,7 @@
     </div>
 
     <div class="pqp-section pqp-summary">
-        <MudText Typo="Typo.caption" Color="Color.Secondary"
-                 Style="text-transform:uppercase;letter-spacing:0.5px;font-weight:600;" Class="mb-1">
+        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mb-1">
             Summary
         </MudText>
 
@@ -203,11 +201,11 @@
 
     .pqp-lt-card-body { display: flex; flex-direction: column; gap: 2px; }
 
-    .pqp-lt-name { font-size: 13px; font-weight: 600; }
+    .pqp-lt-name { font-size: var(--mud-typography-default-size); font-weight: 600; }
 
-    .pqp-lt-days { font-size: 11px; color: var(--mud-palette-text-secondary); }
+    .pqp-lt-days { font-size: var(--mud-typography-caption-size); color: var(--mud-palette-text-secondary); }
 
-    .pqp-lt-price { font-size: 13px; font-weight: 500; }
+    .pqp-lt-price { font-size: var(--mud-typography-default-size); font-weight: 500; }
 
     .pqp-part-row {
         display: flex;
@@ -226,22 +224,22 @@
     }
 
     .pqp-part-name {
-        font-size: 12px;
+        font-size: var(--mud-typography-body2-size);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         display: block;
     }
 
-    .pqp-part-meta { font-size: 11px; color: var(--mud-palette-text-secondary); }
+    .pqp-part-meta { font-size: var(--mud-typography-caption-size); color: var(--mud-palette-text-secondary); }
 
-    .pqp-part-price { font-size: 12px; font-weight: 500; flex-shrink: 0; }
+    .pqp-part-price { font-size: var(--mud-typography-body2-size); font-weight: 500; flex-shrink: 0; }
 
     .pqp-totals { display: flex; flex-direction: column; gap: 4px; }
 
-    .pqp-total-row { display: flex; justify-content: space-between; font-size: 12px; }
+    .pqp-total-row { display: flex; justify-content: space-between; font-size: var(--mud-typography-body2-size); }
 
-    .pqp-total-grand { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-top: 4px; }
+    .pqp-total-grand { display: flex; justify-content: space-between; font-weight: 700; font-size: var(--mud-typography-subtitle1-size); margin-top: 4px; }
 </style>
 
 @code {

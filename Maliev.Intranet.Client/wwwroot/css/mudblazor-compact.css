@@ -22,9 +22,11 @@
     --maliev-radius-md: 10px;
     --maliev-radius-lg: 14px;
     --maliev-shadow-card: 0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
-    /* Typography micro/nano are intentional exceptions - tiny UI elements */
-    --maliev-typography-micro-size: 10px; /* Sub-caption: badges, tertiary metadata */
-    --maliev-typography-nano-size: 9px;   /* Tiny: ext badges, dfm zone labels */
+    --maliev-typography-micro-size: 11px; /* Sub-caption: badges, tertiary metadata */
+    --maliev-typography-nano-size: 11px;   /* Tiny: ext badges, dfm zone labels */
+    --maliev-icon-size-small: 14px;
+    --maliev-icon-size-medium: 18px;
+    --maliev-icon-size-large: 20px;
 }
 
 /* ================================================================
@@ -53,7 +55,7 @@
 }
 
 .mud-input-adornment .mud-icon-root {
-    font-size: 18px;
+    font-size: var(--maliev-icon-size-medium);
 }
 
 .mud-input-label {
@@ -138,11 +140,11 @@
 }
 
 .mud-icon-button-root .mud-icon-root {
-    font-size: 20px;
+    font-size: var(--maliev-icon-size-large);
 }
 
 .mud-icon-button-root.mud-icon-button-size-small .mud-icon-root {
-    font-size: 18px;
+    font-size: var(--maliev-icon-size-medium);
 }
 
 .mud-fab-root.mud-fab-size-small {
@@ -262,7 +264,7 @@
 }
 
 .mud-alert-icon {
-    font-size: 18px;
+    font-size: var(--maliev-icon-size-medium);
     padding: 0;
     margin-right: 8px;
 }
@@ -274,7 +276,6 @@
 
 .mud-chip {
     padding: 2px 7px;
-    /* Typography: use micro size for chips - intentional small size */
     font-size: var(--maliev-typography-micro-size);
     height: auto;
     border-radius: 99px;
@@ -285,7 +286,7 @@
 }
 
 .mud-chip .mud-icon-root {
-    font-size: 14px;
+    font-size: var(--maliev-icon-size-small);
 }
 
 /* ================================================================
@@ -390,7 +391,6 @@
    ================================================================ */
 
 .mud-badge-content {
-    /* Typography: use nano size for badges - intentional tiny size */
     font-size: var(--maliev-typography-nano-size);
 }
 
