@@ -104,15 +104,15 @@
             }
         </div>
 
-        @* Meta row: process/material + quantity *@
+        @* Meta row: process/material *@
         <div class="pmc-meta">
             <span class="pmc-process-material">
                 @if (!string.IsNullOrEmpty(Part.ProcessCode)) { <text>@Part.ProcessCode</text> }
                 @if (!string.IsNullOrEmpty(Part.ProcessCode) && !string.IsNullOrEmpty(Part.MaterialCode)) { <text> · </text> }
                 @if (!string.IsNullOrEmpty(Part.MaterialCode)) { <text>@Part.MaterialCode</text> }
             </span>
-            <span class="pmc-qty @(Part.Quantity == 1 ? "pmc-qty-1" : "")">×@Part.Quantity</span>
         </div>
+        <span class="pmc-qty @(Part.Quantity == 1 ? "pmc-qty-1" : "")">×@Part.Quantity</span>
 
         @* Price row — skeleton when pricing in flight *@
         <div class="pmc-price">
@@ -201,7 +201,7 @@
         display: flex;
         flex-direction: column;
         gap: 1px;
-        padding: 8px 30px 6px 8px;
+        padding: 8px;
         overflow: hidden;
     }
     .pmc-name {
@@ -237,10 +237,13 @@
         align-items: center;
     }
     .pmc-qty {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        z-index: 1;
         font-size: var(--maliev-typography-micro-size);
         color: var(--mud-palette-primary);
         font-weight: 600;
-        margin-left: auto;
         flex-shrink: 0;
     }
     .pmc-qty-1 {
