@@ -165,9 +165,18 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark) {
                         }
                     });
 
-                    // Recompute bounding box after centering
+                    // Recompute bounding box after centering — this is the ground truth
                     const centeredBb = computeSceneBounds(_scene);
                     sceneBoundingBoxes[canvasId] = centeredBb;
+
+                    // Recalculate mesh center AFTER recentering so camera targets correctly
+                    if (centeredBb) {
+                        meshCenters[canvasId] = {
+                            x: (centeredBb.min.x + centeredBb.max.x) / 2,
+                            y: (centeredBb.min.y + centeredBb.max.y) / 2,
+                            z: (centeredBb.min.z + centeredBb.max.z) / 2
+                        };
+                    }
 
                     // ── Create ground grid on XZ plane (Y is up in Y-up) ──
                     const partW = centeredBb.max.x - centeredBb.min.x;
@@ -221,15 +230,17 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark) {
                         const d = newBb.max.y - newBb.min.y; // depth (Y)
                         const h = newBb.max.z - newBb.min.z; // height (Z)
                         // Include all 3 dimensions for correct camera distance
-                        const meshRadius = Math.max(Math.sqrt(w * w + d * d + h * h) * 1.2, 5);
+                        // 0.7x multiplier keeps camera close enough without clipping
+                        const meshRadius = Math.max(Math.sqrt(w * w + d * d + h * h) * 0.7, 5);
                         cam.minZ = meshRadius * 0.001;
                         cam.maxZ = meshRadius * 1000;
                         cam.target = new BABYLON.Vector3(0, meshCenter.y, 0); // look at mesh bounding box center
                         cam.radius = meshRadius;
-                        cam.lowerRadiusLimit = meshRadius * 0.01;
+                        cam.lowerRadiusLimit = meshRadius * 0.1;
                         cam.upperRadiusLimit = meshRadius * 20;
-                        cam.wheelPrecision = Math.max(5, Math.round(meshRadius * 0.3));
-                        cam.pinchPrecision = cam.wheelPrecision * 10;
+                        // Higher wheelPrecision = slower scroll. Scale with meshRadius for consistency.
+                        cam.wheelPrecision = Math.max(50, Math.round(meshRadius * 0.8));
+                        cam.pinchPrecision = cam.wheelPrecision * 8;
                     } else {
                         cam.minZ = 0.001;
                         cam.lowerRadiusLimit = 0.001;
