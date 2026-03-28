@@ -120,7 +120,7 @@ public class UploadsController(
     {
         if (string.IsNullOrWhiteSpace(storagePath))
             return BadRequest("storagePath is required.");
-        var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(storagePath, ct);
+        var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(storagePath, ct, expirationMinutes: 10080);
         if (string.IsNullOrEmpty(signedUrl)) return NotFound("Preview URL not available");
         return Ok(new { Url = signedUrl });
     }

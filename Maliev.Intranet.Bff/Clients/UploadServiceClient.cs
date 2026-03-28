@@ -77,9 +77,9 @@ public class UploadServiceClient
     /// Gets a temporary signed download URL for a file using its GCS storage path.
     /// Used by background consumers where there is no HttpContext for user-identity forwarding.
     /// </summary>
-    public async Task<string?> GetDownloadUrlByPathAsync(string storagePath, CancellationToken ct = default)
+    public async Task<string?> GetDownloadUrlByPathAsync(string storagePath, CancellationToken ct = default, int expirationMinutes = 60)
     {
-        var request = new { StoragePath = storagePath, ExpirationMinutes = 60 };
+        var request = new { StoragePath = storagePath, ExpirationMinutes = expirationMinutes };
         var response = await _httpClient.PostAsJsonAsync("/upload/v1/files/by-path/signed-url", request, ct);
 
         if (response.IsSuccessStatusCode)

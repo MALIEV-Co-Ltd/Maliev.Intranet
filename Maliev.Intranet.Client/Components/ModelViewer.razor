@@ -27,46 +27,231 @@
         </div>
     }
 
-    <div class="viewport-toolbar" style="position: absolute; bottom: 0; left: 0; right: 0;">
-        <button class="vp-btn @(_cameraPreset == "front" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("front"))'>Front</button>
-        <button class="vp-btn @(_cameraPreset == "back" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("back"))'>Back</button>
-        <button class="vp-btn @(_cameraPreset == "left" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("left"))'>Left</button>
-        <button class="vp-btn @(_cameraPreset == "right" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("right"))'>Right</button>
-        <button class="vp-btn @(_cameraPreset == "top" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("top"))'>Top</button>
-        <button class="vp-btn @(_cameraPreset == "bottom" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("bottom"))'>Bottom</button>
-        <button class="vp-btn @(_cameraPreset == "iso" ? "vp-active" : "")" @onclick='@(() => SetCameraPreset("iso"))'>Iso</button>
-        <span class="vp-sep">|</span>
-        <button class="vp-btn @(_renderMode == "solid" ? "vp-active" : "")" @onclick='@(() => SetRenderModeAsync("solid"))'>Solid</button>
-        <button class="vp-btn @(_renderMode == "wireframe" ? "vp-active" : "")" @onclick='@(() => SetRenderModeAsync("wireframe"))'>Wireframe</button>
-        <button class="vp-btn @(_renderMode == "transparent" ? "vp-active" : "")" @onclick='@(() => SetRenderModeAsync("transparent"))'>Transparent</button>
-        <button class="vp-btn @(_edgesEnabled ? "vp-active" : "")" @onclick="ToggleEdgesAsync">Edges</button>
-        <button class="vp-btn @(_bboxEnabled ? "vp-active" : "")" @onclick="ToggleBoundingBoxAsync">Bbox</button>
-        <span class="vp-sep">|</span>
-        <button class="vp-btn" @onclick="ResetCamera">Reset</button>
+    @* ── CAD Toolbar — bottom-center, floating ── *@
+    <div style="position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 10; pointer-events: auto; white-space: nowrap;">
+        <MudPaper Elevation="8" Class="d-flex align-center pa-1 vp-toolbar-paper">
+
+            @* View presets *@
+            @foreach (var v in _viewPresets)
+            {
+                <MudTooltip Text="@v.Label" Placement="Placement.Top" Arrow="false">
+                    <button class="@($"vp-cube-btn {(_cameraPreset == v.Key ? "vp-active" : "")}")"
+                            @onclick="@(() => SetCameraPreset(v.Key))" type="button">
+                        @GetCubeIconSvg(v.Key, _cameraPreset == v.Key)
+                    </button>
+                </MudTooltip>
+            }
+
+            <div class="vp-divider" />
+
+            @* Render modes *@
+            <MudTooltip Text="Solid" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_renderMode == "solid" ? "vp-active" : "")}")"
+                        @onclick='@(() => SetRenderModeAsync("solid"))' type="button">
+                    @GetModeIconSvg("solid", _renderMode == "solid")
+                </button>
+            </MudTooltip>
+            <MudTooltip Text="Wireframe" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_renderMode == "wireframe" ? "vp-active" : "")}")"
+                        @onclick='@(() => SetRenderModeAsync("wireframe"))' type="button">
+                    @GetModeIconSvg("wireframe", _renderMode == "wireframe")
+                </button>
+            </MudTooltip>
+            <MudTooltip Text="Transparent" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_renderMode == "transparent" ? "vp-active" : "")}")"
+                        @onclick='@(() => SetRenderModeAsync("transparent"))' type="button">
+                    @GetModeIconSvg("transparent", _renderMode == "transparent")
+                </button>
+            </MudTooltip>
+
+            <div class="vp-divider" />
+
+            @* Projection mode *@
+            <MudTooltip Text="Perspective" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_cameraProjection == "perspective" ? "vp-active" : "")}")"
+                        @onclick='@(() => SetCameraProjectionAsync("perspective"))' type="button">
+                    @GetModeIconSvg("perspective", _cameraProjection == "perspective")
+                </button>
+            </MudTooltip>
+            <MudTooltip Text="Orthographic" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_cameraProjection == "orthographic" ? "vp-active" : "")}")"
+                        @onclick='@(() => SetCameraProjectionAsync("orthographic"))' type="button">
+                    @GetModeIconSvg("ortho", _cameraProjection == "orthographic")
+                </button>
+            </MudTooltip>
+
+            <div class="vp-divider" />
+
+            @* Toggle tools *@
+            <MudTooltip Text="Edges" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_edgesEnabled ? "vp-active" : "")}")"
+                        @onclick="ToggleEdgesAsync" type="button">
+                    @GetModeIconSvg("edges", _edgesEnabled)
+                </button>
+            </MudTooltip>
+            <MudTooltip Text="Bounding Box" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_bboxEnabled ? "vp-active" : "")}")"
+                        @onclick="ToggleBoundingBoxAsync" type="button">
+                    @GetModeIconSvg("bounds", _bboxEnabled)
+                </button>
+            </MudTooltip>
+
+            <div class="vp-divider" />
+
+            @* Reset *@
+            <MudTooltip Text="Reset View" Placement="Placement.Top" Arrow="false">
+                <MudIconButton Icon="@Icons.Material.Outlined.ZoomOutMap"
+                               Class="vp-icon-btn"
+                               Size="Size.Small" OnClick="ResetCamera" />
+            </MudTooltip>
+
+        </MudPaper>
     </div>
 
 </div>
 
 @code {
-    [Parameter]
-    public Model3DDto? Model { get; set; }
+    [Parameter] public Model3DDto?                Model          { get; set; }
+    [Parameter] public string?                    ViewerUrl      { get; set; }
+    [Parameter] public string?                    FileExtension  { get; set; }
+    /// <summary>Optional bounding-box dimensions in mm. Used when Model is null (e.g. PartDetailCard).</summary>
+    [Parameter] public FileAnalysisDimensionsDto? KnownDimensions { get; set; }
 
-    [Parameter]
-    public string? ViewerUrl { get; set; }
-
-    [Parameter]
-    public string? FileExtension { get; set; }
-
-
-
-    private string _canvasId = $"babylon-canvas-{Guid.NewGuid()}";
+    private string _canvasId    = $"babylon-canvas-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
-    private string _renderMode = "solid";
-    private string _cameraPreset = "iso";
-    private bool _edgesEnabled;
-    private bool _bboxEnabled;
-
+    private string _renderMode        = "solid";
+    private string _cameraPreset      = "iso";
+    private string _cameraProjection  = "perspective";
+    private bool   _edgesEnabled;
+    private bool   _bboxEnabled;
     private string? _lastViewerUrl;
+
+    private record ViewPreset(string Key, string Label);
+
+    private static readonly ViewPreset[] _viewPresets =
+    [
+        new("front",  "Front view"),
+        new("back",   "Back view"),
+        new("left",   "Left view"),
+        new("right",  "Right view"),
+        new("top",    "Top view"),
+        new("bottom", "Bottom view"),
+        new("iso",    "Isometric view"),
+    ];
+
+    // Face polygon points (viewBox 0 0 100 100) for each view direction.
+    private static readonly Dictionary<string, string> _cubeFacePoints = new()
+    {
+        ["front"]  = "50,86 14,70 14,28 50,44",
+        ["back"]   = "86,70 50,54 50,12 86,28",
+        ["left"]   = "14,70 50,54 50,12 14,28",
+        ["right"]  = "50,86 86,70 86,28 50,44",
+        ["top"]    = "50,44 14,28 50,12 86,28",
+        ["bottom"] = "50,86 14,70 50,54 86,70",
+    };
+
+    private static MarkupString GetCubeIconSvg(string viewKey, bool isActive)
+    {
+        var fill   = isActive ? "rgba(90,150,255,0.50)" : "rgba(90,150,255,0.28)";
+        var stroke = isActive ? "#7ab4ff"               : "#4a8fff";
+        var back   = "rgba(150,160,180,0.30)";
+        var front  = isActive ? "rgba(215,225,245,0.95)" : "rgba(190,200,220,0.75)";
+
+        string face;
+        if (viewKey == "iso")
+        {
+            face = $"""
+                <polygon points="50,86 14,70 14,28 50,44"  fill="{fill}" stroke="{stroke}" stroke-width="2.5" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,44"  fill="{fill}" stroke="{stroke}" stroke-width="2.5" stroke-linejoin="round"/>
+                <polygon points="50,44 14,28 50,12 86,28"  fill="{fill}" stroke="{stroke}" stroke-width="2.5" stroke-linejoin="round"/>
+                <polygon points="50,86 14,70 14,28 50,12 86,28 86,70" fill="none" stroke="{stroke}" stroke-width="3" stroke-linejoin="round"/>
+                """;
+        }
+        else if (_cubeFacePoints.TryGetValue(viewKey, out var pts))
+        {
+            face = $"""<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="2.5" stroke-linejoin="round"/>""";
+        }
+        else
+        {
+            face = "";
+        }
+
+        return new MarkupString($"""
+            <svg viewBox="0 0 100 100" width="22" height="22" style="display:block;" aria-hidden="true">
+              <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{back}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="none" stroke="{front}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{front}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              {face}
+            </svg>
+            """);
+    }
+
+    /// <summary>Generates inline SVG icons for render-mode and projection toolbar buttons.</summary>
+    private static MarkupString GetModeIconSvg(string modeKey, bool isActive)
+    {
+        var edgeC  = isActive ? "rgba(215,230,255,0.95)" : "rgba(190,205,230,0.72)";
+        var backC  = isActive ? "rgba(150,165,190,0.40)" : "rgba(130,145,170,0.28)";
+        var activeHighlight = isActive ? "rgba(90,150,255,0.22)" : "none";
+
+        string body = modeKey switch
+        {
+            "solid" => $"""
+                <polygon points="50,44 14,28 50,12 86,28" fill="#dde3ec" stroke="#94a3b8" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 14,70 14,28 50,44" fill="#8496ae" stroke="#64748b" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,44" fill="#b2bfcf" stroke="#94a3b8" stroke-width="1" stroke-linejoin="round"/>
+                """,
+
+            "wireframe" => $"""
+                <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                """,
+
+            "transparent" => $"""
+                <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="50,86 14,70 14,28 50,44" fill="rgba(59,130,246,0.22)" stroke="none"/>
+                <polygon points="50,86 86,70 86,28 50,44" fill="rgba(59,130,246,0.22)" stroke="none"/>
+                <polygon points="50,44 14,28 50,12 86,28" fill="rgba(59,130,246,0.22)" stroke="none"/>
+                """,
+
+            "edges" => $"""
+                <polygon points="50,44 14,28 50,12 86,28" fill="#dde3ec" stroke="#94a3b8" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 14,70 14,28 50,44" fill="#8496ae" stroke="#64748b" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,44" fill="#b2bfcf" stroke="#94a3b8" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                """,
+
+            "bounds" => $"""
+                <circle cx="50" cy="49" r="22" fill="rgba(59,130,246,0.75)"/>
+                <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" stroke="{edgeC}" stroke-width="2" stroke-dasharray="4 4" fill="none" stroke-linecap="round"/>
+                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" stroke="{edgeC}" stroke-width="2" stroke-dasharray="4 4" fill="none" stroke-linecap="round"/>
+                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" stroke="{edgeC}" stroke-width="2" stroke-dasharray="4 4" fill="none" stroke-linecap="round"/>
+                """,
+
+            "ortho" => $"""
+                <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                """,
+
+            "perspective" => $"""
+                <path d="M50,58 L20,69 M50,58 L80,69 M50,58 L50,31" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="50,90 80,69 80,34 50,31 20,34 20,69" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M50,40 L50,90 M50,40 L20,34 M50,40 L80,34" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                """,
+
+            _ => ""
+        };
+
+        return new MarkupString($"""
+            <svg viewBox="0 0 100 100" width="22" height="22" style="display:block;" aria-hidden="true">
+              {body}
+            </svg>
+            """);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -79,14 +264,29 @@
                 _module ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/babylon-viewer.js");
                 if (previousUrl != null)
                     await _module.InvokeVoidAsync("dispose", _canvasId);
-                _renderMode = "solid";
+
+                _renderMode  = "solid";
                 _edgesEnabled = false;
-                _bboxEnabled = false;
-                await _module.InvokeVoidAsync("initialize", _canvasId, ViewerUrl, FileExtension ?? string.Empty, LayoutService.IsDarkMode);
+                _bboxEnabled  = false;
+
+                // Pass known bounding-box dimensions (mm) so the viewer can correct the glTF meter scale.
+                // Prefer Model properties, fall back to KnownDimensions parameter.
+                object? dims = null;
+                if (Model?.BoundingBoxX > 0 && Model.BoundingBoxY > 0 && Model.BoundingBoxZ > 0)
+                    dims = new { x = Model.BoundingBoxX, y = Model.BoundingBoxY, z = Model.BoundingBoxZ };
+                else if (KnownDimensions?.X > 0 && KnownDimensions.Y > 0 && KnownDimensions.Z > 0)
+                    dims = new { x = KnownDimensions.X, y = KnownDimensions.Y, z = KnownDimensions.Z };
+
+                await _module.InvokeVoidAsync("initialize",
+                    _canvasId,
+                    ViewerUrl,
+                    FileExtension ?? string.Empty,
+                    LayoutService.IsDarkMode,
+                    dims);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error initializing BabylonJS viewer: {ex.Message}");
+                Console.WriteLine($"[ModelViewer] Error initializing: {ex.Message}");
             }
         }
     }
@@ -100,10 +300,10 @@
 
     private async Task SetRenderModeAsync(string mode)
     {
-        var targetMode = _renderMode == mode ? "solid" : mode;
-        _renderMode = targetMode;
+        var target = _renderMode == mode ? "solid" : mode;
+        _renderMode = target;
         if (_module != null)
-            await _module.InvokeVoidAsync("setRenderMode", _canvasId, targetMode);
+            await _module.InvokeVoidAsync("setRenderMode", _canvasId, target);
     }
 
     private async Task ResetCamera()
@@ -127,6 +327,13 @@
             await _module.InvokeVoidAsync("toggleBoundingBox", _canvasId, _bboxEnabled);
     }
 
+    private async Task SetCameraProjectionAsync(string mode)
+    {
+        _cameraProjection = mode;
+        if (_module != null)
+            await _module.InvokeVoidAsync("setCameraProjection", _canvasId, mode);
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_module != null)
@@ -136,11 +343,7 @@
                 await _module.InvokeVoidAsync("dispose", _canvasId);
                 await _module.DisposeAsync();
             }
-            catch
-            {
-                // Ignore disposal errors on teardown
-            }
+            catch { }
         }
     }
 }
-

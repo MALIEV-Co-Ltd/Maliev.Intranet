@@ -443,19 +443,6 @@
     .pdc-cube-overlay .animated-cube-icon .cube {
         opacity: 1 !important;
     }
-    .pdc-cube-overlay:hover .animated-cube-icon .cube {
-        animation: cubeRotate 6s linear infinite !important;
-    }
-    .pdc-cube-label {
-        font-size: var(--mud-typography-caption-size);
-        font-weight: 600;
-        color: white;
-        background: rgba(0,0,0,0.55);
-        padding: 2px 8px;
-        border-radius: 10px;
-        white-space: nowrap;
-        pointer-events: none;
-    }
     .pdc-3d-viewer-container {
         position: absolute;
         inset: 0;
@@ -559,16 +546,13 @@
                 {
                     _resolvedUrls[currentSrc] = resolved;
                     setUrl(resolved);
-                    Snackbar.Add($"Preview URL resolved for {Part.Name}", Severity.Success);
                     await OnPartChanged.InvokeAsync(Part);
-                    return;
                 }
             }
-            Snackbar.Add($"Preview URL resolution returned empty for {Part.Name} (raw path: {currentSrc})", Severity.Warning);
         }
-        catch (Exception ex)
+        catch
         {
-            Snackbar.Add($"Preview URL resolution failed for {Part.Name}: {ex.Message}", Severity.Error);
+            // Silently ignore — thumbnail URL refresh is best-effort
         }
     }
 

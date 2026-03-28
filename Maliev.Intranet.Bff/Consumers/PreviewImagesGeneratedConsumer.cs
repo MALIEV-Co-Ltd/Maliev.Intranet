@@ -66,7 +66,7 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             {
                 if (string.IsNullOrEmpty(path))
                     return (null, false);
-                var url = await CreateUploadClient().GetDownloadUrlByPathAsync(path, context.CancellationToken);
+                var url = await CreateUploadClient().GetDownloadUrlByPathAsync(path, context.CancellationToken, expirationMinutes: 10080);
                 if (string.IsNullOrEmpty(url))
                 {
                     _logger.LogWarning(

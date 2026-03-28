@@ -114,7 +114,81 @@ code {
     text-align: start;
 }
 
-/* MudBlazor input controls - use default typography size (13px).
+/* ── 3D Viewer Toolbar ───────────────────────────────────────────────── */
+
+.vp-toolbar-paper {
+    border-radius: 10px !important;
+    backdrop-filter: blur(14px) !important;
+    background: rgba(16, 18, 24, 0.90) !important;
+    gap: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* View preset cube-icon buttons */
+.vp-cube-btn {
+    width: 32px;
+    height: 32px;
+    padding: 5px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s;
+    outline: none;
+    flex-shrink: 0;
+}
+
+.vp-cube-btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.vp-cube-btn.vp-active {
+    background: rgba(90, 150, 255, 0.18) !important;
+}
+
+.vp-cube-btn.vp-active:hover {
+    background: rgba(90, 150, 255, 0.26) !important;
+}
+
+/* Icon buttons (render modes, tools, reset) */
+.vp-icon-btn {
+    width: 30px !important;
+    height: 30px !important;
+    color: rgba(190, 195, 210, 0.80) !important;
+    border-radius: 6px !important;
+    transition: background 0.12s, color 0.12s !important;
+}
+
+.vp-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.09) !important;
+    color: #e8ecf4 !important;
+}
+
+/* Active state — blue tint highlight */
+.vp-active {
+    background: rgba(90, 150, 255, 0.18) !important;
+    color: #7ab4ff !important;
+}
+
+.vp-active:hover {
+    background: rgba(90, 150, 255, 0.26) !important;
+    color: #9ac8ff !important;
+}
+
+/* Separator bar */
+.vp-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.11);
+    margin: 0 3px;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+/* ── MudBlazor input controls - use default typography size (13px).
    .mud-text-field is NOT a real DOM ancestor in MudBlazor 9 — label lives inside .mud-input. */
 .mud-autocomplete .mud-input-control-input-control,
 .mud-input .mud-input-label,

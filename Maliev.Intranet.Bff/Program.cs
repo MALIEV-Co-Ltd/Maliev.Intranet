@@ -52,6 +52,8 @@ try
     builder.Services.AddScoped<Maliev.Intranet.Bff.Services.IChatContextResolver, Maliev.Intranet.Bff.Services.ChatContextResolver>();
     builder.Services.AddSingleton<Maliev.Intranet.Bff.Services.ChatHubService>();
     builder.Services.AddSingleton<Maliev.Intranet.Shared.Services.IMarkdownService, Maliev.Intranet.Shared.Services.MarkdownService>();
+    builder.Services.AddSingleton<Maliev.Intranet.Client.Services.FileTypesSettings>(sp =>
+        sp.GetRequiredService<IConfiguration>().GetSection("FileTypes").Get<Maliev.Intranet.Client.Services.FileTypesSettings>()!);
     builder.Services.AddSignalR();
     builder.Services.AddMudServices();
     builder.AddStandardCache("IntranetBff");
