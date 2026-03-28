@@ -2,6 +2,7 @@
 @using System.Net.Http.Headers
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
 
 <MudStack Spacing="3">
     <MudFileUpload T="IReadOnlyList<IBrowserFile>"
@@ -29,7 +30,7 @@
                     <MudListItem T="string">
                         <div class="d-flex justify-space-between align-center">
                             <div class="d-flex align-center gap-2">
-                                <MudIcon Icon="@GetFileIcon(file.Name)" Size="Size.Small" Color="Color.Default" />
+                                <MudIcon Icon="@FileTypes.GetIcon(Path.GetExtension(file.Name))" Size="Size.Small" Color="Color.Default" />
                                 <div class="d-flex flex-column">
                                     <MudText Typo="Typo.body2">@file.Name</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(file.Size)</MudText>
@@ -64,7 +65,7 @@
                 <MudListItem T="string">
                     <div class="d-flex justify-space-between align-center">
                         <div class="d-flex align-center gap-2">
-                            <MudIcon Icon="@GetFileIcon(att.Name)" Size="Size.Small" Color="Color.Default" />
+                                <MudIcon Icon="@FileTypes.GetIcon(Path.GetExtension(att.Name))" Size="Size.Small" Color="Color.Default" />
                             <div class="d-flex flex-column">
                                 <MudText Typo="Typo.body2">@att.Name</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Default">@FormatFileSize(att.FileSizeBytes)</MudText>
@@ -174,15 +175,6 @@
             Snackbar.Add($"Error: {ex.Message}", Severity.Error);
         }
     }
-
-    private static string GetFileIcon(string name) =>
-        Path.GetExtension(name).ToLowerInvariant() switch
-        {
-            ".pdf" => Icons.Material.Outlined.PictureAsPdf,
-            ".dxf" or ".dwg" => Icons.Material.Outlined.Architecture,
-            ".png" or ".jpg" or ".jpeg" => Icons.Material.Outlined.Image,
-            _ => Icons.Material.Outlined.InsertDriveFile,
-        };
 
     private static string FormatFileSize(long bytes)
     {

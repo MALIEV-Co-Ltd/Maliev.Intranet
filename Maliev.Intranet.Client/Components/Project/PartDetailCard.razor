@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Components
 @using System.Text.Json
 @using MudBlazor
+@inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
 
 <div class="pdc-root">
     @* ── Left 60%: Viewer Column ──────────────────────────────────── *@
@@ -65,7 +66,7 @@
                 @* Fallback grey background — no preview *@
                 @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.AwaitingPreview && !Part.Uploading)
                 {
-                    <MudIcon Icon="@GetFileIcon()" Size="Size.Large" Color="Color.Default" />
+                    <MudIcon Icon="@FileTypes.GetIcon(Path.GetExtension(Part.Name))" Size="Size.Large" Color="Color.Default" />
                 }
 
                 @* AnimatedCubeIcon overlay — always visible when GLB available *@
@@ -517,20 +518,6 @@
         _lastPartId = Part.FileId;
         await base.OnParametersSetAsync();
     }
-
-    private string GetFileIcon() =>
-        Path.GetExtension(Part.Name).ToLowerInvariant() switch
-        {
-            ".stl" or ".step" or ".stp" or ".3mf" or ".obj" or ".igs" or ".iges"
-            or ".blend" or ".fbx" or ".gltf" or ".glb" => Icons.Material.Outlined.ViewInAr,
-            ".pdf" => Icons.Material.Outlined.PictureAsPdf,
-            ".dxf" or ".dwg" => Icons.Material.Outlined.Architecture,
-            ".png" or ".jpg" or ".jpeg" or ".tiff" or ".bmp" or ".webp" => Icons.Material.Outlined.Image,
-            ".doc" or ".docx" => Icons.Material.Outlined.Description,
-            ".xls" or ".xlsx" => Icons.Material.Outlined.TableChart,
-            ".zip" or ".rar" or ".7z" => Icons.Material.Outlined.FolderZip,
-            _ => Icons.Material.Outlined.InsertDriveFile,
-        };
 
     private async Task OpenViewer()
     {

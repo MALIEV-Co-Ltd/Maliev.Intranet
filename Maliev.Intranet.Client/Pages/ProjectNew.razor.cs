@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Maliev.Intranet.Client.Components.Project;
+using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Components;
@@ -73,20 +74,7 @@ public partial class ProjectNew : IAsyncDisposable
     // ── SignalR ────────────────────────────────────────────────────────
     private HubConnection? _hubConnection;
 
-    // ── File type sets ────────────────────────────────────────────────
-    private static readonly HashSet<string> ThreeDExtensions =
-        new(StringComparer.OrdinalIgnoreCase)
-        { ".stl", ".step", ".stp", ".3mf", ".obj", ".igs", ".iges", ".blend", ".fbx", ".gltf", ".glb" };
-
-    private static readonly HashSet<string> AllowedExtensions =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".stl", ".step", ".stp", ".3mf", ".obj", ".igs", ".iges", ".blend", ".fbx", ".gltf", ".glb",
-            ".pdf", ".dxf", ".dwg",
-            ".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".webp",
-            ".doc", ".docx", ".xls", ".xlsx",
-            ".zip", ".rar", ".7z",
-        };
+    [Inject] private FileTypesSettings FileTypes { get; set; } = null!;
 
     private bool CanSubmit =>
         !_saving &&
@@ -303,7 +291,7 @@ public partial class ProjectNew : IAsyncDisposable
         foreach (var file in files)
         {
             var ext = Path.GetExtension(file.Name);
-            if (!AllowedExtensions.Contains(ext))
+            if (!FileTypes.AllUploadExtensions.Contains(ext))
             {
                 Snackbar.Add($"File type '{ext}' is not allowed.", Severity.Warning);
                 continue;
@@ -895,22 +883,11 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private Task OpenFilePicker() => _fileUpload?.OpenFilePickerAsync() ?? Task.CompletedTask;
 
-    private static bool Is3DFile(string name) =>
-        ThreeDExtensions.Contains(Path.GetExtension(name));
+    private bool Is3DFile(string name) =>
+        FileTypes.Is3DFile(Path.GetExtension(name));
 
-    private static string GetFileIcon(string name) =>
-        Path.GetExtension(name).ToLowerInvariant() switch
-        {
-            ".stl" or ".step" or ".stp" or ".3mf" or ".obj" or ".igs" or ".iges"
-            or ".blend" or ".fbx" or ".gltf" or ".glb" => Icons.Material.Outlined.ViewInAr,
-            ".pdf" => Icons.Material.Outlined.PictureAsPdf,
-            ".dxf" or ".dwg" => Icons.Material.Outlined.Architecture,
-            ".png" or ".jpg" or ".jpeg" or ".tiff" or ".bmp" or ".webp" => Icons.Material.Outlined.Image,
-            ".doc" or ".docx" => Icons.Material.Outlined.Description,
-            ".xls" or ".xlsx" => Icons.Material.Outlined.TableChart,
-            ".zip" or ".rar" or ".7z" => Icons.Material.Outlined.FolderZip,
-            _ => Icons.Material.Outlined.InsertDriveFile,
-        };
+    private string GetFileIcon(string name) =>
+        FileTypes.GetIcon(Path.GetExtension(name));
 
     private string? ResolvePreviewUrl(string? url)
     {

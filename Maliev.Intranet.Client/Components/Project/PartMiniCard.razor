@@ -2,6 +2,7 @@
 @using System.Text.Json
 @using Maliev.MessagingContracts.Contracts.Geometry
 @inject HttpClient Http
+@inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
 
 <div class="pmc-card @(IsActive ? "pmc-active" : "") @(Part.Error != null ? "pmc-error" : "")" @onclick="OnSelect">
     @* ── Thumbnail ──────────────────────────────────────────────── *@
@@ -27,7 +28,7 @@
         }
         else
         {
-            <MudIcon Icon="@GetFileIcon(Part.Name)" Size="Size.Medium" Color="Color.Default" />
+            <MudIcon Icon="@FileTypes.GetIcon(Path.GetExtension(Part.Name))" Size="Size.Medium" Color="Color.Default" />
         }
 
         @* ── Status badge (non-manifold warning / acknowledged) ── *@
@@ -314,19 +315,7 @@
         return cm3 >= 1000 ? $"{cm3 / 1000:N1} L" : $"{cm3:N1} cm³";
     }
 
-    private static string GetFileIcon(string name) =>
-        Path.GetExtension(name).ToLowerInvariant() switch
-        {
-            ".stl" or ".step" or ".stp" or ".3mf" or ".obj" or ".igs" or ".iges"
-            or ".blend" or ".fbx" or ".gltf" or ".glb" => Icons.Material.Outlined.ViewInAr,
-            ".pdf" => Icons.Material.Outlined.PictureAsPdf,
-            ".dxf" or ".dwg" => Icons.Material.Outlined.Architecture,
-            ".png" or ".jpg" or ".jpeg" or ".tiff" or ".bmp" or ".webp" => Icons.Material.Outlined.Image,
-            ".doc" or ".docx" => Icons.Material.Outlined.Description,
-            ".xls" or ".xlsx" => Icons.Material.Outlined.TableChart,
-            ".zip" or ".rar" or ".7z" => Icons.Material.Outlined.FolderZip,
-            _ => Icons.Material.Outlined.InsertDriveFile,
-        };
+
 
     private async Task InvokePartChanged() => await OnPartChanged.InvokeAsync();
 
