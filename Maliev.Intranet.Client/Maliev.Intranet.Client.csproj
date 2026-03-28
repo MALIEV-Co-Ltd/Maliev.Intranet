@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Maliev.Intranet.Shared\Maliev.Intranet.Shared.csproj" />
+    <ProjectReference Include="..\..\Maliev.MessagingContracts\generated\csharp\Maliev.MessagingContracts.csproj" />
   </ItemGroup>
 
 </Project>
