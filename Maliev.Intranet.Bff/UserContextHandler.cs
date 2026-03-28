@@ -30,7 +30,7 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
         var user = httpContext.User;
         if (user?.Identity?.IsAuthenticated != true)
         {
-            logger.LogWarning("User is not authenticated in UserContextHandler for request {Url}", request.RequestUri);
+            logger.LogDebug("User is not authenticated in UserContextHandler for request {Url}", request.RequestUri);
             return await base.SendAsync(request, cancellationToken);
         }
 
