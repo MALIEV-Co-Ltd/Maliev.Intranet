@@ -84,6 +84,8 @@ public record FileAnalysisDimensions(double X, double Y, double Z, double? Volum
 /// <param name="BottomSmall">Bottom view URL (small WebP).</param>
 /// <param name="ThumbnailSmall">Isometric thumbnail URL (small ~256px WebP).</param>
 /// <param name="ThumbnailLarge">Isometric thumbnail URL (large 1200px WebP, hi-res display).</param>
+/// <param name="ThumbnailSmallGcsPath">Raw GCS storage path for the small isometric thumbnail.</param>
+/// <param name="ThumbnailLargeGcsPath">Raw GCS storage path for the large isometric thumbnail.</param>
 public record FileAnalysisPreviewUrls(
     string? FrontSmall,
     string? BackSmall,
@@ -92,7 +94,9 @@ public record FileAnalysisPreviewUrls(
     string? TopSmall,
     string? BottomSmall,
     string? ThumbnailSmall,
-    string? ThumbnailLarge = null);
+    string? ThumbnailLarge = null,
+    string? ThumbnailSmallGcsPath = null,
+    string? ThumbnailLargeGcsPath = null);
 
 /// <summary>Payload pushed when the GLB 3D model file is ready for viewing.</summary>
 /// <param name="StoragePath">GCS path of the original file (join key).</param>

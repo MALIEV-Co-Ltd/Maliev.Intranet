@@ -95,14 +95,16 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
 
             var previewUrlsDto = new FileAnalysisPreviewUrlsDto
             {
-                FrontSmall       = frontResult.Url,
-                BackSmall        = backResult.Url,
-                LeftSmall        = leftResult.Url,
-                RightSmall       = rightResult.Url,
-                TopSmall         = topResult.Url,
-                BottomSmall      = bottomResult.Url,
-                ThumbnailSmall   = thumbnailSmallResult.Url,
-                ThumbnailLargeUrl = thumbnailLargeResult.Url,
+                FrontSmall            = frontResult.Url,
+                BackSmall             = backResult.Url,
+                LeftSmall             = leftResult.Url,
+                RightSmall            = rightResult.Url,
+                TopSmall              = topResult.Url,
+                BottomSmall           = bottomResult.Url,
+                ThumbnailSmall        = thumbnailSmallResult.Url,
+                ThumbnailLargeUrl      = thumbnailLargeResult.Url,
+                ThumbnailSmallGcsPath  = previews.ThumbnailSmall,
+                ThumbnailLargeGcsPath  = previews.ThumbnailLarge,
             };
 
             bool overallFailed = payload.Failed || anyUrlFailed;
@@ -138,7 +140,9 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                     TopSmall: previewUrlsDto.TopSmall,
                     BottomSmall: previewUrlsDto.BottomSmall,
                     ThumbnailSmall: thumbnailSmallResult.Url,
-                    ThumbnailLarge: thumbnailLargeResult.Url),
+                    ThumbnailLarge: thumbnailLargeResult.Url,
+                    ThumbnailSmallGcsPath: previews.ThumbnailSmall,
+                    ThumbnailLargeGcsPath: previews.ThumbnailLarge),
                 Failed: overallFailed,
                 ErrorCode: overallFailed ? (payload.Failed ? "preview-generation-failed" : "preview-url-resolution-failed") : null);
 

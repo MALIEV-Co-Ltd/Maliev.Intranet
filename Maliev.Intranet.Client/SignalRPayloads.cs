@@ -51,6 +51,12 @@ public sealed class SignalRPreviewUrls
 
     /// <summary>Bottom-face small preview URL.</summary>
     public string? BottomSmall { get; set; }
+
+    /// <summary>Raw GCS storage path for the small isometric thumbnail.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Raw GCS storage path for the large isometric thumbnail.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
 }
 
 /// <summary>Client-side mirror of GlbReadyPayload from NotificationHub.</summary>

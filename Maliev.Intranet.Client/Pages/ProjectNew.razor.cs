@@ -211,6 +211,8 @@ public partial class ProjectNew : IAsyncDisposable
                 {
                     part.ThumbnailSmallUrl = payload.PreviewUrls.ThumbnailSmall ?? part.ThumbnailSmallUrl;
                     part.ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge ?? payload.HiResThumbnailUrl;
+                    part.ThumbnailSmallGcsPath = payload.PreviewUrls.ThumbnailSmallGcsPath;
+                    part.ThumbnailLargeGcsPath = payload.PreviewUrls.ThumbnailLargeGcsPath;
                     part.AwaitingPreview = false;
                     part.StatusText = "Ready";
                     TriggerAutoSave();

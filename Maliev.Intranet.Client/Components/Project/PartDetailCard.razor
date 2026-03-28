@@ -49,7 +49,7 @@
                     <img src="@Part.ThumbnailLargeUrl"
                          class="pdc-thumb-sharp pdc-thumb-fade-in"
                          alt="@Part.Name"
-                         @onerror="@(async () => await OnImageErrorAsync(Part.ThumbnailLargeUrl, v => Part.ThumbnailLargeUrl = v))" />
+                         @onerror="@(async () => await OnImageErrorAsync(Part.ThumbnailLargeGcsPath ?? Part.ThumbnailLargeUrl, v => Part.ThumbnailLargeUrl = v, isLargeThumbnail: true))" />
                 }
 
                 @* Upload / processing progress overlay *@
@@ -520,7 +520,7 @@
         await OnPartChanged.InvokeAsync(Part);
     }
 
-    private async Task OnImageErrorAsync(string? currentSrc, Action<string?> setUrl)
+    private async Task OnImageErrorAsync(string? currentSrc, Action<string?> setUrl, bool isLargeThumbnail = false)
     {
         if (string.IsNullOrEmpty(currentSrc))
             return;

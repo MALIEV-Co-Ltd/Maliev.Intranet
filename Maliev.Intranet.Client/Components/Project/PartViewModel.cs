@@ -74,6 +74,12 @@ public class PartViewModel
     /// <summary>Large thumbnail (~1200px). Source: status.HiResThumbnailUrl ?? status.PreviewUrls?.ThumbnailLargeUrl</summary>
     public string? ThumbnailLargeUrl { get; set; }
 
+    /// <summary>Raw GCS storage path for the small isometric thumbnail. Preserved to re-resolve signed URLs after expiry.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Raw GCS storage path for the large isometric thumbnail. Preserved to re-resolve signed URLs after expiry.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
     /// <summary>GLB artifact for BabylonJS viewer. Source: status.GlbStoragePath</summary>
     public string? GlbStoragePath { get; set; }
 
@@ -163,6 +169,8 @@ public class PartViewModel
         IsManifold = IsManifold,
         ThumbnailSmallUrl = ThumbnailSmallUrl,
         ThumbnailLargeUrl = ThumbnailLargeUrl,
+        ThumbnailSmallGcsPath = ThumbnailSmallGcsPath,
+        ThumbnailLargeGcsPath = ThumbnailLargeGcsPath,
         GlbStoragePath = GlbStoragePath,
     };
 
@@ -188,6 +196,8 @@ public class PartViewModel
         IsManifold = s.IsManifold,
         ThumbnailSmallUrl = s.ThumbnailSmallUrl,
         ThumbnailLargeUrl = s.ThumbnailLargeUrl,
+        ThumbnailSmallGcsPath = s.ThumbnailSmallGcsPath,
+        ThumbnailLargeGcsPath = s.ThumbnailLargeGcsPath,
         GlbStoragePath = s.GlbStoragePath,
         AwaitingPreview = false,
         StatusText = string.IsNullOrEmpty(s.ThumbnailSmallUrl) && string.IsNullOrEmpty(s.StoragePath)

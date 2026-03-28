@@ -118,4 +118,8 @@ public sealed record FileAnalysisPreviewUrlsDto
     public string? ThumbnailSmall { get; init; }
     /// <summary>Isometric thumbnail WebP URL (1200px large, hi-res detail card display).</summary>
     public string? ThumbnailLargeUrl { get; init; }
+    /// <summary>Raw GCS storage path for the small isometric thumbnail. Preserved to allow re-signing after URL expiry.</summary>
+    public string? ThumbnailSmallGcsPath { get; init; }
+    /// <summary>Raw GCS storage path for the large isometric thumbnail. Preserved to allow re-signing after URL expiry.</summary>
+    public string? ThumbnailLargeGcsPath { get; init; }
 }

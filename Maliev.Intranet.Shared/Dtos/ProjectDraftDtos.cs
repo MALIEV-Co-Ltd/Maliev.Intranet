@@ -113,6 +113,12 @@ public sealed class DraftPartState
     /// <summary>Signed URL to the large (~1200px) isometric thumbnail. Restored to avoid re-fetching on reload.</summary>
     public string? ThumbnailLargeUrl { get; set; }
 
+    /// <summary>Raw GCS storage path for the small isometric thumbnail. Preserved to re-resolve signed URLs after expiry.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Raw GCS storage path for the large isometric thumbnail. Preserved to re-resolve signed URLs after expiry.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
     /// <summary>GCS storage path of the GLB artifact. Non-null when analysis produced a 3D model.</summary>
     public string? GlbStoragePath { get; set; }
 }
