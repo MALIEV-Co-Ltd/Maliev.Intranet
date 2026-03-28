@@ -96,27 +96,11 @@
             <div class="pmc-name">@Part.Name</div>
         </MudTooltip>
 
-        @* Dimensions line — skeleton when awaiting geometry, real data when available *@
+        @* Dimensions line — show only when available *@
         <div class="pmc-dim">
             @if (Part.Dimensions != null)
             {
                 <text>@($"{Part.Dimensions.X:N1} × {Part.Dimensions.Y:N1} × {Part.Dimensions.Z:N1} mm")</text>
-            }
-            else if (Part.FileId != Guid.Empty && Part.Error == null)
-            {
-                <MudSkeleton Width="80px" Height="10px" Animation="Animation.Wave" />
-            }
-        </div>
-
-        @* Volume line — skeleton when awaiting geometry, real data when available *@
-        <div class="pmc-dim">
-            @if (Part.VolumeMm3.HasValue)
-            {
-                <text>@FormatVolume(Part.VolumeMm3.Value)</text>
-            }
-            else if (Part.FileId != Guid.Empty && Part.Error == null)
-            {
-                <MudSkeleton Width="50px" Height="10px" Animation="Animation.Wave" />
             }
         </div>
 
@@ -126,10 +110,6 @@
                 @if (!string.IsNullOrEmpty(Part.ProcessCode)) { <text>@Part.ProcessCode</text> }
                 @if (!string.IsNullOrEmpty(Part.ProcessCode) && !string.IsNullOrEmpty(Part.MaterialCode)) { <text> · </text> }
                 @if (!string.IsNullOrEmpty(Part.MaterialCode)) { <text>@Part.MaterialCode</text> }
-                @if (string.IsNullOrEmpty(Part.ProcessCode) && string.IsNullOrEmpty(Part.MaterialCode) && Part.FileId != Guid.Empty && Part.Error == null)
-                {
-                    <MudSkeleton Width="60px" Height="10px" Animation="Animation.Wave" />
-                }
             </span>
             <span class="pmc-qty @(Part.Quantity == 1 ? "pmc-qty-1" : "")">×@Part.Quantity</span>
         </div>
@@ -221,7 +201,7 @@
         display: flex;
         flex-direction: column;
         gap: 1px;
-        padding: 6px 30px 6px 8px;
+        padding: 8px 30px 6px 8px;
         overflow: hidden;
     }
     .pmc-name {
@@ -265,10 +245,11 @@
     }
     .pmc-qty-1 {
         color: var(--mud-palette-text-disabled);
-        font-weight: 400;
+        font-weight: 600;
+        font-size: var(--mud-typography-default-size);
     }
     .pmc-price {
-        font-size: 11px;
+        font-size: var(--mud-typography-body2-size);
         color: var(--mud-palette-text-primary);
         font-weight: 500;
         margin-top: auto;
@@ -308,14 +289,6 @@
     private bool _dfmPopoverOpen;
 
     private string FormatPrice(decimal amount) => $"฿{amount:N0}";
-
-    private static string FormatVolume(double volumeMm3)
-    {
-        var cm3 = volumeMm3 / 1000.0;
-        return cm3 >= 1000 ? $"{cm3 / 1000:N1} L" : $"{cm3:N1} cm³";
-    }
-
-
 
     private async Task InvokePartChanged() => await OnPartChanged.InvokeAsync();
 
