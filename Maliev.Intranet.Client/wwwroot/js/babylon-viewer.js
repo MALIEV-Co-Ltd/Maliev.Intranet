@@ -721,37 +721,8 @@ function clearBoundingBox(canvasId) {
     }
 }
 
-/**
- * Toggles the detail-right panel visibility and expands the detail-left viewer.
- * @param {boolean} expanded
- */
-export function toggleDetailRightPanel(expanded) {
-    const canvas = document.querySelector('.detail-left canvas');
-    if (!canvas) return;
-    const detailLeft = canvas.closest('.detail-left');
-    if (!detailLeft) return;
-    const detailGrid = detailLeft.closest('.detail-grid');
-    if (!detailGrid) return;
-    const detailRight = detailGrid.querySelector('.detail-right');
-    if (!detailRight) return;
-
-    if (expanded) {
-        detailRight.classList.add('panel-hidden');
-        detailLeft.classList.add('viewer-expanded');
-    } else {
-        detailRight.classList.remove('panel-hidden');
-        detailLeft.classList.remove('viewer-expanded');
-    }
-
-    // Resize BabylonJS engine after layout change
-    const canvasId = canvas.id;
-    if (engines[canvasId]) {
-        engines[canvasId].resize();
-    }
-}
-
 // Debug handle
 window.babylonViewer = {
     initialize, setRenderMode, resetCamera, dispose,
-    setCameraPreset, toggleEdges, toggleBoundingBox, toggleDetailRightPanel
+    setCameraPreset, toggleEdges, toggleBoundingBox
 };

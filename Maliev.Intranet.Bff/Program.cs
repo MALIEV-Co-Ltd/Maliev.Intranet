@@ -42,7 +42,6 @@ try
 
     // Add services to the container.
     builder.Services.AddSingleton<BffMetrics>();
-    builder.Services.AddHostedService<AlertBackgroundService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.BreadcrumbService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();

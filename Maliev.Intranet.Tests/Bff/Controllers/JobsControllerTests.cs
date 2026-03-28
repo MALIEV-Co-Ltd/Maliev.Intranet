@@ -52,6 +52,22 @@ public class JobsControllerTests
         return new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
     }
 
+    private static OrderServiceClient MakeOrderClient<T>(T responseBody, HttpStatusCode code = HttpStatusCode.OK)
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(code)
+                { Content = JsonContent.Create(responseBody) }));
+        return new OrderServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+    }
+
+    private static UploadServiceClient MakeUploadClient<T>(T responseBody, HttpStatusCode code = HttpStatusCode.OK)
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(code)
+                { Content = JsonContent.Create(responseBody) }));
+        return new UploadServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+    }
+
     private static (IHubContext<Maliev.Intranet.Bff.Hubs.ProductionHub> Hub, Mock<IClientProxy> ClientProxyMock) MockHub()
     {
         var allProxy = new Mock<IClientProxy>();
@@ -68,7 +84,8 @@ public class JobsControllerTests
         return (hub.Object, allProxy);
     }
 
-    private static JobsController Make(JobServiceClient client) => new(client);
+    private static JobsController Make(JobServiceClient client) =>
+        new(client, MakeOrderClient(new object()), MakeUploadClient(new object()));
 
     // ── GET /queue ────────────────────────────────────────────────────────────
 
