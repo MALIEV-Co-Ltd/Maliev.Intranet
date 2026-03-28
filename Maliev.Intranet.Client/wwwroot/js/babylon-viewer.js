@@ -111,11 +111,13 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark) {
 
         // Create camera with Y-up targeting (Y is up, Z is depth)
         const camera = new BABYLON.ArcRotateCamera(
-            'cam', Math.PI / 4, Math.PI / 6, 50,  // beta=PI/6 so camera looks slightly down
+            'cam', Math.PI / 4, Math.PI / 6, 10,  // beta=PI/6 so camera looks slightly down
             BABYLON.Vector3.Zero(), scene
         );
         camera.attachControl(canvas, true);
-        camera.wheelPrecision = 5;
+        camera.lowerRadiusLimit = 0.1;
+        camera.upperRadiusLimit = 2000;
+        camera.wheelPrecision = 50;
 
         // Initial light
         new BABYLON.HemisphericLight('light_init', new BABYLON.Vector3(0, 0, 1), scene);
@@ -153,13 +155,13 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark) {
                     const centerZ = (bb.min.z + bb.max.z) / 2;
                     meshCenters[canvasId] = { x: centerX, y: centerY, z: centerZ };
 
-                    // Center mesh at origin (Z-up: Z is vertical)
-                    // X and Z centered horizontally, bottom of mesh sits on grid at Z=0
+                    // Center mesh at origin (Y-up: Y is vertical)
+                    // X and Z centered horizontally, bottom of mesh sits on grid at Y=0
                     _scene.meshes.forEach(m => {
                         if (m.name !== '__grid__' && !m.name.startsWith('__axis')) {
                             m.position.x -= centerX;
-                            m.position.y -= centerY;
-                            m.position.z -= bb.min.z; // sit on grid floor (Z=0)
+                            m.position.y -= (centerY - bb.min.y);  // bottom of mesh at Y=0
+                            m.position.z -= centerZ;
                         }
                     });
 
@@ -222,11 +224,11 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark) {
                         const meshRadius = Math.max(Math.sqrt(w * w + d * d + h * h) * 1.2, 5);
                         cam.minZ = meshRadius * 0.001;
                         cam.maxZ = meshRadius * 1000;
-                        cam.target = new BABYLON.Vector3(0, 0, h / 2); // center of mesh height (Z-up)
+                        cam.target = new BABYLON.Vector3(0, meshCenter.y, 0); // look at mesh bounding box center
                         cam.radius = meshRadius;
                         cam.lowerRadiusLimit = meshRadius * 0.01;
                         cam.upperRadiusLimit = meshRadius * 20;
-                        cam.wheelPrecision = Math.max(3, Math.round(50 / meshRadius));
+                        cam.wheelPrecision = Math.max(5, Math.round(meshRadius * 0.3));
                         cam.pinchPrecision = cam.wheelPrecision * 10;
                     } else {
                         cam.minZ = 0.001;
@@ -451,24 +453,24 @@ export function resetCamera(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
     const bb = sceneBoundingBoxes[canvasId];
+    const meshCenter = meshCenters[canvasId];
     const cam = scene.activeCamera;
     if (cam instanceof BABYLON.ArcRotateCamera) {
         cam.useFramingBehavior = false;
-        // Isometric view for Z-up
         cam.alpha = Math.PI / 4;
         cam.beta = Math.PI / 3; // 60° from horizontal (looking down)
-        if (bb) {
+        if (bb && meshCenter) {
             const w = bb.max.x - bb.min.x; // width (X)
             const d = bb.max.y - bb.min.y; // depth (Y)
             const h = bb.max.z - bb.min.z; // height (Z)
             const meshRadius = Math.max(Math.sqrt(w * w + d * d + h * h) * 1.2, 5);
             cam.minZ = meshRadius * 0.001;
             cam.maxZ = meshRadius * 1000;
-            cam.target = new BABYLON.Vector3(0, 0, h / 2); // center of mesh height (Z-up)
+            cam.target = new BABYLON.Vector3(0, meshCenter.y, 0); // look at mesh bounding box center
             cam.radius = meshRadius;
             cam.lowerRadiusLimit = meshRadius * 0.01;
             cam.upperRadiusLimit = meshRadius * 20;
-            cam.wheelPrecision = Math.max(3, Math.round(50 / meshRadius));
+            cam.wheelPrecision = Math.max(5, Math.round(meshRadius * 0.3));
             cam.pinchPrecision = cam.wheelPrecision * 10;
         }
         if (!cam.inputs.attached.keyboard) {
