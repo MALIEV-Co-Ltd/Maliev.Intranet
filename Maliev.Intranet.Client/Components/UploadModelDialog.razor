@@ -2,6 +2,7 @@
 @using Maliev.Intranet.Shared
 @using System.Net.Http.Headers
 @using Microsoft.AspNetCore.Components
+@inject IJSRuntime JS
 
 <MudDialog>
     <TitleContent>
@@ -22,6 +23,7 @@
                               @onclick="@context.OpenFilePickerAsync"
                               Class="@($"relative d-flex flex-column align-center justify-center py-12 px-6 border-dashed border-2 rounded-xl transition-all {(_dragOver ? "mud-border-primary mud-bg-primary-hover" : "mud-border-lines-default")}")"
                               Style="cursor: pointer;"
+                              id="upload-model-dropzone"
                               @ondragenter="@(() => _dragOver = true)"
                               @ondragleave="@(() => _dragOver = false)"
                               @ondragover:preventDefault
@@ -194,6 +196,12 @@
             Snackbar.Add("Upload(s) complete. Models are being analyzed.", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("initFileDropZone", "upload-model-dropzone");
     }
 
     private void Cancel() => MudDialog.Cancel();

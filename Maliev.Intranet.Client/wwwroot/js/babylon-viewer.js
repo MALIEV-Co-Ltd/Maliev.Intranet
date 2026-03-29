@@ -103,37 +103,46 @@ function fitCameraToMesh(cam, bb, meshCenter) {
 }
 
 /**
- * Z-up preset definitions.
- * Spherical coords relative to BabylonJS default (Y-up formula):
- *   pos = target + R * (sin(β)cos(α), cos(β), sin(β)sin(α))
+ * Z-up preset definitions — position-based to avoid BabylonJS Y-up spherical coord confusion.
+ * `dir` is the unit direction vector FROM target TO camera in world space (Z-up, mm).
+ * Z-up world: X=right, Y=depth (−Y=front, +Y=back), Z=up.
  *
- * With our Z-up visual world (BabylonJS X=SW X, BabylonJS Y=SW Y depth, BabylonJS Z=SW Z up):
- * BabylonJS pos formula: target + R*(sin(β)cos(α), cos(β), sin(β)sin(α))
+ *   front : camera at −Y (in front of model, looking back)
+ *   back  : camera at +Y (behind model)
+ *   right : camera at +X
+ *   left  : camera at −X
+ *   top   : camera at +Z (directly above, looking down)
+ *   bottom: camera at −Z (directly below, looking up)
+ *   iso   : camera at (+1,−1,+1)/√3 — front-right-above, standard 35.26° isometric
  *
- *   Front  (cam at SW −Y): α=0,      β=π       → pos at (0, −R,  0)  matches Python camera_dir (0,−1,0)
- *   Back   (cam at SW +Y): α=0,      β=0       → pos at (0, +R,  0)
- *   Right  (cam at SW +X): α=0,      β=π/2     → pos at (+R, 0,  0)
- *   Left   (cam at SW −X): α=π,      β=π/2     → pos at (−R, 0,  0)
- *   Top    (cam at SW +Z): α=π/2,    β=π/2     → pos at (0,  0, +R)
- *   Bottom (cam at SW −Z): α=−π/2,   β=π/2     → pos at (0,  0, −R)
- *   ISO    (1,−1,1 dir)   : α=π/4, β=π−acos(1/√3) → standard symmetric isometric, 35.26° elevation, front-right-above
+ * `up` is the desired screen "up" direction for each view.
  */
+const _INV3 = 1 / Math.sqrt(3);
 const PRESETS = {
-    front:  { alpha: 0,                beta: Math.PI,             up: [0, 0, 1] },
-    back:   { alpha: 0,                beta: 0,                   up: [0, 0, 1] },
-    right:  { alpha: 0,                beta: Math.PI / 2,         up: [0, 0, 1] },
-    left:   { alpha: Math.PI,          beta: Math.PI / 2,         up: [0, 0, 1] },
-    top:    { alpha: Math.PI / 2,      beta: Math.PI / 2,         up: [0, 1, 0] },
-    bottom: { alpha: -Math.PI / 2,     beta: Math.PI / 2,         up: [0, 1, 0] },
-    iso:    { alpha: Math.PI / 4,      beta: Math.PI - Math.acos(1 / Math.sqrt(3)), up: [0, 0, 1] },
+    front:  { dir: [  0,      -1,       0    ], up: [0, 0, 1] },
+    back:   { dir: [  0,      +1,       0    ], up: [0, 0, 1] },
+    right:  { dir: [ -1,       0,       0    ], up: [0, 0, 1] },
+    left:   { dir: [ +1,       0,       0    ], up: [0, 0, 1] },
+    top:    { dir: [  0,       0,      -1    ], up: [0, 1, 0] },
+    bottom: { dir: [  0,       0,      +1    ], up: [0, 1, 0] },
+    iso:    { dir: [ _INV3,  -_INV3,  _INV3  ], up: [0, 0, 1] },
 };
 
+/**
+ * Positions the camera using a world-space direction vector rather than alpha/beta
+ * so that the Z-up coordinate system is respected without spherical-coord confusion.
+ */
 function applyPreset(cam, presetName) {
     const p = PRESETS[presetName];
     if (!p) return;
-    cam.alpha = p.alpha;
-    cam.beta  = p.beta;
     cam.upVector = new BABYLON.Vector3(p.up[0], p.up[1], p.up[2]);
+    const r = cam.radius;
+    const t = cam.target;
+    cam.setPosition(new BABYLON.Vector3(
+        t.x + p.dir[0] * r,
+        t.y + p.dir[1] * r,
+        t.z + p.dir[2] * r
+    ));
 }
 
 // ── initialize ────────────────────────────────────────────────────────────────
@@ -191,13 +200,19 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 _scene.lights.forEach(l => l.dispose());
 
                 const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 0, 1), _scene);
-                hemi.intensity   = isDark ? 0.55 : 0.70;
-                hemi.specular    = new BABYLON.Color3(0.08, 0.08, 0.08);
-                hemi.groundColor = isDark ? new BABYLON.Color3(0.06, 0.06, 0.08)
-                                          : new BABYLON.Color3(0.45, 0.45, 0.50);
+                hemi.intensity   = isDark ? 0.45 : 0.65;
+                hemi.specular    = new BABYLON.Color3(0.1, 0.1, 0.1);
+                hemi.groundColor = isDark ? new BABYLON.Color3(0.08, 0.08, 0.12)
+                                          : new BABYLON.Color3(0.5, 0.55, 0.6);
 
-                const dir = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-0.5, -0.8, -1), _scene);
-                dir.intensity = isDark ? 0.65 : 0.85;
+                const dir = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-0.7, -1.0, -0.8), _scene);
+                dir.intensity = isDark ? 0.8 : 1.5;
+                
+                // Add shadow generator for soft shadows
+                const shadowGenerator = new BABYLON.ShadowGenerator(2048, dir);
+                shadowGenerator.usePercentageCloserFiltering = true;
+                shadowGenerator.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
+                shadowGenerator.setDarkness(isDark ? 0.3 : 0.6); // Slightly lighter shadows so it's not pitch black
 
                 // ── Find root meshes (exclude system meshes) ──
                 const rootMeshes = _scene.meshes.filter(m =>
@@ -212,23 +227,36 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 if (!rawBb) return;
 
                 // ── Determine scale factor (GLB is in meters per glTF spec → scale to mm) ──
+                //
+                // Strategy:
+                //   1. Auto-detect from rawMaxDim (safe, always bounded).
+                //      < 1 unit  → assume meters  → ×1000
+                //      ≥ 1 unit  → assume already mm → ×1
+                //   2. If knownDimsMm is available and auto-detect disagrees with it by
+                //      more than 100× either way, apply a ratio correction (clamped).
+                //      This handles large parts (> 1000 mm) where auto-detect stays at ×1
+                //      but the GLB is in meters.
                 let scaleFactor = 1;
-                if (knownDimsMm && knownDimsMm.x > 0 && knownDimsMm.y > 0 && knownDimsMm.z > 0) {
-                    const measuredMax = Math.max(
-                        rawBb.max.x - rawBb.min.x,
-                        rawBb.max.y - rawBb.min.y,
-                        rawBb.max.z - rawBb.min.z
-                    );
-                    const knownMax = Math.max(knownDimsMm.x, knownDimsMm.y, knownDimsMm.z);
-                    if (measuredMax > 1e-9) scaleFactor = knownMax / measuredMax;
-                } else {
-                    // Auto-detect: if bounding box < 1 unit assume meters, scale × 1000 to get mm
-                    const maxDim = Math.max(
-                        rawBb.max.x - rawBb.min.x,
-                        rawBb.max.y - rawBb.min.y,
-                        rawBb.max.z - rawBb.min.z
-                    );
-                    if (maxDim > 0 && maxDim < 1.0) scaleFactor = 1000;
+                const rawMaxDim = Math.max(
+                    rawBb.max.x - rawBb.min.x,
+                    rawBb.max.y - rawBb.min.y,
+                    rawBb.max.z - rawBb.min.z
+                );
+                if (rawMaxDim > 1e-9) {
+                    // Step 1: auto-detect
+                    scaleFactor = (rawMaxDim < 1.0) ? 1000 : 1;
+
+                    // Step 2: knownDimsMm correction for cases where auto-detect is way off
+                    if (knownDimsMm && knownDimsMm.x > 0 && knownDimsMm.y > 0 && knownDimsMm.z > 0) {
+                        const knownMax = Math.max(knownDimsMm.x, knownDimsMm.y, knownDimsMm.z);
+                        const autoResult = rawMaxDim * scaleFactor; // predicted max dim after auto-scale
+                        const ratio = autoResult / knownMax;        // 1.0 = perfect match
+                        if (ratio < 0.01 || ratio > 100) {
+                            // Auto-detect is > 100× off — override with ratio-based factor, clamped.
+                            const sf = knownMax / rawMaxDim;
+                            scaleFactor = Math.max(1e-3, Math.min(1e6, sf));
+                        }
+                    }
                 }
 
                 // ── Apply scaling to root meshes ──
@@ -281,7 +309,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 const partY = finalBb.max.y - finalBb.min.y;
                 const maxHoriz = Math.max(partX, partY, 1e-6);
                 const gridRatio = 10; // 10 mm cells
-                const rawGridSize = Math.max(maxHoriz * 1.2, 30);
+                const rawGridSize = Math.max(maxHoriz * 1.5, 50); // Slightly larger grid for shadows
                 const gridSize = Math.ceil(rawGridSize / 10) * 10;
                 // Cap subdivisions to avoid OOM crash on large/wrongly-scaled meshes
                 const subdivs = Math.max(2, Math.min(200, Math.round(gridSize / gridRatio)));
@@ -291,27 +319,38 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 // Rotate XZ plane (Y=0) → XY plane (Z=0)
                 ground.rotation.x = Math.PI / 2;
                 ground.isPickable = false;
+                ground.receiveShadows = true; // Receive shadows from the mesh
+
+                // Push grid down slightly to avoid Z-fighting with flat bottoms
+                ground.position.z = -0.05;
 
                 const gridMat = new BABYLON.GridMaterial('gridMat', _scene);
                 gridMat.majorUnitFrequency = 5;
-                gridMat.minorUnitVisibility = 0.35;
+                gridMat.minorUnitVisibility = 0.45;
                 gridMat.gridRatio = gridRatio;
                 gridMat.backFaceCulling = false;
                 gridMat.mainColor = isDark
-                    ? new BABYLON.Color3(0.15, 0.15, 0.18)
-                    : new BABYLON.Color3(0.88, 0.88, 0.90);
+                    ? new BABYLON.Color3(0.13, 0.15, 0.20)   // slightly lighter than canvas bg
+                    : new BABYLON.Color3(0.94, 0.94, 0.96);  // slightly darker than canvas bg
                 gridMat.lineColor = isDark
-                    ? new BABYLON.Color3(0.30, 0.30, 0.35)
-                    : new BABYLON.Color3(0.62, 0.62, 0.68);
-                gridMat.opacity = 0.90;
+                    ? new BABYLON.Color3(0.35, 0.37, 0.45)
+                    : new BABYLON.Color3(0.55, 0.55, 0.62);
+                gridMat.opacity = 0.9;
                 ground.material = gridMat;
 
-                // ── Save original materials ──
+                // ── Save original materials and setup shadows ──
                 const origMats = originalMaterials[canvasId];
                 _scene.meshes.forEach(m => {
-                    if (m.name !== '__grid__' && !m.name.startsWith('__axis') && m.material)
-                        origMats[m.uniqueId] = m.material;
+                    if (m.name !== '__grid__' && !m.name.startsWith('__axis')) {
+                        if (m.material) origMats[m.uniqueId] = m.material;
+                        shadowGenerator.addShadowCaster(m);
+                        m.receiveShadows = true;
+                    }
                 });
+
+                // Position directional light to correctly cast shadows from the top, front-left
+                const dist = Math.max(partX, partY, finalBb.max.z - finalBb.min.z);
+                dir.position = new BABYLON.Vector3(meshCenters[canvasId].x - dist, meshCenters[canvasId].y - dist, finalBb.max.z + dist);
 
                 // ── Configure camera ──
                 const cam = mainCameras[canvasId];
@@ -320,6 +359,11 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     fitCameraToMesh(cam, finalBb, meshCenters[canvasId]);
                     applyPreset(cam, 'iso');
                 }
+
+                // ── Post Processing ──
+                // Engine is already created with hardware MSAA (new BABYLON.Engine(canvas, true)).
+                // FXAA is intentionally omitted: it blurs wireframes. SSAO is omitted because it
+                // conflicts with the multi-camera setup used for the axis gizmo viewport.
 
                 // ── Axis gizmo ──
                 createAxisGizmo(canvasId, _scene, mainCameras[canvasId], canvas);
@@ -336,6 +380,22 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
             (_scene, message, exception) => {
                 modelLoadState[canvasId] = 'error';
                 console.error('[BabylonViewer] Load error:', message, exception);
+                // Show a fallback grid so the canvas isn't completely blank
+                try {
+                    const g = BABYLON.MeshBuilder.CreateGround('__grid__',
+                        { width: 200, height: 200, subdivisions: 20 }, _scene);
+                    g.rotation.x = Math.PI / 2;
+                    g.isPickable  = false;
+                    const gm = new BABYLON.GridMaterial('gridMat', _scene);
+                    gm.majorUnitFrequency = 5;
+                    gm.minorUnitVisibility = 0.35;
+                    gm.gridRatio  = 10;
+                    gm.backFaceCulling = false;
+                    gm.mainColor  = isDark ? new BABYLON.Color3(0.15, 0.15, 0.18) : new BABYLON.Color3(0.88, 0.88, 0.90);
+                    gm.lineColor  = isDark ? new BABYLON.Color3(0.30, 0.30, 0.35) : new BABYLON.Color3(0.62, 0.62, 0.68);
+                    gm.opacity = 0.90;
+                    g.material = gm;
+                } catch (_) {}
             },
             forcedExt
         );
@@ -359,7 +419,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
 /**
  * Creates a fixed XYZ axis indicator in the top-right corner.
- * Z-up visual: X=red (right), Y=blue (depth), Z=green (up)
+ * Z-up CAD standard colors: X=red (right), Y=green (depth), Z=blue (up)
  */
 function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     // Dispose previous
@@ -383,10 +443,10 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     const LAYER = 0x10000000;
     const LEN   = 0.65;
 
-    // Z-up: X=red, Y=blue (depth/front), Z=green (up)
+    // Z-up CAD standard: X=red, Y=green, Z=blue
     const COL_X = new BABYLON.Color3(0.93, 0.27, 0.27); // Red
-    const COL_Y = new BABYLON.Color3(0.22, 0.51, 0.96); // Blue
-    const COL_Z = new BABYLON.Color3(0.13, 0.77, 0.27); // Green
+    const COL_Y = new BABYLON.Color3(0.13, 0.77, 0.27); // Green
+    const COL_Z = new BABYLON.Color3(0.22, 0.51, 0.96); // Blue
 
     function makeAxisLine(name, pts, color) {
         const l = BABYLON.MeshBuilder.CreateLines(name, { points: pts }, scene);
@@ -447,8 +507,8 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     // ── Hover labels (X, Y, Z text that appear on mouseover) ──
     const labelDefs = [
         { name: 'X', color: '#f04444', pos: new BABYLON.Vector3(LEN + 0.28, 0,       0) },
-        { name: 'Y', color: '#3882f5', pos: new BABYLON.Vector3(0,       LEN + 0.28, 0) },
-        { name: 'Z', color: '#22c750', pos: new BABYLON.Vector3(0,       0,       LEN + 0.28) },
+        { name: 'Y', color: '#22c750', pos: new BABYLON.Vector3(0,       LEN + 0.28, 0) },
+        { name: 'Z', color: '#3882f5', pos: new BABYLON.Vector3(0,       0,       LEN + 0.28) },
     ];
 
     const labelDivs = labelDefs.map(({ name, color, pos }) => {
@@ -534,6 +594,25 @@ function updateAxisLabels(canvasId, scene, axesCam) {
     });
 }
 
+// ── CAD material ──────────────────────────────────────────────────────────────
+
+/**
+ * Returns (or lazily creates) the shared CAD-gray PBR material for a scene.
+ * All solid-mode meshes use this so parts always render with a uniform aluminum-gray
+ * regardless of the original material embedded in the GLB.
+ */
+function getCadMaterial(scene) {
+    const name = '__cad_gray__';
+    const existing = scene.getMaterialByName(name);
+    if (existing) return existing;
+    const pbr = new BABYLON.PBRMaterial(name, scene);
+    // Matte aluminum-gray — matches Fusion/OnShape default appearance without sheen
+    pbr.albedoColor = new BABYLON.Color3(0.86, 0.88, 0.92);
+    pbr.metallic    = 0.0;
+    pbr.roughness   = 0.65;
+    return pbr;
+}
+
 // ── setRenderMode ─────────────────────────────────────────────────────────────
 
 export function setRenderMode(canvasId, mode) {
@@ -558,33 +637,22 @@ export function setRenderMode(canvasId, mode) {
             try { mesh.disableEdgesRendering(); } catch (_) {}
 
         } else if (mode === 'transparent') {
-            if (!origMats[mesh.uniqueId] && mesh.material) origMats[mesh.uniqueId] = mesh.material;
-            const isPBR = mesh.material instanceof BABYLON.PBRMaterial;
-            let tm;
-            if (isPBR) {
-                const pbr = mesh.material;
-                tm = new BABYLON.PBRMaterial('xray_' + mesh.uniqueId, scene);
-                tm.albedoColor      = pbr.albedoColor ? pbr.albedoColor.scale(0.6) : new BABYLON.Color3(0.7, 0.7, 0.7);
+            // CAD-gray semi-transparent (X-Ray view)
+            let tm = scene.getMaterialByName('__xray_shared__');
+            if (!tm) {
+                tm = new BABYLON.StandardMaterial('__xray_shared__', scene);
+                tm.diffuseColor     = new BABYLON.Color3(0.58, 0.60, 0.64);
+                tm.emissiveColor    = new BABYLON.Color3(0.08, 0.08, 0.10);
                 tm.alpha            = 0.38;
-                tm.transparencyMode = BABYLON.PBRMaterial.PBRMATERIAL_ALPHABLEND;
-                tm.metallic         = pbr.metallic ?? 0;
-                tm.roughness        = pbr.roughness ?? 0.5;
-            } else {
-                tm = new BABYLON.StandardMaterial('xray_' + mesh.uniqueId, scene);
-                tm.diffuseColor = mesh.material?.diffuseColor
-                    ? mesh.material.diffuseColor.scale(0.6)
-                    : new BABYLON.Color3(0.7, 0.7, 0.7);
-                tm.alpha         = 0.38;
-                tm.emissiveColor = new BABYLON.Color3(0.12, 0.12, 0.12);
+                tm.backFaceCulling  = false;
+                tm.twoSidedLighting = true;
             }
-            tm.backFaceCulling  = false;
-            tm.twoSidedLighting = true;
             mesh.material = tm;
             try { mesh.disableEdgesRendering(); } catch (_) {}
 
         } else {
-            // Solid — restore original material
-            if (origMats[mesh.uniqueId]) mesh.material = origMats[mesh.uniqueId];
+            // Solid — always apply uniform CAD gray (overrides any GLB-embedded colors)
+            mesh.material = getCadMaterial(scene);
             try { mesh.disableEdgesRendering(); } catch (_) {}
         }
     });
@@ -656,9 +724,10 @@ export function toggleEdges(canvasId, enabled) {
         if (enabled) {
             try {
                 mesh.disableEdgesRendering();
-                // epsilon=0.95, checkVerticesInsteadOfIndices=true fixes non-welded STL meshes
-                mesh.enableEdgesRendering(0.95, true);
-                mesh.edgesWidth = 8;
+                // Use a tighter epsilon (~0.98 or ~11.5 degrees) to catch subtle geometric features
+                // like chamfers and shallow draft angles found in CAD parts.
+                mesh.enableEdgesRendering(0.98, true);
+                mesh.edgesWidth = 8.0;
                 mesh.edgesColor = edgeColor;
             } catch (_) {}
         } else {
@@ -721,8 +790,8 @@ export function toggleBoundingBox(canvasId, enabled) {
 
     const labelDefs = [
         { text: `X: ${(bb.max.x - bb.min.x).toFixed(1)} mm`, borderColor: '#f04444' },
-        { text: `Y: ${(bb.max.y - bb.min.y).toFixed(1)} mm`, borderColor: '#3882f5' },
-        { text: `Z: ${(bb.max.z - bb.min.z).toFixed(1)} mm`, borderColor: '#22c750' },
+        { text: `Y: ${(bb.max.y - bb.min.y).toFixed(1)} mm`, borderColor: '#22c750' },
+        { text: `Z: ${(bb.max.z - bb.min.z).toFixed(1)} mm`, borderColor: '#3882f5' },
     ];
 
     const labelEntries = labelDefs.map(({ text, borderColor }) => {
