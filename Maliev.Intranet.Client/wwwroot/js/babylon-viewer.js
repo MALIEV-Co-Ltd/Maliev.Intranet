@@ -321,7 +321,11 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 });
 
                 // Position directional light to correctly cast shadows from the top, front-left
-                const dist = Math.max(partX, partY, finalBb.max.z - finalBb.min.z);
+                const dist = Math.max(
+                    finalBb.max.x - finalBb.min.x,
+                    finalBb.max.y - finalBb.min.y,
+                    finalBb.max.z - finalBb.min.z
+                );
                 dir.position = new BABYLON.Vector3(meshCenters[canvasId].x - dist, meshCenters[canvasId].y - dist, finalBb.max.z + dist);
 
                 // ── Configure camera ──

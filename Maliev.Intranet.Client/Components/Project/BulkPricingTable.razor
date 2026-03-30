@@ -6,8 +6,8 @@
         <MudText Typo="Typo.body2" Class="ml-1" Style="font-weight:600;">Volume Savings</MudText>
         @if (!_expanded && ActiveTier != null && SavingAmount > 0)
         {
-            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ml-2" Label="true">
-                @CurrencyCode @SavingAmount.ToString("N0")
+            <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="ml-2" Label="true">
+                Saved @CurrencyCode @SavingAmount.ToString("N0")
             </MudChip>
         }
         <MudSpacer />
@@ -36,7 +36,7 @@
 
 <style>
     .bpt-container {
-        border: 1px dashed var(--mud-palette-primary);
+        border: 2px dashed var(--mud-palette-divider);
         border-radius: var(--mud-default-borderradius);
         overflow: hidden;
     }
@@ -57,7 +57,7 @@
         transition: background 0.1s;
     }
     .bpt-tier-row--active {
-        background: var(--mud-palette-primary-lighten);
+        background: var(--mud-palette-success-lighten);
     }
 </style>
 

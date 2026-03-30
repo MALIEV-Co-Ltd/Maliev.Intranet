@@ -111,45 +111,46 @@
                 </MudSelect>
             </div>
 
-            <div class="pcs-field">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Surface Finish</MudText>
-                <MudSelect T="CatalogSurfaceFinishDto"
-                           Value="@SelectedFinish"
-                           ValueChanged="@((CatalogSurfaceFinishDto? f) => OnFinishChanged(f))"
-                           ToStringFunc="@(f => f?.Name ?? string.Empty)"
-                           Disabled="@(Part!.AvailableFinishes.Count == 0)"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Label=""
-                           Placeholder="">
-                    @foreach (var fin in Part!.AvailableFinishes)
-                    {
-                        <MudSelectItem T="CatalogSurfaceFinishDto" Value="@fin">@fin.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-
-            @if (Part!.ProcessCode == "CNC")
-            {
-                <div class="pcs-field">
-                    <MudText Typo="Typo.caption" Class="pcs-field-label">Ra / Roughness</MudText>
-                    <MudSelect T="string"
-                               Value="@Part!.RoughnessCode"
-                               ValueChanged="@((string? v) => OnRoughnessChanged(v))"
+            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                <div class="pcs-field" style="flex: 1;">
+                    <MudText Typo="Typo.caption" Class="pcs-field-label">Surface Finish</MudText>
+                    <MudSelect T="CatalogSurfaceFinishDto"
+                               Value="@SelectedFinish"
+                               ValueChanged="@((CatalogSurfaceFinishDto? f) => OnFinishChanged(f))"
+                               ToStringFunc="@(f => f?.Name ?? string.Empty)"
+                               Disabled="@(Part!.AvailableFinishes.Count == 0)"
                                Variant="Variant.Outlined"
                                Margin="Margin.Dense"
                                Label=""
                                Placeholder="">
-                        <MudSelectItem T="string" Value="@("Ra0.2")">Ra 0.2</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Ra0.4")">Ra 0.4</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Ra0.8")">Ra 0.8</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Ra1.6")">Ra 1.6</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Ra3.2")">Ra 3.2</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Ra6.3")">Ra 6.3</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Ra12.5")">Ra 12.5</MudSelectItem>
+                        @foreach (var fin in Part!.AvailableFinishes)
+                        {
+                            <MudSelectItem T="CatalogSurfaceFinishDto" Value="@fin">@fin.Name</MudSelectItem>
+                        }
                     </MudSelect>
                 </div>
-            }
+                @if (Part!.ProcessCode == "CNC")
+                {
+                    <div class="pcs-field" style="flex: 1;">
+                        <MudText Typo="Typo.caption" Class="pcs-field-label">Ra / Roughness</MudText>
+                        <MudSelect T="string"
+                                   Value="@Part!.RoughnessCode"
+                                   ValueChanged="@((string? v) => OnRoughnessChanged(v))"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Label=""
+                                   Placeholder="">
+                            <MudSelectItem T="string" Value="@("Ra0.2")">Ra 0.2</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Ra0.4")">Ra 0.4</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Ra0.8")">Ra 0.8</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Ra1.6")">Ra 1.6</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Ra3.2")">Ra 3.2</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Ra6.3")">Ra 6.3</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Ra12.5")">Ra 12.5</MudSelectItem>
+                        </MudSelect>
+                    </div>
+                }
+            </MudStack>
         </div>
 
         @* ── Section C: Design & Features ────────────────────────────────── *@
@@ -229,7 +230,7 @@
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
                               Label=""
-                              Placeholder="" />
+                              Placeholder="Add special instructions, notes, or requirements..." />
             </div>
         </div>
 
@@ -384,6 +385,9 @@
         if (Part == null) return;
         Part.ProcessCode = p?.Code;
         Part.ProcessId = p?.Id;
+        Part.AvailableMaterials = [];
+        Part.AvailableFinishes = [];
+        Part.AvailableTolerances = [];
         await OnPartChanged.InvokeAsync(Part);
     }
 

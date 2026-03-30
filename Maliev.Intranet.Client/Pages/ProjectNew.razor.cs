@@ -222,6 +222,7 @@ public partial class ProjectNew : IAsyncDisposable
                 {
                     part.GlbSignedUrl = payload.GlbUrl;
                     part.GlbStoragePath ??= payload.StoragePath;
+                    part.ViewerUrl = payload.GlbUrl;
                 }
                 await InvokeAsync(StateHasChanged);
             });
