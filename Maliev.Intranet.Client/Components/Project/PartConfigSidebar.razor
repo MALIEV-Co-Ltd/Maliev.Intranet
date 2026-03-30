@@ -109,33 +109,57 @@
         <div class="pcs-section">
             <MudText Typo="Typo.overline" Class="pcs-section-label">Design &amp; Features</MudText>
 
-            <div class="pcs-field">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Tolerance</MudText>
-                <MudSelect T="CatalogToleranceDto"
-                           Value="@SelectedTolerance"
-                           ValueChanged="@((CatalogToleranceDto? t) => OnToleranceChanged(t))"
-                           ToStringFunc="@(t => t?.Name ?? string.Empty)"
-                           Disabled="@(Part!.AvailableTolerances.Count == 0)"
-                           Label=""
-                           Placeholder="">
-                    @foreach (var tol in Part!.AvailableTolerances)
-                    {
-                        <MudSelectItem T="CatalogToleranceDto" Value="@tol">@tol.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
+            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-3">
+                <div style="flex: 1;">
+                    <MudText Typo="Typo.caption" Class="pcs-field-label">Tolerance</MudText>
+                    <MudSelect T="CatalogToleranceDto"
+                               Value="@SelectedTolerance"
+                               ValueChanged="@((CatalogToleranceDto? t) => OnToleranceChanged(t))"
+                               ToStringFunc="@(t => t?.Name ?? string.Empty)"
+                               Disabled="@(Part!.AvailableTolerances.Count == 0)"
+                               Label=""
+                               Placeholder="">
+                        @foreach (var tol in Part!.AvailableTolerances)
+                        {
+                            <MudSelectItem T="CatalogToleranceDto" Value="@tol">@tol.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                <div style="flex: 1;">
+                    <MudText Typo="Typo.caption" Class="pcs-field-label">Part Marking</MudText>
+                    <MudSelect T="PartMarkingType"
+                               Value="@Part!.MarkingType"
+                               ValueChanged="@((PartMarkingType v) => OnPartMarkingChanged(v))"
+                               Label=""
+                               Placeholder="">
+                        <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.None">None</MudSelectItem>
+                        <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.Laser">Laser Marking</MudSelectItem>
+                        <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.Printing">Silkscreen</MudSelectItem>
+                        <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.Engraving">CNC Engraving</MudSelectItem>
+                    </MudSelect>
+                </div>
+            </MudStack>
 
-            <MudText Typo="Typo.caption" Class="pcs-field-label">Features</MudText>
-            <MudChipSet T="string"
-                        SelectionMode="SelectionMode.MultiSelection"
-                        CheckMark="true"
-                        Color="Color.Primary"
-                        SelectedValues="@_selectedFeatures"
-                        SelectedValuesChanged="@OnFeaturesChanged">
-                <MudChip T="string" Value="@("ThreadedHoles")" Size="Size.Small">Threaded Holes</MudChip>
-                <MudChip T="string" Value="@("Inserts")" Size="Size.Small">Inserts</MudChip>
-                <MudChip T="string" Value="@("BagAndTag")" Size="Size.Small">Bag &amp; Tag</MudChip>
-            </MudChipSet>
+            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-3">
+                <MudChipSet T="string"
+                            SelectionMode="SelectionMode.MultiSelection"
+                            CheckMark="true"
+                            Color="Color.Primary"
+                            SelectedValues="@_selectedFeatures"
+                            SelectedValuesChanged="@OnFeaturesChanged">
+                    <MudChip T="string" Value="@("ThreadedHoles")" Size="Size.Small">Threaded / Tapped Holes</MudChip>
+                    <MudChip T="string" Value="@("Inserts")" Size="Size.Small">Inserts (e.g. Helicoils)</MudChip>
+                </MudChipSet>
+            </MudStack>
+
+            <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
+                                Icon="@Icons.Material.Outlined.UploadFile"
+                                Label="Upload Revised Model"
+                                SubLabel="Preserves configuration &amp; notes"
+                                MaxFileSizeLabel="max 250 MB"
+                                OnClick="@OnReviseModel"
+                                OnFilesDropped="@OnReviseModel"
+                                Class="mb-3" />
 
             <DrawingUploadSection PartId="@Part!.FileId"
                                   ProjectId="@TempProjectId"
@@ -243,8 +267,8 @@
     /// <summary>Callback invoked after any mutation to the part configuration.</summary>
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
 
-    /// <summary>Callback for opening the file picker for revised CAD upload.</summary>
-    [Parameter] public EventCallback OnOpenFilePicker { get; set; }
+    /// <summary>Callback invoked when the user wants to upload a revised CAD model for this part.</summary>
+    [Parameter] public EventCallback OnReviseModel { get; set; }
 
     private IReadOnlyCollection<string> _selectedFeatures = [];
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
@@ -273,7 +297,6 @@
         var features = new List<string>();
         if (Part.HasThreadedHoles) features.Add("ThreadedHoles");
         if (Part.HasInserts) features.Add("Inserts");
-        if (Part.BagAndTag) features.Add("BagAndTag");
         _selectedFeatures = features;
     }
 
@@ -324,7 +347,13 @@
         _selectedFeatures = selected;
         Part.HasThreadedHoles = selected.Contains("ThreadedHoles");
         Part.HasInserts = selected.Contains("Inserts");
-        Part.BagAndTag = selected.Contains("BagAndTag");
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task OnPartMarkingChanged(PartMarkingType markingType)
+    {
+        if (Part == null) return;
+        Part.MarkingType = markingType;
         await OnPartChanged.InvokeAsync(Part);
     }
 
