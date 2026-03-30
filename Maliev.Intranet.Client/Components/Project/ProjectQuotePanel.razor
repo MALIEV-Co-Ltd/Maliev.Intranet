@@ -4,9 +4,16 @@
 <div class="pqp-root">
 
     <div class="pqp-section pqp-leadtime">
-        <MudText Typo="Typo.overline" Color="Color.Secondary">
-            Lead Time
-        </MudText>
+        <div class="pqp-lt-header" @onclick="@(() => _leadTimeExpanded = !_leadTimeExpanded)">
+            <MudText Typo="Typo.overline" Color="@(_leadTimeExpanded ? Color.Secondary : Color.Primary)">
+                @(_leadTimeExpanded ? "Lead Time" : $"Lead Time ({SelectedLeadTime?.Name})")
+            </MudText>
+            <MudIcon Icon="@(_leadTimeExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                     Size="Size.Small" Color="Color.Secondary" />
+        </div>
+
+        @if (_leadTimeExpanded)
+        {
 
         @if (LeadTimeOptions.Count == 0)
         {
@@ -23,7 +30,7 @@
                     var (dMin, dMax) = GetDisplayDays(opt);
                     var isSelected = SelectedLeadTime?.Code == opt.Code;
                     <div class="pqp-lt-card @(isSelected ? "pqp-lt-selected" : "")"
-                         @onclick="@(() => OnLeadTimeChanged.InvokeAsync(opt))">
+                         @onclick="@(async () => await OnLeadTimeChanged.InvokeAsync(opt))">
                         <div class="pqp-lt-card-body">
                             <div class="pqp-lt-name">@opt.Name</div>
                             <div class="pqp-lt-days">
@@ -51,11 +58,13 @@
                 }
             </div>
         }
+
+        } @* end _leadTimeExpanded *@
     </div>
 
     <div class="pqp-section pqp-summary">
-        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mb-1">
-            Summary
+        <MudText Typo="Typo.overline" Class="mb-1">
+            Order Summary · @Parts.Count part@(Parts.Count == 1 ? "" : "s") · @Parts.Sum(p => p.Quantity) unit@(Parts.Sum(p => p.Quantity) == 1 ? "" : "s")
         </MudText>
 
         @if (Parts.Count == 0)
@@ -66,46 +75,38 @@
         }
         else
         {
-            @foreach (var part in Parts)
-            {
-                <div class="pqp-part-row">
-                    <div class="pqp-part-info">
-                        <MudTooltip Text="@part.Name">
-                            <span class="pqp-part-name">@part.Name</span>
-                        </MudTooltip>
-                        <span class="pqp-part-meta">×@part.Quantity@(string.IsNullOrEmpty(part.MaterialCode) ? "" : $" · {part.MaterialCode}")</span>
-                    </div>
-                    <span class="pqp-part-price">
-                        @if (part.PricingLoading)
-                        {
-                            <MudSkeleton Width="55px" Height="12px" Animation="Animation.Wave" />
-                        }
-                        else if (part.PricingFailed)
-                        {
-                            <MudTooltip Text="Pricing failed — will retry on next config change">
-                                <MudIcon Icon="@Icons.Material.Outlined.Warning" Size="Size.Small" Color="Color.Warning" />
+            <div class="pqp-parts-scroll">
+                @foreach (var part in Parts)
+                {
+                    <div class="pqp-part-row @(IsActivePart(part) ? "summary-item active" : "")" @onclick="@(async () => await OnPartActivated.InvokeAsync(part))">
+                        <div class="pqp-part-info">
+                            <MudTooltip Text="@part.Name">
+                                <span class="pqp-part-name">@part.Name</span>
                             </MudTooltip>
-                        }
-                        else if (part.EstimatedTotalAmount.HasValue)
-                        {
-                            @FormatPrice(part.EstimatedTotalAmount.Value)
-                        }
-                        else
-                        {
-                            <text>—</text>
-                        }
-                    </span>
-                </div>
-            }
+                            <span class="pqp-part-meta">@part.Quantity unit@(part.Quantity == 1 ? "" : "s")@(string.IsNullOrEmpty(part.MaterialCode) ? "" : $" · {part.MaterialCode}")</span>
+                        </div>
+                        <span class="pqp-part-price">
+                            @if (part.PricingLoading)
+                            {
+                                <MudSkeleton Width="55px" Height="12px" Animation="Animation.Wave" />
+                            }
+                            else if (part.EstimatedTotalAmount.HasValue)
+                            {
+                                @FormatPrice(part.EstimatedTotalAmount.Value)
+                            }
+                            else
+                            {
+                                <text>—</text>
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
         }
     </div>
 
     <div class="pqp-section pqp-checkout">
         <div class="pqp-totals">
-            <div class="pqp-total-row">
-                <span>Subtotal</span>
-                <span>@FormatPrice(_subtotal)</span>
-            </div>
             @if (SelectedLeadTime != null && SelectedLeadTime.PriceMultiplier != 1.0m)
             {
                 <div class="pqp-total-row">
@@ -114,17 +115,17 @@
                 </div>
             }
             <div class="pqp-total-grand">
-                <span>Total</span>
-                <span>@FormatPrice(_quoteTotal)</span>
+                <MudText Typo="Typo.body2">Total</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Primary">@FormatPrice(_quoteTotal)</MudText>
             </div>
         </div>
 
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    FullWidth="true"
-                   Class="mt-3"
                    Disabled="@(!CanQuote)"
-                   OnClick="OnQuote">
+                   OnClick="OnQuote"
+                   Style="font-size:16px;">
             @if (Saving)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
@@ -153,8 +154,8 @@
 
 <style>
     .pqp-root {
-        width: 280px;
-        min-width: 280px;
+        width: 340px;
+        min-width: 340px;
         height: 100%;
         overflow-y: auto;
         background: var(--mud-palette-surface);
@@ -195,9 +196,9 @@
         transition: border-color 0.15s, background 0.15s;
     }
 
-    .pqp-lt-card:hover { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-hover); }
+    .pqp-lt-card:hover { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-lighten); }
 
-    .pqp-lt-selected { border-color: var(--mud-palette-primary) !important; background: var(--mud-palette-primary-hover); }
+    .pqp-lt-selected { border-color: var(--mud-palette-primary) !important; background: var(--mud-palette-primary-lighten); }
 
     .pqp-lt-card-body { display: flex; flex-direction: column; gap: 2px; }
 
@@ -239,7 +240,19 @@
 
     .pqp-total-row { display: flex; justify-content: space-between; font-size: var(--mud-typography-body2-size); }
 
-    .pqp-total-grand { display: flex; justify-content: space-between; font-weight: 700; font-size: var(--mud-typography-subtitle1-size); margin-top: 4px; }
+    .pqp-total-grand { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+    .pqp-lt-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+        margin-bottom: 4px;
+    }
+    .pqp-lt-header:hover { opacity: 0.8; }
+    .pqp-parts-scroll { overflow-y: auto; flex: 1; max-height: 240px; }
+    .pqp-part-row { cursor: pointer; }
+    .pqp-part-row:hover { background: var(--mud-palette-background-grey); border-radius: 4px; }
 </style>
 
 @code {
@@ -267,6 +280,13 @@
     /// <summary>Callback invoked when the user clicks the Quote button.</summary>
     [Parameter] public EventCallback OnQuote { get; set; }
 
+    /// <summary>Callback invoked when the user clicks a part row in the summary, to activate it in the configurator.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnPartActivated { get; set; }
+
+    /// <summary>The index of the currently active/selected part in the Parts list.</summary>
+    [Parameter] public int SelectedPartIndex { get; set; } = -1;
+
+    private bool _leadTimeExpanded;
     private int _maxLeadTimeDays;
     private bool _hasPricedParts;
     private decimal _subtotal;
@@ -314,4 +334,7 @@
 
     private string FormatPrice(decimal amount) =>
         $"{SelectedCurrency?.Symbol ?? "฿"}{amount:N2}";
+
+    private bool IsActivePart(PartViewModel part) =>
+        Parts.IndexOf(part) == SelectedPartIndex;
 }

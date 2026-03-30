@@ -437,3 +437,258 @@
     letter-spacing: 0.5px;
     color: var(--mud-palette-text-secondary);
 }
+
+/* ── Input typography — use default theme size (13px) ───────────────────── */
+.mud-autocomplete .mud-input-control-input-control,
+.mud-input .mud-input-label,
+.mud-input-control .mud-input-label,
+.mud-input-slot::placeholder {
+    font-size: var(--mud-typography-default-size);
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — SECTION HEADERS
+   Gray background, uppercase, letter-spacing — matches reference .section-header
+   ================================================================ */
+.section-header {
+    background: #e2e8f0;
+    padding: 8px 16px;
+    margin: -20px -20px 20px -20px;
+    font-size: var(--mud-typography-caption-size);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: #0f172a;
+    border-bottom: 1px solid var(--mud-palette-divider);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — BADGE (Saved state in topbar)
+   ================================================================ */
+.badge {
+    background: rgba(37,99,235,0.05);
+    color: var(--mud-palette-primary);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid rgba(37,99,235,0.2);
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — SUMMARY ITEM ACTIVE STATE (Quote panel)
+   ================================================================ */
+.summary-item.active {
+    background: rgba(37,99,235,0.05);
+    border-color: var(--mud-palette-primary) !important;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — CAROUSEL WRAPPER PADDING
+   ================================================================ */
+.pc-row {
+    padding: 16px !important;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — CHIP SHAPE FIX (6px not full-pill)
+   ================================================================ */
+.mud-chip {
+    border-radius: 6px !important;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — TOOLBAR DIVIDER
+   ================================================================ */
+.vp-divider {
+    width: 1px;
+    background: var(--mud-palette-lines-default);
+    margin: 0 4px;
+    height: 24px;
+    align-self: center;
+    flex-shrink: 0;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — TEXT TERTIARY COLOR (missing from MudBlazor palette)
+   ================================================================ */
+:root {
+    --mud-palette-text-tertiary: #71717a;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — CONFIG SIDEBAR FIELD LABELS
+   ================================================================ */
+.pcs-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.pcs-field-label {
+    font-weight: 500;
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-caption-size);
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — CONFIG SIDEBAR SECTION LABELS
+   ================================================================ */
+.pcs-section-label {
+    text-transform: uppercase;
+    font-size: var(--mud-typography-overline-size);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--mud-palette-text-secondary);
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — CONFIG SIDEBAR HEADER (part name/dim)
+   ================================================================ */
+.pcs-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--mud-palette-divider);
+    flex-shrink: 0;
+}
+
+.pcs-part-name {
+    font-weight: 600;
+    font-size: var(--mud-typography-subtitle1-size);
+}
+
+.pcs-dim {
+    font-family: var(--mud-typography-default-font-family);
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-caption-size);
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — DFM OVERLAY FIXES
+   ================================================================ */
+.dfm-overlay {
+    background: rgba(255,255,255,0.5) !important;
+    backdrop-filter: blur(8px);
+    width: 320px !important;
+}
+
+.dfm-overlay-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — MINI CARD THUMBNAIL STATUS ICONS
+   Thumbnail overlay positioning — status icon bottom-right of thumb
+   ================================================================ */
+.mc-indicator {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 10px;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — LEFT PANEL CUSTOMER CARD ACCENT
+   ================================================================ */
+.pnl-customer-card {
+    background: var(--mud-palette-surface) !important;
+    border: 1px solid var(--mud-palette-lines-default) !important;
+    border-left: 4px solid var(--mud-palette-primary) !important;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — QUOTE PANEL CHECKOUT STICKY
+   ================================================================ */
+.pqp-checkout {
+    position: sticky;
+    bottom: 0;
+    background: var(--mud-palette-surface);
+    z-index: 1;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — TOP BAR
+   ================================================================ */
+.tb-title-input {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--mud-palette-text-primary);
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.tb-title-input:hover {
+    border-color: var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+}
+
+.tb-title-input:focus {
+    border-color: var(--mud-palette-primary);
+    outline: none;
+    background: var(--mud-palette-surface);
+}
+
+.pn-save-icon { transition: color 0.2s; }
+
+@keyframes pn-spin { to { transform: rotate(360deg); } }
+
+.pn-save-icon--spin { animation: pn-spin 1.2s linear infinite; }
+
+/* ================================================================
+   PROJECTNEW PAGE — LEFT PANEL
+   ================================================================ */
+.pnl-left {
+    width: 320px;
+    min-width: 320px;
+}
+
+.pnl-section-grow {
+    flex: 1;
+    min-height: 200px;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — MINI CARD (shared with carousel)
+   ================================================================ */
+.mc-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.mc-qty {
+    font-size: 11px;
+    color: var(--mud-palette-primary);
+    font-weight: 600;
+}
+
+/* ================================================================
+   PROJECTNEW PAGE — QUOTE PANEL
+   ================================================================ */
+.pqp-root {
+    width: 340px;
+    min-width: 340px;
+}

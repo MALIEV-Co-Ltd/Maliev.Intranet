@@ -3,32 +3,31 @@
 
 <div class="pn-topbar">
     @* Back arrow *@
-    <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBackIosNew"
                    Href="/sales/projects"
                    Size="Size.Small"
                    Color="Color.Default" />
 
     @* Inline-editable title *@
-    @if (_editingTitle)
+    <input type="text"
+           value="@_titleDraft"
+           @onchange="(e) => _titleDraft = e.Value?.ToString() ?? string.Empty"
+           @onblur="CommitTitle"
+           class="tb-title-input"
+           size="14" />
+
+    @* Save indicator *@
+    @if (AutoSaving)
     {
-        <MudTextField T="string"
-                      Value="@_titleDraft"
-                      ValueChanged="@(v => _titleDraft = v)"
-                      Immediate="true"
-                      AutoFocus="true"
-                      Variant="Variant.Text"
-                      Margin="Margin.Dense"
-                      @onblur="@CommitTitle"
-                      Style="font-weight:600; font-size:var(--mud-typography-subtitle1-size); min-width:200px;" />
+        <MudIcon Icon="@Icons.Material.Filled.CloudSync" Class="pn-save-icon pn-save-icon--spin" Size="Size.Small" />
     }
     else
     {
-        <span class="pn-topbar-title" @onclick="@(() => { _titleDraft = Title; _editingTitle = true; })">
-            @(string.IsNullOrWhiteSpace(Title) ? "Untitled Project" : Title)
-            <MudIcon Icon="@Icons.Material.Outlined.Edit" Class="pn-title-edit-icon" Size="Size.Small" />
+        <span class="badge">
+            <MudIcon Icon="@Icons.Material.Filled.CloudDone" Size="Size.Small" />
+            Saved
         </span>
     }
-    <MudChip T="string" Size="Size.Small" Color="Color.Default" Label="true" Class="ml-1">Draft</MudChip>
 
     <MudSpacer />
 
@@ -37,51 +36,37 @@
                Value="@SelectedCurrency"
                ValueChanged="@OnCurrencyChanged"
                ToStringFunc="@(c => c?.Code ?? "")"
-               Label="Currency"
+               Label=""
                Variant="Variant.Outlined"
                Margin="Margin.Dense"
                Dense="true"
                Style="width:90px;flex-grow:0;flex-shrink:0;"
-               maxwidth="120px"
                Clearable="false">
         @foreach (var c in Currencies)
         {
-            <MudSelectItem T="CurrencyDto" Value="@c">@c.Code</MudSelectItem>
+            <MudSelectItem T="CurrencyDto" Value="@c">@c.Code @c.Symbol</MudSelectItem>
         }
     </MudSelect>
 
-    @* Saved status *@
-    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mx-2" Style="white-space:nowrap;">
-        @if (AutoSaving) { <text>Saving...</text> }
-        else if (LastSavedAt.HasValue) { <text>@GetRelativeTime(LastSavedAt.Value)</text> }
-    </MudText>
-
-    @* New project button *@
-    <MudTooltip Text="New project">
-        <MudIconButton Icon="@Icons.Material.Outlined.Add"
+    @* Layout toggle *@
+    <MudTooltip Text="@(LayoutMode == LayoutMode.Configurator ? "Switch to table view" : "Switch to configurator")">
+        <MudIconButton Icon="@(LayoutMode == LayoutMode.Configurator ? Icons.Material.Filled.ViewList : Icons.Material.Filled.AutoAwesomeMosaic)"
                        Size="Size.Small"
-                       Href="/sales/projects/new" />
+                       OnClick="@ToggleLayout" />
     </MudTooltip>
 
     @* Duplicate button *@
     <MudTooltip Text="Duplicate project">
-        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
                        Size="Size.Small"
                        OnClick="@OnDuplicate" />
-    </MudTooltip>
-
-    @* Layout toggle *@
-    <MudTooltip Text="@(LayoutMode == LayoutMode.Configurator ? "Switch to table view" : "Switch to configurator")">
-        <MudIconButton Icon="@(LayoutMode == LayoutMode.Configurator ? Icons.Material.Outlined.TableRows : Icons.Material.Outlined.GridView)"
-                       Size="Size.Small"
-                       OnClick="@ToggleLayout" />
     </MudTooltip>
 </div>
 
 <style>
     .pn-topbar {
-        height: 52px;
-        min-height: 52px;
+        height: 48px;
+        min-height: 48px;
         background: var(--mud-palette-surface);
         border-bottom: 1px solid var(--mud-palette-lines-default);
         display: flex;
@@ -90,25 +75,7 @@
         gap: 6px;
         flex-shrink: 0;
     }
-    .pn-topbar-title {
-        font-weight: 600;
-        font-size: var(--mud-typography-subtitle1-size);
-        cursor: pointer;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 300px;
-    }
-    .pn-topbar-title:hover { text-decoration: underline; }
-    .pn-title-edit-icon {
-        font-size: var(--maliev-icon-size-small) !important;
-        opacity: 0;
-        transition: opacity 0.15s;
-        vertical-align: middle;
-        margin-left: 3px;
-        color: var(--mud-palette-text-secondary);
-    }
-    .pn-topbar-title:hover .pn-title-edit-icon { opacity: 0.7; }
+
 </style>
 
 @code {
@@ -117,18 +84,22 @@
     [Parameter] public CurrencyDto? SelectedCurrency { get; set; }
     [Parameter] public List<CurrencyDto> Currencies { get; set; } = [];
     [Parameter] public EventCallback<CurrencyDto?> OnCurrencyChanged { get; set; }
-    [Parameter] public DateTimeOffset? LastSavedAt { get; set; }
     [Parameter] public bool AutoSaving { get; set; }
     [Parameter] public LayoutMode LayoutMode { get; set; }
     [Parameter] public EventCallback<LayoutMode> OnLayoutModeChanged { get; set; }
     [Parameter] public EventCallback OnDuplicate { get; set; }
 
-    private bool _editingTitle;
     private string _titleDraft = string.Empty;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        _titleDraft = Title;
+    }
 
     private async Task CommitTitle()
     {
-        _editingTitle = false;
         if (_titleDraft != Title)
             await OnTitleChanged.InvokeAsync(_titleDraft);
     }
@@ -136,13 +107,4 @@
     private Task ToggleLayout() =>
         OnLayoutModeChanged.InvokeAsync(
             LayoutMode == LayoutMode.Configurator ? LayoutMode.SummaryTable : LayoutMode.Configurator);
-
-    private string GetRelativeTime(DateTimeOffset time)
-    {
-        var diff = DateTimeOffset.Now - time.ToLocalTime();
-        if (diff.TotalMinutes < 1) return "Saved just now";
-        if (diff.TotalMinutes < 60) return $"Saved {(int)diff.TotalMinutes} min ago";
-        if (diff.TotalHours < 24) return $"Saved {(int)diff.TotalHours}h ago";
-        return $"Saved {time.ToLocalTime():dd MMM HH:mm}";
-    }
 }
