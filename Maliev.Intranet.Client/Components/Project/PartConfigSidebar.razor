@@ -155,20 +155,19 @@
                 </div>
             </MudStack>
 
-            <div class="pcs-check-group">
-                <label class="pcs-check-btn @(Part!.HasThreadedHoles ? "checked" : "")">
-                    <input type="checkbox"
-                           checked="@Part!.HasThreadedHoles"
-                           @onchange="@(async (ChangeEventArgs e) => await OnThreadedHolesChanged(Convert.ToBoolean(e.Value)))" />
-                    <span>Threaded / Tapped Holes</span>
-                </label>
-                <label class="pcs-check-btn @(Part!.HasInserts ? "checked" : "")">
-                    <input type="checkbox"
-                           checked="@Part!.HasInserts"
-                           @onchange="@(async (ChangeEventArgs e) => await OnInsertsChanged(Convert.ToBoolean(e.Value)))" />
-                    <span>Inserts (e.g. Helicoils)</span>
-                </label>
-            </div>
+            <MudText Typo="Typo.caption" Class="pcs-field-label">Features</MudText>
+            <MudChipSet T="string"
+                        SelectionMode="SelectionMode.MultiSelection"
+                        CheckMark="true"
+                        Color="Color.Default"
+                        SelectedColor="Color.Primary"
+                        Size="Size.Small"
+                        SelectedValues="@_selectedFeatures"
+                        SelectedValuesChanged="@OnFeaturesChanged">
+                <MudChip T="string" Value="@("ThreadedHoles")">Threaded Holes</MudChip>
+                <MudChip T="string" Value="@("Inserts")">Inserts</MudChip>
+                <MudChip T="string" Value="@("BagAndTag")">Bag &amp; Tag</MudChip>
+            </MudChipSet>
 
             <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
                                 Icon="@Icons.Material.Outlined.UploadFile"
@@ -204,21 +203,12 @@
             <MudText Typo="Typo.overline" Class="pcs-section-label">Logistics &amp; Pricing</MudText>
 
             <div class="pcs-field">
-                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                    <div style="flex: 1;">
-                        <MudText Typo="Typo.caption" Class="pcs-field-label">Quantity</MudText>
-                        <MudNumericField T="int"
-                                         Value="@Part!.Quantity"
-                                         ValueChanged="@((int qty) => OnQuantityChanged(qty))"
-                                         Min="1"
-                                         Max="10000" />
-                    </div>
-                    <MudCheckBox T="bool"
-                                 Value="@Part!.BagAndTag"
-                                 ValueChanged="@(v => { Part!.BagAndTag = v; OnPartChanged.InvokeAsync(Part!); })"
-                                 Label="Bag & Tag"
-                                 Dense="true" />
-                </MudStack>
+                <MudText Typo="Typo.caption" Class="pcs-field-label">Quantity</MudText>
+                <MudNumericField T="int"
+                                 Value="@Part!.Quantity"
+                                 ValueChanged="@((int qty) => OnQuantityChanged(qty))"
+                                 Min="1"
+                                 Max="10000" />
             </div>
 
             <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" />
@@ -333,6 +323,7 @@
 
     private bool _routingExpanded = true;
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
+    private IReadOnlyCollection<string> _selectedFeatures = [];
 
     // ── Computed properties ───────────────────────────────────────────────
 
@@ -354,6 +345,11 @@
     protected override void OnParametersSet()
     {
         if (Part == null) return;
+        var features = new List<string>();
+        if (Part.HasThreadedHoles) features.Add("ThreadedHoles");
+        if (Part.HasInserts) features.Add("Inserts");
+        if (Part.BagAndTag) features.Add("BagAndTag");
+        _selectedFeatures = features;
     }
 
     // ── Event handlers ───────────────────────────────────────────────────
@@ -397,17 +393,13 @@
         await OnPartChanged.InvokeAsync(Part);
     }
 
-    private async Task OnThreadedHolesChanged(bool value)
+    private async Task OnFeaturesChanged(IReadOnlyCollection<string> selected)
     {
         if (Part == null) return;
-        Part.HasThreadedHoles = value;
-        await OnPartChanged.InvokeAsync(Part);
-    }
-
-    private async Task OnInsertsChanged(bool value)
-    {
-        if (Part == null) return;
-        Part.HasInserts = value;
+        _selectedFeatures = selected;
+        Part.HasThreadedHoles = selected.Contains("ThreadedHoles");
+        Part.HasInserts = selected.Contains("Inserts");
+        Part.BagAndTag = selected.Contains("BagAndTag");
         await OnPartChanged.InvokeAsync(Part);
     }
 
