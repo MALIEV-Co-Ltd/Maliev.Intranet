@@ -1,30 +1,30 @@
-    .pcs-sidebar {
-        width: 380px;
-        min-width: 380px;
-        height: 100%;
-        background: var(--mud-palette-surface);
-        border-left: 1px solid var(--mud-palette-lines-default);
-        display: flex;
-        flex-direction: column;
-        flex-shrink: 0;
-        overflow: visible;
-    }
+.pcs-sidebar {
+    width: 380px;
+    min-width: 380px;
+    height: 100%;
+    background: var(--mud-palette-surface);
+    border-left: 1px solid var(--mud-palette-lines-default);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: visible;
+}
 
-    .pcs-scroll {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        background: var(--mud-palette-surface);
-        padding: 0 20px;
-        overflow-y: auto;
-        min-height: 0;
-    }
+.pcs-scroll {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--mud-palette-surface);
+    padding: 0 20px;
+    overflow-y: auto;
+    min-height: 0;
+}
 
-    .pcs-section {
-        padding: 16px 0 16px;
-        flex-shrink: 0;
-        background: var(--mud-palette-surface);
-    }
+.pcs-section {
+    padding: 16px 0 16px;
+    flex-shrink: 0;
+    background: var(--mud-palette-surface);
+}
 
 .pcs-empty {
     display: flex;
@@ -37,9 +37,109 @@
 /* ── Sticky footer for Production Routing ─────────────────────────── */
 .pcs-footer {
     flex-shrink: 0;
-    padding: 16px 20px;
+    padding: 0;
     border-top: 1px solid var(--mud-palette-lines-default);
     background: var(--mud-palette-surface);
+}
+
+/* ── Price card (Production Routing wrapper) ──────────────────────── */
+.pcs-price-card {
+    background: var(--mud-palette-background-grey);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--radius-md);
+    padding: 12px;
+}
+
+/* ── Collapsible routing header ───────────────────────────────────── */
+.pcs-routing-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+}
+
+.pcs-routing-content {
+    max-height: 300px;
+    margin-top: 12px;
+    overflow: hidden;
+    transition: max-height 0.2s cubic-bezier(0.4, 0, 0.2, 1), margin-top 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+}
+
+.pcs-routing-content.collapsed {
+    max-height: 0;
+    margin-top: 0;
+    opacity: 0;
+}
+
+.pcs-routing-chevron {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pcs-routing-chevron.collapsed {
+    transform: rotate(180deg);
+}
+
+/* ── Routing row ──────────────────────────────────────────────────── */
+.pcs-routing-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.pcs-routing-row:last-child {
+    margin-bottom: 0;
+}
+
+/* ── Custom checkboxes (Threaded / Inserts) ──────────────────────── */
+.pcs-check-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.pcs-check-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: var(--mud-palette-surface);
+    font-size: 13px;
+    font-weight: 500;
+    flex: 1;
+    user-select: none;
+}
+
+.pcs-check-btn:hover {
+    background: var(--mud-palette-background-grey);
+    border-color: var(--mud-palette-primary);
+}
+
+.pcs-check-btn input[type="checkbox"] {
+    accent-color: var(--mud-palette-primary);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.pcs-check-btn.checked {
+    background: var(--mud-palette-primary-lighten-5);
+    border-color: var(--mud-palette-primary);
+    color: var(--mud-palette-primary);
+}
+
+.pcs-check-btn.checked input[type="checkbox"] {
+    accent-color: var(--mud-palette-primary);
 }
 
 @media (max-width: 1200px) {

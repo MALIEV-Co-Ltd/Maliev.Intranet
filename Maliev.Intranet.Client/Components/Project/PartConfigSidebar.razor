@@ -15,7 +15,7 @@
 
 <div class="pcs-sidebar">
     <div class="pcs-header">
-        <MudText Typo="Typo.subtitle1" Class="pcs-part-name fw-bold">@Part!.Name</MudText>
+        <MudText Typo="Typo.h6" Class="pcs-part-name">@Part!.Name</MudText>
         @if (Part!.Dimensions != null)
         {
             var dims = Part!.Dimensions;
@@ -41,6 +41,8 @@
                            Value="@SelectedProcess"
                            ValueChanged="@((ProcessDto? p) => OnProcessChanged(p))"
                            ToStringFunc="@(p => p?.Name ?? string.Empty)"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Label=""
                            Placeholder="">
                     @foreach (var proc in Processes)
@@ -57,6 +59,8 @@
                            ValueChanged="@((CatalogMaterialDto? m) => OnMaterialChanged(m))"
                            ToStringFunc="@(m => m?.Name ?? string.Empty)"
                            Disabled="@(Part!.AvailableMaterials.Count == 0)"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Label=""
                            Placeholder="">
                     @foreach (var mat in Part!.AvailableMaterials)
@@ -73,6 +77,8 @@
                            ValueChanged="@((CatalogSurfaceFinishDto? f) => OnFinishChanged(f))"
                            ToStringFunc="@(f => f?.Name ?? string.Empty)"
                            Disabled="@(Part!.AvailableFinishes.Count == 0)"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Label=""
                            Placeholder="">
                     @foreach (var fin in Part!.AvailableFinishes)
@@ -89,6 +95,8 @@
                     <MudSelect T="string"
                                Value="@Part!.RoughnessCode"
                                ValueChanged="@((string? v) => OnRoughnessChanged(v))"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
                                Label=""
                                Placeholder="">
                         <MudSelectItem T="string" Value="@("Ra0.2")">Ra 0.2</MudSelectItem>
@@ -117,6 +125,8 @@
                                ValueChanged="@((CatalogToleranceDto? t) => OnToleranceChanged(t))"
                                ToStringFunc="@(t => t?.Name ?? string.Empty)"
                                Disabled="@(Part!.AvailableTolerances.Count == 0)"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
                                Label=""
                                Placeholder="">
                         @foreach (var tol in Part!.AvailableTolerances)
@@ -130,6 +140,8 @@
                     <MudSelect T="PartMarkingType"
                                Value="@Part!.MarkingType"
                                ValueChanged="@((PartMarkingType v) => OnPartMarkingChanged(v))"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
                                Label=""
                                Placeholder="">
                         <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.None">None</MudSelectItem>
@@ -140,17 +152,20 @@
                 </div>
             </MudStack>
 
-            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-3">
-                <MudChipSet T="string"
-                            SelectionMode="SelectionMode.MultiSelection"
-                            CheckMark="true"
-                            Color="Color.Primary"
-                            SelectedValues="@_selectedFeatures"
-                            SelectedValuesChanged="@OnFeaturesChanged">
-                    <MudChip T="string" Value="@("ThreadedHoles")" Size="Size.Small">Threaded / Tapped Holes</MudChip>
-                    <MudChip T="string" Value="@("Inserts")" Size="Size.Small">Inserts (e.g. Helicoils)</MudChip>
-                </MudChipSet>
-            </MudStack>
+            <div class="pcs-check-group">
+                <label class="pcs-check-btn @(Part!.HasThreadedHoles ? "checked" : "")">
+                    <input type="checkbox"
+                           checked="@Part!.HasThreadedHoles"
+                           @onchange="@(async (ChangeEventArgs e) => await OnThreadedHolesChanged(Convert.ToBoolean(e.Value)))" />
+                    <span>Threaded / Tapped Holes</span>
+                </label>
+                <label class="pcs-check-btn @(Part!.HasInserts ? "checked" : "")">
+                    <input type="checkbox"
+                           checked="@Part!.HasInserts"
+                           @onchange="@(async (ChangeEventArgs e) => await OnInsertsChanged(Convert.ToBoolean(e.Value)))" />
+                    <span>Inserts (e.g. Helicoils)</span>
+                </label>
+            </div>
 
             <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
                                 Icon="@Icons.Material.Outlined.UploadFile"
@@ -217,6 +232,8 @@
                 <MudSelect T="InspectionLevel"
                            Value="@Part!.InspectionLevel"
                            ValueChanged="@((InspectionLevel level) => OnInspectionChanged(level))"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Label=""
                            Placeholder="">
                     <MudSelectItem T="InspectionLevel" Value="@InspectionLevel.Standard">Standard</MudSelectItem>
@@ -230,6 +247,8 @@
                 <MudSelect T="string"
                            MultiSelection="true"
                            Disabled="true"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Label=""
                            Placeholder="Select certificates">
                     <MudSelectItem T="string" Value="@("ISO9001")" Disabled="true">ISO 9001</MudSelectItem>
@@ -242,14 +261,47 @@
 
     </div>
 
-    @* ── Production Routing (sticky footer) ────────────────────────── *@
+    @* ── Production Routing (collapsible sticky footer) ───────────── *@
     @if (Part!.ProductionRouting != null || Part!.ProductionRoutingLoading)
     {
         <MudDivider />
         <div class="pcs-footer">
-            <MudText Typo="Typo.overline" Class="pcs-section-label">Production Routing</MudText>
-            <ProductionRoutingPanel Routing="@Part!.ProductionRouting"
-                                    Loading="@Part!.ProductionRoutingLoading" />
+            <div class="pcs-price-card">
+                <div class="pcs-routing-header"
+                     role="button"
+                     tabindex="0"
+                     @onclick="@(() => _routingExpanded = !_routingExpanded)"
+                     @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") _routingExpanded = !_routingExpanded; })">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <MudIcon Icon="@Icons.Material.Filled.Route" Size="Size.Small" />
+                        <MudText Typo="Typo.overline" Class="pcs-section-label" style="margin: 0; border: none; padding: 0;">
+                            Production Routing &amp; Queue
+                        </MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.ExpandLess"
+                             Class="@(_routingExpanded ? "pcs-routing-chevron" : "pcs-routing-chevron collapsed")" />
+                </div>
+                <div class="pcs-routing-content @(_routingExpanded ? "" : "collapsed")">
+                    <div class="pcs-routing-row">
+                        <span>@Part!.ProductionRouting?.MachineCode — @Part!.ProductionRouting?.MachineName</span>
+                    </div>
+                    <div class="pcs-routing-row">
+                        <span>Queue Position</span>
+                        <span style="color: var(--mud-palette-warning); font-weight: 600;">@Part!.ProductionRouting?.QueueAhead job@(Part!.ProductionRouting?.QueueAhead == 1 ? "" : "s") ahead</span>
+                    </div>
+                    <div class="pcs-routing-row">
+                        <span>Est. Start Date</span>
+                        <span>@Part!.ProductionRouting?.EstimatedStartDate.ToString("d MMM yyyy")</span>
+                    </div>
+                    <MudButton Variant="Variant.Outlined"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.CalendarMonth"
+                               OnClick="OpenScheduleDialog"
+                               Style="width: 100%; margin-top: 12px; border-radius: var(--radius-md);">
+                        View Planning Schedule
+                    </MudButton>
+                </div>
+            </div>
         </div>
     }
 </div>
@@ -270,7 +322,9 @@
     /// <summary>Callback invoked when the user wants to upload a revised CAD model for this part.</summary>
     [Parameter] public EventCallback OnReviseModel { get; set; }
 
-    private IReadOnlyCollection<string> _selectedFeatures = [];
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+
+    private bool _routingExpanded = true;
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
 
     // ── Computed properties ───────────────────────────────────────────────
@@ -293,11 +347,6 @@
     protected override void OnParametersSet()
     {
         if (Part == null) return;
-
-        var features = new List<string>();
-        if (Part.HasThreadedHoles) features.Add("ThreadedHoles");
-        if (Part.HasInserts) features.Add("Inserts");
-        _selectedFeatures = features;
     }
 
     // ── Event handlers ───────────────────────────────────────────────────
@@ -341,12 +390,17 @@
         await OnPartChanged.InvokeAsync(Part);
     }
 
-    private async Task OnFeaturesChanged(IReadOnlyCollection<string> selected)
+    private async Task OnThreadedHolesChanged(bool value)
     {
         if (Part == null) return;
-        _selectedFeatures = selected;
-        Part.HasThreadedHoles = selected.Contains("ThreadedHoles");
-        Part.HasInserts = selected.Contains("Inserts");
+        Part.HasThreadedHoles = value;
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task OnInsertsChanged(bool value)
+    {
+        if (Part == null) return;
+        Part.HasInserts = value;
         await OnPartChanged.InvokeAsync(Part);
     }
 
@@ -383,5 +437,15 @@
         if (Part == null) return;
         Part.DrawingFiles = files;
         await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private void OpenScheduleDialog()
+    {
+        if (Part?.ProductionRouting == null) return;
+        var parameters = new DialogParameters<ScheduleDialogContent>
+        {
+            { x => x.Routing, Part.ProductionRouting }
+        };
+        DialogService.ShowAsync<ScheduleDialogContent>("Planning Schedule", parameters);
     }
 }
