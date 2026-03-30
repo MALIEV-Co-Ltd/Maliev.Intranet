@@ -162,3 +162,28 @@
         border-top: 1px solid var(--mud-palette-lines-default);
     }
 }
+
+/* ── Inline mode (used inside card expanded section) ─────────────────── */
+.pcs-inline {
+    width: 100%;
+    min-width: unset;
+    border-left: none;
+    border-top: 1px solid var(--mud-palette-lines-default);
+    height: auto;
+}
+
+.pcs-inline .pcs-scroll {
+    padding: 0 16px;
+}
+
+.pcs-inline .pcs-section {
+    padding-bottom: 8px;
+}
+
+.pcs-inline .pcs-footer {
+    display: none;
+}
+
+.pcs-inline .pcs-empty-state {
+    min-height: 80px;
+}

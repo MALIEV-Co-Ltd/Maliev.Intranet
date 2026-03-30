@@ -2,7 +2,8 @@
 @using Maliev.Intranet.Shared.Dtos
 
 <div class="plr-wrapper">
-    <div class="plr-row">
+    @* ── Collapsed card row ─────────────────────────────────────────── *@
+    <div class="plr-card-row">
 
         @* Checkbox *@
         <div class="plr-cell plr-cell--check">
@@ -12,8 +13,9 @@
                          Size="Size.Small" />
         </div>
 
-        @* Thumbnail 40x40 *@
-        <div class="plr-cell plr-cell--thumb">
+        @* Thumbnail *@
+        <div class="plr-cell plr-cell--thumb"
+             @onclick="@(async () => await OnViewIn3D.InvokeAsync())">
             @if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl))
             {
                 <img src="@Part.ThumbnailSmallUrl"
@@ -33,61 +35,63 @@
             }
         </div>
 
-        @* File info: name + volume *@
+        @* File info: name + dims + DFM badge *@
         <div class="plr-cell plr-cell--info">
             <MudText Typo="Typo.body2" Class="plr-filename">@Part.Name</MudText>
-            @if (Part.VolumeMm3.HasValue)
-            {
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    @($"{Part.VolumeMm3.Value / 1000.0:N2} cm³")
-                </MudText>
-            }
+            <div class="plr-meta-row">
+                @if (Part.Dimensions != null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="plr-dims">
+                        @($"{Part.Dimensions.X:N1} × {Part.Dimensions.Y:N1} × {Part.Dimensions.Z:N1} mm")
+                    </MudText>
+                }
+                @if (Part.VolumeMm3.HasValue)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="plr-volume">
+                        · @((Part.VolumeMm3.Value / 1000.0).ToString("F2")) cm³
+                    </MudText>
+                }
+            </div>
+            @* DFM status badge *@
+            <div class="plr-badge-row">
+                @if (Part.DfmReport != null && !Part.DfmAcknowledged)
+                {
+                    <MudChip T="string"
+                             Label="true"
+                             Color="Color.Warning"
+                             Size="Size.Small"
+                             Class="plr-dfm-badge">
+                        <MudIcon Icon="@Icons.Material.Filled.WarningAmber"
+                                 Size="Size.Small"
+                                 Class="mr-1" />
+                        DFM Warnings
+                    </MudChip>
+                }
+                else if (Part.IsFullyConfigured)
+                {
+                    <MudChip T="string"
+                             Label="true"
+                             Color="Color.Success"
+                             Size="Size.Small"
+                             Class="plr-dfm-badge">
+                        <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline"
+                                 Size="Size.Small"
+                                 Class="mr-1" />
+                        DFM Passed
+                    </MudChip>
+                }
+            </div>
         </div>
 
-        @* Dimensions: hidden below lg *@
-        <div class="plr-cell plr-cell--dims d-none d-lg-flex">
-            @if (Part.Dimensions != null)
-            {
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    @($"{Part.Dimensions.X:N1}×{Part.Dimensions.Y:N1}×{Part.Dimensions.Z:N1} mm")
-                </MudText>
-            }
-            else
-            {
-                <MudText Typo="Typo.caption" Color="Color.Tertiary">—</MudText>
-            }
-        </div>
-
-        @* DFM status icon *@
-        <div class="plr-cell plr-cell--dfm">
-            @if (Part.DfmReport != null && !Part.DfmAcknowledged)
-            {
-                <MudIcon Icon="@Icons.Material.Filled.WarningAmber"
-                         Size="Size.Small"
-                         Color="Color.Warning" />
-            }
-            else if (Part.IsFullyConfigured)
-            {
-                <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline"
-                         Size="Size.Small"
-                         Color="Color.Success" />
-            }
-            else
-            {
-                <MudIcon Icon="@Icons.Material.Filled.BuildCircle"
-                         Size="Size.Small"
-                         Color="Color.Secondary" />
-            }
-        </div>
-
-        @* Process dropdown: hidden below md *@
-        <div class="plr-cell plr-cell--process d-none d-md-flex">
+        @* Process dropdown *@
+        <div class="plr-cell plr-cell--process">
             <MudSelect T="ProcessDto"
                        Value="@SelectedProcess"
                        ValueChanged="@((ProcessDto? p) => OnProcessChanged(p))"
                        ToStringFunc="@(p => p?.Name ?? string.Empty)"
                        Margin="Margin.Dense"
                        Variant="Variant.Outlined"
+                       Label="Process"
                        Class="plr-select">
                 @foreach (var proc in Processes)
                 {
@@ -96,8 +100,8 @@
             </MudSelect>
         </div>
 
-        @* Material dropdown: hidden below md *@
-        <div class="plr-cell plr-cell--material d-none d-md-flex">
+        @* Material dropdown *@
+        <div class="plr-cell plr-cell--material">
             <MudSelect T="CatalogMaterialDto"
                        Value="@SelectedMaterial"
                        ValueChanged="@((CatalogMaterialDto? m) => OnMaterialChanged(m))"
@@ -105,6 +109,7 @@
                        Disabled="@(Part.AvailableMaterials.Count == 0)"
                        Margin="Margin.Dense"
                        Variant="Variant.Outlined"
+                       Label="Material"
                        Class="plr-select">
                 @foreach (var mat in Part.AvailableMaterials)
                 {
@@ -113,8 +118,8 @@
             </MudSelect>
         </div>
 
-        @* Quantity: hidden below md *@
-        <div class="plr-cell plr-cell--qty d-none d-md-flex">
+        @* Quantity *@
+        <div class="plr-cell plr-cell--qty">
             <MudNumericField T="int"
                              Value="@Part.Quantity"
                              ValueChanged="@((int qty) => OnQuantityChanged(qty))"
@@ -122,21 +127,21 @@
                              Max="10000"
                              Margin="Margin.Dense"
                              Variant="Variant.Outlined"
+                             Label="Qty"
                              Class="plr-qty-field" />
         </div>
 
-        @* Price/unit: hidden below lg *@
-        <div class="plr-cell plr-cell--price d-none d-lg-flex">
-            <MudText Typo="Typo.body2">
-                @(Part.EstimatedUnitPrice.HasValue ? Part.EstimatedUnitPrice.Value.ToString("N2") : "—")
+        @* Total price *@
+        <div class="plr-cell plr-cell--price">
+            <MudText Typo="Typo.h6" Color="Color.Primary" Class="plr-total">
+                @(Part.EstimatedTotalAmount.HasValue ? $"฿{Part.EstimatedTotalAmount.Value:N0}" : "—")
             </MudText>
-        </div>
-
-        @* Total: hidden below lg *@
-        <div class="plr-cell plr-cell--total d-none d-lg-flex">
-            <MudText Typo="Typo.body2" Style="font-weight:600;">
-                @(Part.EstimatedTotalAmount.HasValue ? Part.EstimatedTotalAmount.Value.ToString("N2") : "—")
-            </MudText>
+            @if (Part.EstimatedUnitPrice.HasValue)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="plr-unit-price">
+                    ฿@Part.EstimatedUnitPrice.Value.ToString("N0") ea
+                </MudText>
+            }
         </div>
 
         @* Action buttons *@
@@ -155,64 +160,18 @@
         </div>
     </div>
 
-    @* Inline PartConfigSidebar when expanded *@
+    @* ── Expanded configuration panel ─────────────────────────────── *@
     @if (_expanded)
     {
         <div class="plr-config-panel">
             <PartConfigSidebar Part="@Part"
                                Processes="@Processes"
                                TempProjectId="@TempProjectId"
+                               DisplayMode="@PartConfigSidebarDisplayMode.Inline"
                                OnPartChanged="@OnPartChanged" />
         </div>
     }
 </div>
-
-<style>
-    .plr-wrapper {
-        border-bottom: 1px solid var(--mud-palette-lines-default);
-        background: var(--mud-palette-surface);
-    }
-    .plr-wrapper:hover { background: var(--mud-palette-background-grey); }
-    .plr-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 8px;
-        min-height: 56px;
-    }
-    .plr-cell { display: flex; align-items: center; flex-shrink: 0; }
-    .plr-cell--check { width: 36px; justify-content: center; }
-    .plr-cell--thumb {
-        width: 40px; height: 40px;
-        justify-content: center;
-        background: var(--mud-palette-background);
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .plr-cell--info { flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 1px; }
-    .plr-cell--dims { width: 160px; }
-    .plr-cell--dfm { width: 32px; justify-content: center; }
-    .plr-cell--process { width: 160px; }
-    .plr-cell--material { width: 160px; }
-    .plr-cell--qty { width: 60px; }
-    .plr-cell--price { width: 70px; justify-content: flex-end; }
-    .plr-cell--total { width: 80px; justify-content: flex-end; }
-    .plr-cell--actions { width: 108px; justify-content: flex-end; gap: 0; }
-    .plr-filename {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 100%;
-        font-weight: 600;
-    }
-    .plr-thumb-img { width: 100%; height: 100%; object-fit: contain; }
-    .plr-select { min-width: 0; }
-    .plr-qty-field { width: 60px; }
-    .plr-config-panel {
-        border-top: 1px solid var(--mud-palette-lines-default);
-        background: var(--mud-palette-background);
-    }
-</style>
 
 @code {
     /// <summary>The part view model this row represents.</summary>

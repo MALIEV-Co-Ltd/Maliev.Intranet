@@ -5,7 +5,7 @@
 
 @if (Part == null)
 {
-    <div class="pcs-sidebar">
+    <div class="pcs-sidebar pcs-empty-state">
         <div class="pcs-empty">
             <MudText Typo="Typo.body2" Color="Color.Secondary">Select a part to configure</MudText>
         </div>
@@ -13,7 +13,9 @@
     return;
 }
 
-<div class="pcs-sidebar">
+<div class="pcs-sidebar @(DisplayMode == PartConfigSidebarDisplayMode.Inline ? "pcs-inline" : "")">
+    @if (DisplayMode == PartConfigSidebarDisplayMode.Sidebar)
+    {
     <div class="pcs-header">
         <MudText Typo="Typo.h6" Class="pcs-part-name">@Part!.Name</MudText>
         @if (Part!.FileId != Guid.Empty && Part!.Dimensions == null)
@@ -33,6 +35,7 @@
             </MudText>
         }
     </div>
+    }
 
     <div class="pcs-scroll">
 
@@ -337,6 +340,9 @@
 
     /// <summary>Callback invoked when the user wants to upload a revised CAD model for this part.</summary>
     [Parameter] public EventCallback OnReviseModel { get; set; }
+
+    /// <summary>Controls the layout mode of the sidebar. Sidebar renders the full-width panel; Inline renders a compact version for use inside cards.</summary>
+    [Parameter] public PartConfigSidebarDisplayMode DisplayMode { get; set; } = PartConfigSidebarDisplayMode.Sidebar;
 
     [Inject] private IDialogService DialogService { get; set; } = null!;
 

@@ -3,12 +3,34 @@
 
 <div class="plv-container">
 
-    @* Sticky bulk action bar — visible when 1+ parts selected *@
+    @* ── Sticky header ─────────────────────────────────────────────── *@
+    <div class="plv-header">
+        <div class="plv-header-left">
+            <MudCheckBox T="bool"
+                         Value="@AllSelected"
+                         ValueChanged="@ToggleAll"
+                         Size="Size.Small"
+                         Class="plv-master-check" />
+            <MudText Typo="Typo.h6" Class="plv-title">
+                Project Parts List
+                <span class="plv-part-count">(@Parts.Count @(Parts.Count == 1 ? "part" : "parts"))</span>
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(async () => await OnAddPart.InvokeAsync())">
+            Add Part
+        </MudButton>
+    </div>
+
+    @* ── Bulk action bar — visible when 1+ parts selected ───────────── *@
     @if (_selectedParts.Count > 0)
     {
         <div class="plv-bulk-bar">
-            <MudText Typo="Typo.body2" Style="font-weight:600;" Class="mr-2">
-                @_selectedParts.Count selected
+            <MudText Typo="Typo.body2" Style="font-weight:600;" Class="plv-bulk-count">
+                @_selectedParts.Count part@(_selectedParts.Count == 1 ? "" : "s") selected
             </MudText>
 
             <MudSelect T="ProcessDto"
@@ -19,7 +41,7 @@
                        Variant="Variant.Outlined"
                        Placeholder="Set process"
                        Clearable="true"
-                       Class="plv-bulk-select mr-2">
+                       Class="plv-bulk-select">
                 @foreach (var proc in Processes)
                 {
                     <MudSelectItem T="ProcessDto" Value="@proc">@proc.Name</MudSelectItem>
@@ -35,7 +57,7 @@
                        Variant="Variant.Outlined"
                        Placeholder="Set material"
                        Clearable="true"
-                       Class="plv-bulk-select mr-2">
+                       Class="plv-bulk-select">
                 @foreach (var mat in BulkMaterials)
                 {
                     <MudSelectItem T="CatalogMaterialDto" Value="@mat">@mat.Name</MudSelectItem>
@@ -45,8 +67,7 @@
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        Size="Size.Small"
-                       OnClick="@ApplyBulk"
-                       Class="mr-2">
+                       OnClick="@ApplyBulk">
                 Apply
             </MudButton>
 
@@ -56,58 +77,21 @@
         </div>
     }
 
-    @* Desktop header row *@
-    <div class="plv-header d-none d-lg-flex">
-        <div class="plv-hcell plv-hcell--check">
-            <MudCheckBox T="bool" Value="@AllSelected" ValueChanged="@ToggleAll" Size="Size.Small" />
-        </div>
-        <div class="plv-hcell plv-hcell--thumb"></div>
-        <div class="plv-hcell plv-hcell--info">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">File</MudText>
-        </div>
-        <div class="plv-hcell plv-hcell--dims">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Dimensions</MudText>
-        </div>
-        <div class="plv-hcell plv-hcell--dfm">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">DFM</MudText>
-        </div>
-        <div class="plv-hcell plv-hcell--process">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Process</MudText>
-        </div>
-        <div class="plv-hcell plv-hcell--material">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Material</MudText>
-        </div>
-        <div class="plv-hcell plv-hcell--qty">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Qty</MudText>
-        </div>
-        <div class="plv-hcell plv-hcell--price">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Price/unit</MudText>
-        </div>
-        <div class="plv-hcell plv-hcell--total">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Total</MudText>
-        </div>
-        <div class="plv-hcell plv-hcell--actions">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Actions</MudText>
-        </div>
-    </div>
-
-    @* Part rows *@
-    @foreach (var part in Parts)
-    {
-        <PartListRow Part="@part"
-                     IsSelected="@_selectedParts.Contains(part)"
-                     Processes="@Processes"
-                     TempProjectId="@TempProjectId"
-                     OnSelectChanged="@(v => ToggleSelect(part, v))"
-                     OnRemove="@(async () => await OnRemovePart.InvokeAsync(part))"
-                     OnViewIn3D="@(async () => await OnPartActivated.InvokeAsync(part))"
-                     OnPartChanged="@OnPartChanged" />
-    }
-
-    @* Add part row *@
-    <div class="plv-add-row" @onclick="@(async () => await OnAddPart.InvokeAsync())">
-        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary" Class="mr-1" />
-        <MudText Typo="Typo.body2" Color="Color.Primary">Add part</MudText>
+    @* ── Part cards ────────────────────────────────────────────────── *@
+    <div class="plv-card-list">
+        <MudStack Spacing="2">
+            @foreach (var part in Parts)
+            {
+                <PartListRow Part="@part"
+                             IsSelected="@_selectedParts.Contains(part)"
+                             Processes="@Processes"
+                             TempProjectId="@TempProjectId"
+                             OnSelectChanged="@(v => ToggleSelect(part, v))"
+                             OnRemove="@(async () => await OnRemovePart.InvokeAsync(part))"
+                             OnViewIn3D="@(async () => await OnPartActivated.InvokeAsync(part))"
+                             OnPartChanged="@OnPartChanged" />
+            }
+        </MudStack>
     </div>
 </div>
 
@@ -117,52 +101,73 @@
         flex-direction: column;
         width: 100%;
         background: var(--mud-palette-surface);
-        border: 1px solid var(--mud-palette-lines-default);
-        border-radius: 8px;
-        overflow: hidden;
     }
-    .plv-bulk-bar {
+
+    /* ── Sticky header ─────────────────────────────────────────────── */
+    .plv-header {
         display: flex;
         align-items: center;
-        flex-wrap: wrap;
-        gap: 4px;
-        padding: 8px 12px;
-        background: var(--mud-palette-primary-lighten);
+        justify-content: space-between;
+        padding: 16px 24px;
+        background: var(--mud-palette-surface);
         border-bottom: 1px solid var(--mud-palette-lines-default);
         position: sticky;
         top: 0;
         z-index: 10;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
     }
-    .plv-bulk-select { min-width: 140px; max-width: 180px; }
-    .plv-header {
+
+    .plv-header-left {
         display: flex;
         align-items: center;
+        gap: 16px;
+    }
+
+    .plv-master-check {
+        margin-right: 4px;
+    }
+
+    .plv-title {
+        font-weight: 600;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .plv-part-count {
+        font-weight: 400;
+        color: var(--mud-palette-text-secondary);
+        font-size: var(--mud-typography-body2-size);
+    }
+
+    /* ── Bulk action bar ────────────────────────────────────────────── */
+    .plv-bulk-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
         gap: 8px;
-        padding: 4px 8px;
-        background: var(--mud-palette-background-grey);
+        padding: 12px 24px;
+        background: var(--mud-palette-primary-lighten);
         border-bottom: 1px solid var(--mud-palette-lines-default);
+        position: sticky;
+        top: 73px;
+        z-index: 9;
     }
-    .plv-hcell { display: flex; align-items: center; flex-shrink: 0; }
-    .plv-hcell--check { width: 36px; justify-content: center; }
-    .plv-hcell--thumb { width: 40px; }
-    .plv-hcell--info { flex: 1; min-width: 0; }
-    .plv-hcell--dims { width: 160px; }
-    .plv-hcell--dfm { width: 32px; justify-content: center; }
-    .plv-hcell--process { width: 160px; }
-    .plv-hcell--material { width: 160px; }
-    .plv-hcell--qty { width: 60px; }
-    .plv-hcell--price { width: 70px; justify-content: flex-end; }
-    .plv-hcell--total { width: 80px; justify-content: flex-end; }
-    .plv-hcell--actions { width: 108px; justify-content: flex-end; }
-    .plv-add-row {
-        display: flex;
-        align-items: center;
-        padding: 10px 12px;
-        cursor: pointer;
-        border-top: 1px solid var(--mud-palette-lines-default);
-        transition: background 0.15s;
+
+    .plv-bulk-count {
+        color: var(--mud-palette-primary);
+        margin-right: 4px;
     }
-    .plv-add-row:hover { background: var(--mud-palette-background-grey); }
+
+    .plv-bulk-select {
+        min-width: 160px;
+        max-width: 200px;
+    }
+
+    /* ── Card list ──────────────────────────────────────────────────── */
+    .plv-card-list {
+        padding: 16px 24px;
+        background: var(--mud-palette-background-grey);
+        flex: 1;
+    }
 </style>
 
 @code {

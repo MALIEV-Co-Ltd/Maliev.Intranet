@@ -1,0 +1,230 @@
+.plr-wrapper {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+    transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plr-wrapper:hover {
+    border-color: var(--mud-palette-lines-default);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Collapsed card row ─────────────────────────────────────────── */
+.plr-card-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: transparent;
+}
+
+.plr-cell {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.plr-cell--check {
+    width: 36px;
+    justify-content: center;
+}
+
+.plr-cell--thumb {
+    width: 80px;
+    height: 80px;
+    background: var(--mud-palette-background);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.plr-cell--info {
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.plr-filename {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    font-weight: 600;
+}
+
+.plr-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.plr-dims {
+    font-family: var(--mud-typography-caption-family);
+}
+
+.plr-volume {
+    font-family: var(--mud-typography-caption-family);
+}
+
+.plr-badge-row {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.plr-dfm-badge {
+    font-size: 10px;
+    height: 20px;
+}
+
+.plr-cell--process {
+    width: 140px;
+}
+
+.plr-cell--material {
+    width: 160px;
+}
+
+.plr-cell--qty {
+    width: 80px;
+}
+
+.plr-cell--price {
+    width: 100px;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 2px;
+}
+
+.plr-total {
+    font-weight: 700;
+    line-height: 1;
+}
+
+.plr-unit-price {
+    font-size: 11px;
+}
+
+.plr-cell--actions {
+    display: flex;
+    gap: 4px;
+    padding-left: 12px;
+    border-left: 1px solid var(--mud-palette-lines-default);
+}
+
+.plr-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.plr-select {
+    min-width: 0;
+}
+
+.plr-qty-field {
+    width: 80px;
+}
+
+/* ── Expanded configuration panel ────────────────────────────────── */
+.plr-config-panel {
+    border-top: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .plr-card-row {
+        display: grid;
+        grid-template-columns: auto auto 1fr auto;
+        grid-template-areas:
+            "chk thumb info actions"
+            "config config config config"
+            "price price price price";
+        gap: 16px;
+        padding: 16px;
+        align-items: center;
+    }
+
+    .plr-cell--check {
+        grid-area: chk;
+    }
+
+    .plr-cell--thumb {
+        grid-area: thumb;
+        width: 50px;
+        height: 50px;
+    }
+
+    .plr-cell--info {
+        grid-area: info;
+    }
+
+    .plr-cell--process,
+    .plr-cell--material,
+    .plr-cell--qty {
+        grid-area: config;
+        width: 100%;
+    }
+
+    .plr-cell--price {
+        grid-area: price;
+        width: 100%;
+        flex-direction: row;
+        justify-content: flex-end;
+        align-items: baseline;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px dashed var(--mud-palette-lines-default);
+    }
+
+    .plr-cell--actions {
+        grid-area: actions;
+        border-left: none;
+        padding-left: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .plr-card-row {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "thumb info"
+            "config config"
+            "price price"
+            "actions actions";
+        gap: 12px;
+    }
+
+    .plr-cell--check {
+        display: none;
+    }
+
+    .plr-cell--thumb {
+        width: 48px;
+        height: 48px;
+    }
+
+    .plr-cell--process,
+    .plr-cell--material {
+        display: none;
+    }
+
+    .plr-cell--qty {
+        display: flex;
+    }
+
+    .plr-cell--actions {
+        justify-content: flex-end;
+    }
+}
