@@ -35,21 +35,23 @@
 
     @* RIGHT: currency + action buttons *@
     <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-        <MudSelect T="CurrencyDto"
-                   Value="@SelectedCurrency"
-                   ValueChanged="@OnCurrencyChanged"
-                   ToStringFunc="@(c => c?.Code ?? "")"
-                   Label=""
-                   Variant="Variant.Outlined"
-                   Margin="Margin.Dense"
-                   Dense="true"
-                   Style="width:120px;flex-shrink:0;"
-                   Clearable="false">
-            @foreach (var c in Currencies)
-            {
-                <MudSelectItem T="CurrencyDto" Value="@c">@c.Code @c.Symbol</MudSelectItem>
-            }
-        </MudSelect>
+        <MudAutocomplete T="CurrencyDto"
+                       @bind-Value="@SelectedCurrency"
+                       ToStringFunc="@(c => $"{c.Code} {c.Symbol}")"
+                       SearchFunc="@SearchCurrencies"
+                       Label=""
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Dense="true"
+                       Style="width:120px;flex-shrink:0;"
+                       Clearable="false"
+                       ShowProgressIndicator="true"
+                       DebounceInterval="300"
+                       CoerceText="true">
+            <ItemTemplate Context="c">
+                <MudText Typo="Typo.body2">@c.Code @c.Symbol — @c.Name</MudText>
+            </ItemTemplate>
+        </MudAutocomplete>
 
         <MudTooltip Text="@(LayoutMode == LayoutMode.Configurator ? "Switch to table view" : "Switch to configurator")">
             <MudIconButton Icon="@(LayoutMode == LayoutMode.Configurator ? Icons.Material.Filled.ViewList : Icons.Material.Filled.AutoAwesomeMosaic)"
@@ -105,4 +107,15 @@
     private Task ToggleLayout() =>
         OnLayoutModeChanged.InvokeAsync(
             LayoutMode == LayoutMode.Configurator ? LayoutMode.SummaryTable : LayoutMode.Configurator);
+
+    private Task<IEnumerable<CurrencyDto>> SearchCurrencies(string text, CancellationToken _)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return Task.FromResult<IEnumerable<CurrencyDto>>(Currencies);
+        return Task.FromResult<IEnumerable<CurrencyDto>>(
+            Currencies.Where(c =>
+                c.Code.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                c.Symbol.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                c.Name.Contains(text, StringComparison.OrdinalIgnoreCase)));
+    }
 }
