@@ -653,6 +653,14 @@
     min-height: 200px;
 }
 
+/* ── Dense input margin fix inside panel sections ────────────────────── */
+/* MudBlazor 9.x applies margin-top:8px to dense outlined inputs with labels,
+   which pushes content down inside our compact panel sections. Zero it out. */
+.pnl-section-content .mud-input-control-margin-dense.mud-input-outlined-with-label {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
 /* ================================================================
    PROJECTNEW PAGE — MINI CARD (shared with carousel)
    ================================================================ */

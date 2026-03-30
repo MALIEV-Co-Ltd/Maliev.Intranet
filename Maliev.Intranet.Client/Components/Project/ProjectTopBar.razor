@@ -1,68 +1,69 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
 
-<div class="pn-topbar">
-    @* Back arrow *@
-    <MudIconButton Icon="@Icons.Material.Filled.ArrowBackIosNew"
-                   Href="/sales/projects"
-                   Size="Size.Small"
-                   Color="Color.Default" />
+<MudStack Row AlignItems="AlignItems.Center"
+                  Justify="Justify.SpaceBetween"
+                  Class="pn-topbar">
 
-    @* Inline-editable title *@
-    <input type="text"
-           value="@_titleDraft"
-           @onchange="(e) => _titleDraft = e.Value?.ToString() ?? string.Empty"
-           @onblur="CommitTitle"
-           class="tb-title-input"
-           style="min-width:200px"
-           size="14" />
+    @* LEFT: back + title + badge *@
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBackIosNew"
+                       Href="/sales/projects"
+                       Size="Size.Small"
+                       Color="Color.Default" />
 
-    @* Save indicator *@
-    @if (AutoSaving)
-    {
-        <MudIcon Icon="@Icons.Material.Filled.CloudSync" Class="pn-save-icon pn-save-icon--spin" Size="Size.Small" />
-    }
-    else
-    {
-        <span class="badge">
-            <MudIcon Icon="@Icons.Material.Outlined.CloudDone" Size="Size.Small" />
-            Saved
-        </span>
-    }
+        <input type="text"
+               value="@_titleDraft"
+               @onchange="(e) => _titleDraft = e.Value?.ToString() ?? string.Empty"
+               @onblur="CommitTitle"
+               class="tb-title-input"
+               style="min-width:200px"
+               size="14" />
 
-    <MudSpacer />
-
-    @* Currency select *@
-    <MudSelect T="CurrencyDto"
-               Value="@SelectedCurrency"
-               ValueChanged="@OnCurrencyChanged"
-               ToStringFunc="@(c => c?.Code ?? "")"
-               Label=""
-               Variant="Variant.Outlined"
-               Margin="Margin.Dense"
-               Dense="true"
-               Style="width:120px;max-width:120px;flex-shrink:0;"
-               Clearable="false">
-        @foreach (var c in Currencies)
+        @if (AutoSaving)
         {
-            <MudSelectItem T="CurrencyDto" Value="@c">@c.Code @c.Symbol</MudSelectItem>
+            <MudIcon Icon="@Icons.Material.Filled.CloudSync" Class="pn-save-icon pn-save-icon--spin" Size="Size.Small" />
         }
-    </MudSelect>
+        else
+        {
+            <span class="badge">
+                <MudIcon Icon="@Icons.Material.Outlined.CloudDone" Size="Size.Small" />
+                Saved
+            </span>
+        }
+    </MudStack>
 
-    @* Layout toggle *@
-    <MudTooltip Text="@(LayoutMode == LayoutMode.Configurator ? "Switch to table view" : "Switch to configurator")">
-        <MudIconButton Icon="@(LayoutMode == LayoutMode.Configurator ? Icons.Material.Filled.ViewList : Icons.Material.Filled.AutoAwesomeMosaic)"
-                       Size="Size.Small"
-                       OnClick="@ToggleLayout" />
-    </MudTooltip>
+    @* RIGHT: currency + action buttons *@
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+        <MudSelect T="CurrencyDto"
+                   Value="@SelectedCurrency"
+                   ValueChanged="@OnCurrencyChanged"
+                   ToStringFunc="@(c => c?.Code ?? "")"
+                   Label=""
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense"
+                   Dense="true"
+                   Style="width:120px;flex-shrink:0;"
+                   Clearable="false">
+            @foreach (var c in Currencies)
+            {
+                <MudSelectItem T="CurrencyDto" Value="@c">@c.Code @c.Symbol</MudSelectItem>
+            }
+        </MudSelect>
 
-    @* Duplicate button *@
-    <MudTooltip Text="Duplicate project">
-        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                       Size="Size.Small"
-                       OnClick="@OnDuplicate" />
-    </MudTooltip>
-</div>
+        <MudTooltip Text="@(LayoutMode == LayoutMode.Configurator ? "Switch to table view" : "Switch to configurator")">
+            <MudIconButton Icon="@(LayoutMode == LayoutMode.Configurator ? Icons.Material.Filled.ViewList : Icons.Material.Filled.AutoAwesomeMosaic)"
+                           Size="Size.Small"
+                           OnClick="@ToggleLayout" />
+        </MudTooltip>
+
+        <MudTooltip Text="Duplicate project">
+            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                           Size="Size.Small"
+                           OnClick="@OnDuplicate" />
+        </MudTooltip>
+    </MudStack>
+</MudStack>
 
 <style>
     .pn-topbar {
@@ -70,13 +71,9 @@
         min-height: 48px;
         background: var(--mud-palette-surface);
         border-bottom: 1px solid var(--mud-palette-lines-default);
-        display: flex;
-        align-items: center;
         padding: 0 8px;
-        gap: 6px;
         flex-shrink: 0;
     }
-
 </style>
 
 @code {

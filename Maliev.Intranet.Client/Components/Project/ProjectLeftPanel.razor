@@ -107,21 +107,22 @@
     <MudDivider Class="my-0" />
 
     @* ── Section 2: Requirements ─────────────────────────────────────── *@
-    <div class="pnl-section">
+    <div class="pnl-section pnl-section-grow">
         <div class="section-header">Requirements</div>
-        <div class="pnl-section-content pnl-section-grow">
-            <div class="input-group-fill-y">
-                <MudTextField T="string"
-                              Value="@Description"
-                              ValueChanged="@OnDescriptionChanged"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Lines="0"
-                              Immediate="true"
-                              MaxLength="2000"
-                              Placeholder="Add specific manufacturing instructions..." />
-            </div>
-        </div>
+        <MudStack Justify="Justify.SpaceBetween"
+                  StretchItems="StretchItems.Middle"
+                  Class="pnl-section-content"
+                  Style="flex:1;min-height:0;">
+            <MudTextField T="string"
+                          Value="@Description"
+                          ValueChanged="@OnDescriptionChanged"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Lines="0"
+                          Immediate="true"
+                          MaxLength="2000"
+                          Placeholder="Add specific manufacturing instructions..." />
+        </MudStack>
     </div>
 
     <MudDivider Class="my-0" />
@@ -161,6 +162,7 @@
     .pnl-section {
         display: flex;
         flex-direction: column;
+        flex-shrink: 0;
     }
 
     .pnl-section-grow {
@@ -243,39 +245,6 @@
     .pcc-edit-btn:hover {
         color: var(--mud-palette-primary) !important;
         background: var(--mud-palette-primary-lighten) !important;
-    }
-
-    /* ── Requirements textarea flex-grow ─────────────────────────────── */
-    .input-group-fill-y {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-    }
-
-    .input-group-fill-y .mud-text-field {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .input-group-fill-y .mud-text-field .mud-input-control {
-        flex: 1;
-    }
-
-    .input-group-fill-y .mud-text-field .mud-input-control .mud-input-control-input-control {
-        flex: 1;
-    }
-
-    .input-group-fill-y .mud-text-field .mud-input-slot {
-        flex: 1;
-    }
-
-    .input-group-fill-y .mud-text-field textarea {
-        flex: 1;
-        min-height: 80px;
-        resize: none;
-        height: unset;
     }
 
     /* ── Weapons notice ───────────────────────────────────────────────── */
