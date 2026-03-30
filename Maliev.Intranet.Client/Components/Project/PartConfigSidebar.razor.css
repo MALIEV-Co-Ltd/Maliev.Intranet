@@ -95,6 +95,19 @@
     margin-bottom: 0;
 }
 
+/* ── Quantity + Bag & Tag horizontal layout ──────────────────────── */
+.pcs-qty-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.pcs-bag-field {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
 /* ── Custom checkboxes (Threaded / Inserts) ──────────────────────── */
 .pcs-check-group {
     display: flex;
