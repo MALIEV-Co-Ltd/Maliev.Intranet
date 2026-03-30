@@ -37,7 +37,7 @@
     <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
         <MudAutocomplete T="CurrencyDto"
                        @bind-Value="@SelectedCurrency"
-                       ToStringFunc="@(c => $"{c.Code} {c.Symbol}")"
+                       ToStringFunc="@(c => c == null ? "" : $"{c.Code} {c.Symbol}")"
                        SearchFunc="@SearchCurrencies"
                        Label=""
                        Variant="Variant.Outlined"
@@ -49,7 +49,14 @@
                        DebounceInterval="300"
                        CoerceText="true">
             <ItemTemplate Context="c">
-                <MudText Typo="Typo.body2">@c.Code @c.Symbol — @c.Name</MudText>
+                @if (c == null)
+                {
+                    <MudText Typo="Typo.body2">—</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2">@c.Code @c.Symbol — @c.Name</MudText>
+                }
             </ItemTemplate>
         </MudAutocomplete>
 
@@ -110,12 +117,16 @@
 
     private Task<IEnumerable<CurrencyDto>> SearchCurrencies(string text, CancellationToken _)
     {
+        if (Currencies.Count == 0)
+            return Task.FromResult<IEnumerable<CurrencyDto>>([]);
         if (string.IsNullOrWhiteSpace(text))
             return Task.FromResult<IEnumerable<CurrencyDto>>(Currencies);
         return Task.FromResult<IEnumerable<CurrencyDto>>(
-            Currencies.Where(c =>
-                c.Code.Contains(text, StringComparison.OrdinalIgnoreCase) ||
-                c.Symbol.Contains(text, StringComparison.OrdinalIgnoreCase) ||
-                c.Name.Contains(text, StringComparison.OrdinalIgnoreCase)));
+            Currencies
+                .Where(c => c != null)
+                .Where(c =>
+                    c.Code.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                    c.Symbol.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                    c.Name.Contains(text, StringComparison.OrdinalIgnoreCase)));
     }
 }
