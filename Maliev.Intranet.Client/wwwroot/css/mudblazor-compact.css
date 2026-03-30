@@ -683,3 +683,19 @@
     width: 340px;
     min-width: 340px;
 }
+
+/* Currency code label in prices (matches reference design .currency) */
+.pqp-part-price .currency,
+.pqp-lt-price .currency,
+.pqp-totals .currency {
+    font-size: 10px;
+    color: var(--mud-palette-text-tertiary);
+    font-weight: 400;
+}
+
+/* Enforce currency autocomplete width in topbar */
+.pn-topbar .mud-autocomplete {
+    width: 120px !important;
+    max-width: 120px !important;
+    flex-shrink: 0 !important;
+}

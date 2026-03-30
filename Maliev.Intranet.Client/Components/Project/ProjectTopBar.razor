@@ -119,8 +119,11 @@
     {
         if (Currencies.Count == 0)
             return Task.FromResult<IEnumerable<CurrencyDto>>([]);
+
         if (string.IsNullOrWhiteSpace(text))
-            return Task.FromResult<IEnumerable<CurrencyDto>>(Currencies);
+            return Task.FromResult<IEnumerable<CurrencyDto>>(
+                Currencies.Where(c => c != null));
+
         return Task.FromResult<IEnumerable<CurrencyDto>>(
             Currencies
                 .Where(c => c != null)
