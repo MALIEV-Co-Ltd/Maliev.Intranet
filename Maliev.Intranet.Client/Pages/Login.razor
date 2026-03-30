@@ -23,7 +23,7 @@
         display: flex;
         flex-direction: column;
         background-color: var(--mud-palette-background);
-        overflow: hidden;
+        overflow: auto;
     }
 
     /* Header */
@@ -79,9 +79,10 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem 1.5rem 6rem;
+        padding: 2rem 1.5rem 2rem;
         position: relative;
         z-index: 10;
+        min-height: 0;
     }
 
     /* Clean white card */
@@ -94,6 +95,8 @@
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 24px 48px -12px rgba(0, 0, 0, 0.05);
         position: relative;
         text-align: center;
+        max-height: calc(100vh - 160px);
+        overflow-y: auto;
     }
 
     .dark-theme .glass-card {
@@ -292,11 +295,6 @@
 
     /* Footer */
     .login-footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        z-index: 50;
         padding: 1.5rem 2rem;
         border-top: 1px solid rgba(var(--mud-palette-black-rgb), 0.1);
     }
@@ -378,7 +376,7 @@
     /* Responsive */
     @@media (max-width: 640px) {
         .login-header {
-            padding: 1rem;
+            padding: 0.75rem 1rem;
         }
 
         .header-nav {
@@ -387,10 +385,31 @@
 
         .glass-card {
             padding: 1.5rem;
+            max-height: calc(100vh - 120px);
         }
 
         .login-main {
-            padding: 1rem 1rem 5rem;
+            padding: 1rem;
+        }
+
+        .login-footer {
+            padding: 1rem;
+        }
+
+        .footer-content {
+            flex-direction: column;
+            gap: 0.5rem;
+            text-align: center;
+        }
+    }
+
+    @@media (min-width: 641px) and (max-width: 1024px) {
+        .glass-card {
+            padding: 2rem;
+        }
+
+        .login-main {
+            padding: 1.5rem;
         }
     }
 </style>
