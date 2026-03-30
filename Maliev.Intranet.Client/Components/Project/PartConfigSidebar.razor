@@ -36,7 +36,23 @@
 
     <div class="pcs-scroll">
 
-        @* ── Section A: Manufacturing ─────────────────────────────────────── *@
+        @* ── Section A: Logistics & Pricing ──────────────────────────────── *@
+        <div class="pcs-section">
+            <MudText Typo="Typo.overline" Class="pcs-section-label">Logistics &amp; Pricing</MudText>
+
+            <div class="pcs-field">
+                <MudText Typo="Typo.caption" Class="pcs-field-label">Quantity</MudText>
+                <MudNumericField T="int"
+                                 Value="@Part!.Quantity"
+                                 ValueChanged="@((int qty) => OnQuantityChanged(qty))"
+                                 Min="1"
+                                 Max="10000" />
+            </div>
+
+            <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" CurrencyCode="@CurrencyCode" />
+        </div>
+
+        @* ── Section B: Manufacturing ─────────────────────────────────────── *@
         <div class="pcs-section">
             <MudText Typo="Typo.overline" Class="pcs-section-label">Manufacturing</MudText>
 
@@ -116,7 +132,7 @@
             }
         </div>
 
-        @* ── Section B: Design & Features ────────────────────────────────── *@
+        @* ── Section C: Design & Features ────────────────────────────────── *@
         <div class="pcs-section">
             <MudText Typo="Typo.overline" Class="pcs-section-label">Design &amp; Features</MudText>
 
@@ -196,22 +212,6 @@
                               Label=""
                               Placeholder="" />
             </div>
-        </div>
-
-        @* ── Section C: Logistics & Pricing ──────────────────────────────── *@
-        <div class="pcs-section">
-            <MudText Typo="Typo.overline" Class="pcs-section-label">Logistics &amp; Pricing</MudText>
-
-            <div class="pcs-field">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Quantity</MudText>
-                <MudNumericField T="int"
-                                 Value="@Part!.Quantity"
-                                 ValueChanged="@((int qty) => OnQuantityChanged(qty))"
-                                 Min="1"
-                                 Max="10000" />
-            </div>
-
-            <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" />
         </div>
 
         @* ── Section D: Quality & Compliance ─────────────────────────────── *@
@@ -312,6 +312,9 @@
 
     /// <summary>The temporary project identifier passed through to <see cref="DrawingUploadSection"/>.</summary>
     [Parameter] public Guid TempProjectId { get; set; }
+
+    /// <summary>The currency code for displaying prices (e.g. "THB", "USD").</summary>
+    [Parameter] public string CurrencyCode { get; set; } = "THB";
 
     /// <summary>Callback invoked after any mutation to the part configuration.</summary>
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }

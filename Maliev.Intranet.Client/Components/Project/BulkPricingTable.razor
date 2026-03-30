@@ -4,10 +4,10 @@
     <div class="bpt-header" @onclick="@(() => _expanded = !_expanded)">
         <MudIcon Icon="@Icons.Material.Filled.Discount" Size="Size.Small" Color="Color.Primary" />
         <MudText Typo="Typo.body2" Class="ml-1" Style="font-weight:600;">Volume Savings</MudText>
-        @if (!_expanded && ActiveTier != null)
+        @if (!_expanded && ActiveTier != null && SavingAmount > 0)
         {
-            <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2" Label="true">
-                @ActiveTier.Quantity+ units · @ActiveTier.UnitPrice.ToString("N2")
+            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ml-2" Label="true">
+                @CurrencyCode @SavingAmount.ToString("N0")
             </MudChip>
         }
         <MudSpacer />
@@ -36,8 +36,8 @@
 
 <style>
     .bpt-container {
-        border: 1px solid var(--mud-palette-lines-default);
-        border-radius: 6px;
+        border: 1px dashed var(--mud-palette-primary);
+        border-radius: var(--mud-default-borderradius);
         overflow: hidden;
     }
     .bpt-header {
@@ -68,12 +68,22 @@
     /// <summary>The current part quantity, used to highlight the active pricing tier.</summary>
     [Parameter] public int CurrentQuantity { get; set; } = 1;
 
+    /// <summary>The currency code used to format the savings display (e.g. "THB", "USD").</summary>
+    [Parameter] public string CurrencyCode { get; set; } = "THB";
+
     private bool _expanded;
 
     private BulkTier? ActiveTier => Tiers
         .Where(t => CurrentQuantity >= t.Quantity)
         .OrderByDescending(t => t.Quantity)
         .FirstOrDefault();
+
+    private BulkTier? BaseTier => Tiers.Count > 0 ? Tiers[0] : null;
+
+    private decimal SavingAmount =>
+        ActiveTier != null && BaseTier != null && ActiveTier != BaseTier
+            ? (BaseTier.UnitPrice - ActiveTier.UnitPrice) * CurrentQuantity
+            : 0;
 
     /// <summary>
     /// Represents a single volume pricing tier.

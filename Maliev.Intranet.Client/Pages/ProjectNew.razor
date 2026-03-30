@@ -74,7 +74,8 @@
                                     Part="@_parts[_selectedPartIndex]"
                                     Processes="@_processes"
                                     TempProjectId="@_tempProjectId"
-                                    OnPartChanged="OnPartChanged" />
+                                    OnPartChanged="OnPartChanged"
+                                    CurrencyCode="@(_selectedCurrency?.Code ?? "THB")" />
                             </div>
                         }
                         else
