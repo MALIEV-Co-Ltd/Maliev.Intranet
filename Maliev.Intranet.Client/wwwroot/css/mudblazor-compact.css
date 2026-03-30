@@ -446,24 +446,7 @@
     font-size: var(--mud-typography-default-size);
 }
 
-/* ================================================================
-   PROJECTNEW PAGE — SECTION HEADERS
-   Gray background, uppercase, letter-spacing — matches reference .section-header
-   ================================================================ */
-.section-header {
-    background: #e2e8f0;
-    padding: 8px 16px;
-    margin: -20px -20px 20px -20px;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 600;
-    color: #0f172a;
-    border-bottom: 1px solid var(--mud-palette-lines-default);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+
 
 /* ================================================================
    PROJECTNEW PAGE — BADGE (Saved state in topbar)

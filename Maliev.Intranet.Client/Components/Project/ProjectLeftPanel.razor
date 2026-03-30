@@ -6,134 +6,142 @@
     @* ── Section 1: Customer ─────────────────────────────────────────── *@
     @if (SelectedCustomer != null && !ShowCustomerSearch)
     {
-        <div class="pnl-section pnl-section-customer">
+        <div class="pnl-section">
             <div class="section-header">Customer</div>
-            <div class="pnl-customer-card">
-                @* Row: person icon + customer name *@
-                <div class="pcc-row">
-                    <MudIcon Icon="@Icons.Material.Outlined.Person"
-                             Size="Size.Small"
-                             Color="Color.Default"
-                             Class="pcc-row-icon" />
-                    <MudText Typo="Typo.body1" Class="pcc-name">@SelectedCustomer.Name</MudText>
+            <div class="pnl-section-content">
+                <div class="pnl-customer-card">
+                    @* Row: person icon + customer name *@
+                    <div class="pcc-row">
+                        <MudIcon Icon="@Icons.Material.Outlined.Person"
+                                 Size="Size.Small"
+                                 Color="Color.Default"
+                                 Class="pcc-row-icon" />
+                        <MudText Typo="Typo.body1" Class="pcc-name">@SelectedCustomer.Name</MudText>
+                    </div>
+
+                    @* Row: business icon + company name *@
+                    @if (!string.IsNullOrEmpty(SelectedCustomer.CompanyName))
+                    {
+                        <div class="pcc-row">
+                            <MudIcon Icon="@Icons.Material.Outlined.Business"
+                                     Size="Size.Small"
+                                     Color="Color.Default"
+                                     Class="pcc-row-icon" />
+                            <MudText Typo="Typo.subtitle1" Class="pcc-company">@SelectedCustomer.CompanyName</MudText>
+                        </div>
+                    }
+
+                    @* Row: email icon + email *@
+                    @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
+                    {
+                        <div class="pcc-row">
+                            <MudIcon Icon="@Icons.Material.Outlined.Email"
+                                     Size="Size.Small"
+                                     Color="Color.Default"
+                                     Class="pcc-row-icon" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@SelectedCustomer.Email</MudText>
+                        </div>
+                    }
+
+                    @* Row: phone icon + mobile or landline *@
+                    @{
+                        var phone = !string.IsNullOrEmpty(SelectedCustomer.Mobile)
+                            ? SelectedCustomer.Mobile
+                            : SelectedCustomer.Landline;
+                    }
+                    @if (!string.IsNullOrEmpty(phone))
+                    {
+                        <div class="pcc-row">
+                            <MudIcon Icon="@Icons.Material.Outlined.Phone"
+                                     Size="Size.Small"
+                                     Color="Color.Default"
+                                     Class="pcc-row-icon" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@phone</MudText>
+                        </div>
+                    }
+
+                    @* Edit button — absolute top-right *@
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                   Size="Size.Small"
+                                   Class="pcc-edit-btn"
+                                   OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
                 </div>
-
-                @* Row: business icon + company name *@
-                @if (!string.IsNullOrEmpty(SelectedCustomer.CompanyName))
-                {
-                    <div class="pcc-row">
-                        <MudIcon Icon="@Icons.Material.Outlined.Business"
-                                 Size="Size.Small"
-                                 Color="Color.Default"
-                                 Class="pcc-row-icon" />
-                        <MudText Typo="Typo.subtitle1" Class="pcc-company">@SelectedCustomer.CompanyName</MudText>
-                    </div>
-                }
-
-                @* Row: email icon + email *@
-                @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
-                {
-                    <div class="pcc-row">
-                        <MudIcon Icon="@Icons.Material.Outlined.Email"
-                                 Size="Size.Small"
-                                 Color="Color.Default"
-                                 Class="pcc-row-icon" />
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">@SelectedCustomer.Email</MudText>
-                    </div>
-                }
-
-                @* Row: phone icon + mobile or landline *@
-                @{
-                    var phone = !string.IsNullOrEmpty(SelectedCustomer.Mobile)
-                        ? SelectedCustomer.Mobile
-                        : SelectedCustomer.Landline;
-                }
-                @if (!string.IsNullOrEmpty(phone))
-                {
-                    <div class="pcc-row">
-                        <MudIcon Icon="@Icons.Material.Outlined.Phone"
-                                 Size="Size.Small"
-                                 Color="Color.Default"
-                                 Class="pcc-row-icon" />
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">@phone</MudText>
-                    </div>
-                }
-
-                @* Edit button — absolute top-right *@
-                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                               Size="Size.Small"
-                               Class="pcc-edit-btn"
-                               OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
             </div>
         </div>
     }
     else
     {
-        <div class="pnl-section pnl-section-customer">
+        <div class="pnl-section">
             <div class="section-header">Customer</div>
-            <MudAutocomplete T="CustomerSummaryDto"
-                             @bind-Value="_searchCustomer"
-                             Label="Search customers"
-                             SearchFunc="@(SearchCustomersFunc ?? ((_,__) => Task.FromResult(Enumerable.Empty<CustomerSummaryDto>())))"
-                             ToStringFunc="@(c => c?.Name ?? string.Empty)"
-                             Variant="Variant.Outlined"
-                             Margin="Margin.Dense"
-                             Clearable="true"
-                             ShowProgressIndicator="true"
-                             DebounceInterval="300"
-                             MinCharacters="2"
-                             @bind-Value:after="OnCustomerSelectedFromAutocomplete">
-                <ItemTemplate Context="customer">
-                    <MudStack Row="false" Spacing="0">
-                        <MudText Typo="Typo.body2">@customer.Name</MudText>
-                        @if (!string.IsNullOrEmpty(customer.CompanyName))
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.CompanyName</MudText>
-                        }
-                        @if (!string.IsNullOrEmpty(customer.Email))
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.Email</MudText>
-                        }
-                    </MudStack>
-                </ItemTemplate>
-            </MudAutocomplete>
+            <div class="pnl-section-content">
+                <MudAutocomplete T="CustomerSummaryDto"
+                                 @bind-Value="_searchCustomer"
+                                 Label="Search customers"
+                                 SearchFunc="@(SearchCustomersFunc ?? ((_,__) => Task.FromResult(Enumerable.Empty<CustomerSummaryDto>())))"
+                                 ToStringFunc="@(c => c?.Name ?? string.Empty)"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Clearable="true"
+                                 ShowProgressIndicator="true"
+                                 DebounceInterval="300"
+                                 MinCharacters="2"
+                                 @bind-Value:after="OnCustomerSelectedFromAutocomplete">
+                    <ItemTemplate Context="customer">
+                        <MudStack Row="false" Spacing="0">
+                            <MudText Typo="Typo.body2">@customer.Name</MudText>
+                            @if (!string.IsNullOrEmpty(customer.CompanyName))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.CompanyName</MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(customer.Email))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@customer.Email</MudText>
+                            }
+                        </MudStack>
+                    </ItemTemplate>
+                </MudAutocomplete>
+            </div>
         </div>
     }
 
     <MudDivider Class="my-0" />
 
     @* ── Section 2: Requirements ─────────────────────────────────────── *@
-    <div class="pnl-section pnl-section-grow">
+    <div class="pnl-section">
         <div class="section-header">Requirements</div>
-        <div class="input-group-fill-y">
-            <MudTextField T="string"
-                          Value="@Description"
-                          ValueChanged="@OnDescriptionChanged"
-                          Variant="Variant.Outlined"
-                          Margin="Margin.Dense"
-                          Lines="0"
-                          Immediate="true"
-                          MaxLength="2000"
-                          Placeholder="Add specific manufacturing instructions..." />
+        <div class="pnl-section-content pnl-section-grow">
+            <div class="input-group-fill-y">
+                <MudTextField T="string"
+                              Value="@Description"
+                              ValueChanged="@OnDescriptionChanged"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="0"
+                              Immediate="true"
+                              MaxLength="2000"
+                              Placeholder="Add specific manufacturing instructions..." />
+            </div>
         </div>
     </div>
 
     <MudDivider Class="my-0" />
 
     @* ── Section 3: Upload ───────────────────────────────────────────── *@
-    <div class="pnl-section pnl-upload-section">
+    <div class="pnl-section">
         <div class="section-header">Upload 3D Models</div>
-        <FileUploadDropzone Icon="@Icons.Material.Filled.ViewInAr"
-                            Label="Drag & drop or click to upload"
-                            SubLabel="STL, STEP, STP, 3MF, IGS, IGES, SLDPRT, PRT, SAT, X_T"
-                            OnClick="@OnOpenFilePicker"
-                            OnFilesDropped="@OnOpenFilePicker" />
-        <MudText Typo="Typo.caption" Class="mt-2 pcc-weapons-notice">
-            <MudIcon Icon="@Icons.Material.Filled.Campaign"
-                     Size="Size.Small"
-                     Class="mr-1" />
-            Weapons and illegal items are strictly prohibited.
-        </MudText>
+        <div class="pnl-section-content">
+            <FileUploadDropzone Icon="@Icons.Material.Filled.ViewInAr"
+                                Label="Drag & drop or click to upload"
+                                SubLabel="STL, STEP, STP, 3MF, IGS, IGES, SLDPRT, PRT, SAT, X_T"
+                                OnClick="@OnOpenFilePicker"
+                                OnFilesDropped="@OnOpenFilePicker" />
+            <MudText Typo="Typo.caption" Class="mt-2 pcc-weapons-notice">
+                <MudIcon Icon="@Icons.Material.Filled.Campaign"
+                         Size="Size.Small"
+                         Class="mr-1" />
+                Weapons and illegal items are strictly prohibited.
+            </MudText>
+        </div>
     </div>
 </div>
 
@@ -151,10 +159,8 @@
     }
 
     .pnl-section {
-        padding: 20px;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
     }
 
     .pnl-section-grow {
@@ -162,11 +168,29 @@
         min-height: 200px;
     }
 
-    .pnl-upload-section {
-        flex-shrink: 0;
+    /* ── Section header ─────────────────────────────────────────────── */
+    .section-header {
+        background: #e2e8f0;
+        padding: 8px 16px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        color: #0f172a;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
-    /* ── Customer card ──────────────────────────────────────────────────── */
+    /* ── Section content wrapper ─────────────────────────────────────── */
+    .pnl-section-content {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* ── Customer card ────────────────────────────────────────────────── */
     .pnl-customer-card {
         background: var(--mud-palette-surface);
         border: 1px solid var(--mud-palette-lines-default);
@@ -221,20 +245,18 @@
         background: var(--mud-palette-primary-lighten) !important;
     }
 
-    /* ── Requirements textarea — flex-grow wrapper ──────────────────────── */
+    /* ── Requirements textarea flex-grow ─────────────────────────────── */
     .input-group-fill-y {
         flex: 1;
         display: flex;
         flex-direction: column;
         min-height: 0;
-        margin-bottom: 0;
     }
 
     .input-group-fill-y .mud-text-field {
         flex: 1;
         display: flex;
         flex-direction: column;
-        min-height: 80px;
     }
 
     .input-group-fill-y .mud-text-field .mud-input-control {
@@ -263,7 +285,7 @@
         color: var(--mud-palette-error) !important;
     }
 
-    /* ── Tablet: 3-column grid ─────────────────────────────────────────── */
+    /* ── Tablet: 3-column grid ─────────────────────────────────────── */
     @@media (min-width: 769px) and (max-width: 1200px) {
         .pnl-left {
             width: 100%;
@@ -287,7 +309,7 @@
         }
     }
 
-    /* ── Mobile: vertical stack ───────────────────────────────────────── */
+    /* ── Mobile: vertical stack ─────────────────────────────────────── */
     @@media (max-width: 768px) {
         .pnl-left {
             width: 100%;
