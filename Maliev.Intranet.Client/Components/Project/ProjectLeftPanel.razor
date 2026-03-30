@@ -6,44 +6,70 @@
     @* ── Section 1: Customer ─────────────────────────────────────────── *@
     @if (SelectedCustomer != null && !ShowCustomerSearch)
     {
-        <div class="pnl-section">
+        <div class="pnl-section pnl-section-customer">
             <div class="section-header">Customer</div>
             <div class="pnl-customer-card">
-                <MudText Typo="Typo.body2" Style="font-weight:600;">@SelectedCustomer.Name</MudText>
+                @* Row: person icon + customer name *@
+                <div class="pcc-row">
+                    <MudIcon Icon="@Icons.Material.Outlined.Person"
+                             Size="Size.Small"
+                             Color="Color.Default"
+                             Class="pcc-row-icon" />
+                    <MudText Typo="Typo.body1" Class="pcc-name">@SelectedCustomer.Name</MudText>
+                </div>
+
+                @* Row: business icon + company name *@
                 @if (!string.IsNullOrEmpty(SelectedCustomer.CompanyName))
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">@SelectedCustomer.CompanyName</MudText>
+                    <div class="pcc-row">
+                        <MudIcon Icon="@Icons.Material.Outlined.Business"
+                                 Size="Size.Small"
+                                 Color="Color.Default"
+                                 Class="pcc-row-icon" />
+                        <MudText Typo="Typo.subtitle1" Class="pcc-company">@SelectedCustomer.CompanyName</MudText>
+                    </div>
                 }
+
+                @* Row: email icon + email *@
                 @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Tertiary">@SelectedCustomer.Email</MudText>
+                    <div class="pcc-row">
+                        <MudIcon Icon="@Icons.Material.Outlined.Email"
+                                 Size="Size.Small"
+                                 Color="Color.Default"
+                                 Class="pcc-row-icon" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@SelectedCustomer.Email</MudText>
+                    </div>
                 }
-                <div class="pnl-customer-actions">
-                    @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
-                    {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Email" Size="Size.Small"
-                                       Href="@($"mailto:{SelectedCustomer.Email}")" Target="_blank" Class="pa-0" />
-                    }
-                    @if (!string.IsNullOrEmpty(SelectedCustomer.Mobile))
-                    {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Phone" Size="Size.Small"
-                                       Href="@($"tel:{SelectedCustomer.Mobile}")" Class="pa-0" />
-                    }
-                    else if (!string.IsNullOrEmpty(SelectedCustomer.Landline))
-                    {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Phone" Size="Size.Small"
-                                       Href="@($"tel:{SelectedCustomer.Landline}")" Class="pa-0" />
-                    }
-                    <MudSpacer />
-                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
-                                   OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" Class="pa-0" />
-                </div>
+
+                @* Row: phone icon + mobile or landline *@
+                @{
+                    var phone = !string.IsNullOrEmpty(SelectedCustomer.Mobile)
+                        ? SelectedCustomer.Mobile
+                        : SelectedCustomer.Landline;
+                }
+                @if (!string.IsNullOrEmpty(phone))
+                {
+                    <div class="pcc-row">
+                        <MudIcon Icon="@Icons.Material.Outlined.Phone"
+                                 Size="Size.Small"
+                                 Color="Color.Default"
+                                 Class="pcc-row-icon" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@phone</MudText>
+                    </div>
+                }
+
+                @* Edit button — absolute top-right *@
+                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                               Size="Size.Small"
+                               Class="pcc-edit-btn"
+                               OnClick="@(() => OnShowSearchChanged.InvokeAsync(true))" />
             </div>
         </div>
     }
     else
     {
-        <div class="pnl-section">
+        <div class="pnl-section pnl-section-customer">
             <div class="section-header">Customer</div>
             <MudAutocomplete T="CustomerSummaryDto"
                              @bind-Value="_searchCustomer"
@@ -79,15 +105,18 @@
     @* ── Section 2: Requirements ─────────────────────────────────────── *@
     <div class="pnl-section pnl-section-grow">
         <div class="section-header">Requirements</div>
-        <MudTextField T="string"
-                      Value="@Description"
-                      ValueChanged="@OnDescriptionChanged"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Lines="0"
-                      Immediate="true"
-                      MaxLength="2000"
-                      Placeholder="Add specific manufacturing instructions..." />
+        <div class="pcc-textarea-wrap">
+            <MudTextField T="string"
+                          Value="@Description"
+                          ValueChanged="@OnDescriptionChanged"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Lines="0"
+                          Immediate="true"
+                          MaxLength="2000"
+                          Counter="2000"
+                          Placeholder="Add specific manufacturing instructions..." />
+        </div>
     </div>
 
     <MudDivider Class="my-0" />
@@ -100,8 +129,11 @@
                             SubLabel="STL, STEP, STP, 3MF, IGS, IGES, SLDPRT, PRT, SAT, X_T"
                             OnClick="@OnOpenFilePicker"
                             OnFilesDropped="@OnOpenFilePicker" />
-        <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-2">
-            Note: We do not accept files related to firearms, weapons, or illegal items.
+        <MudText Typo="Typo.caption" Class="mt-2 pcc-weapons-notice">
+            <MudIcon Icon="@Icons.Material.Filled.Campaign"
+                     Size="Size.Small"
+                     Class="mr-1" />
+            Weapons and illegal items are strictly prohibited.
         </MudText>
     </div>
 </div>
@@ -118,40 +150,116 @@
         flex-direction: column;
         flex-shrink: 0;
     }
+
     .pnl-section {
         padding: 14px;
-        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
     }
+
     .pnl-section-grow {
         flex: 1;
         min-height: 200px;
     }
-    .pnl-section-label {
-        display: block;
-        margin-bottom: 8px;
-        letter-spacing: 0.5px;
-    }
-    .pnl-customer-card {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        padding: 8px;
-    }
-    .pnl-customer-actions {
-        display: flex;
-        align-items: center;
-        padding-top: 4px;
-        gap: 4px;
-    }
-    .pnl-customer-actions .mud-icon-button:hover,
-    .pnl-customer-actions .mud-icon-button:focus-visible,
-    .pnl-customer-actions .mud-icon-button:active {
-        background-color: transparent !important;
-    }
+
     .pnl-upload-section {
         flex-shrink: 0;
     }
-    /* Tablet: 3-column grid */
+
+    /* ── Customer card ──────────────────────────────────────────────────── */
+    .pnl-customer-card {
+        background: var(--mud-palette-surface);
+        border: 1px solid var(--mud-palette-lines-default);
+        border-left: 4px solid var(--mud-palette-primary);
+        border-radius: 6px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        position: relative;
+    }
+
+    .pcc-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .pcc-row-icon {
+        flex-shrink: 0;
+        color: var(--mud-palette-text-secondary);
+        font-size: 16px;
+    }
+
+    .pcc-name {
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .pcc-company {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .pcc-edit-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        color: var(--mud-palette-text-secondary) !important;
+        padding: 4px !important;
+        min-width: unset !important;
+        width: 28px !important;
+        height: 28px !important;
+    }
+
+    .pcc-edit-btn:hover {
+        color: var(--mud-palette-primary) !important;
+        background: var(--mud-palette-primary-lighten) !important;
+    }
+
+    /* ── Requirements textarea ──────────────────────────────────────────── */
+    .pcc-textarea-wrap {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .pcc-textarea-wrap .mud-input-control {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pcc-textarea-wrap .mud-input-control .mud-input-control-input-control {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pcc-textarea-wrap .mud-text-field {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .pcc-textarea-wrap .mud-input-slot {
+        flex: 1;
+    }
+
+    /* ── Weapons notice ───────────────────────────────────────────────── */
+    .pcc-weapons-notice {
+        display: flex;
+        align-items: center;
+        color: var(--mud-palette-error) !important;
+    }
+
+    /* ── Tablet: 3-column grid ─────────────────────────────────────────── */
     @@media (min-width: 769px) and (max-width: 1200px) {
         .pnl-left {
             width: 100%;
@@ -164,11 +272,18 @@
             overflow-y: visible;
             flex-shrink: unset;
         }
-        .pnl-section { border-right: 1px solid var(--mud-palette-lines-default); }
-        .pnl-section:last-child { border-right: none; }
-        .pnl-section-grow { flex: unset; }
+        .pnl-section {
+            border-right: 1px solid var(--mud-palette-lines-default);
+        }
+        .pnl-section:last-child {
+            border-right: none;
+        }
+        .pnl-section-grow {
+            flex: unset;
+        }
     }
-    /* Mobile: vertical stack */
+
+    /* ── Mobile: vertical stack ───────────────────────────────────────── */
     @@media (max-width: 768px) {
         .pnl-left {
             width: 100%;

@@ -11,15 +11,15 @@
      @onclick="@HandleClick">
     <MudIcon Icon="@Icon"
              Size="Size.Large"
-             Color="@(DragOver ? Color.Primary : Color.Default)" />
-    <MudText Typo="Typo.body2"
+             Color="Color.Primary" />
+    <MudText Typo="Typo.body1"
              Color="@(DragOver ? Color.Primary : Color.Secondary)"
              Class="mt-1">
         @(DragOver ? "Drop files here" : Label)
     </MudText>
     @if (!string.IsNullOrEmpty(SubLabel))
     {
-        <MudText Typo="Typo.caption" Color="Color.Tertiary">@SubLabel</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">@SubLabel</MudText>
     }
 </div>
 

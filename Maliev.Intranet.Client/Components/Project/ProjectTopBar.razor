@@ -14,6 +14,7 @@
            @onchange="(e) => _titleDraft = e.Value?.ToString() ?? string.Empty"
            @onblur="CommitTitle"
            class="tb-title-input"
+           style="min-width:200px"
            size="14" />
 
     @* Save indicator *@
@@ -24,7 +25,7 @@
     else
     {
         <span class="badge">
-            <MudIcon Icon="@Icons.Material.Filled.CloudDone" Size="Size.Small" />
+            <MudIcon Icon="@Icons.Material.Outlined.CloudDone" Size="Size.Small" />
             Saved
         </span>
     }
@@ -40,7 +41,7 @@
                Variant="Variant.Outlined"
                Margin="Margin.Dense"
                Dense="true"
-               Style="width:90px;flex-grow:0;flex-shrink:0;"
+               Style="width:120px;max-width:120px;flex-shrink:0;"
                Clearable="false">
         @foreach (var c in Currencies)
         {

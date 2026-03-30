@@ -453,13 +453,13 @@
 .section-header {
     background: #e2e8f0;
     padding: 8px 16px;
-    margin: -20px -20px 20px -20px;
-    font-size: var(--mud-typography-caption-size);
+    margin: 0 -14px 12px -14px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: 600;
     color: #0f172a;
-    border-bottom: 1px solid var(--mud-palette-divider);
+    border-bottom: 1px solid var(--mud-palette-lines-default);
     display: flex;
     justify-content: space-between;
     align-items: center;
