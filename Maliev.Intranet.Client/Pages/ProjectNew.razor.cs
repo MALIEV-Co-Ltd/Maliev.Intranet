@@ -637,6 +637,38 @@ public partial class ProjectNew : IAsyncDisposable
             part.PricingLoading = false;
             TriggerAutoSave();
             await InvokeAsync(StateHasChanged);
+            await TriggerRoutingFetchAsync(part);
+        }
+    }
+
+    // ── Production Routing ──────────────────────────────────────────
+
+    /// <summary>
+    /// Fetches production routing data for a part when it is fully configured
+    /// (pricing complete with EstimatedLeadTimeDays &gt; 0 and lead time selected).
+    /// </summary>
+    private async Task TriggerRoutingFetchAsync(PartViewModel part)
+    {
+        if (part.EstimatedLeadTimeDays == 0 || _selectedLeadTime == null)
+            return;
+
+        if (part.ProductionRoutingLoading || part.ProductionRouting != null)
+            return;
+
+        part.ProductionRoutingLoading = true;
+        try
+        {
+            part.ProductionRouting = await Http.GetFromJsonAsync<ProductionRoutingDto>(
+                $"api/projects/{_tempProjectId}/parts/{part.FileId}/routing");
+        }
+        catch
+        {
+            part.ProductionRouting = null;
+        }
+        finally
+        {
+            part.ProductionRoutingLoading = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 

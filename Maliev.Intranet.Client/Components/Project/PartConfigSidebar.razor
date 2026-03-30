@@ -16,7 +16,12 @@
 <div class="pcs-sidebar">
     <div class="pcs-header">
         <MudText Typo="Typo.h6" Class="pcs-part-name">@Part!.Name</MudText>
-        @if (Part!.Dimensions != null)
+        @if (Part!.FileId != Guid.Empty && Part!.Dimensions == null)
+        {
+            <MudSkeleton Width="120px" Height="12px" Class="mb-1" />
+            <MudSkeleton Width="80px" Height="10px" />
+        }
+        else if (Part!.Dimensions != null)
         {
             var dims = Part!.Dimensions;
             <MudText Typo="Typo.caption" Class="pcs-dim">
@@ -111,8 +116,6 @@
             }
         </div>
 
-        <MudDivider />
-
         @* ── Section B: Design & Features ────────────────────────────────── *@
         <div class="pcs-section">
             <MudText Typo="Typo.overline" Class="pcs-section-label">Design &amp; Features</MudText>
@@ -189,12 +192,12 @@
                               Lines="3"
                               MaxLength="1000"
                               Immediate="true"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
                               Label=""
                               Placeholder="" />
             </div>
         </div>
-
-        <MudDivider />
 
         @* ── Section C: Logistics & Pricing ──────────────────────────────── *@
         <div class="pcs-section">
@@ -220,8 +223,6 @@
 
             <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" />
         </div>
-
-        <MudDivider />
 
         @* ── Section D: Quality & Compliance ─────────────────────────────── *@
         <div class="pcs-section">
@@ -262,9 +263,8 @@
     </div>
 
     @* ── Production Routing (collapsible sticky footer) ───────────── *@
-    @if (Part!.ProductionRouting != null || Part!.ProductionRoutingLoading)
+    @if (Part!.ProductionRouting != null || Part.ProductionRoutingLoading)
     {
-        <MudDivider />
         <div class="pcs-footer">
             <div class="pcs-price-card">
                 <div class="pcs-routing-header"
@@ -282,24 +282,31 @@
                              Class="@(_routingExpanded ? "pcs-routing-chevron" : "pcs-routing-chevron collapsed")" />
                 </div>
                 <div class="pcs-routing-content @(_routingExpanded ? "" : "collapsed")">
-                    <div class="pcs-routing-row">
-                        <span>@Part!.ProductionRouting?.MachineCode — @Part!.ProductionRouting?.MachineName</span>
-                    </div>
-                    <div class="pcs-routing-row">
-                        <span>Queue Position</span>
-                        <span style="color: var(--mud-palette-warning); font-weight: 600;">@Part!.ProductionRouting?.QueueAhead job@(Part!.ProductionRouting?.QueueAhead == 1 ? "" : "s") ahead</span>
-                    </div>
-                    <div class="pcs-routing-row">
-                        <span>Est. Start Date</span>
-                        <span>@Part!.ProductionRouting?.EstimatedStartDate.ToString("d MMM yyyy")</span>
-                    </div>
-                    <MudButton Variant="Variant.Outlined"
-                               Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.CalendarMonth"
-                               OnClick="OpenScheduleDialog"
-                               Style="width: 100%; margin-top: 12px; border-radius: var(--radius-md);">
-                        View Planning Schedule
-                    </MudButton>
+                    @if (Part!.ProductionRoutingLoading)
+                    {
+                        <MudProgressLinear Indeterminate="true" Class="mb-2" />
+                    }
+                    else if (Part!.ProductionRouting != null)
+                    {
+                        <div class="pcs-routing-row">
+                            <span>@Part!.ProductionRouting?.MachineCode — @Part!.ProductionRouting?.MachineName</span>
+                        </div>
+                        <div class="pcs-routing-row">
+                            <span>Queue Position</span>
+                            <span style="color: var(--mud-palette-warning); font-weight: 600;">@Part!.ProductionRouting?.QueueAhead job@(Part!.ProductionRouting?.QueueAhead == 1 ? "" : "s") ahead</span>
+                        </div>
+                        <div class="pcs-routing-row">
+                            <span>Est. Start Date</span>
+                            <span>@Part!.ProductionRouting?.EstimatedStartDate.ToString("d MMM yyyy")</span>
+                        </div>
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.CalendarMonth"
+                                   OnClick="OpenScheduleDialog"
+                                   Style="width: 100%; margin-top: 12px; border-radius: var(--radius-md);">
+                            View Planning Schedule
+                        </MudButton>
+                    }
                 </div>
             </div>
         </div>

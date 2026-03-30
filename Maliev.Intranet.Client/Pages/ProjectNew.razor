@@ -110,7 +110,7 @@
                             Parts="@_parts"
                             LeadTimeOptions="@_leadTimeOptions"
                             SelectedLeadTime="@_selectedLeadTime"
-                            OnLeadTimeChanged="@(lt => { _selectedLeadTime = lt; TriggerAutoSave(); })"
+                            OnLeadTimeChanged="@(async lt => { _selectedLeadTime = lt; TriggerAutoSave(); foreach (var p in _parts) { await TriggerRoutingFetchAsync(p); } })"
                             SelectedCurrency="@_selectedCurrency"
                             CanQuote="@CanSubmit"
                             Saving="@_saving"

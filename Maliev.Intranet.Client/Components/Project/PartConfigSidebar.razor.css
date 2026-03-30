@@ -20,11 +20,10 @@
     min-height: 0;
 }
 
-.pcs-section {
-    padding: 16px 0 16px;
-    flex-shrink: 0;
-    background: var(--mud-palette-surface);
-}
+    .pcs-section {
+        flex-shrink: 0;
+        background: var(--mud-palette-surface);
+    }
 
 .pcs-empty {
     display: flex;
