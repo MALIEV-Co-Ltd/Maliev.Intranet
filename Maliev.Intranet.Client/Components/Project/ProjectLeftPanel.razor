@@ -105,7 +105,7 @@
     @* ── Section 2: Requirements ─────────────────────────────────────── *@
     <div class="pnl-section pnl-section-grow">
         <div class="section-header">Requirements</div>
-        <div class="pcc-textarea-wrap">
+        <div class="input-group-fill-y">
             <MudTextField T="string"
                           Value="@Description"
                           ValueChanged="@OnDescriptionChanged"
@@ -114,7 +114,6 @@
                           Lines="0"
                           Immediate="true"
                           MaxLength="2000"
-                          Counter="2000"
                           Placeholder="Add specific manufacturing instructions..." />
         </div>
     </div>
@@ -152,9 +151,10 @@
     }
 
     .pnl-section {
-        padding: 14px;
+        padding: 20px;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
     }
 
     .pnl-section-grow {
@@ -221,35 +221,39 @@
         background: var(--mud-palette-primary-lighten) !important;
     }
 
-    /* ── Requirements textarea ──────────────────────────────────────────── */
-    .pcc-textarea-wrap {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        overflow: hidden;
-    }
-
-    .pcc-textarea-wrap .mud-input-control {
+    /* ── Requirements textarea — flex-grow wrapper ──────────────────────── */
+    .input-group-fill-y {
         flex: 1;
         display: flex;
         flex-direction: column;
+        min-height: 0;
+        margin-bottom: 0;
     }
 
-    .pcc-textarea-wrap .mud-input-control .mud-input-control-input-control {
+    .input-group-fill-y .mud-text-field {
         flex: 1;
         display: flex;
         flex-direction: column;
+        min-height: 80px;
     }
 
-    .pcc-textarea-wrap .mud-text-field {
+    .input-group-fill-y .mud-text-field .mud-input-control {
         flex: 1;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
     }
 
-    .pcc-textarea-wrap .mud-input-slot {
+    .input-group-fill-y .mud-text-field .mud-input-control .mud-input-control-input-control {
         flex: 1;
+    }
+
+    .input-group-fill-y .mud-text-field .mud-input-slot {
+        flex: 1;
+    }
+
+    .input-group-fill-y .mud-text-field textarea {
+        flex: 1;
+        min-height: 80px;
+        resize: none;
+        height: unset;
     }
 
     /* ── Weapons notice ───────────────────────────────────────────────── */
