@@ -3,6 +3,7 @@
 @rendermode InteractiveAuto
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Components.Shared
 @using Microsoft.AspNetCore.Components.Authorization
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -78,17 +79,14 @@
                         }
                         else
                         {
-                            <div class="pn-empty-state"
-                                 @ondragenter="@(() => _dragOver = true)"
-                                 @ondragleave="@(() => _dragOver = false)"
-                                 @ondragover:preventDefault="true">
-                                <div class="pn-empty-dropzone @(_dragOver ? "pn-empty-dropzone-active" : "")"
-                                     @ondrop.prevent="@(() => { _dragOver = false; OpenFilePicker(); })"
-                                     @onclick="OpenFilePicker">
-                                    <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Size="Size.Large" Color="@(_dragOver ? Color.Primary : Color.Default)" />
-                                    <MudText Typo="Typo.h6" Color="@(_dragOver ? Color.Primary : Color.Default)" Class="mt-2">Drop files here or click to upload</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-1">STL, STEP, 3MF, OBJ, and more — up to 100 MB each</MudText>
-                                </div>
+                            <div class="pn-empty-state">
+                                <FileUploadDropzone Icon="@Icons.Material.Outlined.CloudUpload"
+                                                   Label="Drop files here or click to upload"
+                                                   SubLabel="STL, STEP, STP, 3MF, IGS, IGES, SLDPRT, PRT, SAT, X_T"
+                                                   MaxFileSizeLabel="max 100 MB"
+                                                   Class="pn-empty-dropzone"
+                                                   OnClick="OpenFilePicker"
+                                                   OnFilesDropped="OpenFilePicker" />
                             </div>
                         }
                     }
@@ -171,21 +169,13 @@
         justify-content: center;
         padding: 24px;
     }
+    /* Hero dropzone — overrides FileUploadDropzone defaults for the empty-state CTA */
     .pn-empty-dropzone {
-        border: 2px dashed var(--mud-palette-lines-default);
-        border-radius: 16px;
-        padding: 60px 40px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
+        padding: 60px 40px !important;
+        border-radius: 16px !important;
         max-width: 600px;
         width: 100%;
-        transition: border-color 0.2s, background 0.2s;
     }
-    .pn-empty-dropzone:hover { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-lighten); }
-    .pn-empty-dropzone-active { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-lighten); }
     .pn-table-placeholder {
         flex: 1;
         display: flex;

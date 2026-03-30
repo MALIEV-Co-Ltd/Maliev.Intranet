@@ -41,7 +41,7 @@ public partial class ProjectNew : IAsyncDisposable
     private DateTimeOffset? _lastSavedAt;
 #pragma warning restore CS0649
     private LayoutMode _layoutMode = LayoutMode.Configurator;
-    private bool _dragOver;
+
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
 
     // ── Validation ────────────────────────────────────────────────────
@@ -566,6 +566,14 @@ public partial class ProjectNew : IAsyncDisposable
     {
         if (!_selectedCustomerId.HasValue)
             return;
+
+        if (!part.ProcessId.HasValue || !part.MaterialId.HasValue)
+        {
+            part.PricingLoading = false;
+            part.EstimatedUnitPrice = null;
+            part.EstimatedTotalAmount = null;
+            return;
+        }
 
         part.PricingLoading = true;
         part.PricingFailed = false;

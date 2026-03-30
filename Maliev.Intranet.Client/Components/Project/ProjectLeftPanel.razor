@@ -114,7 +114,7 @@
                               ValueChanged="@OnDescriptionChanged"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
-                              Lines="0"
+                              Lines="5"
                               Immediate="true"
                               MaxLength="2000"
                               Placeholder="Add specific manufacturing instructions..." />
@@ -129,6 +129,7 @@
             <FileUploadDropzone Icon="@Icons.Material.Filled.ViewInAr"
                                 Label="Drag & drop or click to upload"
                                 SubLabel="STL, STEP, STP, 3MF, IGS, IGES, SLDPRT, PRT, SAT, X_T"
+                                MaxFileSizeLabel="max 100 MB"
                                 OnClick="@OnOpenFilePicker"
                                 OnFilesDropped="@OnOpenFilePicker" />
             <MudText Typo="Typo.caption" Class="mt-2 pcc-weapons-notice">
@@ -242,7 +243,16 @@
         background: var(--mud-palette-primary-lighten) !important;
     }
 
+    /* ── Requirements content wrapper grows inside pnl-section-grow ──── */
+    .pnl-section-grow .pnl-section-content {
+        flex: 1;
+        min-height: 0;
+    }
+
     /* ── Requirements textarea flex-grow ─────────────────────────────── */
+    /* Each level must be both a flex item (flex:1) AND a flex container  */
+    /* (display:flex + flex-direction:column) to propagate growth down.   */
+    /* MudBlazor 9.x DOM: .mud-text-field > .mud-input-control-input-container > .mud-input > textarea */
     .input-group-fill-y {
         flex: 1;
         display: flex;
@@ -254,25 +264,28 @@
         flex: 1;
         display: flex;
         flex-direction: column;
+        min-height: 0;
     }
 
-    .input-group-fill-y .mud-text-field .mud-input-control {
+    .input-group-fill-y .mud-input-control-input-container {
         flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
     }
 
-    .input-group-fill-y .mud-text-field .mud-input-control .mud-input-control-input-control {
+    .input-group-fill-y .mud-input {
         flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
     }
 
-    .input-group-fill-y .mud-text-field .mud-input-slot {
-        flex: 1;
-    }
-
-    .input-group-fill-y .mud-text-field textarea {
+    .input-group-fill-y textarea {
         flex: 1;
         min-height: 80px;
         resize: none;
-        height: unset;
+        height: unset !important;
     }
 
     /* ── Weapons notice ───────────────────────────────────────────────── */

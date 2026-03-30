@@ -54,6 +54,8 @@ try
     builder.Services.AddSingleton<Maliev.Intranet.Shared.Services.IMarkdownService, Maliev.Intranet.Shared.Services.MarkdownService>();
     builder.Services.AddSingleton<Maliev.Intranet.Client.Services.FileTypesSettings>(sp =>
         sp.GetRequiredService<IConfiguration>().GetSection("FileTypes").Get<Maliev.Intranet.Client.Services.FileTypesSettings>()!);
+    builder.Services.AddSingleton<Maliev.Intranet.Client.Services.UploadSettings>(sp =>
+        sp.GetRequiredService<IConfiguration>().GetSection("Upload").Get<Maliev.Intranet.Client.Services.UploadSettings>()!);
     builder.Services.AddSignalR();
     builder.Services.AddMudServices();
     builder.AddStandardCache("IntranetBff");

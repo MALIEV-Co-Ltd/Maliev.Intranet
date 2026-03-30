@@ -1,8 +1,10 @@
 @using Maliev.Intranet.Shared
 @using System.Net.Http.Headers
+@using Maliev.Intranet.Client.Components.Shared
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
+@inject Maliev.Intranet.Client.Services.UploadSettings UploadSettings
 
 <MudStack Spacing="3">
     <MudFileUpload T="IReadOnlyList<IBrowserFile>"
@@ -10,14 +12,13 @@
                    Accept=".pdf,.dxf,.dwg,.png,.jpg,.jpeg"
                    MaximumFileCount="20">
         <CustomContent>
-            <MudPaper Outlined="true"
-                      Class="d-flex flex-column align-center justify-center py-8 px-4 border-dashed border-2 rounded-xl cursor-pointer"
-                      Style="cursor: pointer;"
-                      @onclick="@context.OpenFilePickerAsync">
-                <MudIcon Icon="@Icons.Material.Filled.Architecture" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
-                <MudText Typo="Typo.body2" Color="Color.Primary">Click to upload drawings</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">PDF, DXF, DWG, PNG, JPG — max 50 MB each</MudText>
-            </MudPaper>
+            <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
+                                Icon="@Icons.Material.Filled.Architecture"
+                                Label="Upload PDF Drawing"
+                                SubLabel="PDF, DXF, DWG, PNG, JPG"
+                                MaxFileSizeLabel="max 50 MB"
+                                OnClick="@(() => context.OpenFilePickerAsync())"
+                                OnFilesDropped="@(() => context.OpenFilePickerAsync())" />
         </CustomContent>
     </MudFileUpload>
 
@@ -117,7 +118,7 @@
             using var content = new MultipartFormDataContent();
             foreach (var file in SelectedFiles)
             {
-                var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+                var stream = file.OpenReadStream(maxAllowedSize: UploadSettings.DrawingLimit);
                 var fileContent = new StreamContent(stream);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
                 content.Add(fileContent, "files", file.Name);

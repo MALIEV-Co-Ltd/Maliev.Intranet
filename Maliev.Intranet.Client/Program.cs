@@ -19,6 +19,8 @@ builder.Services.AddScoped<BreadcrumbService>();
 builder.Services.AddScoped<IReferenceDataService, ClientReferenceDataService>();
 builder.Services.AddSingleton<FileTypesSettings>(sp =>
     sp.GetRequiredService<IConfiguration>().GetSection("FileTypes").Get<FileTypesSettings>()!);
+builder.Services.AddSingleton<UploadSettings>(sp =>
+    sp.GetRequiredService<IConfiguration>().GetSection("Upload").Get<UploadSettings>()!);
 builder.Services.AddSingleton<IMarkdownService, MarkdownService>();
 builder.Services.AddMudServices();
 

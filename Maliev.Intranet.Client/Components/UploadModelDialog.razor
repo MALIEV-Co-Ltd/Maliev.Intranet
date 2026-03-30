@@ -3,6 +3,7 @@
 @using System.Net.Http.Headers
 @using Microsoft.AspNetCore.Components
 @inject IJSRuntime JS
+@inject Maliev.Intranet.Client.Services.UploadSettings UploadSettings
 
 <MudDialog>
     <TitleContent>
@@ -153,7 +154,7 @@
             {
                 using var content = new MultipartFormDataContent();
                 // 3D models can be large, up to 100MB
-                var stream = file.BrowserFile.OpenReadStream(100 * 1024 * 1024);
+                var stream = file.BrowserFile.OpenReadStream(UploadSettings.ThreeDModelLimit);
                 var fileContent = new StreamContent(stream);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.BrowserFile.ContentType ?? "application/octet-stream");
                 content.Add(fileContent, "file", file.Name);

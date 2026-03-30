@@ -1,6 +1,7 @@
 @using Maliev.Intranet.Shared
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject Maliev.Intranet.Client.Services.UploadSettings UploadSettings
 
 <MudPaper Class="pa-4" Elevation="1">
     <div class="d-flex align-center mb-3">
@@ -158,7 +159,7 @@
 
             foreach (var file in SelectedFiles)
             {
-                var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                var stream = file.OpenReadStream(maxAllowedSize: UploadSettings.DocumentLimit);
                 var fileContent = new StreamContent(stream);
                 fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
                 content.Add(fileContent, "files", file.Name);
