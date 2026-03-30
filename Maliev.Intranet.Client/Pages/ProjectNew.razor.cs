@@ -46,7 +46,6 @@ public partial class ProjectNew : IAsyncDisposable
 
     // ── Validation ────────────────────────────────────────────────────
     private bool _titleHasError;
-    private string? _descriptionError;
     private bool _descriptionHasError;
 
     // ── Parts ─────────────────────────────────────────────────────────
@@ -468,6 +467,17 @@ public partial class ProjectNew : IAsyncDisposable
             _selectedPartIndex = Math.Max(0, _parts.Count - 1);
 
         TriggerAutoSave();
+    }
+
+    // ── Task 19: Activate part from list view ─────────────────────────
+
+    /// <summary>Switches to Configurator layout and selects the given part.</summary>
+    private void ActivatePartFromList(PartViewModel part)
+    {
+        _selectedPartIndex = _parts.IndexOf(part);
+        if (_selectedPartIndex < 0) _selectedPartIndex = 0;
+        _layoutMode = LayoutMode.Configurator;
+        StateHasChanged();
     }
 
     // ── Task 12: Cascading dropdowns ──────────────────────────────────
@@ -904,8 +914,8 @@ public partial class ProjectNew : IAsyncDisposable
 
     private void ValidateDescription()
     {
-        if (_description?.Length > 2000) { _descriptionError = "Must be 2000 characters or fewer"; _descriptionHasError = true; }
-        else { _descriptionError = null; _descriptionHasError = false; }
+        if (_description?.Length > 2000) { _descriptionHasError = true; }
+        else { _descriptionHasError = false; }
     }
 
     private void OnCustomerSelected(CustomerSummaryDto? customer)

@@ -1,0 +1,97 @@
+@namespace Maliev.Intranet.Client.Components.Shared
+
+<div class="fud-dropzone @(DragOver ? "fud-dropzone--active" : "")"
+     @ondragenter:preventDefault="true"
+     @ondragover:preventDefault="true"
+     @ondragleave:preventDefault="true"
+     @ondrop:preventDefault="true"
+     @ondragenter="@OnDragEnter"
+     @ondragleave="@OnDragLeave"
+     @ondrop="@HandleDrop"
+     @onclick="@HandleClick">
+    <MudIcon Icon="@Icon"
+             Size="Size.Large"
+             Color="@(DragOver ? Color.Primary : Color.Default)" />
+    <MudText Typo="Typo.body2"
+             Color="@(DragOver ? Color.Primary : Color.Secondary)"
+             Class="mt-1">
+        @(DragOver ? "Drop files here" : Label)
+    </MudText>
+    @if (!string.IsNullOrEmpty(SubLabel))
+    {
+        <MudText Typo="Typo.caption" Color="Color.Tertiary">@SubLabel</MudText>
+    }
+</div>
+
+<style>
+    .fud-dropzone {
+        border: 2px dashed var(--mud-palette-lines-default);
+        border-radius: 8px;
+        padding: 24px 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+        min-height: 120px;
+        text-align: center;
+        user-select: none;
+    }
+    .fud-dropzone:hover,
+    .fud-dropzone--active {
+        border-color: var(--mud-palette-primary);
+        background: var(--mud-palette-primary-lighten);
+    }
+</style>
+
+@code {
+    /// <summary>Material icon string for the dropzone. Defaults to <see cref="Icons.Material.Filled.ViewInAr"/>.</summary>
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.ViewInAr;
+
+    /// <summary>Primary label text shown when not dragging.</summary>
+    [Parameter] public string Label { get; set; } = "Drag & drop or click to upload";
+
+    /// <summary>Secondary label shown below the primary label. Hidden when null or empty.</summary>
+    [Parameter] public string? SubLabel { get; set; }
+
+    /// <summary>Invoked when the user clicks the dropzone.</summary>
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    /// <summary>Invoked when files are dropped onto the dropzone. This is a signal-only callback — the parent is responsible for accessing the actual file data (e.g. opening a file picker).</summary>
+    [Parameter] public EventCallback OnFilesDropped { get; set; }
+
+    private bool DragOver { get; set; }
+    private int _dragDepth;
+    private bool _suppressNextClick;
+
+    private void OnDragEnter()
+    {
+        _dragDepth++;
+        DragOver = _dragDepth > 0;
+    }
+
+    private void OnDragLeave()
+    {
+        _dragDepth--;
+        DragOver = _dragDepth > 0;
+    }
+
+    private async Task HandleDrop()
+    {
+        _dragDepth = 0;
+        DragOver = false;
+        _suppressNextClick = true;
+        await OnFilesDropped.InvokeAsync();
+    }
+
+    private async Task HandleClick()
+    {
+        if (_suppressNextClick)
+        {
+            _suppressNextClick = false;
+            return;
+        }
+        await OnClick.InvokeAsync();
+    }
+}

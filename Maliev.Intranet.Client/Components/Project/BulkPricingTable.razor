@@ -1,0 +1,84 @@
+@namespace Maliev.Intranet.Client.Components.Project
+
+<div class="bpt-container">
+    <div class="bpt-header" @onclick="@(() => _expanded = !_expanded)">
+        <MudIcon Icon="@Icons.Material.Filled.Discount" Size="Size.Small" Color="Color.Primary" />
+        <MudText Typo="Typo.body2" Class="ml-1" Style="font-weight:600;">Volume Savings</MudText>
+        @if (!_expanded && ActiveTier != null)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2" Label="true">
+                @ActiveTier.Quantity+ units · @ActiveTier.UnitPrice.ToString("N2")
+            </MudChip>
+        }
+        <MudSpacer />
+        <MudIcon Icon="@(_expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                 Size="Size.Small" Color="Color.Secondary" />
+    </div>
+
+    @if (_expanded)
+    {
+        <div class="bpt-tiers">
+            @for (var i = 0; i < Tiers.Count; i++)
+            {
+                var tier = Tiers[i];
+                var isActive = CurrentQuantity >= tier.Quantity &&
+                               (i == Tiers.Count - 1 || CurrentQuantity < Tiers[i + 1].Quantity);
+                <div class="bpt-tier-row @(isActive ? "bpt-tier-row--active" : "")">
+                    <MudText Typo="Typo.body2">@tier.Quantity+ units</MudText>
+                    <MudText Typo="Typo.body2" Style="@(isActive ? "font-weight:700;" : "")">
+                        @tier.UnitPrice.ToString("N2") / unit
+                    </MudText>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .bpt-container {
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .bpt-header {
+        display: flex;
+        align-items: center;
+        padding: 8px 10px;
+        cursor: pointer;
+        background: var(--mud-palette-surface);
+        user-select: none;
+    }
+    .bpt-header:hover { background: var(--mud-palette-background); }
+    .bpt-tiers { padding: 4px 0; }
+    .bpt-tier-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 10px;
+        transition: background 0.1s;
+    }
+    .bpt-tier-row--active {
+        background: var(--mud-palette-primary-lighten);
+    }
+</style>
+
+@code {
+    /// <summary>The list of volume pricing tiers, ordered by minimum quantity ascending.</summary>
+    [Parameter] public List<BulkTier> Tiers { get; set; } = [];
+
+    /// <summary>The current part quantity, used to highlight the active pricing tier.</summary>
+    [Parameter] public int CurrentQuantity { get; set; } = 1;
+
+    private bool _expanded;
+
+    private BulkTier? ActiveTier => Tiers
+        .Where(t => CurrentQuantity >= t.Quantity)
+        .OrderByDescending(t => t.Quantity)
+        .FirstOrDefault();
+
+    /// <summary>
+    /// Represents a single volume pricing tier.
+    /// </summary>
+    /// <param name="Quantity">Minimum quantity to qualify for this tier.</param>
+    /// <param name="UnitPrice">Unit price at this tier.</param>
+    public record BulkTier(int Quantity, decimal UnitPrice);
+}

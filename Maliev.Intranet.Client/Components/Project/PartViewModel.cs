@@ -149,6 +149,50 @@ public class PartViewModel
     /// <summary>True while catalog data is being loaded.</summary>
     public bool CatalogLoading { get; set; }
 
+    // ── New config fields (persisted to DraftPartState) ───────────────
+    /// <summary>CNC surface roughness code (e.g. "Ra0.8"). Meaningful only when ProcessCode is "CNC".</summary>
+    public string? RoughnessCode { get; set; }
+
+    /// <summary>Part marking type. Defaults to <see cref="PartMarkingType.None"/>.</summary>
+    public PartMarkingType MarkingType { get; set; } = PartMarkingType.None;
+
+    /// <summary>Marking text content. Meaningful only when <see cref="MarkingType"/> is not <see cref="PartMarkingType.None"/>.</summary>
+    public string? MarkingText { get; set; }
+
+    /// <summary>True when the part requires threaded/tapped holes.</summary>
+    public bool HasThreadedHoles { get; set; }
+
+    /// <summary>Threaded hole specification (e.g. "M6"). Meaningful only when <see cref="HasThreadedHoles"/> is <c>true</c>.</summary>
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>Number of threaded holes. Meaningful only when <see cref="HasThreadedHoles"/> is <c>true</c>.</summary>
+    public int ThreadedHoleCount { get; set; }
+
+    /// <summary>True when the part requires inserts (e.g. Helicoil).</summary>
+    public bool HasInserts { get; set; }
+
+    /// <summary>Insert type. Meaningful only when <see cref="HasInserts"/> is <c>true</c>.</summary>
+    public InsertType InsertType { get; set; } = InsertType.None;
+
+    /// <summary>Number of inserts. Meaningful only when <see cref="InsertType"/> is not <see cref="InsertType.None"/>.</summary>
+    public int InsertCount { get; set; }
+
+    /// <summary>True when the part should be individually bagged and tagged. Defaults to <c>true</c>.</summary>
+    public bool BagAndTag { get; set; } = true;
+
+    /// <summary>Inspection level for quality control. Defaults to <see cref="InspectionLevel.Standard"/>.</summary>
+    public InspectionLevel InspectionLevel { get; set; } = InspectionLevel.Standard;
+
+    /// <summary>Requested quality certificates (e.g. "ISO9001", "MaterialCert"). Disabled/display-only in UI for now.</summary>
+    public List<string> Certificates { get; set; } = [];
+
+    // ── Production routing (UI-only, not persisted) ───────────────────
+    /// <summary>Production routing data fetched from the BFF. Null until loaded.</summary>
+    public ProductionRoutingDto? ProductionRouting { get; set; }
+
+    /// <summary>True while production routing data is being fetched.</summary>
+    public bool ProductionRoutingLoading { get; set; }
+
     // ── Helpers ───────────────────────────────────────────────────────
 
     /// <summary>True when the part has a file, a process, and a material selected with no outstanding errors.</summary>
@@ -182,6 +226,18 @@ public class PartViewModel
         GlbStoragePath = GlbStoragePath,
         DrawingFiles = DrawingFiles,
         SupplementaryFiles = SupplementaryFiles,
+        RoughnessCode = RoughnessCode,
+        MarkingType = MarkingType,
+        MarkingText = MarkingText,
+        HasThreadedHoles = HasThreadedHoles,
+        ThreadedHoleSpec = ThreadedHoleSpec,
+        ThreadedHoleCount = ThreadedHoleCount,
+        HasInserts = HasInserts,
+        InsertType = InsertType,
+        InsertCount = InsertCount,
+        BagAndTag = BagAndTag,
+        InspectionLevel = InspectionLevel,
+        Certificates = [..Certificates],
     };
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
@@ -211,6 +267,18 @@ public class PartViewModel
         GlbStoragePath = s.GlbStoragePath,
         DrawingFiles = s.DrawingFiles,
         SupplementaryFiles = s.SupplementaryFiles,
+        RoughnessCode = s.RoughnessCode,
+        MarkingType = s.MarkingType,
+        MarkingText = s.MarkingText,
+        HasThreadedHoles = s.HasThreadedHoles,
+        ThreadedHoleSpec = s.ThreadedHoleSpec,
+        ThreadedHoleCount = s.ThreadedHoleCount,
+        HasInserts = s.HasInserts,
+        InsertType = s.InsertType,
+        InsertCount = s.InsertCount,
+        BagAndTag = s.BagAndTag,
+        InspectionLevel = s.InspectionLevel,
+        Certificates = [..s.Certificates],
         AwaitingPreview = false,
         StatusText = string.IsNullOrEmpty(s.ThumbnailSmallUrl) && string.IsNullOrEmpty(s.StoragePath)
             ? "Processing..."

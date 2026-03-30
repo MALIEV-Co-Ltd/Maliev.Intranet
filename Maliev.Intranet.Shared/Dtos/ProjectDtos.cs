@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Maliev.Intranet.Shared;
 
 namespace Maliev.Intranet.Shared.Dtos;
 
@@ -308,6 +309,33 @@ public class AddProjectPartRequest
 
     /// <summary>Gets or sets optional tolerance class.</summary>
     public string? Tolerance { get; set; }
+
+    /// <summary>CNC surface roughness code (e.g. "Ra0.8").</summary>
+    public string? RoughnessCode { get; set; }
+
+    /// <summary>True when the part requires threaded/tapped holes.</summary>
+    public bool HasThreadedHoles { get; set; }
+
+    /// <summary>Threaded hole specification (e.g. "M6"). Meaningful only when <see cref="HasThreadedHoles"/> is <c>true</c>.</summary>
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>Number of threaded holes. Meaningful only when <see cref="HasThreadedHoles"/> is <c>true</c>.</summary>
+    public int ThreadedHoleCount { get; set; }
+
+    /// <summary>True when the part requires inserts (e.g. Helicoil).</summary>
+    public bool HasInserts { get; set; }
+
+    /// <summary>Insert type. Meaningful only when <see cref="HasInserts"/> is <c>true</c>.</summary>
+    public InsertType InsertType { get; set; } = InsertType.None;
+
+    /// <summary>Number of inserts. Meaningful only when <see cref="InsertType"/> is not <see cref="InsertType.None"/>.</summary>
+    public int InsertCount { get; set; }
+
+    /// <summary>True when the part should be individually bagged and tagged. Defaults to <c>true</c>.</summary>
+    public bool BagAndTag { get; set; } = true;
+
+    /// <summary>Inspection level for quality control.</summary>
+    public InspectionLevel InspectionLevel { get; set; } = InspectionLevel.Standard;
 }
 
 /// <summary>

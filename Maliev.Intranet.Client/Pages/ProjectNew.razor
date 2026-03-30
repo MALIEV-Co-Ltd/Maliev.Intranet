@@ -22,7 +22,6 @@
                 SelectedCurrency="@_selectedCurrency"
                 Currencies="@_currencies"
                 OnCurrencyChanged="@(c => { _selectedCurrency = c; TriggerAutoSave(); })"
-                LastSavedAt="@_lastSavedAt"
                 AutoSaving="@_autoSaving"
                 LayoutMode="@_layoutMode"
                 OnLayoutModeChanged="@(m => _layoutMode = m)"
@@ -38,14 +37,8 @@
                             OnShowSearchChanged="@(v => _showCustomerSearch = v)"
                             Description="@_description"
                             OnDescriptionChanged="@(v => { _description = v; ValidateDescription(); TriggerAutoSave(); })"
-                            DescriptionHasError="@_descriptionHasError"
-                            DescriptionError="@_descriptionError"
-                            DragOver="@_dragOver"
-                            OnDragEnter="@(() => _dragOver = true)"
-                            OnDragLeave="@(() => _dragOver = false)"
                             OnOpenFilePicker="OpenFilePicker"
-                            SearchCustomersFunc="SearchCustomersAsync"
-                            ShowUploadSection="@(_parts.Count > 0)" />
+                            SearchCustomersFunc="SearchCustomersAsync" />
                     </ChildContent>
                     <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Left panel error.</MudAlert></ErrorContent>
                 </ErrorBoundary>
@@ -60,23 +53,28 @@
                                 SelectedIndex="@_selectedPartIndex"
                                 OnSelectPart="@(i => _selectedPartIndex = i)"
                                 OnRemovePart="RemovePart"
-                                OnAddPart="OpenFilePicker"
-                                OnThumbnailRefreshed="TriggerAutoSave" />
+                                OnAddPart="OpenFilePicker" />
                         }
 
                         @if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)
                         {
-                            <ErrorBoundary>
-                                <ChildContent>
-                                    <PartDetailCard
-                                        Part="@_parts[_selectedPartIndex]"
-                                        Processes="@_processes"
-                                        TempProjectId="@_tempProjectId"
-                                        OnPartChanged="OnPartChanged"
-                                        OnOpenViewer="OpenBabylonViewer" />
-                                </ChildContent>
-                                <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Detail panel error.</MudAlert></ErrorContent>
-                            </ErrorBoundary>
+                            <div class="pn-detail-row">
+                                <ErrorBoundary>
+                                    <ChildContent>
+                                        <PartDetailCard
+                                            Part="@_parts[_selectedPartIndex]"
+                                            TempProjectId="@_tempProjectId"
+                                            OnPartChanged="OnPartChanged"
+                                            OnOpenViewer="OpenBabylonViewer" />
+                                    </ChildContent>
+                                    <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Detail panel error.</MudAlert></ErrorContent>
+                                </ErrorBoundary>
+                                <PartConfigSidebar
+                                    Part="@_parts[_selectedPartIndex]"
+                                    Processes="@_processes"
+                                    TempProjectId="@_tempProjectId"
+                                    OnPartChanged="OnPartChanged" />
+                            </div>
                         }
                         else
                         {
@@ -96,71 +94,15 @@
                     }
                     else
                     {
-                        @* Summary table mode — Task 17 *@
-                        <MudDataGrid T="PartViewModel"
-                                     Items="@_parts"
-                                     Dense="true"
-                                     Hover="true"
-                                     Filterable="false"
-                                     SortMode="SortMode.None"
-                                     Style="flex:1; overflow:auto;">
-                            <Columns>
-                                <TemplateColumn Title="Part" HeaderStyle="width:40%">
-                                    <CellTemplate>
-                                        <div style="display:flex;align-items:center;gap:8px;">
-                                            <img src="@(!string.IsNullOrEmpty(context.Item.ThumbnailSmallUrl) ? context.Item.ThumbnailSmallUrl : "/images/image-placeholder.svg")"
-                                                 style="width:32px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0;" />
-                                            <span>@context.Item.Name</span>
-                                        </div>
-                                    </CellTemplate>
-                                </TemplateColumn>
-                                <TemplateColumn Title="Process">
-                                    <CellTemplate>@(context.Item.ProcessCode ?? "—")</CellTemplate>
-                                </TemplateColumn>
-                                <TemplateColumn Title="Material">
-                                    <CellTemplate>@(context.Item.MaterialCode ?? "—")</CellTemplate>
-                                </TemplateColumn>
-                                <TemplateColumn Title="Finish">
-                                    <CellTemplate>@(context.Item.FinishCode ?? "—")</CellTemplate>
-                                </TemplateColumn>
-                                <TemplateColumn Title="Tolerance">
-                                    <CellTemplate>@(context.Item.ToleranceCode ?? "—")</CellTemplate>
-                                </TemplateColumn>
-                                <PropertyColumn Property="p => p.Quantity" Title="Qty" />
-                                <TemplateColumn Title="Unit Price">
-                                    <CellTemplate>
-                                        @if (context.Item.PricingLoading)
-                                        {
-                                            <MudSkeleton Width="60px" Height="12px" />
-                                        }
-                                        else
-                                        {
-                                            @($"{_selectedCurrency?.Symbol ?? "฿"}{context.Item.EstimatedUnitPrice:N2}")
-                                        }
-                                    </CellTemplate>
-                                </TemplateColumn>
-                                <TemplateColumn Title="Total">
-                                    <CellTemplate>
-                                        @if (context.Item.PricingLoading)
-                                        {
-                                            <MudSkeleton Width="70px" Height="12px" />
-                                        }
-                                        else
-                                        {
-                                            @($"{_selectedCurrency?.Symbol ?? "฿"}{context.Item.EstimatedTotalAmount:N2}")
-                                        }
-                                    </CellTemplate>
-                                </TemplateColumn>
-                                <TemplateColumn Title="" HeaderStyle="width:50px">
-                                    <CellTemplate>
-                                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                                       Size="Size.Small"
-                                                       Color="Color.Error"
-                                                       OnClick="@(() => RemovePart(context.Item))" />
-                                    </CellTemplate>
-                                </TemplateColumn>
-                            </Columns>
-                        </MudDataGrid>
+                        <div class="pn-list-view">
+                            <PartListView Parts="@_parts"
+                                          Processes="@_processes"
+                                          TempProjectId="@_tempProjectId"
+                                          OnPartActivated="ActivatePartFromList"
+                                          OnRemovePart="RemovePart"
+                                          OnAddPart="OpenFilePicker"
+                                          OnPartChanged="OnPartChanged" />
+                        </div>
                     }
                 </div>
 
@@ -174,7 +116,8 @@
                             SelectedCurrency="@_selectedCurrency"
                             CanQuote="@CanSubmit"
                             Saving="@_saving"
-                            OnQuote="CreateProjectAndQuoteAsync" />
+                            OnQuote="CreateProjectAndQuoteAsync"
+                            OnPartActivated="ActivatePartFromList" />
                     </ChildContent>
                     <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Quote panel error.</MudAlert></ErrorContent>
                 </ErrorBoundary>
@@ -212,8 +155,8 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
         min-width: 0;
+        min-height: 0;
     }
     .pn-empty-detail {
         flex: 1;
@@ -241,12 +184,23 @@
         width: 100%;
         transition: border-color 0.2s, background 0.2s;
     }
-    .pn-empty-dropzone:hover { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-hover); }
-    .pn-empty-dropzone-active { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-hover); }
+    .pn-empty-dropzone:hover { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-lighten); }
+    .pn-empty-dropzone-active { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-lighten); }
     .pn-table-placeholder {
         flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
+    }
+    .pn-detail-row {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+        min-height: 0;
+    }
+    .pn-list-view {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
     }
 </style>

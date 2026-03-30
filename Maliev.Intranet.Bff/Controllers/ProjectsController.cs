@@ -238,4 +238,22 @@ public class ProjectsController(ProjectServiceClient client, ILogger<ProjectsCon
         var response = await client.AcceptQuotationAsync(id, ct);
         return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
     }
+
+    // ── Routing ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the production routing information for a specific part.
+    /// </summary>
+    /// <param name="id">The project GUID.</param>
+    /// <param name="partId">The part GUID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Production routing DTO or an appropriate error status code.</returns>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("{id:guid}/parts/{partId:guid}/routing")]
+    public async Task<ActionResult<ProductionRoutingDto>> GetPartRouting(
+        Guid id, Guid partId, CancellationToken ct)
+    {
+        var dto = await client.GetPartRoutingAsync(id, partId, ct);
+        return dto != null ? Ok(dto) : NotFound();
+    }
 }

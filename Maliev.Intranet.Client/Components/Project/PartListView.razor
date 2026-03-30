@@ -1,0 +1,234 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Shared.Dtos
+
+<div class="plv-container">
+
+    @* Sticky bulk action bar — visible when 1+ parts selected *@
+    @if (_selectedParts.Count > 0)
+    {
+        <div class="plv-bulk-bar">
+            <MudText Typo="Typo.body2" Style="font-weight:600;" Class="mr-2">
+                @_selectedParts.Count selected
+            </MudText>
+
+            <MudSelect T="ProcessDto"
+                       Value="@_bulkProcess"
+                       ValueChanged="@((ProcessDto? p) => _bulkProcess = p)"
+                       ToStringFunc="@(p => p?.Name ?? string.Empty)"
+                       Margin="Margin.Dense"
+                       Variant="Variant.Outlined"
+                       Placeholder="Set process"
+                       Clearable="true"
+                       Class="plv-bulk-select mr-2">
+                @foreach (var proc in Processes)
+                {
+                    <MudSelectItem T="ProcessDto" Value="@proc">@proc.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="CatalogMaterialDto"
+                       Value="@_bulkMaterial"
+                       ValueChanged="@((CatalogMaterialDto? m) => _bulkMaterial = m)"
+                       ToStringFunc="@(m => m?.Name ?? string.Empty)"
+                       Disabled="@(BulkMaterials.Count == 0)"
+                       Margin="Margin.Dense"
+                       Variant="Variant.Outlined"
+                       Placeholder="Set material"
+                       Clearable="true"
+                       Class="plv-bulk-select mr-2">
+                @foreach (var mat in BulkMaterials)
+                {
+                    <MudSelectItem T="CatalogMaterialDto" Value="@mat">@mat.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="@ApplyBulk"
+                       Class="mr-2">
+                Apply
+            </MudButton>
+
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           Size="Size.Small"
+                           OnClick="@(() => _selectedParts.Clear())" />
+        </div>
+    }
+
+    @* Desktop header row *@
+    <div class="plv-header d-none d-lg-flex">
+        <div class="plv-hcell plv-hcell--check">
+            <MudCheckBox T="bool" Value="@AllSelected" ValueChanged="@ToggleAll" Size="Size.Small" />
+        </div>
+        <div class="plv-hcell plv-hcell--thumb"></div>
+        <div class="plv-hcell plv-hcell--info">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">File</MudText>
+        </div>
+        <div class="plv-hcell plv-hcell--dims">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Dimensions</MudText>
+        </div>
+        <div class="plv-hcell plv-hcell--dfm">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">DFM</MudText>
+        </div>
+        <div class="plv-hcell plv-hcell--process">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Process</MudText>
+        </div>
+        <div class="plv-hcell plv-hcell--material">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Material</MudText>
+        </div>
+        <div class="plv-hcell plv-hcell--qty">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Qty</MudText>
+        </div>
+        <div class="plv-hcell plv-hcell--price">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Price/unit</MudText>
+        </div>
+        <div class="plv-hcell plv-hcell--total">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Total</MudText>
+        </div>
+        <div class="plv-hcell plv-hcell--actions">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Actions</MudText>
+        </div>
+    </div>
+
+    @* Part rows *@
+    @foreach (var part in Parts)
+    {
+        <PartListRow Part="@part"
+                     IsSelected="@_selectedParts.Contains(part)"
+                     Processes="@Processes"
+                     TempProjectId="@TempProjectId"
+                     OnSelectChanged="@(v => ToggleSelect(part, v))"
+                     OnRemove="@(async () => await OnRemovePart.InvokeAsync(part))"
+                     OnViewIn3D="@(async () => await OnPartActivated.InvokeAsync(part))"
+                     OnPartChanged="@OnPartChanged" />
+    }
+
+    @* Add part row *@
+    <div class="plv-add-row" @onclick="@(async () => await OnAddPart.InvokeAsync())">
+        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary" Class="mr-1" />
+        <MudText Typo="Typo.body2" Color="Color.Primary">Add part</MudText>
+    </div>
+</div>
+
+<style>
+    .plv-container {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        background: var(--mud-palette-surface);
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .plv-bulk-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 8px 12px;
+        background: var(--mud-palette-primary-lighten);
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .plv-bulk-select { min-width: 140px; max-width: 180px; }
+    .plv-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px;
+        background: var(--mud-palette-background-grey);
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+    }
+    .plv-hcell { display: flex; align-items: center; flex-shrink: 0; }
+    .plv-hcell--check { width: 36px; justify-content: center; }
+    .plv-hcell--thumb { width: 40px; }
+    .plv-hcell--info { flex: 1; min-width: 0; }
+    .plv-hcell--dims { width: 160px; }
+    .plv-hcell--dfm { width: 32px; justify-content: center; }
+    .plv-hcell--process { width: 160px; }
+    .plv-hcell--material { width: 160px; }
+    .plv-hcell--qty { width: 60px; }
+    .plv-hcell--price { width: 70px; justify-content: flex-end; }
+    .plv-hcell--total { width: 80px; justify-content: flex-end; }
+    .plv-hcell--actions { width: 108px; justify-content: flex-end; }
+    .plv-add-row {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        cursor: pointer;
+        border-top: 1px solid var(--mud-palette-lines-default);
+        transition: background 0.15s;
+    }
+    .plv-add-row:hover { background: var(--mud-palette-background-grey); }
+</style>
+
+@code {
+    /// <summary>The list of part view models to display as rows.</summary>
+    [Parameter] public List<PartViewModel> Parts { get; set; } = [];
+
+    /// <summary>The list of available manufacturing processes, forwarded to each row.</summary>
+    [Parameter] public List<ProcessDto> Processes { get; set; } = [];
+
+    /// <summary>The temporary project identifier, forwarded to each row.</summary>
+    [Parameter] public Guid TempProjectId { get; set; }
+
+    /// <summary>Callback invoked when the user activates a part (e.g. View in 3D).</summary>
+    [Parameter] public EventCallback<PartViewModel> OnPartActivated { get; set; }
+
+    /// <summary>Callback invoked when the user removes a part.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
+
+    /// <summary>Callback invoked when the user clicks the Add part row.</summary>
+    [Parameter] public EventCallback OnAddPart { get; set; }
+
+    /// <summary>Callback invoked after any mutation to a part configuration.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
+
+    private HashSet<PartViewModel> _selectedParts = [];
+    private ProcessDto? _bulkProcess;
+    private CatalogMaterialDto? _bulkMaterial;
+
+    private bool AllSelected => Parts.Count > 0 && _selectedParts.Count == Parts.Count;
+
+    private List<CatalogMaterialDto> BulkMaterials =>
+        Parts.SelectMany(p => p.AvailableMaterials)
+             .DistinctBy(m => m.Id)
+             .ToList();
+
+    private void ToggleSelect(PartViewModel part, bool selected)
+    {
+        if (selected) _selectedParts.Add(part);
+        else _selectedParts.Remove(part);
+    }
+
+    private void ToggleAll(bool selectAll)
+    {
+        if (selectAll) _selectedParts = [..Parts];
+        else _selectedParts.Clear();
+    }
+
+    private async Task ApplyBulk()
+    {
+        var toProcess = _selectedParts.ToList();
+        _selectedParts.Clear();
+        foreach (var part in toProcess)
+        {
+            if (_bulkProcess != null)
+            {
+                part.ProcessCode = _bulkProcess.Code;
+                part.ProcessId = _bulkProcess.Id;
+            }
+            if (_bulkMaterial != null)
+            {
+                part.MaterialCode = _bulkMaterial.Code;
+                part.MaterialId = _bulkMaterial.Id;
+            }
+            await OnPartChanged.InvokeAsync(part);
+        }
+        _bulkProcess = null;
+        _bulkMaterial = null;
+    }
+}

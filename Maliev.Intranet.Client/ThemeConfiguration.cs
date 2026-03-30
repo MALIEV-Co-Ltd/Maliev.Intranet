@@ -116,26 +116,43 @@ public static class ThemeConfiguration
         theme.Typography.Button.TextTransform = "none";
 
         // ── Palette (light) ──────────────────────────────────────────────────────
-        theme.PaletteLight.Primary = "#1b6ec2";
-        theme.PaletteLight.PrimaryLighten = "#eef4fb";
+        theme.PaletteLight.Primary = "#2563eb";
+        theme.PaletteLight.PrimaryLighten = "rgba(37,99,235,0.05)";
+        theme.PaletteLight.PrimaryDarken = "#1d4ed8";
         theme.PaletteLight.Secondary = "#64748b";
         theme.PaletteLight.SecondaryLighten = "#f1f5f9";
 
+        theme.PaletteDark.Primary = "#3b82f6";
+        theme.PaletteDark.PrimaryLighten = "rgba(59,130,246,0.10)";
+        theme.PaletteDark.PrimaryDarken = "#60a5fa";
         theme.PaletteDark.Secondary = "#94a3b8";
         theme.PaletteDark.SecondaryLighten = "#1e293b";
 
         theme.PaletteLight.Surface = "#ffffff";
-        theme.PaletteLight.Background = "#f5f6f8";
+        theme.PaletteLight.Background = "#f1f5f9";
         theme.PaletteLight.TextPrimary = "#1a1a1a";
         theme.PaletteLight.TextSecondary = "#6b7280";
 
-        theme.PaletteLight.Divider = "#e2e4e9";
-        theme.PaletteLight.LinesDefault = "#e2e4e9";
-        theme.PaletteLight.LinesInputs = "#e2e4e9";
+        theme.PaletteDark.Surface = "#1e2130";
+        theme.PaletteDark.Background = "#131620";
+        theme.PaletteDark.TextPrimary = "#f1f5f9";
+        theme.PaletteDark.TextSecondary = "#94a3b8";
 
-        theme.PaletteLight.Success = "#16a34a";
+        theme.PaletteLight.Divider = "#e4e4e7";
+        theme.PaletteLight.LinesDefault = "#e4e4e7";
+        theme.PaletteLight.LinesInputs = "#d4d4d8";
+
+        theme.PaletteDark.Divider = "#2d3148";
+        theme.PaletteDark.LinesDefault = "#2d3148";
+        theme.PaletteDark.LinesInputs = "#3d4160";
+
+        theme.PaletteLight.Success = "#059669";
         theme.PaletteLight.Warning = "#d97706";
         theme.PaletteLight.Error = "#dc2626";
+
+        theme.PaletteDark.Success = "#10b981";
+        theme.PaletteDark.Warning = "#f59e0b";
+        theme.PaletteDark.Error = "#ef4444";
 
         return theme;
     }

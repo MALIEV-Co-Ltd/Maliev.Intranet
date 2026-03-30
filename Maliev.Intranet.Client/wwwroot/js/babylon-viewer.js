@@ -10,7 +10,6 @@
  *   - Meshes are scaled from meters → mm (or via known dimensions)
  *   - Meshes are rotated +90° around X: GLB-Y → world-Z (up), GLB-Z → world −Y
  *   - Result: X=right, Y=depth/front, Z=up  (standard CAD / 3D-printing convention)
- *   - Grid sits on XY plane at Z=0
  */
 
 // ── Per-canvas state ──────────────────────────────────────────────────────────
@@ -31,6 +30,14 @@ const axisMouseHandlers= {};   // canvasId → mousemove handler function
 const resizeObservers  = {};   // canvasId → ResizeObserver
 const cameraProjection = {};   // canvasId → 'perspective' | 'orthographic'
 const orthoZoomObservers = {}; // canvasId → onViewMatrixChangedObservable handle
+
+// ── Auto-rotation animation state ────────────────────────────────────────────
+const animStates        = {};  // canvasId → 'idle' | 'hovering' | 'interacting'
+const autoSpeedCurrent  = {};  // canvasId → current alpha increment per frame (lerped)
+const autoSpeedTarget   = {};  // canvasId → target alpha increment
+const SPEED_IDLE   = 0.004;
+const SPEED_HOVER  = 0.0005;
+const SPEED_STOP   = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -163,6 +170,8 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         const canvas = document.getElementById(canvasId);
         if (!canvas) { console.error(`[BabylonViewer] Canvas #${canvasId} not found.`); return; }
 
+        canvas.style.background = 'transparent';
+
         if (engines[canvasId]) await dispose(canvasId);
 
         darkModes[canvasId]        = !!isDark;
@@ -175,9 +184,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         const scene  = new BABYLON.Scene(engine);
         engine.resize();
 
-        scene.clearColor = isDark
-            ? new BABYLON.Color4(0.10, 0.12, 0.16, 1)
-            : new BABYLON.Color4(0.97, 0.97, 0.98, 1);
+        scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
         // Camera (upVector updated after model loads)
         const camera = new BABYLON.ArcRotateCamera('cam',
@@ -303,41 +310,6 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     z: (finalBb.min.z + finalBb.max.z) / 2,
                 };
 
-                // ── Create grid (XY plane at Z = 0) ──
-                // Grid cells are always 10 mm. Floor extends 15 % beyond max horizontal dimension.
-                const partX = finalBb.max.x - finalBb.min.x;
-                const partY = finalBb.max.y - finalBb.min.y;
-                const maxHoriz = Math.max(partX, partY, 1e-6);
-                const gridRatio = 10; // 10 mm cells
-                const rawGridSize = Math.max(maxHoriz * 1.5, 50); // Slightly larger grid for shadows
-                const gridSize = Math.ceil(rawGridSize / 10) * 10;
-                // Cap subdivisions to avoid OOM crash on large/wrongly-scaled meshes
-                const subdivs = Math.max(2, Math.min(200, Math.round(gridSize / gridRatio)));
-
-                const ground = BABYLON.MeshBuilder.CreateGround('__grid__',
-                    { width: gridSize, height: gridSize, subdivisions: subdivs }, _scene);
-                // Rotate XZ plane (Y=0) → XY plane (Z=0)
-                ground.rotation.x = Math.PI / 2;
-                ground.isPickable = false;
-                ground.receiveShadows = true; // Receive shadows from the mesh
-
-                // Push grid down slightly to avoid Z-fighting with flat bottoms
-                ground.position.z = -0.05;
-
-                const gridMat = new BABYLON.GridMaterial('gridMat', _scene);
-                gridMat.majorUnitFrequency = 5;
-                gridMat.minorUnitVisibility = 0.45;
-                gridMat.gridRatio = gridRatio;
-                gridMat.backFaceCulling = false;
-                gridMat.mainColor = isDark
-                    ? new BABYLON.Color3(0.13, 0.15, 0.20)   // slightly lighter than canvas bg
-                    : new BABYLON.Color3(0.94, 0.94, 0.96);  // slightly darker than canvas bg
-                gridMat.lineColor = isDark
-                    ? new BABYLON.Color3(0.35, 0.37, 0.45)
-                    : new BABYLON.Color3(0.55, 0.55, 0.62);
-                gridMat.opacity = 0.9;
-                ground.material = gridMat;
-
                 // ── Save original materials and setup shadows ──
                 const origMats = originalMaterials[canvasId];
                 _scene.meshes.forEach(m => {
@@ -365,6 +337,28 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 // FXAA is intentionally omitted: it blurs wireframes. SSAO is omitted because it
                 // conflicts with the multi-camera setup used for the axis gizmo viewport.
 
+                // ── Auto-rotation: idle spin with hover slow-down and click stop ──
+                animStates[canvasId]       = 'idle';
+                autoSpeedCurrent[canvasId] = 0;
+                autoSpeedTarget[canvasId]  = SPEED_IDLE;
+
+                canvas.addEventListener('mouseenter', () => {
+                    if (animStates[canvasId] !== 'interacting') {
+                        animStates[canvasId]      = 'hovering';
+                        autoSpeedTarget[canvasId] = SPEED_HOVER;
+                    }
+                });
+                canvas.addEventListener('mouseleave', () => {
+                    if (animStates[canvasId] !== 'interacting') {
+                        animStates[canvasId]      = 'idle';
+                        autoSpeedTarget[canvasId] = SPEED_IDLE;
+                    }
+                });
+                canvas.addEventListener('pointerdown', () => {
+                    animStates[canvasId]      = 'interacting';
+                    autoSpeedTarget[canvasId] = SPEED_STOP;
+                });
+
                 // ── Axis gizmo ──
                 createAxisGizmo(canvasId, _scene, mainCameras[canvasId], canvas);
 
@@ -380,27 +374,24 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
             (_scene, message, exception) => {
                 modelLoadState[canvasId] = 'error';
                 console.error('[BabylonViewer] Load error:', message, exception);
-                // Show a fallback grid so the canvas isn't completely blank
-                try {
-                    const g = BABYLON.MeshBuilder.CreateGround('__grid__',
-                        { width: 200, height: 200, subdivisions: 20 }, _scene);
-                    g.rotation.x = Math.PI / 2;
-                    g.isPickable  = false;
-                    const gm = new BABYLON.GridMaterial('gridMat', _scene);
-                    gm.majorUnitFrequency = 5;
-                    gm.minorUnitVisibility = 0.35;
-                    gm.gridRatio  = 10;
-                    gm.backFaceCulling = false;
-                    gm.mainColor  = isDark ? new BABYLON.Color3(0.15, 0.15, 0.18) : new BABYLON.Color3(0.88, 0.88, 0.90);
-                    gm.lineColor  = isDark ? new BABYLON.Color3(0.30, 0.30, 0.35) : new BABYLON.Color3(0.62, 0.62, 0.68);
-                    gm.opacity = 0.90;
-                    g.material = gm;
-                } catch (_) {}
             },
             forcedExt
         );
 
-        engine.runRenderLoop(() => scene.render());
+        engine.runRenderLoop(() => {
+            // Smooth speed interpolation (lerp toward target)
+            const curr   = autoSpeedCurrent[canvasId] ?? 0;
+            const target = autoSpeedTarget[canvasId]  ?? 0;
+            autoSpeedCurrent[canvasId] = curr + (target - curr) * 0.04;
+
+            // Apply auto-rotation
+            const cam = mainCameras[canvasId];
+            if (cam && Math.abs(autoSpeedCurrent[canvasId]) > 0.00001) {
+                cam.alpha += autoSpeedCurrent[canvasId];
+            }
+
+            scene.render();
+        });
 
         const resizeHandler = () => engine.resize();
         window.addEventListener('resize', resizeHandler);
@@ -957,6 +948,9 @@ export function dispose(canvasId) {
     delete sceneBoundingBoxes[canvasId];
     delete meshCenters[canvasId];
     delete cameraProjection[canvasId];
+    delete animStates[canvasId];
+    delete autoSpeedCurrent[canvasId];
+    delete autoSpeedTarget[canvasId];
 }
 
 // Debug handle

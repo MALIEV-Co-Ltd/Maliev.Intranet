@@ -1,3 +1,4 @@
+// TODO: Auto-enter 3D mode on part selection — the "View in 3D" button currently required
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.MessagingContracts.Contracts.Geometry
@@ -8,13 +9,13 @@
 @using MudBlazor
 @inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
 
-<div class="pdc-root">
-    @* ── Left 60%: Viewer Column ──────────────────────────────────── *@
-    <div class="pdc-viewer-col">
+<div class="pdc-container">
+    <div class="pdc-viewer-wrap pdc-polkadot">
+        @* Thumbnail area *@
         <div class="pdc-thumb-area">
 
-            @* ── 3D Viewer Mode (inline, replaces thumbnail) ──────── *@
-            @if (_showViewer3d)
+            @* ── 3D Viewer Mode (auto-loads when URL is available) ──────── *@
+            @if (!string.IsNullOrEmpty(Part.ViewerUrl) || !string.IsNullOrEmpty(Part.GlbSignedUrl))
             {
                 <div class="pdc-3d-viewer-container">
                     @if (!string.IsNullOrEmpty(Part.ViewerUrl))
@@ -70,17 +71,15 @@
                     <MudIcon Icon="@FileTypes.GetIcon(Path.GetExtension(Part.Name))" Size="Size.Large" Color="Color.Default" />
                 }
 
-                @* AnimatedCubeIcon overlay — always visible when GLB available *@
-                @if (!string.IsNullOrEmpty(Part.GlbStoragePath) || !string.IsNullOrEmpty(Part.GlbSignedUrl))
-                {
-                    <div class="pdc-cube-overlay pdc-cube-active">
-                        <AnimatedCubeIcon Size="80" OnClick="@OpenViewer" />
-                        <span class="pdc-cube-label">View in 3D</span>
-                    </div>
-                }
             }
+
+            @* DFM overlay — positioned absolute over viewer area *@
+            <DfmOverlayPanel DfmIssues="@_dfmIssues"
+                             IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
+                             OnAcknowledged="@HandleDfmAcknowledged" />
         </div>
 
+        @* Viewer meta *@
         <div class="pdc-viewer-meta">
             <MudText Typo="Typo.caption" Class="pdc-filename">@Part.Name</MudText>
             @if (Part.Dimensions != null)
@@ -90,272 +89,6 @@
                 </MudText>
             }
         </div>
-    </div>
-
-    @* ── Right 40%: Configuration Column ─────────────────────────── *@
-    <div class="pdc-config-col">
-        <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="false" Border="true" TabPanelsClass="pa-3">
-
-            <MudTabPanel Text="Configuration">
-                @* Selection mode toggle *@
-                <div class="pdc-selection-mode mb-3">
-                    <MudToggleGroup T="string" Value="@_selectionMode" ValueChanged="OnSelectionModeChanged" Style="width:fit-content;">
-                        <MudToggleItem Value="@("rich")">Rich</MudToggleItem>
-                        <MudToggleItem Value="@("basic")">Basic</MudToggleItem>
-                    </MudToggleGroup>
-                </div>
-
-                @* Process — always shown first *@
-                <div class="pdc-field-group">
-                    <MudText Typo="Typo.overline" Class="mb-1">Process *</MudText>
-
-                    @if (_selectionMode == "rich")
-                    {
-                        <MudStack Row="true" Spacing="2" Style="overflow-x: auto; flex-wrap: nowrap;">
-                            @foreach (var p in Processes)
-                            {
-                                <CatalogCard Title="@p.Name"
-                                            Subtitle="@(p.Description ?? "")"
-                                            IsSelected="@(Part.ProcessId == p.Id)"
-                                            OnClick="@(() => OnProcessChanged(p.Id))" />
-                            }
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudSelect T="Nullable<Guid>" Label="Process *"
-                                   Value="@Part.ProcessId"
-                                   ValueChanged="@OnProcessChanged"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense">
-                            @foreach (var p in Processes)
-                            {
-                                <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)p.Id)">@p.Name</MudSelectItem>
-                            }
-                        </MudSelect>
-                    }
-                </div>
-
-                @* Material *@
-                <div class="pdc-field-group">
-                    <MudText Typo="Typo.overline" Class="mb-1">Material *</MudText>
-
-                    @if (Part.CatalogLoading)
-                    {
-                        <MudStack Row="true" Spacing="2">
-                            @for (var i = 0; i < 4; i++)
-                            {
-                                <MudSkeleton Width="120px" Height="100px" Style="flex-shrink:0;" />
-                            }
-                        </MudStack>
-                    }
-                    else if (_selectionMode == "rich")
-                    {
-                        <MudStack Row="true" Spacing="2" Style="overflow-x: auto; flex-wrap: nowrap;">
-                            @foreach (var m in Part.AvailableMaterials)
-                            {
-                                <CatalogCard Title="@m.Name"
-                                            Subtitle="@m.Category"
-                                            IsSelected="@(Part.MaterialId == m.Id)"
-                                            OnClick="@(() => OnMaterialChanged(m.Id))" />
-                            }
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudSelect T="Nullable<Guid>" Label="Material *"
-                                   Value="@Part.MaterialId"
-                                   ValueChanged="@OnMaterialChanged"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Disabled="@(Part.ProcessId == null || Part.AvailableMaterials.Count == 0)">
-                            @foreach (var m in Part.AvailableMaterials)
-                            {
-                                <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)m.Id)">@m.Name</MudSelectItem>
-                            }
-                        </MudSelect>
-                    }
-                </div>
-
-                @* Surface Finish *@
-                <div class="pdc-field-group">
-                    <MudText Typo="Typo.overline" Class="mb-1">Surface Finish</MudText>
-
-                    @if (Part.CatalogLoading)
-                    {
-                        <MudStack Row="true" Spacing="2">
-                            @for (var i = 0; i < 3; i++)
-                            {
-                                <MudSkeleton Width="120px" Height="100px" Style="flex-shrink:0;" />
-                            }
-                        </MudStack>
-                    }
-                    else if (_selectionMode == "rich")
-                    {
-                        <MudStack Row="true" Spacing="2" Style="overflow-x: auto; flex-wrap: nowrap;">
-                            <CatalogCard Title="None"
-                                        Subtitle=""
-                                        IsSelected="@(!Part.FinishId.HasValue)"
-                                        OnClick="@(() => OnFinishChanged(null))" />
-                            @foreach (var f in Part.AvailableFinishes)
-                            {
-                                <CatalogCard Title="@f.Name"
-                                            Subtitle="@(f.RaValueUm.HasValue ? $"Ra {f.RaValueUm:N1} µm" : (f.Description ?? ""))"
-                                            IsSelected="@(Part.FinishId == f.Id)"
-                                            OnClick="@(() => OnFinishChanged(f.Id))" />
-                            }
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudSelect T="Nullable<Guid>" Label="Surface Finish"
-                                   Value="@Part.FinishId"
-                                   ValueChanged="@OnFinishChanged"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Disabled="@(Part.ProcessId == null)">
-                            <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)null)">None</MudSelectItem>
-                            @foreach (var f in Part.AvailableFinishes)
-                            {
-                                <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)f.Id)">@f.Name</MudSelectItem>
-                            }
-                        </MudSelect>
-                    }
-                </div>
-
-                @* Tolerance *@
-                <div class="pdc-field-group">
-                    <MudText Typo="Typo.overline" Class="mb-1">Tolerance</MudText>
-
-                    @if (Part.CatalogLoading)
-                    {
-                        <MudStack Row="true" Spacing="2">
-                            @for (var i = 0; i < 3; i++)
-                            {
-                                <MudSkeleton Width="120px" Height="100px" Style="flex-shrink:0;" />
-                            }
-                        </MudStack>
-                    }
-                    else if (_selectionMode == "rich")
-                    {
-                        <MudStack Row="true" Spacing="2" Style="overflow-x: auto; flex-wrap: nowrap;">
-                            <CatalogCard Title="Standard"
-                                        Subtitle=""
-                                        IsSelected="@(!Part.ToleranceId.HasValue)"
-                                        OnClick="@(() => OnToleranceChanged(null))" />
-                            @foreach (var t in Part.AvailableTolerances)
-                            {
-                                <CatalogCard Title="@t.Name"
-                                            Subtitle="@(t.Grade)"
-                                            IsSelected="@(Part.ToleranceId == t.Id)"
-                                            OnClick="@(() => OnToleranceChanged(t.Id))" />
-                            }
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudSelect T="Nullable<Guid>" Label="Tolerance"
-                                   Value="@Part.ToleranceId"
-                                   ValueChanged="@OnToleranceChanged"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Disabled="@(Part.ProcessId == null)">
-                            <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)null)">Standard</MudSelectItem>
-                            @foreach (var t in Part.AvailableTolerances)
-                            {
-                                <MudSelectItem T="Nullable<Guid>" Value="@((Guid?)t.Id)">@t.Name</MudSelectItem>
-                            }
-                        </MudSelect>
-                    }
-                </div>
-
-                @* Quantity *@
-                <div class="pdc-field-group">
-                    <MudNumericField T="int" Label="Quantity"
-                                     Value="@Part.Quantity"
-                                     ValueChanged="@OnQuantityChanged"
-                                     Min="1" Max="999"
-                                     Variant="Variant.Outlined"
-                                     Margin="Margin.Dense" />
-                </div>
-
-                @* Part Notes *@
-                <MudTextField T="string" Value="@Part.PartNotes"
-                              ValueChanged="@((string v) => NotifyChanged(p => p.PartNotes = v))"
-                              Label="Part Notes"
-                              Lines="6"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              MaxLength="2000"
-                              HelperText="Add manufacturing notes, special instructions, or requirements for this part." />
-
-                @* DFM panel — shown when non-manifold *@
-                @if (Part.IsManifold == false)
-                {
-                    <MudExpansionPanel Class="mt-2"
-                                       Style="@(Part.DfmAcknowledged ? "background:#f0fdf4; border:1px solid #bbf7d0;" : "background:#fff7ed; border:1px solid #fed7aa;")">
-                        <TitleContent>
-                            <div style="display:flex;align-items:center;gap:4px;">
-                                <MudIcon Icon="@(Part.DfmAcknowledged ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.WarningAmber)"
-                                         Size="Size.Small"
-                                         Color="@(Part.DfmAcknowledged ? Color.Success : Color.Warning)" />
-                                <MudText Color="@(Part.DfmAcknowledged ? Color.Success : Color.Warning)" Typo="Typo.body2" Style="font-weight:600;">
-                                    @(Part.DfmAcknowledged ? "Non-manifold mesh — acknowledged" : "Non-manifold mesh detected")
-                                </MudText>
-                            </div>
-                        </TitleContent>
-                        <ChildContent>
-                            <MudText Typo="Typo.body2">This mesh may have geometry issues affecting manufacturing.</MudText>
-                            @{
-                                var detailIssues = GetDfmIssueDetailSummary(Part.DfmReport);
-                                if (detailIssues.Count > 0)
-                                {
-                                    <MudList T="string" Dense="true" Class="mt-2" Style="max-height:200px;overflow-y:auto;">
-                                        @foreach (var issue in detailIssues)
-                                        {
-                                            <MudListItem Icon="@issue.Icon" Text="@issue.Text" />
-                                        }
-                                    </MudList>
-                                }
-                            }
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Warning"
-                                       Size="Size.Small"
-                                       Class="mt-2"
-                                       Disabled="@Part.DfmAcknowledged"
-                                       OnClick="@(() => NotifyChanged(p => p.DfmAcknowledged = true))"
-                                       StartIcon="@(Part.DfmAcknowledged ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.WarningAmber)">
-                                @(Part.DfmAcknowledged ? "Acknowledged" : "I understand — proceed")
-                            </MudButton>
-                        </ChildContent>
-                    </MudExpansionPanel>
-                }
-            </MudTabPanel>
-
-            <MudTabPanel Text="Drawings">
-                <div class="pa-3">
-                    <DrawingUploadSection PartId="Part.FileId"
-                                         ProjectId="TempProjectId"
-                                         Attachments="Part.DrawingFiles"
-                                         AttachmentsChanged="OnDrawingAttachmentsChanged" />
-                </div>
-            </MudTabPanel>
-
-            <MudTabPanel Text="Files">
-                <div class="pa-3">
-                    <SupplementaryUploadSection PartId="Part.FileId"
-                                                ProjectId="TempProjectId"
-                                                Attachments="Part.SupplementaryFiles"
-                                                AttachmentsChanged="OnSupplementaryAttachmentsChanged" />
-                </div>
-            </MudTabPanel>
-
-            <MudTabPanel Text="Bulk Pricing">
-                <MudText Color="Color.Secondary" Typo="Typo.body2">
-                    Bulk pricing tiers — not yet available
-                </MudText>
-            </MudTabPanel>
-        </MudTabs>
     </div>
 </div>
 
@@ -368,27 +101,24 @@
         from { opacity: 0; }
         to   { opacity: 1; }
     }
-    .pdc-root {
+    .pdc-container {
         display: flex;
         flex: 1;
         min-height: 0;
-        background: var(--mud-palette-surface);
         overflow: hidden;
-        border-top: 1px solid var(--mud-palette-lines-default);
     }
-    .pdc-viewer-col {
-        width: 60%;
-        min-width: 0;
+    .pdc-viewer-wrap {
         display: flex;
         flex-direction: column;
-        border-right: 1px solid var(--mud-palette-lines-default);
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
     }
-    .pdc-config-col {
-        width: 40%;
-        min-width: 0;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
+    .pdc-polkadot {
+        background-color: var(--mud-palette-background);
+        background-image: radial-gradient(circle, var(--mud-palette-lines-default) 1px, transparent 1px);
+        background-size: 20px 20px;
+        position: relative;
     }
     .pdc-thumb-area {
         position: relative;
@@ -425,23 +155,6 @@
         gap: 4px;
         z-index: 1;
     }
-    .pdc-cube-overlay {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        animation: fade-in 0.2s ease-in-out;
-        z-index: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 6px;
-        cursor: pointer;
-    }
-    /* Cube always visible; animate only on hover */
-    .pdc-cube-overlay .animated-cube-icon .cube {
-        opacity: 1 !important;
-    }
     .pdc-3d-viewer-container {
         position: absolute;
         inset: 0;
@@ -466,6 +179,14 @@
         transition: background 0.15s;
     }
     .pdc-3d-back-btn:hover { background: rgba(0,0,0,0.7); }
+    .pdc-cube-overlay {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2;
+        animation: fade-in 0.2s ease-in-out;
+    }
     .pdc-viewer-meta {
         padding: 8px 12px;
         background: var(--mud-palette-surface);
@@ -477,46 +198,45 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .pdc-field-group {
-        margin-bottom: 12px;
-    }
 </style>
 
 @code {
+    /// <summary>Injected HTTP client for refreshing signed thumbnail URLs.</summary>
     [Inject] private HttpClient Http { get; set; } = null!;
+
+    /// <summary>Injected snackbar service for user notifications.</summary>
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
+    /// <summary>The part view model to display in this card.</summary>
     [Parameter] public PartViewModel Part { get; set; } = null!;
-    [Parameter] public List<ProcessDto> Processes { get; set; } = [];
+
+    /// <summary>Callback invoked when any property of <see cref="Part"/> changes.</summary>
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
+
+    /// <summary>Callback invoked when the user requests to open the 3D viewer for this part.</summary>
     [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
+
+    /// <summary>The temporary project ID used for file upload endpoints.</summary>
     [Parameter] public Guid TempProjectId { get; set; }
 
-    private bool _showViewer3d;
-    private int _activeTab;
-    private string _selectionMode = "rich";
     private readonly Dictionary<string, string> _resolvedUrls = [];
     private Guid _lastPartId;
+    private List<DfmIssue> _dfmIssues = [];
 
+    /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
-        if (_lastPartId != Guid.Empty && _lastPartId != Part.FileId && _showViewer3d)
+        if (_lastPartId != Guid.Empty && _lastPartId != Part.FileId && !string.IsNullOrEmpty(Part.ViewerUrl))
         {
             await CloseViewer();
         }
         _lastPartId = Part.FileId;
+        _dfmIssues = BuildDfmIssues();
         await base.OnParametersSetAsync();
-    }
-
-    private async Task OpenViewer()
-    {
-        _showViewer3d = true;
-        await OnOpenViewer.InvokeAsync(Part);
     }
 
     private async Task CloseViewer()
     {
-        _showViewer3d = false;
         Part.ViewerUrl = null;
         Part.GlbSignedUrl = null;
         await OnPartChanged.InvokeAsync(Part);
@@ -561,110 +281,66 @@
         OnPartChanged.InvokeAsync(Part);
     }
 
+    private Task HandleDfmAcknowledged()
+    {
+        NotifyChanged(p => p.DfmAcknowledged = true);
+        return Task.CompletedTask;
+    }
+
+    private List<DfmIssue> BuildDfmIssues()
+    {
+        var raw = GetDfmIssueDetailSummary(Part.DfmReport);
+        return raw
+            .Select(t => new DfmIssue(Icon: t.Icon, Title: t.Text, Description: t.Description, Severity: DfmIssueSeverity.Warning))
+            .ToList();
+    }
+
     /// <summary>
     /// Extracts a human-readable list of DFM issue details from a DFM report payload.
     /// </summary>
-    private static List<(string Icon, string Text)> GetDfmIssueDetailSummary(object? dfmReport)
+    private static List<(string Icon, string Text, string Description)> GetDfmIssueDetailSummary(object? dfmReport)
     {
-        var issues = new List<(string Icon, string Text)>();
+        var issues = new List<(string Icon, string Text, string Description)>();
         if (dfmReport == null) return issues;
 
         switch (dfmReport)
         {
             case FdmDfmReportPayload fdm:
                 if (fdm.ThinWallCount > 0)
-                    issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.ThinWallCount} thin wall region(s)"));
+                    issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.ThinWallCount} thin wall region(s)", "Wall thickness below minimum recommended for FDM printing"));
                 if (fdm.OverhangFaceCount > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang face(s)"));
+                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang face(s)", "Faces at steep angles may require support structures"));
                 if (fdm.SupportRequired)
-                    issues.Add((Icons.Material.Filled.AddHome, "Support structures required"));
+                    issues.Add((Icons.Material.Filled.AddHome, "Support structures required", "This model requires support structures for printing"));
                 if (fdm.SmallDetailCount > 0)
-                    issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost"));
+                    issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost", "Some fine details may not reproduce accurately"));
                 break;
 
             case SlaDfmReportPayload sla:
                 if (sla.ThinWallCount > 0)
-                    issues.Add((Icons.Material.Filled.Rectangle, $"{sla.ThinWallCount} thin wall region(s)"));
+                    issues.Add((Icons.Material.Filled.Rectangle, $"{sla.ThinWallCount} thin wall region(s)", "Wall thickness may cause resin drainage or print failure"));
                 if (sla.ResinTrappingRisk)
-                    issues.Add((Icons.Material.Filled.Water, "Resin trapping risk"));
+                    issues.Add((Icons.Material.Filled.Water, "Resin trapping risk", "Enclosed cavities may trap resin during printing"));
                 if (sla.SuctionRisk)
-                    issues.Add((Icons.Material.Filled.Opacity, "Suction risk during peeling"));
+                    issues.Add((Icons.Material.Filled.Opacity, "Suction risk during peeling", "Large flat surfaces may cause suction during peeling"));
                 if (sla.HollowRegions.Count > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{sla.HollowRegions.Count} hollow region(s)"));
+                    issues.Add((Icons.Material.Filled.Layers, $"{sla.HollowRegions.Count} hollow region(s)", "Hollow regions may require additional drainage holes"));
                 break;
 
             case CncDfmReportPayload cnc:
                 if (cnc.SharpCornerCount > 0)
-                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)"));
+                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)", "Sharp inside corners cannot be cut precisely with standard end mills"));
                 if (cnc.HasUndercuts)
-                    issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected"));
+                    issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected", "Undercut features require special machining strategies or EDM"));
                 if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0)
-                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)"));
+                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)", $"This model has {cnc.DrillHoleCount} drill hole(s) to machine"));
                 if (cnc.RequiresEdm)
-                    issues.Add((Icons.Material.Filled.Build, "EDM required for complex features"));
+                    issues.Add((Icons.Material.Filled.Build, "EDM required for complex features", "Complex internal geometry requires EDM (Electrical Discharge Machining)"));
                 if (cnc.RequiresGrinding)
-                    issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces"));
+                    issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces", "Flat surfaces require grinding for tight tolerance"));
                 break;
         }
 
         return issues;
-    }
-
-    private Task OnSelectionModeChanged(string mode)
-    {
-        _selectionMode = mode;
-        return Task.CompletedTask;
-    }
-
-    private void OnProcessChanged(Guid? processId)
-    {
-        NotifyChanged(p =>
-        {
-            p.ProcessId = processId;
-            p.ProcessCode = Processes.FirstOrDefault(x => x.Id == processId)?.Code;
-            p.MaterialId = null; p.MaterialCode = null;
-            p.FinishId = null; p.FinishCode = null;
-            p.ToleranceId = null; p.ToleranceCode = null;
-            p.DfmAcknowledged = false;
-            p.AvailableMaterials = [];
-            p.AvailableFinishes = [];
-            p.AvailableTolerances = [];
-        });
-    }
-
-    private void OnMaterialChanged(Guid? materialId) =>
-        NotifyChanged(p =>
-        {
-            p.MaterialId = materialId;
-            p.MaterialCode = p.AvailableMaterials.FirstOrDefault(x => x.Id == materialId)?.Code;
-        });
-
-    private void OnFinishChanged(Guid? finishId) =>
-        NotifyChanged(p =>
-        {
-            p.FinishId = finishId;
-            p.FinishCode = p.AvailableFinishes.FirstOrDefault(x => x.Id == finishId)?.Code;
-        });
-
-    private void OnToleranceChanged(Guid? toleranceId) =>
-        NotifyChanged(p =>
-        {
-            p.ToleranceId = toleranceId;
-            p.ToleranceCode = p.AvailableTolerances.FirstOrDefault(x => x.Id == toleranceId)?.Code;
-        });
-
-    private void OnQuantityChanged(int qty) =>
-        NotifyChanged(p => p.Quantity = Math.Clamp(qty, 1, 999));
-
-    private Task OnDrawingAttachmentsChanged(List<DraftProjectAttachmentDto> attachments)
-    {
-        Part.DrawingFiles = attachments;
-        return OnPartChanged.InvokeAsync(Part);
-    }
-
-    private Task OnSupplementaryAttachmentsChanged(List<DraftProjectAttachmentDto> attachments)
-    {
-        Part.SupplementaryFiles = attachments;
-        return OnPartChanged.InvokeAsync(Part);
     }
 }

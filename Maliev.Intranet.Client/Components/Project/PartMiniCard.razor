@@ -1,389 +1,199 @@
 @namespace Maliev.Intranet.Client.Components.Project
-@using System.Text.Json
-@using Maliev.MessagingContracts.Contracts.Geometry
-@inject HttpClient Http
-@inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
 
-<div class="pmc-card @(IsActive ? "pmc-active" : "") @(Part.Error != null ? "pmc-error" : "")" @onclick="OnSelect">
-    @* ── Thumbnail ──────────────────────────────────────────────── *@
+<div class="pmc-card @(IsActive ? "pmc-card--active" : "")"
+     @onclick="@OnClick">
+    @* Thumbnail *@
     <div class="pmc-thumb">
         @if (Part.Uploading)
         {
-            @* Uploading — show progress overlay on placeholder *@
-            <img src="images/image-placeholder.svg" alt="Uploading" class="pmc-thumb-img" />
+            <MudProgressCircular Size="Size.Small"
+                                 Indeterminate="false"
+                                 Value="@Part.ProgressPercent"
+                                 Color="Color.Primary" />
         }
-        else if (Part.Error != null)
+        else if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl))
         {
-            <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Medium" Color="Color.Error" />
-        }
-        else if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && !Part.PreviewLoadFailed)
-        {
-            <img src="@Part.ThumbnailSmallUrl" alt="@Part.Name"
-                 @onerror="OnThumbnailErrorAsync" class="pmc-thumb-img" />
-        }
-        else if (Part.FileId != Guid.Empty)
-        {
-            @* Uploaded but awaiting geometry/preview — show placeholder SVG *@
-            <img src="images/image-placeholder.svg" alt="Processing" class="pmc-thumb-img" />
+            <img src="@Part.ThumbnailSmallUrl"
+                 class="pmc-thumb-img"
+                 onerror="this.style.display='none'"
+                 alt="@Part.Name" />
         }
         else
         {
-            <MudIcon Icon="@FileTypes.GetIcon(Path.GetExtension(Part.Name))" Size="Size.Medium" Color="Color.Default" />
+            <MudIcon Icon="@Icons.Material.Outlined.ViewInAr"
+                     Size="Size.Small"
+                     Color="Color.Tertiary" />
         }
-
-        @* ── Status badge (non-manifold warning / acknowledged) ── *@
-        @if (Part.Error == null && Part.IsManifold == false)
+        @* DFM status indicator overlay *@
+        @if (Part.DfmReport != null && !Part.DfmAcknowledged)
         {
-            <div class="pmc-badge">
-                <MudIconButton Icon="@(_dfmPopoverOpen && Part.DfmAcknowledged ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.WarningAmber)"
-                               Size="Size.Small"
-                               Color="@(Part.DfmAcknowledged ? Color.Success : Color.Warning)"
-                               OnClick="@(() => _dfmPopoverOpen = !_dfmPopoverOpen)"
-                               Class="pmc-badge-btn" />
-                <MudPopover Open="@_dfmPopoverOpen"
-                            AnchorOrigin="Origin.TopCenter"
-                            TransformOrigin="Origin.BottomCenter"
-                            Style="min-width:220px; max-width:280px;">
-                    <MudStack Spacing="1" Class="pa-2">
-                        @* DFM issue summary *@
-                        @if (GetDfmIssueSummary(Part.DfmReport) is { } summary && summary.Count > 0)
-                        {
-                            @foreach (var item in summary)
-                            {
-                                <MudText Typo="Typo.caption" Class="pmc-dfm-issue">
-                                    <MudIcon Icon="@item.Icon" Size="Size.Small" Color="Color.Warning" Class="me-1" />
-                                    @item.Text
-                                </MudText>
-                            }
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">No geometry issues detected.</MudText>
-                        }
-
-                        @* Acknowledge button *@
-                        @if (!Part.DfmAcknowledged)
-                        {
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Warning"
-                                       Size="Size.Small"
-                                       Class="mt-1"
-                                                                               OnClick="@HandleDfmAcknowledge">
-                                Acknowledge
-                            </MudButton>
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Success" Class="mt-1">
-                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="me-1" />
-                                Acknowledged
-                            </MudText>
-                        }
-                    </MudStack>
-                </MudPopover>
+            <div class="mc-indicator warn">
+                <MudIcon Icon="@Icons.Material.Filled.WarningAmber"
+                         Size="Size.Small"
+                         Color="Color.Warning" />
             </div>
         }
-        else if (Part.Error == null && !Part.PreviewLoadFailed && !string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && Part.IsManifold != false)
+        else if (Part.IsFullyConfigured)
         {
-            @* Fully OK — green check *@
-            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" Class="pmc-badge" />
+            <div class="mc-indicator ok">
+                <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline"
+                         Size="Size.Small"
+                         Color="Color.Success" />
+            </div>
         }
     </div>
 
-    @* ── Info section ─────────────────────────────────────────── *@
+    @* Info *@
     <div class="pmc-info">
-        <MudTooltip Text="@Part.Name">
-            <div class="pmc-name">@Part.Name</div>
-        </MudTooltip>
-
-        @* Dimensions line — show only when available *@
-        <div class="pmc-dim">
-            @if (Part.Dimensions != null)
-            {
-                <text>@($"{Part.Dimensions.X:N1} × {Part.Dimensions.Y:N1} × {Part.Dimensions.Z:N1} mm")</text>
-            }
-        </div>
-
-        @* Meta row: process/material *@
-        <div class="pmc-meta">
-            <span class="pmc-process-material">
-                @if (!string.IsNullOrEmpty(Part.ProcessCode)) { <text>@Part.ProcessCode</text> }
-                @if (!string.IsNullOrEmpty(Part.ProcessCode) && !string.IsNullOrEmpty(Part.MaterialCode)) { <text> · </text> }
-                @if (!string.IsNullOrEmpty(Part.MaterialCode)) { <text>@Part.MaterialCode</text> }
-            </span>
-        </div>
-        <span class="pmc-qty @(Part.Quantity == 1 ? "pmc-qty-1" : "")">×@Part.Quantity</span>
-
-        @* Price row — skeleton when pricing in flight *@
-        <div class="pmc-price">
-            @if (Part.PricingLoading)
-            {
-                <MudSkeleton Width="50px" Height="12px" />
-            }
-            else if (Part.EstimatedTotalAmount.HasValue)
-            {
-                <text>@FormatPrice(Part.EstimatedTotalAmount.Value)</text>
-            }
+        <MudText Typo="Typo.body2" Class="pmc-name" Style="font-weight:600;">
+            @TruncateName(Part.Name)
+        </MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pmc-meta">
+            @(Part.ProcessCode ?? "No process") · @(Part.MaterialCode ?? "No material")
+        </MudText>
+        <div class="mc-bottom">
+            <MudText Typo="Typo.caption" Style="font-weight:700;" Class="pmc-price">
+                @(Part.EstimatedUnitPrice.HasValue ? $"{Part.EstimatedUnitPrice.Value:N0}" : "—")
+            </MudText>
+            <MudText Typo="Typo.caption" Class="mc-qty">
+                ×@Part.Quantity
+            </MudText>
         </div>
     </div>
 
-    @* ── Upload progress bar ─────────────────────────────────── *@
-    @if (Part.Uploading)
-    {
-        <div class="pmc-progress">
-            <MudProgressLinear Value="Part.ProgressPercent" Color="Color.Primary" />
-        </div>
-    }
-
-    @* ── Remove button ──────────────────────────────────────── *@
-    <span class="pmc-remove" @onclick:stopPropagation="true">
-        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                       Size="Size.Small"
-                       Color="Color.Error"
-                       OnClick="@(() => OnRemove.InvokeAsync())"
-                       Disabled="@Part.Uploading" />
-    </span>
+    @* Remove button — visible on card hover *@
+    <button class="pmc-remove"
+            @onclick:stopPropagation="true"
+            @onclick="@OnRemove">
+        <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
+    </button>
 </div>
 
 <style>
     .pmc-card {
-        display: flex;
-        align-items: stretch;
-        border: 2px solid var(--mud-palette-lines-default);
-        border-radius: 8px;
-        background: var(--mud-palette-background);
-        cursor: pointer;
-        min-width: 280px;
-        max-width: 300px;
-        height: 80px;
-        flex-shrink: 0;
         position: relative;
-        transition: border-color 0.15s, background 0.15s;
+        width: 260px;
+        min-width: 260px;
+        height: 72px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 8px;
+        background: var(--mud-palette-surface);
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 8px;
+        cursor: pointer;
         overflow: hidden;
+        box-shadow: var(--maliev-shadow-card, 0 1px 4px rgba(0,0,0,0.06));
+        transition: border-color 0.15s, box-shadow 0.15s;
+        flex-shrink: 0;
     }
-    .pmc-card:hover { border-color: var(--mud-palette-primary-hover); background: var(--mud-palette-surface); }
-    .pmc-active { border-color: var(--mud-palette-primary) !important; background: var(--mud-palette-surface) !important; }
-    .pmc-error { border-color: var(--mud-palette-error) !important; }
+    .pmc-card:hover {
+        border-color: var(--mud-palette-lines-default);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    }
+    .pmc-card--active {
+        border-color: var(--mud-palette-primary) !important;
+        background: var(--mud-palette-primary-lighten) !important;
+        box-shadow: 0 0 0 2px var(--mud-palette-primary-lighten) !important;
+    }
     .pmc-thumb {
-        width: 80px;
-        min-width: 80px;
-        height: 100%;
-        border-radius: 4px 0 0 4px;
-        background: var(--mud-palette-background-grey);
+        width: 72px;
+        height: 72px;
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: var(--mud-palette-background);
+        border-radius: 4px;
         overflow: hidden;
-        flex-shrink: 0;
         position: relative;
     }
-    .pmc-thumb-img { width: 100%; height: 100%; object-fit: cover; }
-    .pmc-badge {
+    .pmc-thumb-img { width: 100%; height: 100%; object-fit: contain; }
+    .mc-indicator {
         position: absolute;
-        bottom: 2px;
-        right: 2px;
-        font-size: var(--mud-typography-default-size);
+        bottom: 4px;
+        right: 4px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 10px;
     }
-    .pmc-badge-btn {
-        padding: 0 !important;
-        width: 18px !important;
-        height: 18px !important;
-        min-width: unset !important;
-        min-height: unset !important;
-    }
-    .pmc-badge-uploading { background: rgba(var(--mud-palette-black-rgb), 0.2); color: rgba(var(--mud-palette-black-rgb), 0.6); }
-    .pmc-badge-warning { color: var(--mud-palette-warning); }
-    .pmc-badge-ok { background: rgba(var(--mud-palette-success-rgb), 0.15); color: var(--mud-palette-success); }
-    .pmc-dfm-issue { display: flex; align-items: center; }
+    .mc-indicator.warn { background: var(--mud-palette-warning-bg); color: var(--mud-palette-warning); }
+    .mc-indicator.ok { background: var(--mud-palette-success-bg); color: var(--mud-palette-success); }
     .pmc-info {
         flex: 1;
         min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 1px;
-        padding: 8px;
-        overflow: hidden;
     }
     .pmc-name {
-        font-size: var(--mud-typography-caption-size);
-        font-weight: 500;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;"B:\maliev\temp\cube-views.html"
-    }
-    .pmc-dim {
-        font-size: var(--maliev-typography-micro-size);
-        color: var(--mud-palette-text-secondary);
-        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        min-height: 14px;
-        display: flex;
-        align-items: center;
+        white-space: nowrap;
     }
     .pmc-meta {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        min-height: 18px;
-    }
-    .pmc-process-material {
-        font-size: var(--maliev-typography-micro-size);
-        color: var(--mud-palette-text-secondary);
-        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        display: flex;
-        align-items: center;
+        white-space: nowrap;
     }
-    .pmc-qty {
-        position: absolute;
-        bottom: 8px;
-        right: 8px;
-        z-index: 1;
-        font-size: var(--maliev-typography-micro-size);
+    .mc-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }
+    .mc-qty {
+        font-size: 11px;
         color: var(--mud-palette-primary);
         font-weight: 600;
-        flex-shrink: 0;
     }
-    .pmc-qty-1 {
-        color: var(--mud-palette-text-disabled);
-        font-weight: 600;
-        font-size: var(--mud-typography-default-size);
-    }
-    .pmc-price {
-        font-size: var(--mud-typography-body2-size);
-        color: var(--mud-palette-text-primary);
-        font-weight: 500;
-        margin-top: auto;
-    }
-    .pmc-progress {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        z-index: 3;
-    }
+    .pmc-price { flex-shrink: 0; }
     .pmc-remove {
-        opacity: 0;
-        transition: opacity 0.15s;
         position: absolute;
-        top: 0;
-        right: 0;
-        transform: translateX(15%);
+        top: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.15s, color 0.15s;
+        color: var(--mud-palette-text-secondary);
+        padding: 0;
     }
     .pmc-card:hover .pmc-remove { opacity: 1; }
-    .pmc-remove .mud-icon-button:hover,
-    .pmc-remove .mud-icon-button:focus {
-        background-color: transparent !important;
-    }
-    .pmc-remove .mud-icon-button::after { display: none !important; }
+    .pmc-remove:hover { color: var(--mud-palette-error) !important; }
 </style>
 
 @code {
+    /// <summary>The part view model to display.</summary>
     [Parameter] public PartViewModel Part { get; set; } = null!;
+
+    /// <summary>True when this card is the active/selected part in the configurator.</summary>
     [Parameter] public bool IsActive { get; set; }
-    [Parameter] public EventCallback OnSelect { get; set; }
+
+    /// <summary>Invoked when the card body is clicked (selects the part).</summary>
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    /// <summary>Invoked when the remove (×) button is clicked.</summary>
     [Parameter] public EventCallback OnRemove { get; set; }
-    [Parameter] public EventCallback OnThumbnailRefreshed { get; set; }
-    [Parameter] public EventCallback OnPartChanged { get; set; }
 
-    private bool _dfmPopoverOpen;
-
-    private string FormatPrice(decimal amount) => $"฿{amount:N0}";
-
-    private async Task InvokePartChanged() => await OnPartChanged.InvokeAsync();
-
-    private async Task HandleDfmAcknowledge()
+    private static string TruncateName(string? name)
     {
-        Part.DfmAcknowledged = true;
-        _dfmPopoverOpen = false;
-        await InvokePartChanged();
-    }
-
-    private async Task OnThumbnailErrorAsync()
-    {
-        if (string.IsNullOrEmpty(Part.ThumbnailSmallGcsPath))
-        {
-            Part.PreviewLoadFailed = true;
-            StateHasChanged();
-            return;
-        }
-
-        try
-        {
-            var resp = await Http.GetAsync(
-                $"api/uploads/preview-url?storagePath={Uri.EscapeDataString(Part.ThumbnailSmallGcsPath)}");
-            if (resp.IsSuccessStatusCode)
-            {
-                var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
-                var resolved = json?.RootElement.GetProperty("url").GetString();
-                if (!string.IsNullOrEmpty(resolved))
-                {
-                    Part.ThumbnailSmallUrl = resolved;
-                    Part.PreviewLoadFailed = false;
-                    await OnThumbnailRefreshed.InvokeAsync();
-                    StateHasChanged();
-                    return;
-                }
-            }
-        }
-        catch
-        {
-            // fall through to failure state
-        }
-
-        Part.PreviewLoadFailed = true;
-        StateHasChanged();
-    }
-
-    /// <summary>
-    /// Extracts a human-readable list of DFM issue summaries from the embedded DfmReport.
-    /// </summary>
-    private static List<(string Icon, string Text)> GetDfmIssueSummary(object? dfmReport)
-    {
-        var issues = new List<(string Icon, string Text)>();
-        if (dfmReport == null) return issues;
-
-        switch (dfmReport)
-        {
-            case FdmDfmReportPayload fdm:
-                if (fdm.ThinWallCount > 0)
-                    issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.ThinWallCount} thin wall region(s)"));
-                if (fdm.OverhangFaceCount > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang face(s)"));
-                if (fdm.SupportRequired)
-                    issues.Add((Icons.Material.Filled.AddHome, "Support structures required"));
-                if (fdm.SmallDetailCount > 0)
-                    issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost"));
-                break;
-
-            case SlaDfmReportPayload sla:
-                if (sla.ThinWallCount > 0)
-                    issues.Add((Icons.Material.Filled.Rectangle, $"{sla.ThinWallCount} thin wall region(s)"));
-                if (sla.ResinTrappingRisk)
-                    issues.Add((Icons.Material.Filled.Water, "Resin trapping risk"));
-                if (sla.SuctionRisk)
-                    issues.Add((Icons.Material.Filled.Opacity, "Suction risk during peeling"));
-                if (sla.HollowRegions.Count > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{sla.HollowRegions.Count} hollow region(s)"));
-                break;
-
-            case CncDfmReportPayload cnc:
-                if (cnc.SharpCornerCount > 0)
-                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)"));
-                if (cnc.HasUndercuts)
-                    issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected"));
-                if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0)
-                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)"));
-                if (cnc.RequiresEdm)
-                    issues.Add((Icons.Material.Filled.Build, "EDM required for complex features"));
-                if (cnc.RequiresGrinding)
-                    issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces"));
-                break;
-        }
-
-        return issues;
+        if (string.IsNullOrEmpty(name)) return string.Empty;
+        if (name.Length <= 20) return name;
+        var ext = System.IO.Path.GetExtension(name);
+        var stem = System.IO.Path.GetFileNameWithoutExtension(name);
+        return (stem.Length > 14 ? stem[..14] : stem) + "…" + ext;
     }
 }

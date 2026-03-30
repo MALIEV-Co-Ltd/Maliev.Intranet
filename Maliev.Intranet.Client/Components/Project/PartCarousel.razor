@@ -6,12 +6,11 @@
         var idx = i;
         <PartMiniCard Part="@Parts[idx]"
                       IsActive="@(idx == SelectedIndex)"
-                      OnSelect="@(() => OnSelectPart.InvokeAsync(idx))"
-                      OnRemove="@(() => OnRemovePart.InvokeAsync(Parts[idx]))"
-                      OnThumbnailRefreshed="OnThumbnailRefreshed" />
+                      OnClick="@(() => OnSelectPart.InvokeAsync(idx))"
+                      OnRemove="@(() => OnRemovePart.InvokeAsync(Parts[idx]))" />
     }
     <div class="pc-add" @onclick="OnAddPart">
-        <MudIcon Icon="@Icons.Material.Outlined.Add" Size="Size.Large" Color="Color.Default" />
+        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Large" Color="Color.Default" />
         <MudText Typo="Typo.caption" Color="Color.Secondary">Add Part</MudText>
     </div>
 </div>
@@ -22,7 +21,7 @@
         flex-direction: row;
         overflow-x: auto;
         gap: 8px;
-        padding: 8px;
+        padding: 16px;
         background: var(--mud-palette-surface);
         border-radius: 8px;
         flex-shrink: 0;
@@ -35,7 +34,7 @@
         justify-content: center;
         min-width: 80px;
         height: 100%;
-        border: 2px dashed var(--mud-palette-lines-default);
+        border: 1px dashed var(--mud-palette-lines-default);
         border-radius: 8px;
         cursor: pointer;
         flex-shrink: 0;
@@ -47,10 +46,18 @@
 </style>
 
 @code {
+    /// <summary>The list of parts to display as mini-cards.</summary>
     [Parameter] public List<PartViewModel> Parts { get; set; } = [];
+
+    /// <summary>The index of the currently active/selected part.</summary>
     [Parameter] public int SelectedIndex { get; set; }
+
+    /// <summary>Invoked when the user clicks a part card, passing the part's index.</summary>
     [Parameter] public EventCallback<int> OnSelectPart { get; set; }
+
+    /// <summary>Invoked when the user clicks the remove button on a part card.</summary>
     [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
+
+    /// <summary>Invoked when the user clicks the Add Part button.</summary>
     [Parameter] public EventCallback OnAddPart { get; set; }
-    [Parameter] public EventCallback OnThumbnailRefreshed { get; set; }
 }

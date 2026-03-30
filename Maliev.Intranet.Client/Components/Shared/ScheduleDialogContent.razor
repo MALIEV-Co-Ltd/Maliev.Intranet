@@ -1,0 +1,46 @@
+@namespace Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Shared.Dtos
+
+<MudDialog>
+    <DialogContent>
+        @if (Routing?.ScheduleItems != null)
+        {
+            foreach (var item in Routing.ScheduleItems)
+            {
+                <div class="psi-item">
+                    <MudText Typo="Typo.caption">@item.PlannedDate.ToString("d MMM yyyy")</MudText>
+                    <MudText Typo="Typo.body2">@item.JobReference</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(item.Status)">@item.Status</MudChip>
+                </div>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .psi-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+    }
+    .psi-item:last-child { border-bottom: none; }
+</style>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public ProductionRoutingDto? Routing { get; set; }
+
+    private Color GetStatusColor(string status) => status.ToUpperInvariant() switch
+    {
+        "COMPLETE" => Color.Success,
+        "INPROGRESS" => Color.Warning,
+        "CANCELLED" => Color.Error,
+        _ => Color.Default
+    };
+}

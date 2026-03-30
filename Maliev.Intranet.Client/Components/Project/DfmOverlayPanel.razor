@@ -1,0 +1,122 @@
+@namespace Maliev.Intranet.Client.Components.Project
+
+@if (IsVisible && DfmIssues.Count > 0)
+{
+    <div class="dfm-overlay @(_acknowledged ? "dfm-overlay--success" : "")">
+        <div class="dfm-overlay-header" @onclick="@ToggleExpanded">
+            <MudIcon Icon="@Icons.Material.Filled.WarningAmber"
+                     Size="Size.Small"
+                     Color="@(_acknowledged ? Color.Success : Color.Warning)" />
+            <MudText Typo="Typo.subtitle2" Class="ml-1">
+                @(_acknowledged ? "Issues acknowledged" : $"{DfmIssues.Count} DFM issue{(DfmIssues.Count > 1 ? "s" : "")}")
+            </MudText>
+            <MudIcon Icon="@(_expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                     Size="Size.Small"
+                     Class="ml-auto" />
+        </div>
+        @if (_expanded && !_acknowledged)
+        {
+            <div class="dfm-overlay-issues">
+                @foreach (var issue in DfmIssues)
+                {
+                    <div class="dfm-issue-row">
+                        <MudIcon Icon="@issue.Icon"
+                                 Size="Size.Small"
+                                 Color="@(issue.Severity == DfmIssueSeverity.Error ? Color.Error : Color.Warning)"
+                                 Class="dfm-issue-icon" />
+                        <div>
+                            <MudText Typo="Typo.body2" Style="font-weight:600;">@issue.Title</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@issue.Description</MudText>
+                        </div>
+                    </div>
+                }
+            </div>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Warning"
+                       Size="Size.Small"
+                       Class="mt-2"
+                       OnClick="@Acknowledge">
+                Acknowledge Issues
+            </MudButton>
+        }
+    </div>
+}
+
+<style>
+    .dfm-overlay {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        width: 320px;
+        background: rgba(255,255,255,0.5);
+        backdrop-filter: blur(8px);
+        border-top: 4px solid var(--mud-palette-warning);
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 8px;
+        padding: 12px;
+        z-index: 10;
+        transition: background 0.3s, border-color 0.3s;
+    }
+    .dfm-overlay--success {
+        border-color: var(--mud-palette-success) !important;
+    }
+    .dfm-overlay-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+        cursor: pointer;
+    }
+    .dfm-overlay-issues {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 180px;
+        overflow-y: auto;
+    }
+    .dfm-issue-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .dfm-issue-icon { margin-top: 2px; flex-shrink: 0; }
+    @@media (max-width: 768px) {
+        .dfm-overlay { left: 16px; right: 16px; width: auto; }
+    }
+</style>
+
+@code {
+    /// <summary>The list of DFM issues to display.</summary>
+    [Parameter] public IReadOnlyList<DfmIssue> DfmIssues { get; set; } = [];
+
+    /// <summary>True when the overlay should be shown (i.e., when there are unacknowledged DFM issues).</summary>
+    [Parameter] public bool IsVisible { get; set; }
+
+    /// <summary>Invoked when the user clicks the Acknowledge button.</summary>
+    [Parameter] public EventCallback OnAcknowledged { get; set; }
+
+    private bool _acknowledged;
+    private bool _expanded;
+    private bool _previousIsVisible;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (DfmIssues.Count == 0 || (IsVisible && !_previousIsVisible))
+        {
+            _acknowledged = false;
+            _expanded = false;
+        }
+        _previousIsVisible = IsVisible;
+    }
+
+    private void ToggleExpanded()
+    {
+        _expanded = !_expanded;
+    }
+
+    private async Task Acknowledge()
+    {
+        _acknowledged = true;
+        await OnAcknowledged.InvokeAsync();
+    }
+}

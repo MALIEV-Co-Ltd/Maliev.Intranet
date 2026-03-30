@@ -127,6 +127,46 @@ public sealed class DraftPartState
 
     /// <summary>Supplementary files attached to this part (images, documents, archives).</summary>
     public List<DraftProjectAttachmentDto> SupplementaryFiles { get; set; } = [];
+
+    // ── Manufacturing ────────────────────────────────────────────────────
+    /// <summary>CNC surface roughness code (e.g. "Ra0.8").</summary>
+    public string? RoughnessCode { get; set; }
+
+    // ── Design & Features ─────────────────────────────────────────────────
+    /// <summary>The type of part marking applied (engraving, laser, etc.).</summary>
+    public PartMarkingType MarkingType { get; set; } = PartMarkingType.None;
+
+    /// <summary>The text or content to be marked on the part, when applicable.</summary>
+    public string? MarkingText { get; set; }
+
+    /// <summary>Whether the part contains threaded holes.</summary>
+    public bool HasThreadedHoles { get; set; }
+
+    /// <summary>Thread specification string (e.g. "M3x0.5") when threaded holes are present.</summary>
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>The number of threaded holes on the part. Meaningful only when <see cref="HasThreadedHoles"/> is <c>true</c>.</summary>
+    public int ThreadedHoleCount { get; set; }
+
+    /// <summary>Whether the part requires inserts.</summary>
+    public bool HasInserts { get; set; }
+
+    /// <summary>The type of insert to be installed (heat-set, press-fit, ultrasonic).</summary>
+    public InsertType InsertType { get; set; } = InsertType.None;
+
+    /// <summary>The number of inserts required on the part. Meaningful only when <see cref="InsertType"/> is not <see cref="InsertType.None"/>.</summary>
+    public int InsertCount { get; set; }
+
+    // ── Logistics ─────────────────────────────────────────────────────────
+    /// <summary>Whether the part should be individually bagged and tagged for delivery.</summary>
+    public bool BagAndTag { get; set; } = true;
+
+    // ── Quality ───────────────────────────────────────────────────────────
+    /// <summary>The required inspection level for this part.</summary>
+    public InspectionLevel InspectionLevel { get; set; } = InspectionLevel.Standard;
+
+    /// <summary>List of material or process certificates required (e.g. "EN10204-3.1", "RoHS").</summary>
+    public List<string> Certificates { get; set; } = [];
 }
 
 /// <summary>
@@ -162,4 +202,43 @@ public sealed class DraftProjectAttachmentDto
 
     /// <summary>The kind of attachment (Drawing or Supplementary).</summary>
     public DraftAttachmentKind Kind { get; set; }
+}
+
+/// <summary>Describes the type of marking applied to a manufactured part.</summary>
+public enum PartMarkingType
+{
+    /// <summary>No marking required.</summary>
+    None,
+    /// <summary>Mechanical engraving.</summary>
+    Engraving,
+    /// <summary>Laser marking or etching.</summary>
+    Laser,
+    /// <summary>Pad or ink printing.</summary>
+    Printing,
+    /// <summary>Self-adhesive sticker label.</summary>
+    Sticker
+}
+
+/// <summary>Describes the type of threaded insert to be installed in a part.</summary>
+public enum InsertType
+{
+    /// <summary>No insert required.</summary>
+    None,
+    /// <summary>Heat-set insert installed with a soldering iron or heat press.</summary>
+    HeatSet,
+    /// <summary>Press-fit insert installed under mechanical pressure.</summary>
+    PressFit,
+    /// <summary>Ultrasonic insert installed using ultrasonic vibration.</summary>
+    Ultrasonic
+}
+
+/// <summary>Defines the quality inspection level required for a part.</summary>
+public enum InspectionLevel
+{
+    /// <summary>Standard visual and basic dimensional check.</summary>
+    Standard,
+    /// <summary>Full dimensional inspection with measurement report.</summary>
+    Dimensional,
+    /// <summary>Complete CMM (coordinate measuring machine) inspection with full report.</summary>
+    FullCmm
 }

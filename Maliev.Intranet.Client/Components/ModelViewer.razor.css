@@ -1,0 +1,77 @@
+/* Viewer toolbar — responsive to light/dark mode via MudBlazor palette vars */
+.model-viewer-container ::deep .vp-toolbar-paper {
+    border-radius: 12px !important;
+    backdrop-filter: blur(8px) !important;
+    background: rgba(255,255,255,0.85) !important;
+    gap: 4px;
+    border: 1px solid var(--mud-palette-lines-default) !important;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1) !important;
+}
+
+.model-viewer-container ::deep .vp-cube-btn {
+    width: 32px;
+    height: 32px;
+    padding: 5px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s;
+    outline: none;
+    flex-shrink: 0;
+    color: var(--mud-palette-text-primary);
+}
+
+.model-viewer-container ::deep .vp-cube-btn:hover {
+    background: var(--mud-palette-primary-lighten);
+}
+
+.model-viewer-container ::deep .vp-cube-btn.vp-active {
+    background: var(--mud-palette-primary-lighten) !important;
+}
+
+.model-viewer-container ::deep .vp-cube-btn.vp-active:hover {
+    background: var(--mud-palette-primary-lighten) !important;
+}
+
+.model-viewer-container ::deep .vp-icon-btn {
+    width: 30px !important;
+    height: 30px !important;
+    color: var(--mud-palette-text-secondary) !important;
+    border-radius: 6px !important;
+    transition: background 0.12s, color 0.12s !important;
+}
+
+.model-viewer-container ::deep .vp-icon-btn:hover {
+    background: var(--mud-palette-primary-lighten) !important;
+    color: var(--mud-palette-text-primary) !important;
+}
+
+.model-viewer-container ::deep .vp-active {
+    background: var(--mud-palette-primary-lighten) !important;
+    color: var(--mud-palette-primary) !important;
+}
+
+.model-viewer-container ::deep .vp-active:hover {
+    background: var(--mud-palette-primary-lighten) !important;
+    color: var(--mud-palette-primary-darken) !important;
+}
+
+.model-viewer-container ::deep .vp-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--mud-palette-lines-default);
+    margin: 0 4px;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+@media (max-width: 768px) {
+    .model-viewer-container ::deep .vp-toolbar-paper {
+        bottom: 16px !important;
+        justify-content: flex-start !important;
+    }
+}
