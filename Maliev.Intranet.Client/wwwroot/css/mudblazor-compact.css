@@ -528,9 +528,11 @@
     text-transform: uppercase;
     font-size: var(--mud-typography-overline-size);
     font-weight: 600;
-    letter-spacing: 0.5px;
-    color: var(--mud-palette-text-secondary);
-    margin-bottom: 12px;
+    letter-spacing: 0.05em;
+    color: var(--mud-palette-text-tertiary, var(--mud-palette-text-secondary));
+    margin: 16px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
     display: block;
 }
 
@@ -545,13 +547,14 @@
 
 .pcs-part-name {
     font-weight: 600;
-    font-size: var(--mud-typography-subtitle1-size);
+    font-size: var(--mud-typography-h6-size);
 }
 
 .pcs-dim {
-    font-family: var(--mud-typography-default-font-family);
-    color: var(--mud-palette-text-secondary);
+    font-family: monospace;
+    color: var(--mud-palette-text-tertiary, var(--mud-palette-text-secondary));
     font-size: var(--mud-typography-caption-size);
+    margin-top: 2px;
 }
 
 /* ================================================================
@@ -560,7 +563,7 @@
 .dfm-overlay {
     background: rgba(255,255,255,0.5) !important;
     backdrop-filter: blur(8px);
-    width: 320px !important;
+    max-width: 320px !important;
 }
 
 .dfm-overlay-header {

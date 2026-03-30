@@ -1,30 +1,79 @@
 @namespace Maliev.Intranet.Client.Components.Shared
 
-<div class="fud-dropzone @(DragOver ? "fud-dropzone--active" : "")"
-     @ondragenter:preventDefault="true"
-     @ondragover:preventDefault="true"
-     @ondragleave:preventDefault="true"
-     @ondrop:preventDefault="true"
-     @ondragenter="@OnDragEnter"
-     @ondragleave="@OnDragLeave"
-     @ondrop="@HandleDrop"
-     @onclick="@HandleClick">
-    <MudIcon Icon="@Icon"
-             Size="Size.Large"
-             Color="Color.Primary" />
-    <MudText Typo="Typo.body1"
-             Style="font-weight:600"
-             Color="@(DragOver ? Color.Primary : Color.Secondary)"
-             Class="mt-1">
-        @(DragOver ? "Drop files here" : Label)
-    </MudText>
-    @if (!string.IsNullOrEmpty(SubLabel))
-    {
-        <MudText Typo="Typo.caption" Color="Color.Secondary">@SubLabel</MudText>
-    }
-</div>
+@if (Variant == DropzoneVariant.Compact)
+{
+    <div class="fud-compact @(DragOver ? "fud-compact--active" : "") @Class"
+         @ondragenter:preventDefault="true"
+         @ondragover:preventDefault="true"
+         @ondragleave:preventDefault="true"
+         @ondrop:preventDefault="true"
+         @ondragenter="@OnDragEnter"
+         @ondragleave="@OnDragLeave"
+         @ondrop="@HandleDrop"
+         @onclick="@HandleClick">
+        <MudIcon Icon="@Icon" Size="Size.Medium" Color="Color.Primary" Class="fud-compact-icon" />
+        <div class="fud-compact-body">
+            <span class="fud-compact-title">@(DragOver ? "Drop files here" : Label)</span>
+            @if (!string.IsNullOrEmpty(SubLabel) || !string.IsNullOrEmpty(MaxFileSizeLabel))
+            {
+                <span class="fud-compact-sub">
+                    @if (!string.IsNullOrEmpty(SubLabel) && !string.IsNullOrEmpty(MaxFileSizeLabel))
+                    {
+                        @($"{SubLabel} · {MaxFileSizeLabel}")
+                    }
+                    else if (!string.IsNullOrEmpty(SubLabel))
+                    {
+                        @SubLabel
+                    }
+                    else
+                    {
+                        @MaxFileSizeLabel
+                    }
+                </span>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="fud-dropzone @(DragOver ? "fud-dropzone--active" : "") @Class"
+         @ondragenter:preventDefault="true"
+         @ondragover:preventDefault="true"
+         @ondragleave:preventDefault="true"
+         @ondrop:preventDefault="true"
+         @ondragenter="@OnDragEnter"
+         @ondragleave="@OnDragLeave"
+         @ondrop="@HandleDrop"
+         @onclick="@HandleClick">
+        <MudIcon Icon="@Icon"
+                 Size="Size.Large"
+                 Color="Color.Primary"
+                 Class="fud-icon" />
+        <MudText Typo="Typo.body2" Class="@($"fud-label{(DragOver ? " fud-label--drag" : "")}")">
+            @(DragOver ? "Drop files here" : Label)
+        </MudText>
+        @if (!string.IsNullOrEmpty(SubLabel) || !string.IsNullOrEmpty(MaxFileSizeLabel))
+        {
+            <MudText Typo="Typo.caption" Class="fud-sublabel">
+                @if (!string.IsNullOrEmpty(SubLabel) && !string.IsNullOrEmpty(MaxFileSizeLabel))
+                {
+                    @($"{SubLabel} · {MaxFileSizeLabel}")
+                }
+                else if (!string.IsNullOrEmpty(SubLabel))
+                {
+                    @SubLabel
+                }
+                else
+                {
+                    @MaxFileSizeLabel
+                }
+            </MudText>
+        }
+    </div>
+}
 
 <style>
+    /* ── Normal variant ─────────────────────────────────────────────── */
     .fud-dropzone {
         border: 2px dashed var(--mud-palette-lines-default);
         border-radius: 8px;
@@ -38,45 +87,112 @@
         min-height: 120px;
         text-align: center;
         user-select: none;
+        background: var(--mud-palette-background);
     }
+
     .fud-dropzone:hover,
     .fud-dropzone--active {
         border-color: var(--mud-palette-primary);
         background: var(--mud-palette-primary-lighten);
     }
+
+    .fud-icon {
+        transition: transform 0.25s ease;
+    }
+
+    .fud-dropzone:hover .fud-icon,
+    .fud-dropzone--active .fud-icon {
+        transform: translateY(-4px) scale(1.1);
+    }
+
+    .fud-label {
+        font-weight: 600 !important;
+        color: var(--mud-palette-text-primary) !important;
+        margin-top: 4px;
+    }
+
+    .fud-label--drag {
+        color: var(--mud-palette-primary) !important;
+    }
+
+    .fud-sublabel {
+        color: var(--mud-palette-text-secondary) !important;
+        margin-top: 2px;
+    }
+
+    /* ── Compact variant ─────────────────────────────────────────────── */
+    .fud-compact {
+        border: 1px dashed var(--mud-palette-lines-default);
+        border-radius: 6px;
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s;
+        user-select: none;
+        background: var(--mud-palette-surface);
+    }
+
+    .fud-compact:hover,
+    .fud-compact--active {
+        border-color: var(--mud-palette-primary);
+        background: var(--mud-palette-primary-lighten);
+    }
+
+    .fud-compact-icon { flex-shrink: 0; }
+
+    .fud-compact-body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .fud-compact-title {
+        font-size: var(--mud-typography-body2-size);
+        font-weight: 500;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .fud-compact-sub {
+        font-size: var(--mud-typography-caption-size);
+        color: var(--mud-palette-text-secondary);
+        line-height: 1.4;
+    }
 </style>
 
 @code {
-    /// <summary>Material icon string for the dropzone. Defaults to <see cref="Icons.Material.Filled.ViewInAr"/>.</summary>
+    /// <summary>Additional CSS classes applied to the root element.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Visual variant: <see cref="DropzoneVariant.Normal"/> (large centred) or <see cref="DropzoneVariant.Compact"/> (small horizontal row).</summary>
+    [Parameter] public DropzoneVariant Variant { get; set; } = DropzoneVariant.Normal;
+
+    /// <summary>Material icon string shown in the dropzone.</summary>
     [Parameter] public string Icon { get; set; } = Icons.Material.Filled.ViewInAr;
 
-    /// <summary>Primary label text shown when not dragging.</summary>
+    /// <summary>Primary label shown when not dragging.</summary>
     [Parameter] public string Label { get; set; } = "Drag & drop or click to upload";
 
-    /// <summary>Secondary label shown below the primary label. Hidden when null or empty.</summary>
+    /// <summary>Secondary hint text (file type list, description, etc.).</summary>
     [Parameter] public string? SubLabel { get; set; }
+
+    /// <summary>Max file size string appended to SubLabel (e.g. "max 250 MB").</summary>
+    [Parameter] public string? MaxFileSizeLabel { get; set; }
 
     /// <summary>Invoked when the user clicks the dropzone.</summary>
     [Parameter] public EventCallback OnClick { get; set; }
 
-    /// <summary>Invoked when files are dropped onto the dropzone. This is a signal-only callback — the parent is responsible for accessing the actual file data (e.g. opening a file picker).</summary>
+    /// <summary>Invoked when files are dropped. Signal-only — the parent handles actual file access.</summary>
     [Parameter] public EventCallback OnFilesDropped { get; set; }
 
     private bool DragOver { get; set; }
     private int _dragDepth;
     private bool _suppressNextClick;
 
-    private void OnDragEnter()
-    {
-        _dragDepth++;
-        DragOver = _dragDepth > 0;
-    }
-
-    private void OnDragLeave()
-    {
-        _dragDepth--;
-        DragOver = _dragDepth > 0;
-    }
+    private void OnDragEnter() { _dragDepth++; DragOver = _dragDepth > 0; }
+    private void OnDragLeave() { _dragDepth--; DragOver = _dragDepth > 0; }
 
     private async Task HandleDrop()
     {
@@ -88,11 +204,10 @@
 
     private async Task HandleClick()
     {
-        if (_suppressNextClick)
-        {
-            _suppressNextClick = false;
-            return;
-        }
+        if (_suppressNextClick) { _suppressNextClick = false; return; }
         await OnClick.InvokeAsync();
     }
+
+    /// <summary>Display variant for <see cref="FileUploadDropzone"/>.</summary>
+    public enum DropzoneVariant { Normal, Compact }
 }

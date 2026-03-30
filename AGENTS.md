@@ -71,10 +71,11 @@ This document provides essential information for agentic coding assistants opera
 - **Component Parameters**: Use `[Parameter]` for public properties that are meant to be passed from parents.
 - **EventCallback**: Use `EventCallback` or `EventCallback<T>` for child-to-parent communication.
 - **RenderMode**: Most pages should use `@rendermode InteractiveAuto`. Always consider the trade-offs between `InteractiveServer`, `InteractiveWebAssembly`, and `InteractiveAuto` based on the page's requirements (offline support, initial load speed, data complexity).
-- **MudBlazor**: 
+- **MudBlazor**:
     - Use `MudTable` with `ServerData` for large datasets.
     - Use `MudDialog` for modals and `ISnackbar` for transient notifications.
     - Prefer `MudStack` and `MudItem` for layouts over raw CSS/HTML where possible.
+    - **Typography**: Never hard-code `font-size` values in CSS (e.g. `12px`, `14px`). Always use MudBlazor CSS typography variables such as `var(--mud-typography-body1-size)`, `var(--mud-typography-body2-size)`, `var(--mud-typography-caption-size)`, `var(--mud-typography-overline-size)`, `var(--mud-typography-default-size)`, etc. This ensures sizes stay consistent with the application's theme.
 - **Text Input with Live Counter**: For all `longtext` fields or any input that could potentially exceed the max length limit, display a live character counter (e.g., `50/2000` or `13/100`). Use immediate client-side validation to enforce the limit.
 - **Skeleton Loaders**: Always use skeleton components with animation when waiting for data to load. Never show blank spaces or spinner-only states.
 

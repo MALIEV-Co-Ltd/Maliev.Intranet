@@ -4,15 +4,14 @@
 {
     <div class="dfm-overlay @(_acknowledged ? "dfm-overlay--success" : "")">
         <div class="dfm-overlay-header" @onclick="@ToggleExpanded">
-            <MudIcon Icon="@Icons.Material.Filled.WarningAmber"
-                     Size="Size.Small"
-                     Color="@(_acknowledged ? Color.Success : Color.Warning)" />
-            <MudText Typo="Typo.subtitle2" Class="ml-1">
-                @(_acknowledged ? "Issues acknowledged" : $"{DfmIssues.Count} DFM issue{(DfmIssues.Count > 1 ? "s" : "")}")
-            </MudText>
+            <div class="dfm-header-left">
+                <MudIcon Icon="@Icons.Material.Filled.WarningAmber"
+                         Size="Size.Small"
+                         Color="@(_acknowledged ? Color.Success : Color.Warning)" />
+                <span>@(_acknowledged ? "Issues acknowledged" : $"{DfmIssues.Count} DFM issue{(DfmIssues.Count > 1 ? "s" : "")}")</span>
+            </div>
             <MudIcon Icon="@(_expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
-                     Size="Size.Small"
-                     Class="ml-auto" />
+                     Size="Size.Small" />
         </div>
         @if (_expanded && !_acknowledged)
         {
@@ -25,13 +24,13 @@
                                  Color="@(issue.Severity == DfmIssueSeverity.Error ? Color.Error : Color.Warning)"
                                  Class="dfm-issue-icon" />
                         <div>
-                            <MudText Typo="Typo.body2" Style="font-weight:600;">@issue.Title</MudText>
+                            <MudText Typo="Typo.caption" Class="dfm-issue-title">@issue.Title</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@issue.Description</MudText>
                         </div>
                     </div>
                 }
             </div>
-            <MudButton Variant="Variant.Filled"
+            <MudButton Variant="Variant.Outlined"
                        Color="Color.Warning"
                        Size="Size.Small"
                        Class="mt-2"
@@ -47,29 +46,42 @@
         position: absolute;
         top: 16px;
         left: 16px;
-        width: 320px;
+        max-width: 320px;
         background: rgba(255,255,255,0.5);
         backdrop-filter: blur(8px);
-        border-top: 4px solid var(--mud-palette-warning);
         border: 1px solid var(--mud-palette-lines-default);
+        border-top: 4px solid var(--mud-palette-warning);
         border-radius: 8px;
-        padding: 12px;
+        padding: 12px 16px;
         z-index: 10;
-        transition: background 0.3s, border-color 0.3s;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        transition: border-color 0.3s;
     }
     .dfm-overlay--success {
-        border-color: var(--mud-palette-success) !important;
+        border-top-color: var(--mud-palette-success) !important;
     }
     .dfm-overlay-header {
         display: flex;
         align-items: center;
-        margin-bottom: 8px;
+        justify-content: space-between;
+        font-size: var(--mud-typography-body1-size);
+        font-weight: 600;
+        color: var(--mud-palette-text-primary);
         cursor: pointer;
+        user-select: none;
+    }
+    .dfm-header-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
     .dfm-overlay-issues {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 10px;
+        margin-top: 12px;
+        border-top: 1px solid var(--mud-palette-lines-default);
+        padding-top: 12px;
         max-height: 180px;
         overflow-y: auto;
     }
@@ -79,8 +91,9 @@
         gap: 8px;
     }
     .dfm-issue-icon { margin-top: 2px; flex-shrink: 0; }
+    .dfm-issue-title { display: block; font-weight: 600; color: var(--mud-palette-text-primary); margin-bottom: 2px; }
     @@media (max-width: 768px) {
-        .dfm-overlay { left: 16px; right: 16px; width: auto; }
+        .dfm-overlay { left: 16px; right: 16px; max-width: none; }
     }
 </style>
 

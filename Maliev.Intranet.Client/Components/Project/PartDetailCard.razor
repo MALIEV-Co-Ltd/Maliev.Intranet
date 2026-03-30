@@ -1,4 +1,3 @@
-// TODO: Auto-enter 3D mode on part selection — the "View in 3D" button currently required
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.MessagingContracts.Contracts.Geometry
@@ -79,16 +78,6 @@
                              OnAcknowledged="@HandleDfmAcknowledged" />
         </div>
 
-        @* Viewer meta *@
-        <div class="pdc-viewer-meta">
-            <MudText Typo="Typo.caption" Class="pdc-filename">@Part.Name</MudText>
-            @if (Part.Dimensions != null)
-            {
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    @($"{Part.Dimensions.X:N1} × {Part.Dimensions.Y:N1} × {Part.Dimensions.Z:N1} mm")
-                </MudText>
-            }
-        </div>
     </div>
 </div>
 
@@ -186,17 +175,6 @@
         transform: translateX(-50%);
         z-index: 2;
         animation: fade-in 0.2s ease-in-out;
-    }
-    .pdc-viewer-meta {
-        padding: 8px 12px;
-        background: var(--mud-palette-surface);
-        border-top: 1px solid var(--mud-palette-lines-default);
-    }
-    .pdc-filename {
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
 </style>
 
