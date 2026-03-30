@@ -52,7 +52,7 @@
                             <PartCarousel
                                 Parts="@_parts"
                                 SelectedIndex="@_selectedPartIndex"
-                                OnSelectPart="@(i => _selectedPartIndex = i)"
+                                OnSelectPart="@(i => { _selectedPartIndex = i; StateHasChanged(); })"
                                 OnRemovePart="RemovePart"
                                 OnAddPart="OpenFilePicker" />
                         }
