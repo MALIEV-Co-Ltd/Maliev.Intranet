@@ -35,9 +35,10 @@
 
     @* RIGHT: currency + action buttons *@
     <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-        <MudAutocomplete T="CurrencyDto"
-                       @bind-Value="@SelectedCurrency"
-                       ToStringFunc="@(c => c == null ? "" : $"{c.Code} {c.Symbol}")"
+        <MudAutocomplete T="object"
+                       Value="@_selectedCurrencyWrapper"
+                       ValueChanged="@OnCurrencySelected"
+                       ToStringFunc="@CurrencyToString"
                        SearchFunc="@SearchCurrencies"
                        Label=""
                        Variant="Variant.Outlined"
@@ -48,14 +49,14 @@
                        ShowProgressIndicator="true"
                        DebounceInterval="300"
                        CoerceText="true">
-            <ItemTemplate Context="c">
-                @if (c == null)
+            <ItemTemplate Context="item">
+                @if (item is DividerItem)
                 {
-                    <MudText Typo="Typo.body2">—</MudText>
+                    <div class="currency-divider">All Currencies</div>
                 }
-                else
+                else if (item is CurrencyDto currency)
                 {
-                    <MudText Typo="Typo.body2">@c.Code @c.Symbol — @c.Name</MudText>
+                    <MudText Typo="Typo.body2">@currency.Code @currency.Symbol</MudText>
                 }
             </ItemTemplate>
         </MudAutocomplete>
@@ -83,6 +84,17 @@
         padding: 0 8px;
         flex-shrink: 0;
     }
+
+    .currency-divider {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--mud-palette-text-tertiary);
+        padding: 8px 12px 4px;
+        border-top: 1px solid var(--mud-palette-lines-default);
+        margin-top: 4px;
+    }
 </style>
 
 @code {
@@ -98,11 +110,19 @@
 
     private string _titleDraft = string.Empty;
 
+    private object? _selectedCurrencyWrapper;
+
+    private static readonly string[] TopCurrencyCodes = ["THB", "USD", "EUR", "GBP", "JPY"];
+
+    /// <summary>A non-selectable divider item used to visually separate currency sections in the dropdown.</summary>
+    private sealed class DividerItem;
+
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
         _titleDraft = Title;
+        _selectedCurrencyWrapper ??= SelectedCurrency;
     }
 
     private async Task CommitTitle()
@@ -115,21 +135,58 @@
         OnLayoutModeChanged.InvokeAsync(
             LayoutMode == LayoutMode.Configurator ? LayoutMode.SummaryTable : LayoutMode.Configurator);
 
-    private Task<IEnumerable<CurrencyDto>> SearchCurrencies(string text, CancellationToken _)
+    private string CurrencyToString(object? item) =>
+        item switch
+        {
+            CurrencyDto c => $"{c.Code} {c.Symbol}",
+            _ => string.Empty
+        };
+
+    private async Task OnCurrencySelected(object? item)
+    {
+        if (item is CurrencyDto currency)
+        {
+            await OnCurrencyChanged.InvokeAsync(currency);
+        }
+    }
+
+    private Task<IEnumerable<object>> SearchCurrencies(string text, CancellationToken _)
     {
         if (Currencies.Count == 0)
-            return Task.FromResult<IEnumerable<CurrencyDto>>([]);
+            return Task.FromResult<IEnumerable<object>>([]);
 
         if (string.IsNullOrWhiteSpace(text))
-            return Task.FromResult<IEnumerable<CurrencyDto>>(
-                Currencies.Where(c => c != null));
+        {
+            var top = Currencies
+                .Where(c => c != null && TopCurrencyCodes.Contains(c.Code))
+                .OrderBy(c => Array.IndexOf(TopCurrencyCodes, c.Code))
+                .Cast<object>()
+                .ToList();
 
-        return Task.FromResult<IEnumerable<CurrencyDto>>(
-            Currencies
-                .Where(c => c != null)
-                .Where(c =>
-                    c.Code.Contains(text, StringComparison.OrdinalIgnoreCase) ||
-                    c.Symbol.Contains(text, StringComparison.OrdinalIgnoreCase) ||
-                    c.Name.Contains(text, StringComparison.OrdinalIgnoreCase)));
+            var rest = Currencies
+                .Where(c => c != null && !TopCurrencyCodes.Contains(c.Code))
+                .OrderBy(c => c.Code)
+                .Cast<object>()
+                .ToList();
+
+            if (rest.Count > 0)
+                top.Add(new DividerItem());
+
+            top.AddRange(rest);
+            return Task.FromResult<IEnumerable<object>>(top);
+        }
+
+        var filtered = Currencies
+            .Where(c => c != null)
+            .Where(c =>
+                c.Code.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                c.Symbol.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                c.Name.Contains(text, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(c => !TopCurrencyCodes.Contains(c.Code))
+            .ThenBy(c => Array.IndexOf(TopCurrencyCodes, c.Code) is var idx && idx >= 0 ? idx : int.MaxValue)
+            .ThenBy(c => c.Code)
+            .Cast<object>();
+
+        return Task.FromResult<IEnumerable<object>>(filtered);
     }
 }
