@@ -240,18 +240,18 @@
             </div>
         </div>
 
-        @* ── Production Routing ──────────────────────────────────────────── *@
-        @if (Part!.ProductionRouting != null || Part!.ProductionRoutingLoading)
-        {
-            <MudDivider />
-            <div class="pcs-section">
-                <MudText Typo="Typo.overline" Class="pcs-section-label">Production Routing</MudText>
-                <ProductionRoutingPanel Routing="@Part!.ProductionRouting"
-                                        Loading="@Part!.ProductionRoutingLoading" />
-            </div>
-        }
-
     </div>
+
+    @* ── Production Routing (sticky footer) ────────────────────────── *@
+    @if (Part!.ProductionRouting != null || Part!.ProductionRoutingLoading)
+    {
+        <MudDivider />
+        <div class="pcs-footer">
+            <MudText Typo="Typo.overline" Class="pcs-section-label">Production Routing</MudText>
+            <ProductionRoutingPanel Routing="@Part!.ProductionRouting"
+                                    Loading="@Part!.ProductionRoutingLoading" />
+        </div>
+    }
 </div>
 
 @code {
