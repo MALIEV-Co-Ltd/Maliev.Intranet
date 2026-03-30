@@ -549,7 +549,8 @@ public partial class Program
                pathValue.StartsWith("/_content/", StringComparison.OrdinalIgnoreCase) ||
                pathValue.StartsWith("/css/", StringComparison.OrdinalIgnoreCase) ||
                pathValue.StartsWith("/js/", StringComparison.OrdinalIgnoreCase) ||
-               pathValue.Contains("/hubs/", StringComparison.OrdinalIgnoreCase);
+               pathValue.Contains("/hubs/", StringComparison.OrdinalIgnoreCase) ||
+               pathValue.EndsWith(".styles.css", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static partial class Log
