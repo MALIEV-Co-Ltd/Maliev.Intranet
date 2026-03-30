@@ -3,106 +3,107 @@
 
 <div class="pqp-root">
 
-    <div class="pqp-section pqp-leadtime">
-        <div class="pqp-lt-header" @onclick="@(() => _leadTimeExpanded = !_leadTimeExpanded)">
-            <MudText Typo="Typo.overline" Color="@(_leadTimeExpanded ? Color.Secondary : Color.Primary)">
-                @(_leadTimeExpanded ? "Lead Time" : $"Lead Time ({SelectedLeadTime?.Name})")
-            </MudText>
+    <div class="pqp-section">
+        <div class="section-header" @onclick="@(() => _leadTimeExpanded = !_leadTimeExpanded)">
+            <MudText Typo="Typo.overline">Lead Time</MudText>
             <MudIcon Icon="@(_leadTimeExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
-                     Size="Size.Small" Color="Color.Secondary" />
+                     Size="Size.Small" />
         </div>
 
         @if (_leadTimeExpanded)
         {
-
-        @if (LeadTimeOptions.Count == 0)
-        {
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1 mb-3"
-                     Style="text-align:center; padding:12px 0;">
-                Available after parts are configured
-            </MudText>
-        }
-        else
-        {
-            <div class="pqp-lt-options mt-1 mb-3">
-                @foreach (var opt in LeadTimeOptions)
+            <div class="pnl-section-content">
+                @if (LeadTimeOptions.Count == 0)
                 {
-                    var (dMin, dMax) = GetDisplayDays(opt);
-                    var isSelected = SelectedLeadTime?.Code == opt.Code;
-                    <div class="pqp-lt-card @(isSelected ? "pqp-lt-selected" : "")"
-                         @onclick="@(async () => await OnLeadTimeChanged.InvokeAsync(opt))">
-                        <div class="pqp-lt-card-body">
-                            <div class="pqp-lt-name">@opt.Name</div>
-                            <div class="pqp-lt-days">
-                                @if (Parts.Count > 0 && !_hasPricedParts)
-                                {
-                                    <MudSkeleton Width="60px" Height="11px" Animation="Animation.Wave" />
-                                }
-                                else if (_hasPricedParts)
-                                {
-                                    <text>@dMin–@dMax business days</text>
-                                }
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1 mb-3"
+                             Style="text-align:center; padding:12px 0;">
+                        Available after parts are configured
+                    </MudText>
+                }
+                else
+                {
+                    <div class="pqp-lt-options mt-1 mb-3">
+                        @foreach (var opt in LeadTimeOptions)
+                        {
+                            var (dMin, dMax) = GetDisplayDays(opt);
+                            var isSelected = SelectedLeadTime?.Code == opt.Code;
+                            <div class="pqp-lt-card @(isSelected ? "pqp-lt-selected" : "")"
+                                 @onclick="@(async () => await OnLeadTimeChanged.InvokeAsync(opt))">
+                                <div class="pqp-lt-card-body">
+                                    <div class="pqp-lt-name">@opt.Name</div>
+                                    <div class="pqp-lt-days">
+                                        @if (Parts.Count > 0 && !_hasPricedParts)
+                                        {
+                                            <MudSkeleton Width="60px" Height="11px" Animation="Animation.Wave" />
+                                        }
+                                        else if (_hasPricedParts)
+                                        {
+                                            <text>@dMin–@dMax business days</text>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="pqp-lt-price">
+                                    @if (Parts.Count > 0 && !_hasPricedParts)
+                                    {
+                                        <MudSkeleton Width="50px" Height="14px" Animation="Animation.Wave" />
+                                    }
+                                    else if (_hasPricedParts)
+                                    {
+                                        @FormatPrice(_subtotal * opt.PriceMultiplier)
+                                    }
+                                </div>
                             </div>
-                        </div>
-                        <div class="pqp-lt-price">
-                            @if (Parts.Count > 0 && !_hasPricedParts)
-                            {
-                                <MudSkeleton Width="50px" Height="14px" Animation="Animation.Wave" />
-                            }
-                            else if (_hasPricedParts)
-                            {
-                                @FormatPrice(_subtotal * opt.PriceMultiplier)
-                            }
-                        </div>
+                        }
                     </div>
                 }
             </div>
-        }
-
         } @* end _leadTimeExpanded *@
     </div>
 
-    <div class="pqp-section pqp-summary">
-        <MudText Typo="Typo.overline" Class="mb-1">
-            Order Summary · @Parts.Count part@(Parts.Count == 1 ? "" : "s") · @Parts.Sum(p => p.Quantity) unit@(Parts.Sum(p => p.Quantity) == 1 ? "" : "s")
-        </MudText>
-
-        @if (Parts.Count == 0)
-        {
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="py-3" Style="text-align:center;">
-                Add and configure parts to see pricing
+    <div class="pqp-section">
+        <div class="section-header">
+            <MudText Typo="Typo.overline">
+                Order Summary · @Parts.Count part@(Parts.Count == 1 ? "" : "s") · @Parts.Sum(p => p.Quantity) unit@(Parts.Sum(p => p.Quantity) == 1 ? "" : "s")
             </MudText>
-        }
-        else
-        {
-            <div class="pqp-parts-scroll">
-                @foreach (var part in Parts)
-                {
-                    <div class="pqp-part-row @(IsActivePart(part) ? "summary-item active" : "")" @onclick="@(async () => await OnPartActivated.InvokeAsync(part))">
-                        <div class="pqp-part-info">
-                            <MudTooltip Text="@part.Name">
-                                <span class="pqp-part-name">@part.Name</span>
-                            </MudTooltip>
-                            <span class="pqp-part-meta">@part.Quantity unit@(part.Quantity == 1 ? "" : "s")@(string.IsNullOrEmpty(part.MaterialCode) ? "" : $" · {part.MaterialCode}")</span>
+        </div>
+        <div class="pnl-section-content">
+            @if (Parts.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="py-3" Style="text-align:center;">
+                    Add and configure parts to see pricing
+                </MudText>
+            }
+            else
+            {
+                <div class="pqp-parts-scroll">
+                    @foreach (var part in Parts)
+                    {
+                        <div class="pqp-part-row @(IsActivePart(part) ? "summary-item active" : "")" @onclick="@(async () => await OnPartActivated.InvokeAsync(part))">
+                            <div class="pqp-part-info">
+                                <MudTooltip Text="@part.Name">
+                                    <span class="pqp-part-name">@part.Name</span>
+                                </MudTooltip>
+                                <span class="pqp-part-meta">@part.Quantity unit@(part.Quantity == 1 ? "" : "s")@(string.IsNullOrEmpty(part.MaterialCode) ? "" : $" · {part.MaterialCode}")</span>
+                            </div>
+                            <span class="pqp-part-price">
+                                @if (part.PricingLoading)
+                                {
+                                    <MudSkeleton Width="55px" Height="12px" Animation="Animation.Wave" />
+                                }
+                                else if (part.EstimatedTotalAmount.HasValue)
+                                {
+                                    @FormatPrice(part.EstimatedTotalAmount.Value)
+                                }
+                                else
+                                {
+                                    <text>—</text>
+                                }
+                            </span>
                         </div>
-                        <span class="pqp-part-price">
-                            @if (part.PricingLoading)
-                            {
-                                <MudSkeleton Width="55px" Height="12px" Animation="Animation.Wave" />
-                            }
-                            else if (part.EstimatedTotalAmount.HasValue)
-                            {
-                                @FormatPrice(part.EstimatedTotalAmount.Value)
-                            }
-                            else
-                            {
-                                <text>—</text>
-                            }
-                        </span>
-                    </div>
-                }
-            </div>
-        }
+                    }
+                </div>
+            }
+        </div>
     </div>
 
     <div class="pqp-section pqp-checkout">
@@ -167,16 +168,41 @@
     }
 
     .pqp-section {
-        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
         border-bottom: 1px solid var(--mud-palette-lines-default);
-    }
-
-    .pqp-section.pqp-header {
-        padding: 14px;
     }
 
     .pqp-section.pqp-checkout {
         border-bottom: none;
+    }
+
+    /* ── Section header ─────────────────────────────────────────────── */
+    .section-header {
+        background: #e2e8f0;
+        padding: 8px 16px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        color: #0f172a;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .section-header:hover {
+        opacity: 0.85;
+    }
+
+    /* ── Section content wrapper ─────────────────────────────────────── */
+    .pnl-section-content {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
     }
 
     .pqp-lt-options {
@@ -241,15 +267,6 @@
     .pqp-total-row { display: flex; justify-content: space-between; font-size: var(--mud-typography-body2-size); }
 
     .pqp-total-grand { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-    .pqp-lt-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        cursor: pointer;
-        user-select: none;
-        margin-bottom: 4px;
-    }
-    .pqp-lt-header:hover { opacity: 0.8; }
     .pqp-parts-scroll { overflow-y: auto; flex: 1; max-height: 240px; }
     .pqp-part-row { cursor: pointer; }
     .pqp-part-row:hover { background: var(--mud-palette-background-grey); border-radius: 4px; }
