@@ -280,7 +280,18 @@ public class UploadsController(
             return BadRequest("customerId is required.");
 
         var result = await uploadClient.MigrateProjectAsync(projectId, customerId, dryRun, ct);
-        return result != null ? Ok(result) : StatusCode(500, "Migration failed.");
+        if (result == null)
+            return StatusCode(500, "Migration failed.");
+
+        if (!dryRun && result.MigratedFiles.Count > 0)
+        {
+            foreach (var file in result.MigratedFiles)
+            {
+                await analysisStatusService.MigrateGlbStoragePathAsync(file.OldPath, file.NewPath, ct);
+            }
+        }
+
+        return Ok(result);
     }
 
     private static string GetMimeTypeFromExtension(string? extension)

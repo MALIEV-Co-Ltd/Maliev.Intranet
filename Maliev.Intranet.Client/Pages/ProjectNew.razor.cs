@@ -1024,8 +1024,17 @@ public partial class ProjectNew : IAsyncDisposable
 
             part.StoragePath = newBasePath;
 
-            if (!string.IsNullOrEmpty(part.GlbStoragePath) && part.GlbStoragePath.StartsWith(oldBasePath))
-                part.GlbStoragePath = part.GlbStoragePath.Replace(oldBasePath, newBasePath);
+            // GlbStoragePath holds the viewer artifact path: oldBasePath + "_viewer.glb".
+            // The naive StartsWith check fails because of the _viewer.glb suffix, so we
+            // also check the fully-derived old viewer path explicitly.
+            if (!string.IsNullOrEmpty(part.GlbStoragePath))
+            {
+                var oldGlbViewerPath = oldBasePath + "_viewer.glb";
+                if (part.GlbStoragePath.StartsWith(oldGlbViewerPath))
+                    part.GlbStoragePath = newBasePath + "_viewer.glb";
+                else if (part.GlbStoragePath.StartsWith(oldBasePath))
+                    part.GlbStoragePath = newBasePath;
+            }
 
             if (!string.IsNullOrEmpty(part.ThumbnailSmallGcsPath) && part.ThumbnailSmallGcsPath.StartsWith(oldBasePath))
                 part.ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath.Replace(oldBasePath, newBasePath);
@@ -1033,8 +1042,7 @@ public partial class ProjectNew : IAsyncDisposable
             if (!string.IsNullOrEmpty(part.ThumbnailLargeGcsPath) && part.ThumbnailLargeGcsPath.StartsWith(oldBasePath))
                 part.ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath.Replace(oldBasePath, newBasePath);
 
-            if (!string.IsNullOrEmpty(part.GlbStoragePath))
-                part.GlbSignedUrl = null;
+            part.GlbSignedUrl = null;
         }
 
         Snackbar.Add($"Migrated {totalMigrated} file(s) to permanent storage.", Severity.Success);

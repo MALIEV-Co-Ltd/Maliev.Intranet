@@ -207,4 +207,52 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
         _cache.TryGetValue($"{CacheKeyPrefix}{uploadId}", out FileAnalysisStatusDto? status);
         return status;
     }
+
+    /// <inheritdoc />
+    public async Task MigrateGlbStoragePathAsync(string oldStoragePath, string newStoragePath, CancellationToken cancellationToken = default)
+    {
+        var oldKey = $"{CacheKeyPrefix}{oldStoragePath}";
+        if (!_cache.TryGetValue(oldKey, out FileAnalysisStatusDto? existing))
+        {
+            _logger.LogDebug("MigrateGlbStoragePathAsync: no cache entry found for old key={OldKey}", oldKey);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(existing?.GlbStoragePath))
+        {
+            _logger.LogDebug("MigrateGlbStoragePathAsync: no GlbStoragePath to migrate for entry {OldKey}", oldKey);
+            return;
+        }
+
+        var oldGlbViewerPath = oldStoragePath + "_viewer.glb";
+        if (!existing.GlbStoragePath.EndsWith(oldGlbViewerPath, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "MigrateGlbStoragePathAsync: GlbStoragePath={GlbPath} does not match expected viewer convention for old path {OldPath}. Manual migration may be required.",
+                existing.GlbStoragePath, oldStoragePath);
+            return;
+        }
+
+        var newGlbViewerPath = newStoragePath + "_viewer.glb";
+        var updated = new FileAnalysisStatusDto
+        {
+            UploadId = existing.UploadId,
+            Status = existing.Status,
+            Dimensions = existing.Dimensions,
+            IsManifold = existing.IsManifold,
+            ThumbnailUrl = existing.ThumbnailUrl,
+            HiResThumbnailUrl = existing.HiResThumbnailUrl,
+            PreviewUrls = existing.PreviewUrls,
+            GlbStoragePath = newGlbViewerPath,
+            PreviewProcessingStatus = existing.PreviewProcessingStatus,
+            ErrorCode = existing.ErrorCode,
+            ProcessedAt = existing.ProcessedAt,
+            DfmReport = existing.DfmReport,
+        };
+
+        Set(newStoragePath, updated);
+        _logger.LogInformation(
+            "MigrateGlbStoragePathAsync: migrated cache entry {OldKey} → {NewKey}, GlbStoragePath {OldGlbPath} → {NewGlbPath}",
+            oldKey, $"{CacheKeyPrefix}{newStoragePath}", existing.GlbStoragePath, newGlbViewerPath);
+    }
 }

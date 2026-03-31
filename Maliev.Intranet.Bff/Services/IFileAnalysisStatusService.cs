@@ -48,4 +48,17 @@ public interface IFileAnalysisStatusService
     /// Gets the current analysis status for a file.
     /// </summary>
     Task<FileAnalysisStatusDto?> GetStatusAsync(string uploadId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Migrates all cached file-analysis entries from a temp-bucket storage path prefix
+    /// to a customer-bucket prefix. This is called by the BFF after
+    /// UploadServiceClient.MigrateProjectAsync successfully migrates the
+    /// original file, so that viewer and thumbnail URLs derived from the analysis cache
+    /// continue to resolve correctly under the new path.
+    /// </summary>
+    /// <param name="oldStoragePath">The original temp-bucket path prefix (e.g. "projects/{guid}/").</param>
+    /// <param name="newStoragePath">The new customer-bucket path prefix (e.g. "customers/{guid}/projects/{guid}/").</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    // TODO: Remove NoWarn 1591 suppression from Directory.Build.props once all public members have XML docs.
+    Task MigrateGlbStoragePathAsync(string oldStoragePath, string newStoragePath, CancellationToken cancellationToken = default);
 }
