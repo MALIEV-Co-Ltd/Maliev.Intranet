@@ -53,7 +53,7 @@
         </MudText>
         <div class="mc-bottom">
             <MudText Typo="Typo.caption" Style="font-weight:700;" Class="pmc-price">
-                @(Part.EstimatedUnitPrice.HasValue ? $"{Part.EstimatedUnitPrice.Value:N0}" : "—")
+                @(Part.EstimatedUnitPrice.HasValue ? $"{CurrencyCode} {Part.EstimatedUnitPrice.Value:N0}" : "—")
             </MudText>
             <MudText Typo="Typo.caption" Class="mc-qty">
                 ×@Part.Quantity
@@ -180,6 +180,9 @@
 
     /// <summary>True when this card is the active/selected part in the configurator.</summary>
     [Parameter] public bool IsActive { get; set; }
+
+    /// <summary>The currency code for displaying the unit price (e.g. "THB", "USD").</summary>
+    [Parameter] public string CurrencyCode { get; set; } = "THB";
 
     /// <summary>Invoked when the card body is clicked (selects the part).</summary>
     [Parameter] public EventCallback OnClick { get; set; }

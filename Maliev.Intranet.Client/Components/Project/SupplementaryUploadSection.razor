@@ -7,7 +7,7 @@
 <MudStack Spacing="3">
     <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                    FilesChanged="OnFilesSelected"
-                   Accept=".png,.jpg,.jpeg,.tiff,.bmp,.webp,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z"
+                   Accept="@FileTypes.SupplementaryAcceptString"
                    MaximumFileCount="20">
         <CustomContent>
             <MudPaper Outlined="true"

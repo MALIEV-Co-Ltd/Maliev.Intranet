@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components
 @inject IJSRuntime JS
 @inject Maliev.Intranet.Client.Services.UploadSettings UploadSettings
+@inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
 
 <MudDialog>
     <TitleContent>
@@ -16,7 +17,7 @@
         <MudStack Spacing="4">
             <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                            FilesChanged="OnFilesSelected"
-                           Accept=".stl,.obj,.3mf,.step,.stp,.igs,.iges"
+                           Accept="@FileTypes.ThreeDAcceptString"
                            MaximumFileCount="10"
                            @ref="_fileUpload">
                 <CustomContent>
@@ -31,7 +32,7 @@
                               @ondrop="@(() => _dragOver = false)">
                         <MudIcon Icon="@Icons.Material.Filled.ViewInAr" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
                         <MudText Typo="Typo.h6">Click to upload or drag and drop</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Default">Upload 3D models up to 100MB each (STL, OBJ, STEP, 3MF, IGES)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Upload 3D models up to 100MB each (@FileTypes.ThreeDSubLabel)</MudText>
                     </MudPaper>
                 </CustomContent>
             </MudFileUpload>

@@ -1,6 +1,7 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Client.Components.Shared
 @using Maliev.Intranet.Shared.Dtos
+@inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
 
 <div class="pnl-left">
     @* ── Section 1: Customer ─────────────────────────────────────────── *@
@@ -128,7 +129,7 @@
         <div class="pnl-section-content">
             <FileUploadDropzone Icon="@Icons.Material.Filled.ViewInAr"
                                 Label="Drag & drop or click to upload"
-                                SubLabel="STL, STEP, STP, 3MF, IGS, IGES, SLDPRT, PRT, SAT, X_T"
+                                SubLabel="@FileTypes.ThreeDSubLabel"
                                 MaxFileSizeLabel="max 100 MB"
                                 OnClick="@OnOpenFilePicker"
                                 OnFilesDropped="@OnOpenFilePicker" />

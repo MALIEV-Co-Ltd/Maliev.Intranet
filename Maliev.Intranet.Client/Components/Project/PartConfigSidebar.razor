@@ -346,10 +346,12 @@
     [Parameter] public PartConfigSidebarDisplayMode DisplayMode { get; set; } = PartConfigSidebarDisplayMode.Sidebar;
 
     [Inject] private IDialogService DialogService { get; set; } = null!;
+    [Inject] private HttpClient Http { get; set; } = null!;
 
     private bool _routingExpanded = true;
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
     private IReadOnlyCollection<string> _selectedFeatures = [];
+    private decimal? _lastLoadedUnitPrice;
 
     // ── Computed properties ───────────────────────────────────────────────
 
@@ -368,14 +370,51 @@
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     /// <inheritdoc />
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
-        if (Part == null) return;
+        if (Part == null)
+        {
+            _lastLoadedUnitPrice = null;
+            _bulkTiers = [];
+            return;
+        }
+
         var features = new List<string>();
         if (Part.HasThreadedHoles) features.Add("ThreadedHoles");
         if (Part.HasInserts) features.Add("Inserts");
         if (Part.BagAndTag) features.Add("BagAndTag");
         _selectedFeatures = features;
+
+        if (Part.EstimatedUnitPrice.HasValue && Part.EstimatedUnitPrice != _lastLoadedUnitPrice)
+        {
+            _lastLoadedUnitPrice = Part.EstimatedUnitPrice;
+            await FetchBulkTiersAsync();
+        }
+        else if (!Part.EstimatedUnitPrice.HasValue && _lastLoadedUnitPrice.HasValue)
+        {
+            _lastLoadedUnitPrice = null;
+            _bulkTiers = [];
+        }
+    }
+
+    private async Task FetchBulkTiersAsync()
+    {
+        if (Part?.EstimatedUnitPrice == null) return;
+        try
+        {
+            var request = new BulkPricingRequestDto { BaseUnitPrice = Part.EstimatedUnitPrice.Value };
+            var response = await Http.PostAsJsonAsync("api/pricing/bulk", request);
+            if (response.IsSuccessStatusCode)
+            {
+                var tiers = await response.Content.ReadFromJsonAsync<List<BulkPriceTierDto>>();
+                if (tiers != null)
+                    _bulkTiers = tiers.Select(t => new BulkPricingTable.BulkTier(t.Quantity, t.UnitPrice)).ToList();
+            }
+        }
+        catch
+        {
+            // Non-fatal — bulk pricing table stays empty
+        }
     }
 
     // ── Event handlers ───────────────────────────────────────────────────

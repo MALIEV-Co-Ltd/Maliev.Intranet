@@ -54,6 +54,12 @@ public sealed class FileTypesSettings
     /// <summary>Archive file extensions.</summary>
     public required HashSet<string> ArchiveExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Drawing attachment extensions (PDF, DXF, DWG, common images).</summary>
+    public required HashSet<string> DrawingExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Supplementary attachment extensions (images, office docs, archives).</summary>
+    public required HashSet<string> SupplementaryExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>All supported upload extensions combined.</summary>
     public HashSet<string> AllUploadExtensions => new(
         ThreeDExtensions
@@ -62,6 +68,28 @@ public sealed class FileTypesSettings
             .Concat(OfficeExtensions)
             .Concat(ArchiveExtensions),
         StringComparer.OrdinalIgnoreCase);
+
+    // ── Accept strings for HTML file inputs ─────────────────────────────
+
+    /// <summary>Comma-separated 3D extensions for file input Accept attribute.</summary>
+    public string ThreeDAcceptString => string.Join(",", ThreeDExtensions);
+
+    /// <summary>Comma-separated drawing extensions for file input Accept attribute.</summary>
+    public string DrawingAcceptString => string.Join(",", DrawingExtensions);
+
+    /// <summary>Comma-separated supplementary extensions for file input Accept attribute.</summary>
+    public string SupplementaryAcceptString => string.Join(",", SupplementaryExtensions);
+
+    /// <summary>Comma-separated string of all upload extensions for file input Accept attribute.</summary>
+    public string AllUploadAcceptString => string.Join(",", AllUploadExtensions);
+
+    // ── Display labels ──────────────────────────────────────────────────
+
+    /// <summary>Uppercase comma-separated 3D extension names for UI display (e.g. "STL, STEP, STP").</summary>
+    public string ThreeDSubLabel => string.Join(", ", ThreeDExtensions.Select(e => e.TrimStart('.').ToUpperInvariant()));
+
+    /// <summary>Uppercase comma-separated drawing extension names for UI display.</summary>
+    public string DrawingSubLabel => string.Join(", ", DrawingExtensions.Select(e => e.TrimStart('.').ToUpperInvariant()));
 
     /// <summary>
     /// Returns the appropriate MudBlazor icon for a given file extension.

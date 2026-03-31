@@ -52,6 +52,7 @@
                             <PartCarousel
                                 Parts="@_parts"
                                 SelectedIndex="@_selectedPartIndex"
+                                CurrencyCode="@(_selectedCurrency?.Code ?? "THB")"
                                 OnSelectPart="@(i => { _selectedPartIndex = i; StateHasChanged(); })"
                                 OnRemovePart="RemovePart"
                                 OnAddPart="OpenFilePicker" />
@@ -83,7 +84,7 @@
                             <div class="pn-empty-state">
                                 <FileUploadDropzone Icon="@Icons.Material.Outlined.CloudUpload"
                                                    Label="Drop files here or click to upload"
-                                                   SubLabel="STL, STEP, STP, 3MF, IGS, IGES, SLDPRT, PRT, SAT, X_T"
+                                                   SubLabel="@FileTypes.ThreeDSubLabel"
                                                    MaxFileSizeLabel="max 100 MB"
                                                    Class="pn-empty-dropzone"
                                                    OnClick="OpenFilePicker"
@@ -116,7 +117,8 @@
                             CanQuote="@CanSubmit"
                             Saving="@_saving"
                             OnQuote="CreateProjectAndQuoteAsync"
-                            OnPartActivated="ActivatePartFromList" />
+                            OnPartActivated="ActivatePartFromList"
+                            SelectedPartIndex="@_selectedPartIndex" />
                     </ChildContent>
                     <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Quote panel error.</MudAlert></ErrorContent>
                 </ErrorBoundary>
@@ -131,7 +133,7 @@
 <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                @ref="_fileUpload"
                FilesChanged="HandleFileSelected"
-               Accept=".stl,.step,.stp,.3mf,.obj,.igs,.iges,.blend,.fbx,.gltf,.glb,.pdf,.dxf,.dwg,.png,.jpg,.jpeg,.tiff,.bmp,.webp,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z"
+               Accept="@FileTypes.AllUploadAcceptString"
                MaximumFileCount="20"
                Hidden="true"
                Style="display:none;" />

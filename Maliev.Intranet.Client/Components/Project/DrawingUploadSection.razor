@@ -9,13 +9,13 @@
 <MudStack Spacing="3">
     <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                    FilesChanged="OnFilesSelected"
-                   Accept=".pdf,.dxf,.dwg,.png,.jpg,.jpeg"
+                   Accept="@FileTypes.DrawingAcceptString"
                    MaximumFileCount="20">
         <CustomContent>
             <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
                                 Icon="@Icons.Material.Filled.Architecture"
                                 Label="Upload PDF Drawing"
-                                SubLabel="PDF, DXF, DWG, PNG, JPG"
+                                SubLabel="@FileTypes.DrawingSubLabel"
                                 MaxFileSizeLabel="max 50 MB"
                                 OnClick="@(() => context.OpenFilePickerAsync())"
                                 OnFilesDropped="@(() => context.OpenFilePickerAsync())" />

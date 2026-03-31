@@ -26,11 +26,6 @@
                     {
                         <MudProgressCircular Indeterminate="true" />
                     }
-                    <button class="pdc-3d-back-btn"
-                            @onclick="@CloseViewer"
-                            title="Back to thumbnail">
-                        <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
-                    </button>
                 </div>
             }
             else
@@ -207,10 +202,6 @@
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
-        if (_lastPartId != Guid.Empty && _lastPartId != Part.FileId && !string.IsNullOrEmpty(Part.ViewerUrl))
-        {
-            await CloseViewer();
-        }
         _lastPartId = Part.FileId;
         _dfmIssues = BuildDfmIssues();
         await base.OnParametersSetAsync();

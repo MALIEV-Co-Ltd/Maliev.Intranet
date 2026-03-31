@@ -650,7 +650,10 @@ public partial class ProjectNew : IAsyncDisposable
     /// </summary>
     private async Task TriggerRoutingFetchAsync(PartViewModel part)
     {
-        if (part.EstimatedLeadTimeDays == 0 || _selectedLeadTime == null)
+        if (_selectedLeadTime == null)
+            return;
+
+        if (!part.ProcessId.HasValue || !part.MaterialId.HasValue)
             return;
 
         if (part.ProductionRoutingLoading || part.ProductionRouting != null)

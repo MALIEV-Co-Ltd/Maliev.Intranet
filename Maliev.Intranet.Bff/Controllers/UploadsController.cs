@@ -12,11 +12,13 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 /// <param name="uploadClient">The typed UploadService HTTP client.</param>
 /// <param name="analysisStatusService">Service for file analysis status.</param>
+/// <param name="fileTypes">File type configuration from appsettings.</param>
 [ApiController]
 [Route("api/uploads")]
 public class UploadsController(
     UploadServiceClient uploadClient,
-    IFileAnalysisStatusService analysisStatusService) : ControllerBase
+    IFileAnalysisStatusService analysisStatusService,
+    Maliev.Intranet.Client.Services.FileTypesSettings fileTypes) : ControllerBase
 {
     /// <summary>
     /// Uploads a single project file to GCS via UploadService.
@@ -51,7 +53,10 @@ public class UploadsController(
         }
 
         using var stream = file.OpenReadStream();
-        var path = $"projects/{projectId}/{file.FileName}";
+        // Unique prefix ensures the same filename can be uploaded multiple times
+        // (e.g. same model with different process/material configurations).
+        var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+        var path = $"projects/{projectId}/{uniquePrefix}_{file.FileName}";
 
         var result = await uploadClient.UploadFileAsync(file.FileName, stream, contentType, path, true, ct);
         return result != null ? Ok(result) : StatusCode(500, "Upload failed.");
@@ -158,11 +163,7 @@ public class UploadsController(
             (kind != "Drawing" && kind != "Supplementary"))
             return BadRequest("kind must be 'Drawing' or 'Supplementary'.");
 
-        var allowedDrawing = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { ".pdf", ".dxf", ".dwg", ".png", ".jpg", ".jpeg" };
-        var allowedSupplementary = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { ".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar", ".7z" };
-        var allowed = kind == "Drawing" ? allowedDrawing : allowedSupplementary;
+        var allowed = kind == "Drawing" ? fileTypes.DrawingExtensions : fileTypes.SupplementaryExtensions;
 
         var results = new List<DraftProjectAttachmentDto>();
 
