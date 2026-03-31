@@ -60,6 +60,7 @@ try
     builder.Services.AddMudServices();
     builder.AddStandardCache("IntranetBff");
     builder.Services.AddSingleton<IFileAnalysisStatusService, FileAnalysisStatusService>();
+    builder.Services.AddSingleton<ITicketStore, DistributedCacheTicketStore>();
 
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddTransient<UserContextHandler>();
@@ -194,6 +195,10 @@ try
                             identity?.AddClaim(new System.Security.Claims.Claim(claim.Type, claim.Value));
                         }
 
+                        // Add access_token as a claim fallback — if cookie truncation prevents GetTokenAsync
+                        // from finding the stored token, UserContextHandler can fall back to user.FindFirst("access_token")
+                        identity?.AddClaim(new System.Security.Claims.Claim("access_token", accessToken));
+
                         // Do NOT add roles/permissions to cookie - they will be read from JWT during authorization
 
                         // Auto-bootstrap: promote first employee to platform owner in Development
@@ -236,6 +241,13 @@ try
 
         // DO NOT use FallbackPolicy here - it breaks static file serving
         // Instead, we require authorization explicitly on Razor Components below
+    });
+
+    // Fix auth cookie size limit: store tickets server-side instead of in the cookie
+    // The cookie will only hold a ~50-byte session key instead of the full ~7KB encrypted ticket
+    builder.Services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+    {
+        options.SessionStore = new DistributedCacheTicketStore(new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()));
     });
 
     // Named client for Google OAuth callback (no UserContextHandler - pre-auth)
