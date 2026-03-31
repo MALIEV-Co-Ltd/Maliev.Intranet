@@ -55,7 +55,6 @@
                                      Margin="Margin.Dense" />
                 </div>
                 <div class="pcs-field pcs-bag-field" style="flex: 2;">
-                    <MudText Typo="Typo.caption" Class="pcs-field-label">Bag &amp; Tag</MudText>
                     <MudChipSet T="string"
                                 SelectionMode="SelectionMode.ToggleSelection"
                                 CheckMark="true"
@@ -69,7 +68,7 @@
                 </div>
             </div>
 
-            <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" CurrencyCode="@CurrencyCode" />
+            <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" CurrencySymbol="@CurrencySymbol" />
         </div>
 
         @* ── Section B: Manufacturing ─────────────────────────────────────── *@
@@ -333,8 +332,8 @@
     /// <summary>The temporary project identifier passed through to <see cref="DrawingUploadSection"/>.</summary>
     [Parameter] public Guid TempProjectId { get; set; }
 
-    /// <summary>The currency code for displaying prices (e.g. "THB", "USD").</summary>
-    [Parameter] public string CurrencyCode { get; set; } = "THB";
+    /// <summary>The currency symbol for displaying prices (e.g. "฿").</summary>
+    [Parameter] public string CurrencySymbol { get; set; } = "฿";
 
     /// <summary>Callback invoked after any mutation to the part configuration.</summary>
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
@@ -402,7 +401,7 @@
         if (Part?.EstimatedUnitPrice == null) return;
         try
         {
-            var request = new BulkPricingRequestDto { BaseUnitPrice = Part.EstimatedUnitPrice.Value };
+            var request = new BulkPricingRequestDto { BaseUnitPrice = Part.EstimatedUnitPrice.Value, Quantities = [1, 2, 5, 10, 25, 50, 100] };
             var response = await Http.PostAsJsonAsync("api/pricing/bulk", request);
             if (response.IsSuccessStatusCode)
             {

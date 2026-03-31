@@ -6,9 +6,7 @@
         <MudText Typo="Typo.body2" Class="ml-1" Style="font-weight:600;">Volume Savings</MudText>
         @if (!_expanded && ActiveTier != null && SavingAmount > 0)
         {
-            <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="ml-2" Label="true">
-                Saved @CurrencyCode @SavingAmount.ToString("N0")
-            </MudChip>
+            <span class="bpt-saved-chip">Saved @CurrencySymbol @SavingAmount.ToString("N0")</span>
         }
         <MudSpacer />
         <MudIcon Icon="@(_expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
@@ -26,7 +24,7 @@
                 <div class="bpt-tier-row @(isActive ? "bpt-tier-row--active" : "")">
                     <MudText Typo="Typo.body2">@tier.Quantity+ units</MudText>
                     <MudText Typo="Typo.body2" Style="@(isActive ? "font-weight:700;" : "")">
-                        @tier.UnitPrice.ToString("N2") / unit
+                        @CurrencySymbol @tier.UnitPrice.ToString("N2")
                     </MudText>
                 </div>
             }
@@ -36,9 +34,18 @@
 
 <style>
     .bpt-container {
-        border: 2px dashed var(--mud-palette-divider);
+        border: 1px dashed var(--mud-palette-primary);
         border-radius: var(--mud-default-borderradius);
         overflow: hidden;
+    }
+    .bpt-saved-chip {
+        background: var(--mud-palette-primary);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: var(--mud-typography-caption-size);
+        margin-left: auto;
     }
     .bpt-header {
         display: flex;
@@ -68,8 +75,8 @@
     /// <summary>The current part quantity, used to highlight the active pricing tier.</summary>
     [Parameter] public int CurrentQuantity { get; set; } = 1;
 
-    /// <summary>The currency code used to format the savings display (e.g. "THB", "USD").</summary>
-    [Parameter] public string CurrencyCode { get; set; } = "THB";
+    /// <summary>The currency symbol used to format the savings display (e.g. "฿").</summary>
+    [Parameter] public string CurrencySymbol { get; set; } = "฿";
 
     private bool _expanded;
 
