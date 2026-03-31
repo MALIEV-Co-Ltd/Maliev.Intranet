@@ -123,7 +123,7 @@ try
         options.LoginPath = "/login";
         options.Cookie.Name = "Maliev.Intranet.Auth";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Strict; // Strict provides stronger CSRF protection for intranet app
+        options.Cookie.SameSite = SameSiteMode.Lax; // Lax allows the cookie on top-level nav (GET) and same-site AJAX calls; SameSite=Strict broke AJAX-based auth after OAuth callback
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 
         // Add cookie size limits to prevent 431 errors
