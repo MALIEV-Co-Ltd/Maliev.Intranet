@@ -73,7 +73,7 @@
                         <div class="pqp-part-row @(IsActivePart(part) ? "active" : "")" @onclick="@(async () => await OnPartActivated.InvokeAsync(part))">
                             <div class="pqp-part-info">
                                 <span class="pqp-part-name">@part.Name</span>
-                                <span class="pqp-part-meta">@part.Quantity unit@(part.Quantity == 1 ? "" : "s")@(string.IsNullOrEmpty(part.MaterialCode) ? "" : $" · {part.MaterialCode}")</span>
+                                <span class="pqp-part-meta">@part.Quantity unit@(part.Quantity == 1 ? "" : "s") x @FormatUnitPrice(part.EstimatedUnitPrice)</span>
                             </div>
                             <span class="pqp-part-price">
                                 @if (part.PricingLoading)
@@ -82,7 +82,8 @@
                                 }
                                 else if (part.EstimatedTotalAmount.HasValue)
                                 {
-                                    @FormatPrice(part.EstimatedTotalAmount.Value)
+                                    <span class="pqp-price-amount">@FormatPriceValue(part.EstimatedTotalAmount.Value)</span>
+                                    <span class="pqp-price-currency">@SelectedCurrency?.Symbol ?? SelectedCurrency?.Code</span>
                                 }
                                 else
                                 {
@@ -121,7 +122,10 @@
             }
             <div class="pqp-total-grand">
                 <MudText Typo="Typo.body2">Total</MudText>
-                <MudText Typo="Typo.h4" Color="Color.Primary">@FormatPrice(_quoteTotal)</MudText>
+                <div class="pqp-grand-price">
+                    <MudText Typo="Typo.h4" Color="Color.Primary" Class="pqp-price-amount">@FormatPriceValue(_quoteTotal)</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pqp-price-currency">@SelectedCurrency?.Symbol ?? SelectedCurrency?.Code</MudText>
+                </div>
             </div>
         </div>
 
@@ -312,7 +316,13 @@
 
     .pqp-part-meta { font-size: var(--mud-typography-caption-size); color: var(--mud-palette-text-secondary); }
 
-    .pqp-part-price { font-size: var(--mud-typography-default-size); font-weight: 600; flex-shrink: 0; }
+    .pqp-part-price { font-size: var(--mud-typography-default-size); font-weight: 600; flex-shrink: 0; display: flex; align-items: baseline; gap: 4px; }
+
+    .pqp-price-amount { font-weight: 600; }
+
+    .pqp-price-currency { font-size: var(--mud-typography-caption-size); color: var(--mud-palette-text-secondary); font-weight: 400; }
+
+    .pqp-grand-price { display: flex; align-items: baseline; gap: 4px; }
 
     /* ── Sticky footer ───────────────────────────────────────────────── */
     .pqp-footer {
@@ -435,6 +445,14 @@
 
     private string FormatPrice(decimal amount) =>
         $"{SelectedCurrency?.Code ?? "THB"} {amount:N2}";
+
+    private string FormatUnitPrice(decimal? unitPrice) =>
+        unitPrice.HasValue
+            ? $"{SelectedCurrency?.Symbol ?? SelectedCurrency?.Code} {unitPrice.Value:N2}"
+            : "—";
+
+    private string FormatPriceValue(decimal amount) =>
+        $"{amount:N2}";
 
     private bool IsActivePart(PartViewModel part) =>
         Parts.IndexOf(part) == SelectedPartIndex;
