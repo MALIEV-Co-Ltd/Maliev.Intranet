@@ -13,12 +13,14 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="uploadClient">The typed UploadService HTTP client.</param>
 /// <param name="analysisStatusService">Service for file analysis status.</param>
 /// <param name="fileTypes">File type configuration from appsettings.</param>
+/// <param name="logger">Logger for diagnostic events.</param>
 [ApiController]
 [Route("api/uploads")]
 public class UploadsController(
     UploadServiceClient uploadClient,
     IFileAnalysisStatusService analysisStatusService,
-    Maliev.Intranet.Client.Services.FileTypesSettings fileTypes) : ControllerBase
+    Maliev.Intranet.Client.Services.FileTypesSettings fileTypes,
+    ILogger<UploadsController> logger) : ControllerBase
 {
     /// <summary>
     /// Uploads a single project file to GCS via UploadService.
@@ -287,7 +289,22 @@ public class UploadsController(
         {
             foreach (var file in result.MigratedFiles)
             {
-                await analysisStatusService.MigrateGlbStoragePathAsync(file.OldPath, file.NewPath, ct);
+                var oldGlbPath = file.OldPath + "_viewer.glb";
+                var newGlbPath = file.NewPath + "_viewer.glb";
+                var glbCopied = await uploadClient.CopyFileAsync(oldGlbPath, newGlbPath, ct);
+
+                if (glbCopied)
+                {
+                    await analysisStatusService.MigrateGlbStoragePathAsync(file.OldPath, file.NewPath, ct);
+                    logger.LogInformation("Migrated GLB artifact {OldGlbPath} → {NewGlbPath}", oldGlbPath, newGlbPath);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "GLB artifact not found at {OldGlbPath} — 3D viewer will continue using the temp-bucket URL. " +
+                        "Geometry analysis may not have completed yet.",
+                        oldGlbPath);
+                }
             }
         }
 

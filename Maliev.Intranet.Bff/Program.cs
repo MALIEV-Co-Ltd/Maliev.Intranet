@@ -467,19 +467,20 @@ try
     app.UseAntiforgery();
 
     app.MapDefaultEndpoints("intranet");
-    app.UseAuthentication();
 
-    // Clear stale auth cookies that the server can no longer decrypt (e.g. after restart with ephemeral DP)
+    // Clear stale auth cookies that the server can no longer decrypt (e.g. after restart with ephemeral DP).
+    // Must run BEFORE UseAuthentication so the protected ticket is removed before decryption is attempted.
     app.Use(async (context, next) =>
     {
         if (context.Request.Cookies.ContainsKey("Maliev.Intranet.Auth") &&
-            context.User.Identity?.IsAuthenticated != true &&
             !IsStaticResource(context.Request.Path))
         {
             context.Response.Cookies.Delete("Maliev.Intranet.Auth");
         }
         await next();
     });
+
+    app.UseAuthentication();
 
     // Apply JWT claims enrichment only to non-static requests
     app.UseWhen(

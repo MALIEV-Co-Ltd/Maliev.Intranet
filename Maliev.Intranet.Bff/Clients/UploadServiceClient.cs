@@ -156,6 +156,21 @@ public class UploadServiceClient
 
         return null;
     }
+
+    /// <summary>
+    /// Copies a GCS object from one storage path to another (cross-bucket supported).
+    /// Used to migrate derived artifacts (e.g. _viewer.glb) alongside the original file.
+    /// </summary>
+    /// <param name="sourcePath">The source storage path.</param>
+    /// <param name="destinationPath">The destination storage path.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True on success; false on any failure (including 404 NotFound).</returns>
+    public async Task<bool> CopyFileAsync(string sourcePath, string destinationPath, CancellationToken ct = default)
+    {
+        var url = $"/upload/v1/admin/copy-file?sourcePath={Uri.EscapeDataString(sourcePath)}&destinationPath={Uri.EscapeDataString(destinationPath)}";
+        var response = await _httpClient.PostAsync(url, null, ct);
+        return response.IsSuccessStatusCode;
+    }
 }
 
 /// <summary>
