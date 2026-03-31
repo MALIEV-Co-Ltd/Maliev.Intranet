@@ -4,7 +4,7 @@
 @inject IJSRuntime JSRuntime
 @inject LayoutService LayoutService
 
-<div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: hidden; background-color: var(--mud-palette-surface); contain: layout style;">
+<div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: hidden; contain: layout style;">
     <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block;"></canvas>
 
     @if (Model != null)
@@ -266,7 +266,7 @@
                     await _module.InvokeVoidAsync("dispose", _canvasId);
 
                 _renderMode  = "solid";
-                _edgesEnabled = false;
+                _edgesEnabled = true;
                 _bboxEnabled  = false;
 
                 // Pass known bounding-box dimensions (mm) so the viewer can correct the glTF meter scale.
@@ -302,6 +302,8 @@
     {
         var target = _renderMode == mode ? "solid" : mode;
         _renderMode = target;
+        // Wireframe is incompatible with edge rendering — clear the edge button state.
+        if (target == "wireframe") _edgesEnabled = false;
         if (_module != null)
             await _module.InvokeVoidAsync("setRenderMode", _canvasId, target);
     }

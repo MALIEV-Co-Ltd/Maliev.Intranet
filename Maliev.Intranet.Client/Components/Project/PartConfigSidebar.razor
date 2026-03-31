@@ -215,6 +215,7 @@
 
             <DrawingUploadSection PartId="@Part!.FileId"
                                   ProjectId="@TempProjectId"
+                                  CustomerId="@CustomerId"
                                   Attachments="@Part!.DrawingFiles"
                                   AttachmentsChanged="@OnDrawingsChanged" />
 
@@ -331,6 +332,12 @@
 
     /// <summary>The temporary project identifier passed through to <see cref="DrawingUploadSection"/>.</summary>
     [Parameter] public Guid TempProjectId { get; set; }
+
+    /// <summary>
+    /// The customer identifier that owns this project. Null if no customer is selected yet.
+    /// Passed through to <see cref="DrawingUploadSection"/>.
+    /// </summary>
+    [Parameter] public Guid? CustomerId { get; set; }
 
     /// <summary>The currency symbol for displaying prices (e.g. "฿").</summary>
     [Parameter] public string CurrencySymbol { get; set; } = "฿";

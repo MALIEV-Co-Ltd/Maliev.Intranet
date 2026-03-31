@@ -134,4 +134,62 @@ public class UploadServiceClient
         var response = await _httpClient.DeleteAsync($"/upload/v1/files/{id}", ct);
         response.EnsureSuccessStatusCode();
     }
+
+    /// <summary>
+    /// Migrates all files for a project from the temp bucket to the customer bucket.
+    /// Files are copied from <c>projects/{projectId}/...</c> to
+    /// <c>customers/{customerId}/projects/{projectId}/...</c>.
+    /// </summary>
+    /// <param name="projectId">The project GUID whose files should be migrated.</param>
+    /// <param name="customerId">The target customer GUID.</param>
+    /// <param name="dryRun">If true, only reports what would be migrated without making changes.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task<MigrateProjectResponse?> MigrateProjectAsync(Guid projectId, Guid customerId, bool dryRun = false, CancellationToken ct = default)
+    {
+        var url = $"/upload/v1/admin/migrate-project/{projectId}?customerId={customerId}&dryRun={dryRun.ToString().ToLower()}";
+        var response = await _httpClient.PostAsync(url, null, ct);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<MigrateProjectResponse>(cancellationToken: ct);
+        }
+
+        return null;
+    }
+}
+
+/// <summary>
+/// Response from the single-project migration endpoint.
+/// </summary>
+public class MigrateProjectResponse
+{
+    /// <summary>Gets or sets whether this was a dry run with no actual changes.</summary>
+    public bool DryRun { get; set; }
+
+    /// <summary>Gets or sets the total number of files evaluated for migration.</summary>
+    public int TotalEvaluated { get; set; }
+
+    /// <summary>Gets or sets the total number of files successfully migrated.</summary>
+    public int TotalMigrated { get; set; }
+
+    /// <summary>Gets or sets the list of individual file migration results.</summary>
+    public List<MigratedFileEntry> MigratedFiles { get; set; } = [];
+
+    /// <summary>Gets or sets any errors encountered during migration.</summary>
+    public List<string> Errors { get; set; } = [];
+}
+
+/// <summary>
+/// Represents a single migrated file with old and new paths.
+/// </summary>
+public class MigratedFileEntry
+{
+    /// <summary>Gets or sets the unique identifier of the migrated file.</summary>
+    public string FileId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the original storage path before migration.</summary>
+    public string OldPath { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the new storage path after migration.</summary>
+    public string NewPath { get; set; } = string.Empty;
 }

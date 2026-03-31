@@ -22,11 +22,19 @@ public class UploadsController(
 {
     /// <summary>
     /// Uploads a single project file to GCS via UploadService.
-    /// The file is stored at <c>projects/{projectId}/{fileName}</c>.
+    /// If <paramref name="customerId"/> is provided, the file is stored at
+    /// <c>customers/{customerId}/projects/{projectId}/{fileName}</c> (routes to
+    /// <c>maliev-customers</c> bucket). Otherwise, the file is stored at
+    /// <c>projects/{projectId}/{fileName}</c> (routes to <c>maliev-temp</c> bucket),
+    /// allowing drafts to be saved before a customer is selected.
     /// </summary>
     /// <param name="file">The multipart file to upload.</param>
     /// <param name="projectId">
     /// The project (or temporary client-side) GUID that scopes the storage path.
+    /// </param>
+    /// <param name="customerId">
+    /// The customer GUID that owns this project. Optional — if not provided,
+    /// the file is uploaded to the temp bucket for later migration.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>
@@ -38,6 +46,7 @@ public class UploadsController(
     public async Task<ActionResult<BffUploadResponse>> UploadAsync(
         IFormFile file,
         [FromQuery] Guid projectId,
+        [FromQuery] Guid? customerId,
         CancellationToken ct)
     {
         if (file == null || file.Length == 0)
@@ -53,10 +62,10 @@ public class UploadsController(
         }
 
         using var stream = file.OpenReadStream();
-        // Unique prefix ensures the same filename can be uploaded multiple times
-        // (e.g. same model with different process/material configurations).
         var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
-        var path = $"projects/{projectId}/{uniquePrefix}_{file.FileName}";
+        var path = customerId.HasValue
+            ? $"customers/{customerId}/projects/{projectId}/{uniquePrefix}_{file.FileName}"
+            : $"projects/{projectId}/{uniquePrefix}_{file.FileName}";
 
         var result = await uploadClient.UploadFileAsync(file.FileName, stream, contentType, path, true, ct);
         return result != null ? Ok(result) : StatusCode(500, "Upload failed.");
@@ -132,11 +141,16 @@ public class UploadsController(
 
     /// <summary>
     /// Uploads one or more drawing or supplementary files attached to a specific part.
-    /// Files are stored at <c>projects/{projectId}/parts/{partId}/{kind}/{fileName}</c>.
-    /// Only the file extensions listed for each kind are accepted.
+    /// If <paramref name="customerId"/> is provided, files are stored at
+    /// <c>customers/{customerId}/projects/{projectId}/parts/{partId}/{kind}/</c>.
+    /// Otherwise, files are stored at <c>projects/{projectId}/parts/{partId}/{kind}/</c>
+    /// (temp bucket). Only the file extensions listed for each kind are accepted.
     /// </summary>
     /// <param name="files">The files to upload.</param>
     /// <param name="projectId">The project GUID.</param>
+    /// <param name="customerId">
+    /// The customer GUID that owns this project. Optional.
+    /// </param>
     /// <param name="partId">The parent part FileId.</param>
     /// <param name="kind">The attachment kind: "Drawing" or "Supplementary".</param>
     /// <param name="ct">Cancellation token.</param>
@@ -146,6 +160,7 @@ public class UploadsController(
     public async Task<ActionResult<List<DraftProjectAttachmentDto>>> UploadAttachmentsAsync(
         List<IFormFile> files,
         [FromQuery] Guid projectId,
+        [FromQuery] Guid? customerId,
         [FromQuery] Guid partId,
         [FromQuery] string kind,
         CancellationToken ct)
@@ -179,7 +194,9 @@ public class UploadsController(
             if (string.IsNullOrWhiteSpace(contentType))
                 contentType = GetMimeTypeFromExtension(ext) ?? "application/octet-stream";
 
-            var storagePath = $"projects/{projectId}/parts/{partId}/{kind}/{file.FileName}";
+            var storagePath = customerId.HasValue
+                ? $"customers/{customerId}/projects/{projectId}/parts/{partId}/{kind}/{file.FileName}"
+                : $"projects/{projectId}/parts/{partId}/{kind}/{file.FileName}";
             using var stream = file.OpenReadStream();
             var uploadResult = await uploadClient.UploadFileAsync(file.FileName, stream, contentType, storagePath, true, ct);
 
@@ -234,6 +251,36 @@ public class UploadsController(
         var signedUrl = await uploadClient.GetDownloadUrlAsync(fileId.ToString(), ct);
         if (string.IsNullOrEmpty(signedUrl)) return NotFound("Download URL not available");
         return Ok(new { Url = signedUrl });
+    }
+
+    /// <summary>
+    /// Migrates all files for a project from the temp bucket to the customer bucket.
+    /// Called by the frontend when a customer is selected for a draft project that
+    /// already has uploaded files in the temp bucket.
+    /// </summary>
+    /// <param name="projectId">The project GUID whose files should be migrated.</param>
+    /// <param name="customerId">The target customer GUID.</param>
+    /// <param name="dryRun">If true, only reports what would be migrated without making changes.</param>
+    /// <param name="ct">Cancellation token.</param>
+    [HttpPost("migrate-project")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [ProducesResponseType(typeof(MigrateProjectResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> MigrateProjectAsync(
+        [FromQuery] Guid projectId,
+        [FromQuery] Guid customerId,
+        [FromQuery] bool dryRun = false,
+        CancellationToken ct = default)
+    {
+        if (projectId == Guid.Empty)
+            return BadRequest("projectId is required.");
+
+        if (customerId == Guid.Empty)
+            return BadRequest("customerId is required.");
+
+        var result = await uploadClient.MigrateProjectAsync(projectId, customerId, dryRun, ct);
+        return result != null ? Ok(result) : StatusCode(500, "Migration failed.");
     }
 
     private static string GetMimeTypeFromExtension(string? extension)

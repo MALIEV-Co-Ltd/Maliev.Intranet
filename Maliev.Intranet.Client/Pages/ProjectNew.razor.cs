@@ -92,8 +92,7 @@ public partial class ProjectNew : IAsyncDisposable
     {
         foreach (var cts in _pricingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         _autoSaveDebounceTimer?.Dispose();
-        await _searchCts?.CancelAsync()!;
-        _searchCts?.Dispose();
+        if (_searchCts != null) { await _searchCts.CancelAsync(); _searchCts.Dispose(); }
         if (_hubConnection != null)
             await _hubConnection.DisposeAsync();
     }
@@ -329,7 +328,7 @@ public partial class ProjectNew : IAsyncDisposable
             await readStream.CopyToAsync(memoryStream);
             var fileBytes = memoryStream.ToArray();
 
-            var url = $"api/uploads?projectId={_tempProjectId}";
+            var url = $"api/uploads?projectId={_tempProjectId}&customerId={_selectedCustomerId}";
             var result = await JS.InvokeAsync<UploadResult>($"window.uploadWithProgress", url, fileBytes, file.Name, callbackRef);
 
             if (result.Status != 200)
@@ -962,8 +961,85 @@ public partial class ProjectNew : IAsyncDisposable
         else { _descriptionHasError = false; }
     }
 
-    private void OnCustomerSelected(CustomerSummaryDto? customer)
-    { _selectedCustomer = customer; if (customer != null) _showCustomerSearch = false; }
+    private async void OnCustomerSelected(CustomerSummaryDto? customer)
+    {
+        var previousCustomerId = _selectedCustomerId;
+        _selectedCustomer = customer;
+        if (customer != null) _showCustomerSearch = false;
+
+        if (previousCustomerId.HasValue || !_selectedCustomerId.HasValue)
+            return;
+
+        var partsInTemp = _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath) && p.StoragePath.StartsWith("projects/")).ToList();
+        if (partsInTemp.Count == 0)
+            return;
+
+        Snackbar.Add($"Moving {partsInTemp.Count} file(s) to customer storage...", Severity.Info);
+
+        var migrationResult = await Http.PostAsJsonAsync(
+            $"api/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
+            (object?)null);
+
+        if (!migrationResult.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Failed to migrate files to customer storage. Please try again.", Severity.Error);
+            return;
+        }
+
+        var migrated = await migrationResult.Content.ReadFromJsonAsync<JsonDocument>();
+        if (migrated == null)
+        {
+            Snackbar.Add("Migration failed.", Severity.Error);
+            return;
+        }
+
+        var root = migrated.RootElement;
+        var errors = root.GetProperty("Errors");
+        var totalMigrated = root.GetProperty("TotalMigrated").GetInt32();
+
+        if (errors.GetArrayLength() > 0)
+        {
+            Snackbar.Add($"Migration completed with {errors.GetArrayLength()} error(s).", Severity.Warning);
+            return;
+        }
+
+        if (totalMigrated == 0)
+        {
+            Snackbar.Add("No files needed to be migrated.", Severity.Info);
+            return;
+        }
+
+        var migratedFiles = root.GetProperty("MigratedFiles");
+        foreach (var entry in migratedFiles.EnumerateArray())
+        {
+            var fileId = entry.GetProperty("FileId").GetString();
+            var newBasePath = entry.GetProperty("NewPath").GetString();
+            var oldBasePath = entry.GetProperty("OldPath").GetString();
+
+            if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(newBasePath) || string.IsNullOrEmpty(oldBasePath))
+                continue;
+
+            var part = _parts.FirstOrDefault(p => p.FileId.ToString() == fileId);
+            if (part == null) continue;
+
+            part.StoragePath = newBasePath;
+
+            if (!string.IsNullOrEmpty(part.GlbStoragePath) && part.GlbStoragePath.StartsWith(oldBasePath))
+                part.GlbStoragePath = part.GlbStoragePath.Replace(oldBasePath, newBasePath);
+
+            if (!string.IsNullOrEmpty(part.ThumbnailSmallGcsPath) && part.ThumbnailSmallGcsPath.StartsWith(oldBasePath))
+                part.ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath.Replace(oldBasePath, newBasePath);
+
+            if (!string.IsNullOrEmpty(part.ThumbnailLargeGcsPath) && part.ThumbnailLargeGcsPath.StartsWith(oldBasePath))
+                part.ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath.Replace(oldBasePath, newBasePath);
+
+            if (!string.IsNullOrEmpty(part.GlbStoragePath))
+                part.GlbSignedUrl = null;
+        }
+
+        Snackbar.Add($"Migrated {totalMigrated} file(s) to permanent storage.", Severity.Success);
+        await InvokeAsync(StateHasChanged);
+    }
 
     private async Task OpenBabylonViewer(PartViewModel part)
     {

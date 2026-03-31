@@ -89,6 +89,9 @@
     /// <summary>The temporary project identifier.</summary>
     [Parameter] public Guid ProjectId { get; set; }
 
+    /// <summary>The customer identifier that owns this project. Null if no customer is selected yet.</summary>
+    [Parameter] public Guid? CustomerId { get; set; }
+
     /// <summary>Existing supplementary attachments to display.</summary>
     [Parameter] public List<DraftProjectAttachmentDto> Attachments { get; set; } = [];
 
@@ -123,7 +126,8 @@
                 content.Add(fileContent, "files", file.Name);
             }
 
-            var url = $"api/uploads/attachments?projectId={ProjectId}&partId={PartId}&kind=Supplementary";
+            var customerPart = CustomerId.HasValue ? $"&customerId={CustomerId}" : "";
+            var url = $"api/uploads/attachments?projectId={ProjectId}{customerPart}&partId={PartId}&kind=Supplementary";
             var response = await Http.PostAsync(url, content);
 
             if (response.IsSuccessStatusCode)
