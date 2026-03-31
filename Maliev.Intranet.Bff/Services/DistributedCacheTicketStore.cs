@@ -1,28 +1,25 @@
 using System.Collections.Concurrent;
-using System.Security.Cryptography;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace Maliev.Intranet.Bff.Services;
 
 /// <summary>
 /// Stores authentication tickets in a server-side concurrent dictionary to avoid browser cookie size limits.
-/// The cookie itself only holds a short session key (~50 bytes) instead of the full encrypted ticket (~7KB).
+/// The cookie itself only holds the user's sub claim (~36 bytes) instead of the full encrypted ticket (~7KB).
+/// Uses the user's sub claim as the session key for deterministic, stable lookups.
 /// </summary>
 public sealed class DistributedCacheTicketStore : ITicketStore
 {
     private readonly ConcurrentDictionary<string, AuthenticationTicket> _tickets = new();
-    private readonly IMemoryCache _cache;
     private static readonly TimeSpan TicketExpiration = TimeSpan.FromHours(8);
 
     /// <summary>
     /// Initializes a new instance of <see cref="DistributedCacheTicketStore"/>.
     /// </summary>
-    /// <param name="cache">The memory cache instance.</param>
-    public DistributedCacheTicketStore(IMemoryCache cache)
+    public DistributedCacheTicketStore()
     {
-        _cache = cache;
     }
 
     /// <inheritdoc />
@@ -35,11 +32,14 @@ public sealed class DistributedCacheTicketStore : ITicketStore
     /// <inheritdoc />
     public Task<string> StoreAsync(AuthenticationTicket ticket)
     {
-        var key = GenerateSecureKey();
+        var userId = ticket.Principal.FindFirst("sub")?.Value
+            ?? ticket.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? throw new InvalidOperationException("Cannot store ticket: sub claim is missing. Ensure the user has a valid sub claim before authentication.");
+
         var expiresUtc = ticket.Properties.ExpiresUtc ?? DateTimeOffset.UtcNow.Add(TicketExpiration);
         ticket.Properties.ExpiresUtc = expiresUtc;
-        _tickets[key] = ticket;
-        return Task.FromResult(key);
+        _tickets[userId] = ticket;
+        return Task.FromResult(userId);
     }
 
     /// <inheritdoc />
@@ -56,12 +56,5 @@ public sealed class DistributedCacheTicketStore : ITicketStore
     {
         _tickets.TryRemove(key, out _);
         return Task.CompletedTask;
-    }
-
-    private static string GenerateSecureKey()
-    {
-        var bytes = new byte[32];
-        RandomNumberGenerator.Fill(bytes);
-        return Convert.ToBase64String(bytes);
     }
 }

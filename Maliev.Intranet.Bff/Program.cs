@@ -60,7 +60,6 @@ try
     builder.Services.AddMudServices();
     builder.AddStandardCache("IntranetBff");
     builder.Services.AddSingleton<IFileAnalysisStatusService, FileAnalysisStatusService>();
-    builder.Services.AddSingleton<ITicketStore, DistributedCacheTicketStore>();
 
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddTransient<UserContextHandler>();
@@ -244,10 +243,10 @@ try
     });
 
     // Fix auth cookie size limit: store tickets server-side instead of in the cookie
-    // The cookie will only hold a ~50-byte session key instead of the full ~7KB encrypted ticket
+    // The cookie will only hold the user's sub claim (~36 bytes) instead of the full ~7KB encrypted ticket
     builder.Services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, options =>
     {
-        options.SessionStore = new DistributedCacheTicketStore(new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()));
+        options.SessionStore = new DistributedCacheTicketStore();
     });
 
     // Named client for Google OAuth callback (no UserContextHandler - pre-auth)
