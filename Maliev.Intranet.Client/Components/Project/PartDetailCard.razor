@@ -20,7 +20,16 @@
                     @if (!string.IsNullOrEmpty(Part.ViewerUrl))
                     {
                         <ModelViewer ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
-                                     KnownDimensions="@Part.Dimensions" />
+                                     KnownDimensions="@Part.Dimensions"
+                                     OnLoadFailed="HandleViewerLoadFailed" />
+                    }
+                    else if (_viewerLoadFailed)
+                    {
+                        <div class="pdc-viewer-error">
+                            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Warning" />
+                            <MudText Typo="Typo.body2" Color="Color.Warning">3D preview failed</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Default">@_viewerErrorMessage</MudText>
+                        </div>
                     }
                     else
                     {
@@ -180,6 +189,15 @@
         z-index: 2;
         animation: fade-in 0.2s ease-in-out;
     }
+    .pdc-viewer-error {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 100%;
+        color: var(--mud-palette-text-disabled);
+    }
 </style>
 
 @code {
@@ -204,12 +222,19 @@
     private readonly Dictionary<string, string> _resolvedUrls = [];
     private Guid _lastPartId;
     private List<DfmIssue> _dfmIssues = [];
+    private bool _viewerLoadFailed;
+    private string? _viewerErrorMessage;
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
         _lastPartId = Part.FileId;
         _dfmIssues = BuildDfmIssues();
+        if (!string.IsNullOrEmpty(Part.ViewerUrl))
+        {
+            _viewerLoadFailed = false;
+            _viewerErrorMessage = null;
+        }
         await base.OnParametersSetAsync();
     }
 
@@ -263,6 +288,14 @@
     {
         NotifyChanged(p => p.DfmAcknowledged = true);
         return Task.CompletedTask;
+    }
+
+    private async Task HandleViewerLoadFailed(string errorMessage)
+    {
+        _viewerLoadFailed = true;
+        _viewerErrorMessage = errorMessage;
+        Snackbar.Add($"3D preview unavailable: {errorMessage}", Severity.Warning);
+        await InvokeAsync(StateHasChanged);
     }
 
     private List<DfmIssue> BuildDfmIssues()

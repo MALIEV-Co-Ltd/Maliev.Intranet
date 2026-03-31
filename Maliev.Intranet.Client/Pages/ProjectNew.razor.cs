@@ -1059,8 +1059,17 @@ public partial class ProjectNew : IAsyncDisposable
             Snackbar.Add("Failed to load 3D viewer URL.", Severity.Error);
             return;
         }
+
         var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
-        part.ViewerUrl = json?.RootElement.GetProperty("url").GetString();
+        var url = json?.RootElement.GetProperty("url").GetString();
+
+        if (string.IsNullOrEmpty(url))
+        {
+            Snackbar.Add("3D preview not available yet for this file.", Severity.Warning);
+            return;
+        }
+
+        part.ViewerUrl = url;
         await InvokeAsync(StateHasChanged);
     }
 

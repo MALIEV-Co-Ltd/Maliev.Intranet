@@ -116,9 +116,12 @@
     [Parameter] public string?                    FileExtension  { get; set; }
     /// <summary>Optional bounding-box dimensions in mm. Used when Model is null (e.g. PartDetailCard).</summary>
     [Parameter] public FileAnalysisDimensionsDto? KnownDimensions { get; set; }
+    /// <summary>Invoked when the 3D model fails to load (e.g. 404, network error).</summary>
+    [Parameter] public EventCallback<string>       OnLoadFailed  { get; set; }
 
     private string _canvasId    = $"babylon-canvas-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
+    private DotNetObjectReference<ModelViewer>? _dotNetRef;
     private string _renderMode        = "solid";
     private string _cameraPreset      = "iso";
     private string _cameraProjection  = "perspective";
@@ -127,6 +130,19 @@
     private string? _lastViewerUrl;
 
     private record ViewPreset(string Key, string Label);
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    [JSInvokable]
+    public async Task OnLoadError(string errorMessage)
+    {
+        if (OnLoadFailed.HasDelegate)
+            await OnLoadFailed.InvokeAsync(errorMessage);
+    }
 
     private static readonly ViewPreset[] _viewPresets =
     [
@@ -282,7 +298,8 @@
                     ViewerUrl,
                     FileExtension ?? string.Empty,
                     LayoutService.IsDarkMode,
-                    dims);
+                    dims,
+                    _dotNetRef);
             }
             catch (Exception ex)
             {
@@ -338,6 +355,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _dotNetRef?.Dispose();
         if (_module != null)
         {
             try

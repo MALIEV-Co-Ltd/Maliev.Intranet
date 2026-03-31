@@ -162,8 +162,9 @@ function applyPreset(cam, presetName) {
  * @param {string}  fileExt        e.g. ".glb"
  * @param {boolean} isDark
  * @param {object|null} knownDimsMm  Optional { x, y, z } bounding box in mm from server
+ * @param {object|null} dotNetRef   Optional DotNetObjectReference for error callbacks
  */
-export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm) {
+export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef) {
     try {
         await loadScript('https://cdn.babylonjs.com/babylon.js');
         await loadScript('https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js');
@@ -210,6 +211,9 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         BABYLON.SceneLoader.Append('', fileUrl, scene,
             (_scene) => {
                 modelLoadState[canvasId] = 'loaded';
+
+                // ── Re-affirm transparent background (append:true keeps existing scene) ──
+                _scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
                 // ── Remove placeholder lights, add proper Z-up lighting ──
                 _scene.lights.forEach(l => l.dispose());
@@ -338,7 +342,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     finalBb.max.y - finalBb.min.y,
                     finalBb.max.z - finalBb.min.z
                 );
-                dir.position = new BABYLON.Vector3(meshCenters[canvasId].x - dist, meshCenters[canvasId].y - dist, finalBb.max.z + dist);
+                key.position = new BABYLON.Vector3(meshCenters[canvasId].x - dist, meshCenters[canvasId].y - dist, finalBb.max.z + dist);
 
                 // ── Configure camera ──
                 const cam = mainCameras[canvasId];
@@ -399,8 +403,12 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
             (_scene, message, exception) => {
                 modelLoadState[canvasId] = 'error';
                 console.error('[BabylonViewer] Load error:', message, exception);
+                if (dotNetRef) {
+                    dotNetRef.invokeMethodAsync('OnLoadError', message || 'Failed to load 3D model');
+                }
             },
-            forcedExt
+            forcedExt,
+            true // appendMode — load into existing scene so clearColor is preserved
         );
 
         engine.runRenderLoop(() => {
@@ -435,6 +443,9 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
     } catch (err) {
         modelLoadState[canvasId] = 'error';
         console.error('[BabylonViewer] Init failed:', err);
+        if (dotNetRef) {
+            dotNetRef.invokeMethodAsync('OnLoadError', err.message || 'Failed to initialize 3D viewer');
+        }
     }
 }
 
