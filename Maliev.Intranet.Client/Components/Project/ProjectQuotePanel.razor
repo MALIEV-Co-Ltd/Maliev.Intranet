@@ -331,6 +331,29 @@
     .pqp-total-row { display: flex; justify-content: space-between; font-size: var(--mud-typography-body2-size); }
 
     .pqp-total-grand { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+
+    /* ── Tablet / Mobile ─────────────────────────────────────────────── */
+    @@media (max-width: 1200px) {
+        .pqp-root {
+            order: 2;
+            width: 100%;
+            min-width: unset;
+            height: auto;
+            border-left: none;
+            border-top: 1px solid var(--mud-palette-lines-default);
+        }
+        .pqp-content {
+            overflow: visible;
+            min-height: unset;
+        }
+        .pqp-section.pqp-order-summary {
+            overflow: visible;
+            flex-shrink: 0;
+        }
+        .pqp-parts-scroll {
+            overflow-y: visible;
+        }
+    }
 </style>
 
 @code {

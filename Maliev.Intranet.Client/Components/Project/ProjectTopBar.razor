@@ -17,7 +17,6 @@
                @onchange="(e) => _titleDraft = e.Value?.ToString() ?? string.Empty"
                @onblur="CommitTitle"
                class="tb-title-input"
-               style="min-width:200px"
                size="14" />
 
         @if (AutoSaving)
@@ -83,6 +82,20 @@
         border-bottom: 1px solid var(--mud-palette-lines-default);
         padding: 0 8px;
         flex-shrink: 0;
+    }
+
+    .tb-title-input {
+        min-width: 200px;
+    }
+
+    @@media (max-width: 768px) {
+        .tb-title-input {
+            min-width: 80px;
+            max-width: 120px;
+        }
+        .badge {
+            display: none;
+        }
     }
 
     .currency-divider {

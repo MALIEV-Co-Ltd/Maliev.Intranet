@@ -158,6 +158,7 @@
     .pcs-sidebar {
         width: 100%;
         min-width: unset;
+        height: auto;
         border-left: none;
         border-top: 1px solid var(--mud-palette-lines-default);
     }

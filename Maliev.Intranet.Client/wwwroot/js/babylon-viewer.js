@@ -368,7 +368,9 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
                 // ── Resize observer ──
                 if (resizeObservers[canvasId]) resizeObservers[canvasId].disconnect();
-                const ro = new ResizeObserver(() => { if (engines[canvasId]) engines[canvasId].resize(); });
+                const ro = new ResizeObserver(() => {
+                    requestAnimationFrame(() => { if (engines[canvasId]) engines[canvasId].resize(); });
+                });
                 ro.observe(canvas);
                 resizeObservers[canvasId] = ro;
 
@@ -397,7 +399,9 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
             scene.render();
         });
 
-        const resizeHandler = () => engine.resize();
+        const resizeHandler = () => {
+            requestAnimationFrame(() => { if (engines[canvasId]) engines[canvasId].resize(); });
+        };
         window.addEventListener('resize', resizeHandler);
         engine._resizeHandler = resizeHandler;
 
