@@ -155,12 +155,12 @@ public class DashboardController(
         var onHoldOrdersTask      = SafeCount(t => orderClient.GetOnHoldOrderCountAsync(t), ct);
         var agingQuotesTask       = SafeCount(t => quotationClient.GetAgingQuotationCountAsync(7, t), ct);
         var overdueInvoicesTask   = SafeCount(t => invoiceClient.GetOverdueInvoiceCountAsync(t), ct);
-        var pendingLeaveTask      = SafeCount(async t =>
-        {
-            var employeeId = await GetEmployeeIdAsync(t);
-            return await leaveClient.GetPendingApprovalCountAsync(employeeId, t);
-        }, ct);
         var configuringProjectsTask = SafeCount(t => projectClient.GetConfiguringCountAsync(t), ct);
+
+        var employeeId = await GetEmployeeIdAsync(ct);
+        var pendingLeaveTask = employeeId == Guid.Empty
+            ? Task.FromResult(0)
+            : SafeCount(t => leaveClient.GetPendingApprovalCountAsync(employeeId, t), ct);
 
         await Task.WhenAll(onHoldOrdersTask, agingQuotesTask, overdueInvoicesTask, pendingLeaveTask, configuringProjectsTask);
 
