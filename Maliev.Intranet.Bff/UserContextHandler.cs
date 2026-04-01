@@ -134,8 +134,31 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
         {
             var user = context.User;
             var email = user.FindFirst("email")?.Value ?? user.FindFirst(ClaimTypes.Email)?.Value;
-            var googleUserId = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var fullName = user.FindFirst("name")?.Value ?? user.FindFirst(ClaimTypes.Name)?.Value;
+
+            // Extract google_user_id (Google's numeric sub) from the stored platform JWT.
+            // OnTicketReceived stores the platform JWT as "access_token" in auth properties.
+            // We must send Google's numeric sub for the exchange request, not the platform sub.
+            string? googleUserId = null;
+            var accessToken = user.FindFirst("access_token")?.Value;
+            if (string.IsNullOrEmpty(accessToken))
+                accessToken = await context.GetTokenAsync("access_token");
+
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                var handler = new JwtSecurityTokenHandler();
+                if (handler.CanReadToken(accessToken))
+                {
+                    var jwt = handler.ReadJwtToken(accessToken);
+                    // The platform JWT's "sub" is the platform GUID.
+                    // Google's numeric sub was originally stored as ClaimTypes.NameIdentifier in the cookie
+                    // (set by Google OAuth before we replaced it with the platform sub).
+                    googleUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                }
+            }
+
+            // Fallback: if no stored JWT, use cookie claim (shouldn't happen in practice)
+            googleUserId ??= user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(googleUserId))
             {

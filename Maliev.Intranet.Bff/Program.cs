@@ -189,6 +189,14 @@ try
                             System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email or
                             System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Name);
 
+                        // Remove the old Google NameIdentifier (numeric sub) before adding platform claims
+                        // to prevent SignInAsync from merging it with the new platform sub.
+                        var oldNameIdClaim = identity?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+                        if (oldNameIdClaim != null)
+                        {
+                            identity?.RemoveClaim(oldNameIdClaim);
+                        }
+
                         foreach (var claim in essentialClaims)
                         {
                             identity?.AddClaim(new System.Security.Claims.Claim(claim.Type, claim.Value));
@@ -479,21 +487,12 @@ try
 
     app.MapDefaultEndpoints("intranet");
 
-    // Clear stale auth cookies that the server can no longer decrypt (e.g. after restart with ephemeral DP).
-    // Must run BEFORE UseAuthentication so the protected ticket is removed before decryption is attempted.
-    // Skip /signin-* paths — these are OAuth callback endpoints where the cookie is set by the handler
-    // and MUST NOT be deleted before UseAuthentication can process it (would cause redirect loop).
-    app.Use(async (context, next) =>
-    {
-        var path = context.Request.Path.Value ?? "";
-        if (context.Request.Cookies.ContainsKey("Maliev.Intranet.Auth") &&
-            !IsStaticResource(context.Request.Path) &&
-            !path.Contains("/signin-", StringComparison.OrdinalIgnoreCase))
-        {
-            context.Response.Cookies.Delete("Maliev.Intranet.Auth");
-        }
-        await next();
-    });
+    // Stale cookie handling is NOT needed here:
+    // - DistributedCacheTicketStore stores tickets server-side in memory.
+    // - On restart, the in-memory store is empty, so RetrieveAsync returns null.
+    // - The auth middleware then treats the user as unauthenticated and redirects to /login.
+    // - Ephemeral data protection key loss also causes natural auth failure without explicit deletion.
+    // DO NOT delete the auth cookie unconditionally — it destroys valid sessions after login.
 
     app.UseAuthentication();
 
