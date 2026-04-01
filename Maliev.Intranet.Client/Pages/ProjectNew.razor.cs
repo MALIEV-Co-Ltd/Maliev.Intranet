@@ -961,7 +961,7 @@ public partial class ProjectNew : IAsyncDisposable
         else { _descriptionHasError = false; }
     }
 
-    private async void OnCustomerSelected(CustomerSummaryDto? customer)
+    private async Task OnCustomerSelected(CustomerSummaryDto? customer)
     {
         var previousCustomerId = _selectedCustomerId;
         _selectedCustomer = customer;

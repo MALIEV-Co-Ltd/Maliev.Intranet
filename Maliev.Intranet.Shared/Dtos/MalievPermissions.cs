@@ -11,9 +11,9 @@ public static class MalievPermissions
     public static class IAM
     {
         /// <summary>Permission to manage IAM policies, users, and roles.</summary>
-        public const string Manage = "iam.manage";
+        public const string Manage = "iam.principals.manage";
         /// <summary>Permission to read IAM information.</summary>
-        public const string Read = "iam.read";
+        public const string Read = "iam.principals.read";
     }
 
     /// <summary>
@@ -22,9 +22,9 @@ public static class MalievPermissions
     public static class Iam
     {
         /// <summary>Permission to manage IAM policies, users, and roles.</summary>
-        public const string Manage = "iam.manage";
+        public const string Manage = "iam.principals.manage";
         /// <summary>Permission to read IAM information.</summary>
-        public const string Read = "iam.read";
+        public const string Read = "iam.principals.read";
     }
 
     /// <summary>
