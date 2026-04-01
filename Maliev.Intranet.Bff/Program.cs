@@ -208,8 +208,9 @@ try
 
                         // Do NOT add roles/permissions to cookie - they will be read from JWT during authorization
 
-                        // Auto-bootstrap: promote first employee to platform owner in Development
-                        // Calls promote directly — the IAM endpoint has its own guard (humanUsers.Count <= 1)
+                        // Auto-bootstrap: promote first employee to platform owner in Development.
+                        // After a successful promote, re-exchange the token so the cookie JWT
+                        // includes the newly granted Platform Owner role.
                         if (context.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
                         {
                             try
@@ -219,7 +220,29 @@ try
                                 iamHttp.DefaultRequestHeaders.Authorization =
                                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
-                                await iamHttp.PostAsync("/iam/v1/principals/bootstrap/promote", null);
+                                var promoteResp = await iamHttp.PostAsync("/iam/v1/principals/bootstrap/promote", null);
+                                if (promoteResp.IsSuccessStatusCode)
+                                {
+                                    // Re-exchange to get a JWT that reflects the new role
+                                    var refreshResp = await authClient.PostAsJsonAsync("/auth/v1/exchange/google",
+                                        new { email, full_name = fullName, google_user_id = googleUserId });
+                                    if (refreshResp.IsSuccessStatusCode)
+                                    {
+                                        var refreshResult = await refreshResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                                        var newToken = refreshResult.GetProperty("access_token").GetString();
+                                        if (!string.IsNullOrEmpty(newToken))
+                                        {
+                                            accessToken = newToken;
+                                            context.Properties!.StoreTokens(new[] {
+                                                new AuthenticationToken { Name = "access_token", Value = newToken }
+                                            });
+                                            // Update the access_token claim so UserContextHandler picks up the new token
+                                            var oldTokenClaim = identity?.FindFirst("access_token");
+                                            if (oldTokenClaim != null) identity?.RemoveClaim(oldTokenClaim);
+                                            identity?.AddClaim(new System.Security.Claims.Claim("access_token", newToken));
+                                        }
+                                    }
+                                }
                             }
                             catch { /* Bootstrap is best-effort */ }
                         }

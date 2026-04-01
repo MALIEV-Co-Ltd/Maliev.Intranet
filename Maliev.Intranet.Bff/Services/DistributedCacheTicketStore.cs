@@ -7,8 +7,7 @@ namespace Maliev.Intranet.Bff.Services;
 
 /// <summary>
 /// Stores authentication tickets in a server-side concurrent dictionary to avoid browser cookie size limits.
-/// The cookie itself only holds the user's sub claim (~36 bytes) instead of the full encrypted ticket (~7KB).
-/// Uses the user's sub claim as the session key for deterministic, stable lookups.
+/// The cookie itself only holds a unique session ID (~36 bytes) instead of the full encrypted ticket (~7KB).
 /// </summary>
 public sealed class DistributedCacheTicketStore : ITicketStore
 {
@@ -32,14 +31,20 @@ public sealed class DistributedCacheTicketStore : ITicketStore
     /// <inheritdoc />
     public Task<string> StoreAsync(AuthenticationTicket ticket)
     {
+        // Enforce that a 'sub' claim exists, even though we use a Guid for the actual session key.
         var userId = ticket.Principal.FindFirst("sub")?.Value
             ?? ticket.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? throw new InvalidOperationException("Cannot store ticket: sub claim is missing. Ensure the user has a valid sub claim before authentication.");
 
+        // Generate a unique session ID. This prevents bugs when a user logs in multiple times,
+        // which could cause ASP.NET to inadvertently delete their newly created session if keys collide.
+        var sessionId = Guid.NewGuid().ToString("N");
+
         var expiresUtc = ticket.Properties.ExpiresUtc ?? DateTimeOffset.UtcNow.Add(TicketExpiration);
         ticket.Properties.ExpiresUtc = expiresUtc;
-        _tickets[userId] = ticket;
-        return Task.FromResult(userId);
+        
+        _tickets[sessionId] = ticket;
+        return Task.FromResult(sessionId);
     }
 
     /// <inheritdoc />
