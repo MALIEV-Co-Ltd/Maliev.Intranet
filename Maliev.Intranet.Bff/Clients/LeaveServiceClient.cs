@@ -34,9 +34,9 @@ public interface ILeaveServiceClient
     Task<bool> ProcessDecisionAsync(Guid requestId, Guid approverId, ApproveRejectLeaveRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// Retrieves the count of leave requests pending manager approval (current user).
+    /// Retrieves the count of leave requests pending manager approval for a specific manager.
     /// </summary>
-    Task<int> GetPendingApprovalCountAsync(CancellationToken ct = default);
+    Task<int> GetPendingApprovalCountAsync(Guid managerId, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -88,9 +88,9 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
     }
 
     /// <inheritdoc />
-    public async Task<int> GetPendingApprovalCountAsync(CancellationToken ct = default)
+    public async Task<int> GetPendingApprovalCountAsync(Guid managerId, CancellationToken ct = default)
     {
-        var httpResponse = await httpClient.GetAsync("/leave/v1/LeaveRequests/pending-count", ct);
+        var httpResponse = await httpClient.GetAsync($"/leave/v1/LeaveRequests/pending-count?managerId={managerId}", ct);
         if (!httpResponse.IsSuccessStatusCode) return 0;
         var response = await httpResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
         return response.TryGetProperty("count", out var count) ? count.GetInt32() : 0;

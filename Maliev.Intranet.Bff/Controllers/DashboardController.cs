@@ -2,6 +2,7 @@ using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace Maliev.Intranet.Bff.Controllers;
@@ -154,7 +155,11 @@ public class DashboardController(
         var onHoldOrdersTask      = SafeCount(t => orderClient.GetOnHoldOrderCountAsync(t), ct);
         var agingQuotesTask       = SafeCount(t => quotationClient.GetAgingQuotationCountAsync(7, t), ct);
         var overdueInvoicesTask   = SafeCount(t => invoiceClient.GetOverdueInvoiceCountAsync(t), ct);
-        var pendingLeaveTask      = SafeCount(t => leaveClient.GetPendingApprovalCountAsync(t), ct);
+        var pendingLeaveTask      = SafeCount(async t =>
+        {
+            var employeeId = await GetEmployeeIdAsync(t);
+            return await leaveClient.GetPendingApprovalCountAsync(employeeId, t);
+        }, ct);
         var configuringProjectsTask = SafeCount(t => projectClient.GetConfiguringCountAsync(t), ct);
 
         await Task.WhenAll(onHoldOrdersTask, agingQuotesTask, overdueInvoicesTask, pendingLeaveTask, configuringProjectsTask);
@@ -229,6 +234,27 @@ public class DashboardController(
         }
 
         return Ok(result);
+    }
+
+    private async Task<Guid> GetEmployeeIdAsync(CancellationToken ct)
+    {
+        var employeeIdClaim = User.FindFirst("employee_id")?.Value;
+        if (Guid.TryParse(employeeIdClaim, out var employeeId))
+        {
+            return employeeId;
+        }
+
+        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdString, out var principalId))
+        {
+            var employee = await employeeClient.GetByPrincipalIdAsync(principalId, ct);
+            if (employee != null)
+            {
+                return employee.Id;
+            }
+        }
+
+        return Guid.Empty;
     }
 }
 
