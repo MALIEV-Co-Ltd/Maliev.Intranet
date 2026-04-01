@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
 using MudBlazor.Services;
+using StackExchange.Redis;
+using System.Security.Cryptography.X509Certificates;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -65,12 +67,26 @@ try
     builder.Services.AddTransient<UserContextHandler>();
     builder.Services.AddTransient<Maliev.Intranet.Bff.Handlers.CookieForwardingHandler>();
 
-    // Use ephemeral data protection in development to ensure cookies are invalidated on restart
-
-    if (builder.Environment.IsDevelopment())
+    var redisConnectionString = builder.Configuration.GetConnectionString("redis");
+    if (!string.IsNullOrEmpty(redisConnectionString))
     {
-        builder.Services.AddDataProtection()
-            .UseEphemeralDataProtectionProvider();
+        var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+        builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+
+        var dataProtectionBuilder = builder.Services.AddDataProtection()
+            .PersistKeysToStackExchangeRedis(redis, "Maliev:DataProtection:Keys")
+            .SetApplicationName("MalievIntranet");
+
+        var certPath = builder.Configuration["DataProtection:CertificatePath"];
+        if (!string.IsNullOrEmpty(certPath))
+        {
+            var certPassword = builder.Configuration["DataProtection:CertificatePassword"];
+            var certData = File.ReadAllBytes(certPath);
+            var certificate = string.IsNullOrEmpty(certPassword)
+                ? X509Certificate2.CreateFromPemFile(certPath)
+                : X509Certificate2.CreateFromEncryptedPemFile(certPath, certPassword);
+            dataProtectionBuilder.ProtectKeysWithCertificate(certificate);
+        }
     }
 
     // Configure Authentication
