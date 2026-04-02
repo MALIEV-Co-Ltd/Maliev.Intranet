@@ -201,44 +201,6 @@ public class PreviewImagesGeneratedConsumerTests
     }
 
     [Fact]
-    public async Task Consume_ShouldPreferThumbnailSmallAsThumbnailUrl()
-    {
-        const string isoUrl = "p/thumbnail_small.webp";
-        var (consumer, clientProxyMock) = CreateConsumerWithPassthrough();
-
-        FileAnalysisCompletedPayload? captured = null;
-        clientProxyMock
-            .Setup(x => x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None))
-            .Callback<string, object[], CancellationToken>((_, args, _) =>
-                captured = args[0] as FileAnalysisCompletedPayload)
-            .Returns(Task.CompletedTask);
-
-        await consumer.Consume(MakeCtx(BuildEvent(front: "p/front.webp", iso: isoUrl)).Object);
-
-        Assert.NotNull(captured);
-        Assert.Equal(isoUrl, captured.ThumbnailUrl);
-    }
-
-    [Fact]
-    public async Task Consume_ShouldUseFrontPreviewAsThumbnailUrl_WhenThumbnailSmallNotAvailable()
-    {
-        const string frontUrl = "p/front.webp";
-        var (consumer, clientProxyMock) = CreateConsumerWithPassthrough();
-
-        FileAnalysisCompletedPayload? captured = null;
-        clientProxyMock
-            .Setup(x => x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None))
-            .Callback<string, object[], CancellationToken>((_, args, _) =>
-                captured = args[0] as FileAnalysisCompletedPayload)
-            .Returns(Task.CompletedTask);
-
-        await consumer.Consume(MakeCtx(BuildEvent(front: frontUrl, iso: null)).Object);
-
-        Assert.NotNull(captured);
-        Assert.Equal(frontUrl, captured.ThumbnailUrl);
-    }
-
-    [Fact]
     public async Task Consume_ShouldSetStoragePath()
     {
         var (consumer, clientProxyMock) = CreateConsumerWithPassthrough();

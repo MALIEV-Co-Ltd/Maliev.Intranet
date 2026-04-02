@@ -31,20 +31,15 @@ public sealed class DistributedCacheTicketStore : ITicketStore
     /// <inheritdoc />
     public Task<string> StoreAsync(AuthenticationTicket ticket)
     {
-        // Enforce that a 'sub' claim exists, even though we use a Guid for the actual session key.
         var userId = ticket.Principal.FindFirst("sub")?.Value
             ?? ticket.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? throw new InvalidOperationException("Cannot store ticket: sub claim is missing. Ensure the user has a valid sub claim before authentication.");
 
-        // Generate a unique session ID. This prevents bugs when a user logs in multiple times,
-        // which could cause ASP.NET to inadvertently delete their newly created session if keys collide.
-        var sessionId = Guid.NewGuid().ToString("N");
-
         var expiresUtc = ticket.Properties.ExpiresUtc ?? DateTimeOffset.UtcNow.Add(TicketExpiration);
         ticket.Properties.ExpiresUtc = expiresUtc;
-        
-        _tickets[sessionId] = ticket;
-        return Task.FromResult(sessionId);
+
+        _tickets[userId] = ticket;
+        return Task.FromResult(userId);
     }
 
     /// <inheritdoc />

@@ -1,12 +1,12 @@
 using Bunit;
 using Maliev.Intranet.Client.Components;
+using Maliev.Intranet.Client.Services;
+using Maliev.Intranet.Tests.Testing;
 using MudBlazor;
 using MudBlazor.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Maliev.Intranet.Tests.Testing;
 using Microsoft.JSInterop;
-using Microsoft.AspNetCore.Components.Forms;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
@@ -20,6 +20,17 @@ public class UploadDialogTests : BunitContext, IAsyncLifetime
         Services.AddMudServices();
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton(_snackbarMock.Object);
+        Services.AddSingleton(new FileTypesSettings
+        {
+            ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".stl", ".step", ".3mf", ".obj" },
+            DocumentExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".dxf", ".dwg" },
+            ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".webp" },
+            OfficeExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".doc", ".docx", ".xls", ".xlsx" },
+            ArchiveExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".zip", ".rar", ".7z" },
+            DrawingExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".dxf", ".dwg", ".png", ".jpg" },
+            SupplementaryExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".doc", ".docx", ".xls", ".xlsx", ".zip" }
+        });
+        Services.AddSingleton(new UploadSettings());
 
         var handler = new MockHttpMessageHandler();
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };

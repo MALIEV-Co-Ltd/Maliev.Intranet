@@ -203,11 +203,22 @@ public class SmallThumbnailReadyConsumerTests
     }
 
     [Fact]
-    public async Task Consume_ShouldThrowWhenSignedUrlResolutionFails()
+    public async Task Consume_ShouldSetFailedTrueWhenSignedUrlResolutionFails()
     {
-        var (consumer, _) = CreateConsumerWithFailingHttp();
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => consumer.Consume(MakeCtx(BuildEvent()).Object));
+        var (consumer, clientProxyMock) = CreateConsumerWithFailingHttp();
+
+        FileAnalysisCompletedPayload? captured = null;
+        clientProxyMock
+            .Setup(x => x.SendCoreAsync("FileAnalysisCompleted", It.IsAny<object[]>(), CancellationToken.None))
+            .Callback<string, object[], CancellationToken>((_, args, _) =>
+                captured = args[0] as FileAnalysisCompletedPayload)
+            .Returns(Task.CompletedTask);
+
+        await consumer.Consume(MakeCtx(BuildEvent()).Object);
+
+        Assert.NotNull(captured);
+        Assert.True(captured.Failed);
+        Assert.Equal("thumbnail-url-resolution-failed", captured.ErrorCode);
     }
 
     [Fact]

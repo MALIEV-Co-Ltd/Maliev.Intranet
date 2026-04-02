@@ -71,7 +71,11 @@ public class UserContextHandlerTests
     public async Task SendAsync_ShouldUseSubClaim_WhenUserIdMissing()
     {
         var sub = "sub-123";
-        var claims = new List<Claim> { new("sub", sub) };
+        var claims = new List<Claim>
+        {
+            new("sub", sub),
+            new("access_token", sub) // Add access_token so handler can use as Bearer token
+        };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var httpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) };
 
