@@ -33,6 +33,15 @@
                          Color="Color.Warning" />
             </div>
         }
+        else if (!Part.IsFullyConfigured && Part.FileId != Guid.Empty)
+        {
+            @* Part is uploaded (possibly DFM-ready) but not yet fully configured *@
+            <div class="mc-indicator cfg">
+                <MudIcon Icon="@Icons.Material.Filled.BuildCircle"
+                         Size="Size.Small"
+                         Color="Color.Info" />
+            </div>
+        }
         else if (Part.IsFullyConfigured)
         {
             <div class="mc-indicator ok">
@@ -123,7 +132,8 @@
         font-size: 10px;
     }
     .mc-indicator.warn { background: var(--mud-palette-warning-bg); color: var(--mud-palette-warning); }
-    .mc-indicator.ok { background: var(--mud-palette-success-bg); color: var(--mud-palette-success); }
+    .mc-indicator.ok   { background: var(--mud-palette-success-bg); color: var(--mud-palette-success); }
+    .mc-indicator.cfg  { background: var(--mud-palette-info-lighten); color: var(--mud-palette-info); }
     .pmc-info {
         flex: 1;
         min-width: 0;

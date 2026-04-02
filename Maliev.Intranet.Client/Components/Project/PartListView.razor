@@ -1,5 +1,6 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Shared
 
 <div class="plv-container">
 
@@ -35,7 +36,7 @@
 
             <MudSelect T="ProcessDto"
                        Value="@_bulkProcess"
-                       ValueChanged="@((ProcessDto? p) => _bulkProcess = p)"
+                       ValueChanged="@OnBulkProcessChanged"
                        ToStringFunc="@(p => p?.Name ?? string.Empty)"
                        Margin="Margin.Dense"
                        Variant="Variant.Outlined"
@@ -52,16 +53,45 @@
                        Value="@_bulkMaterial"
                        ValueChanged="@((CatalogMaterialDto? m) => _bulkMaterial = m)"
                        ToStringFunc="@(m => m?.Name ?? string.Empty)"
-                       Disabled="@(BulkMaterials.Count == 0)"
+                       Disabled="@(_bulkAvailableMaterials.Count == 0)"
                        Margin="Margin.Dense"
                        Variant="Variant.Outlined"
                        Placeholder="Set material"
                        Clearable="true"
                        Class="plv-bulk-select">
-                @foreach (var mat in BulkMaterials)
+                @foreach (var mat in _bulkAvailableMaterials)
                 {
                     <MudSelectItem T="CatalogMaterialDto" Value="@mat">@mat.Name</MudSelectItem>
                 }
+            </MudSelect>
+
+            <MudSelect T="PartMarkingType?"
+                       Value="@_bulkMarking"
+                       ValueChanged="@((PartMarkingType? v) => _bulkMarking = v)"
+                       ToStringFunc="@(v => v == null ? string.Empty : v switch { PartMarkingType.None => "None", PartMarkingType.Laser => "Laser", PartMarkingType.Printing => "Silkscreen", PartMarkingType.Engraving => "Engraving", _ => v.ToString()! })"
+                       Margin="Margin.Dense"
+                       Variant="Variant.Outlined"
+                       Placeholder="Set marking"
+                       Clearable="true"
+                       Class="plv-bulk-select">
+                <MudSelectItem T="PartMarkingType?" Value="@((PartMarkingType?)PartMarkingType.None)">None</MudSelectItem>
+                <MudSelectItem T="PartMarkingType?" Value="@((PartMarkingType?)PartMarkingType.Laser)">Laser Marking</MudSelectItem>
+                <MudSelectItem T="PartMarkingType?" Value="@((PartMarkingType?)PartMarkingType.Printing)">Silkscreen</MudSelectItem>
+                <MudSelectItem T="PartMarkingType?" Value="@((PartMarkingType?)PartMarkingType.Engraving)">CNC Engraving</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="InspectionLevel?"
+                       Value="@_bulkInspection"
+                       ValueChanged="@((InspectionLevel? v) => _bulkInspection = v)"
+                       ToStringFunc="@(v => v == null ? string.Empty : v switch { InspectionLevel.Standard => "Standard", InspectionLevel.Dimensional => "Dimensional", InspectionLevel.FullCmm => "Full CMM", _ => v.ToString()! })"
+                       Margin="Margin.Dense"
+                       Variant="Variant.Outlined"
+                       Placeholder="Set inspection"
+                       Clearable="true"
+                       Class="plv-bulk-select">
+                <MudSelectItem T="InspectionLevel?" Value="@((InspectionLevel?)InspectionLevel.Standard)">Standard</MudSelectItem>
+                <MudSelectItem T="InspectionLevel?" Value="@((InspectionLevel?)InspectionLevel.Dimensional)">Dimensional</MudSelectItem>
+                <MudSelectItem T="InspectionLevel?" Value="@((InspectionLevel?)InspectionLevel.FullCmm)">Full CMM</MudSelectItem>
             </MudSelect>
 
             <MudButton Variant="Variant.Filled"
@@ -192,16 +222,16 @@
     /// <summary>Callback invoked after any mutation to a part configuration.</summary>
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
 
+    [Inject] private HttpClient Http { get; set; } = null!;
+
     private HashSet<PartViewModel> _selectedParts = [];
     private ProcessDto? _bulkProcess;
     private CatalogMaterialDto? _bulkMaterial;
+    private PartMarkingType? _bulkMarking;
+    private InspectionLevel? _bulkInspection;
+    private List<CatalogMaterialDto> _bulkAvailableMaterials = [];
 
     private bool AllSelected => Parts.Count > 0 && _selectedParts.Count == Parts.Count;
-
-    private List<CatalogMaterialDto> BulkMaterials =>
-        Parts.SelectMany(p => p.AvailableMaterials)
-             .DistinctBy(m => m.Id)
-             .ToList();
 
     private void ToggleSelect(PartViewModel part, bool selected)
     {
@@ -215,25 +245,87 @@
         else _selectedParts.Clear();
     }
 
+    /// <summary>
+    /// When the bulk process changes, fetch the materials list for that process
+    /// so the material dropdown reflects valid options for the selected process.
+    /// Clears the bulk material selection to prevent stale cross-process values.
+    /// </summary>
+    private async Task OnBulkProcessChanged(ProcessDto? p)
+    {
+        _bulkProcess = p;
+        _bulkMaterial = null;
+        _bulkAvailableMaterials = [];
+
+        if (p == null) return;
+
+        try
+        {
+            var mats = await Http.GetFromJsonAsync<List<CatalogMaterialDto>>(
+                $"api/catalog/processes/{Uri.EscapeDataString(p.Code)}/materials");
+            _bulkAvailableMaterials = mats ?? [];
+        }
+        catch
+        {
+            // Non-fatal — material list stays empty
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Applies bulk edits in two passes:
+    /// Pass 1 — process (triggers catalog reload via OnPartChanged).
+    /// Pass 2 — material, marking, and inspection (applied after catalog is populated).
+    /// This ordering prevents stale SLA materials persisting when switching to FDM.
+    /// </summary>
     private async Task ApplyBulk()
     {
         var toProcess = _selectedParts.ToList();
         _selectedParts.Clear();
-        foreach (var part in toProcess)
+
+        // Pass 1: apply process to all parts and trigger catalog reload
+        if (_bulkProcess != null)
         {
-            if (_bulkProcess != null)
+            foreach (var part in toProcess)
             {
                 part.ProcessCode = _bulkProcess.Code;
                 part.ProcessId = _bulkProcess.Id;
+                part.AvailableMaterials = [];
+                part.AvailableFinishes = [];
+                part.AvailableTolerances = [];
+                await OnPartChanged.InvokeAsync(part);
             }
+        }
+
+        // Pass 2: apply material (now that catalog is loaded), marking, and inspection
+        foreach (var part in toProcess)
+        {
+            var changed = false;
             if (_bulkMaterial != null)
             {
                 part.MaterialCode = _bulkMaterial.Code;
                 part.MaterialId = _bulkMaterial.Id;
+                changed = true;
             }
-            await OnPartChanged.InvokeAsync(part);
+            if (_bulkMarking.HasValue)
+            {
+                part.MarkingType = _bulkMarking.Value;
+                changed = true;
+            }
+            if (_bulkInspection.HasValue)
+            {
+                part.InspectionLevel = _bulkInspection.Value;
+                changed = true;
+            }
+            if (changed) await OnPartChanged.InvokeAsync(part);
         }
+
         _bulkProcess = null;
         _bulkMaterial = null;
+        _bulkMarking = null;
+        _bulkInspection = null;
+        _bulkAvailableMaterials = [];
     }
 }

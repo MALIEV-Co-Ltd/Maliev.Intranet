@@ -80,6 +80,7 @@
             <DfmOverlayPanel DfmIssues="@_dfmIssues"
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
                              Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged)"
+                             TimedOut="@Part.DfmAnalysisTimedOut"
                              AllClear="@(_dfmIssues.Count == 0 && Part.DfmReport != null && !Part.DfmAcknowledged)"
                              OnAcknowledged="@HandleDfmAcknowledged" />
         </div>
@@ -226,6 +227,8 @@
     private List<DfmIssue> _dfmIssues = [];
     private bool _viewerLoadFailed;
     private string? _viewerErrorMessage;
+    private CancellationTokenSource? _dfmTimeoutCts;
+    private const int DfmTimeoutSeconds = 60;
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
@@ -237,6 +240,41 @@
             _viewerLoadFailed = false;
             _viewerErrorMessage = null;
         }
+
+        // DFM timeout: start a 60-second countdown when the viewer is open and
+        // DFM has not arrived. Cancel/reset if the report arrives or the part changes.
+        var shouldBeAnalyzing = _dfmIssues.Count == 0
+            && Part.ViewerUrl != null
+            && Part.DfmReport == null
+            && !Part.DfmAcknowledged
+            && !Part.DfmAnalysisTimedOut;
+
+        if (shouldBeAnalyzing && _dfmTimeoutCts == null)
+        {
+            _dfmTimeoutCts = new CancellationTokenSource();
+            var token = _dfmTimeoutCts.Token;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(DfmTimeoutSeconds), token);
+                    if (!token.IsCancellationRequested && Part.DfmReport == null)
+                    {
+                        Part.DfmAnalysisTimedOut = true;
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+                catch (OperationCanceledException) { }
+            }, token);
+        }
+        else if (!shouldBeAnalyzing)
+        {
+            // Cancel any pending timeout — report arrived or part changed
+            _dfmTimeoutCts?.Cancel();
+            _dfmTimeoutCts?.Dispose();
+            _dfmTimeoutCts = null;
+        }
+
         await base.OnParametersSetAsync();
     }
 

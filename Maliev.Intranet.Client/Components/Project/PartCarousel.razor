@@ -1,15 +1,17 @@
 @namespace Maliev.Intranet.Client.Components.Project
 
 <div class="pc-row">
-    @for (var i = 0; i < Parts.Count; i++)
-    {
-        var idx = i;
-        <PartMiniCard Part="@Parts[idx]"
-                      IsActive="@(idx == SelectedIndex)"
-                      CurrencyCode="@CurrencyCode"
-                      OnClick="@(() => OnSelectPart.InvokeAsync(idx))"
-                      OnRemove="@(() => OnRemovePart.InvokeAsync(Parts[idx]))" />
-    }
+    <div class="pc-parts">
+        @for (var i = 0; i < Parts.Count; i++)
+        {
+            var idx = i;
+            <PartMiniCard Part="@Parts[idx]"
+                          IsActive="@(idx == SelectedIndex)"
+                          CurrencyCode="@CurrencyCode"
+                          OnClick="@(() => OnSelectPart.InvokeAsync(idx))"
+                          OnRemove="@(() => OnRemovePart.InvokeAsync(Parts[idx]))" />
+        }
+    </div>
     <div class="pc-add" @onclick="OnAddPart">
         <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Large" Color="Color.Default" />
         <MudText Typo="Typo.caption" Color="Color.Secondary">Add Part</MudText>
@@ -20,13 +22,20 @@
     .pc-row {
         display: flex;
         flex-direction: row;
-        overflow-x: auto;
         padding: 16px;
         background: var(--mud-palette-surface);
         flex-shrink: 0;
         align-items: stretch;
-        gap: 8px;
         border-bottom: 1px solid var(--mud-palette-lines-default);
+    }
+    .pc-parts {
+        display: flex;
+        flex-direction: row;
+        flex: 1;
+        overflow-x: auto;
+        gap: 8px;
+        align-items: stretch;
+        margin-right: 8px;
     }
     .pc-add {
         display: flex;

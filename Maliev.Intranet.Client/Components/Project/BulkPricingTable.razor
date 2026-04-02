@@ -3,12 +3,12 @@
 <div class="bpt-container">
     <div class="bpt-header" @onclick="@(() => _expanded = !_expanded)">
         <MudIcon Icon="@Icons.Material.Filled.Discount" Size="Size.Small" Color="Color.Primary" />
-        <MudText Typo="Typo.body2" Class="ml-1" Style="font-weight:600;">Volume Savings</MudText>
+        <MudText Typo="Typo.body2" Class="ml-1" Style="font-weight:600;" Color="Color.Primary">Volume Savings</MudText>
+        <MudSpacer />
         @if (!_expanded && ActiveTier != null && SavingAmount > 0)
         {
             <span class="bpt-saved-chip">Saved @CurrencySymbol @SavingAmount.ToString("N0")</span>
         }
-        <MudSpacer />
         <MudIcon Icon="@(_expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
                  Size="Size.Small" Color="Color.Secondary" />
     </div>
@@ -45,7 +45,7 @@
         border-radius: 4px;
         font-weight: 600;
         font-size: var(--mud-typography-caption-size);
-        margin-left: auto;
+        white-space: nowrap;
     }
     .bpt-header {
         display: flex;

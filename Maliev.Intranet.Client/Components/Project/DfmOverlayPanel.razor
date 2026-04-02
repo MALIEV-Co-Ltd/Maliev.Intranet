@@ -1,6 +1,19 @@
 @namespace Maliev.Intranet.Client.Components.Project
 
-@if (Analyzing)
+@if (Analyzing && TimedOut)
+{
+    <div class="dfm-overlay dfm-overlay--timed-out">
+        <div class="dfm-overlay-header">
+            <div class="dfm-header-left">
+                <MudIcon Icon="@Icons.Material.Outlined.Info"
+                         Size="Size.Small"
+                         Color="Color.Default" />
+                <span>DFM analysis unavailable</span>
+            </div>
+        </div>
+    </div>
+}
+else if (Analyzing)
 {
     <div class="dfm-overlay dfm-overlay--analyzing">
         <div class="dfm-overlay-header">
@@ -84,6 +97,10 @@ else if (IsVisible && DfmIssues.Count > 0)
     .dfm-overlay--analyzing {
         border-top-color: var(--mud-palette-info);
     }
+    .dfm-overlay--timed-out {
+        border-top-color: var(--mud-palette-lines-default);
+        background: rgba(200,200,200,0.35);
+    }
     .dfm-overlay--all-clear {
         border-top-color: var(--mud-palette-success);
         background: rgba(220,255,220,0.5);
@@ -141,6 +158,9 @@ else if (IsVisible && DfmIssues.Count > 0)
     /// <summary>True while DFM analysis is in progress but no report has arrived yet.</summary>
     [Parameter] public bool Analyzing { get; set; }
 
+    /// <summary>True when DFM analysis timed out on the client (60 s with no event). Shows 'unavailable' notice.</summary>
+    [Parameter] public bool TimedOut { get; set; }
+
     /// <summary>True when DFM analysis completed and no issues were found.</summary>
     [Parameter] public bool AllClear { get; set; }
 
@@ -153,6 +173,9 @@ else if (IsVisible && DfmIssues.Count > 0)
     private bool _allClearFading;
     private bool _allClearShown;
     private CancellationTokenSource? _allClearCts;
+    // Tracks the last issue count we transitioned *from* when showing All Clear.
+    // Prevents re-triggering the banner every time parameters change.
+    private int _previousIssueCount = -1;
 
     protected override void OnParametersSet()
     {
@@ -166,12 +189,23 @@ else if (IsVisible && DfmIssues.Count > 0)
 
         if (AllClear && !_allClearShown)
         {
-            _allClearShown = true;
-            _allClearFading = false;
-            _ = TriggerAllClearAutoDismiss();
+            // Only fire the All Clear dismissal when transitioning from issues → clear,
+            // not on every re-render. _previousIssueCount tracks the last count that
+            // triggered a meaningful state change.
+            var isNewAllClear = _previousIssueCount != 0;
+            _previousIssueCount = 0;
+
+            if (isNewAllClear)
+            {
+                _allClearShown = true;
+                _allClearFading = false;
+                _ = TriggerAllClearAutoDismiss();
+            }
         }
         else if (!AllClear)
         {
+            if (DfmIssues.Count > 0)
+                _previousIssueCount = DfmIssues.Count;
             _allClearShown = false;
             _allClearFading = false;
             _allClearCts?.Cancel();

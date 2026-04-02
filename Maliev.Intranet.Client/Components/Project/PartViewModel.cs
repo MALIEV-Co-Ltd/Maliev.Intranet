@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Maliev.MessagingContracts.Contracts.Geometry;
 
 namespace Maliev.Intranet.Client.Components.Project;
 
@@ -135,6 +137,13 @@ public class PartViewModel
     /// <summary>Error message if upload or analysis failed; null when healthy.</summary>
     public string? Error { get; set; }
 
+    /// <summary>
+    /// Set to true by <see cref="PartDetailCard"/> after a 60-second timeout when
+    /// no <c>DfmAnalysisReady</c> event arrives. Collapses the "Analyzing…" spinner
+    /// into an "unavailable" notice so the overlay does not spin indefinitely.
+    /// </summary>
+    public bool DfmAnalysisTimedOut { get; set; }
+
     // ── Per-part attachments ───────────────────────────────────────────
 
     /// <summary>Technical drawing files attached to this part (PDF, DXF, DWG, images).</summary>
@@ -263,50 +272,78 @@ public class PartViewModel
         BagAndTag = BagAndTag,
         InspectionLevel = InspectionLevel,
         Certificates = [..Certificates],
+        // Persist pricing snapshot so the panel shows instantly on restore
+        EstimatedUnitPrice = EstimatedUnitPrice,
+        EstimatedTotalAmount = EstimatedTotalAmount,
+        // Serialise typed DFM payloads to JSON so BuildDfmIssues works after restore
+        FdmDfmReportJson = FdmDfmReport is FdmDfmReportPayload fdm ? JsonSerializer.Serialize(fdm) : null,
+        SlaDfmReportJson = SlaDfmReport is SlaDfmReportPayload sla ? JsonSerializer.Serialize(sla) : null,
+        CncDfmReportJson = CncDfmReport is CncDfmReportPayload cnc ? JsonSerializer.Serialize(cnc) : null,
     };
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
-    public static PartViewModel FromDraftPartState(DraftPartState s) => new()
+    public static PartViewModel FromDraftPartState(DraftPartState s)
     {
-        FileId = s.FileId,
-        StoragePath = s.StoragePath,
-        Name = s.Name,
-        Quantity = s.Quantity,
-        ProcessCode = s.ProcessCode,
-        ProcessId = s.ProcessId,
-        MaterialCode = s.MaterialCode,
-        MaterialId = s.MaterialId,
-        FinishCode = s.SurfaceFinishCode,
-        FinishId = s.SurfaceFinishId,
-        ToleranceCode = s.ToleranceCode,
-        ToleranceId = s.ToleranceId,
-        PartNotes = s.PartNotes,
-        DfmAcknowledged = s.DfmAcknowledged,
-        VolumeMm3 = s.VolumeMm3,
-        Dimensions = s.Dimensions,
-        IsManifold = s.IsManifold,
-        ThumbnailSmallUrl = s.ThumbnailSmallUrl,
-        ThumbnailLargeUrl = s.ThumbnailLargeUrl,
-        ThumbnailSmallGcsPath = s.ThumbnailSmallGcsPath,
-        ThumbnailLargeGcsPath = s.ThumbnailLargeGcsPath,
-        GlbStoragePath = s.GlbStoragePath,
-        DrawingFiles = s.DrawingFiles,
-        SupplementaryFiles = s.SupplementaryFiles,
-        RoughnessCode = s.RoughnessCode,
-        MarkingType = s.MarkingType,
-        MarkingText = s.MarkingText,
-        HasThreadedHoles = s.HasThreadedHoles,
-        ThreadedHoleSpec = s.ThreadedHoleSpec,
-        ThreadedHoleCount = s.ThreadedHoleCount,
-        HasInserts = s.HasInserts,
-        InsertType = s.InsertType,
-        InsertCount = s.InsertCount,
-        BagAndTag = s.BagAndTag,
-        InspectionLevel = s.InspectionLevel,
-        Certificates = [..s.Certificates],
-        AwaitingPreview = false,
-        StatusText = string.IsNullOrEmpty(s.ThumbnailSmallUrl) && string.IsNullOrEmpty(s.StoragePath)
-            ? "Processing..."
-            : "Ready",
-    };
+        var vm = new PartViewModel
+        {
+            FileId = s.FileId,
+            StoragePath = s.StoragePath,
+            Name = s.Name,
+            Quantity = s.Quantity,
+            ProcessCode = s.ProcessCode,
+            ProcessId = s.ProcessId,
+            MaterialCode = s.MaterialCode,
+            MaterialId = s.MaterialId,
+            FinishCode = s.SurfaceFinishCode,
+            FinishId = s.SurfaceFinishId,
+            ToleranceCode = s.ToleranceCode,
+            ToleranceId = s.ToleranceId,
+            PartNotes = s.PartNotes,
+            DfmAcknowledged = s.DfmAcknowledged,
+            VolumeMm3 = s.VolumeMm3,
+            Dimensions = s.Dimensions,
+            IsManifold = s.IsManifold,
+            ThumbnailSmallUrl = s.ThumbnailSmallUrl,
+            ThumbnailLargeUrl = s.ThumbnailLargeUrl,
+            ThumbnailSmallGcsPath = s.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = s.ThumbnailLargeGcsPath,
+            GlbStoragePath = s.GlbStoragePath,
+            DrawingFiles = s.DrawingFiles,
+            SupplementaryFiles = s.SupplementaryFiles,
+            RoughnessCode = s.RoughnessCode,
+            MarkingType = s.MarkingType,
+            MarkingText = s.MarkingText,
+            HasThreadedHoles = s.HasThreadedHoles,
+            ThreadedHoleSpec = s.ThreadedHoleSpec,
+            ThreadedHoleCount = s.ThreadedHoleCount,
+            HasInserts = s.HasInserts,
+            InsertType = s.InsertType,
+            InsertCount = s.InsertCount,
+            BagAndTag = s.BagAndTag,
+            InspectionLevel = s.InspectionLevel,
+            Certificates = [..s.Certificates],
+            AwaitingPreview = false,
+            StatusText = string.IsNullOrEmpty(s.ThumbnailSmallUrl) && string.IsNullOrEmpty(s.StoragePath)
+                ? "Processing..."
+                : "Ready",
+            // Restore pricing snapshot for instant display while background recalculation runs
+            EstimatedUnitPrice = s.EstimatedUnitPrice,
+            EstimatedTotalAmount = s.EstimatedTotalAmount,
+        };
+
+        // Deserialise DFM reports from JSON so BuildDfmIssues pattern-matching works correctly.
+        // Without this, the reports arrive as JsonElement after catch-up which never matches
+        // FdmDfmReportPayload / SlaDfmReportPayload / CncDfmReportPayload.
+        if (!string.IsNullOrEmpty(s.FdmDfmReportJson))
+            vm.FdmDfmReport = JsonSerializer.Deserialize<FdmDfmReportPayload>(s.FdmDfmReportJson);
+        if (!string.IsNullOrEmpty(s.SlaDfmReportJson))
+            vm.SlaDfmReport = JsonSerializer.Deserialize<SlaDfmReportPayload>(s.SlaDfmReportJson);
+        if (!string.IsNullOrEmpty(s.CncDfmReportJson))
+            vm.CncDfmReport = JsonSerializer.Deserialize<CncDfmReportPayload>(s.CncDfmReportJson);
+
+        // Resolve DfmReport from the typed per-process reports so overlay panels start correctly.
+        vm.ResolveDfmReport();
+
+        return vm;
+    }
 }

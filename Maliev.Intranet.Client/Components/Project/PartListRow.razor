@@ -125,6 +125,8 @@
                              ValueChanged="@((int qty) => OnQuantityChanged(qty))"
                              Min="1"
                              Max="10000"
+                             Immediate="true"
+                             DebounceInterval="500"
                              Margin="Margin.Dense"
                              Variant="Variant.Outlined"
                              Label="Qty"

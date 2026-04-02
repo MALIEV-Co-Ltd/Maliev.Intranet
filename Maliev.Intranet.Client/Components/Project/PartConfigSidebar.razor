@@ -51,6 +51,8 @@
                                      ValueChanged="@((int qty) => OnQuantityChanged(qty))"
                                      Min="1"
                                      Max="10000"
+                                     Immediate="true"
+                                     DebounceInterval="500"
                                      Variant="Variant.Outlined"
                                      Margin="Margin.Dense" />
                 </div>
@@ -417,13 +419,35 @@
             {
                 var tiers = await response.Content.ReadFromJsonAsync<List<BulkPriceTierDto>>();
                 if (tiers != null)
+                {
                     _bulkTiers = tiers.Select(t => new BulkPricingTable.BulkTier(t.Quantity, t.UnitPrice)).ToList();
+                    ApplyBulkPricingToTotal();
+                }
             }
         }
         catch
         {
             // Non-fatal — bulk pricing table stays empty
         }
+    }
+
+    /// <summary>
+    /// Finds the active bulk tier for the current quantity and sets
+    /// <see cref="PartViewModel.EstimatedTotalAmount"/> to tier unit price × quantity.
+    /// This corrects the server-returned total which uses the base (non-discounted) unit price.
+    /// </summary>
+    private void ApplyBulkPricingToTotal()
+    {
+        if (Part == null || _bulkTiers.Count == 0) return;
+
+        // Active tier: highest tier whose Quantity ≤ current quantity
+        var activeTier = _bulkTiers
+            .Where(t => t.Quantity <= Part.Quantity)
+            .OrderByDescending(t => t.Quantity)
+            .FirstOrDefault();
+
+        if (activeTier != null)
+            Part.EstimatedTotalAmount = activeTier.UnitPrice * Part.Quantity;
     }
 
     // ── Event handlers ───────────────────────────────────────────────────

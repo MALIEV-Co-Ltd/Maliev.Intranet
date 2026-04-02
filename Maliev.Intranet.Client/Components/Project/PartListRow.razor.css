@@ -1,5 +1,5 @@
 .plr-wrapper {
-    border-radius: var(--radius-lg);
+    border-radius: 8px;
     border: 1px solid var(--mud-palette-lines-default);
     background: var(--mud-palette-surface);
     transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -35,7 +35,7 @@
     height: 80px;
     background: var(--mud-palette-background);
     border: 1px solid var(--mud-palette-lines-default);
-    border-radius: var(--radius-md);
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -86,15 +86,18 @@
 }
 
 .plr-cell--process {
-    width: 140px;
+    min-width: 160px;
+    flex: 1;
 }
 
 .plr-cell--material {
-    width: 160px;
+    min-width: 180px;
+    flex: 1.2;
 }
 
 .plr-cell--qty {
-    width: 80px;
+    width: 88px;
+    flex-shrink: 0;
 }
 
 .plr-cell--price {
@@ -116,9 +119,13 @@
 
 .plr-cell--actions {
     display: flex;
-    gap: 4px;
-    padding-left: 12px;
+    gap: 0;
+    padding-left: 4px;
     border-left: 1px solid var(--mud-palette-lines-default);
+}
+
+.plr-cell--actions ::deep .mud-button-root {
+    padding: 6px;
 }
 
 .plr-thumb-img {
@@ -131,6 +138,12 @@
     min-width: 0;
 }
 
+.plr-select ::deep .mud-input-slot {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .plr-qty-field {
     width: 80px;
 }
@@ -139,7 +152,7 @@
 .plr-config-panel {
     border-top: 1px solid var(--mud-palette-lines-default);
     background: var(--mud-palette-surface);
-    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    border-radius: 0 0 8px 8px;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────── */
