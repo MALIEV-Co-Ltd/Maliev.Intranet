@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Bff.Services;
 using Maliev.MessagingContracts.Contracts.Geometry;
@@ -57,9 +58,9 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
 
         var dfmReports = new
         {
-            FdmReport = payload.FdmReport,
-            SlaReport = payload.SlaReport,
-            CncReport = payload.CncReport,
+            FdmReport = (object?)payload.FdmReport,
+            SlaReport = (object?)payload.SlaReport,
+            CncReport = (object?)payload.CncReport,
         };
 
         await _analysisStatusService.SetDfmReportsAsync(
@@ -69,13 +70,26 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
             "DfmAnalysisReadyConsumer: cached DFM reports for storagePath={StoragePath}",
             payload.StoragePath);
 
+        var fdmReport = DeserializeReport<FdmDfmReportPayload>(payload.FdmReport);
+        var slaReport = DeserializeReport<SlaDfmReportPayload>(payload.SlaReport);
+        var cncReport = DeserializeReport<CncDfmReportPayload>(payload.CncReport);
+
         await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
             "DfmAnalysisReady",
             new DfmAnalysisReadyPayload(
                 StoragePath: payload.StoragePath,
-                FdmReport: payload.FdmReport,
-                SlaReport: payload.SlaReport,
-                CncReport: payload.CncReport),
+                FdmReport: fdmReport,
+                SlaReport: slaReport,
+                CncReport: cncReport),
             context.CancellationToken);
+    }
+
+    private static T? DeserializeReport<T>(object? value) where T : class
+    {
+        if (value is null) return null;
+        if (value is T typed) return typed;
+        if (value is System.Text.Json.JsonElement element)
+            return JsonSerializer.Deserialize<T>(element.GetRawText());
+        return null;
     }
 }

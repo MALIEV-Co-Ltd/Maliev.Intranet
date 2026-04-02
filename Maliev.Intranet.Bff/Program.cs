@@ -451,6 +451,7 @@ try
             mt.AddConsumer<PreviewImagesGeneratedConsumer>();
             mt.AddConsumer<DfmAnalysisReadyConsumer>();
             mt.AddConsumer<PriceCalculatedConsumer>();
+            mt.AddConsumer<FileAnalysisFailedConsumer>();
         },
         configureRabbitMq: (ctx, cfg) =>
         {
