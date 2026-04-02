@@ -30,6 +30,8 @@ const axisMouseHandlers= {};   // canvasId → mousemove handler function
 const resizeObservers  = {};   // canvasId → ResizeObserver
 const cameraProjection = {};   // canvasId → 'perspective' | 'orthographic'
 const orthoZoomObservers = {}; // canvasId → onViewMatrixChangedObservable handle
+const fitRadiusMap     = {};   // canvasId → initial camera radius from fitCameraToMesh
+const edgeZoomObservers= {};   // canvasId → onViewMatrixChangedObservable handle for dynamic edge width
 
 // ── Auto-rotation animation state ────────────────────────────────────────────
 const edgesEnabled      = {};  // canvasId → boolean
@@ -85,8 +87,9 @@ function resolveExtension(fileUrl, fileExt) {
 
 /**
  * Camera fitting: set radius so the mesh is comfortably framed by the FOV.
+ * @param {string|null} canvasId  When provided, stores the fit radius for dynamic edge scaling.
  */
-function fitCameraToMesh(cam, bb, meshCenter) {
+function fitCameraToMesh(cam, bb, meshCenter, canvasId) {
     const w = bb.max.x - bb.min.x;
     const d = bb.max.y - bb.min.y;
     const h = bb.max.z - bb.min.z;
@@ -109,6 +112,8 @@ function fitCameraToMesh(cam, bb, meshCenter) {
     cam.pinchPrecision = cam.wheelPrecision * 4;
     cam.minZ = meshRadius * 0.001;
     cam.maxZ = meshRadius * 2000;
+    // Store initial radius for dynamic perspective edge width scaling
+    if (canvasId != null) fitRadiusMap[canvasId] = meshRadius;
 }
 
 /**
@@ -184,7 +189,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         originalMaterials[canvasId]= {};
         sceneBoundingBoxes[canvasId] = null;
         meshCenters[canvasId]      = null;
-        edgesEnabled[canvasId]     = true;
+        edgesEnabled[canvasId]     = false;
 
         const engine = new BABYLON.Engine(canvas, true, { premultipliedAlpha: false, alpha: true });
         const scene  = new BABYLON.Scene(engine);
@@ -201,6 +206,11 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         camera.upVector = new BABYLON.Vector3(0, 0, 1); // Z-up
         // Disable built-in panning — replaced by pick-point pan below
         camera.panningSensibility = 0;
+        // Restrict rotation to left-click only — right-click is reserved for pick-point pan
+        camera.inputs.attached.pointers.buttons = [0];
+        // Remove default pole clamp — allow full vertical rotation over top and bottom
+        camera.lowerBetaLimit = null;
+        camera.upperBetaLimit = null;
         mainCameras[canvasId] = camera;
 
         // ── Right-click pixel-perfect pan (attached now, updated each model load) ────
@@ -353,7 +363,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 const cam = mainCameras[canvasId];
                 if (cam) {
                     cam.upVector = new BABYLON.Vector3(0, 0, 1);
-                    fitCameraToMesh(cam, finalBb, meshCenters[canvasId]);
+                    fitCameraToMesh(cam, finalBb, meshCenters[canvasId], canvasId);
                     applyPreset(cam, 'iso');
                 }
 
@@ -402,7 +412,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 resizeObservers[canvasId] = ro;
 
                 setRenderMode(canvasId, 'solid');
-                toggleEdges(canvasId, true);
+                toggleEdges(canvasId, false);
             },
             null,
             (_scene, message, exception) => {
@@ -784,7 +794,11 @@ export function setRenderMode(canvasId, mode) {
             const wm = new BABYLON.StandardMaterial('wire_' + mesh.uniqueId, scene);
             wm.wireframe      = true;
             // Flat emissive-only: no diffuse lighting response → identical colour on every mesh
-            wm.emissiveColor  = new BABYLON.Color3(0.75, 0.78, 0.85);
+            // Use a darker tone in light mode, lighter in dark mode for legibility.
+            const isDk = darkModes[canvasId];
+            wm.emissiveColor  = isDk
+                ? new BABYLON.Color3(0.70, 0.73, 0.80)   // light lines on dark bg
+                : new BABYLON.Color3(0.15, 0.18, 0.25);   // dark lines on light bg
             wm.diffuseColor   = BABYLON.Color3.Black();
             wm.specularColor  = BABYLON.Color3.Black();
             wm.disableLighting = true;
@@ -828,7 +842,7 @@ export function setCameraPreset(canvasId, preset) {
     if (!cam) return;
 
     // Re-fit camera distance so model stays in frame
-    if (bb) fitCameraToMesh(cam, bb, meshCenters[canvasId]);
+    if (bb) fitCameraToMesh(cam, bb, meshCenters[canvasId], canvasId);
 
     applyPreset(cam, preset);
 }
@@ -841,7 +855,7 @@ export function resetCamera(canvasId) {
     if (!cam) return;
 
     cam.upVector = new BABYLON.Vector3(0, 0, 1);
-    if (bb) fitCameraToMesh(cam, bb, meshCenters[canvasId]);
+    if (bb) fitCameraToMesh(cam, bb, meshCenters[canvasId], canvasId);
     applyPreset(cam, 'iso');
 
     const canvas = document.getElementById(canvasId);
@@ -879,14 +893,20 @@ function getEdgeColorFromCss(isDark) {
 
 /**
  * Returns the edge width appropriate for the current camera projection.
- * Perspective foreshortens edges at distance so they need a wider base value;
- * orthographic renders every edge at the same screen thickness so a narrower
- * value is used to keep edges proportional to the model.
+ * In perspective mode, width scales with camera radius relative to the initial
+ * fit-radius so that edges remain visually thin regardless of zoom level.
+ * Orthographic renders all edges at equal screen thickness so a fixed narrow
+ * value is used.
  */
 function getEdgesWidth(canvasId) {
-    // Ortho: thinner (every edge same apparent thickness; thick looks noisy)
-    // Perspective: slightly thicker (edges foreshorten at distance)
-    return cameraProjection[canvasId] === 'orthographic' ? 3 : 22;
+    if (cameraProjection[canvasId] === 'orthographic') return 3;
+    // Perspective: scale width proportionally to zoom level.
+    // At the default fit radius (zoom=1) edges are 25px wide.
+    // Zooming in (radius shrinks) scales down to a minimum of 8px.
+    const cam   = mainCameras[canvasId];
+    const fitR  = fitRadiusMap[canvasId];
+    if (!cam || !fitR) return 25;
+    return Math.max(8, Math.min(25, 25 * (cam.radius / fitR)));
 }
 
 export function toggleEdges(canvasId, enabled) {
@@ -910,6 +930,40 @@ export function toggleEdges(canvasId, enabled) {
             try { mesh.disableEdgesRendering(); } catch (_) {}
         }
     });
+
+    // In perspective mode, attach a view-matrix observer so edge width
+    // updates dynamically as the user zooms in/out.
+    if (enabled && cameraProjection[canvasId] !== 'orthographic') {
+        _attachEdgeZoomObserver(canvasId);
+    } else {
+        _detachEdgeZoomObserver(canvasId);
+    }
+}
+
+/**
+ * Attaches a camera view-matrix observer that re-applies edges width
+ * every time the user zooms in perspective mode.
+ */
+function _attachEdgeZoomObserver(canvasId) {
+    _detachEdgeZoomObserver(canvasId); // remove any previous
+    const cam   = mainCameras[canvasId];
+    const scene = scenes[canvasId];
+    if (!cam || !scene) return;
+    edgeZoomObservers[canvasId] = cam.onViewMatrixChangedObservable.add(() => {
+        if (!edgesEnabled[canvasId] || cameraProjection[canvasId] === 'orthographic') return;
+        const w = getEdgesWidth(canvasId);
+        scene.meshes.forEach(mesh => {
+            if (mesh.name === '__grid__' || mesh.name.startsWith('__axis') || mesh.name === 'bbox_lines') return;
+            if (mesh._edgesRenderer) mesh.edgesWidth = w;
+        });
+    });
+}
+
+function _detachEdgeZoomObserver(canvasId) {
+    if (!edgeZoomObservers[canvasId]) return;
+    const cam = mainCameras[canvasId];
+    if (cam) cam.onViewMatrixChangedObservable.remove(edgeZoomObservers[canvasId]);
+    delete edgeZoomObservers[canvasId];
 }
 
 // ── toggleBoundingBox ─────────────────────────────────────────────────────────
@@ -1132,6 +1186,7 @@ export function dispose(canvasId) {
         if (cam) cam.onViewMatrixChangedObservable.remove(orthoZoomObservers[canvasId]);
         delete orthoZoomObservers[canvasId];
     }
+    _detachEdgeZoomObserver(canvasId);
 
     clearBoundingBox(canvasId);
 
@@ -1148,6 +1203,7 @@ export function dispose(canvasId) {
     delete meshCenters[canvasId];
     delete cameraProjection[canvasId];
     delete edgesEnabled[canvasId];
+    delete fitRadiusMap[canvasId];
     delete animStates[canvasId];
     delete autoSpeedCurrent[canvasId];
     delete autoSpeedTarget[canvasId];
