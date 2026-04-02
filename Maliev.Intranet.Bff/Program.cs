@@ -236,8 +236,22 @@ try
                                 iamHttp.DefaultRequestHeaders.Authorization =
                                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
+                                // ⚠ BOOTSTRAP RACE — do NOT change this to IsSuccessStatusCode-only.
+                                //
+                                // Two paths reach here on first login:
+                                //   A) IntranetBff wins the race: promote returns 200 OK → we granted the role.
+                                //   B) EmployeeCreatedConsumer wins the race (RabbitMQ fast): promote returns
+                                //      400 BadRequest ("System is already bootstrapped") → consumer already granted
+                                //      the role, but the JWT in `accessToken` was issued BEFORE the grant and
+                                //      therefore contains zero permissions.
+                                //
+                                // In path B, skipping the re-exchange leaves the user with a stale zero-permission
+                                // JWT baked into the auth cookie.  Every downstream call then returns 403 until the
+                                // short-lived JWT expires.  We must re-exchange in BOTH cases so the cookie always
+                                // carries a token that reflects the current DB state.
                                 var promoteResp = await iamHttp.PostAsync("/iam/v1/principals/bootstrap/promote", null);
-                                if (promoteResp.IsSuccessStatusCode)
+                                if (promoteResp.IsSuccessStatusCode ||
+                                    promoteResp.StatusCode == System.Net.HttpStatusCode.BadRequest)
                                 {
                                     // Re-exchange to get a JWT that reflects the new role
                                     var refreshResp = await authClient.PostAsJsonAsync("/auth/v1/exchange/google",

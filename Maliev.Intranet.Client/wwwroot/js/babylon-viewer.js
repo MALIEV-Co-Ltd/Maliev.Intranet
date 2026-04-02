@@ -174,6 +174,8 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         if (!canvas) { console.error(`[BabylonViewer] Canvas #${canvasId} not found.`); return; }
 
         canvas.style.background = 'transparent';
+        canvas.style.opacity = '0';
+        canvas.style.transition = 'opacity 0.3s ease-in';
 
         if (engines[canvasId]) await dispose(canvasId);
 
@@ -184,7 +186,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         meshCenters[canvasId]      = null;
         edgesEnabled[canvasId]     = true;
 
-        const engine = new BABYLON.Engine(canvas, true);
+        const engine = new BABYLON.Engine(canvas, true, { premultipliedAlpha: false, alpha: true });
         const scene  = new BABYLON.Scene(engine);
         engine.resize();
 
@@ -208,9 +210,12 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         new BABYLON.HemisphericLight('__init_light__', new BABYLON.Vector3(0, 0, 1), scene);
 
         const forcedExt = resolveExtension(fileUrl, fileExt);
+        BABYLON.SceneLoader.ShowLoadingScreen = false;
         BABYLON.SceneLoader.Append('', fileUrl, scene,
             (_scene) => {
                 modelLoadState[canvasId] = 'loaded';
+                requestAnimationFrame(() => { canvas.style.opacity = '1'; });
+
 
                 // ── Re-affirm transparent background (append:true keeps existing scene) ──
                 _scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
@@ -406,9 +411,9 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 if (dotNetRef) {
                     dotNetRef.invokeMethodAsync('OnLoadError', message || 'Failed to load 3D model');
                 }
+                requestAnimationFrame(() => { canvas.style.opacity = '1'; });
             },
             forcedExt,
-            true // appendMode — load into existing scene so clearColor is preserved
         );
 
         engine.runRenderLoop(() => {

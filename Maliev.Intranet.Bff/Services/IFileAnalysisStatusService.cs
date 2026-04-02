@@ -45,6 +45,15 @@ public interface IFileAnalysisStatusService
     Task SetAnalysisFailedAsync(string uploadId, string errorCode, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Updates only the DFM report data for a cached file analysis entry,
+    /// preserving all other fields (status, dimensions, thumbnails, etc.).
+    /// Called by <see cref="Consumers.DfmAnalysisReadyConsumer"/> when
+    /// <c>DfmAnalysisReadyEvent</c> arrives after the initial file analysis.
+    /// No-op if no existing cache entry is found.
+    /// </summary>
+    Task SetDfmReportsAsync(string uploadId, object dfmReports, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the current analysis status for a file.
     /// </summary>
     Task<FileAnalysisStatusDto?> GetStatusAsync(string uploadId, CancellationToken cancellationToken = default);

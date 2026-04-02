@@ -1,6 +1,30 @@
 @namespace Maliev.Intranet.Client.Components.Project
 
-@if (IsVisible && DfmIssues.Count > 0)
+@if (Analyzing)
+{
+    <div class="dfm-overlay dfm-overlay--analyzing">
+        <div class="dfm-overlay-header">
+            <div class="dfm-header-left">
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                <span>Analyzing your model&hellip;</span>
+            </div>
+        </div>
+    </div>
+}
+else if (_allClearShown)
+{
+    <div class="dfm-overlay dfm-overlay--all-clear @( _allClearFading ? "dfm-overlay--fade-out" : "")">
+        <div class="dfm-overlay-header">
+            <div class="dfm-header-left">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                         Size="Size.Small"
+                         Color="Color.Success" />
+                <span>All Clear &mdash; No Issues Found</span>
+            </div>
+        </div>
+    </div>
+}
+else if (IsVisible && DfmIssues.Count > 0)
 {
     <div class="dfm-overlay @(_acknowledged ? "dfm-overlay--success" : "")">
         <div class="dfm-overlay-header" @onclick="@ToggleExpanded">
@@ -55,7 +79,17 @@
         padding: 12px 16px;
         z-index: 10;
         box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-        transition: border-color 0.3s;
+        transition: border-color 0.3s, opacity 0.5s ease;
+    }
+    .dfm-overlay--analyzing {
+        border-top-color: var(--mud-palette-info);
+    }
+    .dfm-overlay--all-clear {
+        border-top-color: var(--mud-palette-success);
+        background: rgba(220,255,220,0.5);
+    }
+    .dfm-overlay--fade-out {
+        opacity: 0;
     }
     .dfm-overlay--success {
         border-top-color: var(--mud-palette-success) !important;
@@ -104,12 +138,21 @@
     /// <summary>True when the overlay should be shown (i.e., when there are unacknowledged DFM issues).</summary>
     [Parameter] public bool IsVisible { get; set; }
 
+    /// <summary>True while DFM analysis is in progress but no report has arrived yet.</summary>
+    [Parameter] public bool Analyzing { get; set; }
+
+    /// <summary>True when DFM analysis completed and no issues were found.</summary>
+    [Parameter] public bool AllClear { get; set; }
+
     /// <summary>Invoked when the user clicks the Acknowledge button.</summary>
     [Parameter] public EventCallback OnAcknowledged { get; set; }
 
     private bool _acknowledged;
     private bool _expanded;
     private bool _previousIsVisible;
+    private bool _allClearFading;
+    private bool _allClearShown;
+    private CancellationTokenSource? _allClearCts;
 
     protected override void OnParametersSet()
     {
@@ -120,6 +163,38 @@
             _expanded = true;
         }
         _previousIsVisible = IsVisible;
+
+        if (AllClear && !_allClearShown)
+        {
+            _allClearShown = true;
+            _allClearFading = false;
+            _ = TriggerAllClearAutoDismiss();
+        }
+        else if (!AllClear)
+        {
+            _allClearShown = false;
+            _allClearFading = false;
+            _allClearCts?.Cancel();
+        }
+    }
+
+    private async Task TriggerAllClearAutoDismiss()
+    {
+        _allClearCts?.Cancel();
+        _allClearCts = new CancellationTokenSource();
+        var token = _allClearCts.Token;
+        try
+        {
+            await Task.Delay(3000, token);
+            _allClearFading = true;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(500, token);
+            _allClearShown = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private void ToggleExpanded()

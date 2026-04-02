@@ -1,4 +1,5 @@
 using Maliev.Intranet.Bff.Hubs;
+using Maliev.Intranet.Bff.Services;
 using Maliev.MessagingContracts.Contracts.Geometry;
 using MassTransit;
 using Microsoft.AspNetCore.SignalR;
@@ -7,11 +8,12 @@ namespace Maliev.Intranet.Bff.Consumers;
 
 /// <summary>
 /// MassTransit consumer that handles <see cref="DfmAnalysisReadyEvent"/> messages published by GeometryService.
-/// Broadcasts DFM analysis results to connected Blazor clients via SignalR.
+/// Persists DFM reports in the analysis cache and broadcasts results via SignalR.
 /// </summary>
 public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
 {
     private readonly IHubContext<NotificationHub> _hub;
+    private readonly IFileAnalysisStatusService _analysisStatusService;
     private readonly ILogger<DfmAnalysisReadyConsumer> _logger;
 
     /// <summary>
@@ -19,14 +21,17 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
     /// </summary>
     public DfmAnalysisReadyConsumer(
         IHubContext<NotificationHub> hub,
+        IFileAnalysisStatusService analysisStatusService,
         ILogger<DfmAnalysisReadyConsumer> logger)
     {
         _hub = hub;
+        _analysisStatusService = analysisStatusService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Processes an incoming <see cref="DfmAnalysisReadyEvent"/> and pushes results via SignalR.
+    /// Processes an incoming <see cref="DfmAnalysisReadyEvent"/>: persists DFM reports in the
+    /// BFF cache and pushes results to connected Blazor clients via SignalR.
     /// </summary>
     /// <param name="context">The MassTransit consume context.</param>
     public async Task Consume(ConsumeContext<DfmAnalysisReadyEvent> context)
@@ -45,10 +50,24 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         if (string.IsNullOrEmpty(payload.StoragePath))
         {
             _logger.LogWarning(
-                "DfmAnalysisReadyConsumer: missing StoragePath for FileId={FileId} — skipping SignalR push",
+                "DfmAnalysisReadyConsumer: missing StoragePath for FileId={FileId} — skipping",
                 payload.FileId);
             return;
         }
+
+        var dfmReports = new
+        {
+            FdmReport = payload.FdmReport,
+            SlaReport = payload.SlaReport,
+            CncReport = payload.CncReport,
+        };
+
+        await _analysisStatusService.SetDfmReportsAsync(
+            payload.StoragePath, dfmReports, context.CancellationToken);
+
+        _logger.LogInformation(
+            "DfmAnalysisReadyConsumer: cached DFM reports for storagePath={StoragePath}",
+            payload.StoragePath);
 
         await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
             "DfmAnalysisReady",

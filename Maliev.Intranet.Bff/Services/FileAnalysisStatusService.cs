@@ -182,6 +182,36 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     }
 
     /// <inheritdoc />
+    public Task SetDfmReportsAsync(string uploadId, object dfmReports, CancellationToken cancellationToken = default)
+    {
+        var existing = Get(uploadId);
+        if (existing == null)
+        {
+            _logger.LogDebug("SetDfmReportsAsync: no entry found for key={Key}, skipping", uploadId);
+            return Task.CompletedTask;
+        }
+
+        var status = new FileAnalysisStatusDto
+        {
+            UploadId = existing.UploadId,
+            Status = existing.Status,
+            Dimensions = existing.Dimensions,
+            IsManifold = existing.IsManifold,
+            ThumbnailUrl = existing.ThumbnailUrl,
+            HiResThumbnailUrl = existing.HiResThumbnailUrl,
+            PreviewUrls = existing.PreviewUrls,
+            GlbStoragePath = existing.GlbStoragePath,
+            PreviewProcessingStatus = existing.PreviewProcessingStatus,
+            ErrorCode = existing.ErrorCode,
+            ProcessedAt = existing.ProcessedAt,
+            DfmReport = dfmReports,
+        };
+        Set(uploadId, status);
+        _logger.LogInformation("SetDfmReportsAsync: updated DFM reports for key={Key}", uploadId);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public Task<FileAnalysisStatusDto?> GetStatusAsync(string uploadId, CancellationToken cancellationToken = default)
     {
         var status = Get(uploadId);

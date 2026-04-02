@@ -231,12 +231,10 @@ public partial class ProjectNew : IAsyncDisposable
                 var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
                 if (part == null) return;
 
-                part.DfmReport = part.ProcessCode?.ToUpperInvariant() switch
-                {
-                    "SLA" or "DLP" => payload.SlaReport,
-                    "CNC" => payload.CncReport,
-                    _ => payload.FdmReport,
-                };
+                part.FdmDfmReport = payload.FdmReport;
+                part.SlaDfmReport = payload.SlaReport;
+                part.CncDfmReport = payload.CncReport;
+                part.ResolveDfmReport();
 
                 await InvokeAsync(StateHasChanged);
             });
@@ -406,7 +404,20 @@ public partial class ProjectNew : IAsyncDisposable
             part.VolumeMm3 = status.Dimensions?.VolumeMm3;
             part.IsManifold = status.IsManifold;
             part.GlbStoragePath = status.GlbStoragePath;
-            part.DfmReport = status.DfmReport;
+
+            if (status.DfmReport is JsonElement je && je.ValueKind == JsonValueKind.Object
+                && je.TryGetProperty("FdmReport", out _))
+            {
+                var dfmPayload = JsonSerializer.Deserialize<SignalRDfmAnalysisPayload>(je.GetRawText());
+                part.FdmDfmReport = dfmPayload?.FdmReport;
+                part.SlaDfmReport = dfmPayload?.SlaReport;
+                part.CncDfmReport = dfmPayload?.CncReport;
+                part.ResolveDfmReport();
+            }
+            else
+            {
+                part.DfmReport = status.DfmReport;
+            }
 
             if (status.PreviewUrls != null)
             {
@@ -521,6 +532,9 @@ public partial class ProjectNew : IAsyncDisposable
             part.AvailableFinishes = [];
             part.AvailableTolerances = [];
         }
+
+        if (part.FdmDfmReport != null || part.SlaDfmReport != null || part.CncDfmReport != null)
+            part.ResolveDfmReport();
 
         TriggerAutoSave();
         TriggerPricingAsync(part);

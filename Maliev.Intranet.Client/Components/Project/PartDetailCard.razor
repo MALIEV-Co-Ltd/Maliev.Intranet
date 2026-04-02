@@ -60,7 +60,7 @@
                 }
 
                 @* Upload / processing progress overlay *@
-                @if ((Part.Uploading || Part.AwaitingPreview) && string.IsNullOrEmpty(Part.ThumbnailSmallUrl))
+                @if (Part.Uploading || Part.AwaitingPreview)
                 {
                     <div class="pdc-upload-progress">
                         <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mb-2" />
@@ -79,6 +79,8 @@
             @* DFM overlay — positioned absolute over viewer area *@
             <DfmOverlayPanel DfmIssues="@_dfmIssues"
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
+                             Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged)"
+                             AllClear="@(_dfmIssues.Count == 0 && Part.DfmReport != null && !Part.DfmAcknowledged)"
                              OnAcknowledged="@HandleDfmAcknowledged" />
         </div>
 

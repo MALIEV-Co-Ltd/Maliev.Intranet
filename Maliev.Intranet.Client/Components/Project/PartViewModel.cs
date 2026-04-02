@@ -107,6 +107,31 @@ public class PartViewModel
     /// <summary>DFM analysis report embedded in FileAnalyzedEvent. Polymorphic — cast to FdmDfmReport, SlaDfmReport, or CncDfmReport as needed.</summary>
     public object? DfmReport { get; set; }
 
+    /// <summary>FDM-specific DFM analysis report from <c>DfmAnalysisReadyEvent</c>.</summary>
+    public object? FdmDfmReport { get; set; }
+
+    /// <summary>SLA/DLP-specific DFM analysis report from <c>DfmAnalysisReadyEvent</c>.</summary>
+    public object? SlaDfmReport { get; set; }
+
+    /// <summary>CNC-specific DFM analysis report from <c>DfmAnalysisReadyEvent</c>.</summary>
+    public object? CncDfmReport { get; set; }
+
+    /// <summary>
+    /// Resolves <see cref="DfmReport"/> from the per-process DFM report properties
+    /// based on the currently selected <see cref="ProcessCode"/>.
+    /// Call this after setting any of FdmDfmReport/SlaDfmReport/CncDfmReport,
+    /// or after ProcessCode changes.
+    /// </summary>
+    public void ResolveDfmReport()
+    {
+        DfmReport = ProcessCode?.ToUpperInvariant() switch
+        {
+            "SLA" or "DLP" => SlaDfmReport,
+            "CNC" => CncDfmReport,
+            _ => FdmDfmReport,
+        };
+    }
+
     /// <summary>Error message if upload or analysis failed; null when healthy.</summary>
     public string? Error { get; set; }
 

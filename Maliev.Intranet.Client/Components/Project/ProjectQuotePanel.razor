@@ -83,7 +83,7 @@
                                 else if (part.EstimatedTotalAmount.HasValue)
                                 {
                                     <span class="pqp-price-amount">@FormatPriceValue(part.EstimatedTotalAmount.Value)</span>
-                                    <span class="pqp-price-currency">@SelectedCurrency?.Symbol ?? SelectedCurrency?.Code</span>
+                                    <span class="pqp-price-currency">@(SelectedCurrency?.Symbol ?? SelectedCurrency?.Code)</span>
                                 }
                                 else
                                 {
@@ -124,7 +124,7 @@
                 <MudText Typo="Typo.body2">Total</MudText>
                 <div class="pqp-grand-price">
                     <MudText Typo="Typo.h4" Color="Color.Primary" Class="pqp-price-amount">@FormatPriceValue(_quoteTotal)</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pqp-price-currency">@SelectedCurrency?.Symbol ?? SelectedCurrency?.Code</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pqp-price-currency">@(SelectedCurrency?.Symbol ?? SelectedCurrency?.Code)</MudText>
                 </div>
             </div>
         </div>
