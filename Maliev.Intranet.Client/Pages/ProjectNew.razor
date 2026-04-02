@@ -39,7 +39,9 @@
                             Description="@_description"
                             OnDescriptionChanged="@(v => { _description = v; ValidateDescription(); TriggerAutoSave(); })"
                             OnOpenFilePicker="OpenFilePicker"
-                            SearchCustomersFunc="SearchCustomersAsync" />
+                            SearchCustomersFunc="SearchCustomersAsync"
+                            OnProjectClicked="OnRecentProjectClicked"
+                            LoadRecentProjectsFunc="LoadRecentProjectsAsync" />
                     </ChildContent>
                     <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Left panel error.</MudAlert></ErrorContent>
                 </ErrorBoundary>

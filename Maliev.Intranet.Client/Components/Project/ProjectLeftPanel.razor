@@ -105,6 +105,48 @@
         </div>
     }
 
+    @* ── Section 1b: Recent Projects (visible when customer selected) ── *@
+    @if (SelectedCustomer != null)
+    {
+        <div class="pnl-section pnl-section-recent-projects">
+            <div class="section-header">
+                <span>Recent Projects</span>
+                @if (_loadingRecentProjects)
+                {
+                    <MudProgressLinear Indeterminate="true" Size="Size.Small" Color="Color.Primary" Class="mb-0" />
+                }
+            </div>
+            <div class="pnl-section-content pnl-recent-projects-content">
+                @if (_loadingRecentProjects)
+                {
+                    <MudSkeleton Width="100%" Height="32px" />
+                    <MudSkeleton Width="100%" Height="32px" />
+                }
+                else if (_recentProjects.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">No recent projects for this customer.</MudText>
+                }
+                else
+                {
+                    foreach (var project in _recentProjects)
+                    {
+                        <MudChip T="string"
+                                 Variant="Variant.Outlined"
+                                 Size="Size.Small"
+                                 Color="@(project.Status == "Draft" ? Color.Default : Color.Primary)"
+                                 Class="recent-project-chip"
+                                 OnClick="@(() => OnProjectClicked.InvokeAsync(project.Id))">
+                            <span class="recent-project-title">@project.Title</span>
+                            <MudText Typo="Typo.caption" Class="recent-project-meta">
+                                @project.ProjectNumber &middot; @project.PartsCount part(s)
+                            </MudText>
+                        </MudChip>
+                    }
+                }
+            </div>
+        </div>
+    }
+
     @* ── Section 2: Requirements ─────────────────────────────────────── *@
     <div class="pnl-section pnl-section-grow">
         <div class="section-header">Requirements</div>
@@ -187,6 +229,33 @@
         padding: 16px;
         display: flex;
         flex-direction: column;
+    }
+
+    /* ── Recent Projects section ────────────────────────────────────── */
+    .pnl-section-recent-projects {
+        max-height: 180px;
+        overflow: hidden;
+    }
+
+    .pnl-recent-projects-content {
+        gap: 6px;
+        overflow-y: auto;
+        max-height: 140px;
+    }
+
+    .recent-project-chip {
+        width: 100%;
+        justify-content: flex-start !important;
+        cursor: pointer;
+    }
+
+    .recent-project-title {
+        font-weight: 500;
+        margin-right: 8px;
+    }
+
+    .recent-project-meta {
+        opacity: 0.7;
     }
 
     /* ── Customer card ────────────────────────────────────────────────── */
@@ -361,11 +430,46 @@
     /// <summary>Search function for the customer autocomplete. Takes a query string and cancellation token.</summary>
     [Parameter] public Func<string, CancellationToken, Task<IEnumerable<CustomerSummaryDto>>>? SearchCustomersFunc { get; set; }
 
-    protected override void OnParametersSet()
+    /// <summary>Invoked when a recent project is clicked. Passes the project GUID.</summary>
+    [Parameter] public EventCallback<Guid> OnProjectClicked { get; set; }
+
+    /// <summary>Function to load recent projects for a given customer ID.</summary>
+    [Parameter] public Func<Guid, Task<List<ProjectSummaryDto>>>? LoadRecentProjectsFunc { get; set; }
+
+    private List<ProjectSummaryDto> _recentProjects = [];
+    private bool _loadingRecentProjects;
+    private Guid? _lastLoadedCustomerId;
+
+    protected override async Task OnParametersSetAsync()
     {
-        base.OnParametersSet();
+        await base.OnParametersSetAsync();
         if (!ShowCustomerSearch && SelectedCustomer != null)
+        {
             _searchCustomer = SelectedCustomer;
+            await LoadRecentProjectsAsync(SelectedCustomer.Id);
+        }
+    }
+
+    private async Task LoadRecentProjectsAsync(Guid customerId)
+    {
+        if (_lastLoadedCustomerId == customerId) return;
+        if (LoadRecentProjectsFunc == null) return;
+
+        _lastLoadedCustomerId = customerId;
+        _loadingRecentProjects = true;
+
+        try
+        {
+            _recentProjects = await LoadRecentProjectsFunc(customerId);
+        }
+        catch
+        {
+            _recentProjects = [];
+        }
+        finally
+        {
+            _loadingRecentProjects = false;
+        }
     }
 
     private Task OnCustomerSelectedFromAutocomplete() =>

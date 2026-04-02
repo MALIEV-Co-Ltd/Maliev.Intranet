@@ -44,6 +44,12 @@ public sealed class DraftProjectState
     /// <summary>Timestamp of the last modification to this draft.</summary>
     public DateTime LastModified { get; set; }
 
+    /// <summary>
+    /// When non-null, the draft has been persisted to the ProjectService as a real Draft project.
+    /// Used to resume the draft from the server after tab close or cross-device.
+    /// </summary>
+    public Guid? ServerProjectId { get; set; }
+
     /// <summary>The list of parts associated with this draft project.</summary>
     public List<DraftPartState> Parts { get; set; } = [];
 }
@@ -94,6 +100,34 @@ public sealed class DraftPartState
 
     /// <summary>True when the user has acknowledged all DFM warnings.</summary>
     public bool DfmAcknowledged { get; set; }
+
+    // ── DFM reports (serialised as JSON so typed payloads survive a refresh) ──
+
+    /// <summary>
+    /// FDM DFM report serialised as a JSON string. Null until analysis completes or if
+    /// the selected process is not FDM.
+    /// </summary>
+    public string? FdmDfmReportJson { get; set; }
+
+    /// <summary>
+    /// SLA/DLP DFM report serialised as a JSON string. Null until analysis completes or if
+    /// the selected process is not SLA/DLP.
+    /// </summary>
+    public string? SlaDfmReportJson { get; set; }
+
+    /// <summary>
+    /// CNC DFM report serialised as a JSON string. Null until analysis completes or if
+    /// the selected process is not CNC.
+    /// </summary>
+    public string? CncDfmReportJson { get; set; }
+
+    // ── Pricing snapshot (shown instantly on restore; recalculated in background) ──
+
+    /// <summary>Last computed unit price. Shown immediately on restore; recalculated in background.</summary>
+    public decimal? EstimatedUnitPrice { get; set; }
+
+    /// <summary>Last computed total amount (unit price × quantity). Shown immediately on restore.</summary>
+    public decimal? EstimatedTotalAmount { get; set; }
 
     /// <summary>Additional process-specific configuration key-value pairs.</summary>
     public Dictionary<string, string> ProcessConfig { get; set; } = new();

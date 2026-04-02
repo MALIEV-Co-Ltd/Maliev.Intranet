@@ -35,11 +35,9 @@ public partial class ProjectNew : IAsyncDisposable
     private List<LeadTimeOptionDto> _leadTimeOptions = [];
     private LeadTimeOptionDto? _selectedLeadTime;
     private List<ProcessDto> _processes = [];
-#pragma warning disable CS0649
     private bool _saving;
     private bool _autoSaving;
     private DateTimeOffset? _lastSavedAt;
-#pragma warning restore CS0649
     private LayoutMode _layoutMode = LayoutMode.Configurator;
 
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
@@ -64,6 +62,12 @@ public partial class ProjectNew : IAsyncDisposable
 
     // ── Session ────────────────────────────────────────────────────────
     private Guid _sessionId;
+
+    /// <summary>
+    /// When non-null, the project has been persisted to the ProjectService as a Draft.
+    /// Subsequent auto-saves PUT updates to this project instead of POSTing a new one.
+    /// </summary>
+    private Guid? _serverProjectId;
 
     // ── Auto-save debounce ─────────────────────────────────────────────
     private const int AutoSaveDebounceMs = 1000;
@@ -106,14 +110,16 @@ public partial class ProjectNew : IAsyncDisposable
         var uri = new Uri(Navigation.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
         var sessionParam = query["session"];
+        var resumeParam = query["resume"];
 
         if (string.IsNullOrEmpty(sessionParam) || !Guid.TryParse(sessionParam, out _sessionId))
         {
             _sessionId = Guid.NewGuid();
+            var resumeFragment = Guid.TryParse(resumeParam, out var resumeId) ? $"&resume={resumeId}" : "";
             // Redirect to URL with session param. In SSR this throws NavigationException (stops execution).
             // In WASM, NavigateTo updates the URL in-place without recreating the component, so we must
             // NOT return — data loading must continue immediately with the newly assigned _sessionId.
-            Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}", replace: true);
+            Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}{resumeFragment}", replace: true);
         }
 
         // ── Load reference data ────────────────────────────────────────
@@ -162,6 +168,13 @@ public partial class ProjectNew : IAsyncDisposable
         catch (Exception ex) { Snackbar.Add($"Failed to load lead times: {ex.Message}", Severity.Warning); }
 
         await RestoreDraftAsync();
+
+        // ── Server resume: if ?resume={id} or draft has ServerProjectId, hydrate from server ──
+        var serverResumeId = Guid.TryParse(resumeParam, out var parsedResumeId) ? parsedResumeId : _serverProjectId;
+        if (serverResumeId.HasValue && _selectedCustomer == null)
+        {
+            await ResumeFromServerAsync(serverResumeId.Value);
+        }
 
         // ── SignalR hub connection ─────────────────────────────────────
         if (OperatingSystem.IsBrowser()) // client-side only; skip on SSR prerender
@@ -280,6 +293,27 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
+    // ── Recent Projects for left panel ────────────────────────────────
+
+    private async Task<List<ProjectSummaryDto>> LoadRecentProjectsAsync(Guid customerId)
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>(
+                $"api/projects?customerId={customerId}&status=Draft&pageSize=5");
+            return result?.Data?.OrderByDescending(p => p.CreatedAt).ToList() ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private void OnRecentProjectClicked(Guid projectId)
+    {
+        Navigation.NavigateTo($"/sales/projects/new?resume={projectId}");
+    }
+
     // ── Task 10: File upload / polling ─────────────────────────────────
 
     /// <inheritdoc />
@@ -395,10 +429,20 @@ public partial class ProjectNew : IAsyncDisposable
             var statusResponse = await Http.GetAsync(
                 $"api/uploads/analysis-status?storagePath={Uri.EscapeDataString(storagePath)}");
 
-            if (!statusResponse.IsSuccessStatusCode) return;
+            if (!statusResponse.IsSuccessStatusCode)
+            {
+                await ResolveViewerUrlAsync(part);
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
 
             var status = await statusResponse.Content.ReadFromJsonAsync<FileAnalysisStatusDto>();
-            if (status == null) return;
+            if (status == null)
+            {
+                await ResolveViewerUrlAsync(part);
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
 
             part.Dimensions = status.Dimensions;
             part.VolumeMm3 = status.Dimensions?.VolumeMm3;
@@ -449,12 +493,44 @@ public partial class ProjectNew : IAsyncDisposable
                 part.StatusText = "Analysis failed";
             }
 
+            // Bug 1 fix: resolve a signed GLB viewer URL so the 3D viewer auto-loads
+            // after a draft restore. This mirrors OpenBabylonViewer but is non-fatal.
+            await ResolveViewerUrlAsync(part);
+
+            // Bug 5/6 fix: trigger pricing after the catch-up fetch has populated
+            // Dimensions/VolumeMm3 so ComputePriceAsync has accurate geometry data.
+            if (part.ProcessId.HasValue && part.MaterialId.HasValue && _selectedCustomerId.HasValue)
+                TriggerPricingAsync(part);
+
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
             // Catch-up fetch is a safety net — failures are non-fatal; SignalR will deliver the final state
             await InvokeAsync(() => Snackbar.Add($"Status fetch failed for {part.Name}: {ex.Message}", Severity.Warning));
+        }
+    }
+
+    private async Task ResolveViewerUrlAsync(PartViewModel part)
+    {
+        if (!string.IsNullOrEmpty(part.GlbStoragePath) && string.IsNullOrEmpty(part.ViewerUrl))
+        {
+            try
+            {
+                var viewerResp = await Http.GetAsync(
+                    $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
+                if (viewerResp.IsSuccessStatusCode)
+                {
+                    var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
+                    var resolvedUrl = viewerJson?.RootElement.GetProperty("url").GetString();
+                    if (!string.IsNullOrEmpty(resolvedUrl))
+                        part.ViewerUrl = resolvedUrl;
+                }
+            }
+            catch
+            {
+                // Non-fatal — viewer URL resolution is best-effort
+            }
         }
     }
 
@@ -470,6 +546,12 @@ public partial class ProjectNew : IAsyncDisposable
         foreach (var att in part.DrawingFiles.Concat(part.SupplementaryFiles))
         {
             try { await Http.DeleteAsync($"api/uploads/attachments/{att.FileId}"); } catch { /* non-fatal */ }
+        }
+
+        // Delete from server if the project has been cloud-saved
+        if (_serverProjectId.HasValue && !string.IsNullOrEmpty(part.StoragePath))
+        {
+            try { await Http.DeleteAsync($"api/projects/{_serverProjectId}/parts/{part.FileId}"); } catch { /* non-fatal */ }
         }
 
         _parts.Remove(part);
@@ -533,7 +615,12 @@ public partial class ProjectNew : IAsyncDisposable
             part.AvailableTolerances = [];
         }
 
-        if (part.FdmDfmReport != null || part.SlaDfmReport != null || part.CncDfmReport != null)
+        // Bug 4 fix: only re-resolve the DFM report when there are per-process reports to
+        // resolve from. Do NOT call ResolveDfmReport unconditionally — it clears DfmReport
+        // to null when ProcessCode is null/empty, which causes the overlay to flash
+        // "All Clear" on every keystroke in the description field or any config change.
+        if ((part.FdmDfmReport != null || part.SlaDfmReport != null || part.CncDfmReport != null)
+            && !string.IsNullOrEmpty(part.ProcessCode))
             part.ResolveDfmReport();
 
         TriggerAutoSave();
@@ -597,7 +684,7 @@ public partial class ProjectNew : IAsyncDisposable
             var geometry = part.VolumeMm3.HasValue
                 ? new GeometryMetricsDto
                 {
-                    VolumeCm3 = (decimal)part.VolumeMm3.Value / 1_000_000m,
+                    VolumeCm3 = (decimal)part.VolumeMm3.Value / 1_000m,
                     SupportVolumeCm3 = 0m,
                     SurfaceAreaCm2 = 0m,
                     BoundingBoxX = (decimal)(part.Dimensions?.X ?? 0),
@@ -703,14 +790,19 @@ public partial class ProjectNew : IAsyncDisposable
 
     private Guid? _selectedCustomerId => _selectedCustomer?.Id;
 
+    private bool _serverSaveInProgress;
+
     private async Task SaveDraftAsync()
     {
         _autoSaving = true;
+        await InvokeAsync(StateHasChanged);
+
         try
         {
             var draft = new DraftProjectState
             {
                 TempProjectId = _tempProjectId,
+                ServerProjectId = _serverProjectId,
                 Title = _title,
                 Description = _description,
                 CustomerId = _selectedCustomer?.Id,
@@ -728,6 +820,11 @@ public partial class ProjectNew : IAsyncDisposable
             var json = JsonSerializer.Serialize(draft);
             await JS.InvokeVoidAsync("sessionStorage.setItem", DraftStorageKey, json);
             _lastSavedAt = DateTimeOffset.UtcNow;
+
+            if (_selectedCustomerId.HasValue && !_serverSaveInProgress)
+            {
+                _ = SaveDraftToServerAsync();
+            }
         }
         catch (Exception)
         {
@@ -737,6 +834,95 @@ public partial class ProjectNew : IAsyncDisposable
         {
             _autoSaving = false;
             StateHasChanged();
+        }
+    }
+
+    private async Task SaveDraftToServerAsync()
+    {
+        _serverSaveInProgress = true;
+        try
+        {
+            if (_serverProjectId == null)
+            {
+                var createRequest = new CreateProjectRequest
+                {
+                    CustomerId = _selectedCustomerId!.Value,
+                    CustomerName = _selectedCustomer?.Name ?? string.Empty,
+                    Title = _title,
+                    Description = _description,
+                    Currency = _selectedCurrency?.Code ?? "THB",
+                };
+
+                var response = await Http.PostAsJsonAsync("api/projects", createRequest);
+                if (response.IsSuccessStatusCode)
+                {
+                    var project = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
+                    if (project != null)
+                    {
+                        _serverProjectId = project.Id;
+                        _tempProjectId = project.Id;
+
+                        foreach (var part in _parts.Where(p => p.IsFullyConfigured && !string.IsNullOrEmpty(p.StoragePath)))
+                        {
+                            try
+                            {
+                                var addPartRequest = new AddProjectPartRequest
+                                {
+                                    FileId = part.FileId,
+                                    FileName = part.Name,
+                                    ProcessType = part.ProcessCode,
+                                    MaterialId = part.MaterialId,
+                                    Quantity = part.Quantity,
+                                    Finish = part.FinishCode,
+                                    Tolerance = part.ToleranceCode,
+                                };
+                                await Http.PostAsJsonAsync($"api/projects/{_serverProjectId}/parts", addPartRequest);
+                            }
+                            catch
+                            {
+                                // Non-fatal: part sync will retry on next auto-save
+                            }
+                        }
+
+                        await SaveDraftAsync();
+                    }
+                }
+            }
+            else
+            {
+                var updatePayload = new { Title = _title, Description = _description };
+                await Http.PutAsJsonAsync($"api/projects/{_serverProjectId}", updatePayload);
+
+                foreach (var part in _parts.Where(p => p.IsFullyConfigured))
+                {
+                    try
+                    {
+                        var partRequest = new UpdateProjectPartRequest
+                        {
+                            ProcessType = part.ProcessCode,
+                            MaterialId = part.MaterialId,
+                            Quantity = part.Quantity,
+                            Finish = part.FinishCode,
+                            Tolerance = part.ToleranceCode,
+                        };
+                        await Http.PutAsJsonAsync(
+                            $"api/projects/{_serverProjectId}/parts/{part.FileId}",
+                            partRequest);
+                    }
+                    catch
+                    {
+                        // Non-fatal: part update will retry on next auto-save
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Server save failure is non-fatal; sessionStorage draft is the fallback
+        }
+        finally
+        {
+            _serverSaveInProgress = false;
         }
     }
 
@@ -753,6 +939,7 @@ public partial class ProjectNew : IAsyncDisposable
                 return;
 
             _tempProjectId = draft.TempProjectId;
+            _serverProjectId = draft.ServerProjectId;
             _title = draft.Title;
             _description = draft.Description;
             _selectedLeadTime = _leadTimeOptions.FirstOrDefault(lt => lt.Code == draft.SelectedLeadTimeCode)
@@ -770,6 +957,8 @@ public partial class ProjectNew : IAsyncDisposable
                     Landline = draft.CustomerLandline,
                     CompanyPhone = draft.CustomerCompanyPhone,
                 };
+                // Bug 2 fix: hide the search box so the customer card is shown immediately.
+                _showCustomerSearch = false;
             }
 
             _parts.Clear();
@@ -779,9 +968,9 @@ public partial class ProjectNew : IAsyncDisposable
                 if (partVm.ProcessId.HasValue && !string.IsNullOrEmpty(partVm.ProcessCode))
                     _ = ReloadPartCatalogAsync(partVm);
 
-                // Catch-up fetch for any part that is still missing its thumbnail (analysis completed
-                // while the page was closed, SignalR event was missed).
-                if (!string.IsNullOrEmpty(partVm.StoragePath) && string.IsNullOrEmpty(partVm.ThumbnailSmallUrl))
+                // Catch-up fetch for any part with a storage path — refreshes thumbnail signed URLs,
+                // restores DFM results from BFF cache, and repopulates GlbStoragePath.
+                if (!string.IsNullOrEmpty(partVm.StoragePath))
                 {
                     var p = partVm; var path = partVm.StoragePath!;
                     _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(p, path); });
@@ -797,6 +986,83 @@ public partial class ProjectNew : IAsyncDisposable
         catch (Exception)
         {
             // Draft restore failures are non-fatal
+        }
+    }
+
+    private async Task ResumeFromServerAsync(Guid projectId)
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/projects/{projectId}");
+            if (!response.IsSuccessStatusCode) return;
+
+            var project = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
+            if (project == null) return;
+            if (project.Status != "Draft" && project.Status != "Configuring") return;
+
+            _serverProjectId = project.Id;
+            _tempProjectId = project.Id;
+            _title = project.Title;
+            _description = project.Description;
+
+            if (!string.IsNullOrEmpty(project.Currency))
+            {
+                _selectedCurrency = _currencies.FirstOrDefault(c => c.Code == project.Currency) ?? _selectedCurrency;
+            }
+
+            _selectedCustomer = new CustomerSummaryDto
+            {
+                Id = project.CustomerId,
+                Name = project.CustomerName,
+            };
+            _showCustomerSearch = false;
+
+            foreach (var part in project.Parts)
+            {
+                var existing = _parts.FirstOrDefault(p => p.FileId == part.Id);
+                if (existing == null && !string.IsNullOrEmpty(part.FileName))
+                {
+                    var partVm = new PartViewModel
+                    {
+                        FileId = part.Id,
+                        Name = part.FileName,
+                        ProcessCode = part.ProcessType,
+                        MaterialId = part.MaterialId,
+                        MaterialCode = part.MaterialName,
+                        Quantity = part.Quantity,
+                        FinishCode = part.Finish,
+                        ToleranceCode = part.Tolerance,
+                        EstimatedUnitPrice = part.ConfirmedPrice ?? part.EstimatedPrice,
+                    };
+
+                    if (!string.IsNullOrEmpty(part.ProcessType))
+                    {
+                        var process = _processes.FirstOrDefault(p =>
+                            p.Code.Equals(part.ProcessType, StringComparison.OrdinalIgnoreCase));
+                        if (process != null)
+                        {
+                            partVm.ProcessId = process.Id;
+                            partVm.ProcessCode = process.Code;
+                            _ = ReloadPartCatalogAsync(partVm);
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(part.ModelPreviewUrl))
+                    {
+                        partVm.ThumbnailSmallUrl = part.ModelPreviewUrl;
+                    }
+
+                    _parts.Add(partVm);
+                }
+            }
+
+            _selectedPartIndex = 0;
+            await SaveDraftAsync();
+            Snackbar.Add("Draft restored from server.", Severity.Info);
+        }
+        catch (Exception)
+        {
+            // Server resume failures are non-fatal; sessionStorage draft is the fallback
         }
     }
 
@@ -840,60 +1106,97 @@ public partial class ProjectNew : IAsyncDisposable
         _saving = true;
         try
         {
-            var createRequest = new CreateProjectRequest
-            {
-                CustomerId = _selectedCustomer!.Id,
-                CustomerName = _selectedCustomer.Name,
-                Title = _title,
-                Description = _description,
-                Currency = _selectedCurrency?.Code ?? "THB",
-            };
+            Guid projectId;
 
-            using var projectResponse = await Http.PostAsJsonAsync("api/projects", createRequest);
-            if (!projectResponse.IsSuccessStatusCode)
+            if (_serverProjectId.HasValue)
             {
-                var errorContent = await projectResponse.Content.ReadAsStringAsync();
-                Snackbar.Add($"Failed to create project: {errorContent}", Severity.Error);
-                return;
-            }
+                projectId = _serverProjectId.Value;
 
-            var project = await projectResponse.Content.ReadFromJsonAsync<ProjectDetailDto>();
-            if (project == null)
-            {
-                Snackbar.Add("Project created but response was invalid.", Severity.Error);
-                return;
-            }
-
-            foreach (var part in _parts.Where(p => p.IsFullyConfigured))
-            {
-                var addPartRequest = new AddProjectPartRequest
+                var updatePayload = new { Title = _title, Description = _description };
+                var updateResponse = await Http.PutAsJsonAsync($"api/projects/{projectId}", updatePayload);
+                if (!updateResponse.IsSuccessStatusCode)
                 {
-                    FileId = part.FileId,
-                    FileName = part.Name,
-                    ProcessType = part.ProcessCode,
-                    MaterialId = part.MaterialId,
-                    Quantity = part.Quantity,
-                    Finish = part.FinishCode,
-                    Tolerance = part.ToleranceCode,
+                    var errorContent = await updateResponse.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Failed to update project: {errorContent}", Severity.Error);
+                    return;
+                }
+
+                foreach (var part in _parts.Where(p => p.IsFullyConfigured && !string.IsNullOrEmpty(p.StoragePath)))
+                {
+                    var addPartRequest = new AddProjectPartRequest
+                    {
+                        FileId = part.FileId,
+                        FileName = part.Name,
+                        ProcessType = part.ProcessCode,
+                        MaterialId = part.MaterialId,
+                        Quantity = part.Quantity,
+                        Finish = part.FinishCode,
+                        Tolerance = part.ToleranceCode,
+                    };
+
+                    try { await Http.PostAsJsonAsync($"api/projects/{projectId}/parts", addPartRequest); }
+                    catch { /* parts may already exist from auto-save; non-fatal */ }
+                }
+            }
+            else
+            {
+                var createRequest = new CreateProjectRequest
+                {
+                    CustomerId = _selectedCustomer!.Id,
+                    CustomerName = _selectedCustomer.Name,
+                    Title = _title,
+                    Description = _description,
+                    Currency = _selectedCurrency?.Code ?? "THB",
                 };
 
-                using var partResponse = await Http.PostAsJsonAsync($"api/projects/{project.Id}/parts", addPartRequest);
-                if (!partResponse.IsSuccessStatusCode)
-                    Snackbar.Add($"Failed to add part '{part.Name}'.", Severity.Warning);
+                using var projectResponse = await Http.PostAsJsonAsync("api/projects", createRequest);
+                if (!projectResponse.IsSuccessStatusCode)
+                {
+                    var errorContent = await projectResponse.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Failed to create project: {errorContent}", Severity.Error);
+                    return;
+                }
+
+                var project = await projectResponse.Content.ReadFromJsonAsync<ProjectDetailDto>();
+                if (project == null)
+                {
+                    Snackbar.Add("Project created but response was invalid.", Severity.Error);
+                    return;
+                }
+
+                projectId = project.Id;
+
+                foreach (var part in _parts.Where(p => p.IsFullyConfigured))
+                {
+                    var addPartRequest = new AddProjectPartRequest
+                    {
+                        FileId = part.FileId,
+                        FileName = part.Name,
+                        ProcessType = part.ProcessCode,
+                        MaterialId = part.MaterialId,
+                        Quantity = part.Quantity,
+                        Finish = part.FinishCode,
+                        Tolerance = part.ToleranceCode,
+                    };
+
+                    using var partResponse = await Http.PostAsJsonAsync($"api/projects/{projectId}/parts", addPartRequest);
+                    if (!partResponse.IsSuccessStatusCode)
+                        Snackbar.Add($"Failed to add part '{part.Name}'.", Severity.Warning);
+                }
             }
 
-            using var quoteResponse = await Http.PostAsync($"api/projects/{project.Id}/generate-quotation", null);
+            using var quoteResponse = await Http.PostAsync($"api/projects/{projectId}/generate-quotation", null);
             if (!quoteResponse.IsSuccessStatusCode)
             {
                 Snackbar.Add("Project created but quotation generation failed.", Severity.Warning);
-                Navigation.NavigateTo($"/sales/projects/{project.Id}");
+                Navigation.NavigateTo($"/sales/projects/{projectId}");
                 return;
             }
 
             await JS.InvokeVoidAsync("sessionStorage.removeItem", DraftStorageKey);
 
             Snackbar.Add("Project and quotation created successfully!", Severity.Success);
-            Navigation.NavigateTo($"/sales/projects/{project.Id}");
+            Navigation.NavigateTo($"/sales/projects/{projectId}");
         }
         catch (Exception ex)
         {
@@ -911,6 +1214,7 @@ public partial class ProjectNew : IAsyncDisposable
     private void DuplicateProject()
     {
         _tempProjectId = Guid.NewGuid();
+        _serverProjectId = null;
         _title = string.IsNullOrEmpty(_title) ? string.Empty : $"{_title} (Copy)";
         _selectedCustomer = null;
         _showCustomerSearch = true;
