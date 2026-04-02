@@ -41,6 +41,7 @@ public partial class ProjectNew : IAsyncDisposable
     private LayoutMode _layoutMode = LayoutMode.Configurator;
 
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
+    private ProjectLeftPanel? _leftPanel;
 
     // ── Validation ────────────────────────────────────────────────────
     private bool _titleHasError;
@@ -300,8 +301,12 @@ public partial class ProjectNew : IAsyncDisposable
         try
         {
             var result = await Http.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>(
-                $"api/projects?customerId={customerId}&status=Draft&pageSize=5");
-            return result?.Data?.OrderByDescending(p => p.CreatedAt).ToList() ?? [];
+                $"api/projects?customerId={customerId}&pageSize=10");
+            return result?.Data
+                ?.Where(p => p.Status is "Draft" or "Configuring")
+                .OrderByDescending(p => p.CreatedAt)
+                .Take(5)
+                .ToList() ?? [];
         }
         catch
         {
@@ -309,9 +314,21 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
-    private void OnRecentProjectClicked(Guid projectId)
+    private async Task OnRecentProjectClicked(Guid projectId)
     {
-        Navigation.NavigateTo($"/sales/projects/new?resume={projectId}");
+        _serverProjectId = null;
+        _parts.Clear();
+        _title = $"Project {DateTime.Today:yyyy-MM-dd}";
+        _description = null;
+        _selectedCustomer = null;
+        _showCustomerSearch = true;
+        _selectedLeadTime = null;
+        _selectedCurrency = _currencies.FirstOrDefault(c => c.IsPrimary) ?? _currencies.FirstOrDefault();
+        _lastSavedAt = null;
+
+        await ResumeFromServerAsync(projectId);
+
+        Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}&resume={projectId}", replace: true);
     }
 
     // ── Task 10: File upload / polling ─────────────────────────────────
@@ -884,7 +901,29 @@ public partial class ProjectNew : IAsyncDisposable
                             }
                         }
 
-                        await SaveDraftAsync();
+                        var updatedDraft = new DraftProjectState
+                        {
+                            TempProjectId = _tempProjectId,
+                            ServerProjectId = _serverProjectId,
+                            Title = _title,
+                            Description = _description,
+                            CustomerId = _selectedCustomer?.Id,
+                            CustomerName = _selectedCustomer?.Name,
+                            CustomerCompanyName = _selectedCustomer?.CompanyName,
+                            CustomerEmail = _selectedCustomer?.Email,
+                            CustomerMobile = _selectedCustomer?.Mobile,
+                            CustomerLandline = _selectedCustomer?.Landline,
+                            CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
+                            SelectedLeadTimeCode = _selectedLeadTime?.Code ?? "STANDARD",
+                            LastModified = DateTime.UtcNow,
+                            Parts = _parts.Select(p => p.ToDraftPartState()).ToList(),
+                        };
+                        var updatedJson = JsonSerializer.Serialize(updatedDraft);
+                        await JS.InvokeVoidAsync("sessionStorage.setItem", DraftStorageKey, updatedJson);
+                        _lastSavedAt = DateTimeOffset.UtcNow;
+
+                        if (_leftPanel is not null)
+                            await _leftPanel.RefreshRecentProjectsAsync();
                     }
                 }
             }

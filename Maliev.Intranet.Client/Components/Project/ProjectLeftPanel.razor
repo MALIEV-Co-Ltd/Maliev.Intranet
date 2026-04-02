@@ -472,6 +472,18 @@
         }
     }
 
+    /// <summary>
+    /// Forces a refresh of the recent projects list, bypassing the customer ID cache.
+    /// Called by the parent after a successful server save to immediately show the new project.
+    /// </summary>
+    public async Task RefreshRecentProjectsAsync()
+    {
+        if (SelectedCustomer == null || LoadRecentProjectsFunc == null) return;
+        _lastLoadedCustomerId = null;
+        await LoadRecentProjectsAsync(SelectedCustomer.Id);
+        await InvokeAsync(StateHasChanged);
+    }
+
     private Task OnCustomerSelectedFromAutocomplete() =>
         OnCustomerSelected.InvokeAsync(_searchCustomer);
 }
