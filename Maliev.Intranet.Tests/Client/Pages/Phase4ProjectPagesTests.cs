@@ -3,12 +3,16 @@ using Maliev.Intranet.Client.Pages;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Tests.Testing;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MudBlazor;
 using MudBlazor.Services;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Components.Authorization;
-using System.Security.Claims;
 using Moq;
+using System.Net;
+using System.Security.Claims;
+using System.Text;
 
 namespace Maliev.Intranet.Tests.Client.Pages;
 
@@ -23,6 +27,30 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
         JSInterop.Mode = JSRuntimeMode.Loose;
 
         var handler = new MockHttpMessageHandler();
+        handler.HandlerFunc = (request, _) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path.Contains("currencies"))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("[{\"Code\":\"THB\",\"Name\":\"Thai Baht\",\"Symbol\":\"฿\"}]", Encoding.UTF8, "application/json")
+                });
+            if (path.Contains("processes"))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("[]", Encoding.UTF8, "application/json")
+                });
+            if (path.Contains("lead-times"))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("[]", Encoding.UTF8, "application/json")
+                });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}", Encoding.UTF8, "application/json")
+            });
+        };
+
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);
         Services.AddScoped<BreadcrumbService>();
@@ -36,6 +64,34 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
         Services.AddLogging();
         Services.AddAuthorization();
         Services.AddScoped<AuthenticationStateProvider, TestAuthenticationStateProvider>();
+
+        var layoutLoggerMock = new Mock<ILogger<LayoutService>>();
+        Services.AddSingleton<LayoutService>(new LayoutService(JSInterop.JSRuntime, layoutLoggerMock.Object, null!));
+
+        Services.AddSingleton(new FileTypesSettings
+        {
+            ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".stl", ".step", ".3mf", ".obj" },
+            DocumentExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".dxf", ".dwg" },
+            ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".webp" },
+            OfficeExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".doc", ".docx", ".xls", ".xlsx" },
+            ArchiveExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".zip", ".rar", ".7z" },
+            DrawingExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".dxf", ".dwg", ".png", ".jpg" },
+            SupplementaryExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".doc", ".docx", ".xls", ".xlsx", ".zip" },
+        });
+
+        Services.AddAuthorizationCore();
+        Services.AddCascadingAuthenticationState();
+        var authServiceMock = new Mock<IAuthorizationService>();
+        authServiceMock.Setup(x => x.AuthorizeAsync(
+            It.IsAny<ClaimsPrincipal>(), It.IsAny<object>(),
+            It.IsAny<IEnumerable<IAuthorizationRequirement>>()))
+            .ReturnsAsync(AuthorizationResult.Success());
+        authServiceMock.Setup(x => x.AuthorizeAsync(
+            It.IsAny<ClaimsPrincipal>(), It.IsAny<object>(), It.IsAny<string>()))
+            .ReturnsAsync(AuthorizationResult.Success());
+        Services.AddSingleton(authServiceMock.Object);
+
+        Services.AddSingleton<ChatService>();
 
         Render<MudPopoverProvider>();
     }
@@ -80,21 +136,21 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
 
     // ── ProjectNew page ───────────────────────────────────────────────────────
 
-    [Fact(Skip = "ProjectNew requires LayoutService not registered in test context")]
+    [Fact]
     public void ProjectNewPage_ShouldRender_WithoutException()
     {
         var cut = Render<ProjectNew>();
         Assert.NotEmpty(cut.Markup);
     }
 
-    [Fact(Skip = "ProjectNew requires LayoutService not registered in test context")]
+    [Fact]
     public void ProjectNewPage_ShouldContain_CustomerField()
     {
         var cut = Render<ProjectNew>();
         Assert.Contains("Customer", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact(Skip = "ProjectNew requires LayoutService not registered in test context")]
+    [Fact]
     public void ProjectNewPage_ShouldContain_TitleField()
     {
         var cut = Render<ProjectNew>();
