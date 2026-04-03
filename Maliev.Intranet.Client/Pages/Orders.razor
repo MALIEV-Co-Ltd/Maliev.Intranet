@@ -78,6 +78,12 @@ else if (!_isTableView)
                     <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
                         @CurrencyFormatter.Format(context.TotalAmount, "THB", 2)
                     </MudText>
+                    @if (context.IsOutsourced)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text" Class="ml-1">
+                            Outsourced
+                        </MudChip>
+                    }
                 </MudCardContent>
             </MudCard>
         </ItemRenderer>
@@ -103,6 +109,16 @@ else
                     <MudText Typo="Typo.body2" Color="Color.Success">
                         @CurrencyFormatter.Format(context.Item.TotalAmount, "THB", 2)
                     </MudText>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="">
+                <CellTemplate>
+                    @if (context.Item.IsOutsourced)
+                    {
+                        <MudTooltip Text="Outsourced to external supplier">
+                            <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Color="Color.Warning" Size="Size.Small" />
+                        </MudTooltip>
+                    }
                 </CellTemplate>
             </TemplateColumn>
             <TemplateColumn Title="Status">

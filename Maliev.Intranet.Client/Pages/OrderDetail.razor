@@ -31,6 +31,13 @@ else
                 <MudChip T="string" Size="Size.Medium" Color="@GetStatusColor(_order.Status)">
                     @_order.Status
                 </MudChip>
+                @if (_order.IsOutsourced)
+                {
+                    <MudChip T="string" Size="Size.Medium" Color="Color.Warning" Variant="Variant.Outlined">
+                        <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Outsourced</MudText>
+                    </MudChip>
+                }
             </MudStack>
 
             <MudStack Row="true" Spacing="2">
@@ -182,6 +189,30 @@ else
                         <MudText Typo="Typo.caption" Align="Align.Center">@progress.ToString("N1")% Complete</MudText>
                     </MudStack>
                 </MudPaper>
+
+                @if (_order.IsOutsourced)
+                {
+                    <MudPaper Class="pa-4" Elevation="0" Style="border: 1px solid var(--mud-palette-warning);">
+                        <MudText Typo="Typo.h6" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Medium" Color="Color.Warning" />
+                            Outsourcing Info
+                        </MudText>
+                        <MudStack Spacing="2">
+                            @if (!string.IsNullOrEmpty(_order.SupplierName))
+                            {
+                                <MudText Typo="Typo.body2"><strong>Supplier:</strong> @_order.SupplierName</MudText>
+                            }
+                            @if (_order.SupplierCostTHB.HasValue)
+                            {
+                                <MudText Typo="Typo.body2"><strong>Supplier Cost:</strong> @($"{_order.SupplierCostTHB.Value:N2}") THB</MudText>
+                            }
+                            @if (_order.SupplierEstimatedDelivery.HasValue)
+                            {
+                                <MudText Typo="Typo.body2"><strong>Est. Delivery:</strong> @_order.SupplierEstimatedDelivery.Value.ToString("dd MMM yyyy")</MudText>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
             </MudStack>
         </MudItem>
     </MudGrid>

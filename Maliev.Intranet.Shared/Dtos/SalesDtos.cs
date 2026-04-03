@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Maliev.Intranet.Shared;
 
@@ -27,6 +28,13 @@ public class OrderSummaryDto
 
     /// <summary>The date and time when the order was created.</summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// Indicates whether this order is outsourced to an external manufacturing partner.
+    /// Employee-only information.
+    /// </summary>
+    [JsonPropertyName("isOutsourced")]
+    public bool IsOutsourced { get; set; }
 }
 
 /// <summary>
@@ -252,6 +260,22 @@ public class OrderDetailDto
 
     /// <summary>The date and time when the order record was last updated.</summary>
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>Employee-only. True if order is outsourced.</summary>
+    [JsonPropertyName("isOutsourced")]
+    public bool IsOutsourced { get; set; }
+
+    /// <summary>Employee-only. Supplier cost in THB for margin tracking.</summary>
+    [JsonPropertyName("supplierCostTHB")]
+    public decimal? SupplierCostTHB { get; set; }
+
+    /// <summary>Employee-only. Outsourcing supplier name.</summary>
+    [JsonPropertyName("supplierName")]
+    public string? SupplierName { get; set; }
+
+    /// <summary>Employee-only. Estimated delivery from supplier.</summary>
+    [JsonPropertyName("supplierEstimatedDelivery")]
+    public DateTime? SupplierEstimatedDelivery { get; set; }
 }
 
 /// <summary>
