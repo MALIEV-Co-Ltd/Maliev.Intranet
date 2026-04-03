@@ -2,6 +2,8 @@
 
 This document provides essential information for agentic coding assistants operating in the Maliev.Intranet repository. It captures architecture, standards, and operational workflows.
 
+---
+
 ## 🏗️ Architecture & Tech Stack
 
 - **Framework**: .NET 10.0 (C# 13)
@@ -16,58 +18,76 @@ This document provides essential information for agentic coding assistants opera
   - `InteractiveWebAssembly`: True offline capability, faster subsequent loads, better for static content.
   - `InteractiveAuto`: Best of both worlds but with added complexity. Default choice when uncertain.
 
-## 🛠️ Build, Lint, and Test Commands
+---
 
-| Action | Command |
-|--------|---------|
-| **Restore** | `dotnet restore` |
-| **Build** | `dotnet build Maliev.Intranet.slnx` |
-| **Run BFF** | `dotnet run --project Maliev.Intranet.Bff` |
-| **Lint/Format** | `dotnet format Maliev.Intranet.slnx` |
-| **Test All** | `dotnet test` |
-| **Single Test** | `dotnet test --filter Name={TestName}` |
-| **Specific Project** | `dotnet test Maliev.Intranet.Tests` |
+## 🛠️ Build, Test & Lint Commands
+
+All commands run from within this service directory (`B:\maliev\Maliev.Intranet`).
+
+```powershell
+# Build (treats warnings as errors — all must be fixed)
+dotnet build Maliev.Intranet.slnx
+
+# Run all tests
+dotnet test Maliev.Intranet.slnx --verbosity normal
+
+# Run a single test method
+dotnet test --filter "FullyQualifiedName~CustomerTests.GetCustomerAsync_WhenNotFound_ReturnsNull"
+
+# Run all tests in a class
+dotnet test --filter "FullyQualifiedName~CustomerTests"
+
+# Run with code coverage
+dotnet test Maliev.Intranet.slnx --collect:"XPlat Code Coverage"
+
+# Format check
+dotnet format Maliev.Intranet.slnx
+
+# Run BFF
+dotnet run --project Maliev.Intranet.Bff
+
+# EF Core migrations (Infrastructure project only)
+dotnet ef migrations add <Name> --project Maliev.Intranet.Infrastructure --startup-project Maliev.Intranet.Infrastructure
+```
 
 > **Note**: Integration tests require Docker for **Testcontainers**.
 
-## ⚖️ Development Mandates (Constitution)
+---
 
-- ✅ **TreatWarningsAsErrors**: Enabled in all projects. Do not introduce warnings.
-- ✅ **XML Documentation**: Required on all public members (classes, methods, properties).
-- ✅ **BFF Pattern**: Blazor WASM MUST NOT call domain services directly. Route all requests through the Bff.
-- ✅ **Explicit Mapping**: NO AutoMapper. Use manual mapping extensions in `Extensions/` folders.
-- ✅ **Data Annotations**: NO FluentValidation. Use standard `System.ComponentModel.DataAnnotations`.
-- ✅ **xUnit Assertions**: NO FluentAssertions. Use standard `Xunit.Assert`.
-- ✅ **Async Suffix**: All asynchronous methods must end with the `Async` suffix.
-- ✅ **Identity Propagation**: Ensure user context (JWT) is forwarded using `UserContextHandler`.
-- ✅ **Input Validation**: All input must have validation. Use immediate (client-side) validation when appropriate for responsiveness; always enforce validation server-side as the source of truth.
-- ✅ **Zero Dead BFF Endpoints**: Every BFF endpoint must have actual usage. Before committing, verify the endpoint is wired to a client component, handler, or integration test. Orphaned endpoints are not allowed.
+## Code Style & Conventions
 
-## 🎨 Code Style & Conventions
+### C# Naming & Formatting
 
-### 1. Naming Conventions
-- **Classes/Interfaces/Methods**: `PascalCase` (e.g., `UserContextHandler`, `IReferenceDataService`).
-- **Interfaces**: Prefix with `I` (e.g., `ICustomerService`).
-- **Properties**: `PascalCase`.
-- **Parameters/Local Variables**: `camelCase`.
-- **Fields**: `_camelCase` with underscore prefix (e.g., `_httpClient`).
-- **Namespaces**: Match folder structure, starting with `Maliev.Intranet`.
+- **Namespaces**: File-scoped (`namespace Maliev.Intranet.Shared;`)
+- **Classes/Methods/Properties**: `PascalCase`
+- **Private fields**: `_camelCase` (underscore prefix)
+- **Parameters/locals**: `camelCase`
+- **Async methods**: Suffix with `Async` (e.g., `GetCustomerAsync`)
+- **Interfaces**: Prefix with `I` (e.g., `ICustomerService`)
+- **Permissions**: GCP-style `{domain}.{plural-resource}.{action}` as `public const string` in a `Permissions` static class
+  - Valid: `orders.shipments.create`, `customer.customers.create`
+  - Invalid: `customer.customer.create` (singular), `orders.ship` (missing action)
+- **XML docs**: Required on ALL public methods and properties
+- **Nullable**: Enabled (`<Nullable>enable</Nullable>`). Use `?` explicitly
+- **Imports**: System first, then third-party, then local. Alphabetize within groups. Remove unused `using`
+- **Braces**: Allman style (new line) for methods and control structures. Expression-bodied for properties/accessors
+- **Indentation**: 4 spaces, LF line endings, UTF-8, trim trailing whitespace
+- **C# 13 Features**: Use primary constructors where appropriate (e.g., `public class MyService(IHttpClientFactory factory) { ... }`)
+- **Collection Initialization**: Prefer modern `[]` syntax for empty or small collections (e.g., `List<string> list = [];`)
+- **Strings**: Use raw string literals (`"""`) for multi-line strings or JSON
 
-### 2. Formatting & Structure
-- **C# 13 Features**: Use primary constructors where appropriate (e.g., `public class MyService(IHttpClientFactory factory) { ... }`).
-- **Namespaces**: Use file-scoped namespaces (e.g., `namespace Maliev.Intranet.Shared;`).
-- **Imports**: Organize alphabetically; remove unused `using` statements.
-- **Collection Initialization**: Prefer modern `[]` syntax for empty or small collections (e.g., `List<string> list = [];`).
-- **Strings**: Use raw string literals (`"""`) for multi-line strings or JSON.
+### C# Patterns
 
-### 3. Error Handling & Responses
-- **API Responses**: Wrap BFF responses in `MalievResponse<T>` or `PagedResponse<T>`.
-- **Downstream Calls**: Use `DownstreamResponse<T>` to handle responses from domain services.
-- **Global Error Handling**: Use `ErrorBoundary` in Blazor and Exception Middleware in BFF.
-- **Logging**: Use `ILogger<T>` for structured logging. Do not use `Console.WriteLine`.
-- **User-Friendly Errors**: Never expose raw exceptions to the frontend. Always map exceptions to user-friendly messages. Use a standard `ErrorResponse` DTO structure that frontend components can parse and display meaningfully.
+- **DI**: Constructor injection with `private readonly` fields
+- **Controllers**: `[ApiController]`, `[ApiVersion("1")]`, `[Route("intranet/v{version:apiVersion}")]`
+- **Logging**: `ILogger<T>` with structured placeholders (never interpolate): `_logger.LogInformation("Processing {FileId}", fileId)`
+- **Error handling**: Global exception middleware. Return `ProblemDetails` / `ErrorResponse` DTOs. Never expose stack traces
+- **JSON**: Check existing conventions in this service
+- **Manual mapping**: Static extension methods (`ToDto()`, `ToEntity()`). AutoMapper is banned
+- **Validation**: `System.ComponentModel.DataAnnotations` on DTOs. FluentValidation is banned
 
-### 4. Blazor & MudBlazor Best Practices
+### Blazor & MudBlazor Best Practices
+
 - **Component Parameters**: Use `[Parameter]` for public properties that are meant to be passed from parents.
 - **EventCallback**: Use `EventCallback` or `EventCallback<T>` for child-to-parent communication.
 - **RenderMode**: Most pages should use `@rendermode InteractiveAuto`. Always consider the trade-offs between `InteractiveServer`, `InteractiveWebAssembly`, and `InteractiveAuto` based on the page's requirements (offline support, initial load speed, data complexity).
@@ -79,7 +99,8 @@ This document provides essential information for agentic coding assistants opera
 - **Text Input with Live Counter**: For all `longtext` fields or any input that could potentially exceed the max length limit, display a live character counter (e.g., `50/2000` or `13/100`). Use immediate client-side validation to enforce the limit.
 - **Skeleton Loaders**: Always use skeleton components with animation when waiting for data to load. Never show blank spaces or spinner-only states.
 
-### 5. Mapping Extensions (Manual)
+### Mapping Extensions (Manual)
+
 Since AutoMapper is banned, use static extension classes:
 ```csharp
 public static class CustomerExtensions
@@ -92,6 +113,27 @@ public static class CustomerExtensions
 }
 ```
 
+### API Responses & Error Handling
+
+- **API Responses**: Wrap BFF responses in `MalievResponse<T>` or `PagedResponse<T>`.
+- **Downstream Calls**: Use `DownstreamResponse<T>` to handle responses from domain services.
+- **Global Error Handling**: Use `ErrorBoundary` in Blazor and Exception Middleware in BFF.
+- **User-Friendly Errors**: Never expose raw exceptions to the frontend. Always map exceptions to user-friendly messages. Use a standard `ErrorResponse` DTO structure that frontend components can parse and display meaningfully.
+
+---
+
+## Banned Libraries (Build Will Fail)
+
+| Banned | Use Instead |
+|--------|-------------|
+| AutoMapper | Manual mapping extensions |
+| FluentValidation | DataAnnotations or manual validation |
+| FluentAssertions | Standard xUnit `Assert.*` |
+| Swashbuckle/Swagger | Scalar (at `/{service}/scalar`) |
+| InMemoryDatabase (EF Core) | Testcontainers with real PostgreSQL |
+
+---
+
 ## 📂 Project Structure
 
 - `Maliev.Intranet.Bff`: ASP.NET Core host. Contains Controllers, Hubs, and Handlers.
@@ -101,19 +143,28 @@ public static class CustomerExtensions
 - `specs/`: Markdown specifications and feature plans. Use these to understand requirements.
 - `.specify/`: Automation scripts and templates for feature development.
 
-## 🧪 Testing Guidelines
+---
 
-- **Unit Tests**: Place in `Maliev.Intranet.Tests`. Mock external dependencies using `Moq` or similar.
-- **Integration Tests**: Use **Testcontainers** for database or external service dependencies. Use `WebApplicationFactory` for BFF tests.
-- **Naming**: `[MethodName]_[Scenario]_[ExpectedResult]` (e.g., `GetCustomerAsync_WhenNotFound_ReturnsNull`).
-- **Assertions**: Stick to `Assert.Equal`, `Assert.NotNull`, etc.
+## 🧪 Testing Rules
+
+- **Framework**: xUnit with standard `Assert` (`Assert.Equal`, `Assert.NotNull`, etc.)
+- **Naming**: `MethodName_StateUnderTest_ExpectedBehavior` or `HTTP_METHOD_Path_Scenario_ExpectedStatus`
+- **Coverage**: Minimum 80% per service
+- **Integration tests**: `BaseIntegrationTestFactory<TProgram, TDbContext>` with Testcontainers (PostgreSQL, Redis, RabbitMQ). Never InMemoryDatabase
+- **System tests** (Tier 3): `AspireTestFixture` with `[Collection("AspireDomainTests")]` — shared AppHost, never one per class
+- **Eventual consistency**: Use `TestHelpers.WaitForAsync`. Never `Task.Delay`
+- **MassTransit consumers**: Must have consumer tests using `AddMassTransitTestHarness()`
 - **UX/UI Validation**: Always validate UI changes with tests. Component tests should verify rendered output, user interactions, and loading states. Never commit UI changes without corresponding test coverage.
+
+---
 
 ## 📡 Communication & Identity
 
 - **SignalR**: Hubs should be located in `Maliev.Intranet.Bff/Hubs`. Use typed hubs if possible.
 - **Identity**: Identity is propagated to downstream services via `UserContextHandler`, which forwards the user's platform JWT as a Bearer token. The JWT `sub` claim contains the user's GUID. No separate `X-User-Id` header is forwarded.
 - **Permissions**: Follow GCP-style naming: `{service}.{resource}.{action}` (e.g., `orders.shipments.create`).
+
+---
 
 ## 🔄 Frontend-to-Backend Wiring
 
@@ -126,43 +177,57 @@ When connecting the Blazor Frontend (Client) or the BFF to downstream microservi
 
 Failure to check the downstream "source of truth" first is the primary cause of platform-level data inconsistencies.
 
-## 🤖 Interaction Policy
+---
 
-- **Verification**: Always verify changes with `dotnet build` before finishing.
-- **New Features**: Check `specs/` for requirements before implementing.
-- **Refactoring**: Maintain consistency with `Maliev.Intranet.Shared/Dtos/CommonDtos.cs`.
-- **UI**: Use MudBlazor components (`MudTable`, `MudButton`, `MudCard`) for consistent look and feel.
+## Mandatory Rules
 
+- **`TreatWarningsAsErrors = true`**: Zero warnings allowed. No suppression
+- **`[RequirePermission("domain.resources.action")]`**: On all endpoints, not plain `[Authorize]`
+- **API versioning**: All routes versioned (`v1/`)
+- **Service prefix**: Routes prefixed with service domain (e.g., `/intranet`)
+- **Scalar docs**: Configured at `/{service}/scalar`
+- **Secrets**: Never hardcoded. Use GCP Secret Manager or environment variables
+- **Async/await**: All the way down. Pass `CancellationToken`
+- **EF Core Design package**: Only in Infrastructure project, never in Api
+- **PostgreSQL xmin**: Shadow property only — `entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion()`. Never add entity property
+- **Temporary files**: Generate in `/temp` folder, clean up afterwards
+- **BFF Pattern**: Blazor WASM MUST NOT call domain services directly. Route all requests through the Bff.
+- **Identity Propagation**: Ensure user context (JWT) is forwarded using `UserContextHandler`.
+- **Input Validation**: All input must have validation. Use immediate (client-side) validation when appropriate for responsiveness; always enforce validation server-side as the source of truth.
+- **Zero Dead BFF Endpoints**: Every BFF endpoint must have actual usage. Before committing, verify the endpoint is wired to a client component, handler, or integration test. Orphaned endpoints are not allowed.
 
-## Git & Version Control — Mandatory Rules
+### Database & EF Core — Mandatory Rules
 
-### 🚨 CRITICAL: Always Commit Code Changes (Non-Negotiable)
-- **You MUST commit your changes to the local repository after completing any meaningful unit of work.**
-- **Never accumulate uncommitted changes.** Do not wait until end of session or until something breaks.
-- **Commit early and often** — if a change is meaningful (even a small fix or refactor), commit it.
-- **You do NOT need to push to remote** — local commits are sufficient to protect against accidental loss.
-- **If you are unsure whether to commit, commit anyway.** Extra commits are harmless; lost work is irreversible.
-- This rule applies even if you are just "testing" or "exploring" — use git branches to isolate experimental work and commit those changes too.
-
-### 🚨 CRITICAL: Never Use `git checkout` to Restore Broken Files
-- **NEVER use `git checkout` to restore or recover files.** This operation discards uncommitted changes permanently and will result in data loss.
-- **To undo/recover from broken files: first commit your current changes, then use `git revert` or `git reset --soft` to safely undo.**
-
-## Database & EF Core — Mandatory Rules
-
-### EF Core Design Package
+**EF Core Design Package**:
 - ❌ `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
 - ✅ It belongs ONLY in the Infrastructure (or Data) project where migrations live
-- Migration commands must target Infrastructure as both project and startup-project (since EF Core Design package is in Infrastructure):
+- Migration commands must target Infrastructure as both project and startup-project:
   ```
-  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project Maliev.<Domain>Service.Infrastructure
+  dotnet ef migrations add <Name> --project Maliev.Intranet.Infrastructure --startup-project Maliev.Intranet.Infrastructure
   ```
 
-### PostgreSQL xmin Concurrency — Mandatory Pattern
-Use shadow property ONLY. Never add a Xmin/xmin property to domain entities.
+**PostgreSQL xmin Concurrency** — Use shadow property ONLY. Never add a Xmin/xmin property to domain entities.
 ```csharp
 entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion();
 ```
 - ❌ Never use `UseXminAsConcurrencyToken()` (removed in Npgsql EF v7)
 - ❌ Never use entity property `public uint Xmin { get; set; }` or `public uint xmin { get; set; }`
 - ❌ Never use `.Ignore(e => e.Xmin)` — remove the entity property instead
+
+---
+
+## Git Rules
+
+- Each `Maliev.*` folder is an independent git repo. `cd` into it before git commands
+- **Commit early and often** after every meaningful unit of work. Do not accumulate changes
+- **Never use `git checkout` to restore files** — commit first, then `git revert` or `git reset --soft`
+- Feature branches merged to `develop` via PR. Do not push without being asked
+
+---
+
+## 🤖 Interaction Policy
+
+- **Verification**: Always verify changes with `dotnet build` before finishing.
+- **New Features**: Check `specs/` for requirements before implementing.
+- **Refactoring**: Maintain consistency with `Maliev.Intranet.Shared/Dtos/CommonDtos.cs`.
+- **UI**: Use MudBlazor components (`MudTable`, `MudButton`, `MudCard`) for consistent look and feel.
