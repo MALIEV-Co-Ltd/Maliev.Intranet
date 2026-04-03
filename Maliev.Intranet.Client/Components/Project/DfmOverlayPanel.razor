@@ -55,15 +55,26 @@ else if (IsVisible && DfmIssues.Count > 0)
             <div class="dfm-overlay-issues">
                 @foreach (var issue in DfmIssues)
                 {
-                    <div class="dfm-issue-row">
+                    var isActive = issue.OverlayKey != null && _activeOverlays.Contains(issue.OverlayKey);
+                    <div class="dfm-issue-row @(isActive ? "dfm-issue-row--active" : "")">
                         <MudIcon Icon="@issue.Icon"
                                  Size="Size.Small"
                                  Color="@(issue.Severity == DfmIssueSeverity.Error ? Color.Error : Color.Warning)"
                                  Class="dfm-issue-icon" />
-                        <div>
+                        <div style="flex:1; min-width:0;">
                             <MudText Typo="Typo.caption" Class="dfm-issue-title">@issue.Title</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@issue.Description</MudText>
                         </div>
+                        @if (issue.OverlayUrl != null && OnToggleOverlay.HasDelegate)
+                        {
+                            <MudTooltip Text="@(isActive ? "Hide on model" : "Show on model")" Placement="Placement.Left" Arrow="false">
+                                <MudIconButton Icon="@(isActive ? Icons.Material.Filled.Visibility : Icons.Material.Outlined.Visibility)"
+                                               Size="Size.Small"
+                                               Color="@(isActive ? Color.Primary : Color.Default)"
+                                               Class="dfm-overlay-toggle-btn"
+                                               OnClick="@(() => ToggleOverlay(issue))" />
+                            </MudTooltip>
+                        }
                     </div>
                 }
             </div>
@@ -141,8 +152,15 @@ else if (IsVisible && DfmIssues.Count > 0)
         align-items: flex-start;
         gap: 8px;
     }
+    .dfm-issue-row--active {
+        background: rgba(90,150,255,0.08);
+        border-radius: 4px;
+        padding: 2px 4px;
+        margin: -2px -4px;
+    }
     .dfm-issue-icon { margin-top: 2px; flex-shrink: 0; }
     .dfm-issue-title { display: block; font-weight: 600; color: var(--mud-palette-text-primary); margin-bottom: 2px; }
+    .dfm-overlay-toggle-btn { flex-shrink: 0; margin-top: -4px; margin-right: -8px; }
     @@media (max-width: 768px) {
         .dfm-overlay { left: 16px; right: 16px; max-width: none; }
     }
@@ -167,8 +185,12 @@ else if (IsVisible && DfmIssues.Count > 0)
     /// <summary>Invoked when the user clicks the Acknowledge button.</summary>
     [Parameter] public EventCallback OnAcknowledged { get; set; }
 
+    /// <summary>Invoked when the user clicks the eye icon on a DFM issue to toggle its overlay on the 3D model.</summary>
+    [Parameter] public EventCallback<DfmIssue> OnToggleOverlay { get; set; }
+
     private bool _acknowledged;
     private bool _expanded;
+    internal readonly HashSet<string> _activeOverlays = [];
     private bool _previousIsVisible;
     private bool _allClearFading;
     private bool _allClearShown;
@@ -240,5 +262,21 @@ else if (IsVisible && DfmIssues.Count > 0)
     {
         _acknowledged = true;
         await OnAcknowledged.InvokeAsync();
+    }
+
+    private async Task ToggleOverlay(DfmIssue issue)
+    {
+        if (issue.OverlayKey == null) return;
+        if (_activeOverlays.Contains(issue.OverlayKey))
+            _activeOverlays.Remove(issue.OverlayKey);
+        else
+            _activeOverlays.Add(issue.OverlayKey);
+        await OnToggleOverlay.InvokeAsync(issue);
+    }
+
+    /// <summary>Clears all active overlay state (e.g. when the process changes).</summary>
+    public void ResetOverlays()
+    {
+        _activeOverlays.Clear();
     }
 }

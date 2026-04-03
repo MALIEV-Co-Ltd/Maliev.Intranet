@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Maliev.Intranet.Client.Components.Project;
+using Maliev.Intranet.Client.Helpers;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
@@ -79,6 +80,7 @@ public partial class ProjectNew : IAsyncDisposable
     private HubConnection? _hubConnection;
 
     [Inject] private FileTypesSettings FileTypes { get; set; } = null!;
+    [Inject] private CookieProvider CookieProvider { get; set; } = null!;
 
     private bool CanSubmit =>
         !_saving &&
@@ -151,7 +153,7 @@ public partial class ProjectNew : IAsyncDisposable
         {
             var result = await processesTask;
             if (result is { Count: > 0 })
-                _processes = result;
+                _processes = result.Where(p => p.Code is not "CNC").ToList();
         }
         catch (Exception ex) { Snackbar.Add($"Failed to load processes: {ex.Message}", Severity.Warning); }
 
@@ -178,87 +180,81 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         // ── SignalR hub connection ─────────────────────────────────────
-        if (OperatingSystem.IsBrowser()) // client-side only; skip on SSR prerender
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrlAndCookies(Navigation.ToAbsoluteUri("/hubs/notifications").ToString(), CookieProvider.CookieHeader)
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.Reconnected += async _ =>
         {
-            _hubConnection = new HubConnectionBuilder()
-                .WithUrl(Navigation.ToAbsoluteUri("/hubs/notifications"))
-                .WithAutomaticReconnect()
-                .Build();
-
-            _hubConnection.Reconnected += async _ =>
-            {
-                foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
-                    await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
-            };
-
-            _hubConnection.On<SignalRFileAnalysisPayload>("FileAnalysisCompleted", async payload =>
-            {
-                var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
-                if (part == null) return;
-
-                if (payload.Failed)
-                {
-                    part.AwaitingPreview = false;
-                    part.StatusText = string.IsNullOrEmpty(payload.ErrorCode) ? "Preview unavailable" : $"Preview failed: {payload.ErrorCode}";
-                    TriggerAutoSave();
-                    await InvokeAsync(StateHasChanged);
-                    return;
-                }
-
-                // Small thumbnail arrives first (ThumbnailUrl only, PreviewUrls null)
-                if (!string.IsNullOrEmpty(payload.ThumbnailUrl) && string.IsNullOrEmpty(part.ThumbnailSmallUrl))
-                {
-                    part.ThumbnailSmallUrl = payload.ThumbnailUrl;
-                    await InvokeAsync(StateHasChanged);
-                }
-
-                // Full preview from PreviewImagesGeneratedConsumer
-                if (payload.PreviewUrls != null)
-                {
-                    part.ThumbnailSmallUrl = payload.PreviewUrls.ThumbnailSmall ?? part.ThumbnailSmallUrl;
-                    part.ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge ?? payload.HiResThumbnailUrl;
-                    part.ThumbnailSmallGcsPath = payload.PreviewUrls.ThumbnailSmallGcsPath;
-                    part.ThumbnailLargeGcsPath = payload.PreviewUrls.ThumbnailLargeGcsPath;
-                    part.AwaitingPreview = false;
-                    part.StatusText = "Ready";
-                    TriggerAutoSave();
-                    await InvokeAsync(StateHasChanged);
-                }
-            });
-
-            _hubConnection.On<SignalRGlbReadyPayload>("GlbReady", async payload =>
-            {
-                var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
-                if (part == null) return;
-
-                if (!payload.Failed)
-                {
-                    part.GlbSignedUrl = payload.GlbUrl;
-                    part.GlbStoragePath ??= payload.StoragePath;
-                    part.ViewerUrl = payload.GlbUrl;
-                }
-                await InvokeAsync(StateHasChanged);
-            });
-
-            _hubConnection.On<SignalRDfmAnalysisPayload>("DfmAnalysisReady", async payload =>
-            {
-                var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
-                if (part == null) return;
-
-                part.FdmDfmReport = payload.FdmReport;
-                part.SlaDfmReport = payload.SlaReport;
-                part.CncDfmReport = payload.CncReport;
-                part.ResolveDfmReport();
-
-                await InvokeAsync(StateHasChanged);
-            });
-
-            await _hubConnection.StartAsync();
-
-            // Join groups for any parts already in the list (restored from draft)
             foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
                 await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
-        }
+        };
+
+        _hubConnection.On<SignalRFileAnalysisPayload>("FileAnalysisCompleted", async payload =>
+        {
+            var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
+            if (part == null) return;
+
+            if (payload.Failed)
+            {
+                part.AwaitingPreview = false;
+                part.StatusText = string.IsNullOrEmpty(payload.ErrorCode) ? "Preview unavailable" : $"Preview failed: {payload.ErrorCode}";
+                TriggerAutoSave();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(payload.ThumbnailUrl) && string.IsNullOrEmpty(part.ThumbnailSmallUrl))
+            {
+                part.ThumbnailSmallUrl = payload.ThumbnailUrl;
+                await InvokeAsync(StateHasChanged);
+            }
+
+            if (payload.PreviewUrls != null)
+            {
+                part.ThumbnailSmallUrl = payload.PreviewUrls.ThumbnailSmall ?? part.ThumbnailSmallUrl;
+                part.ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge ?? payload.HiResThumbnailUrl;
+                part.ThumbnailSmallGcsPath = payload.PreviewUrls.ThumbnailSmallGcsPath;
+                part.ThumbnailLargeGcsPath = payload.PreviewUrls.ThumbnailLargeGcsPath;
+                part.AwaitingPreview = false;
+                part.StatusText = "Ready";
+                TriggerAutoSave();
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        _hubConnection.On<SignalRGlbReadyPayload>("GlbReady", async payload =>
+        {
+            var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
+            if (part == null) return;
+
+            if (!payload.Failed)
+            {
+                part.GlbSignedUrl = payload.GlbUrl;
+                part.GlbStoragePath ??= payload.StoragePath;
+                part.ViewerUrl = payload.GlbUrl;
+            }
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<SignalRDfmAnalysisPayload>("DfmAnalysisReady", async payload =>
+        {
+            var part = _parts.FirstOrDefault(p => p.StoragePath == payload.StoragePath);
+            if (part == null) return;
+
+            part.FdmDfmReport = payload.FdmReport;
+            part.SlaDfmReport = payload.SlaReport;
+            part.CncDfmReport = payload.CncReport;
+            part.ResolveDfmReport();
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await _hubConnection.StartAsync();
+
+        foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
+            await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
     }
 
     // ── Task 4: Customer search ────────────────────────────────────────
@@ -614,6 +610,36 @@ public partial class ProjectNew : IAsyncDisposable
                 part.AvailableMaterials = materialsTask.Result ?? [];
                 part.AvailableFinishes = finishesTask.Result ?? [];
                 part.AvailableTolerances = tolerancesTask.Result ?? [];
+
+                if (!part.MaterialId.HasValue)
+                {
+                    var defaultMaterial = part.AvailableMaterials.OrderBy(m => m.SortOrder).FirstOrDefault();
+                    if (defaultMaterial != null)
+                    {
+                        part.MaterialId = defaultMaterial.Id;
+                        part.MaterialCode = defaultMaterial.Code;
+                    }
+                }
+
+                if (!part.FinishId.HasValue)
+                {
+                    var defaultFinish = part.AvailableFinishes.OrderBy(f => f.SortOrder).FirstOrDefault();
+                    if (defaultFinish != null)
+                    {
+                        part.FinishId = defaultFinish.Id;
+                        part.FinishCode = defaultFinish.Code;
+                    }
+                }
+
+                if (!part.ToleranceId.HasValue)
+                {
+                    var defaultTolerance = part.AvailableTolerances.OrderBy(t => t.SortOrder).FirstOrDefault();
+                    if (defaultTolerance != null)
+                    {
+                        part.ToleranceId = defaultTolerance.Id;
+                        part.ToleranceCode = defaultTolerance.Code;
+                    }
+                }
             }
             catch (Exception)
             {
@@ -776,11 +802,16 @@ public partial class ProjectNew : IAsyncDisposable
         if (part.ProductionRoutingLoading || part.ProductionRouting != null)
             return;
 
+        // Use ServerPartId when available (part synced to server), fall back to FileId
+        var partId = part.ServerPartId ?? part.FileId;
+        if (partId == Guid.Empty)
+            return;
+
         part.ProductionRoutingLoading = true;
         try
         {
             part.ProductionRouting = await Http.GetFromJsonAsync<ProductionRoutingDto>(
-                $"api/projects/{_tempProjectId}/parts/{part.FileId}/routing");
+                $"api/projects/{_tempProjectId}/parts/{partId}/routing");
         }
         catch
         {
@@ -893,7 +924,15 @@ public partial class ProjectNew : IAsyncDisposable
                                     Finish = part.FinishCode,
                                     Tolerance = part.ToleranceCode,
                                 };
-                                await Http.PostAsJsonAsync($"api/projects/{_serverProjectId}/parts", addPartRequest);
+                                var partResponse = await Http.PostAsJsonAsync($"api/projects/{_serverProjectId}/parts", addPartRequest);
+                                if (partResponse.IsSuccessStatusCode)
+                                {
+                                    var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
+                                    if (createdPart != null)
+                                    {
+                                        part.ServerPartId = createdPart.Id;
+                                    }
+                                }
                             }
                             catch
                             {
@@ -936,6 +975,32 @@ public partial class ProjectNew : IAsyncDisposable
                 {
                     try
                     {
+                        // Parts not yet synced to the server need to be created first
+                        if (!part.ServerPartId.HasValue)
+                        {
+                            var addPartRequest = new AddProjectPartRequest
+                            {
+                                FileId = part.FileId,
+                                FileName = part.Name,
+                                ProcessType = part.ProcessCode,
+                                MaterialId = part.MaterialId,
+                                Quantity = part.Quantity,
+                                Finish = part.FinishCode,
+                                Tolerance = part.ToleranceCode,
+                            };
+                            var partResponse = await Http.PostAsJsonAsync($"api/projects/{_serverProjectId}/parts", addPartRequest);
+                            if (partResponse.IsSuccessStatusCode)
+                            {
+                                var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
+                                if (createdPart != null)
+                                {
+                                    part.ServerPartId = createdPart.Id;
+                                }
+                            }
+
+                            continue;
+                        }
+
                         var partRequest = new UpdateProjectPartRequest
                         {
                             ProcessType = part.ProcessCode,
@@ -945,7 +1010,7 @@ public partial class ProjectNew : IAsyncDisposable
                             Tolerance = part.ToleranceCode,
                         };
                         await Http.PutAsJsonAsync(
-                            $"api/projects/{_serverProjectId}/parts/{part.FileId}",
+                            $"api/projects/{_serverProjectId}/parts/{part.ServerPartId}",
                             partRequest);
                     }
                     catch
@@ -1058,12 +1123,13 @@ public partial class ProjectNew : IAsyncDisposable
 
             foreach (var part in project.Parts)
             {
-                var existing = _parts.FirstOrDefault(p => p.FileId == part.Id);
+                var existing = _parts.FirstOrDefault(p => p.ServerPartId == part.Id || p.FileId == part.FileId);
                 if (existing == null && !string.IsNullOrEmpty(part.FileName))
                 {
                     var partVm = new PartViewModel
                     {
-                        FileId = part.Id,
+                        FileId = part.FileId,
+                        ServerPartId = part.Id,
                         Name = part.FileName,
                         ProcessCode = part.ProcessType,
                         MaterialId = part.MaterialId,
@@ -1160,7 +1226,7 @@ public partial class ProjectNew : IAsyncDisposable
                     return;
                 }
 
-                foreach (var part in _parts.Where(p => p.IsFullyConfigured && !string.IsNullOrEmpty(p.StoragePath)))
+                foreach (var part in _parts.Where(p => p.IsFullyConfigured && !string.IsNullOrEmpty(p.StoragePath) && !p.ServerPartId.HasValue))
                 {
                     var addPartRequest = new AddProjectPartRequest
                     {
@@ -1173,7 +1239,16 @@ public partial class ProjectNew : IAsyncDisposable
                         Tolerance = part.ToleranceCode,
                     };
 
-                    try { await Http.PostAsJsonAsync($"api/projects/{projectId}/parts", addPartRequest); }
+                    try
+                    {
+                        var partResponse = await Http.PostAsJsonAsync($"api/projects/{projectId}/parts", addPartRequest);
+                        if (partResponse.IsSuccessStatusCode)
+                        {
+                            var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
+                            if (createdPart != null)
+                                part.ServerPartId = createdPart.Id;
+                        }
+                    }
                     catch { /* parts may already exist from auto-save; non-fatal */ }
                 }
             }
@@ -1219,8 +1294,16 @@ public partial class ProjectNew : IAsyncDisposable
                     };
 
                     using var partResponse = await Http.PostAsJsonAsync($"api/projects/{projectId}/parts", addPartRequest);
-                    if (!partResponse.IsSuccessStatusCode)
+                    if (partResponse.IsSuccessStatusCode)
+                    {
+                        var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
+                        if (createdPart != null)
+                            part.ServerPartId = createdPart.Id;
+                    }
+                    else
+                    {
                         Snackbar.Add($"Failed to add part '{part.Name}'.", Severity.Warning);
+                    }
                 }
             }
 
@@ -1275,6 +1358,7 @@ public partial class ProjectNew : IAsyncDisposable
             ToleranceCode = p.ToleranceCode,
             PartNotes = p.PartNotes,
             DfmAcknowledged = p.DfmAcknowledged,
+            BagAndTag = true,
             AvailableMaterials = p.AvailableMaterials,
             AvailableFinishes = p.AvailableFinishes,
             AvailableTolerances = p.AvailableTolerances,

@@ -19,7 +19,8 @@
                 <div class="pdc-3d-viewer-container">
                     @if (!string.IsNullOrEmpty(Part.ViewerUrl))
                     {
-                        <ModelViewer ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
+                        <ModelViewer @ref="_modelViewer"
+                                     ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
                                      KnownDimensions="@Part.Dimensions"
                                      OnLoadFailed="HandleViewerLoadFailed" />
                     }
@@ -77,12 +78,14 @@
             }
 
             @* DFM overlay — positioned absolute over viewer area *@
-            <DfmOverlayPanel DfmIssues="@_dfmIssues"
+            <DfmOverlayPanel @ref="_dfmPanel"
+                             DfmIssues="@_dfmIssues"
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
                              Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged)"
                              TimedOut="@Part.DfmAnalysisTimedOut"
                              AllClear="@(_dfmIssues.Count == 0 && Part.DfmReport != null && !Part.DfmAcknowledged)"
-                             OnAcknowledged="@HandleDfmAcknowledged" />
+                             OnAcknowledged="@HandleDfmAcknowledged"
+                             OnToggleOverlay="@HandleToggleOverlay" />
         </div>
 
     </div>
@@ -229,6 +232,8 @@
     private string? _viewerErrorMessage;
     private CancellationTokenSource? _dfmTimeoutCts;
     private const int DfmTimeoutSeconds = 60;
+    private ModelViewer? _modelViewer;
+    private DfmOverlayPanel? _dfmPanel;
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
@@ -341,54 +346,73 @@
     private List<DfmIssue> BuildDfmIssues()
     {
         var raw = GetDfmIssueDetailSummary(Part.DfmReport);
-        return raw
-            .Select(t => new DfmIssue(Icon: t.Icon, Title: t.Text, Description: t.Description, Severity: DfmIssueSeverity.Warning))
-            .ToList();
+        var processCode = Part.ProcessCode?.ToUpperInvariant() ?? "FDM";
+        return raw.Select(t =>
+        {
+            var overlayKey = t.Category != null ? $"{processCode}__{t.Category}" : null;
+            var overlayUrl = overlayKey != null ? Part.OverlayUrls?.GetValueOrDefault(overlayKey) : null;
+            return new DfmIssue(
+                Icon: t.Icon,
+                Title: t.Text,
+                Description: t.Description,
+                Severity: DfmIssueSeverity.Warning,
+                Category: t.Category,
+                OverlayKey: overlayKey,
+                OverlayUrl: overlayUrl);
+        }).ToList();
+    }
+
+    private async Task HandleToggleOverlay(DfmIssue issue)
+    {
+        if (_modelViewer == null || issue.OverlayKey == null || issue.OverlayUrl == null) return;
+        // _dfmPanel tracks active state; just check if the key is now active
+        var isActive = _dfmPanel?._activeOverlays.Contains(issue.OverlayKey) ?? false;
+        await _modelViewer.ToggleDfmOverlayAsync(issue.OverlayKey, issue.OverlayUrl, isActive);
     }
 
     /// <summary>
     /// Extracts a human-readable list of DFM issue details from a DFM report payload.
     /// </summary>
-    private static List<(string Icon, string Text, string Description)> GetDfmIssueDetailSummary(object? dfmReport)
+    private static List<(string Icon, string Text, string Description, string? Category)> GetDfmIssueDetailSummary(object? dfmReport)
     {
-        var issues = new List<(string Icon, string Text, string Description)>();
+        var issues = new List<(string Icon, string Text, string Description, string? Category)>();
         if (dfmReport == null) return issues;
 
         switch (dfmReport)
         {
             case FdmDfmReportPayload fdm:
                 if (fdm.ThinWallCount > 0)
-                    issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.ThinWallCount} thin wall region(s)", "Wall thickness below minimum recommended for FDM printing"));
+                    issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.ThinWallCount} thin wall region(s)", "Wall thickness below minimum recommended for FDM printing", "thin_wall"));
                 if (fdm.OverhangFaceCount > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang face(s)", "Faces at steep angles may require support structures"));
+                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang face(s)", "Faces at steep angles may require support structures", "overhang"));
                 if (fdm.SupportRequired)
-                    issues.Add((Icons.Material.Filled.AddHome, "Support structures required", "This model requires support structures for printing"));
+                    issues.Add((Icons.Material.Filled.AddHome, "Support structures required", "This model requires support structures for printing", null));
                 if (fdm.SmallDetailCount > 0)
-                    issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost", "Some fine details may not reproduce accurately"));
+                    issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost", "Some fine details may not reproduce accurately", "small_feature"));
                 break;
 
             case SlaDfmReportPayload sla:
                 if (sla.ThinWallCount > 0)
-                    issues.Add((Icons.Material.Filled.Rectangle, $"{sla.ThinWallCount} thin wall region(s)", "Wall thickness may cause resin drainage or print failure"));
+                    issues.Add((Icons.Material.Filled.Rectangle, $"{sla.ThinWallCount} thin wall region(s)", "Wall thickness may cause resin drainage or print failure", "thin_wall"));
                 if (sla.ResinTrappingRisk)
-                    issues.Add((Icons.Material.Filled.Water, "Resin trapping risk", "Enclosed cavities may trap resin during printing"));
+                    issues.Add((Icons.Material.Filled.Water, "Resin trapping risk", "Enclosed cavities may trap resin during printing", "escape_hole"));
                 if (sla.SuctionRisk)
-                    issues.Add((Icons.Material.Filled.Opacity, "Suction risk during peeling", "Large flat surfaces may cause suction during peeling"));
+                    issues.Add((Icons.Material.Filled.Opacity, "Suction risk during peeling", "Large flat surfaces may cause suction during peeling", "overhang"));
                 if (sla.HollowRegions.Count > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{sla.HollowRegions.Count} hollow region(s)", "Hollow regions may require additional drainage holes"));
+                    issues.Add((Icons.Material.Filled.Layers, $"{sla.HollowRegions.Count} hollow region(s)", "Hollow regions may require additional drainage holes", null));
                 break;
 
             case CncDfmReportPayload cnc:
                 if (cnc.SharpCornerCount > 0)
-                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)", "Sharp inside corners cannot be cut precisely with standard end mills"));
+                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)", "Sharp inside corners cannot be cut precisely with standard end mills", "internal_radius"));
                 if (cnc.HasUndercuts)
-                    issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected", "Undercut features require special machining strategies or EDM"));
+                    issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected", "Undercut features require special machining strategies or EDM", "undercut"));
                 if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0)
-                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)", $"This model has {cnc.DrillHoleCount} drill hole(s) to machine"));
+                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)", $"This model has {cnc.DrillHoleCount} drill hole(s) to machine", null));
                 if (cnc.RequiresEdm)
-                    issues.Add((Icons.Material.Filled.Build, "EDM required for complex features", "Complex internal geometry requires EDM (Electrical Discharge Machining)"));
+                    issues.Add((Icons.Material.Filled.Build, "EDM required for complex features", "Complex internal geometry requires EDM (Electrical Discharge Machining)", null));
                 if (cnc.RequiresGrinding)
-                    issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces", "Flat surfaces require grinding for tight tolerance"));
+                    issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces", "Flat surfaces require grinding for tight tolerance", null));
                 break;
         }
 

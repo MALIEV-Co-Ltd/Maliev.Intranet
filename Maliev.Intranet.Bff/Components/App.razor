@@ -2,6 +2,7 @@
 @inject IHttpContextAccessor HttpContextAccessor
 @inject ILogger<App> Logger
 @using Maliev.Intranet.Client
+@using Maliev.Intranet.Client.Services
 @implements IDisposable
 
 <!DOCTYPE html>
@@ -90,7 +91,7 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveAuto" />
+    <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="js/note-editor.js"></script>
@@ -101,11 +102,30 @@
 </html>
 
 @code {
-    // PersistentComponentState doesn't work reliably with InteractiveAuto
-    // The blocking script handles theme persistence instead
-    
+    [Inject] private CookieProvider CookieProvider { get; set; } = null!;
+
+    private PersistingComponentStateSubscription? _subscription;
+
+    protected override void OnInitialized()
+    {
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            var cookieHeader = httpContext.Request.Headers["Cookie"].ToString();
+            if (!string.IsNullOrEmpty(cookieHeader))
+            {
+                CookieProvider.CookieHeader = cookieHeader;
+                _subscription = ApplicationState.RegisterOnPersisting(() =>
+                {
+                    ApplicationState.PersistAsJson(CookieProvider.StateKey, cookieHeader);
+                    return Task.CompletedTask;
+                }, RenderMode.InteractiveServer);
+            }
+        }
+    }
+
     public void Dispose()
     {
-        // No resources to dispose
+        _subscription?.Dispose();
     }
 }

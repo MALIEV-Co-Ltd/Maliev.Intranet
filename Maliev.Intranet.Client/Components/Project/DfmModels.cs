@@ -5,7 +5,17 @@ namespace Maliev.Intranet.Client.Components.Project;
 /// <param name="Title">Short title describing the issue.</param>
 /// <param name="Description">Detailed description of the issue.</param>
 /// <param name="Severity">Severity level: Warning or Error.</param>
-public record DfmIssue(string Icon, string Title, string Description, DfmIssueSeverity Severity);
+/// <param name="Category">Issue category key (e.g. "thin_wall") matching the overlay GLB key "{PROCESS}__{category}".</param>
+/// <param name="OverlayKey">Full overlay key "{PROCESS}__{category}" used to load and toggle the overlay GLB.</param>
+/// <param name="OverlayUrl">Signed GCS URL to the overlay GLB, or null if none was generated.</param>
+public record DfmIssue(
+    string Icon,
+    string Title,
+    string Description,
+    DfmIssueSeverity Severity,
+    string? Category = null,
+    string? OverlayKey = null,
+    string? OverlayUrl = null);
 
 /// <summary>Severity level of a DFM issue.</summary>
 public enum DfmIssueSeverity

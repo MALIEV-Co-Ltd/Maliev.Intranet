@@ -3,12 +3,14 @@
 @using Microsoft.AspNetCore.SignalR.Client
 
 @using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Client.Helpers
 @using Maliev.Intranet.Client.Components
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LayoutService LayoutService
 @inject ChatService ChatService
 @inject BreadcrumbService BreadcrumbService
+@inject CookieProvider CookieProvider
 @inject IJSRuntime JSRuntime
 @inject ILogger<MainLayout> Logger
 @implements IAsyncDisposable
@@ -200,12 +202,12 @@
             StateHasChanged();
 
             var authState = await AuthStateTask;
-            if (authState.User.Identity?.IsAuthenticated == true && OperatingSystem.IsBrowser())
+            if (authState.User.Identity?.IsAuthenticated == true)
             {
                 try
                 {
                     _hubConnection = new HubConnectionBuilder()
-                        .WithUrl(Navigation.ToAbsoluteUri("/hubs/notifications"))
+                        .WithUrlAndCookies(Navigation.ToAbsoluteUri("/hubs/notifications").ToString(), CookieProvider.CookieHeader)
                         .WithAutomaticReconnect()
                         .Build();
 

@@ -1,3 +1,4 @@
+using Maliev.Intranet.Client.Helpers;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -6,12 +7,13 @@ namespace Maliev.Intranet.Client.Services;
 /// <summary>
 /// Client-side service that maintains a SignalR connection to the BFF <c>ProductionHub</c>
 /// and exposes events for job status and stats changes consumed by the Production Queue page.
-/// Only connects when running in the browser — no-op during SSR prerendering.
+/// Forwards authentication cookies when running server-side (InteractiveServer mode).
 /// </summary>
 public sealed class ProductionHubService : IAsyncDisposable
 {
     private HubConnection? _connection;
     private readonly NavigationManager _navigation;
+    private readonly CookieProvider _cookieProvider;
 
     /// <summary>Fired when a job's status changes. Args: jobId, newStatus.</summary>
     public event Action<Guid, string>? JobStatusChanged;
@@ -29,9 +31,11 @@ public sealed class ProductionHubService : IAsyncDisposable
     /// Initializes a new instance of <see cref="ProductionHubService"/>.
     /// </summary>
     /// <param name="navigation">The Blazor NavigationManager used to resolve the hub URL.</param>
-    public ProductionHubService(NavigationManager navigation)
+    /// <param name="cookieProvider">Provides cookies captured during SSR for server-side hub auth.</param>
+    public ProductionHubService(NavigationManager navigation, CookieProvider cookieProvider)
     {
         _navigation = navigation;
+        _cookieProvider = cookieProvider;
     }
 
     /// <summary>
@@ -41,14 +45,11 @@ public sealed class ProductionHubService : IAsyncDisposable
     /// <returns>A task that completes when the connection is established (or immediately when not in browser).</returns>
     public async Task StartAsync()
     {
-        // Guard: SignalR WebSocket connections cannot be established during SSR prerendering
-        if (!OperatingSystem.IsBrowser()) return;
-
         if (_connection is { State: HubConnectionState.Connected or HubConnectionState.Connecting })
             return;
 
         _connection = new HubConnectionBuilder()
-            .WithUrl(_navigation.ToAbsoluteUri("/hubs/production"))
+            .WithUrlAndCookies(_navigation.ToAbsoluteUri("/hubs/production").ToString(), _cookieProvider.CookieHeader)
             .WithAutomaticReconnect()
             .Build();
 

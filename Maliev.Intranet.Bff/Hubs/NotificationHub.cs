@@ -109,11 +109,16 @@ public record GlbReadyPayload(string StoragePath, string? GlbUrl, bool Failed);
 /// <param name="FdmReport">FDM-specific DFM analysis data, or null if not applicable.</param>
 /// <param name="SlaReport">SLA-specific DFM analysis data, or null if not applicable.</param>
 /// <param name="CncReport">CNC-specific DFM analysis data, or null if not applicable.</param>
+/// <param name="OverlayUrls">
+/// Signed GCS download URLs for per-issue overlay GLBs, keyed by "{PROCESS}__{category}".
+/// Frontend loads these on-demand when a DFM issue is clicked. Null if none were generated.
+/// </param>
 public record DfmAnalysisReadyPayload(
     string StoragePath,
     Maliev.MessagingContracts.Contracts.Geometry.FdmDfmReportPayload? FdmReport,
     Maliev.MessagingContracts.Contracts.Geometry.SlaDfmReportPayload? SlaReport,
-    Maliev.MessagingContracts.Contracts.Geometry.CncDfmReportPayload? CncReport);
+    Maliev.MessagingContracts.Contracts.Geometry.CncDfmReportPayload? CncReport,
+    IReadOnlyDictionary<string, string>? OverlayUrls = null);
 
 /// <summary>Payload pushed when a pricing calculation result is ready.</summary>
 /// <param name="StoragePath">GCS path of the original file (join key).</param>

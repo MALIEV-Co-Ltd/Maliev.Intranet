@@ -14,6 +14,7 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<IProjectDraftService, ProjectDraftService>();
+builder.Services.AddScoped<CookieProvider>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<BreadcrumbService>();
 builder.Services.AddScoped<IReferenceDataService, ClientReferenceDataService>();

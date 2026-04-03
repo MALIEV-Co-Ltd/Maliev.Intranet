@@ -95,4 +95,11 @@ public sealed class SignalRDfmAnalysisPayload
 
     /// <summary>CNC-specific DFM analysis data, or null if not applicable.</summary>
     public CncDfmReportPayload? CncReport { get; set; }
+
+    /// <summary>
+    /// Signed GCS download URLs for per-issue overlay GLBs, keyed by "{PROCESS}__{category}"
+    /// (e.g. "FDM__thin_wall"). Load these on-demand when the user clicks a DFM issue.
+    /// Null if no overlays were generated.
+    /// </summary>
+    public Dictionary<string, string>? OverlayUrls { get; set; }
 }

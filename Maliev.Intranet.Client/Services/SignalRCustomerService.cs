@@ -1,3 +1,4 @@
+using Maliev.Intranet.Client.Helpers;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -10,6 +11,7 @@ public class SignalRCustomerService : ISignalRCustomerService
 {
     private HubConnection? _hubConnection;
     private readonly NavigationManager _navigationManager;
+    private readonly CookieProvider _cookieProvider;
 
     /// <inheritdoc />
     public event Func<Task>? OnCustomerChanged;
@@ -21,31 +23,25 @@ public class SignalRCustomerService : ISignalRCustomerService
     /// Initializes a new instance of the <see cref="SignalRCustomerService"/> class.
     /// </summary>
     /// <param name="navigationManager">The navigation manager used to resolve the SignalR hub URL.</param>
-    public SignalRCustomerService(NavigationManager navigationManager)
+    /// <param name="cookieProvider">Provides cookies captured during SSR for server-side hub auth.</param>
+    public SignalRCustomerService(NavigationManager navigationManager, CookieProvider cookieProvider)
     {
         _navigationManager = navigationManager;
+        _cookieProvider = cookieProvider;
     }
 
     /// <inheritdoc />
     public async Task StartAsync()
     {
-        // Only connect to SignalR when running in the browser (client-side)
-        // Skip during server-side prerendering
-        if (!OperatingSystem.IsBrowser())
-        {
-            return;
-        }
-
         if (_hubConnection != null) return;
 
         var hubUrl = _navigationManager.BaseUri.TrimEnd('/') + "/hubs/notifications";
 
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(hubUrl)
+            .WithUrlAndCookies(hubUrl, _cookieProvider.CookieHeader)
             .WithAutomaticReconnect()
             .Build();
 
-        // Subscribe to customer change events
         _hubConnection.On("CustomerChanged", async () =>
         {
             if (OnCustomerChanged != null)

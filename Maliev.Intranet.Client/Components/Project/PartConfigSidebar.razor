@@ -115,46 +115,23 @@
                 </MudSelect>
             </div>
 
-            <MudStack Row="true" Justify="Justify.SpaceBetween">
-                <div class="pcs-field" style="flex: 1;">
-                    <MudText Typo="Typo.caption" Class="pcs-field-label">Surface Finish</MudText>
-                    <MudSelect T="CatalogSurfaceFinishDto"
-                               Value="@SelectedFinish"
-                               ValueChanged="@((CatalogSurfaceFinishDto? f) => OnFinishChanged(f))"
-                               ToStringFunc="@(f => f?.Name ?? string.Empty)"
-                               Disabled="@(Part!.AvailableFinishes.Count == 0)"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Label=""
-                               Placeholder="">
-                        @foreach (var fin in Part!.AvailableFinishes)
-                        {
-                            <MudSelectItem T="CatalogSurfaceFinishDto" Value="@fin">@fin.Name</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
-                @if (Part!.ProcessCode == "CNC")
-                {
-                    <div class="pcs-field" style="flex: 1;">
-                        <MudText Typo="Typo.caption" Class="pcs-field-label">Ra / Roughness</MudText>
-                        <MudSelect T="string"
-                                   Value="@Part!.RoughnessCode"
-                                   ValueChanged="@((string? v) => OnRoughnessChanged(v))"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Label=""
-                                   Placeholder="">
-                            <MudSelectItem T="string" Value="@("Ra0.2")">Ra 0.2</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Ra0.4")">Ra 0.4</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Ra0.8")">Ra 0.8</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Ra1.6")">Ra 1.6</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Ra3.2")">Ra 3.2</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Ra6.3")">Ra 6.3</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Ra12.5")">Ra 12.5</MudSelectItem>
-                        </MudSelect>
-                    </div>
-                }
-            </MudStack>
+            <div class="pcs-field">
+                <MudText Typo="Typo.caption" Class="pcs-field-label">Surface Finish</MudText>
+                <MudSelect T="CatalogSurfaceFinishDto"
+                           Value="@SelectedFinish"
+                           ValueChanged="@((CatalogSurfaceFinishDto? f) => OnFinishChanged(f))"
+                           ToStringFunc="@(f => f?.Name ?? string.Empty)"
+                           Disabled="@(Part!.AvailableFinishes.Count == 0)"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Label=""
+                           Placeholder="">
+                    @foreach (var fin in Part!.AvailableFinishes)
+                    {
+                        <MudSelectItem T="CatalogSurfaceFinishDto" Value="@fin">@fin.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
         </div>
 
         @* ── Section C: Design & Features ────────────────────────────────── *@
@@ -363,6 +340,7 @@
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
     private IReadOnlyCollection<string> _selectedFeatures = [];
     private decimal? _lastLoadedUnitPrice;
+    private int _lastQuantity;
 
     // ── Computed properties ───────────────────────────────────────────────
 
@@ -393,7 +371,6 @@
         var features = new List<string>();
         if (Part.HasThreadedHoles) features.Add("ThreadedHoles");
         if (Part.HasInserts) features.Add("Inserts");
-        if (Part.BagAndTag) features.Add("BagAndTag");
         _selectedFeatures = features;
 
         if (Part.EstimatedUnitPrice.HasValue && Part.EstimatedUnitPrice != _lastLoadedUnitPrice)
@@ -433,21 +410,23 @@
 
     /// <summary>
     /// Finds the active bulk tier for the current quantity and sets
-    /// <see cref="PartViewModel.EstimatedTotalAmount"/> to tier unit price × quantity.
-    /// This corrects the server-returned total which uses the base (non-discounted) unit price.
+    /// <see cref="PartViewModel.EstimatedUnitPrice"/> and <see cref="PartViewModel.EstimatedTotalAmount"/>
+    /// to reflect the bulk-discounted pricing.
     /// </summary>
     private void ApplyBulkPricingToTotal()
     {
         if (Part == null || _bulkTiers.Count == 0) return;
 
-        // Active tier: highest tier whose Quantity ≤ current quantity
         var activeTier = _bulkTiers
             .Where(t => t.Quantity <= Part.Quantity)
             .OrderByDescending(t => t.Quantity)
             .FirstOrDefault();
 
         if (activeTier != null)
+        {
+            Part.EstimatedUnitPrice = activeTier.UnitPrice;
             Part.EstimatedTotalAmount = activeTier.UnitPrice * Part.Quantity;
+        }
     }
 
     // ── Event handlers ───────────────────────────────────────────────────
@@ -521,6 +500,8 @@
     {
         if (Part == null) return;
         Part.Quantity = qty;
+        ApplyBulkPricingToTotal();
+        _lastQuantity = qty;
         await OnPartChanged.InvokeAsync(Part);
     }
 

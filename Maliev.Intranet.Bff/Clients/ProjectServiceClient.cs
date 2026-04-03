@@ -100,19 +100,45 @@ public class ProjectServiceClient(HttpClient httpClient)
 
     /// <summary>
     /// Adds a new part to an existing project.
+    /// Maps the Intranet DTO to the ProjectService DTO shape (field name differences).
     /// </summary>
     public async Task<ProjectPartDto?> AddPartAsync(Guid projectId, AddProjectPartRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync($"/project/v1/projects/{projectId}/parts", request, ct);
+        var payload = new
+        {
+            request.FileId,
+            request.FileName,
+            request.ProcessType,
+            request.MaterialId,
+            request.Quantity,
+            FinishType = request.Finish,
+            request.Color,
+            request.Tolerance,
+        };
+
+        var response = await httpClient.PostAsJsonAsync($"/project/v1/projects/{projectId}/parts", payload, ct);
         if (!response.IsSuccessStatusCode) return null;
         return await response.Content.ReadFromJsonAsync<ProjectPartDto>(cancellationToken: ct);
     }
 
     /// <summary>
     /// Updates the configuration of an existing part.
+    /// Maps the Intranet DTO to the ProjectService DTO shape (field name differences).
     /// </summary>
     public async Task<HttpResponseMessage> UpdatePartAsync(Guid projectId, Guid partId, UpdateProjectPartRequest request, CancellationToken ct = default)
-        => await httpClient.PutAsJsonAsync($"/project/v1/projects/{projectId}/parts/{partId}", request, ct);
+    {
+        var payload = new
+        {
+            request.ProcessType,
+            request.MaterialId,
+            request.Quantity,
+            FinishType = request.Finish,
+            request.Color,
+            request.Tolerance,
+        };
+
+        return await httpClient.PutAsJsonAsync($"/project/v1/projects/{projectId}/parts/{partId}", payload, ct);
+    }
 
     /// <summary>
     /// Removes a part from a project.

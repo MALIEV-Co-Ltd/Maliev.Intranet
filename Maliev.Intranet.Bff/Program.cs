@@ -46,6 +46,7 @@ try
     builder.Services.AddSingleton<BffMetrics>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.BreadcrumbService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.CookieProvider>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ProductionHubService>();

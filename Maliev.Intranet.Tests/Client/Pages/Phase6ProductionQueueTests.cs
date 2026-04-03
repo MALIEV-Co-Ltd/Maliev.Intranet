@@ -23,6 +23,7 @@ public class Phase6ProductionQueueTests : BunitContext, IAsyncLifetime
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);
         Services.AddScoped<ProductionHubService>();
+        Services.AddScoped<CookieProvider>();
         Render<MudPopoverProvider>();
     }
 
@@ -73,7 +74,7 @@ public class Phase6ProductionQueueTests : BunitContext, IAsyncLifetime
     public void ProductionHubService_InitialState_IsDisconnected()
     {
         var nav = Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
-        var svc = new ProductionHubService(nav);
+        var svc = new ProductionHubService(nav, new CookieProvider());
         Assert.Equal(Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected, svc.State);
     }
 
@@ -81,7 +82,7 @@ public class Phase6ProductionQueueTests : BunitContext, IAsyncLifetime
     public void ProductionHubService_JobStatusChangedEvent_CanBeSubscribed()
     {
         var nav = Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
-        var svc = new ProductionHubService(nav);
+        var svc = new ProductionHubService(nav, new CookieProvider());
         var fired = false;
         svc.JobStatusChanged += (_, _) => fired = true;
         // The event handler is registered — can't fire it without a hub, but subscription works

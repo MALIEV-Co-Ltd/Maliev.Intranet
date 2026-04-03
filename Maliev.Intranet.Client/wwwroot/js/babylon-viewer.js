@@ -1152,6 +1152,73 @@ export function setCameraProjection(canvasId, mode) {
     if (edgesEnabled[canvasId]) toggleEdges(canvasId, true);
 }
 
+// ── DFM Overlays ──────────────────────────────────────────────────────────────
+// overlayMeshes[canvasId] → Map<overlayKey, BABYLON.AbstractMesh[]>
+// overlayLoading[canvasId] → Set<overlayKey> (prevents concurrent loads)
+const overlayMeshes  = {};
+const overlayLoading = {};
+
+/**
+ * Toggles a DFM overlay GLB on the scene. Lazy-loads on first show.
+ * @param {string} canvasId
+ * @param {string} overlayKey  e.g. "FDM__thin_wall"
+ * @param {string} glbUrl      Signed URL to the overlay GLB
+ * @param {boolean} visible    true = show, false = hide
+ */
+export async function toggleDfmOverlay(canvasId, overlayKey, glbUrl, visible) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    overlayMeshes[canvasId]  ??= new Map();
+    overlayLoading[canvasId] ??= new Set();
+
+    const existing = overlayMeshes[canvasId].get(overlayKey);
+    if (existing) {
+        existing.forEach(m => { m.isVisible = visible; });
+        return;
+    }
+
+    if (!visible) return; // nothing to hide if not loaded yet
+
+    if (overlayLoading[canvasId].has(overlayKey)) return; // already loading
+    overlayLoading[canvasId].add(overlayKey);
+
+    try {
+        const result = await BABYLON.SceneLoader.ImportMeshAsync('', '', glbUrl, scene, null, '.glb');
+        const meshes = result.meshes.filter(m => m.getTotalVertices() > 0);
+
+        meshes.forEach(mesh => {
+            // Semi-transparent PBR material using vertex colors from the GLB
+            const mat = new BABYLON.PBRMaterial(`dfm_${overlayKey}_mat`, scene);
+            mat.metallic      = 0;
+            mat.roughness     = 0.8;
+            mat.alpha         = 0.5;
+            mat.backFaceCulling = false;
+            mat.useVertexColors = true;
+            mesh.material = mat;
+            mesh.isPickable = false;
+        });
+
+        overlayMeshes[canvasId].set(overlayKey, meshes);
+    } catch (err) {
+        console.error(`[BabylonViewer] Failed to load overlay ${overlayKey}:`, err);
+    } finally {
+        overlayLoading[canvasId].delete(overlayKey);
+    }
+}
+
+/**
+ * Removes all DFM overlay meshes for the given canvas.
+ * @param {string} canvasId
+ */
+export function clearDfmOverlays(canvasId) {
+    const map = overlayMeshes[canvasId];
+    if (!map) return;
+    map.forEach(meshes => meshes.forEach(m => m.dispose()));
+    map.clear();
+    if (overlayLoading[canvasId]) overlayLoading[canvasId].clear();
+}
+
 // ── dispose ───────────────────────────────────────────────────────────────────
 
 export function dispose(canvasId) {
@@ -1207,7 +1274,11 @@ export function dispose(canvasId) {
     delete animStates[canvasId];
     delete autoSpeedCurrent[canvasId];
     delete autoSpeedTarget[canvasId];
+
+    clearDfmOverlays(canvasId);
+    delete overlayMeshes[canvasId];
+    delete overlayLoading[canvasId];
 }
 
 // Debug handle
-window.babylonViewer = { initialize, setRenderMode, resetCamera, dispose, setCameraPreset, toggleEdges, toggleBoundingBox, setCameraProjection };
+window.babylonViewer = { initialize, setRenderMode, resetCamera, dispose, setCameraPreset, toggleEdges, toggleBoundingBox, setCameraProjection, toggleDfmOverlay, clearDfmOverlays };

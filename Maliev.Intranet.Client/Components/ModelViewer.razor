@@ -353,6 +353,34 @@
             await _module.InvokeVoidAsync("setCameraProjection", _canvasId, mode);
     }
 
+    /// <summary>Loads and toggles a DFM overlay GLB on the 3D model.</summary>
+    public async Task ToggleDfmOverlayAsync(string overlayKey, string glbUrl, bool visible)
+    {
+        if (_module == null) return;
+        try
+        {
+            await _module.InvokeVoidAsync("toggleDfmOverlay", _canvasId, overlayKey, glbUrl, visible);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] toggleDfmOverlay error: {ex.Message}");
+        }
+    }
+
+    /// <summary>Removes all DFM overlay meshes from the 3D scene.</summary>
+    public async Task ClearDfmOverlaysAsync()
+    {
+        if (_module == null) return;
+        try
+        {
+            await _module.InvokeVoidAsync("clearDfmOverlays", _canvasId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] clearDfmOverlays error: {ex.Message}");
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         _dotNetRef?.Dispose();

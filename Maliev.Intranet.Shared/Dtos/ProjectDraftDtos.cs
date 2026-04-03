@@ -62,6 +62,9 @@ public sealed class DraftPartState
     /// <summary>The unique file identifier assigned by the UploadService.</summary>
     public Guid FileId { get; set; }
 
+    /// <summary>The server-assigned part ID returned by ProjectService after part creation. Null until the part is synced to the server.</summary>
+    public Guid? ServerPartId { get; set; }
+
     /// <summary>The storage path of the uploaded file.</summary>
     public string StoragePath { get; set; } = string.Empty;
 

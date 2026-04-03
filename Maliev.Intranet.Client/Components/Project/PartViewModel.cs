@@ -20,6 +20,9 @@ public class PartViewModel
     /// <summary>The unique file identifier assigned by the UploadService.</summary>
     public Guid FileId { get; set; }
 
+    /// <summary>The server-assigned part ID returned by ProjectService after part creation. Null until the part is synced to the server.</summary>
+    public Guid? ServerPartId { get; set; }
+
     /// <summary>The storage path of the uploaded file.</summary>
     public string? StoragePath { get; set; }
 
@@ -119,6 +122,13 @@ public class PartViewModel
     public object? CncDfmReport { get; set; }
 
     /// <summary>
+    /// Signed overlay GLB URLs keyed by "{PROCESS}__{category}" (e.g. "FDM__thin_wall").
+    /// Populated from the DfmAnalysisReady SignalR event. Used by PartDetailCard to wire
+    /// clickable overlay toggling in the BabylonJS viewer.
+    /// </summary>
+    public Dictionary<string, string>? OverlayUrls { get; set; }
+
+    /// <summary>
     /// Resolves <see cref="DfmReport"/> from the per-process DFM report properties
     /// based on the currently selected <see cref="ProcessCode"/>.
     /// Call this after setting any of FdmDfmReport/SlaDfmReport/CncDfmReport,
@@ -128,9 +138,9 @@ public class PartViewModel
     {
         DfmReport = ProcessCode?.ToUpperInvariant() switch
         {
-            "SLA" or "DLP" => SlaDfmReport,
-            "CNC" => CncDfmReport,
-            _ => FdmDfmReport,
+            "SLA" or "SLA_DLP" or "DLP" => SlaDfmReport,
+            "CNC" or "CNC_MILL" or "CNC_TURN" => CncDfmReport,
+            _ => FdmDfmReport,  // FDM, SLS, MJF, MJ, BJ, DMLS all use FDM report structure
         };
     }
 
@@ -237,6 +247,7 @@ public class PartViewModel
     public DraftPartState ToDraftPartState() => new()
     {
         FileId = FileId,
+        ServerPartId = ServerPartId,
         StoragePath = StoragePath ?? string.Empty,
         Name = Name,
         Quantity = Quantity,
@@ -287,6 +298,7 @@ public class PartViewModel
         var vm = new PartViewModel
         {
             FileId = s.FileId,
+            ServerPartId = s.ServerPartId,
             StoragePath = s.StoragePath,
             Name = s.Name,
             Quantity = s.Quantity,

@@ -1,3 +1,4 @@
+using Maliev.Intranet.Client.Helpers;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -53,6 +54,7 @@ public class ChatService : IAsyncDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly NavigationManager _navigationManager;
+    private readonly CookieProvider _cookieProvider;
     private HubConnection? _hubConnection;
 
     /// <summary>
@@ -60,10 +62,12 @@ public class ChatService : IAsyncDisposable
     /// </summary>
     /// <param name="httpClient">The HTTP client for API requests.</param>
     /// <param name="navigationManager">The navigation manager for resolving hub URLs.</param>
-    public ChatService(HttpClient httpClient, NavigationManager navigationManager)
+    /// <param name="cookieProvider">Provides cookies captured during SSR for server-side hub auth.</param>
+    public ChatService(HttpClient httpClient, NavigationManager navigationManager, CookieProvider cookieProvider)
     {
         _httpClient = httpClient;
         _navigationManager = navigationManager;
+        _cookieProvider = cookieProvider;
     }
 
     /// <summary>
@@ -133,12 +137,12 @@ public class ChatService : IAsyncDisposable
     /// <returns>A task representing the asynchronous connection operation.</returns>
     public async Task ConnectSignalRAsync()
     {
-        if (!OperatingSystem.IsBrowser() || _hubConnection != null) return;
+        if (_hubConnection != null || _navigationManager == null) return;
 
         var hubUrl = _navigationManager.BaseUri.TrimEnd('/') + "/hubs/chat";
 
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(hubUrl)
+            .WithUrlAndCookies(hubUrl, _cookieProvider.CookieHeader)
             .WithAutomaticReconnect()
             .Build();
 

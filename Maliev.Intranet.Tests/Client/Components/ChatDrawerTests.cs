@@ -25,7 +25,7 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
         // Mock ChatService
         var handler = new MockHttpMessageHandler();
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
-        Services.AddSingleton(new ChatService(client, null!)); // Mocking SignalR as null
+        Services.AddSingleton(new ChatService(client, null!, new CookieProvider()));
 
         Services.AddSingleton(client);
 
@@ -49,7 +49,7 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
         testContext.Services.AddMudServices();
         testContext.JSInterop.Mode = JSRuntimeMode.Loose;
         testContext.Services.AddSingleton(_authMock.Object);
-        testContext.Services.AddSingleton(new ChatService(client, null!));
+        testContext.Services.AddSingleton(new ChatService(client, null!, new CookieProvider()));
         testContext.Services.AddSingleton(client);
 
         // Act
@@ -72,7 +72,7 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
         testContext.Services.AddMudServices();
         testContext.JSInterop.Mode = JSRuntimeMode.Loose;
         testContext.Services.AddSingleton(_authMock.Object);
-        testContext.Services.AddSingleton(new ChatService(client, null!));
+        testContext.Services.AddSingleton(new ChatService(client, null!, new CookieProvider()));
         testContext.Services.AddSingleton(client);
 
         // Act
