@@ -23,6 +23,8 @@
                 Currencies="@_currencies"
                 OnCurrencyChanged="@(c => { _selectedCurrency = c; TriggerAutoSave(); })"
                 AutoSaving="@_autoSaving"
+                LastSavedAt="@_lastSavedAt"
+                HasCustomerSelected="@(_selectedCustomer != null)"
                 LayoutMode="@_layoutMode"
                 OnLayoutModeChanged="@(m => _layoutMode = m)"
                 OnDuplicate="DuplicateProject" />

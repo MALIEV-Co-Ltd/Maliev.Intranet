@@ -41,6 +41,9 @@ public sealed class DraftProjectState
     /// <summary>The selected lead time option code.</summary>
     public string SelectedLeadTimeCode { get; set; } = "STANDARD";
 
+    /// <summary>The selected currency code (e.g. "THB", "USD"). Null restores the primary default.</summary>
+    public string? SelectedCurrencyCode { get; set; }
+
     /// <summary>Timestamp of the last modification to this draft.</summary>
     public DateTime LastModified { get; set; }
 

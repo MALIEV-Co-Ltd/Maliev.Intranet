@@ -136,12 +136,12 @@
         @* Total price *@
         <div class="plr-cell plr-cell--price">
             <MudText Typo="Typo.h6" Color="Color.Primary" Class="plr-total">
-                @(Part.EstimatedTotalAmount.HasValue ? $"฿{Part.EstimatedTotalAmount.Value:N0}" : "—")
+                @(Part.EstimatedTotalAmount.HasValue ? $"฿{Part.EstimatedTotalAmount.Value:N2}" : "—")
             </MudText>
             @if (Part.EstimatedUnitPrice.HasValue)
             {
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="plr-unit-price">
-                    ฿@Part.EstimatedUnitPrice.Value.ToString("N0") ea
+                    ฿@Part.EstimatedUnitPrice.Value.ToString("N2") ea
                 </MudText>
             }
         </div>

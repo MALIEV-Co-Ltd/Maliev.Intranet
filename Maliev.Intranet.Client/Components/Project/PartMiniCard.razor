@@ -62,7 +62,7 @@
         </MudText>
         <div class="mc-bottom">
             <MudText Typo="Typo.caption" Style="font-weight:700;" Class="pmc-price">
-                @(Part.EstimatedUnitPrice.HasValue ? $"{CurrencyCode} {Part.EstimatedUnitPrice.Value:N0}" : "—")
+                @(Part.EstimatedUnitPrice.HasValue ? $"{CurrencyCode} {Part.EstimatedUnitPrice.Value:N2}" : "—")
             </MudText>
             <MudText Typo="Typo.caption" Class="mc-qty">
                 ×@Part.Quantity

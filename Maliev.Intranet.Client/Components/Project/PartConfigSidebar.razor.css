@@ -44,8 +44,6 @@
 /* ── Price card (Production Routing wrapper) ──────────────────────── */
 .pcs-price-card {
     background: var(--mud-palette-background-grey);
-    border: 1px solid var(--mud-palette-lines-default);
-    border-radius: var(--radius-md);
     padding: 12px;
 }
 
@@ -56,7 +54,9 @@
     justify-content: space-between;
     cursor: pointer;
     user-select: none;
-    padding: 4px 0;
+    background: var(--mud-palette-background-grey);
+    padding: 8px 12px;
+    border-radius: var(--maliev-radius-sm);
 }
 
 .pcs-routing-content {
@@ -121,7 +121,7 @@
     gap: 8px;
     padding: 8px 12px;
     border: 1px solid var(--mud-palette-lines-default);
-    border-radius: var(--radius-md);
+    border-radius: var(--maliev-radius-md);
     cursor: pointer;
     transition: all 0.15s ease;
     background: var(--mud-palette-surface);

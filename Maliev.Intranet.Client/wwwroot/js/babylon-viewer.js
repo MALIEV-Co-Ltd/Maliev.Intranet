@@ -21,6 +21,8 @@ const modelLoadState   = {};   // canvasId → 'loading' | 'loaded' | 'error'
 const originalMaterials= {};   // canvasId → { mesh.uniqueId → original material }
 const sceneBoundingBoxes={};   // canvasId → { min:{x,y,z}, max:{x,y,z} } world coords (Z-up, mm)
 const meshCenters      = {};   // canvasId → { x, y, z } world center after centering
+const modelScaleFactors= {};   // canvasId → number (scale applied to main model root nodes)
+const modelCenterOffsets={};   // canvasId → { cx, cy, zLift } (centering applied to main model root nodes)
 const bboxLines        = {};   // canvasId → BABYLON.LinesMesh
 const bboxLabels       = {};   // canvasId → [ { div, worldPos } ]
 const bboxObservers    = {};   // canvasId → scene render observable handle
@@ -135,11 +137,11 @@ const _INV3 = 1 / Math.sqrt(3);
 const PRESETS = {
     front:  { dir: [  0,      -1,       0    ], up: [0, 0, 1] },
     back:   { dir: [  0,      +1,       0    ], up: [0, 0, 1] },
-    right:  { dir: [ -1,       0,       0    ], up: [0, 0, 1] },
-    left:   { dir: [ +1,       0,       0    ], up: [0, 0, 1] },
+    right:  { dir: [ +1,       0,       0    ], up: [0, 0, 1] },
+    left:   { dir: [ -1,       0,       0    ], up: [0, 0, 1] },
     top:    { dir: [  0,       0,      -1    ], up: [0, 1, 0] },
     bottom: { dir: [  0,       0,      +1    ], up: [0, 1, 0] },
-    iso:    { dir: [-_INV3,  -_INV3,  _INV3  ], up: [0, 0, 1] },
+    iso:    { dir: [+_INV3,  -_INV3,  _INV3  ], up: [0, 0, 1] },
 };
 
 /**
@@ -221,8 +223,14 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
         const forcedExt = resolveExtension(fileUrl, fileExt);
         BABYLON.SceneLoader.ShowLoadingScreen = false;
-        BABYLON.SceneLoader.Append('', fileUrl, scene,
-            (_scene) => {
+
+        // Retry-with-backoff: the GLB may not yet be in GCS when the signed URL arrives
+        // (race between the geometry worker writing the file and the SignalR event).
+        // Retry up to 2 times on 404 before surfacing the error to the UI.
+        const _retryDelays = [1000, 3000];
+        function _loadAttempt(attempt) {
+            BABYLON.SceneLoader.Append('', fileUrl, scene,
+                (_scene) => {
                 modelLoadState[canvasId] = 'loaded';
                 requestAnimationFrame(() => { canvas.style.opacity = '1'; });
 
@@ -297,6 +305,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 if (scaleFactor !== 1) {
                     rootMeshes.forEach(m => m.scaling.setAll(scaleFactor));
                 }
+                modelScaleFactors[canvasId] = scaleFactor;
 
                 // ── Apply +90°X rotation to model root nodes ──
                 // GLBs are Y-up (glTF spec). +90°X converts to Z-up (CAD/print standard).
@@ -324,6 +333,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 const cx = (bb.min.x + bb.max.x) / 2;
                 const cy = (bb.min.y + bb.max.y) / 2;
                 const zLift = -bb.min.z;
+                modelCenterOffsets[canvasId] = { cx, cy, zLift };
                 targetNodes.forEach(n => {
                     n.position.x -= cx;
                     n.position.y -= cy;
@@ -416,6 +426,13 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
             },
             null,
             (_scene, message, exception) => {
+                const is404 = message && (message.includes('404') || message.includes('Not Found') || message.includes('status: 404'));
+                if (is404 && attempt < _retryDelays.length) {
+                    const delay = _retryDelays[attempt];
+                    console.warn(`[BabylonViewer] GLB not ready (404), retry ${attempt + 1}/${_retryDelays.length} in ${delay}ms`);
+                    setTimeout(() => _loadAttempt(attempt + 1), delay);
+                    return;
+                }
                 modelLoadState[canvasId] = 'error';
                 console.error('[BabylonViewer] Load error:', message, exception);
                 if (dotNetRef) {
@@ -424,7 +441,9 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 requestAnimationFrame(() => { canvas.style.opacity = '1'; });
             },
             forcedExt,
-        );
+            );
+        }
+        _loadAttempt(0);
 
         engine.runRenderLoop(() => {
             // Smooth speed interpolation (lerp toward target)
@@ -1109,6 +1128,69 @@ function clearBoundingBox(canvasId) {
     }
 }
 
+// ── showGrid / hideGrid ───────────────────────────────────────────────────────
+
+/**
+ * Shows a grid floor at the model's base (Z=0 after centering) to visualise
+ * the print bed / machine table. Uses a 10mm-spaced GridMaterial.
+ * The mesh is named '__grid__' so existing exclusion guards skip it in all
+ * bounding-box, render-mode, shadow, and edge-rendering operations.
+ */
+export function showGrid(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    // Remove any existing grid first
+    const existing = scene.getMeshByName('__grid__');
+    if (existing) existing.dispose();
+
+    const bb = sceneBoundingBoxes[canvasId];
+    if (!bb) return;
+
+    const sizeX = bb.max.x - bb.min.x;
+    const sizeY = bb.max.y - bb.min.y;
+    const gridSize = Math.max(sizeX, sizeY) * 3;
+
+    // In Z-up space the floor is the XY plane at z=0 (already the model base after centering).
+    // BabylonJS ground lies in the XZ plane by default, so we rotate −90° around X to flip it.
+    const ground = BABYLON.MeshBuilder.CreateGround('__grid__', {
+        width: gridSize, height: gridSize, subdivisions: 1
+    }, scene);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.z = 0;
+    ground.isPickable = false;
+    ground.receiveShadows = true;
+
+    if (typeof BABYLON.GridMaterial !== 'undefined') {
+        const mat = new BABYLON.GridMaterial('__grid_mat__', scene);
+        mat.majorUnitFrequency = 10;
+        mat.minorUnitVisibility = 0.25;
+        mat.gridRatio = 10;          // 10mm grid lines
+        mat.backFaceCulling = false;
+        mat.mainColor   = new BABYLON.Color3(0.85, 0.85, 0.85);
+        mat.lineColor   = new BABYLON.Color3(0.55, 0.55, 0.55);
+        mat.opacity     = 0.70;
+        ground.material = mat;
+    } else {
+        // GridMaterial CDN not yet loaded — use a plain transparent material as fallback
+        const mat = new BABYLON.StandardMaterial('__grid_mat__', scene);
+        mat.alpha = 0.15;
+        mat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
+        mat.backFaceCulling = false;
+        ground.material = mat;
+    }
+}
+
+/**
+ * Removes the grid floor mesh from the scene.
+ */
+export function hideGrid(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+    const grid = scene.getMeshByName('__grid__');
+    if (grid) grid.dispose();
+}
+
 // ── setCameraProjection ───────────────────────────────────────────────────────
 
 /**
@@ -1187,6 +1269,27 @@ export async function toggleDfmOverlay(canvasId, overlayKey, glbUrl, visible) {
         const result = await BABYLON.SceneLoader.ImportMeshAsync('', '', glbUrl, scene, null, '.glb');
         const meshes = result.meshes.filter(m => m.getTotalVertices() > 0);
 
+        // Apply the same three transforms that initialize applies to the main model
+        // so overlays align perfectly in world space.
+        const scaleFactor = modelScaleFactors[canvasId] ?? 1;
+        const offset = modelCenterOffsets[canvasId] ?? { cx: 0, cy: 0, zLift: 0 };
+        const zUpQuat = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.X, Math.PI / 2);
+
+        const overlayRoots = result.meshes.filter(m => !m.parent);
+        overlayRoots.forEach(n => {
+            if (scaleFactor !== 1) n.scaling.setAll(scaleFactor);
+            if (n.rotationQuaternion == null) {
+                n.rotationQuaternion = (n.rotation && n.rotation.length)
+                    ? BABYLON.Quaternion.FromEulerVector(n.rotation)
+                    : BABYLON.Quaternion.Identity();
+            }
+            n.rotationQuaternion = zUpQuat.multiply(n.rotationQuaternion);
+            n.position.x -= offset.cx;
+            n.position.y -= offset.cy;
+            n.position.z += offset.zLift;
+        });
+        result.meshes.forEach(m => m.computeWorldMatrix(true));
+
         meshes.forEach(mesh => {
             // Semi-transparent PBR material using vertex colors from the GLB
             const mat = new BABYLON.PBRMaterial(`dfm_${overlayKey}_mat`, scene);
@@ -1195,6 +1298,7 @@ export async function toggleDfmOverlay(canvasId, overlayKey, glbUrl, visible) {
             mat.alpha         = 0.5;
             mat.backFaceCulling = false;
             mat.useVertexColors = true;
+            mat.zOffset       = -2; // depth bias: overlay wins depth test against coplanar main mesh (prevents Z-fighting)
             mesh.material = mat;
             mesh.isPickable = false;
         });
@@ -1278,6 +1382,8 @@ export function dispose(canvasId) {
     clearDfmOverlays(canvasId);
     delete overlayMeshes[canvasId];
     delete overlayLoading[canvasId];
+    delete modelScaleFactors[canvasId];
+    delete modelCenterOffsets[canvasId];
 }
 
 // Debug handle

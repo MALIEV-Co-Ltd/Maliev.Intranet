@@ -104,9 +104,22 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
 
             return response;
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "Downstream request timed out: {Url}. User: {UserId}", request.RequestUri, userId);
+            throw;
+        }
+        catch (TaskCanceledException)
+        {
+            logger.LogWarning("Downstream request timed out (TaskCanceledException): {Url}. User: {UserId}", request.RequestUri, userId);
+            return new HttpResponseMessage(HttpStatusCode.GatewayTimeout)
+            {
+                RequestMessage = request,
+                Content = new StringContent("The request to the downstream service timed out.")
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("Downstream request timed out: {Url}. User: {UserId}", request.RequestUri, userId);
             return new HttpResponseMessage(HttpStatusCode.GatewayTimeout)
             {
                 RequestMessage = request,

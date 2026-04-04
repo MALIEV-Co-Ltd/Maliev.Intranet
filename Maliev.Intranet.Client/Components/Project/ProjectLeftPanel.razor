@@ -5,7 +5,7 @@
 
 <div class="pnl-left">
     @* ── Section 1: Customer ─────────────────────────────────────────── *@
-    @if (SelectedCustomer != null && !ShowCustomerSearch)
+    @if (SelectedCustomer is { } sc && !ShowCustomerSearch)
     {
         <div class="pnl-section">
             <div class="section-header">Customer</div>
@@ -17,38 +17,38 @@
                                  Size="Size.Small"
                                  Color="Color.Default"
                                  Class="pcc-row-icon" />
-                        <MudText Typo="Typo.body1" Class="pcc-name">@SelectedCustomer.Name</MudText>
+                        <MudText Typo="Typo.body1" Class="pcc-name">@sc.Name</MudText>
                     </div>
 
                     @* Row: business icon + company name *@
-                    @if (!string.IsNullOrEmpty(SelectedCustomer.CompanyName))
+                    @if (!string.IsNullOrEmpty(sc.CompanyName))
                     {
                         <div class="pcc-row">
                             <MudIcon Icon="@Icons.Material.Outlined.Business"
                                      Size="Size.Small"
                                      Color="Color.Default"
                                      Class="pcc-row-icon" />
-                            <MudText Typo="Typo.subtitle1" Class="pcc-company">@SelectedCustomer.CompanyName</MudText>
+                            <MudText Typo="Typo.subtitle1" Class="pcc-company">@sc.CompanyName</MudText>
                         </div>
                     }
 
                     @* Row: email icon + email *@
-                    @if (!string.IsNullOrEmpty(SelectedCustomer.Email))
+                    @if (!string.IsNullOrEmpty(sc.Email))
                     {
                         <div class="pcc-row">
                             <MudIcon Icon="@Icons.Material.Outlined.Email"
                                      Size="Size.Small"
                                      Color="Color.Default"
                                      Class="pcc-row-icon" />
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@SelectedCustomer.Email</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@sc.Email</MudText>
                         </div>
                     }
 
                     @* Row: phone icon + mobile or landline *@
                     @{
-                        var phone = !string.IsNullOrEmpty(SelectedCustomer.Mobile)
-                            ? SelectedCustomer.Mobile
-                            : SelectedCustomer.Landline;
+                        var phone = !string.IsNullOrEmpty(sc.Mobile)
+                            ? sc.Mobile
+                            : sc.Landline;
                     }
                     @if (!string.IsNullOrEmpty(phone))
                     {
@@ -113,7 +113,7 @@
                 <span>Recent Projects</span>
                 @if (_loadingRecentProjects)
                 {
-                    <MudProgressLinear Indeterminate="true" Size="Size.Small" Color="Color.Primary" Class="mb-0" />
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
                 }
             </div>
             <div class="pnl-section-content pnl-recent-projects-content">

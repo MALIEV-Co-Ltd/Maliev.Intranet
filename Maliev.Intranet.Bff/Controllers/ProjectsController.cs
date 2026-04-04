@@ -19,7 +19,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 public class ProjectsController(
     ProjectServiceClient client,
     JobServiceClient jobClient,
-    FacilityServiceClient facilityClient,
+    IFacilityServiceClient facilityClient,
     ILogger<ProjectsController> logger) : ControllerBase
 {
     private readonly ILogger<ProjectsController> _logger = logger;
@@ -265,17 +265,47 @@ public class ProjectsController(
         if (string.IsNullOrEmpty(processType))
             return BadRequest("processType query parameter is required.");
 
-        var queueDepths = await jobClient.GetQueueDepthAsync(processType, ct);
         var queueAhead = 0;
-        queueDepths?.TryGetValue(processType, out queueAhead);
+        try
+        {
+            var queueDepths = await jobClient.GetQueueDepthAsync(processType, ct);
+            queueDepths?.TryGetValue(processType, out queueAhead);
+        }
+        catch (TaskCanceledException)
+        {
+            _logger.LogWarning("JobService request cancelled or timed out for '{ProcessType}'; defaulting to 0.", processType);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "JobService request failed for '{ProcessType}'; defaulting to 0.", processType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error fetching queue depth for '{ProcessType}'; defaulting to 0.", processType);
+        }
 
         var category = MapProcessToEquipmentCategory(processType);
         EquipmentSummaryDto? machine = null;
         if (category is not null)
         {
-            var equipments = await facilityClient.GetEquipmentsAsync(
-                category: category, status: "Active", page: 1, pageSize: 1, ct: ct);
-            machine = equipments?.Items?.FirstOrDefault();
+            try
+            {
+                var equipments = await facilityClient.GetEquipmentsAsync(
+                    category: category, status: "Active", page: 1, pageSize: 1, ct: ct);
+                machine = equipments?.Items?.FirstOrDefault();
+            }
+            catch (TaskCanceledException)
+            {
+                _logger.LogWarning("FacilityService request cancelled or timed out for category '{Category}'; machine lookup skipped.", category);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "FacilityService request failed for category '{Category}'; machine lookup skipped.", category);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Unexpected error fetching equipment for category '{Category}'; machine lookup skipped.", category);
+            }
         }
         else
         {

@@ -464,6 +464,12 @@
     border: 1px solid rgba(37,99,235,0.2);
 }
 
+.badge--draft {
+    background: rgba(120,120,120,0.08);
+    color: var(--mud-palette-text-secondary);
+    border-color: rgba(120,120,120,0.25);
+}
+
 /* ================================================================
    PROJECTNEW PAGE — SUMMARY ITEM ACTIVE STATE (Quote panel)
    ================================================================ */
@@ -636,12 +642,6 @@
     outline: none;
     background: var(--mud-palette-surface);
 }
-
-.pn-save-icon { transition: color 0.2s; }
-
-@keyframes pn-spin { to { transform: rotate(360deg); } }
-
-.pn-save-icon--spin { animation: pn-spin 1.2s linear infinite; }
 
 /* ================================================================
    PROJECTNEW PAGE — LEFT PANEL

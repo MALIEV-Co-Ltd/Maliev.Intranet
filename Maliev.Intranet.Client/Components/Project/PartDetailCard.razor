@@ -238,7 +238,18 @@
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
+        var partChanged = Part.FileId != _lastPartId;
         _lastPartId = Part.FileId;
+
+        if (partChanged)
+        {
+            _dfmPanel?.ResetOverlays();
+            if (_modelViewer != null)
+                await _modelViewer.ClearDfmOverlaysAsync();
+            _viewerLoadFailed = false;
+            _viewerErrorMessage = null;
+        }
+
         _dfmIssues = BuildDfmIssues();
         if (!string.IsNullOrEmpty(Part.ViewerUrl))
         {
@@ -368,6 +379,15 @@
         // _dfmPanel tracks active state; just check if the key is now active
         var isActive = _dfmPanel?._activeOverlays.Contains(issue.OverlayKey) ?? false;
         await _modelViewer.ToggleDfmOverlayAsync(issue.OverlayKey, issue.OverlayUrl, isActive);
+
+        // Show/hide the grid floor when overhang overlay is toggled
+        if (issue.Category == "overhang")
+        {
+            if (isActive)
+                await _modelViewer.ShowGridAsync();
+            else
+                await _modelViewer.HideGridAsync();
+        }
     }
 
     /// <summary>

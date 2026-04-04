@@ -21,13 +21,24 @@
 
         @if (AutoSaving)
         {
-            <MudIcon Icon="@Icons.Material.Filled.CloudSync" Class="pn-save-icon pn-save-icon--spin" Size="Size.Small" />
-        }
-        else
-        {
             <span class="badge">
-                <MudIcon Icon="@Icons.Material.Outlined.CloudDone" Size="Size.Small" />
-                Saved
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                Saving
+            </span>
+        }
+        else if (LastSavedAt.HasValue)
+        {
+            <span class="badge @(HasCustomerSelected ? "" : "badge--draft")">
+                @if (HasCustomerSelected)
+                {
+                    <MudIcon Icon="@Icons.Material.Outlined.CloudDone" Size="Size.Small" />
+                    @:Saved
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Outlined.Save" Size="Size.Small" />
+                    @:Draft
+                }
             </span>
         }
     </MudStack>
@@ -118,6 +129,8 @@
     [Parameter] public List<CurrencyDto> Currencies { get; set; } = [];
     [Parameter] public EventCallback<CurrencyDto?> OnCurrencyChanged { get; set; }
     [Parameter] public bool AutoSaving { get; set; }
+    [Parameter] public DateTimeOffset? LastSavedAt { get; set; }
+    [Parameter] public bool HasCustomerSelected { get; set; }
     [Parameter] public LayoutMode LayoutMode { get; set; }
     [Parameter] public EventCallback<LayoutMode> OnLayoutModeChanged { get; set; }
     [Parameter] public EventCallback OnDuplicate { get; set; }

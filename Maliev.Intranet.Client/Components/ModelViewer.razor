@@ -282,7 +282,7 @@
                     await _module.InvokeVoidAsync("dispose", _canvasId);
 
                 _renderMode  = "solid";
-                _edgesEnabled = true;
+                _edgesEnabled = false;
                 _bboxEnabled  = false;
 
                 // Pass known bounding-box dimensions (mm) so the viewer can correct the glTF meter scale.
@@ -365,6 +365,22 @@
         {
             Console.WriteLine($"[ModelViewer] toggleDfmOverlay error: {ex.Message}");
         }
+    }
+
+    /// <summary>Shows a grid floor at the model base (Z=0) for overhang visualisation.</summary>
+    public async Task ShowGridAsync()
+    {
+        if (_module == null) return;
+        try { await _module.InvokeVoidAsync("showGrid", _canvasId); }
+        catch (Exception ex) { Console.WriteLine($"[ModelViewer] showGrid error: {ex.Message}"); }
+    }
+
+    /// <summary>Hides the grid floor.</summary>
+    public async Task HideGridAsync()
+    {
+        if (_module == null) return;
+        try { await _module.InvokeVoidAsync("hideGrid", _canvasId); }
+        catch (Exception ex) { Console.WriteLine($"[ModelViewer] hideGrid error: {ex.Message}"); }
     }
 
     /// <summary>Removes all DFM overlay meshes from the 3D scene.</summary>

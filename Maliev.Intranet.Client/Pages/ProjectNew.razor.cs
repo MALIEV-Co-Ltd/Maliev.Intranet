@@ -9,6 +9,7 @@ using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using MudBlazor;
@@ -81,6 +82,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     [Inject] private FileTypesSettings FileTypes { get; set; } = null!;
     [Inject] private CookieProvider CookieProvider { get; set; } = null!;
+    [Inject] private ILogger<ProjectNew> Logger { get; set; } = null!;
 
     private bool CanSubmit =>
         !_saving &&
@@ -517,7 +519,9 @@ public partial class ProjectNew : IAsyncDisposable
 
             // Bug 5/6 fix: trigger pricing after the catch-up fetch has populated
             // Dimensions/VolumeMm3 so ComputePriceAsync has accurate geometry data.
-            if (part.ProcessId.HasValue && part.MaterialId.HasValue && _selectedCustomerId.HasValue)
+            // Skip if catalog is not yet loaded (ReloadPartCatalogAsync will trigger pricing itself).
+            if (part.ProcessId.HasValue && part.MaterialId.HasValue
+                && part.AvailableMaterials.Count > 0)
                 TriggerPricingAsync(part);
 
             await InvokeAsync(StateHasChanged);
@@ -531,24 +535,30 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task ResolveViewerUrlAsync(PartViewModel part)
     {
-        if (!string.IsNullOrEmpty(part.GlbStoragePath) && string.IsNullOrEmpty(part.ViewerUrl))
+        if (!string.IsNullOrEmpty(part.ViewerUrl)) return;
+
+        // The viewer-url endpoint expects the original file StoragePath and derives the GLB
+        // path via convention ({storagePath}_viewer.glb) or from BFF cache.
+        // GlbStoragePath already ends with _viewer.glb — passing it causes a double-suffix
+        // when the cache is cold, producing a non-existent GCS path and a 404.
+        var storagePath = part.StoragePath;
+        if (string.IsNullOrEmpty(storagePath)) return;
+
+        try
         {
-            try
+            var viewerResp = await Http.GetAsync(
+                $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(storagePath)}");
+            if (viewerResp.IsSuccessStatusCode)
             {
-                var viewerResp = await Http.GetAsync(
-                    $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
-                if (viewerResp.IsSuccessStatusCode)
-                {
-                    var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
-                    var resolvedUrl = viewerJson?.RootElement.GetProperty("url").GetString();
-                    if (!string.IsNullOrEmpty(resolvedUrl))
-                        part.ViewerUrl = resolvedUrl;
-                }
+                var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
+                var resolvedUrl = viewerJson?.RootElement.GetProperty("url").GetString();
+                if (!string.IsNullOrEmpty(resolvedUrl))
+                    part.ViewerUrl = resolvedUrl;
             }
-            catch
-            {
-                // Non-fatal — viewer URL resolution is best-effort
-            }
+        }
+        catch
+        {
+            // Non-fatal — viewer URL resolution is best-effort
         }
     }
 
@@ -714,6 +724,8 @@ public partial class ProjectNew : IAsyncDisposable
     /// <param name="part">The part to price.</param>
     private void TriggerPricingAsync(PartViewModel part)
     {
+        if (_projectLocked) return;
+
         if (_pricingTokens.TryGetValue(part.FileId, out var existingCts))
         {
             existingCts.Cancel();
@@ -724,6 +736,8 @@ public partial class ProjectNew : IAsyncDisposable
         var cts = new CancellationTokenSource();
         _pricingTokens[part.FileId] = cts;
 
+        part.PricingLoading = true;
+        _ = InvokeAsync(StateHasChanged);
         _ = DebouncedPriceCallAsync(part, cts.Token);
     }
 
@@ -744,8 +758,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task ComputePriceAsync(PartViewModel part, CancellationToken ct)
     {
-        if (!_selectedCustomerId.HasValue)
-            return;
+        if (_projectLocked) return;
 
         if (!part.ProcessId.HasValue || !part.MaterialId.HasValue)
         {
@@ -779,7 +792,7 @@ public partial class ProjectNew : IAsyncDisposable
             var request = new PricingRequestDto
             {
                 FileId = part.FileId,
-                CustomerId = _selectedCustomerId.Value,
+                CustomerId = _selectedCustomerId ?? Guid.Empty,
                 MaterialId = part.MaterialId ?? Guid.Empty,
                 MaterialCode = part.MaterialCode ?? string.Empty,
                 ManufacturingProcessId = part.ProcessId ?? Guid.Empty,
@@ -880,6 +893,12 @@ public partial class ProjectNew : IAsyncDisposable
 
     private bool _serverSaveInProgress;
 
+    /// <summary>
+    /// True when the project has transitioned past Draft/Configuring (e.g. Quoted or Accepted).
+    /// Pricing must not re-trigger for locked projects.
+    /// </summary>
+    private bool _projectLocked;
+
     private async Task SaveDraftAsync()
     {
         _autoSaving = true;
@@ -901,6 +920,7 @@ public partial class ProjectNew : IAsyncDisposable
                 CustomerLandline = _selectedCustomer?.Landline,
                 CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
                 SelectedLeadTimeCode = _selectedLeadTime?.Code ?? "STANDARD",
+                SelectedCurrencyCode = _selectedCurrency?.Code,
                 LastModified = DateTime.UtcNow,
                 Parts = _parts.Select(p => p.ToDraftPartState()).ToList(),
             };
@@ -920,8 +940,11 @@ public partial class ProjectNew : IAsyncDisposable
         }
         finally
         {
-            _autoSaving = false;
-            StateHasChanged();
+            if (!_serverSaveInProgress)
+            {
+                _autoSaving = false;
+                StateHasChanged();
+            }
         }
     }
 
@@ -994,6 +1017,7 @@ public partial class ProjectNew : IAsyncDisposable
                             CustomerLandline = _selectedCustomer?.Landline,
                             CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
                             SelectedLeadTimeCode = _selectedLeadTime?.Code ?? "STANDARD",
+                            SelectedCurrencyCode = _selectedCurrency?.Code,
                             LastModified = DateTime.UtcNow,
                             Parts = _parts.Select(p => p.ToDraftPartState()).ToList(),
                         };
@@ -1058,6 +1082,16 @@ public partial class ProjectNew : IAsyncDisposable
                         // Non-fatal: part update will retry on next auto-save
                     }
                 }
+
+                try
+                {
+                    if (_leftPanel is not null)
+                        await _leftPanel.RefreshRecentProjectsAsync();
+                }
+                catch
+                {
+                    // Non-fatal: left panel refresh is best-effort
+                }
             }
         }
         catch
@@ -1067,6 +1101,8 @@ public partial class ProjectNew : IAsyncDisposable
         finally
         {
             _serverSaveInProgress = false;
+            _autoSaving = false;
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 
@@ -1088,6 +1124,9 @@ public partial class ProjectNew : IAsyncDisposable
             _description = draft.Description;
             _selectedLeadTime = _leadTimeOptions.FirstOrDefault(lt => lt.Code == draft.SelectedLeadTimeCode)
                                 ?? _leadTimeOptions.FirstOrDefault();
+
+            if (!string.IsNullOrEmpty(draft.SelectedCurrencyCode))
+                _selectedCurrency = _currencies.FirstOrDefault(c => c.Code == draft.SelectedCurrencyCode) ?? _selectedCurrency;
 
             if (draft.CustomerId.HasValue)
             {
@@ -1125,7 +1164,7 @@ public partial class ProjectNew : IAsyncDisposable
 
             _selectedPartIndex = 0;
             _lastSavedAt = draft.LastModified;
-            Snackbar.Add("Draft restored from session storage.", Severity.Info);
+            Logger.LogDebug("Draft restored from session storage for session {SessionId}", _sessionId);
         }
         catch (Exception)
         {
@@ -1355,6 +1394,9 @@ public partial class ProjectNew : IAsyncDisposable
                 return;
             }
 
+            // Lock pricing before clearing the draft so no in-flight debounced calls reprice
+            _projectLocked = true;
+
             await JS.InvokeVoidAsync("sessionStorage.removeItem", DraftStorageKey);
 
             Snackbar.Add("Project and quotation created successfully!", Severity.Success);
@@ -1455,8 +1497,6 @@ public partial class ProjectNew : IAsyncDisposable
         if (partsInTemp.Count == 0)
             return;
 
-        Snackbar.Add($"Moving {partsInTemp.Count} file(s) to customer storage...", Severity.Info);
-
         var migrationResult = await Http.PostAsJsonAsync(
             $"api/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
             (object?)null);
@@ -1475,27 +1515,54 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         var root = migrated.RootElement;
-        var errors = root.GetProperty("Errors");
-        var totalMigrated = root.GetProperty("TotalMigrated").GetInt32();
 
-        if (errors.GetArrayLength() > 0)
+        if (!root.TryGetProperty("errors", out var errorsElement) && 
+            !root.TryGetProperty("Errors", out errorsElement))
         {
-            Snackbar.Add($"Migration completed with {errors.GetArrayLength()} error(s).", Severity.Warning);
+            Snackbar.Add("Migration response is invalid: missing errors property.", Severity.Error);
+            return;
+        }
+
+        var totalMigrated = 0;
+        if (root.TryGetProperty("total_migrated", out var totalMigratedElement) || 
+            root.TryGetProperty("TotalMigrated", out totalMigratedElement))
+        {
+            totalMigrated = totalMigratedElement.GetInt32();
+        }
+
+        if (errorsElement.GetArrayLength() > 0)
+        {
+            Snackbar.Add($"Migration completed with {errorsElement.GetArrayLength()} error(s).", Severity.Warning);
             return;
         }
 
         if (totalMigrated == 0)
         {
-            Snackbar.Add("No files needed to be migrated.", Severity.Info);
             return;
         }
 
-        var migratedFiles = root.GetProperty("MigratedFiles");
-        foreach (var entry in migratedFiles.EnumerateArray())
+        if (!root.TryGetProperty("migrated_files", out var migratedFilesElement) && 
+            !root.TryGetProperty("MigratedFiles", out migratedFilesElement))
         {
-            var fileId = entry.GetProperty("FileId").GetString();
-            var newBasePath = entry.GetProperty("NewPath").GetString();
-            var oldBasePath = entry.GetProperty("OldPath").GetString();
+            Snackbar.Add("Migration response is invalid: missing migrated_files property.", Severity.Error);
+            return;
+        }
+
+        foreach (var entry in migratedFilesElement.EnumerateArray())
+        {
+            if (!entry.TryGetProperty("file_id", out var fileIdElement) && 
+                !entry.TryGetProperty("FileId", out fileIdElement))
+                continue;
+            if (!entry.TryGetProperty("new_path", out var newPathElement) && 
+                !entry.TryGetProperty("NewPath", out newPathElement))
+                continue;
+            if (!entry.TryGetProperty("old_path", out var oldPathElement) && 
+                !entry.TryGetProperty("OldPath", out oldPathElement))
+                continue;
+
+            var fileId = fileIdElement.GetString();
+            var newBasePath = newPathElement.GetString();
+            var oldBasePath = oldPathElement.GetString();
 
             if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(newBasePath) || string.IsNullOrEmpty(oldBasePath))
                 continue;
@@ -1526,8 +1593,10 @@ public partial class ProjectNew : IAsyncDisposable
             part.GlbSignedUrl = null;
         }
 
-        Snackbar.Add($"Migrated {totalMigrated} file(s) to permanent storage.", Severity.Success);
         await InvokeAsync(StateHasChanged);
+
+        foreach (var part in _parts.Where(p => p.ProcessId.HasValue && p.MaterialId.HasValue))
+            TriggerPricingAsync(part);
     }
 
     private async Task OpenBabylonViewer(PartViewModel part)
