@@ -206,6 +206,13 @@ try
                             System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email or
                             System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Name);
 
+                        // Store google_user_id as a separate claim BEFORE removing the old NameIdentifier
+                        // This is required for token re-exchange in UserContextHandler
+                        if (!string.IsNullOrEmpty(googleUserId) && identity != null)
+                        {
+                            identity.AddClaim(new System.Security.Claims.Claim("google_user_id", googleUserId));
+                        }
+
                         // Remove the old Google NameIdentifier (numeric sub) before adding platform claims
                         // to prevent SignInAsync from merging it with the new platform sub.
                         var oldNameIdClaim = identity?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);

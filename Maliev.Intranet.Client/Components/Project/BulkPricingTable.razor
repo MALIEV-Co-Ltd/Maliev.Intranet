@@ -10,12 +10,11 @@
             <span class="bpt-saved-chip">Saved @CurrencySymbol @SavingAmount.ToString("N0")</span>
         }
         <MudIcon Icon="@(_expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
-                 Size="Size.Small" Color="Color.Secondary" />
+                 Size="Size.Small" Color="Color.Secondary" Class="bpt-expand-icon" />
     </div>
 
-    @if (_expanded)
-    {
-        <div class="bpt-tiers">
+    <div class="bpt-content" style="@(_expanded ? "grid-template-rows: 1fr;" : "grid-template-rows: 0fr;")">
+        <div class="bpt-tiers-inner">
             @for (var i = 0; i < Tiers.Count; i++)
             {
                 var tier = Tiers[i];
@@ -29,7 +28,7 @@
                 </div>
             }
         </div>
-    }
+    </div>
 </div>
 
 <style>
@@ -56,7 +55,18 @@
         user-select: none;
     }
     .bpt-header:hover { background: var(--mud-palette-background); }
-    .bpt-tiers { padding: 4px 0; }
+    .bpt-expand-icon {
+        transition: transform 0.2s ease;
+    }
+    .bpt-content {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.2s ease-out;
+    }
+    .bpt-tiers-inner {
+        overflow: hidden;
+        padding: 4px 0;
+    }
     .bpt-tier-row {
         display: flex;
         justify-content: space-between;
