@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Bff.Services;
 using Maliev.MessagingContracts.Contracts.Geometry;
@@ -15,7 +14,6 @@ namespace Maliev.Intranet.Bff.Consumers;
 public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
 {
     private readonly IHubContext<NotificationHub> _hub;
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IFileAnalysisStatusService _analysisStatusService;
     private readonly ILogger<DfmAnalysisReadyConsumer> _logger;
 
@@ -24,18 +22,13 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
     /// </summary>
     public DfmAnalysisReadyConsumer(
         IHubContext<NotificationHub> hub,
-        IHttpClientFactory httpClientFactory,
         IFileAnalysisStatusService analysisStatusService,
         ILogger<DfmAnalysisReadyConsumer> logger)
     {
         _hub = hub;
-        _httpClientFactory = httpClientFactory;
         _analysisStatusService = analysisStatusService;
         _logger = logger;
     }
-
-    private UploadServiceClient CreateUploadClient() =>
-        new("UploadServiceClient.Consumer", _httpClientFactory);
 
     /// <summary>
     /// Processes an incoming <see cref="DfmAnalysisReadyEvent"/>: persists DFM reports in the
@@ -81,45 +74,13 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         var slaReport = DeserializeReport<SlaDfmReportPayload>(payload.SlaReport);
         var cncReport = DeserializeReport<CncDfmReportPayload>(payload.CncReport);
 
-        // Sign overlay GLB paths concurrently (fire-and-forget per key)
-        IReadOnlyDictionary<string, string>? overlayUrls = null;
-        if (payload.OverlayPaths is { Count: > 0 })
-        {
-            try
-            {
-                var client = CreateUploadClient();
-                var signTasks = payload.OverlayPaths
-                    .Select(async kv =>
-                    {
-                        var url = await client.GetDownloadUrlByPathAsync(
-                            kv.Value, context.CancellationToken);
-                        return (kv.Key, Url: url);
-                    });
-                var signed = await Task.WhenAll(signTasks);
-                overlayUrls = signed
-                    .Where(x => !string.IsNullOrEmpty(x.Url))
-                    .ToDictionary(x => x.Key, x => x.Url!);
-                _logger.LogInformation(
-                    "DfmAnalysisReadyConsumer: signed {Count} overlay URLs for storagePath={StoragePath}",
-                    overlayUrls.Count, payload.StoragePath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "DfmAnalysisReadyConsumer: overlay URL signing failed (non-fatal) for storagePath={StoragePath}",
-                    payload.StoragePath);
-            }
-        }
-
         await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
             "DfmAnalysisReady",
             new DfmAnalysisReadyPayload(
                 StoragePath: payload.StoragePath,
                 FdmReport: fdmReport,
                 SlaReport: slaReport,
-                CncReport: cncReport,
-                OverlayUrls: overlayUrls,
-                OverlayPaths: payload.OverlayPaths),
+                CncReport: cncReport),
             context.CancellationToken);
     }
 
