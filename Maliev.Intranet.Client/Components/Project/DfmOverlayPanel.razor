@@ -58,7 +58,7 @@ else if (IsVisible && DfmIssues.Count > 0)
                     var isActive = issue.OverlayKey != null && _activeOverlays.Contains(issue.OverlayKey);
                     var canToggle = issue.OverlayUrl != null && OnToggleOverlay.HasDelegate;
                     <div class="dfm-issue-row @(isActive ? "dfm-issue-row--active" : "") @(canToggle ? "dfm-issue-row--clickable" : "")"
-                         @onclick="@(canToggle ? () => ToggleOverlay(issue) : null)">
+                         @onclick="@(canToggle ? EventCallback.Factory.Create<MouseEventArgs>(this, () => ToggleOverlay(issue)) : EventCallback<MouseEventArgs>.Empty)">
                         <MudIcon Icon="@issue.Icon"
                                  Size="Size.Small"
                                  Color="@(issue.Severity == DfmIssueSeverity.Error ? Color.Error : Color.Warning)"
