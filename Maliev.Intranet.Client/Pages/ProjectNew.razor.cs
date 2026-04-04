@@ -246,6 +246,8 @@ public partial class ProjectNew : IAsyncDisposable
             part.FdmDfmReport = payload.FdmReport;
             part.SlaDfmReport = payload.SlaReport;
             part.CncDfmReport = payload.CncReport;
+            part.OverlayUrls = payload.OverlayUrls;
+            part.OverlayPaths = payload.OverlayPaths;
             part.ResolveDfmReport();
 
             await InvokeAsync(StateHasChanged);
@@ -510,6 +512,9 @@ public partial class ProjectNew : IAsyncDisposable
             // after a draft restore. This mirrors OpenBabylonViewer but is non-fatal.
             await ResolveViewerUrlAsync(part);
 
+            // Re-sign overlay GLB paths so click-to-highlight works after draft restore
+            await ResolveOverlayUrlsAsync(part);
+
             // Bug 5/6 fix: trigger pricing after the catch-up fetch has populated
             // Dimensions/VolumeMm3 so ComputePriceAsync has accurate geometry data.
             if (part.ProcessId.HasValue && part.MaterialId.HasValue && _selectedCustomerId.HasValue)
@@ -544,6 +549,37 @@ public partial class ProjectNew : IAsyncDisposable
             {
                 // Non-fatal — viewer URL resolution is best-effort
             }
+        }
+    }
+
+    /// <summary>
+    /// Re-signs raw GCS overlay paths into fresh signed URLs so overlays work after
+    /// draft restore when the original signed URLs may have expired.
+    /// </summary>
+    private async Task ResolveOverlayUrlsAsync(PartViewModel part)
+    {
+        if (part.OverlayPaths is not { Count: > 0 }) return;
+        try
+        {
+            var signed = new Dictionary<string, string>(part.OverlayPaths.Count);
+            foreach (var (key, path) in part.OverlayPaths)
+            {
+                var resp = await Http.GetAsync(
+                    $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(path)}");
+                if (resp.IsSuccessStatusCode)
+                {
+                    var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
+                    var url = json?.RootElement.GetProperty("url").GetString();
+                    if (!string.IsNullOrEmpty(url))
+                        signed[key] = url;
+                }
+            }
+            if (signed.Count > 0)
+                part.OverlayUrls = signed;
+        }
+        catch
+        {
+            // Non-fatal — overlay URL resolution is best-effort
         }
     }
 
@@ -796,10 +832,13 @@ public partial class ProjectNew : IAsyncDisposable
         if (_selectedLeadTime == null)
             return;
 
-        if (!part.ProcessId.HasValue || !part.MaterialId.HasValue)
+        if (!part.ProcessId.HasValue || !part.MaterialId.HasValue || string.IsNullOrEmpty(part.ProcessCode))
             return;
 
         if (part.ProductionRoutingLoading || part.ProductionRouting != null)
+            return;
+
+        if (_tempProjectId == Guid.Empty)
             return;
 
         // Use ServerPartId when available (part synced to server), fall back to FileId
@@ -810,8 +849,9 @@ public partial class ProjectNew : IAsyncDisposable
         part.ProductionRoutingLoading = true;
         try
         {
+            var processCode = Uri.EscapeDataString(part.ProcessCode ?? "");
             part.ProductionRouting = await Http.GetFromJsonAsync<ProductionRoutingDto>(
-                $"api/projects/{_tempProjectId}/parts/{partId}/routing");
+                $"api/projects/{_tempProjectId}/parts/{partId}/routing?processType={processCode}");
         }
         catch
         {

@@ -129,6 +129,12 @@ public class PartViewModel
     public Dictionary<string, string>? OverlayUrls { get; set; }
 
     /// <summary>
+    /// Raw GCS storage paths for overlay GLBs (same keys as <see cref="OverlayUrls"/>).
+    /// Persisted in draft state so signed URLs can be re-generated after expiry.
+    /// </summary>
+    public Dictionary<string, string>? OverlayPaths { get; set; }
+
+    /// <summary>
     /// Resolves <see cref="DfmReport"/> from the per-process DFM report properties
     /// based on the currently selected <see cref="ProcessCode"/>.
     /// Call this after setting any of FdmDfmReport/SlaDfmReport/CncDfmReport,
@@ -290,6 +296,7 @@ public class PartViewModel
         FdmDfmReportJson = FdmDfmReport is FdmDfmReportPayload fdm ? JsonSerializer.Serialize(fdm) : null,
         SlaDfmReportJson = SlaDfmReport is SlaDfmReportPayload sla ? JsonSerializer.Serialize(sla) : null,
         CncDfmReportJson = CncDfmReport is CncDfmReportPayload cnc ? JsonSerializer.Serialize(cnc) : null,
+        OverlayPaths = OverlayPaths,
     };
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
@@ -341,6 +348,7 @@ public class PartViewModel
             // Restore pricing snapshot for instant display while background recalculation runs
             EstimatedUnitPrice = s.EstimatedUnitPrice,
             EstimatedTotalAmount = s.EstimatedTotalAmount,
+            OverlayPaths = s.OverlayPaths,
         };
 
         // Deserialise DFM reports from JSON so BuildDfmIssues pattern-matching works correctly.

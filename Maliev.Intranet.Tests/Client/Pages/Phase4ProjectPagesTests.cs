@@ -91,6 +91,7 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
             .ReturnsAsync(AuthorizationResult.Success());
         Services.AddSingleton(authServiceMock.Object);
 
+        Services.AddSingleton<CookieProvider>();
         Services.AddSingleton<ChatService>();
 
         Render<MudPopoverProvider>();

@@ -113,12 +113,17 @@ public record GlbReadyPayload(string StoragePath, string? GlbUrl, bool Failed);
 /// Signed GCS download URLs for per-issue overlay GLBs, keyed by "{PROCESS}__{category}".
 /// Frontend loads these on-demand when a DFM issue is clicked. Null if none were generated.
 /// </param>
+/// <param name="OverlayPaths">
+/// Raw GCS storage paths for overlay GLBs (same keys as <paramref name="OverlayUrls"/>).
+/// Persisted in draft state so signed URLs can be re-generated after expiry.
+/// </param>
 public record DfmAnalysisReadyPayload(
     string StoragePath,
     Maliev.MessagingContracts.Contracts.Geometry.FdmDfmReportPayload? FdmReport,
     Maliev.MessagingContracts.Contracts.Geometry.SlaDfmReportPayload? SlaReport,
     Maliev.MessagingContracts.Contracts.Geometry.CncDfmReportPayload? CncReport,
-    IReadOnlyDictionary<string, string>? OverlayUrls = null);
+    IReadOnlyDictionary<string, string>? OverlayUrls = null,
+    IReadOnlyDictionary<string, string>? OverlayPaths = null);
 
 /// <summary>Payload pushed when a pricing calculation result is ready.</summary>
 /// <param name="StoragePath">GCS path of the original file (join key).</param>

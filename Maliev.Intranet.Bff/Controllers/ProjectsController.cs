@@ -10,11 +10,17 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// BFF controller that proxies all project lifecycle operations to the downstream ProjectService.
 /// </summary>
 /// <param name="client">The typed ProjectService HTTP client.</param>
+/// <param name="jobClient">The typed JobService HTTP client (used for routing queue depth).</param>
+/// <param name="facilityClient">The typed FacilityService HTTP client (used for routing machine lookup).</param>
 /// <param name="logger">The logger instance.</param>
 [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [Route("api/[controller]")]
-public class ProjectsController(ProjectServiceClient client, ILogger<ProjectsController> logger) : ControllerBase
+public class ProjectsController(
+    ProjectServiceClient client,
+    JobServiceClient jobClient,
+    FacilityServiceClient facilityClient,
+    ILogger<ProjectsController> logger) : ControllerBase
 {
     private readonly ILogger<ProjectsController> _logger = logger;
     // ── Query endpoints ──────────────────────────────────────────────────────
@@ -243,17 +249,63 @@ public class ProjectsController(ProjectServiceClient client, ILogger<ProjectsCon
 
     /// <summary>
     /// Returns the production routing information for a specific part.
+    /// Computed in the BFF by aggregating JobService queue depth and FacilityService machine data.
     /// </summary>
     /// <param name="id">The project GUID.</param>
     /// <param name="partId">The part GUID.</param>
+    /// <param name="processType">The manufacturing process code (e.g. "FDM", "CNC_MILL").</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>Production routing DTO or an appropriate error status code.</returns>
-    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    /// <returns>Production routing DTO.</returns>
     [HttpGet("{id:guid}/parts/{partId:guid}/routing")]
     public async Task<ActionResult<ProductionRoutingDto>> GetPartRouting(
-        Guid id, Guid partId, CancellationToken ct)
+        Guid id, Guid partId,
+        [FromQuery] string? processType,
+        CancellationToken ct)
     {
-        var dto = await client.GetPartRoutingAsync(id, partId, ct);
-        return dto != null ? Ok(dto) : NotFound();
+        if (string.IsNullOrEmpty(processType))
+            return BadRequest("processType query parameter is required.");
+
+        var queueDepths = await jobClient.GetQueueDepthAsync(processType, ct);
+        var queueAhead = 0;
+        queueDepths?.TryGetValue(processType, out queueAhead);
+
+        var category = MapProcessToEquipmentCategory(processType);
+        EquipmentSummaryDto? machine = null;
+        if (category is not null)
+        {
+            var equipments = await facilityClient.GetEquipmentsAsync(
+                category: category, status: "Active", page: 1, pageSize: 1, ct: ct);
+            machine = equipments?.Items?.FirstOrDefault();
+        }
+        else
+        {
+            _logger.LogWarning("No equipment category mapping for process type '{ProcessType}'; machine lookup skipped.", processType);
+        }
+
+        // CNC requires fixture and toolpath verification; other processes need only 1 setup day.
+        var setupDays = processType.StartsWith("CNC", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
+        var estimatedStart = DateTimeOffset.UtcNow.AddDays(setupDays + queueAhead);
+
+        return Ok(new ProductionRoutingDto(
+            MachineId:          machine?.Id ?? Guid.Empty,
+            MachineCode:        machine?.AssetCode ?? "TBD",
+            MachineName:        machine?.Name ?? "Unassigned",
+            QueueAhead:         queueAhead,
+            EstimatedStartDate: estimatedStart,
+            ScheduleItems:      []));
     }
+
+    private static string? MapProcessToEquipmentCategory(string processType) => processType switch
+    {
+        "FDM"      => "FdmPrinter",
+        "SLA_DLP"  => "SlaPrinter",
+        "SLS"      => "SlsPrinter",
+        "MJF"      => "MjfPrinter",
+        "MJ"       => "MjPrinter",
+        "BJ"       => "BjPrinter",
+        "DMLS"     => "DmlsPrinter",
+        "CNC_MILL" => "CncMachine",
+        "CNC_TURN" => "CncMachine",
+        _          => null,
+    };
 }

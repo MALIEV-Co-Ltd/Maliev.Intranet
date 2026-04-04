@@ -88,6 +88,26 @@ public class JobServiceClient(HttpClient httpClient)
     public async Task<HttpResponseMessage> AssignMachineAsync(Guid id, Guid machineId, CancellationToken ct = default) =>
         await httpClient.PostAsJsonAsync($"/job/v1/jobs/{id}/assign", new { MachineId = machineId }, ct);
 
+    // ── Queue depth ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Gets queue depth (active job count) by technology.
+    /// </summary>
+    /// <param name="technology">Optional technology filter (e.g., "FDM", "CNC_MILL").</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Dictionary of technology to active job count, or null on failure.</returns>
+    public async Task<Dictionary<string, int>?> GetQueueDepthAsync(
+        string? technology = null, CancellationToken ct = default)
+    {
+        var url = "/job/v1/jobs/queue-depth";
+        if (!string.IsNullOrEmpty(technology))
+            url += $"?technology={Uri.EscapeDataString(technology)}";
+
+        var response = await httpClient.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<Dictionary<string, int>>(cancellationToken: ct);
+    }
+
     // ── Stats & QR ────────────────────────────────────────────────────────────
 
     /// <summary>

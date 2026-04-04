@@ -20,6 +20,7 @@ public class PlaceholderPageTests : BunitContext, IAsyncLifetime
         var handler = new MockHttpMessageHandler();
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);
+        Services.AddSingleton<CookieProvider>();
         Services.AddScoped<ProductionHubService>();
         Render<MudPopoverProvider>();
     }

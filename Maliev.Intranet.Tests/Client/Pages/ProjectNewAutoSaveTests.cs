@@ -42,6 +42,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Services.AddSingleton(authServiceMock.Object);
         var layoutLoggerMock = new Mock<ILogger<LayoutService>>();
         Services.AddSingleton<LayoutService>(new LayoutService(JSInterop.JSRuntime, layoutLoggerMock.Object, null!));
+        Services.AddSingleton<CookieProvider>();
         Services.AddSingleton<ChatService>();
         Services.AddScoped<BreadcrumbService>();
         Services.AddSingleton(new FileTypesSettings

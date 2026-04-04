@@ -178,24 +178,6 @@ public class ProjectServiceClient(HttpClient httpClient)
     public async Task<HttpResponseMessage> AcceptQuotationAsync(Guid projectId, CancellationToken ct = default)
         => await httpClient.PostAsync($"/project/v1/projects/{projectId}/accept-quotation", null, ct);
 
-    // ── Routing endpoints ────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Retrieves the production routing information for a specific part.
-    /// </summary>
-    /// <param name="projectId">The project GUID.</param>
-    /// <param name="partId">The part GUID.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>The production routing DTO, or <c>null</c> if the downstream call did not succeed.</returns>
-    public async Task<ProductionRoutingDto?> GetPartRoutingAsync(
-        Guid projectId, Guid partId, CancellationToken ct = default)
-    {
-        var response = await httpClient.GetAsync(
-            $"/project/v1/projects/{projectId}/parts/{partId}/routing", ct);
-        if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<ProductionRoutingDto>(cancellationToken: ct);
-    }
-
     // ── Dashboard helpers ────────────────────────────────────────────────────
 
     /// <summary>

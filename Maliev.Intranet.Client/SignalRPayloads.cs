@@ -102,4 +102,10 @@ public sealed class SignalRDfmAnalysisPayload
     /// Null if no overlays were generated.
     /// </summary>
     public Dictionary<string, string>? OverlayUrls { get; set; }
+
+    /// <summary>
+    /// Raw GCS storage paths for overlay GLBs (same keys as <see cref="OverlayUrls"/>).
+    /// Persisted in draft state so signed URLs can be re-generated after expiry.
+    /// </summary>
+    public Dictionary<string, string>? OverlayPaths { get; set; }
 }

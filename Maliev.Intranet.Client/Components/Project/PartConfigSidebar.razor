@@ -436,6 +436,7 @@
         if (Part == null) return;
         Part.ProcessCode = p?.Code;
         Part.ProcessId = p?.Id;
+        Part.ResolveDfmReport();
         Part.AvailableMaterials = [];
         Part.AvailableFinishes = [];
         Part.AvailableTolerances = [];

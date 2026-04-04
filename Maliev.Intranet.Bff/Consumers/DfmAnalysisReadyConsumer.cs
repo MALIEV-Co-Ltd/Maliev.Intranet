@@ -118,7 +118,8 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
                 FdmReport: fdmReport,
                 SlaReport: slaReport,
                 CncReport: cncReport,
-                OverlayUrls: overlayUrls),
+                OverlayUrls: overlayUrls,
+                OverlayPaths: payload.OverlayPaths),
             context.CancellationToken);
     }
 

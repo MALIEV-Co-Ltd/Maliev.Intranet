@@ -33,8 +33,9 @@ public class FacilityServiceClient(HttpClient httpClient) : IFacilityServiceClie
         CancellationToken ct = default)
     {
         var query = BuildEquipmentListQuery(category, status, search, page, pageSize);
-        return await httpClient.GetFromJsonAsync<FacilityPagedResult<EquipmentSummaryDto>>(
-            $"/facility/v1/equipments{query}", ct);
+        var response = await httpClient.GetAsync($"/facility/v1/equipments{query}", ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<FacilityPagedResult<EquipmentSummaryDto>>(cancellationToken: ct);
     }
 
     /// <summary>

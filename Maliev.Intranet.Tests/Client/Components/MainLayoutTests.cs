@@ -48,6 +48,7 @@ public class MainLayoutTests : BunitContext, IAsyncLifetime
         var layoutService = new LayoutService(JSInterop.JSRuntime, _layoutLoggerMock.Object, null!);
 
         Services.AddSingleton<LayoutService>(layoutService);
+        Services.AddSingleton<CookieProvider>();
         Services.AddSingleton<ChatService>();
         Services.AddScoped<BreadcrumbService>();
 

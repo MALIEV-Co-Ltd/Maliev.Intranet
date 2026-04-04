@@ -204,6 +204,12 @@ public sealed class DraftPartState
 
     /// <summary>List of material or process certificates required (e.g. "EN10204-3.1", "RoHS").</summary>
     public List<string> Certificates { get; set; } = [];
+
+    /// <summary>
+    /// Raw GCS storage paths for overlay GLBs, keyed by "{PROCESS}__{category}".
+    /// Persisted instead of signed URLs so they survive expiry. Re-signed on restore.
+    /// </summary>
+    public Dictionary<string, string>? OverlayPaths { get; set; }
 }
 
 /// <summary>
