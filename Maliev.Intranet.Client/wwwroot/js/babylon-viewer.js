@@ -1,6 +1,9 @@
 /**
  * BabylonJS 3D Viewer for Maliev Intranet
- * Lazy-loads BabylonJS from CDN and provides functions for Blazor JS interop.
+ * Loads bundled BabylonJS from wwwroot/lib/babylonjs/ and provides functions for Blazor JS interop.
+ *
+ * Bundled version: 9.1.0 — to upgrade, download new files to wwwroot/lib/babylonjs/
+ * and update the version comment above.
  *
  * Supported formats (via babylonjs.loaders): .glb, .gltf, .stl, .obj
  * Unsupported formats (.step, .iges, .3mf etc.) must be converted to GLB before reaching this script.
@@ -173,9 +176,9 @@ function applyPreset(cam, presetName) {
  */
 export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef) {
     try {
-        await loadScript('https://cdn.babylonjs.com/babylon.js@9.1.0');
-        await loadScript('https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js@9.1.0');
-        await loadScript('https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js@9.1.0');
+        await loadScript('./lib/babylonjs/babylon.js');
+        await loadScript('./lib/babylonjs/babylonjs.loaders.min.js');
+        await loadScript('./lib/babylonjs/babylonjs.materials.min.js');
 
         const canvas = document.getElementById(canvasId);
         if (!canvas) { console.error(`[BabylonViewer] Canvas #${canvasId} not found.`); return; }
