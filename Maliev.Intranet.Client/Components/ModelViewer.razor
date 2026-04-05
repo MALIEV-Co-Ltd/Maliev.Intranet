@@ -329,7 +329,10 @@
     {
         _cameraPreset = preset;
         if (_module != null)
+        {
             await _module.InvokeVoidAsync("setCameraPreset", _canvasId, preset);
+            await _module.InvokeVoidAsync("stopAutoRotation", _canvasId);
+        }
     }
 
     private async Task SetRenderModeAsync(string mode)

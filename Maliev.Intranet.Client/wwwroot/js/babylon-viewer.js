@@ -600,7 +600,10 @@ function attachPickPointPan(canvasId, canvas, camera) {
 
 /**
  * Creates a fixed XYZ axis indicator in the top-right corner.
- * Z-up CAD standard colors: X=red (right), Y=green (depth), Z=blue (up)
+ * After 90° clockwise rotation around Z (Z is up on screen):
+ * - X (red) → points up (Y+)
+ * - Y (green) → points right (X+)
+ * - Z (blue) → points up (Z+, unchanged)
  */
 function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     // Dispose previous
@@ -635,9 +638,9 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         return l;
     }
 
-    makeAxisLine('__axisX__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, LEN, 0)], COL_X);  // Y+ direction (up), red
-    makeAxisLine('__axisY__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(LEN, 0, 0)], COL_Y);  // X+ direction (right), green
-    makeAxisLine('__axisZ__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, 0, LEN)], COL_Z);  // Z+ direction (depth), blue
+    makeAxisLine('__axisX__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(-LEN, 0, 0)], COL_X);  // X+ direction, red
+    makeAxisLine('__axisY__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, LEN, 0)], COL_Y);  // Y+ direction, green
+    makeAxisLine('__axisZ__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, 0, LEN)], COL_Z);  // Z+ direction, blue
 
     function makeCone(name, dir, color) {
         const d = dir.normalize();
@@ -659,9 +662,9 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         return cone;
     }
 
-    makeCone('__axisXArr__', new BABYLON.Vector3(0, 1, 0), COL_X);  // Y+ direction (up), red
-    makeCone('__axisYArr__', new BABYLON.Vector3(1, 0, 0), COL_Y);  // X+ direction (right), green
-    makeCone('__axisZArr__', new BABYLON.Vector3(0, 0, 1), COL_Z);  // Z+ direction (depth), blue
+    makeCone('__axisXArr__', new BABYLON.Vector3(-1, 0, 0), COL_X);  // X+ direction, red
+    makeCone('__axisYArr__', new BABYLON.Vector3(0, 1, 0), COL_Y);  // Y+ direction, green
+    makeCone('__axisZArr__', new BABYLON.Vector3(0, 0, 1), COL_Z);  // Z+ direction, blue
 
     // Gizmo camera — top-right corner, orthographic, renders only LAYER meshes
     const hw = 1.1;
@@ -690,9 +693,9 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
 
     // ── Hover labels (X, Y, Z text that appear on mouseover) ──
     const labelDefs = [
-        { name: 'X', color: '#f04444', pos: new BABYLON.Vector3(0, LEN + 0.28, 0) },  // Y+ (up), red
-        { name: 'Y', color: '#22c750', pos: new BABYLON.Vector3(LEN + 0.28, 0, 0) },  // X+ (right), green
-        { name: 'Z', color: '#3882f5', pos: new BABYLON.Vector3(0, 0, LEN + 0.28) },  // Z+ (depth), blue
+        { name: 'X', color: '#f04444', pos: new BABYLON.Vector3(-(LEN + 0.28), 0, 0) },  // X+, red
+        { name: 'Y', color: '#22c750', pos: new BABYLON.Vector3(0, LEN + 0.28, 0) },  // Y+, green
+        { name: 'Z', color: '#3882f5', pos: new BABYLON.Vector3(0, 0, LEN + 0.28) },  // Z+, blue
     ];
 
     const labelDivs = labelDefs.map(({ name, color, pos }) => {
@@ -873,6 +876,13 @@ export function setCameraPreset(canvasId, preset) {
     if (bb) fitCameraToMesh(cam, bb, meshCenters[canvasId], canvasId);
 
     applyPreset(cam, preset);
+}
+
+// ── stopAutoRotation ───────────────────────────────────────────────────────────
+
+export function stopAutoRotation(canvasId) {
+    animStates[canvasId]      = 'interacting';
+    autoSpeedTarget[canvasId] = SPEED_STOP;
 }
 
 // ── resetCamera ───────────────────────────────────────────────────────────────
