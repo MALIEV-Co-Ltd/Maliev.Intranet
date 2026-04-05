@@ -33,6 +33,7 @@ public partial class ProjectNew : IAsyncDisposable
     private CustomerSummaryDto? _selectedCustomer;
     private bool _showCustomerSearch = true;
     private CurrencyDto? _selectedCurrency;
+    private decimal _exchangeRate = 1m;
     private List<CurrencyDto> _currencies = [];
     private List<LeadTimeOptionDto> _leadTimeOptions = [];
     private LeadTimeOptionDto? _selectedLeadTime;
@@ -81,6 +82,7 @@ public partial class ProjectNew : IAsyncDisposable
     private HubConnection? _hubConnection;
 
     [Inject] private FileTypesSettings FileTypes { get; set; } = null!;
+    [Inject] private UploadSettings UploadSettings { get; set; } = null!;
     [Inject] private CookieProvider CookieProvider { get; set; } = null!;
     [Inject] private ILogger<ProjectNew> Logger { get; set; } = null!;
 
@@ -465,6 +467,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.VolumeMm3 = status.Dimensions?.VolumeMm3;
             part.IsManifold = status.IsManifold;
             part.GlbStoragePath = status.GlbStoragePath;
+            part.GlbSignedUrl = status.GlbSignedUrl;  // Option B: use cached signed URL directly
 
             if (status.DfmReport is JsonElement je && je.ValueKind == JsonValueKind.Object
                 && je.TryGetProperty("FdmReport", out _))
@@ -537,11 +540,16 @@ public partial class ProjectNew : IAsyncDisposable
     {
         if (!string.IsNullOrEmpty(part.ViewerUrl)) return;
 
-        // The viewer-url endpoint expects the original file StoragePath and derives the GLB
-        // path via convention ({storagePath}_viewer.glb) or from BFF cache.
-        // GlbStoragePath already ends with _viewer.glb — passing it causes a double-suffix
-        // when the cache is cold, producing a non-existent GCS path and a 404.
-        var storagePath = part.StoragePath;
+        // Option B: Use pre-signed URL from cache if available (no API call needed)
+        if (!string.IsNullOrEmpty(part.GlbSignedUrl))
+        {
+            part.ViewerUrl = part.GlbSignedUrl;
+            return;
+        }
+
+        // Fallback: Call viewer-url API for backward compatibility (drafts created before this fix)
+        // Prefer GlbStoragePath (already has _viewer.glb suffix) over StoragePath to avoid double-suffix bug
+        var storagePath = part.GlbStoragePath ?? part.StoragePath;
         if (string.IsNullOrEmpty(storagePath)) return;
 
         try
@@ -880,6 +888,31 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Task 14: Auto-save ─────────────────────────────────────────────
 
     /// <inheritdoc />
+    private async Task OnCurrencyChangedAsync(CurrencyDto? currency)
+    {
+        _selectedCurrency = currency;
+
+        if (currency == null || string.Equals(currency.Code, "THB", StringComparison.OrdinalIgnoreCase))
+        {
+            _exchangeRate = 1m;
+        }
+        else
+        {
+            try
+            {
+                var resp = await Http.GetFromJsonAsync<ExchangeRateResponse>(
+                    $"api/reference-data/currencies/rate?from=THB&to={Uri.EscapeDataString(currency.Code)}");
+                _exchangeRate = resp?.Rate ?? 1m;
+            }
+            catch
+            {
+                _exchangeRate = 1m;
+            }
+        }
+
+        TriggerAutoSave();
+    }
+
     private void TriggerAutoSave()
     {
         _autoSaveDebounceTimer?.Dispose();

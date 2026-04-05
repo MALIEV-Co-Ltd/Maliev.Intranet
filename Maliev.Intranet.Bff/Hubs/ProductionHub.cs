@@ -39,4 +39,13 @@ public class ProductionHub : Hub
     /// <returns>A task representing the broadcast operation.</returns>
     public async Task NotifyStatsUpdated(object stats) =>
         await Clients.All.SendAsync("ProductionStatsUpdated", stats);
+
+    /// <summary>
+    /// Broadcasts a schedule change notification to all connected clients.
+    /// Triggered after a job is reordered or rescheduled on a machine.
+    /// </summary>
+    /// <param name="machineId">The machine whose schedule changed.</param>
+    /// <returns>A task representing the broadcast operation.</returns>
+    public async Task NotifyScheduleChanged(string machineId) =>
+        await Clients.All.SendAsync("ScheduleChanged", new { MachineId = machineId });
 }

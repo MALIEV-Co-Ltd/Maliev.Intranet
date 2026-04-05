@@ -24,10 +24,10 @@ public interface IFileAnalysisStatusService
     Task SetPreviewUrlsAsync(string uploadId, FileAnalysisPreviewUrlsDto previewUrls, string? thumbnailUrl, string? hiResThumbnailUrl = null, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Marks the geometry analysis as completed and stores the optional GLB storage path and DFM report.
+    /// Marks the geometry analysis as completed and stores the optional GLB storage path, signed URL, and DFM report.
     /// Preview URLs may still be pending.
     /// </summary>
-    Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, object? dfmReport = null, CancellationToken cancellationToken = default);
+    Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, string? glbSignedUrl = null, object? dfmReport = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Marks the preview URLs as completed (independent of geometry analysis status).

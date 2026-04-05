@@ -63,24 +63,25 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
         {
             try
             {
-                var existing = await _analysisStatusService.GetStatusAsync(gcsStoragePath, context.CancellationToken);
-                await _analysisStatusService.SetAnalysisCompletedAsync(
-                    gcsStoragePath,
-                    payload.GlbStoragePath ?? existing?.GlbStoragePath,
-                    payload.DfmReport ?? existing?.DfmReport,
-                    context.CancellationToken);
-
-                _logger.LogInformation(
-                    "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}, hasDfmReport={HasDfmReport}",
-                    gcsStoragePath, payload.GlbStoragePath, payload.DfmReport != null);
-
+                // Generate signed URL first, then store it in cache
                 string? glbUrl = null;
                 if (!string.IsNullOrEmpty(payload.GlbStoragePath))
                 {
                     glbUrl = await CreateUploadClient()
                         .GetDownloadUrlByPathAsync(payload.GlbStoragePath, context.CancellationToken);
-                    // No fallback — if signed URL resolution fails, Failed = true on the client
                 }
+
+                var existing = await _analysisStatusService.GetStatusAsync(gcsStoragePath, context.CancellationToken);
+                await _analysisStatusService.SetAnalysisCompletedAsync(
+                    gcsStoragePath,
+                    payload.GlbStoragePath ?? existing?.GlbStoragePath,
+                    glbUrl,
+                    payload.DfmReport ?? existing?.DfmReport,
+                    context.CancellationToken);
+
+                _logger.LogInformation(
+                    "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}, GlbSignedUrl={HasGlbSignedUrl}, hasDfmReport={HasDfmReport}",
+                    gcsStoragePath, payload.GlbStoragePath, !string.IsNullOrEmpty(glbUrl), payload.DfmReport != null);
 
                 await _hub.Clients.Group($"file:{gcsStoragePath}").SendAsync("GlbReady", new GlbReadyPayload(
                     StoragePath: gcsStoragePath,

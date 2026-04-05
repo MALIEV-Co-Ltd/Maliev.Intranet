@@ -134,4 +134,34 @@ public class JobServiceClient(HttpClient httpClient)
         if (!response.IsSuccessStatusCode) return null;
         return await response.Content.ReadFromJsonAsync<JobQrDto>(cancellationToken: ct);
     }
+
+    // ── Scheduling ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Gets all scheduled jobs on a specific machine within a UTC date range.
+    /// </summary>
+    /// <param name="machineId">The machine identifier (asset code).</param>
+    /// <param name="from">Range start (UTC).</param>
+    /// <param name="to">Range end (UTC).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of scheduled job DTOs, or empty list on failure.</returns>
+    public async Task<List<MachineScheduleItemDto>> GetMachineScheduleAsync(
+        string machineId, DateTime from, DateTime to, CancellationToken ct = default)
+    {
+        var url = $"/job/v1/jobs/machine/{Uri.EscapeDataString(machineId)}/schedule" +
+                  $"?from={from:O}&to={to:O}";
+        var response = await httpClient.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode) return [];
+        return await response.Content.ReadFromJsonAsync<List<MachineScheduleItemDto>>(cancellationToken: ct) ?? [];
+    }
+
+    /// <summary>
+    /// Reorders a queued job to a new position in the machine queue.
+    /// </summary>
+    /// <param name="id">The job GUID.</param>
+    /// <param name="newPosition">The target queue position (1-based).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The HTTP response.</returns>
+    public async Task<HttpResponseMessage> ReorderJobAsync(Guid id, int newPosition, CancellationToken ct = default) =>
+        await httpClient.PatchAsJsonAsync($"/job/v1/jobs/{id}/reorder", new { NewPosition = newPosition }, ct);
 }

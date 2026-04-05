@@ -316,13 +316,41 @@ public class ProjectsController(
         var setupDays = processType.StartsWith("CNC", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
         var estimatedStart = DateTimeOffset.UtcNow.AddDays(setupDays + queueAhead);
 
+        // Fetch schedule items if we have a machine asset code
+        IReadOnlyList<PlanningScheduleItemDto> scheduleItems = [];
+        var machineCode = machine?.AssetCode;
+        if (!string.IsNullOrEmpty(machineCode))
+        {
+            try
+            {
+                var from = DateTime.UtcNow.Date;
+                var to = from.AddDays(30);
+                var slots = await jobClient.GetMachineScheduleAsync(machineCode, from, to, ct);
+                var machineName = machine?.Name ?? string.Empty;
+                scheduleItems = slots.Select(s => new PlanningScheduleItemDto(
+                    PlannedDate:       new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
+                    PlannedEndDate:    new DateTimeOffset(s.ScheduledEnd, TimeSpan.Zero),
+                    JobReference:      s.JobId.ToString("N")[..8].ToUpperInvariant(),
+                    Status:            s.Status,
+                    JobId:             s.JobId,
+                    MachineName:       machineName,
+                    SetupTimeMinutes:  s.SetupMinutes,
+                    PrintTimeMinutes:  s.PrintMinutes
+                )).ToList();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to fetch machine schedule for '{MachineCode}'; schedule will be empty.", machineCode);
+            }
+        }
+
         return Ok(new ProductionRoutingDto(
             MachineId:          machine?.Id ?? Guid.Empty,
             MachineCode:        machine?.AssetCode ?? "TBD",
             MachineName:        machine?.Name ?? "Unassigned",
             QueueAhead:         queueAhead,
             EstimatedStartDate: estimatedStart,
-            ScheduleItems:      []));
+            ScheduleItems:      scheduleItems));
     }
 
     private static string? MapProcessToEquipmentCategory(string processType) => processType switch

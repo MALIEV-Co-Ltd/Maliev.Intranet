@@ -52,31 +52,40 @@ else if (IsVisible && DfmIssues.Count > 0)
         </div>
         @if (_expanded && !_acknowledged)
         {
-            <div class="dfm-overlay-issues">
+            <MudList T="DfmIssue"
+                     SelectionMode="SelectionMode.ToggleSelection"
+                     SelectedValue="@_selectedIssue"
+                     SelectedValueChanged="@OnIssueSelectionChanged"
+                     Class="dfm-overlay-issues pa-0">
                 @foreach (var issue in DfmIssues)
                 {
-                    var isActive = issue.OverlayKey != null && _activeOverlays.Contains(issue.OverlayKey);
+                    var isActive = _selectedIssue == issue;
                     var canToggle = issue.OverlayUrl != null && OnToggleOverlay.HasDelegate;
-                    <div class="dfm-issue-row @(isActive ? "dfm-issue-row--active" : "") @(canToggle ? "dfm-issue-row--clickable" : "")"
-                         @onclick="@(canToggle ? EventCallback.Factory.Create<MouseEventArgs>(this, () => ToggleOverlay(issue)) : EventCallback<MouseEventArgs>.Empty)">
-                        <MudIcon Icon="@issue.Icon"
-                                 Size="Size.Small"
-                                 Color="@(issue.Severity == DfmIssueSeverity.Error ? Color.Error : Color.Warning)"
-                                 Class="dfm-issue-icon" />
-                        <div style="flex:1; min-width:0;">
-                            <MudText Typo="Typo.caption" Class="dfm-issue-title">@issue.Title</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@issue.Description</MudText>
-                        </div>
-                        @if (canToggle)
-                        {
-                            <MudIcon Icon="@(isActive ? Icons.Material.Filled.Visibility : Icons.Material.Outlined.VisibilityOff)"
+                    <MudListItem T="DfmIssue"
+                                 Value="@issue"
+                                 Disabled="@(!canToggle)"
+                                 Class="@($"dfm-issue-row {(isActive ? "dfm-issue-row--active" : "")} {(canToggle ? "dfm-issue-row--clickable" : "")}")"
+                                 Style="padding:4px 4px 4px 6px;">
+                        <div style="display:flex;align-items:flex-start;gap:8px;width:100%;">
+                            <MudIcon Icon="@issue.Icon"
                                      Size="Size.Small"
-                                     Color="@(isActive ? Color.Primary : Color.Default)"
-                                     Class="dfm-overlay-indicator" />
-                        }
-                    </div>
+                                     Color="@(issue.Severity == DfmIssueSeverity.Error ? Color.Error : Color.Warning)"
+                                     Class="dfm-issue-icon" />
+                            <div style="flex:1; min-width:0;">
+                                <MudText Typo="Typo.caption" Class="dfm-issue-title">@issue.Title</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@issue.Description</MudText>
+                            </div>
+                            @if (canToggle)
+                            {
+                                <MudIcon Icon="@(isActive ? Icons.Material.Filled.Visibility : Icons.Material.Outlined.VisibilityOff)"
+                                         Size="Size.Small"
+                                         Color="@(isActive ? Color.Primary : Color.Default)"
+                                         Class="dfm-overlay-indicator" />
+                            }
+                        </div>
+                    </MudListItem>
                 }
-            </div>
+            </MudList>
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Warning"
                        Size="Size.Small"
@@ -137,30 +146,16 @@ else if (IsVisible && DfmIssues.Count > 0)
         gap: 8px;
     }
     .dfm-overlay-issues {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
         margin-top: 12px;
         border-top: 1px solid var(--mud-palette-lines-default);
-        padding-top: 12px;
-        max-height: 180px;
+        padding-top: 4px;
+        max-height: 200px;
         overflow-y: auto;
     }
     .dfm-issue-row {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
         border-left: 3px solid transparent;
-        padding: 4px 4px 4px 6px;
-        margin: 0 -4px 0 -6px;
         border-radius: 4px;
-        transition: background 0.15s, border-color 0.15s;
-    }
-    .dfm-issue-row--clickable {
-        cursor: pointer;
-    }
-    .dfm-issue-row--clickable:hover {
-        background: rgba(0,0,0,0.03);
+        transition: border-color 0.15s;
     }
     .dfm-issue-row--active {
         border-left-color: var(--mud-palette-primary);
@@ -198,6 +193,9 @@ else if (IsVisible && DfmIssues.Count > 0)
 
     private bool _acknowledged;
     private bool _expanded;
+    // Tracks the currently selected issue whose overlay is shown on the 3D model (single-select).
+    private DfmIssue? _selectedIssue;
+    // Kept for backward compatibility: parent reads this to determine isActive for ToggleDfmOverlayAsync.
     internal readonly HashSet<string> _activeOverlays = [];
     private bool _previousIsVisible;
     private bool _allClearFading;
@@ -272,19 +270,33 @@ else if (IsVisible && DfmIssues.Count > 0)
         await OnAcknowledged.InvokeAsync();
     }
 
-    private async Task ToggleOverlay(DfmIssue issue)
+    private async Task OnIssueSelectionChanged(DfmIssue? newIssue)
     {
-        if (issue.OverlayKey == null) return;
-        if (_activeOverlays.Contains(issue.OverlayKey))
-            _activeOverlays.Remove(issue.OverlayKey);
-        else
-            _activeOverlays.Add(issue.OverlayKey);
-        await OnToggleOverlay.InvokeAsync(issue);
+        // Deactivate the previously selected overlay (if any and different from the new selection).
+        if (_selectedIssue != null && _selectedIssue != newIssue && _selectedIssue.OverlayKey != null)
+        {
+            _activeOverlays.Remove(_selectedIssue.OverlayKey);
+            await OnToggleOverlay.InvokeAsync(_selectedIssue);
+        }
+
+        _selectedIssue = newIssue;
+
+        if (newIssue?.OverlayKey != null)
+        {
+            // Toggle on: activate the new overlay.
+            _activeOverlays.Add(newIssue.OverlayKey);
+            await OnToggleOverlay.InvokeAsync(newIssue);
+        }
     }
 
-    /// <summary>Clears all active overlay state (e.g. when the process changes).</summary>
+    /// <summary>Clears all active overlay and animation state (e.g. when the active part changes).</summary>
     public void ResetOverlays()
     {
+        _selectedIssue = null;
         _activeOverlays.Clear();
+        _allClearShown = false;
+        _allClearFading = false;
+        _previousIssueCount = -1;
+        _allClearCts?.Cancel();
     }
 }

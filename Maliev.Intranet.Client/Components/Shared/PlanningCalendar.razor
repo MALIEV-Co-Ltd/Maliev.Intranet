@@ -1,0 +1,97 @@
+@namespace Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Shared.Dtos
+
+<div class="pc-root">
+    @* ── Month navigation header ──────────────────────────────────────────────*@
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small"
+                       OnClick="PrevMonth" />
+        <MudText Typo="Typo.subtitle1" Style="font-weight:700;">
+            @CurrentMonth.ToString("MMMM yyyy")
+        </MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small"
+                       OnClick="NextMonth" />
+    </MudStack>
+
+    @* ── Day-of-week headers ─────────────────────────────────────────────────*@
+    <MudGrid Spacing="0" Class="pc-grid">
+        @foreach (var dow in new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" })
+        {
+            <MudItem xs="@DayWidth" Class="pc-dow-header">
+                <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">@dow</MudText>
+            </MudItem>
+        }
+
+        @* ── Day cells ────────────────────────────────────────────────────────*@
+        @foreach (var day in _calendarDays)
+        {
+            var dayItems = _itemsByDate.GetValueOrDefault(DateOnly.FromDateTime(day.Date), []);
+            <MudItem xs="@DayWidth">
+                <PlanningCalendarDay Date="@day"
+                                     Items="@dayItems"
+                                     IsCurrentMonth="@(day.Month == CurrentMonth.Month)"
+                                     IsToday="@(DateOnly.FromDateTime(day.Date) == _today)"
+                                     OnDayClicked="@OnDayClicked" />
+            </MudItem>
+        }
+    </MudGrid>
+</div>
+
+<style>
+    .pc-root { width: 100%; }
+    .pc-grid { display: grid; }
+    .pc-dow-header { padding: 4px 2px; text-align: center; border-bottom: 1px solid var(--mud-palette-lines-default); }
+</style>
+
+@code {
+    [Parameter] public IReadOnlyList<PlanningScheduleItemDto> ScheduleItems { get; set; } = [];
+    [Parameter] public DateTime CurrentMonth { get; set; } = DateTime.Today;
+    [Parameter] public EventCallback<DateTime> OnDayClicked { get; set; }
+    [Parameter] public EventCallback<DateTime> OnMonthChanged { get; set; }
+
+    private const int DayWidth = 0; // MudGrid xs uses 1-12, 0 = auto via CSS
+    private List<DateTime> _calendarDays = [];
+    private Dictionary<DateOnly, List<PlanningScheduleItemDto>> _itemsByDate = [];
+    private readonly DateOnly _today = DateOnly.FromDateTime(DateTime.Today);
+
+    protected override void OnParametersSet()
+    {
+        BuildCalendar();
+        BuildItemIndex();
+    }
+
+    private void BuildCalendar()
+    {
+        _calendarDays = [];
+        var first = new DateTime(CurrentMonth.Year, CurrentMonth.Month, 1);
+        // Monday-first: offset 0=Mon … 6=Sun
+        var offset = ((int)first.DayOfWeek + 6) % 7;
+        var start = first.AddDays(-offset);
+        // Build 6 weeks = 42 cells
+        for (int i = 0; i < 42; i++)
+            _calendarDays.Add(start.AddDays(i));
+    }
+
+    private void BuildItemIndex()
+    {
+        _itemsByDate = ScheduleItems
+            .GroupBy(i => DateOnly.FromDateTime(i.PlannedDate.Date))
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private async Task PrevMonth()
+    {
+        CurrentMonth = CurrentMonth.AddMonths(-1);
+        BuildCalendar();
+        BuildItemIndex();
+        await OnMonthChanged.InvokeAsync(CurrentMonth);
+    }
+
+    private async Task NextMonth()
+    {
+        CurrentMonth = CurrentMonth.AddMonths(1);
+        BuildCalendar();
+        BuildItemIndex();
+        await OnMonthChanged.InvokeAsync(CurrentMonth);
+    }
+}

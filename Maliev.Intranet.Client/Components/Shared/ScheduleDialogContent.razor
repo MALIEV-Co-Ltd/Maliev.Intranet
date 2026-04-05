@@ -3,7 +3,7 @@
 
 <MudDialog>
     <DialogContent>
-        @if (Routing?.ScheduleItems != null)
+        @if (Routing?.ScheduleItems is { Count: > 0 })
         {
             foreach (var item in Routing.ScheduleItems)
             {
@@ -13,6 +13,12 @@
                     <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(item.Status)">@item.Status</MudChip>
                 </div>
             }
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Style="text-align:center; padding: 16px 0;">
+                No scheduled items yet
+            </MudText>
         }
     </DialogContent>
     <DialogActions>

@@ -187,13 +187,13 @@
 
     /* ── Section header ─────────────────────────────────────────────── */
     .section-header {
-        background: #e2e8f0;
+        background: var(--mud-palette-background-grey);
         padding: 8px 16px;
-        font-size: 12px;
+        font-size: var(--mud-typography-overline-size);
         text-transform: uppercase;
         letter-spacing: 0.05em;
         font-weight: 600;
-        color: #0f172a;
+        color: var(--mud-palette-text-primary);
         border-bottom: 1px solid var(--mud-palette-lines-default);
         display: flex;
         justify-content: space-between;
@@ -382,6 +382,9 @@
     /// <summary>The currency used to format all displayed prices.</summary>
     [Parameter] public CurrencyDto? SelectedCurrency { get; set; }
 
+    /// <summary>Multiplier applied to THB-denominated prices for display (e.g. 0.028 for USD). Defaults to 1.</summary>
+    [Parameter] public decimal ExchangeRate { get; set; } = 1m;
+
     /// <summary>Whether the Quote button should be enabled.</summary>
     [Parameter] public bool CanQuote { get; set; }
 
@@ -444,15 +447,15 @@
     }
 
     private string FormatPrice(decimal amount) =>
-        $"{SelectedCurrency?.Code ?? "THB"} {amount:N2}";
+        $"{SelectedCurrency?.Code ?? "THB"} {amount * ExchangeRate:N2}";
 
     private string FormatUnitPrice(decimal? unitPrice) =>
         unitPrice.HasValue
-            ? $"{SelectedCurrency?.Symbol ?? SelectedCurrency?.Code} {unitPrice.Value:N2}"
+            ? $"{SelectedCurrency?.Symbol ?? SelectedCurrency?.Code} {unitPrice.Value * ExchangeRate:N2}"
             : "—";
 
     private string FormatPriceValue(decimal amount) =>
-        $"{amount:N2}";
+        $"{amount * ExchangeRate:N2}";
 
     private bool IsActivePart(PartViewModel part) =>
         Parts.IndexOf(part) == SelectedPartIndex;

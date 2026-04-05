@@ -1,9 +1,11 @@
+using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Maliev.Intranet.Tests.Testing;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
@@ -17,7 +19,9 @@ public class ReferenceDataControllerTests
     {
         _serviceMock = new Mock<IReferenceDataService>();
         _loggerMock = new Mock<ILogger<ReferenceDataController>>();
-        _controller = new ReferenceDataController(_serviceMock.Object, _loggerMock.Object);
+        var httpClient = new HttpClient(new MockHttpMessageHandler()) { BaseAddress = new Uri("http://test") };
+        var currencyClient = new CurrencyServiceClient(httpClient);
+        _controller = new ReferenceDataController(_serviceMock.Object, currencyClient, _loggerMock.Object);
     }
 
     [Fact]

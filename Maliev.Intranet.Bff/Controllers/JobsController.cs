@@ -175,4 +175,51 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
 
         return NoContent();
     }
+
+    // ── Scheduling ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the scheduled jobs on a specific machine within a UTC date range.
+    /// </summary>
+    /// <param name="machineId">The machine identifier (asset code).</param>
+    /// <param name="from">Range start (UTC). Defaults to today.</param>
+    /// <param name="to">Range end (UTC). Defaults to 30 days from now.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of machine schedule items.</returns>
+    [HttpGet("machine/{machineId}/schedule")]
+    public async Task<ActionResult<List<MachineScheduleItemDto>>> GetMachineSchedule(
+        string machineId,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        CancellationToken ct)
+    {
+        var rangeFrom = from ?? DateTime.UtcNow.Date;
+        var rangeTo = to ?? DateTime.UtcNow.Date.AddDays(30);
+        var result = await client.GetMachineScheduleAsync(machineId, rangeFrom, rangeTo, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Reorders a queued job to a new position in the machine queue. Broadcasts via SignalR.
+    /// </summary>
+    /// <param name="id">The job GUID.</param>
+    /// <param name="request">The reorder request (new position, 1-based).</param>
+    /// <param name="hub">The ProductionHub context for broadcasting.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>204 No Content on success.</returns>
+    [HttpPatch("{id:guid}/reorder")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<IActionResult> Reorder(
+        Guid id,
+        [FromBody] ReorderJobRequest request,
+        [FromServices] Microsoft.AspNetCore.SignalR.IHubContext<Maliev.Intranet.Bff.Hubs.ProductionHub> hub,
+        CancellationToken ct)
+    {
+        var response = await client.ReorderJobAsync(id, request.NewPosition, ct);
+        if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+
+        await hub.Clients.All.SendAsync("ScheduleChanged", new { JobId = id });
+
+        return NoContent();
+    }
 }

@@ -93,7 +93,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     }
 
     /// <inheritdoc />
-    public Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, object? dfmReport = null, CancellationToken cancellationToken = default)
+    public Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, string? glbSignedUrl = null, object? dfmReport = null, CancellationToken cancellationToken = default)
     {
         var existing = Get(uploadId);
         var status = new FileAnalysisStatusDto
@@ -106,6 +106,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
             GlbStoragePath = glbStoragePath ?? existing?.GlbStoragePath,
+            GlbSignedUrl = glbSignedUrl ?? existing?.GlbSignedUrl,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = null,
             ProcessedAt = DateTimeOffset.UtcNow,
@@ -274,6 +275,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             HiResThumbnailUrl = existing.HiResThumbnailUrl,
             PreviewUrls = existing.PreviewUrls,
             GlbStoragePath = newGlbViewerPath,
+            GlbSignedUrl = existing.GlbSignedUrl,
             PreviewProcessingStatus = existing.PreviewProcessingStatus,
             ErrorCode = existing.ErrorCode,
             ProcessedAt = existing.ProcessedAt,

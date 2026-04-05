@@ -8,6 +8,7 @@
             <PartMiniCard Part="@Parts[idx]"
                           IsActive="@(idx == SelectedIndex)"
                           CurrencyCode="@CurrencyCode"
+                          ExchangeRate="@ExchangeRate"
                           OnClick="@(() => OnSelectPart.InvokeAsync(idx))"
                           OnRemove="@(() => OnRemovePart.InvokeAsync(Parts[idx]))" />
         }
@@ -64,6 +65,9 @@
 
     /// <summary>The currency code for displaying prices in mini-cards (e.g. "THB", "USD").</summary>
     [Parameter] public string CurrencyCode { get; set; } = "THB";
+
+    /// <summary>Multiplier applied to THB-denominated prices for display. Defaults to 1.</summary>
+    [Parameter] public decimal ExchangeRate { get; set; } = 1m;
 
     /// <summary>Invoked when the user clicks a part card, passing the part's index.</summary>
     [Parameter] public EventCallback<int> OnSelectPart { get; set; }

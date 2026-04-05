@@ -43,6 +43,40 @@ public class CurrencyServiceClient(HttpClient httpClient)
         var currencies = await GetCurrenciesAsync(ct);
         return currencies.FirstOrDefault(c => c.IsPrimary);
     }
+
+    /// <summary>
+    /// Gets the live exchange rate between two currencies.
+    /// Returns null if the rate is unavailable.
+    /// </summary>
+    /// <param name="from">Source currency code (e.g. "THB").</param>
+    /// <param name="to">Target currency code (e.g. "USD").</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The exchange rate, or null if unavailable.</returns>
+    public async Task<decimal?> GetExchangeRateAsync(string from, string to, CancellationToken ct = default)
+    {
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase))
+            return 1m;
+
+        try
+        {
+            var response = await _httpClient.GetFromJsonAsync<ExchangeRateResult>(
+                $"/currency/v1/rates?from={Uri.EscapeDataString(from)}&to={Uri.EscapeDataString(to)}&mode=live", ct);
+            return response?.Rate;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}
+
+/// <summary>
+/// Minimal projection of the CurrencyService ExchangeRateResponse for rate lookup.
+/// </summary>
+internal sealed class ExchangeRateResult
+{
+    [JsonPropertyName("rate")]
+    public decimal Rate { get; set; }
 }
 
 /// <summary>

@@ -99,6 +99,31 @@ dotnet ef migrations add <Name> --project Maliev.Intranet.Infrastructure --start
 - **Text Input with Live Counter**: For all `longtext` fields or any input that could potentially exceed the max length limit, display a live character counter (e.g., `50/2000` or `13/100`). Use immediate client-side validation to enforce the limit.
 - **Skeleton Loaders**: Always use skeleton components with animation when waiting for data to load. Never show blank spaces or spinner-only states.
 
+### 3D Viewer URL Resolution (Option B)
+
+The recommended pattern uses pre-signed URLs from the BFF cache, eliminating the need for the `viewer-url` API endpoint:
+
+```csharp
+// ✅ OPTION B (preferred): Use pre-signed URL from cache - no API call needed
+if (!string.IsNullOrEmpty(part.GlbSignedUrl))
+{
+    part.ViewerUrl = part.GlbSignedUrl;
+    return;
+}
+
+// Fallback: Call viewer-url API for backward compatibility (drafts created before this fix)
+var storagePath = part.StoragePath;
+```
+
+**Why this works**: 
+1. `FileAnalyzedConsumer` generates a signed URL from `GlbStoragePath` and stores it in the BFF cache (`GlbSignedUrl`)
+2. The cache is returned in the `analysis-status` API response
+3. SignalR also pushes `GlbSignedUrl` via the `GlbReady` event
+4. Client checks `GlbSignedUrl` first - if available, uses it directly without any API call
+5. Only falls back to `viewer-url` API for older drafts that don't have the cached URL
+
+**Important**: Never pass `GlbStoragePath` (which ends in `_viewer.glb`) to the `viewer-url` endpoint - this causes a double-suffix bug producing paths like `file.stl_viewer.glb_viewer.glb`.
+
 ### Mapping Extensions (Manual)
 
 Since AutoMapper is banned, use static extension classes:

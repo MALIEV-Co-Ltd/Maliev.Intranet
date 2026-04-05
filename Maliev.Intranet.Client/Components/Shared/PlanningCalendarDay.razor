@@ -1,0 +1,61 @@
+@namespace Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Shared.Dtos
+
+<div class="pcd-cell @(_isCurrentMonth ? "" : "pcd-other-month") @(_isToday ? "pcd-today" : "")"
+     @onclick="HandleClick" style="cursor: pointer; min-height: 72px;">
+    @* Day number *@
+    <div class="pcd-day-num">
+        <MudText Typo="Typo.caption"
+                 Style="@(_isToday ? "font-weight:800;" : "")"
+                 Color="@(_isCurrentMonth ? Color.Default : Color.Tertiary)">
+            @Date.Day
+        </MudText>
+    </div>
+    @* Job chips (up to 3) *@
+    @foreach (var item in Items.Take(3))
+    {
+        <MudChip T="string" Size="Size.Small"
+                 Color="@GetStatusColor(item.Status)"
+                 Variant="Variant.Filled"
+                 Class="pcd-chip">
+            @item.JobReference
+        </MudChip>
+    }
+    @if (Items.Count > 3)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pcd-more">
+            +@(Items.Count - 3) more
+        </MudText>
+    }
+</div>
+
+<style>
+    .pcd-cell { padding: 4px; border: 1px solid var(--mud-palette-lines-default); overflow: hidden; }
+    .pcd-cell:hover { background: var(--mud-palette-action-hover); }
+    .pcd-other-month { opacity: 0.4; }
+    .pcd-today { background: var(--mud-palette-primary-lighten) !important; }
+    .pcd-day-num { margin-bottom: 2px; }
+    .pcd-chip { font-size: 9px !important; height: 16px !important; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
+    .pcd-more { font-size: 9px !important; }
+</style>
+
+@code {
+    [Parameter] public DateTime Date { get; set; }
+    [Parameter] public List<PlanningScheduleItemDto> Items { get; set; } = [];
+    [Parameter] public bool IsCurrentMonth { get; set; } = true;
+    [Parameter] public bool IsToday { get; set; }
+    [Parameter] public EventCallback<DateTime> OnDayClicked { get; set; }
+
+    private bool _isCurrentMonth => IsCurrentMonth;
+    private bool _isToday => IsToday;
+
+    private async Task HandleClick() => await OnDayClicked.InvokeAsync(Date);
+
+    private static Color GetStatusColor(string status) => status.ToUpperInvariant() switch
+    {
+        "COMPLETED" or "COMPLETE" => Color.Success,
+        "INPROGRESS"              => Color.Warning,
+        "CANCELLED"               => Color.Error,
+        _                         => Color.Primary
+    };
+}

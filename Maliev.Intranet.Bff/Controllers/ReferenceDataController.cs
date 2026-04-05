@@ -1,3 +1,4 @@
+using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -14,16 +15,22 @@ namespace Maliev.Intranet.Bff.Controllers;
 public class ReferenceDataController : ControllerBase
 {
     private readonly IReferenceDataService _referenceDataService;
+    private readonly CurrencyServiceClient _currencyClient;
     private readonly ILogger<ReferenceDataController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ReferenceDataController"/> class.
     /// </summary>
     /// <param name="referenceDataService">Reference data service.</param>
+    /// <param name="currencyClient">Currency service client.</param>
     /// <param name="logger">Logger instance.</param>
-    public ReferenceDataController(IReferenceDataService referenceDataService, ILogger<ReferenceDataController> logger)
+    public ReferenceDataController(
+        IReferenceDataService referenceDataService,
+        CurrencyServiceClient currencyClient,
+        ILogger<ReferenceDataController> logger)
     {
         _referenceDataService = referenceDataService;
+        _currencyClient = currencyClient;
         _logger = logger;
     }
 
@@ -89,5 +96,29 @@ public class ReferenceDataController : ControllerBase
             _logger.LogError(ex, "Error fetching primary currency");
             return StatusCode(500, "An error occurred while fetching primary currency");
         }
+    }
+
+    /// <summary>
+    /// Gets the live exchange rate between two currencies.
+    /// Returns 1.0 when from == to.
+    /// </summary>
+    /// <param name="from">Source currency code (ISO 4217).</param>
+    /// <param name="to">Target currency code (ISO 4217).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The exchange rate as a decimal.</returns>
+    [HttpGet("currencies/rate")]
+    public async Task<ActionResult<ExchangeRateResponse>> GetExchangeRate(
+        [FromQuery] string from,
+        [FromQuery] string to,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
+            return BadRequest("Both 'from' and 'to' currency codes are required.");
+
+        var rate = await _currencyClient.GetExchangeRateAsync(from, to, cancellationToken);
+        if (rate == null)
+            return StatusCode(503, "Exchange rate temporarily unavailable.");
+
+        return Ok(new ExchangeRateResponse(from.ToUpperInvariant(), to.ToUpperInvariant(), rate.Value));
     }
 }

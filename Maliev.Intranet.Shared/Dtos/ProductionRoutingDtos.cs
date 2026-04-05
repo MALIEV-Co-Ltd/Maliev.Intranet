@@ -21,11 +21,21 @@ public record ProductionRoutingDto(
 /// <summary>
 /// A single item in a machine's planning schedule.
 /// </summary>
-/// <param name="PlannedDate">The planned date and time for this schedule item.</param>
+/// <param name="PlannedDate">The planned start date and time for this schedule item.</param>
+/// <param name="PlannedEndDate">The planned end date and time for this schedule item.</param>
 /// <param name="JobReference">The reference identifier of the job.</param>
 /// <param name="Status">The scheduling status of this job. Known values: <c>Planned</c>, <c>InProgress</c>, <c>Complete</c>, <c>Cancelled</c>.</param>
+/// <param name="JobId">The job unique identifier.</param>
+/// <param name="MachineName">The name of the machine this job is scheduled on.</param>
+/// <param name="SetupTimeMinutes">The setup time in minutes required before production.</param>
+/// <param name="PrintTimeMinutes">The estimated print/machining time in minutes.</param>
 public record PlanningScheduleItemDto(
     DateTimeOffset PlannedDate,
+    DateTimeOffset PlannedEndDate,
     string JobReference,
-    string Status
+    string Status,
+    Guid JobId,
+    string MachineName,
+    int SetupTimeMinutes,
+    int PrintTimeMinutes
 );

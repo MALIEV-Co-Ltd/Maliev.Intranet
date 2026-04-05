@@ -21,7 +21,7 @@
                 OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
                 SelectedCurrency="@_selectedCurrency"
                 Currencies="@_currencies"
-                OnCurrencyChanged="@(c => { _selectedCurrency = c; TriggerAutoSave(); })"
+                OnCurrencyChanged="@OnCurrencyChangedAsync"
                 AutoSaving="@_autoSaving"
                 LastSavedAt="@_lastSavedAt"
                 HasCustomerSelected="@(_selectedCustomer != null)"
@@ -57,6 +57,7 @@
                                 Parts="@_parts"
                                 SelectedIndex="@_selectedPartIndex"
                                 CurrencyCode="@(_selectedCurrency?.Code ?? "THB")"
+                                ExchangeRate="@_exchangeRate"
                                 OnSelectPart="@(i => { _selectedPartIndex = i; StateHasChanged(); })"
                                 OnRemovePart="RemovePart"
                                 OnAddPart="OpenFilePicker" />
@@ -119,6 +120,7 @@
                             SelectedLeadTime="@_selectedLeadTime"
                             OnLeadTimeChanged="@(async lt => { _selectedLeadTime = lt; TriggerAutoSave(); foreach (var p in _parts) { await TriggerRoutingFetchAsync(p); } })"
                             SelectedCurrency="@_selectedCurrency"
+                            ExchangeRate="@_exchangeRate"
                             CanQuote="@CanSubmit"
                             Saving="@_saving"
                             OnQuote="CreateProjectAndQuoteAsync"
@@ -138,7 +140,7 @@
 <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                @ref="_fileUpload"
                FilesChanged="HandleFileSelected"
-               Accept="@FileTypes.AllUploadAcceptString"
+               Accept="@FileTypes.ThreeDAcceptString"
                MaximumFileCount="20"
                Hidden="true"
                Style="display:none;" />

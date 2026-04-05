@@ -48,12 +48,12 @@ const SPEED_STOP   = 0;
 
 function loadScript(url) {
     return new Promise((resolve, reject) => {
-        if (Array.from(document.scripts).some(s => s.src === url)) { resolve(); return; }
-        const s = document.createElement('script');
-        s.type = 'text/javascript'; s.src = url;
-        s.onload = resolve;
-        s.onerror = () => reject(new Error(`Failed to load: ${url}`));
-        document.head.appendChild(s);
+        if (Array.from(document.scripts).some(script => script.src === url)) { resolve(); return; }
+        const script = document.createElement('script');
+        script.type = 'text/javascript'; script.src = url;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Failed to load: ${url}`));
+        document.head.appendChild(script);
     });
 }
 
@@ -173,9 +173,9 @@ function applyPreset(cam, presetName) {
  */
 export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef) {
     try {
-        await loadScript('https://cdn.babylonjs.com/babylon.js');
-        await loadScript('https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js');
-        await loadScript('https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js');
+        await loadScript('https://cdn.babylonjs.com/babylon.js@9.1.0');
+        await loadScript('https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js@9.1.0');
+        await loadScript('https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js@9.1.0');
 
         const canvas = document.getElementById(canvasId);
         if (!canvas) { console.error(`[BabylonViewer] Canvas #${canvasId} not found.`); return; }
@@ -226,8 +226,8 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
         // Retry-with-backoff: the GLB may not yet be in GCS when the signed URL arrives
         // (race between the geometry worker writing the file and the SignalR event).
-        // Retry up to 2 times on 404 before surfacing the error to the UI.
-        const _retryDelays = [1000, 3000];
+        // Retry up to 4 times on 404 with exponential backoff before surfacing the error to the UI.
+        const _retryDelays = [2000, 5000, 10000, 20000];
         function _loadAttempt(attempt) {
             BABYLON.SceneLoader.Append('', fileUrl, scene,
                 (_scene) => {
@@ -283,11 +283,17 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     (m.parent == null || !(m.parent instanceof BABYLON.AbstractMesh))
                 );
 
-                if (modelRootNodes.length === 0 && rootMeshes.length === 0) return;
+                if (modelRootNodes.length === 0 && rootMeshes.length === 0) {
+    console.warn('[BabylonViewer] No model meshes found - GLB may be empty or conversion failed');
+    return;
+}
 
                 // ── Compute raw bounding box (GLB as-loaded, Y-up, mm) ──
                 let rawBb = computeSceneBounds(_scene);
-                if (!rawBb) return;
+                if (!rawBb) {
+    console.warn('[BabylonViewer] Could not compute bounding box - GLB may be corrupt');
+    return;
+}
 
                 // ── Scale correction (if GLB dimensions deviate >5% from known) ──
                 let scaleFactor = 1;
@@ -626,9 +632,9 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         return l;
     }
 
-    makeAxisLine('__axisX__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(LEN, 0, 0)], COL_X);
-    makeAxisLine('__axisY__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, LEN, 0)], COL_Y);
-    makeAxisLine('__axisZ__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, 0, LEN)], COL_Z);
+    makeAxisLine('__axisX__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, LEN, 0)], COL_X);  // Y+ direction (up), red
+    makeAxisLine('__axisY__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(LEN, 0, 0)], COL_Y);  // X+ direction (right), green
+    makeAxisLine('__axisZ__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, 0, LEN)], COL_Z);  // Z+ direction (depth), blue
 
     function makeCone(name, dir, color) {
         const d = dir.normalize();
@@ -650,9 +656,9 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         return cone;
     }
 
-    makeCone('__axisXArr__', new BABYLON.Vector3(1, 0, 0), COL_X);
-    makeCone('__axisYArr__', new BABYLON.Vector3(0, 1, 0), COL_Y);
-    makeCone('__axisZArr__', new BABYLON.Vector3(0, 0, 1), COL_Z);
+    makeCone('__axisXArr__', new BABYLON.Vector3(0, 1, 0), COL_X);  // Y+ direction (up), red
+    makeCone('__axisYArr__', new BABYLON.Vector3(1, 0, 0), COL_Y);  // X+ direction (right), green
+    makeCone('__axisZArr__', new BABYLON.Vector3(0, 0, 1), COL_Z);  // Z+ direction (depth), blue
 
     // Gizmo camera — top-right corner, orthographic, renders only LAYER meshes
     const hw = 1.1;
@@ -681,9 +687,9 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
 
     // ── Hover labels (X, Y, Z text that appear on mouseover) ──
     const labelDefs = [
-        { name: 'X', color: '#f04444', pos: new BABYLON.Vector3(LEN + 0.28, 0,       0) },
-        { name: 'Y', color: '#22c750', pos: new BABYLON.Vector3(0,       LEN + 0.28, 0) },
-        { name: 'Z', color: '#3882f5', pos: new BABYLON.Vector3(0,       0,       LEN + 0.28) },
+        { name: 'X', color: '#f04444', pos: new BABYLON.Vector3(0, LEN + 0.28, 0) },  // Y+ (up), red
+        { name: 'Y', color: '#22c750', pos: new BABYLON.Vector3(LEN + 0.28, 0, 0) },  // X+ (right), green
+        { name: 'Z', color: '#3882f5', pos: new BABYLON.Vector3(0, 0, LEN + 0.28) },  // Z+ (depth), blue
     ];
 
     const labelDivs = labelDefs.map(({ name, color, pos }) => {
@@ -1321,6 +1327,41 @@ export function clearDfmOverlays(canvasId) {
     map.forEach(meshes => meshes.forEach(m => m.dispose()));
     map.clear();
     if (overlayLoading[canvasId]) overlayLoading[canvasId].clear();
+}
+
+// ── rotateModel ─────────────────────────────────────────────────────────────────
+
+export function rotateModel(canvasId, degrees) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+    const rad = degrees * Math.PI / 180;
+    const rotAxis = new BABYLON.Vector3(0, 0, 1);
+    const quat = BABYLON.Quaternion.RotationAxis(rotAxis, rad);
+
+    const _sysNames = new Set(['key', 'fill', 'back', 'hemi', 'cam', '__init_light__', '__grid__']);
+    const modelNodes = scene.rootNodes.filter(n =>
+        n.name !== '__grid__' &&
+        !n.name.startsWith('__axis') &&
+        !_sysNames.has(n.name) &&
+        !(n instanceof BABYLON.Camera) &&
+        !(n instanceof BABYLON.Light)
+    );
+
+    if (modelNodes.length === 0) {
+        const meshes = scene.meshes.filter(m =>
+            m.name !== '__grid__' && !m.name.startsWith('__axis') && !m.name.startsWith('__dfm')
+        );
+        for (const mesh of meshes) {
+            if (!mesh.parent) {
+                mesh.rotate(rotAxis, rad, BABYLON.Space.WORLD);
+            }
+        }
+        return;
+    }
+
+    for (const node of modelNodes) {
+        if (node.rotate) node.rotate(rotAxis, rad, BABYLON.Space.WORLD);
+    }
 }
 
 // ── dispose ───────────────────────────────────────────────────────────────────

@@ -29,6 +29,12 @@ public sealed record FileAnalysisStatusDto
     /// </summary>
     public string? GlbStoragePath { get; init; }
 
+    /// <summary>
+    /// Pre-signed URL for the GLB viewer artifact. Null until FileAnalyzed event is consumed.
+    /// Client should prefer this over calling the viewer-url API.
+    /// </summary>
+    public string? GlbSignedUrl { get; init; }
+
     /// <summary>Gets or sets the error code if the analysis failed.</summary>
     public string? ErrorCode { get; init; }
 

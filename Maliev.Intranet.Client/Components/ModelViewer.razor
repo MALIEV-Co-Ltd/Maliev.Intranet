@@ -3,6 +3,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 @inject LayoutService LayoutService
+@inject ILogger<ModelViewer> Logger
 
 <div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: hidden; contain: layout style;">
     <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block;"></canvas>
@@ -98,7 +99,16 @@
 
             <div class="vp-divider" />
 
-            @* Reset *@
+            @* Rotate model *@
+            <MudTooltip Text="Rotate 90°" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn")"
+                        @onclick='@(() => RotateModelAsync(90))' type="button">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 4v6h-6M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                    </svg>
+                </button>
+            </MudTooltip>
             <MudTooltip Text="Reset View" Placement="Placement.Top" Arrow="false">
                 <MudIconButton Icon="@Icons.Material.Outlined.ZoomOutMap"
                                Class="vp-icon-btn"
@@ -168,10 +178,10 @@
 
     private static MarkupString GetCubeIconSvg(string viewKey, bool isActive)
     {
-        var fill   = isActive ? "rgba(90,150,255,0.50)" : "rgba(90,150,255,0.28)";
-        var stroke = isActive ? "#7ab4ff"               : "#4a8fff";
-        var back   = "rgba(150,160,180,0.30)";
-        var front  = isActive ? "rgba(215,225,245,0.95)" : "rgba(190,200,220,0.75)";
+        var fill   = isActive ? "rgba(var(--mud-palette-primary-rgb), 0.50)" : "rgba(var(--mud-palette-primary-rgb), 0.28)";
+        var stroke = isActive ? "var(--mud-palette-primary-lighten)" : "var(--mud-palette-primary)";
+        var back   = "rgba(var(--mud-palette-text-secondary-rgb), 0.30)";
+        var front  = isActive ? "rgba(var(--mud-palette-text-primary-rgb), 0.95)" : "rgba(var(--mud-palette-text-secondary-rgb), 0.75)";
 
         string face;
         if (viewKey == "iso")
@@ -205,16 +215,21 @@
     /// <summary>Generates inline SVG icons for render-mode and projection toolbar buttons.</summary>
     private static MarkupString GetModeIconSvg(string modeKey, bool isActive)
     {
-        var edgeC  = isActive ? "rgba(215,230,255,0.95)" : "rgba(190,205,230,0.72)";
-        var backC  = isActive ? "rgba(150,165,190,0.40)" : "rgba(130,145,170,0.28)";
-        var activeHighlight = isActive ? "rgba(90,150,255,0.22)" : "none";
+        var edgeC  = isActive ? "rgba(var(--mud-palette-primary-rgb), 0.95)" : "rgba(var(--mud-palette-text-secondary-rgb), 0.72)";
+        var backC  = isActive ? "rgba(var(--mud-palette-text-secondary-rgb), 0.40)" : "rgba(var(--mud-palette-text-secondary-rgb), 0.28)";
+        var activeHighlight = isActive ? "rgba(var(--mud-palette-primary-rgb), 0.22)" : "none";
+
+        var solidTop = "var(--mud-palette-background)";
+        var solidLeft = "var(--mud-palette-text-secondary)";
+        var solidRight = "var(--mud-palette-text-tertiary)";
+        var solidStroke = "var(--mud-palette-lines-default)";
 
         string body = modeKey switch
         {
             "solid" => $"""
-                <polygon points="50,44 14,28 50,12 86,28" fill="#dde3ec" stroke="#94a3b8" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="50,86 14,70 14,28 50,44" fill="#8496ae" stroke="#64748b" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="50,86 86,70 86,28 50,44" fill="#b2bfcf" stroke="#94a3b8" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,44 14,28 50,12 86,28" fill="{solidTop}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 14,70 14,28 50,44" fill="{solidLeft}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,44" fill="{solidRight}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
                 """,
 
             "wireframe" => $"""
@@ -227,21 +242,21 @@
                 <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                 <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <polygon points="50,86 14,70 14,28 50,44" fill="rgba(59,130,246,0.22)" stroke="none"/>
-                <polygon points="50,86 86,70 86,28 50,44" fill="rgba(59,130,246,0.22)" stroke="none"/>
-                <polygon points="50,44 14,28 50,12 86,28" fill="rgba(59,130,246,0.22)" stroke="none"/>
+                <polygon points="50,86 14,70 14,28 50,44" fill="rgba(var(--mud-palette-primary-rgb), 0.22)" stroke="none"/>
+                <polygon points="50,86 86,70 86,28 50,44" fill="rgba(var(--mud-palette-primary-rgb), 0.22)" stroke="none"/>
+                <polygon points="50,44 14,28 50,12 86,28" fill="rgba(var(--mud-palette-primary-rgb), 0.22)" stroke="none"/>
                 """,
 
             "edges" => $"""
-                <polygon points="50,44 14,28 50,12 86,28" fill="#dde3ec" stroke="#94a3b8" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="50,86 14,70 14,28 50,44" fill="#8496ae" stroke="#64748b" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="50,86 86,70 86,28 50,44" fill="#b2bfcf" stroke="#94a3b8" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,44 14,28 50,12 86,28" fill="{solidTop}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 14,70 14,28 50,44" fill="{solidLeft}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,44" fill="{solidRight}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
                 <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                 """,
 
             "bounds" => $"""
-                <circle cx="50" cy="49" r="22" fill="rgba(59,130,246,0.75)"/>
+                <circle cx="50" cy="49" r="22" fill="rgba(var(--mud-palette-primary-rgb), 0.75)"/>
                 <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" stroke="{edgeC}" stroke-width="2" stroke-dasharray="4 4" fill="none" stroke-linecap="round"/>
                 <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" stroke="{edgeC}" stroke-width="2" stroke-dasharray="4 4" fill="none" stroke-linecap="round"/>
                 <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" stroke="{edgeC}" stroke-width="2" stroke-dasharray="4 4" fill="none" stroke-linecap="round"/>
@@ -271,6 +286,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        Logger.LogInformation("OnAfterRenderAsync: ViewerUrl='{ViewerUrl}', _lastViewerUrl='{LastViewerUrl}'", ViewerUrl, _lastViewerUrl);
         if (!string.IsNullOrEmpty(ViewerUrl) && ViewerUrl != _lastViewerUrl)
         {
             var previousUrl = _lastViewerUrl;
@@ -293,6 +309,7 @@
                 else if (KnownDimensions?.X > 0 && KnownDimensions.Y > 0 && KnownDimensions.Z > 0)
                     dims = new { x = KnownDimensions.X, y = KnownDimensions.Y, z = KnownDimensions.Z };
 
+                Logger.LogInformation("Calling JS initialize with URL: {ViewerUrl}", ViewerUrl);
                 await _module.InvokeVoidAsync("initialize",
                     _canvasId,
                     ViewerUrl,
@@ -303,7 +320,7 @@
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ModelViewer] Error initializing: {ex.Message}");
+                Logger.LogError(ex, "Error initializing BabylonJS viewer");
             }
         }
     }
@@ -330,6 +347,12 @@
         _cameraPreset = "iso";
         if (_module != null)
             await _module.InvokeVoidAsync("resetCamera", _canvasId);
+    }
+
+    private async Task RotateModelAsync(int degrees)
+    {
+        if (_module != null)
+            await _module.InvokeVoidAsync("rotateModel", _canvasId, degrees);
     }
 
     private async Task ToggleEdgesAsync()

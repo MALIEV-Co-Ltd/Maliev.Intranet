@@ -299,3 +299,9 @@ public class ApiErrorResponse
     /// </summary>
     public int? Status { get; set; }
 }
+
+/// <summary>Exchange rate returned by the BFF currency rate proxy endpoint.</summary>
+/// <param name="From">Source currency code (e.g. "THB").</param>
+/// <param name="To">Target currency code (e.g. "USD").</param>
+/// <param name="Rate">Multiplier to convert an amount from <paramref name="From"/> to <paramref name="To"/>.</param>
+public sealed record ExchangeRateResponse(string From, string To, decimal Rate);

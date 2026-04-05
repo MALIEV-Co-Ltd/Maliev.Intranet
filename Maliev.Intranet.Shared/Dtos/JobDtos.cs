@@ -53,6 +53,15 @@ public class JobSummaryDto
     /// <summary>Gets or sets when the job was created.</summary>
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>Gets or sets the scheduled start time for this job.</summary>
+    public DateTime? ScheduledStartTime { get; set; }
+
+    /// <summary>Gets or sets the scheduled end time for this job.</summary>
+    public DateTime? ScheduledEndTime { get; set; }
+
+    /// <summary>Gets or sets the position of this job in the machine queue.</summary>
+    public int QueuePosition { get; set; }
+
     /// <summary>Gets a value indicating whether this job is overdue.</summary>
     public bool IsOverdue => EstimatedCompletionAt.HasValue
         && EstimatedCompletionAt.Value < DateTime.UtcNow
@@ -175,3 +184,19 @@ public sealed record AssignMachineRequest
     /// <summary>Gets or sets the machine ID to assign.</summary>
     public Guid MachineId { get; set; }
 }
+
+/// <summary>Request model for reordering a job in the machine queue.</summary>
+public sealed record ReorderJobRequest(int NewPosition);
+
+/// <summary>A compact scheduling slot returned by the machine schedule endpoint.</summary>
+public sealed record MachineScheduleItemDto(
+    Guid JobId,
+    string Technology,
+    DateTime ScheduledStart,
+    DateTime ScheduledEnd,
+    int SetupMinutes,
+    int PrintMinutes,
+    int QueuePosition,
+    string Status,
+    Guid OrderId
+);
