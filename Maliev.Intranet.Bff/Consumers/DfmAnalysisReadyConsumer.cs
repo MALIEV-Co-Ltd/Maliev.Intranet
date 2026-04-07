@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;

@@ -43,7 +43,8 @@ public class DfmAnalysisReadyConsumerTests
             FdmReport:   fdmReport,
             SlaReport:   null!,
             CncReport:   null!,
-            AnalyzedAt:  DateTimeOffset.UtcNow);
+            AnalyzedAt:  DateTimeOffset.UtcNow,
+            OverlayPaths: null!);
 
         return new DfmAnalysisReadyEvent(
             MessageId:      Guid.NewGuid(),
@@ -83,6 +84,7 @@ public class DfmAnalysisReadyConsumerTests
 
         var consumer = new DfmAnalysisReadyConsumer(
             hubMock.Object,
+            new Mock<IHttpClientFactory>().Object,
             statusService.Object,
             NullLogger<DfmAnalysisReadyConsumer>.Instance);
 

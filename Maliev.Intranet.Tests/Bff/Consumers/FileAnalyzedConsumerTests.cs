@@ -118,7 +118,7 @@ public class FileAnalyzedConsumerTests
         await consumer.Consume(MakeCtx(evt).Object);
 
         statusMock.Verify(s =>
-            s.SetAnalysisCompletedAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            s.SetAnalysisCompletedAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
