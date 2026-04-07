@@ -84,7 +84,7 @@
                              Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged)"
                              TimedOut="@Part.DfmAnalysisTimedOut"
                              ErrorMessage="@(Part.DfmAnalysisTimedOut ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
-                             AllClear="@(_dfmIssues.Count == 0 && Part.DfmReport != null && !Part.DfmAcknowledged)"
+                             AllClear="@(_dfmIssues.Count == 0 && Part.DfmReport != null && !Part.DfmAcknowledged && !string.IsNullOrEmpty(Part.ProcessCode))"
                              OnAcknowledged="@HandleDfmAcknowledged"
                              OnToggleOverlay="@HandleToggleOverlay" />
         </div>
@@ -228,6 +228,7 @@
 
     private readonly Dictionary<string, string> _resolvedUrls = [];
     private Guid _lastPartId;
+    private string? _lastProcessCode;
     private List<DfmIssue> _dfmIssues = [];
     private bool _viewerLoadFailed;
     private string? _viewerErrorMessage;
@@ -240,15 +241,20 @@
     protected override async Task OnParametersSetAsync()
     {
         var partChanged = Part.FileId != _lastPartId;
+        var processChanged = Part.ProcessCode != _lastProcessCode;
         _lastPartId = Part.FileId;
+        _lastProcessCode = Part.ProcessCode;
 
-        if (partChanged)
+        if (partChanged || processChanged)
         {
             _dfmPanel?.ResetOverlays();
             if (_modelViewer != null)
                 await _modelViewer.ClearDfmOverlaysAsync();
-            _viewerLoadFailed = false;
-            _viewerErrorMessage = null;
+            if (partChanged)
+            {
+                _viewerLoadFailed = false;
+                _viewerErrorMessage = null;
+            }
         }
 
         _dfmIssues = BuildDfmIssues();
@@ -356,8 +362,14 @@
 
     private List<DfmIssue> BuildDfmIssues()
     {
+        // Without a selected manufacturing process, show only general mesh quality issues.
+        // Process-specific checks (thin wall, overhang, sharp corners, etc.) are meaningless
+        // and misleading until the user picks a process.
+        if (string.IsNullOrEmpty(Part.ProcessCode))
+            return BuildGeneralMeshIssues();
+
         var raw = GetDfmIssueDetailSummary(Part.DfmReport);
-        var processCode = Part.ProcessCode?.ToUpperInvariant() ?? "FDM";
+        var processCode = Part.ProcessCode.ToUpperInvariant();
         // "CNC" is the legacy alias for "CNC_MILL" — overlay GLBs are keyed under CNC_MILL.
         var overlayProcessCode = processCode == "CNC" ? "CNC_MILL" : processCode;
         return raw.Select(t =>
@@ -373,6 +385,24 @@
                 OverlayKey: overlayKey,
                 OverlayUrl: overlayUrl);
         }).ToList();
+    }
+
+    /// <summary>
+    /// Returns mesh-quality issues that are process-agnostic.
+    /// Shown when no manufacturing process is selected yet.
+    /// </summary>
+    private List<DfmIssue> BuildGeneralMeshIssues()
+    {
+        var issues = new List<DfmIssue>();
+
+        if (Part.IsManifold == false)
+            issues.Add(new DfmIssue(
+                Icon: Icons.Material.Filled.WarningAmber,
+                Title: "Non-manifold mesh",
+                Description: "The mesh has holes or overlapping geometry. This may cause issues during manufacturing regardless of process.",
+                Severity: DfmIssueSeverity.Warning));
+
+        return issues;
     }
 
     private async Task HandleToggleOverlay(DfmIssue issue)

@@ -1352,14 +1352,17 @@ export async function toggleDfmOverlay(canvasId, overlayKey, glbUrl, visible) {
         result.meshes.forEach(m => m.computeWorldMatrix(true));
 
         meshes.forEach(mesh => {
-            // Semi-transparent PBR material using vertex colors from the GLB
+            // Semi-transparent red PBR material for DFM issue highlighting.
+            // Vertex colors from the GLB are ignored — a flat red is clearer and consistent.
             const mat = new BABYLON.PBRMaterial(`dfm_${overlayKey}_mat`, scene);
-            mat.metallic      = 0;
-            mat.roughness     = 0.8;
-            mat.alpha         = 0.5;
+            mat.metallic        = 0;
+            mat.roughness       = 0.8;
+            mat.alpha           = 0.55;
+            mat.albedoColor     = new BABYLON.Color3(0.95, 0.10, 0.05); // red
+            mat.emissiveColor   = new BABYLON.Color3(0.25, 0.00, 0.00); // faint red glow
             mat.backFaceCulling = false;
-            mat.useVertexColors = true;
-            mat.zOffset       = -2; // depth bias: overlay wins depth test against coplanar main mesh (prevents Z-fighting)
+            mat.useVertexColors = false;
+            mat.zOffset         = -2; // depth bias: overlay wins depth test against coplanar main mesh
             mesh.material = mat;
             mesh.isPickable = false;
         });
