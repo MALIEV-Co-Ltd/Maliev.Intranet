@@ -83,73 +83,43 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         var slaReport = DeserializeReport<SlaDfmReportPayload>(payload.SlaReport);
         var cncReport = DeserializeReport<CncDfmReportPayload>(payload.CncReport);
 
-        Dictionary<string, string>? overlayUrls = null;
-        if (payload.OverlayPaths != null)
+        // Extract raw overlay paths from payload (MassTransit deserialises object? as JsonElement).
+        Dictionary<string, string>? rawOverlayPaths = null;
+        if (payload.OverlayPaths is JsonElement je2 && je2.ValueKind == JsonValueKind.Object)
         {
-            var rawPaths = payload.OverlayPaths as JsonElement?;
-            if (rawPaths.HasValue && rawPaths.Value.ValueKind == JsonValueKind.Object)
-            {
-                var pathDict = new Dictionary<string, string>();
-                foreach (var prop in rawPaths!.Value.EnumerateObject())
-                {
-                    pathDict[prop.Name] = prop.Value.GetString() ?? "";
-                }
+            rawOverlayPaths = je2.EnumerateObject()
+                .Where(p => !string.IsNullOrEmpty(p.Value.GetString()))
+                .ToDictionary(p => p.Name, p => p.Value.GetString()!);
+        }
+        else if (payload.OverlayPaths is IDictionary<string, object> dict2)
+        {
+            rawOverlayPaths = dict2
+                .Where(kvp => !string.IsNullOrEmpty(kvp.Value?.ToString()))
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!.ToString()!);
+        }
 
-                var signedUrls = new Dictionary<string, string>();
-                foreach (var (key, path) in pathDict)
-                {
-                    if (!string.IsNullOrEmpty(path))
-                    {
-                        try
-                        {
-                            var url = await CreateUploadClient().GetDownloadUrlByPathAsync(
-                                path, context.CancellationToken, expirationMinutes: 10080);
-                            if (!string.IsNullOrEmpty(url))
-                            {
-                                signedUrls[key] = url;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex,
-                                "DfmAnalysisReadyConsumer: failed to get signed URL for overlay {Key}", key);
-                        }
-                    }
-                }
-                if (signedUrls.Count > 0)
-                {
-                    overlayUrls = new Dictionary<string, string>(signedUrls);
-                }
-            }
-            else if (payload.OverlayPaths is IDictionary<string, object> dict)
+        // Sign all overlay URLs in parallel so the SignalR event is not delayed by 20+ serial HTTP calls.
+        Dictionary<string, string>? overlayUrls = null;
+        if (rawOverlayPaths is { Count: > 0 })
+        {
+            var signed = new ConcurrentDictionary<string, string>();
+            await Task.WhenAll(rawOverlayPaths.Select(async kvp =>
             {
-                var signedUrls = new Dictionary<string, string>();
-                foreach (var kvp in dict)
+                try
                 {
-                    var path = kvp.Value?.ToString();
-                    if (!string.IsNullOrEmpty(path))
-                    {
-                        try
-                        {
-                            var url = await CreateUploadClient().GetDownloadUrlByPathAsync(
-                                path, context.CancellationToken, expirationMinutes: 10080);
-                            if (!string.IsNullOrEmpty(url))
-                            {
-                                signedUrls[kvp.Key] = url;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex,
-                                "DfmAnalysisReadyConsumer: failed to get signed URL for overlay {Key}", kvp.Key);
-                        }
-                    }
+                    var url = await CreateUploadClient().GetDownloadUrlByPathAsync(
+                        kvp.Value, context.CancellationToken, expirationMinutes: 10080);
+                    if (!string.IsNullOrEmpty(url))
+                        signed[kvp.Key] = url;
                 }
-                if (signedUrls.Count > 0)
+                catch (Exception ex)
                 {
-                    overlayUrls = new Dictionary<string, string>(signedUrls);
+                    _logger.LogWarning(ex,
+                        "DfmAnalysisReadyConsumer: failed to get signed URL for overlay {Key}", kvp.Key);
                 }
-            }
+            }));
+            if (signed.Count > 0)
+                overlayUrls = new Dictionary<string, string>(signed);
         }
 
         await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
@@ -161,6 +131,9 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
                 CncReport: cncReport,
                 OverlayUrls: overlayUrls != null
                     ? new ReadOnlyDictionary<string, string>(overlayUrls)
+                    : null,
+                OverlayPaths: rawOverlayPaths != null
+                    ? new ReadOnlyDictionary<string, string>(rawOverlayPaths)
                     : null),
             context.CancellationToken);
     }
