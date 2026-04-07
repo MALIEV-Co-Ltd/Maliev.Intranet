@@ -275,6 +275,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.CncDfmReport = payload.CncReport;
             part.OverlayUrls = payload.OverlayUrls;
             part.OverlayPaths = payload.OverlayPaths;
+            part.BodyCount = payload.BodyCount;
             part.ResolveDfmReport();
             StopStatusWatchdog(payload.StoragePath);
 
@@ -670,6 +671,41 @@ public partial class ProjectNew : IAsyncDisposable
         catch
         {
             // Non-fatal — overlay URL resolution is best-effort
+        }
+    }
+
+    /// <summary>
+    /// Refreshes the 3D viewer signed URL when the current one has expired.
+    /// Called by PartDetailCard when BabylonJS viewer fails to load.
+    /// </summary>
+    private async Task RequestFreshViewerUrlAsync(string storagePath)
+    {
+        var part = _parts.FirstOrDefault(p => p.GlbStoragePath == storagePath || p.StoragePath == storagePath);
+        if (part == null) return;
+
+        try
+        {
+            var viewerResp = await Http.GetAsync(
+                $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(storagePath)}");
+            if (viewerResp.IsSuccessStatusCode)
+            {
+                var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
+                var resolvedUrl = viewerJson?.RootElement.GetProperty("url").GetString();
+                if (!string.IsNullOrEmpty(resolvedUrl))
+                {
+                    part.ViewerUrl = resolvedUrl;
+                    part.GlbSignedUrl = resolvedUrl;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Failed to refresh 3D viewer URL. Please try again.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to refresh viewer: {ex.Message}", Severity.Warning);
         }
     }
 

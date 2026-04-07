@@ -135,6 +135,11 @@ public class PartViewModel
     public Dictionary<string, string>? OverlayPaths { get; set; }
 
     /// <summary>
+    /// Number of distinct bodies/shells in the mesh. Greater than 1 indicates multi-body geometry.
+    /// </summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>
     /// Resolves <see cref="DfmReport"/> from the per-process DFM report properties
     /// based on the currently selected <see cref="ProcessCode"/>.
     /// Call this after setting any of FdmDfmReport/SlaDfmReport/CncDfmReport,

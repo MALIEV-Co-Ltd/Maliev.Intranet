@@ -129,4 +129,9 @@ public sealed class SignalRDfmAnalysisPayload
     /// Persisted in draft state so signed URLs can be re-generated after expiry.
     /// </summary>
     public Dictionary<string, string>? OverlayPaths { get; set; }
+
+    /// <summary>
+    /// Number of distinct bodies/shells detected in the mesh. Greater than 1 means multi-body.
+    /// </summary>
+    public int? BodyCount { get; set; }
 }

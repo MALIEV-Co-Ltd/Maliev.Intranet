@@ -72,7 +72,8 @@
                                             Part="@_parts[_selectedPartIndex]"
                                             TempProjectId="@_tempProjectId"
                                             OnPartChanged="OnPartChanged"
-                                            OnOpenViewer="OpenBabylonViewer" />
+                                            OnOpenViewer="OpenBabylonViewer"
+                                            OnRequestFreshViewerUrl="RequestFreshViewerUrlAsync" />
                                     </ChildContent>
                                     <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Detail panel error.</MudAlert></ErrorContent>
                                 </ErrorBoundary>

@@ -122,6 +122,8 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
                 overlayUrls = new Dictionary<string, string>(signed);
         }
 
+        int? bodyCount = payload.BodyCount;
+
         await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
             "DfmAnalysisReady",
             new DfmAnalysisReadyPayload(
@@ -134,7 +136,8 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
                     : null,
                 OverlayPaths: rawOverlayPaths != null
                     ? new ReadOnlyDictionary<string, string>(rawOverlayPaths)
-                    : null),
+                    : null,
+                BodyCount: bodyCount),
             context.CancellationToken);
     }
 

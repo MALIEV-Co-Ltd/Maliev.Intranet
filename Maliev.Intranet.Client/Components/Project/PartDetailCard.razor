@@ -223,6 +223,9 @@
     /// <summary>Callback invoked when the user requests to open the 3D viewer for this part.</summary>
     [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
 
+    /// <summary>Callback invoked when the 3D viewer fails to load (e.g., expired signed URL) to request a fresh URL.</summary>
+    [Parameter] public EventCallback<string> OnRequestFreshViewerUrl { get; set; }
+
     /// <summary>The temporary project ID used for file upload endpoints.</summary>
     [Parameter] public Guid TempProjectId { get; set; }
 
@@ -357,7 +360,15 @@
         _viewerLoadFailed = true;
         _viewerErrorMessage = errorMessage;
         Snackbar.Add($"3D preview unavailable: {errorMessage}", Severity.Warning);
-        await InvokeAsync(StateHasChanged);
+
+        if (!string.IsNullOrEmpty(Part.GlbStoragePath) && OnRequestFreshViewerUrl.HasDelegate)
+        {
+            await OnRequestFreshViewerUrl.InvokeAsync(Part.GlbStoragePath);
+        }
+        else
+        {
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private List<DfmIssue> BuildDfmIssues()
@@ -372,7 +383,7 @@
         var processCode = Part.ProcessCode.ToUpperInvariant();
         // "CNC" is the legacy alias for "CNC_MILL" — overlay GLBs are keyed under CNC_MILL.
         var overlayProcessCode = processCode == "CNC" ? "CNC_MILL" : processCode;
-        return raw.Select(t =>
+        var issues = raw.Select(t =>
         {
             var overlayKey = t.Category != null ? $"{overlayProcessCode}__{t.Category}" : null;
             var overlayUrl = overlayKey != null ? Part.OverlayUrls?.GetValueOrDefault(overlayKey) : null;
@@ -385,6 +396,9 @@
                 OverlayKey: overlayKey,
                 OverlayUrl: overlayUrl);
         }).ToList();
+        // Always append general mesh issues (non-manifold, multi-body) regardless of process.
+        issues.AddRange(BuildGeneralMeshIssues());
+        return issues;
     }
 
     /// <summary>
@@ -401,6 +415,20 @@
                 Title: "Non-manifold mesh",
                 Description: "The mesh has holes or overlapping geometry. This may cause issues during manufacturing regardless of process.",
                 Severity: DfmIssueSeverity.Warning));
+
+        if (Part.BodyCount > 1)
+        {
+            var overlayKey = "GENERAL__multi_body";
+            var resolvedOverlayUrl = Part.OverlayUrls?.GetValueOrDefault(overlayKey);
+            issues.Add(new DfmIssue(
+                Icon: Icons.Material.Filled.CallSplit,
+                Title: $"Multiple bodies detected ({Part.BodyCount})",
+                Description: $"This file contains {Part.BodyCount} separate bodies. Each body is shown in a different colour. Please upload one part per file.",
+                Severity: DfmIssueSeverity.Warning,
+                Category: "multi_body",
+                OverlayKey: overlayKey,
+                OverlayUrl: resolvedOverlayUrl));
+        }
 
         return issues;
     }

@@ -117,13 +117,15 @@ public record GlbReadyPayload(string StoragePath, string? GlbUrl, bool Failed);
 /// Raw GCS storage paths for overlay GLBs (same keys as <paramref name="OverlayUrls"/>).
 /// Persisted in draft state so signed URLs can be re-generated after expiry.
 /// </param>
+/// <param name="BodyCount">Number of distinct bodies/shells detected; greater than 1 means multi-body.</param>
 public record DfmAnalysisReadyPayload(
     string StoragePath,
     Maliev.MessagingContracts.Contracts.Geometry.FdmDfmReportPayload? FdmReport,
     Maliev.MessagingContracts.Contracts.Geometry.SlaDfmReportPayload? SlaReport,
     Maliev.MessagingContracts.Contracts.Geometry.CncDfmReportPayload? CncReport,
     IReadOnlyDictionary<string, string>? OverlayUrls = null,
-    IReadOnlyDictionary<string, string>? OverlayPaths = null);
+    IReadOnlyDictionary<string, string>? OverlayPaths = null,
+    int? BodyCount = null);
 
 /// <summary>Payload pushed when a pricing calculation result is ready.</summary>
 /// <param name="StoragePath">GCS path of the original file (join key).</param>

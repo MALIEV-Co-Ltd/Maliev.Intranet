@@ -1351,18 +1351,27 @@ export async function toggleDfmOverlay(canvasId, overlayKey, glbUrl, visible) {
         });
         result.meshes.forEach(m => m.computeWorldMatrix(true));
 
+        const isMultiBody = overlayKey === 'GENERAL__multi_body';
         meshes.forEach(mesh => {
-            // Semi-transparent red PBR material for DFM issue highlighting.
-            // Vertex colors from the GLB are ignored — a flat red is clearer and consistent.
             const mat = new BABYLON.PBRMaterial(`dfm_${overlayKey}_mat`, scene);
             mat.metallic        = 0;
             mat.roughness       = 0.8;
-            mat.alpha           = 0.55;
-            mat.albedoColor     = new BABYLON.Color3(0.95, 0.10, 0.05); // red
-            mat.emissiveColor   = new BABYLON.Color3(0.25, 0.00, 0.00); // faint red glow
             mat.backFaceCulling = false;
-            mat.useVertexColors = false;
-            mat.zOffset         = -2; // depth bias: overlay wins depth test against coplanar main mesh
+            if (isMultiBody) {
+                // Multi-body overlay: honour per-body vertex colours baked into the GLB.
+                mat.useVertexColors = true;
+                mat.albedoColor     = new BABYLON.Color3(1, 1, 1); // multiply with vertex colour
+                mat.alpha           = 0.85;
+                mat.emissiveColor   = new BABYLON.Color3(0, 0, 0);
+                mat.zOffset         = 0; // bodies sit on the model surface — no depth bias needed
+            } else {
+                // Process-specific DFM issue: flat semi-transparent red, vertex colours ignored.
+                mat.useVertexColors = false;
+                mat.albedoColor     = new BABYLON.Color3(0.95, 0.10, 0.05); // red
+                mat.alpha           = 0.55;
+                mat.emissiveColor   = new BABYLON.Color3(0.25, 0.00, 0.00); // faint red glow
+                mat.zOffset         = -2; // depth bias: overlay wins depth test against coplanar main mesh
+            }
             mesh.material = mat;
             mesh.isPickable = false;
         });
