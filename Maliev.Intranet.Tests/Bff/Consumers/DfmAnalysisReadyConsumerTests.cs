@@ -161,6 +161,7 @@ public class DfmAnalysisReadyConsumerTests
 
         var consumer = new DfmAnalysisReadyConsumer(
             hubMock.Object,
+            new Mock<IHttpClientFactory>().Object,
             new Mock<IFileAnalysisStatusService>().Object,
             NullLogger<DfmAnalysisReadyConsumer>.Instance);
 
@@ -192,6 +193,7 @@ public class DfmAnalysisReadyConsumerTests
 
         var consumer = new DfmAnalysisReadyConsumer(
             hub.Object,
+            new Mock<IHttpClientFactory>().Object,
             new Mock<IFileAnalysisStatusService>().Object,
             NullLogger<DfmAnalysisReadyConsumer>.Instance);
 
