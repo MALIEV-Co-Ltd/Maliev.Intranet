@@ -8,7 +8,7 @@
                 <MudIcon Icon="@Icons.Material.Outlined.Info"
                          Size="Size.Small"
                          Color="Color.Default" />
-                <span>DFM analysis unavailable</span>
+                <span>@(string.IsNullOrEmpty(ErrorMessage) ? "DFM analysis unavailable" : ErrorMessage)</span>
             </div>
         </div>
     </div>
@@ -75,13 +75,6 @@ else if (IsVisible && DfmIssues.Count > 0)
                                 <MudText Typo="Typo.caption" Class="dfm-issue-title">@issue.Title</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@issue.Description</MudText>
                             </div>
-                            @if (canToggle)
-                            {
-                                <MudIcon Icon="@(isActive ? Icons.Material.Filled.Visibility : Icons.Material.Outlined.VisibilityOff)"
-                                         Size="Size.Small"
-                                         Color="@(isActive ? Color.Primary : Color.Default)"
-                                         Class="dfm-overlay-indicator" />
-                            }
                         </div>
                     </MudListItem>
                 }
@@ -179,8 +172,11 @@ else if (IsVisible && DfmIssues.Count > 0)
     /// <summary>True while DFM analysis is in progress but no report has arrived yet.</summary>
     [Parameter] public bool Analyzing { get; set; }
 
-    /// <summary>True when DFM analysis timed out on the client (60 s with no event). Shows 'unavailable' notice.</summary>
+    /// <summary>True when DFM analysis timed out on the client or a failure event arrived. Shows 'unavailable' notice.</summary>
     [Parameter] public bool TimedOut { get; set; }
+
+    /// <summary>Optional user-friendly message describing why DFM is unavailable. Shown instead of the generic label when set.</summary>
+    [Parameter] public string? ErrorMessage { get; set; }
 
     /// <summary>True when DFM analysis completed and no issues were found.</summary>
     [Parameter] public bool AllClear { get; set; }

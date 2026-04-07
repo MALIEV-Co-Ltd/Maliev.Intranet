@@ -188,6 +188,14 @@ public sealed record AssignMachineRequest
 /// <summary>Request model for reordering a job in the machine queue.</summary>
 public sealed record ReorderJobRequest(int NewPosition);
 
+/// <summary>All-machine schedule summary for Gantt planning view.</summary>
+public record MachineScheduleSummaryDto(
+    string MachineId,
+    string MachineName,
+    string Category,
+    IReadOnlyList<PlanningScheduleItemDto> Schedule
+);
+
 /// <summary>A compact scheduling slot returned by the machine schedule endpoint.</summary>
 public sealed record MachineScheduleItemDto(
     Guid JobId,

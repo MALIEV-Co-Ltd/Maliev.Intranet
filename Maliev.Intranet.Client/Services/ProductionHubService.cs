@@ -24,6 +24,9 @@ public sealed class ProductionHubService : IAsyncDisposable
     /// <summary>Fired when production stats are updated — signals callers to refresh stats.</summary>
     public event Action? ProductionStatsUpdated;
 
+    /// <summary>Fired when a machine schedule changes (job reordered/rescheduled). Arg: machineId.</summary>
+    public event Action<string>? ScheduleChanged;
+
     /// <summary>Gets the current hub connection state.</summary>
     public HubConnectionState State => _connection?.State ?? HubConnectionState.Disconnected;
 
@@ -62,6 +65,9 @@ public sealed class ProductionHubService : IAsyncDisposable
         _connection.On("ProductionStatsUpdated", () =>
             ProductionStatsUpdated?.Invoke());
 
+        _connection.On<ScheduleChangedPayload>("ScheduleChanged", payload =>
+            ScheduleChanged?.Invoke(payload.MachineId));
+
         await _connection.StartAsync();
     }
 
@@ -86,4 +92,5 @@ public sealed class ProductionHubService : IAsyncDisposable
 
     private sealed record JobStatusChangedPayload(Guid JobId, string Status);
     private sealed record JobAssignedPayload(Guid JobId, Guid MachineId);
+    private sealed record ScheduleChangedPayload(string MachineId);
 }

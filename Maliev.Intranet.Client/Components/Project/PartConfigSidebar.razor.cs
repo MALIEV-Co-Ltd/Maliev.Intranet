@@ -281,9 +281,11 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part?.ProductionRouting == null) return;
         var parameters = new DialogParameters<ScheduleDialogContent>
         {
-            { x => x.Routing, Part.ProductionRouting }
+            { x => x.Routing,   Part.ProductionRouting },
+            { x => x.MachineId, Part.ProductionRouting.MachineCode },
         };
-        DialogService.ShowAsync<ScheduleDialogContent>("Planning Schedule", parameters);
+        DialogService.ShowAsync<ScheduleDialogContent>("Planning Schedule", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
     }
 
 }

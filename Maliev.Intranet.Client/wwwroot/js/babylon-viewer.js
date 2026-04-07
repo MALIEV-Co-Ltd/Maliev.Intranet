@@ -43,7 +43,7 @@ const edgesEnabled      = {};  // canvasId → boolean
 const animStates        = {};  // canvasId → 'idle' | 'hovering' | 'interacting'
 const autoSpeedCurrent  = {};  // canvasId → current alpha increment per frame (lerped)
 const autoSpeedTarget   = {};  // canvasId → target alpha increment
-const SPEED_IDLE   = 0.004;
+const SPEED_IDLE   = 0.001;
 const SPEED_HOVER  = 0.0005;
 const SPEED_STOP   = 0;
 
@@ -100,7 +100,7 @@ function fitCameraToMesh(cam, bb, meshCenter, canvasId) {
     const h = bb.max.z - bb.min.z;
     const halfDiag = Math.sqrt(w * w + d * d + h * h) / 2;
     const fov = cam.fov || 0.8;
-    const meshRadius = Math.max(halfDiag / Math.tan(fov / 2) * 1.3, 1);
+    const meshRadius = Math.max(halfDiag / Math.tan(fov / 2) * 1.2, 1);
 
     // Z-up target: center horizontally, vertically at half-height
     cam.target = new BABYLON.Vector3(
@@ -111,11 +111,10 @@ function fitCameraToMesh(cam, bb, meshCenter, canvasId) {
     cam.radius = meshRadius;
     cam.lowerRadiusLimit = meshRadius * 0.02;
     cam.upperRadiusLimit = meshRadius * 50;
-    // Scroll sensitivity: ~20× more sensitive than the original formula (5000/r).
-    // wheelPrecision is inverse sensitivity: lower value = faster zoom.
-    cam.wheelPrecision = Math.max(0.05, 250 / meshRadius);
+    // Scroll sensitivity: wheelPrecision is inverse sensitivity (lower = faster zoom).
+    cam.wheelPrecision = Math.max(0.05, 60 / meshRadius);
     cam.pinchPrecision = cam.wheelPrecision * 4;
-    cam.minZ = meshRadius * 0.001;
+    cam.minZ = meshRadius * 0.00001;
     cam.maxZ = meshRadius * 2000;
     // Store initial radius for dynamic perspective edge width scaling
     if (canvasId != null) fitRadiusMap[canvasId] = meshRadius;
@@ -140,11 +139,11 @@ const _INV3 = 1 / Math.sqrt(3);
 const PRESETS = {
     front:  { dir: [  0,      -1,       0    ], up: [0, 0, 1] },
     back:   { dir: [  0,      +1,       0    ], up: [0, 0, 1] },
-    right:  { dir: [ +1,       0,       0    ], up: [0, 0, 1] },
-    left:   { dir: [ -1,       0,       0    ], up: [0, 0, 1] },
-    top:    { dir: [  0,       0,      -1    ], up: [0, 1, 0] },
-    bottom: { dir: [  0,       0,      +1    ], up: [0, 1, 0] },
-    iso:    { dir: [+_INV3,  -_INV3,  _INV3  ], up: [0, 0, 1] },
+    right:  { dir: [ -1,       0,       0    ], up: [0, 0, 1] },
+    left:   { dir: [ +1,       0,       0    ], up: [0, 0, 1] },
+    top:    { dir: [  0,       0,      +1    ], up: [0, 1, 0] },
+    bottom: { dir: [  0,       0,      -1    ], up: [0, 1, 0] },
+    iso:    { dir: [ -_INV3, -_INV3, _INV3   ], up: [0, 0, 1] },
 };
 
 /**
@@ -155,7 +154,7 @@ function applyPreset(cam, presetName) {
     const p = PRESETS[presetName];
     if (!p) return;
     cam.upVector = new BABYLON.Vector3(p.up[0], p.up[1], p.up[2]);
-    const r = cam.radius;
+    const r = cam.radius * 0.95;
     const t = cam.target;
     cam.setPosition(new BABYLON.Vector3(
         t.x + p.dir[0] * r,
@@ -173,8 +172,10 @@ function applyPreset(cam, presetName) {
  * @param {boolean} isDark
  * @param {object|null} knownDimsMm  Optional { x, y, z } bounding box in mm from server
  * @param {object|null} dotNetRef   Optional DotNetObjectReference for error callbacks
+ * @param {string}  renderMode     Optional render mode: "solid", "wireframe", "transparent" (default: "solid")
+ * @param {string}  cameraProjection  Optional camera projection: "perspective" or "orthographic" (default: "perspective")
  */
-export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef) {
+export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef, renderMode = "solid", cameraProjection = "perspective") {
     try {
         await loadScript('./lib/babylonjs/babylon.js');
         await loadScript('./lib/babylonjs/babylonjs.loaders.min.js');
@@ -204,7 +205,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
         // Camera (upVector updated after model loads)
         const camera = new BABYLON.ArcRotateCamera('cam',
-            Math.PI / 4, Math.acos(1 / Math.sqrt(3)), 10,
+            Math.PI / 4, Math.acos(1 / Math.sqrt(3)) + (15 * Math.PI / 180), 10,
             BABYLON.Vector3.Zero(), scene);
         camera.attachControl(canvas, true);
         camera.wheelPrecision = 5; // Will be tuned by fitCameraToMesh after load
@@ -217,6 +218,12 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         camera.lowerBetaLimit = null;
         camera.upperBetaLimit = null;
         mainCameras[canvasId] = camera;
+
+        // Set initial projection mode based on parameter
+        console.log('[BabylonViewer] initialize: cameraProjection =', cameraProjection);
+        if (cameraProjection === 'orthographic') {
+            setCameraProjection(canvasId, 'orthographic');
+        }
 
         // ── Right-click pixel-perfect pan (attached now, updated each model load) ────
         attachPickPointPan(canvasId, canvas, camera);
@@ -384,6 +391,11 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     cam.upVector = new BABYLON.Vector3(0, 0, 1);
                     fitCameraToMesh(cam, finalBb, meshCenters[canvasId], canvasId);
                     applyPreset(cam, 'iso');
+                    // Apply projection after fit: engines[canvasId] is now set (assigned after
+                    // _loadAttempt is started, before the async callback fires), so
+                    // setCameraProjection will no longer return early. This also recalculates
+                    // ortho bounds using the correct model-scale radius.
+                    setCameraProjection(canvasId, cameraProjection);
                 }
 
                 // ── Post Processing ──
@@ -430,7 +442,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 ro.observe(canvas);
                 resizeObservers[canvasId] = ro;
 
-                setRenderMode(canvasId, 'solid');
+                setRenderMode(canvasId, renderMode);
                 toggleEdges(canvasId, false);
             },
             null,
@@ -818,7 +830,7 @@ export function setRenderMode(canvasId, mode) {
 
     scene.meshes.forEach(mesh => {
         // Skip system meshes: ground grid, axis gizmo parts, bounding box lines
-        if (mesh.name === '__grid__' || mesh.name.startsWith('__axis') || mesh.name === 'bbox_lines') return;
+        if (mesh.name === '__grid__' || mesh.name.startsWith('__axis') || mesh.name.startsWith('bbox_')) return;
 
         if (mode === 'wireframe') {
             if (!origMats[mesh.uniqueId] && mesh.material) origMats[mesh.uniqueId] = mesh.material;
@@ -937,14 +949,28 @@ function getEdgeColorFromCss(isDark) {
  * value is used.
  */
 function getEdgesWidth(canvasId) {
-    if (cameraProjection[canvasId] === 'orthographic') return 3;
-    // Perspective: scale width proportionally to zoom level.
-    // At the default fit radius (zoom=1) edges are 25px wide.
-    // Zooming in (radius shrinks) scales down to a minimum of 8px.
+    if (cameraProjection[canvasId] === 'orthographic') return 2;
+    // Perspective mode: thinner edges to reduce visual clutter
+    // At the default fit radius (zoom=1) edges are 12px wide.
+    // Zooming in (radius shrinks) scales down to a minimum of 4px.
     const cam   = mainCameras[canvasId];
     const fitR  = fitRadiusMap[canvasId];
-    if (!cam || !fitR) return 25;
-    return Math.max(8, Math.min(25, 25 * (cam.radius / fitR)));
+    if (!cam || !fitR) return 12;
+    return Math.max(4, Math.min(12, 12 * (cam.radius / fitR)));
+}
+
+/**
+ * Returns the polygon offset factor for edge rendering.
+ * In orthographic mode a minimal value suffices (depth is linear).
+ * In perspective mode the factor scales with sqrt(radius / fitRadius) so that
+ * the non-linear depth compression at larger distances is compensated.
+ */
+function getEdgesZOffset(canvasId) {
+    if (cameraProjection[canvasId] === 'orthographic') return 1;
+    const cam  = mainCameras[canvasId];
+    const fitR = fitRadiusMap[canvasId];
+    if (!cam || !fitR) return 15;
+    return Math.max(15, Math.round(15 * Math.sqrt(cam.radius / fitR)));
 }
 
 export function toggleEdges(canvasId, enabled) {
@@ -953,16 +979,24 @@ export function toggleEdges(canvasId, enabled) {
     edgesEnabled[canvasId] = enabled;
     const edgeColor = getEdgeColorFromCss(darkModes[canvasId]);
     const width = getEdgesWidth(canvasId);
+    // zOffset (factor) scales with camera distance in perspective to compensate for
+    // non-linear depth precision. zOffsetUnits provides a constant depth bias that
+    // prevents Z-fighting on flat faces viewed head-on (where the factor contribution is ~0).
+    const zOffset      = getEdgesZOffset(canvasId);
+    const zOffsetUnits = cameraProjection[canvasId] === 'orthographic' ? 0 : 4096;
     scene.meshes.forEach(mesh => {
         // Skip system meshes: ground grid, axis gizmo parts, bounding box lines
-        if (mesh.name === '__grid__' || mesh.name.startsWith('__axis') || mesh.name === 'bbox_lines') return;
+        if (mesh.name === '__grid__' || mesh.name.startsWith('__axis') || mesh.name.startsWith('bbox_')) return;
         if (enabled) {
             try {
                 mesh.disableEdgesRendering();
                 // Tighter epsilon catches chamfers and shallow draft angles on CAD parts.
-                mesh.enableEdgesRendering(0.98, true);
+                mesh.enableEdgesRendering(0.98, false, zOffset);
                 mesh.edgesWidth = width;
                 mesh.edgesColor = edgeColor;
+                if (mesh._edgesRenderer && 'zOffsetUnits' in mesh._edgesRenderer) {
+                    mesh._edgesRenderer.zOffsetUnits = zOffsetUnits;
+                }
             } catch (_) {}
         } else {
             try { mesh.disableEdgesRendering(); } catch (_) {}
@@ -980,7 +1014,7 @@ export function toggleEdges(canvasId, enabled) {
 
 /**
  * Attaches a camera view-matrix observer that re-applies edges width
- * every time the user zooms in perspective mode.
+ * and zOffset every time the user zooms in perspective mode.
  */
 function _attachEdgeZoomObserver(canvasId) {
     _detachEdgeZoomObserver(canvasId); // remove any previous
@@ -989,10 +1023,17 @@ function _attachEdgeZoomObserver(canvasId) {
     if (!cam || !scene) return;
     edgeZoomObservers[canvasId] = cam.onViewMatrixChangedObservable.add(() => {
         if (!edgesEnabled[canvasId] || cameraProjection[canvasId] === 'orthographic') return;
-        const w = getEdgesWidth(canvasId);
+        const w    = getEdgesWidth(canvasId);
+        const zOff = getEdgesZOffset(canvasId);
         scene.meshes.forEach(mesh => {
-            if (mesh.name === '__grid__' || mesh.name.startsWith('__axis') || mesh.name === 'bbox_lines') return;
-            if (mesh._edgesRenderer) mesh.edgesWidth = w;
+            if (mesh.name === '__grid__' || mesh.name.startsWith('__axis') || mesh.name.startsWith('bbox_')) return;
+            if (mesh._edgesRenderer) {
+                mesh.edgesWidth = w;
+                mesh._edgesRenderer.zOffset = zOff;
+                if ('zOffsetUnits' in mesh._edgesRenderer) {
+                    mesh._edgesRenderer.zOffsetUnits = 4096;
+                }
+            }
         });
     });
 }
@@ -1220,6 +1261,7 @@ export function hideGrid(canvasId) {
 export function setCameraProjection(canvasId, mode) {
     const cam    = mainCameras[canvasId];
     const engine = engines[canvasId];
+    console.log('[BabylonViewer] setCameraProjection:', canvasId, mode, 'cam?', !!cam, 'engine?', !!engine);
     if (!cam || !engine) return;
 
     cameraProjection[canvasId] = mode;
@@ -1347,34 +1389,10 @@ export function clearDfmOverlays(canvasId) {
 export function rotateModel(canvasId, degrees) {
     const scene = scenes[canvasId];
     if (!scene) return;
+    const cam = mainCameras[canvasId];
+    if (!cam || !(cam instanceof BABYLON.ArcRotateCamera)) return;
     const rad = degrees * Math.PI / 180;
-    const rotAxis = new BABYLON.Vector3(0, 0, 1);
-    const quat = BABYLON.Quaternion.RotationAxis(rotAxis, rad);
-
-    const _sysNames = new Set(['key', 'fill', 'back', 'hemi', 'cam', '__init_light__', '__grid__']);
-    const modelNodes = scene.rootNodes.filter(n =>
-        n.name !== '__grid__' &&
-        !n.name.startsWith('__axis') &&
-        !_sysNames.has(n.name) &&
-        !(n instanceof BABYLON.Camera) &&
-        !(n instanceof BABYLON.Light)
-    );
-
-    if (modelNodes.length === 0) {
-        const meshes = scene.meshes.filter(m =>
-            m.name !== '__grid__' && !m.name.startsWith('__axis') && !m.name.startsWith('__dfm')
-        );
-        for (const mesh of meshes) {
-            if (!mesh.parent) {
-                mesh.rotate(rotAxis, rad, BABYLON.Space.WORLD);
-            }
-        }
-        return;
-    }
-
-    for (const node of modelNodes) {
-        if (node.rotate) node.rotate(rotAxis, rad, BABYLON.Space.WORLD);
-    }
+    cam.alpha += rad;
 }
 
 // ── dispose ───────────────────────────────────────────────────────────────────

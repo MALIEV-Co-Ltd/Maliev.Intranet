@@ -13,43 +13,77 @@
                        OnClick="NextMonth" />
     </MudStack>
 
-    @* ── Day-of-week headers ─────────────────────────────────────────────────*@
-    <MudGrid Spacing="0" Class="pc-grid">
+    @* ── 7-column CSS grid ───────────────────────────────────────────────────*@
+    <div class="pc-grid">
+        @* Day-of-week headers *@
         @foreach (var dow in new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" })
         {
-            <MudItem xs="@DayWidth" Class="pc-dow-header">
+            <div class="pc-dow-header">
                 <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">@dow</MudText>
-            </MudItem>
+            </div>
         }
 
-        @* ── Day cells ────────────────────────────────────────────────────────*@
+        @* Day cells *@
         @foreach (var day in _calendarDays)
         {
             var dayItems = _itemsByDate.GetValueOrDefault(DateOnly.FromDateTime(day.Date), []);
-            <MudItem xs="@DayWidth">
-                <PlanningCalendarDay Date="@day"
-                                     Items="@dayItems"
-                                     IsCurrentMonth="@(day.Month == CurrentMonth.Month)"
-                                     IsToday="@(DateOnly.FromDateTime(day.Date) == _today)"
-                                     OnDayClicked="@OnDayClicked" />
-            </MudItem>
+            <PlanningCalendarDay Date="@day"
+                                 Items="@dayItems"
+                                 IsCurrentMonth="@(day.Month == CurrentMonth.Month)"
+                                 IsToday="@(DateOnly.FromDateTime(day.Date) == _today)"
+                                 OnDayClicked="@OnDayClicked" />
         }
-    </MudGrid>
+    </div>
+
+    @* ── Legend *@
+    @if (ProposedSlotStart.HasValue)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-2">
+            <div class="pc-legend-proposed"></div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Proposed slot for this part</MudText>
+        </MudStack>
+    }
 </div>
 
 <style>
     .pc-root { width: 100%; }
-    .pc-grid { display: grid; }
-    .pc-dow-header { padding: 4px 2px; text-align: center; border-bottom: 1px solid var(--mud-palette-lines-default); }
+
+    .pc-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0;
+        width: 100%;
+    }
+
+    .pc-dow-header {
+        padding: 4px 2px;
+        text-align: center;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        border-right: 1px solid var(--mud-palette-lines-default);
+    }
+
+    .pc-dow-header:last-child {
+        border-right: none;
+    }
+
+    .pc-legend-proposed {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border: 2px dashed var(--mud-palette-secondary);
+        background: color-mix(in srgb, var(--mud-palette-secondary) 15%, transparent);
+    }
 </style>
 
 @code {
     [Parameter] public IReadOnlyList<PlanningScheduleItemDto> ScheduleItems { get; set; } = [];
     [Parameter] public DateTime CurrentMonth { get; set; } = DateTime.Today;
+    [Parameter] public DateTimeOffset? ProposedSlotStart { get; set; }
+    [Parameter] public DateTimeOffset? ProposedSlotEnd { get; set; }
+    [Parameter] public string ProposedMachineName { get; set; } = string.Empty;
     [Parameter] public EventCallback<DateTime> OnDayClicked { get; set; }
     [Parameter] public EventCallback<DateTime> OnMonthChanged { get; set; }
 
-    private const int DayWidth = 0; // MudGrid xs uses 1-12, 0 = auto via CSS
     private List<DateTime> _calendarDays = [];
     private Dictionary<DateOnly, List<PlanningScheduleItemDto>> _itemsByDate = [];
     private readonly DateOnly _today = DateOnly.FromDateTime(DateTime.Today);
@@ -64,10 +98,9 @@
     {
         _calendarDays = [];
         var first = new DateTime(CurrentMonth.Year, CurrentMonth.Month, 1);
-        // Monday-first: offset 0=Mon … 6=Sun
+        // Monday-first: Mon=0 … Sun=6
         var offset = ((int)first.DayOfWeek + 6) % 7;
         var start = first.AddDays(-offset);
-        // Build 6 weeks = 42 cells
         for (int i = 0; i < 42; i++)
             _calendarDays.Add(start.AddDays(i));
     }
@@ -77,6 +110,29 @@
         _itemsByDate = ScheduleItems
             .GroupBy(i => DateOnly.FromDateTime(i.PlannedDate.Date))
             .ToDictionary(g => g.Key, g => g.ToList());
+
+        // Inject proposed slot into the index
+        if (ProposedSlotStart.HasValue)
+        {
+            var proposedDate = DateOnly.FromDateTime(ProposedSlotStart.Value.Date);
+            var proposed = new PlanningScheduleItemDto(
+                PlannedDate:      ProposedSlotStart.Value,
+                PlannedEndDate:   ProposedSlotEnd ?? ProposedSlotStart.Value.AddHours(1),
+                JobReference:     "This part",
+                Status:           "Proposed",
+                JobId:            Guid.Empty,
+                MachineName:      ProposedMachineName,
+                SetupTimeMinutes: 0,
+                PrintTimeMinutes: 0,
+                IsProposed:       true
+            );
+            if (!_itemsByDate.TryGetValue(proposedDate, out var list))
+            {
+                list = [];
+                _itemsByDate[proposedDate] = list;
+            }
+            list.Add(proposed);
+        }
     }
 
     private async Task PrevMonth()

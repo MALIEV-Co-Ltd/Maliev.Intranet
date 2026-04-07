@@ -1,24 +1,105 @@
 @namespace Maliev.Intranet.Client.Components.Shared
 @using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
 
 <MudDialog>
-    <DialogContent>
-        @if (Routing?.ScheduleItems is { Count: > 0 })
-        {
-            foreach (var item in Routing.ScheduleItems)
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.AccountTree" />
+            <MudText Typo="Typo.h6">Production Planning</MudText>
+            @if (!string.IsNullOrEmpty(_machineName))
             {
-                <div class="psi-item">
-                    <MudText Typo="Typo.caption">@item.PlannedDate.ToString("d MMM yyyy")</MudText>
-                    <MudText Typo="Typo.body2">@item.JobReference</MudText>
-                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(item.Status)">@item.Status</MudChip>
-                </div>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                    @_machineName
+                </MudChip>
             }
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_initialLoading)
+        {
+            <div style="min-height:200px; display:flex; align-items:center; justify-content:center;">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(_errorMsg))
+        {
+            <MudAlert Severity="Severity.Warning">@_errorMsg</MudAlert>
         }
         else
         {
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Style="text-align:center; padding: 16px 0;">
-                No scheduled items yet
-            </MudText>
+            <div style="position:relative;">
+                @* ── Job detail panel (slide-in when a bar is clicked) ── *@
+                @if (_detailItem != null)
+                {
+                    <div class="sdc-detail-panel">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-3">
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                                           Size="Size.Small"
+                                           OnClick="@(() => _detailItem = null)" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight:700;">
+                                @(_detailItem.IsProposed ? "Proposed Slot" : _detailItem.JobReference)
+                            </MudText>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@GetStatusColor(_detailItem.Status)"
+                                     Variant="@(_detailItem.IsProposed ? Variant.Outlined : Variant.Filled)">
+                                @_detailItem.Status
+                            </MudChip>
+                        </MudStack>
+
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.body2">
+                                <strong>Start</strong> &nbsp; @_detailItem.PlannedDate.ToString("d MMM yyyy, HH:mm")
+                            </MudText>
+                            <MudText Typo="Typo.body2">
+                                <strong>End</strong> &nbsp;&nbsp;&nbsp; @_detailItem.PlannedEndDate.ToString("d MMM yyyy, HH:mm")
+                            </MudText>
+                            @{
+                                var totalMin = (int)(_detailItem.PlannedEndDate - _detailItem.PlannedDate).TotalMinutes;
+                            }
+                            <MudText Typo="Typo.body2">
+                                <strong>Duration</strong> &nbsp; @FormatDuration(totalMin)
+                            </MudText>
+                            @if (!string.IsNullOrEmpty(_detailItem.MachineName))
+                            {
+                                <MudText Typo="Typo.body2">
+                                    <strong>Machine</strong> &nbsp; @_detailItem.MachineName
+                                </MudText>
+                            }
+                            @if (!_detailItem.IsProposed && (_detailItem.SetupTimeMinutes > 0 || _detailItem.PrintTimeMinutes > 0))
+                            {
+                                var setupPct = totalMin > 0 ? 100 * _detailItem.SetupTimeMinutes / totalMin : 0;
+                                var printPct = 100 - setupPct;
+                                <div class="sdc-time-bar mt-2">
+                                    <div class="sdc-setup" style="width:@setupPct%;"></div>
+                                    <div class="sdc-print" style="width:@printPct%;"></div>
+                                </div>
+                                <MudStack Row="true" Spacing="3">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Setup @_detailItem.SetupTimeMinutes min
+                                    </MudText>
+                                    <MudText Typo="Typo.caption">
+                                        Print @_detailItem.PrintTimeMinutes min
+                                    </MudText>
+                                </MudStack>
+                            }
+                            @if (_detailItem.IsProposed)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                                    Estimated slot only. Actual time is assigned when the order enters production.
+                                </MudAlert>
+                            }
+                        </MudStack>
+                    </div>
+                }
+                else
+                {
+                    <MachineTimelineView Items="@_scheduleItems"
+                                         MachineName="@_machineName"
+                                         ProposedSlotStart="@_proposedSlotStart"
+                                         ProposedSlotEnd="@_proposedSlotEnd" />
+                }
+            </div>
         }
     </DialogContent>
     <DialogActions>
@@ -27,26 +108,95 @@
 </MudDialog>
 
 <style>
-    .psi-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 6px 0;
-        border-bottom: 1px solid var(--mud-palette-lines-default);
-    }
-    .psi-item:last-child { border-bottom: none; }
+    .sdc-detail-panel { padding: 4px 0; }
+    .sdc-time-bar { height: 6px; border-radius: 3px; overflow: hidden; display: flex; background: var(--mud-palette-lines-default); }
+    .sdc-setup { background: var(--mud-palette-warning); }
+    .sdc-print { background: var(--mud-palette-primary); }
 </style>
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
+    /// <summary>Pre-fetched routing from the BFF (includes ScheduleItems + ProposedSlot).</summary>
     [Parameter] public ProductionRoutingDto? Routing { get; set; }
 
-    private Color GetStatusColor(string status) => status.ToUpperInvariant() switch
+    /// <summary>Asset code of the machine to fetch schedule for (used when Routing has no items).</summary>
+    [Parameter] public string? MachineId { get; set; }
+
+    private bool _initialLoading;
+    private string? _errorMsg;
+    private string _machineName = string.Empty;
+    private IReadOnlyList<PlanningScheduleItemDto> _scheduleItems = [];
+    private DateTimeOffset? _proposedSlotStart;
+    private DateTimeOffset? _proposedSlotEnd;
+    private PlanningScheduleItemDto? _detailItem;
+
+    protected override async Task OnInitializedAsync()
     {
-        "COMPLETE" => Color.Success,
-        "INPROGRESS" => Color.Warning,
-        "CANCELLED" => Color.Error,
-        _ => Color.Default
+        _machineName = Routing?.MachineName ?? MachineId ?? string.Empty;
+
+        if (Routing?.ScheduleItems is { Count: > 0 })
+        {
+            _scheduleItems     = Routing.ScheduleItems;
+            _proposedSlotStart = Routing.ProposedSlotStart;
+            _proposedSlotEnd   = Routing.ProposedSlotEnd;
+        }
+        else if (!string.IsNullOrEmpty(MachineId))
+        {
+            _initialLoading = true;
+            StateHasChanged();
+            await LoadScheduleAsync();
+            _initialLoading = false;
+        }
+        else if (Routing is not null)
+        {
+            _scheduleItems     = [];
+            _proposedSlotStart = Routing.ProposedSlotStart;
+            _proposedSlotEnd   = Routing.ProposedSlotEnd;
+        }
+    }
+
+    private async Task LoadScheduleAsync()
+    {
+        var machineCode = MachineId ?? Routing?.MachineCode;
+        if (string.IsNullOrEmpty(machineCode)) return;
+        try
+        {
+            var from = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, 0, 0, 0, DateTimeKind.Utc);
+            var to   = from.AddDays(30);
+            var url  = $"api/jobs/machine/{Uri.EscapeDataString(machineCode)}/schedule?from={from:O}&to={to:O}";
+            var items = await Http.GetFromJsonAsync<List<MachineScheduleItemDto>>(url);
+            _scheduleItems = items?.Select(i => new PlanningScheduleItemDto(
+                PlannedDate:      new DateTimeOffset(i.ScheduledStart, TimeSpan.Zero),
+                PlannedEndDate:   new DateTimeOffset(i.ScheduledEnd,   TimeSpan.Zero),
+                JobReference:     i.JobId.ToString("N")[..8].ToUpperInvariant(),
+                Status:           i.Status,
+                JobId:            i.JobId,
+                MachineName:      machineCode,
+                SetupTimeMinutes: i.SetupMinutes,
+                PrintTimeMinutes: i.PrintMinutes
+            )).ToList() ?? [];
+        }
+        catch
+        {
+            _errorMsg = "Unable to load schedule. Please try again.";
+        }
+    }
+
+    private static Color GetStatusColor(string status) => status.ToUpperInvariant() switch
+    {
+        "COMPLETED" or "COMPLETE" => Color.Success,
+        "INPROGRESS"              => Color.Warning,
+        "CANCELLED"               => Color.Error,
+        "PROPOSED"                => Color.Secondary,
+        _                         => Color.Primary
     };
+
+    private static string FormatDuration(int minutes)
+    {
+        if (minutes < 60) return $"{minutes} min";
+        var h = minutes / 60;
+        var m = minutes % 60;
+        return m == 0 ? $"{h}h" : $"{h}h {m}m";
+    }
 }

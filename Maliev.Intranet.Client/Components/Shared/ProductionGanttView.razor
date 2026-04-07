@@ -1,0 +1,129 @@
+@namespace Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+@* ── Production Gantt View ─────────────────────────────────────────────────
+   Shows all active machines as rows on a shared 7-day timeline.
+   Machines are grouped by equipment category.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<div class="pgv-root">
+    @* ── Navigation header ─────────────────────────────────────────────── *@
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" OnClick="PrevWeek" Disabled="_loading" />
+            <MudText Typo="Typo.subtitle2" Style="font-weight:700;">
+                @_rangeStart.ToString("d MMM") – @_rangeStart.AddDays(6).ToString("d MMM yyyy")
+            </MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" OnClick="NextWeek" Disabled="_loading" />
+        </MudStack>
+        <MudTooltip Text="Refresh">
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small"
+                           OnClick="LoadAsync" Disabled="_loading" />
+        </MudTooltip>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudStack Spacing="2">
+            @for (int i = 0; i < 4; i++)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" Class="rounded" />
+            }
+        </MudStack>
+    }
+    else if (_groups.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Text">
+            No active machines found.
+        </MudAlert>
+    }
+    else
+    {
+        @foreach (var group in _groups)
+        {
+            <div class="pgv-group">
+                <MudText Typo="Typo.overline" Color="Color.Secondary" Class="pgv-group-label">
+                    @FormatCategory(group.Key)
+                </MudText>
+                @foreach (var machine in group.Value)
+                {
+                    <MachineTimelineView Items="@machine.Schedule"
+                                        MachineName="@machine.MachineName"
+                                        RangeStart="@_rangeStart" />
+                }
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .pgv-root {
+        padding: 12px;
+    }
+    .pgv-group {
+        margin-bottom: 20px;
+    }
+    .pgv-group-label {
+        display: block;
+        margin-bottom: 6px;
+        letter-spacing: 0.06em;
+    }
+</style>
+
+@code {
+    private bool _loading;
+    private DateTime _rangeStart = DateTime.Today;
+    private Dictionary<string, List<MachineScheduleSummaryDto>> _groups = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var from = _rangeStart.ToString("yyyy-MM-dd");
+            var to   = _rangeStart.AddDays(7).ToString("yyyy-MM-dd");
+            var machines = await Http.GetFromJsonAsync<List<MachineScheduleSummaryDto>>(
+                $"api/jobs/schedule?from={from}&to={to}");
+
+            _groups = (machines ?? [])
+                .GroupBy(m => m.Category)
+                .OrderBy(g => g.Key)
+                .ToDictionary(g => g.Key, g => g.OrderBy(m => m.MachineName).ToList());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load Gantt schedule: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void PrevWeek()
+    {
+        _rangeStart = _rangeStart.AddDays(-7);
+        _ = LoadAsync();
+    }
+
+    private void NextWeek()
+    {
+        _rangeStart = _rangeStart.AddDays(7);
+        _ = LoadAsync();
+    }
+
+    private static string FormatCategory(string category) => category switch
+    {
+        "FdmPrinter"  => "FDM Printers",
+        "SlaPrinter"  => "SLA / DLP Printers",
+        "SlsPrinter"  => "SLS Printers",
+        "CncMachine"  => "CNC Machines",
+        "LaserCutter" => "Laser Cutters",
+        _             => category
+    };
+}

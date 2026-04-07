@@ -154,11 +154,17 @@ public class PartViewModel
     public string? Error { get; set; }
 
     /// <summary>
-    /// Set to true by <see cref="PartDetailCard"/> after a 60-second timeout when
-    /// no <c>DfmAnalysisReady</c> event arrives. Collapses the "Analyzing…" spinner
-    /// into an "unavailable" notice so the overlay does not spin indefinitely.
+    /// Set to true when DFM analysis fails (either by the client-side watchdog timer or
+    /// when a <c>FileAnalysisCompleted</c> failure event arrives from the backend).
+    /// Collapses the "Analyzing…" spinner into an "unavailable" notice in the overlay.
     /// </summary>
     public bool DfmAnalysisTimedOut { get; set; }
+
+    /// <summary>
+    /// Backend error code from a <c>FileAnalysisFailedEvent</c>, e.g. "GEOMETRY_PHASE2_TIMEOUT".
+    /// Null when analysis completed normally or has not failed yet.
+    /// </summary>
+    public string? AnalysisErrorCode { get; set; }
 
     // ── Per-part attachments ───────────────────────────────────────────
 

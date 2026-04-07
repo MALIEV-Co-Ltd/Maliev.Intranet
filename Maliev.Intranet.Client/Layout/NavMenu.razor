@@ -253,12 +253,12 @@
 
         if (userPermissions.Count == 0) return false;
 
-        if (userPermissions.Any(p => string.Equals(p, "roles.platform.owner", StringComparison.OrdinalIgnoreCase)))
+        if (userPermissions.Any(p => string.Equals(p, "platform.owner", StringComparison.OrdinalIgnoreCase)))
             return true;
 
         if (_user.Claims.Any(c =>
                 c.Type is "roles" or System.Security.Claims.ClaimTypes.Role &&
-                string.Equals(c.Value, "roles.platform.owner", StringComparison.OrdinalIgnoreCase)))
+                string.Equals(c.Value, "platform.owner", StringComparison.OrdinalIgnoreCase)))
             return true;
 
         if (userPermissions.Any(p => p == "*"))

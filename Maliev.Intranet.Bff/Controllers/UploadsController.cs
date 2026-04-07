@@ -107,10 +107,14 @@ public class UploadsController(
 
         var status = await analysisStatusService.GetStatusAsync(storagePath, ct);
 
-        // Derive GLB path from convention when cache is cold/expired
+        // Only return a signed URL when we know the GLB actually exists in GCS.
+        // Deriving the path by convention and signing a speculative URL causes the Babylon
+        // viewer to get a well-signed but 404-ing URL while analysis is still in progress.
+        // The client must wait for the GlbReady SignalR event or a completed status before
+        // opening the viewer.
         var glbPath = status?.GlbStoragePath;
         if (string.IsNullOrEmpty(glbPath))
-            glbPath = $"{storagePath}_viewer.glb";
+            return NotFound("Viewer artifact not available. The file may still be processing.");
 
         var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(glbPath, ct);
         // Note: GetDownloadUrlByPathAsync returns null when UploadService returns 401/403
@@ -118,7 +122,7 @@ public class UploadsController(
         // these as structured errors. Here we surface it as a 404 to avoid leaking
         // permission state to the client.
         if (string.IsNullOrEmpty(signedUrl))
-            return NotFound("Viewer artifacts not available yet. The file may still be processing or geometry analysis failed.");
+            return NotFound("Viewer artifact not available. The file may still be processing or geometry analysis failed.");
         return Ok(new { Url = signedUrl });
     }
 

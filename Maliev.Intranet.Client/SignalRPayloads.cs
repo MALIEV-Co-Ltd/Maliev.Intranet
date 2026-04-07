@@ -17,6 +17,9 @@ public sealed class SignalRFileAnalysisPayload
     /// <summary>Hi-res thumbnail URL, set by PreviewImagesGeneratedConsumer.</summary>
     public string? HiResThumbnailUrl { get; set; }
 
+    /// <summary>Bounding box dimensions in millimetres, or null if analysis failed.</summary>
+    public SignalRDimensions? Dimensions { get; set; }
+
     /// <summary>Full set of preview URLs, set by PreviewImagesGeneratedConsumer when processing is complete.</summary>
     public SignalRPreviewUrls? PreviewUrls { get; set; }
 
@@ -25,6 +28,24 @@ public sealed class SignalRFileAnalysisPayload
 
     /// <summary>Error code when Failed is true.</summary>
     public string? ErrorCode { get; set; }
+}
+
+/// <summary>
+/// Client-side mirror of FileAnalysisDimensions from NotificationHub.
+/// </summary>
+public sealed class SignalRDimensions
+{
+    /// <summary>Width in millimetres.</summary>
+    public double X { get; set; }
+
+    /// <summary>Depth in millimetres.</summary>
+    public double Y { get; set; }
+
+    /// <summary>Height in millimetres.</summary>
+    public double Z { get; set; }
+
+    /// <summary>Part volume in cubic millimetres.</summary>
+    public double? VolumeMm3 { get; set; }
 }
 
 /// <summary>

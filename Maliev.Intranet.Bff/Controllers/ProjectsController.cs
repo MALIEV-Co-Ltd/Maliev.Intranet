@@ -286,13 +286,50 @@ public class ProjectsController(
 
         var category = MapProcessToEquipmentCategory(processType);
         EquipmentSummaryDto? machine = null;
+        IReadOnlyList<PlanningScheduleItemDto> scheduleItems = [];
+
         if (category is not null)
         {
             try
             {
                 var equipments = await facilityClient.GetEquipmentsAsync(
-                    category: category, status: "Active", page: 1, pageSize: 1, ct: ct);
-                machine = equipments?.Items?.FirstOrDefault();
+                    category: category, status: "Active", page: 1, pageSize: 50, ct: ct);
+                var candidates = equipments?.Items ?? [];
+
+                if (candidates.Count > 0)
+                {
+                    var from = DateTime.UtcNow.Date;
+                    var to = from.AddDays(30);
+
+                    // Fetch schedule for all candidate machines in parallel, then pick least-loaded
+                    var scheduleTasks = candidates.Select(async m =>
+                    {
+                        try
+                        {
+                            var slots = await jobClient.GetMachineScheduleAsync(m.AssetCode, from, to, ct);
+                            return (Machine: m, Slots: (IReadOnlyList<MachineScheduleItemDto>)slots);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            _logger.LogWarning(ex, "Failed to fetch schedule for machine '{AssetCode}'.", m.AssetCode);
+                            return (Machine: m, Slots: (IReadOnlyList<MachineScheduleItemDto>)[]);
+                        }
+                    });
+
+                    var results = await Task.WhenAll(scheduleTasks);
+                    var best = results.MinBy(r => r.Slots.Count);
+                    machine = best.Machine;
+                    scheduleItems = best.Slots.Select(s => new PlanningScheduleItemDto(
+                        PlannedDate:      new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
+                        PlannedEndDate:   new DateTimeOffset(s.ScheduledEnd, TimeSpan.Zero),
+                        JobReference:     s.JobId.ToString("N")[..8].ToUpperInvariant(),
+                        Status:           s.Status,
+                        JobId:            s.JobId,
+                        MachineName:      best.Machine.Name,
+                        SetupTimeMinutes: s.SetupMinutes,
+                        PrintTimeMinutes: s.PrintMinutes
+                    )).ToList();
+                }
             }
             catch (TaskCanceledException)
             {
@@ -316,32 +353,20 @@ public class ProjectsController(
         var setupDays = processType.StartsWith("CNC", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
         var estimatedStart = DateTimeOffset.UtcNow.AddDays(setupDays + queueAhead);
 
-        // Fetch schedule items if we have a machine asset code
-        IReadOnlyList<PlanningScheduleItemDto> scheduleItems = [];
-        var machineCode = machine?.AssetCode;
-        if (!string.IsNullOrEmpty(machineCode))
+        // Compute proposed slot: starts right after the last scheduled job ends (or now if queue is empty).
+        // Uses default setup/print durations matching TimeEstimationService defaults.
+        DateTimeOffset? proposedSlotStart = null;
+        DateTimeOffset? proposedSlotEnd = null;
+        if (machine is not null)
         {
-            try
-            {
-                var from = DateTime.UtcNow.Date;
-                var to = from.AddDays(30);
-                var slots = await jobClient.GetMachineScheduleAsync(machineCode, from, to, ct);
-                var machineName = machine?.Name ?? string.Empty;
-                scheduleItems = slots.Select(s => new PlanningScheduleItemDto(
-                    PlannedDate:       new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
-                    PlannedEndDate:    new DateTimeOffset(s.ScheduledEnd, TimeSpan.Zero),
-                    JobReference:      s.JobId.ToString("N")[..8].ToUpperInvariant(),
-                    Status:            s.Status,
-                    JobId:             s.JobId,
-                    MachineName:       machineName,
-                    SetupTimeMinutes:  s.SetupMinutes,
-                    PrintTimeMinutes:  s.PrintMinutes
-                )).ToList();
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Failed to fetch machine schedule for '{MachineCode}'; schedule will be empty.", machineCode);
-            }
+            var lastEnd = scheduleItems.Count > 0
+                ? scheduleItems.Max(s => s.PlannedEndDate)
+                : estimatedStart;
+            proposedSlotStart = lastEnd;
+            var defaultSetupMin = processType.StartsWith("CNC", StringComparison.OrdinalIgnoreCase) ? 60
+                : processType is "SLA_DLP" or "SLA" ? 30
+                : 15;
+            proposedSlotEnd = proposedSlotStart.Value.AddMinutes(defaultSetupMin + 30);
         }
 
         return Ok(new ProductionRoutingDto(
@@ -350,7 +375,9 @@ public class ProjectsController(
             MachineName:        machine?.Name ?? "Unassigned",
             QueueAhead:         queueAhead,
             EstimatedStartDate: estimatedStart,
-            ScheduleItems:      scheduleItems));
+            ScheduleItems:      scheduleItems,
+            ProposedSlotStart:  proposedSlotStart,
+            ProposedSlotEnd:    proposedSlotEnd));
     }
 
     private static string? MapProcessToEquipmentCategory(string processType) => processType switch

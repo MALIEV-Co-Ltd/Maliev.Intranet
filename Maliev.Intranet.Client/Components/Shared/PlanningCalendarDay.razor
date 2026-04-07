@@ -2,7 +2,7 @@
 @using Maliev.Intranet.Shared.Dtos
 
 <div class="pcd-cell @(_isCurrentMonth ? "" : "pcd-other-month") @(_isToday ? "pcd-today" : "")"
-     @onclick="HandleClick" style="cursor: pointer; min-height: 72px;">
+     @onclick="HandleClick">
     @* Day number *@
     <div class="pcd-day-num">
         <MudText Typo="Typo.caption"
@@ -11,8 +11,12 @@
             @Date.Day
         </MudText>
     </div>
-    @* Job chips (up to 3) *@
-    @foreach (var item in Items.Take(3))
+    @* Job chips (up to 3 real + proposed always shown) *@
+    @{
+        var real = Items.Where(i => !i.IsProposed).Take(3).ToList();
+        var proposed = Items.FirstOrDefault(i => i.IsProposed);
+    }
+    @foreach (var item in real)
     {
         <MudChip T="string" Size="Size.Small"
                  Color="@GetStatusColor(item.Status)"
@@ -21,21 +25,51 @@
             @item.JobReference
         </MudChip>
     }
-    @if (Items.Count > 3)
+    @if (Items.Count(i => !i.IsProposed) > 3)
     {
         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pcd-more">
-            +@(Items.Count - 3) more
+            +@(Items.Count(i => !i.IsProposed) - 3) more
         </MudText>
+    }
+    @if (proposed is not null)
+    {
+        <div class="pcd-chip pcd-proposed-chip">This part</div>
     }
 </div>
 
 <style>
-    .pcd-cell { padding: 4px; border: 1px solid var(--mud-palette-lines-default); overflow: hidden; }
+    .pcd-cell {
+        padding: 4px;
+        border-right: 1px solid var(--mud-palette-lines-default);
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        overflow: hidden;
+        min-height: 72px;
+        cursor: pointer;
+    }
+    .pcd-cell:nth-child(7n) { border-right: none; }
     .pcd-cell:hover { background: var(--mud-palette-action-hover); }
     .pcd-other-month { opacity: 0.4; }
-    .pcd-today { background: var(--mud-palette-primary-lighten) !important; }
+    .pcd-today { background: color-mix(in srgb, var(--mud-palette-primary) 12%, transparent) !important; }
     .pcd-day-num { margin-bottom: 2px; }
-    .pcd-chip { font-size: 9px !important; height: 16px !important; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
+    .pcd-chip {
+        font-size: 9px !important;
+        height: 16px !important;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 1px;
+        padding: 0 4px !important;
+        min-width: 0 !important;
+    }
+    .pcd-proposed-chip {
+        border: 1.5px dashed var(--mud-palette-secondary) !important;
+        background: color-mix(in srgb, var(--mud-palette-secondary) 12%, transparent) !important;
+        color: var(--mud-palette-secondary-text) !important;
+        border-radius: 4px;
+        line-height: 14px;
+        font-weight: 600;
+    }
     .pcd-more { font-size: 9px !important; }
 </style>
 

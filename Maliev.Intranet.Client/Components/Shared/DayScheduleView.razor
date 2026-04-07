@@ -10,58 +10,92 @@
         </MudText>
     </MudStack>
 
-    @if (!Items.Any())
+    @{
+        var real = Items.Where(i => !i.IsProposed).OrderBy(i => i.PlannedDate).ToList();
+        var proposed = Items.FirstOrDefault(i => i.IsProposed);
+    }
+
+    @if (!real.Any() && proposed is null)
     {
         <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="mt-4">
             No jobs scheduled on this day.
         </MudText>
     }
-    else
+
+    @foreach (var item in real)
     {
-        @foreach (var item in Items.OrderBy(i => i.PlannedDate))
-        {
-            <MudCard Elevation="0" Class="dsv-card mb-2 border mud-border-lines-default">
-                <MudCardContent Class="pa-3">
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-1">
-                        <MudText Typo="Typo.subtitle2" Style="font-weight:700;">@item.JobReference</MudText>
-                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(item.Status)" Variant="Variant.Filled">
-                            @item.Status
-                        </MudChip>
-                    </MudStack>
+        <MudCard Elevation="0" Class="dsv-card mb-2 border mud-border-lines-default">
+            <MudCardContent Class="pa-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-1">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:700;">@item.JobReference</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(item.Status)" Variant="Variant.Filled">
+                        @item.Status
+                    </MudChip>
+                </MudStack>
 
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        @item.PlannedDate.ToString("HH:mm") — @item.PlannedEndDate.ToString("HH:mm")
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @item.PlannedDate.ToString("HH:mm") — @item.PlannedEndDate.ToString("HH:mm")
+                </MudText>
+
+                @if (!string.IsNullOrEmpty(item.MachineName))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-1">
+                        <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Small" />
+                        @item.MachineName
                     </MudText>
+                }
 
-                    @if (!string.IsNullOrEmpty(item.MachineName))
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-1">
-                            <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Small" />
-                            @item.MachineName
-                        </MudText>
-                    }
+                @{
+                    var total = item.SetupTimeMinutes + item.PrintTimeMinutes;
+                    var setupPct = total > 0 ? (int)(100.0 * item.SetupTimeMinutes / total) : 0;
+                    var printPct = 100 - setupPct;
+                }
+                <div class="dsv-time-bar mt-2">
+                    <div class="dsv-setup" style="width:@setupPct%;"></div>
+                    <div class="dsv-print" style="width:@printPct%;"></div>
+                </div>
+                <MudStack Row="true" Spacing="2" Class="mt-1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Setup @item.SetupTimeMinutes min</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">Print @item.PrintTimeMinutes min</MudText>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    }
 
-                    @* Setup / print time breakdown bar *@
-                    @{
-                        var total = item.SetupTimeMinutes + item.PrintTimeMinutes;
-                        var setupPct = total > 0 ? (int)(100.0 * item.SetupTimeMinutes / total) : 0;
-                        var printPct = 100 - setupPct;
-                    }
-                    <div class="dsv-time-bar mt-2">
-                        <div class="dsv-setup" style="width:@setupPct%;"></div>
-                        <div class="dsv-print" style="width:@printPct%;"></div>
-                    </div>
-                    <MudStack Row="true" Spacing="2" Class="mt-1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            Setup @item.SetupTimeMinutes min
-                        </MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Default">
-                            Print @item.PrintTimeMinutes min
+    @if (proposed is not null)
+    {
+        <MudCard Elevation="0" Class="dsv-card dsv-proposed mb-2">
+            <MudCardContent Class="pa-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-1">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Outlined.Schedule" Size="Size.Small"
+                                 Color="Color.Secondary" />
+                        <MudText Typo="Typo.subtitle2" Style="font-weight:700;" Color="Color.Secondary">
+                            This part (proposed)
                         </MudText>
                     </MudStack>
-                </MudCardContent>
-            </MudCard>
-        }
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                        Proposed
+                    </MudChip>
+                </MudStack>
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @proposed.PlannedDate.ToString("HH:mm") — @proposed.PlannedEndDate.ToString("HH:mm")
+                </MudText>
+
+                @if (!string.IsNullOrEmpty(proposed.MachineName))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                        <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Small" />
+                        @proposed.MachineName
+                    </MudText>
+                }
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                    Estimated slot — actual times assigned when order enters production.
+                </MudText>
+            </MudCardContent>
+        </MudCard>
     }
 </div>
 
@@ -71,6 +105,10 @@
     .dsv-time-bar { height: 6px; border-radius: 3px; overflow: hidden; display: flex; background: var(--mud-palette-lines-default); }
     .dsv-setup { background: var(--mud-palette-warning); }
     .dsv-print { background: var(--mud-palette-primary); }
+    .dsv-proposed {
+        border: 1.5px dashed var(--mud-palette-secondary) !important;
+        background: color-mix(in srgb, var(--mud-palette-secondary) 8%, transparent) !important;
+    }
 </style>
 
 @code {

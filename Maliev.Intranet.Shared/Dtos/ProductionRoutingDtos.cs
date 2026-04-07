@@ -9,13 +9,17 @@ namespace Maliev.Intranet.Shared.Dtos;
 /// <param name="QueueAhead">The number of jobs queued ahead of the current job.</param>
 /// <param name="EstimatedStartDate">The estimated date and time when the current job will start.</param>
 /// <param name="ScheduleItems">The ordered list of planning schedule items for this machine.</param>
+/// <param name="ProposedSlotStart">The estimated start time for the proposed (not yet committed) slot for this part.</param>
+/// <param name="ProposedSlotEnd">The estimated end time for the proposed slot.</param>
 public record ProductionRoutingDto(
     Guid MachineId,
     string MachineCode,
     string MachineName,
     int QueueAhead,
     DateTimeOffset EstimatedStartDate,
-    IReadOnlyList<PlanningScheduleItemDto> ScheduleItems
+    IReadOnlyList<PlanningScheduleItemDto> ScheduleItems,
+    DateTimeOffset? ProposedSlotStart = null,
+    DateTimeOffset? ProposedSlotEnd = null
 );
 
 /// <summary>
@@ -29,6 +33,7 @@ public record ProductionRoutingDto(
 /// <param name="MachineName">The name of the machine this job is scheduled on.</param>
 /// <param name="SetupTimeMinutes">The setup time in minutes required before production.</param>
 /// <param name="PrintTimeMinutes">The estimated print/machining time in minutes.</param>
+/// <param name="IsProposed">True when this is an estimated (not yet committed) slot for the current part.</param>
 public record PlanningScheduleItemDto(
     DateTimeOffset PlannedDate,
     DateTimeOffset PlannedEndDate,
@@ -37,5 +42,6 @@ public record PlanningScheduleItemDto(
     Guid JobId,
     string MachineName,
     int SetupTimeMinutes,
-    int PrintTimeMinutes
+    int PrintTimeMinutes,
+    bool IsProposed = false
 );

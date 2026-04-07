@@ -2,6 +2,7 @@
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Client.Components.Shared
 @using MudBlazor
 @inject HttpClient Http
 @inject ISnackbar Snackbar
@@ -27,8 +28,22 @@
         </MudText>
     </div>
 
-    @* Filters *@
+    @* View toggle + Filters *@
     <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+        <MudToggleGroup T="string" @bind-Value="_viewMode" Color="Color.Primary">
+            <MudToggleItem Value="@("kanban")">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Outlined.ViewKanban" Size="Size.Small" />
+                    <span>Kanban</span>
+                </MudStack>
+            </MudToggleItem>
+            <MudToggleItem Value="@("gantt")">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Outlined.CalendarViewWeek" Size="Size.Small" />
+                    <span>Gantt</span>
+                </MudStack>
+            </MudToggleItem>
+        </MudToggleGroup>
         <MudSelect T="string" Value="@_filterProcess" ValueChanged="OnFilterChanged"
                    Label="Process" Variant="Variant.Outlined" Margin="Margin.Dense"
                    Style="min-width: 130px;" Clearable="true">
@@ -73,7 +88,15 @@
     }
 </MudGrid>
 
-@* ── Kanban board ─────────────────────────────────────────────────────────────*@
+@* ── Main view ────────────────────────────────────────────────────────────────*@
+@if (_viewMode == "gantt")
+{
+    <ProductionGanttView />
+}
+else
+{
+
+@* ── Kanban board ────────────────────────────────────────────────────────── *@
 @if (_loading)
 {
     <MudGrid Spacing="3">
@@ -206,6 +229,8 @@ else
     </MudDropContainer>
 }
 
+} @* end kanban else *@
+
 <style>
     .job-card { transition: box-shadow 0.15s ease, transform 0.12s ease; }
     .job-card:hover { box-shadow: var(--mud-elevation-4); transform: translateY(-1px); }
@@ -243,6 +268,7 @@ else
     private readonly string[] _processTypes = ["FDM", "SLA", "SLS", "CNC", "Laser", "Other"];
 
     // ── State ─────────────────────────────────────────────────────────────────
+    private string _viewMode = "kanban";
     private bool _loading = true;
     private bool _hubConnected;
     private string _filterProcess = string.Empty;
@@ -258,9 +284,10 @@ else
 
     public async ValueTask DisposeAsync()
     {
-        Hub.JobStatusChanged -= OnJobStatusChanged;
-        Hub.JobAssigned      -= OnJobAssigned;
+        Hub.JobStatusChanged      -= OnJobStatusChanged;
+        Hub.JobAssigned           -= OnJobAssigned;
         Hub.ProductionStatsUpdated -= OnStatsUpdated;
+        Hub.ScheduleChanged       -= OnScheduleChanged;
         await Hub.StopAsync();
     }
 
@@ -298,9 +325,10 @@ else
     {
         try
         {
-            Hub.JobStatusChanged      += OnJobStatusChanged;
-            Hub.JobAssigned           += OnJobAssigned;
+            Hub.JobStatusChanged       += OnJobStatusChanged;
+            Hub.JobAssigned            += OnJobAssigned;
             Hub.ProductionStatsUpdated += OnStatsUpdated;
+            Hub.ScheduleChanged        += OnScheduleChanged;
             await Hub.StartAsync();
             _hubConnected = true;
         }
@@ -341,10 +369,31 @@ else
     private void OnStatsUpdated() =>
         InvokeAsync(async () =>
         {
-            try 
+            try
             {
                 var stats = await Http.GetFromJsonAsync<JobStatsDto>("api/jobs/stats");
                 if (stats != null) _statsDto = stats;
+            }
+            catch { /* best-effort */ }
+            StateHasChanged();
+        });
+
+    private void OnScheduleChanged(string _machineId) =>
+        InvokeAsync(async () =>
+        {
+            // Refresh Queued jobs so updated QueuePosition values are reflected
+            try
+            {
+                var result = await Http.GetFromJsonAsync<ProductionQueueDto>("api/jobs/queue");
+                if (result != null)
+                {
+                    var queued = result.Jobs.Where(j => j.Status == "Queued").ToList();
+                    foreach (var updated in queued)
+                    {
+                        var existing = _jobs.FirstOrDefault(j => j.Id == updated.Id);
+                        if (existing != null) existing.QueuePosition = updated.QueuePosition;
+                    }
+                }
             }
             catch { /* best-effort */ }
             StateHasChanged();
@@ -372,6 +421,14 @@ else
 
         var old = dropInfo.Item.Status;
         var newStatus = dropInfo.DropzoneIdentifier;
+
+        // Same-column Queued drop → reorder in the machine queue
+        if (old == newStatus && old == "Queued")
+        {
+            await ReorderJobAsync(dropInfo.Item, dropInfo.IndexInZone + 1);
+            return;
+        }
+
         if (old == newStatus) return;
 
         // Optimistic update
@@ -420,6 +477,34 @@ else
     {
         var order = _columns.Select(c => c.Id).ToList();
         return order.IndexOf(to) < order.IndexOf(from);
+    }
+
+    private async Task ReorderJobAsync(JobSummaryDto job, int newPosition)
+    {
+        // Optimistic: update QueuePosition locally
+        var oldPosition = job.QueuePosition;
+        job.QueuePosition = newPosition;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.PatchAsJsonAsync(
+                $"api/jobs/{job.Id}/reorder",
+                new ReorderJobRequest(newPosition));
+
+            if (!response.IsSuccessStatusCode)
+            {
+                job.QueuePosition = oldPosition;
+                Snackbar.Add("Failed to reorder job.", Severity.Error);
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            job.QueuePosition = oldPosition;
+            Snackbar.Add("Failed to reorder job.", Severity.Error);
+            StateHasChanged();
+        }
     }
 
     // ── Job ticket dialog ─────────────────────────────────────────────────────

@@ -120,22 +120,26 @@
     private const int MaxFileCount = 10;
     private string? _fileCountWarning;
 
-    private void OnFilesSelected(IReadOnlyList<IBrowserFile> files)
+    private async Task OnFilesSelected(IReadOnlyList<IBrowserFile> files)
     {
-        _fileCountWarning = null;
-        var incoming = files.ToList();
-        if (incoming.Count > MaxFileCount)
+        await InvokeAsync(async () =>
         {
-            _fileCountWarning = $"Only the first {MaxFileCount} files will be accepted.";
-            incoming = incoming.Take(MaxFileCount).ToList();
-        }
-        foreach (var file in incoming)
-        {
-            if (!_uploadingFiles.Any(f => f.Name == file.Name && f.Size == file.Size))
+            await Task.Yield();
+            _fileCountWarning = null;
+            var incoming = files.ToList();
+            if (incoming.Count > MaxFileCount)
             {
-                _uploadingFiles.Add(new UploadFileState { BrowserFile = file });
+                _fileCountWarning = $"Only the first {MaxFileCount} files will be accepted.";
+                incoming = incoming.Take(MaxFileCount).ToList();
             }
-        }
+            foreach (var file in incoming)
+            {
+                if (!_uploadingFiles.Any(f => f.Name == file.Name && f.Size == file.Size))
+                {
+                    _uploadingFiles.Add(new UploadFileState { BrowserFile = file });
+                }
+            }
+        });
     }
 
     private void RemoveFile(UploadFileState file) => _uploadingFiles.Remove(file);

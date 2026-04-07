@@ -83,6 +83,7 @@
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
                              Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged)"
                              TimedOut="@Part.DfmAnalysisTimedOut"
+                             ErrorMessage="@(Part.DfmAnalysisTimedOut ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
                              AllClear="@(_dfmIssues.Count == 0 && Part.DfmReport != null && !Part.DfmAcknowledged)"
                              OnAcknowledged="@HandleDfmAcknowledged"
                              OnToggleOverlay="@HandleToggleOverlay" />
@@ -231,7 +232,7 @@
     private bool _viewerLoadFailed;
     private string? _viewerErrorMessage;
     private CancellationTokenSource? _dfmTimeoutCts;
-    private const int DfmTimeoutSeconds = 60;
+    private const int DfmTimeoutSeconds = 600;
     private ModelViewer? _modelViewer;
     private DfmOverlayPanel? _dfmPanel;
 
@@ -257,15 +258,14 @@
             _viewerErrorMessage = null;
         }
 
-        // DFM timeout: start a 60-second countdown when the viewer is open and
-        // DFM has not arrived. Cancel/reset if the report arrives or the part changes.
-        var shouldBeAnalyzing = _dfmIssues.Count == 0
-            && Part.ViewerUrl != null
-            && Part.DfmReport == null
-            && !Part.DfmAcknowledged
-            && !Part.DfmAnalysisTimedOut;
+        // DFM watchdog: arm as soon as upload completes (StoragePath assigned), not only when
+        // the GLB viewer loads. This ensures the spinner cannot hang indefinitely even when
+        // Phase 1 tessellation is slow and GlbReady never arrives within the backend budget.
+        // Timer budget matches backend Phase 1 (300 s) + Phase 2 DFM (300 s) = 600 s.
+        var uploadCompleted = !Part.Uploading && !string.IsNullOrEmpty(Part.StoragePath);
+        var dfmPending = Part.DfmReport == null && !Part.DfmAcknowledged && !Part.DfmAnalysisTimedOut;
 
-        if (shouldBeAnalyzing && _dfmTimeoutCts == null)
+        if (uploadCompleted && dfmPending && _dfmTimeoutCts == null)
         {
             _dfmTimeoutCts = new CancellationTokenSource();
             var token = _dfmTimeoutCts.Token;
@@ -283,9 +283,9 @@
                 catch (OperationCanceledException) { }
             }, token);
         }
-        else if (!shouldBeAnalyzing)
+        else if (!uploadCompleted || !dfmPending)
         {
-            // Cancel any pending timeout — report arrived or part changed
+            // Cancel any pending watchdog — report arrived, failure event received, or part changed
             _dfmTimeoutCts?.Cancel();
             _dfmTimeoutCts?.Dispose();
             _dfmTimeoutCts = null;
@@ -358,9 +358,11 @@
     {
         var raw = GetDfmIssueDetailSummary(Part.DfmReport);
         var processCode = Part.ProcessCode?.ToUpperInvariant() ?? "FDM";
+        // "CNC" is the legacy alias for "CNC_MILL" — overlay GLBs are keyed under CNC_MILL.
+        var overlayProcessCode = processCode == "CNC" ? "CNC_MILL" : processCode;
         return raw.Select(t =>
         {
-            var overlayKey = t.Category != null ? $"{processCode}__{t.Category}" : null;
+            var overlayKey = t.Category != null ? $"{overlayProcessCode}__{t.Category}" : null;
             var overlayUrl = overlayKey != null ? Part.OverlayUrls?.GetValueOrDefault(overlayKey) : null;
             return new DfmIssue(
                 Icon: t.Icon,
@@ -404,8 +406,10 @@
                 if (fdm.ThinWallCount > 0)
                     issues.Add((Icons.Material.Filled.Rectangle, $"{fdm.ThinWallCount} thin wall region(s)", "Wall thickness below minimum recommended for FDM printing", "thin_wall"));
                 if (fdm.OverhangFaceCount > 0)
-                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang face(s)", "Faces at steep angles may require support structures", "overhang"));
-                if (fdm.SupportRequired)
+                    issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang region(s)", "Overhang regions exceeding the angle limit — support structures likely required", "overhang"));
+                else if (fdm.SupportRequired)
+                    // Only show the generic support notice when there are no overhang regions
+                    // to display (e.g. support driven purely by thin walls or bridges).
                     issues.Add((Icons.Material.Filled.AddHome, "Support structures required", "This model requires support structures for printing", null));
                 if (fdm.SmallDetailCount > 0)
                     issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost", "Some fine details may not reproduce accurately", "small_feature"));

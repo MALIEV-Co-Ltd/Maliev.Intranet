@@ -57,11 +57,16 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Customer search ────────────────────────────────────────────────
     private CancellationTokenSource? _searchCts;
 
-    // ── Upload catch-up ────────────────────────────────────────────────
-    private const int CatchUpDelayMs = 5000; // one-shot fetch after SignalR group join
+    // ── Upload catch-up / watchdog ─────────────────────────────────────
+    private const int CatchUpDelayMs = 5000;   // first fetch after SignalR group join
+    private const int StatusPollIntervalMs = 30_000; // subsequent interval
+    private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new();
 
     // ── Pricing debounce ───────────────────────────────────────────────
     private readonly Dictionary<Guid, CancellationTokenSource> _pricingTokens = new();
+    // Tracks which process code was in effect when routing was last fetched per part, to avoid
+    // redundant re-fetches on non-process-change events (e.g. quantity, material, finish updates).
+    private readonly Dictionary<Guid, string> _routingProcessByPart = new();
     private const int PricingDebounceMs = 300;
 
     // ── Session ────────────────────────────────────────────────────────
@@ -102,6 +107,8 @@ public partial class ProjectNew : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         foreach (var cts in _pricingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
+        foreach (var cts in _statusPollCts.Values) { cts.Cancel(); cts.Dispose(); }
+        _statusPollCts.Clear();
         _autoSaveDebounceTimer?.Dispose();
         if (_searchCts != null) { await _searchCts.CancelAsync(); _searchCts.Dispose(); }
         if (_hubConnection != null)
@@ -203,7 +210,10 @@ public partial class ProjectNew : IAsyncDisposable
             if (payload.Failed)
             {
                 part.AwaitingPreview = false;
-                part.StatusText = string.IsNullOrEmpty(payload.ErrorCode) ? "Preview unavailable" : $"Preview failed: {payload.ErrorCode}";
+                part.AnalysisErrorCode = payload.ErrorCode;
+                part.DfmAnalysisTimedOut = true; // unblocks the DFM overlay immediately
+                part.StatusText = DfmStatusMessages.GetStatusText(payload.ErrorCode);
+                StopStatusWatchdog(payload.StoragePath);
                 TriggerAutoSave();
                 await InvokeAsync(StateHasChanged);
                 return;
@@ -213,6 +223,19 @@ public partial class ProjectNew : IAsyncDisposable
             {
                 part.ThumbnailSmallUrl = payload.ThumbnailUrl;
                 await InvokeAsync(StateHasChanged);
+            }
+
+            if (payload.Dimensions != null)
+            {
+                part.Dimensions = new FileAnalysisDimensionsDto
+                {
+                    X = payload.Dimensions.X,
+                    Y = payload.Dimensions.Y,
+                    Z = payload.Dimensions.Z,
+                    VolumeMm3 = payload.Dimensions.VolumeMm3
+                };
+                part.VolumeMm3 = payload.Dimensions.VolumeMm3;
+                TriggerAutoSave();
             }
 
             if (payload.PreviewUrls != null)
@@ -253,6 +276,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.OverlayUrls = payload.OverlayUrls;
             part.OverlayPaths = payload.OverlayPaths;
             part.ResolveDfmReport();
+            StopStatusWatchdog(payload.StoragePath);
 
             await InvokeAsync(StateHasChanged);
         });
@@ -411,7 +435,9 @@ public partial class ProjectNew : IAsyncDisposable
             if (_hubConnection?.State == HubConnectionState.Connected)
                 await _hubConnection.InvokeAsync("JoinFileGroup", storagePath);
 
-            _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(part, storagePath); });
+            var pollCts = new CancellationTokenSource();
+            _statusPollCts[storagePath] = pollCts;
+            _ = Task.Run(() => StatusWatchdogLoopAsync(part, storagePath, pollCts.Token));
         }
         catch (OperationCanceledException)
         {
@@ -437,9 +463,55 @@ public partial class ProjectNew : IAsyncDisposable
     private sealed record UploadResult(int Status, string Body);
 
     /// <summary>
-    /// Single catch-up fetch: applied once after upload to handle the case where the
-    /// SignalR event fired before the hub group join completed.
-    /// Live updates arrive via SignalR; this is only a safety net.
+    /// Polls <c>analysis-status</c> on a 30 s interval until a terminal state is reached or the
+    /// token is cancelled. Handles the case where a SignalR event is missed due to reconnect timing.
+    /// The first fetch is delayed by <see cref="CatchUpDelayMs"/> (5 s) to let SignalR deliver first.
+    /// </summary>
+    private async Task StatusWatchdogLoopAsync(PartViewModel part, string storagePath, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(CatchUpDelayMs, ct);
+            while (!ct.IsCancellationRequested)
+            {
+                await FetchCurrentStatusAsync(part, storagePath);
+
+                // Stop looping once a terminal state is known
+                if (part.DfmAnalysisTimedOut
+                    || part.DfmReport != null
+                    || !string.IsNullOrEmpty(part.Error)
+                    || (!part.AwaitingPreview && part.StatusText == "Ready")
+                    || !_parts.Contains(part))
+                    break;
+
+                await Task.Delay(StatusPollIntervalMs, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (_statusPollCts.TryGetValue(storagePath, out var cts) && cts.Token == ct)
+            {
+                _statusPollCts.Remove(storagePath);
+                cts.Dispose();
+            }
+        }
+    }
+
+    private void StopStatusWatchdog(string? storagePath)
+    {
+        if (storagePath == null) return;
+        if (_statusPollCts.TryGetValue(storagePath, out var cts))
+        {
+            _statusPollCts.Remove(storagePath);
+            cts.Cancel();
+            cts.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Catch-up fetch for analysis status — called by the watchdog loop.
+    /// Live updates arrive via SignalR; this is a safety net for missed events.
     /// </summary>
     private async Task FetchCurrentStatusAsync(PartViewModel part, string storagePath)
     {
@@ -609,6 +681,8 @@ public partial class ProjectNew : IAsyncDisposable
         if (!string.IsNullOrEmpty(part.StoragePath) && _hubConnection?.State == HubConnectionState.Connected)
             await _hubConnection.InvokeAsync("LeaveFileGroup", part.StoragePath);
 
+        StopStatusWatchdog(part.StoragePath);
+
         // Cascade delete all attachment files before removing the part
         foreach (var att in part.DrawingFiles.Concat(part.SupplementaryFiles))
         {
@@ -648,6 +722,8 @@ public partial class ProjectNew : IAsyncDisposable
         if (part.ProcessId.HasValue && !string.IsNullOrEmpty(part.ProcessCode)
             && part.AvailableMaterials.Count == 0) // only reload catalog on process change (OnProcessChanged clears AvailableMaterials before invoking this)
         {
+            // Process changed — stale routing is for the old process type; clear it so it re-fetches.
+            part.ProductionRouting = null;
             part.CatalogLoading = true;
             try
             {
@@ -856,7 +932,14 @@ public partial class ProjectNew : IAsyncDisposable
         if (!part.ProcessId.HasValue || !part.MaterialId.HasValue || string.IsNullOrEmpty(part.ProcessCode))
             return;
 
-        if (part.ProductionRoutingLoading || part.ProductionRouting != null)
+        // Allow re-fetch if process type changed (routing was cleared above by OnPartChanged).
+        // Skip only if a fetch is already in flight or routing is fresh for the current process.
+        if (part.ProductionRoutingLoading)
+            return;
+        if (part.ProductionRouting != null &&
+            string.Equals(part.ProductionRouting.MachineCode, "TBD", StringComparison.Ordinal) == false &&
+            _routingProcessByPart.TryGetValue(part.FileId, out var cachedProcess) &&
+            cachedProcess == part.ProcessCode)
             return;
 
         if (_tempProjectId == Guid.Empty)
@@ -868,11 +951,15 @@ public partial class ProjectNew : IAsyncDisposable
             return;
 
         part.ProductionRoutingLoading = true;
+        var fetchedProcess = part.ProcessCode;
         try
         {
             var processCode = Uri.EscapeDataString(part.ProcessCode ?? "");
             part.ProductionRouting = await Http.GetFromJsonAsync<ProductionRoutingDto>(
                 $"api/projects/{_tempProjectId}/parts/{partId}/routing?processType={processCode}");
+            // Record which process this routing is for so we can detect staleness later
+            if (part.ProcessCode == fetchedProcess)
+                _routingProcessByPart[part.FileId] = fetchedProcess!;
         }
         catch
         {
@@ -1563,33 +1650,25 @@ public partial class ProjectNew : IAsyncDisposable
             totalMigrated = totalMigratedElement.GetInt32();
         }
 
-        if (errorsElement.GetArrayLength() > 0)
-        {
-            Snackbar.Add($"Migration completed with {errorsElement.GetArrayLength()} error(s).", Severity.Warning);
-            return;
-        }
-
-        if (totalMigrated == 0)
-        {
-            return;
-        }
-
-        if (!root.TryGetProperty("migrated_files", out var migratedFilesElement) && 
-            !root.TryGetProperty("MigratedFiles", out migratedFilesElement))
+        if (!root.TryGetProperty("migrated_files", out var migratedFilesElement) &&
+            !root.TryGetProperty("MigratedFiles", out migratedFilesElement) &&
+            !root.TryGetProperty("migratedFiles", out migratedFilesElement))
         {
             Snackbar.Add("Migration response is invalid: missing migrated_files property.", Severity.Error);
             return;
         }
 
+        var successfullyMigratedParts = new List<PartViewModel>();
+
         foreach (var entry in migratedFilesElement.EnumerateArray())
         {
-            if (!entry.TryGetProperty("file_id", out var fileIdElement) && 
+            if (!entry.TryGetProperty("file_id", out var fileIdElement) &&
                 !entry.TryGetProperty("FileId", out fileIdElement))
                 continue;
-            if (!entry.TryGetProperty("new_path", out var newPathElement) && 
+            if (!entry.TryGetProperty("new_path", out var newPathElement) &&
                 !entry.TryGetProperty("NewPath", out newPathElement))
                 continue;
-            if (!entry.TryGetProperty("old_path", out var oldPathElement) && 
+            if (!entry.TryGetProperty("old_path", out var oldPathElement) &&
                 !entry.TryGetProperty("OldPath", out oldPathElement))
                 continue;
 
@@ -1605,9 +1684,6 @@ public partial class ProjectNew : IAsyncDisposable
 
             part.StoragePath = newBasePath;
 
-            // GlbStoragePath holds the viewer artifact path: oldBasePath + "_viewer.glb".
-            // The naive StartsWith check fails because of the _viewer.glb suffix, so we
-            // also check the fully-derived old viewer path explicitly.
             if (!string.IsNullOrEmpty(part.GlbStoragePath))
             {
                 var oldGlbViewerPath = oldBasePath + "_viewer.glb";
@@ -1624,12 +1700,29 @@ public partial class ProjectNew : IAsyncDisposable
                 part.ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath.Replace(oldBasePath, newBasePath);
 
             part.GlbSignedUrl = null;
+            successfullyMigratedParts.Add(part);
         }
 
         await InvokeAsync(StateHasChanged);
 
-        foreach (var part in _parts.Where(p => p.ProcessId.HasValue && p.MaterialId.HasValue))
+        foreach (var part in successfullyMigratedParts.Where(p => p.ProcessId.HasValue && p.MaterialId.HasValue))
             TriggerPricingAsync(part);
+
+        if (errorsElement.GetArrayLength() > 0)
+        {
+            var errorMessages = errorsElement.EnumerateArray()
+                .Select(e => e.GetString() ?? string.Empty)
+                .Where(e => !string.IsNullOrEmpty(e))
+                .ToList();
+
+            var summary = $"Migration completed with {errorsElement.GetArrayLength()} error(s). {successfullyMigratedParts.Count} file(s) migrated successfully.";
+            if (errorMessages.Count > 0 && errorMessages.Count <= 3)
+            {
+                summary += " Errors: " + string.Join("; ", errorMessages);
+            }
+
+            Snackbar.Add(summary, Severity.Warning);
+        }
     }
 
     private async Task OpenBabylonViewer(PartViewModel part)

@@ -61,9 +61,11 @@
     {
         var parameters = new DialogParameters<ScheduleDialogContent>
         {
-            { x => x.Routing, Routing }
+            { x => x.Routing,    Routing },
+            { x => x.MachineId,  Routing?.MachineCode },
         };
-        DialogService.ShowAsync<ScheduleDialogContent>("Planning Schedule", parameters);
+        DialogService.ShowAsync<ScheduleDialogContent>("Production Planning", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
     }
 
     private Color GetStatusColor(string status) => status.ToUpperInvariant() switch

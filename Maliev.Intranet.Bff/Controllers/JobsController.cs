@@ -193,8 +193,8 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         [FromQuery] DateTime? to,
         CancellationToken ct)
     {
-        var rangeFrom = from ?? DateTime.UtcNow.Date;
-        var rangeTo = to ?? DateTime.UtcNow.Date.AddDays(30);
+        var rangeFrom = DateTime.SpecifyKind(from ?? DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var rangeTo = DateTime.SpecifyKind(to ?? DateTime.UtcNow.Date.AddDays(30), DateTimeKind.Utc);
         var result = await client.GetMachineScheduleAsync(machineId, rangeFrom, rangeTo, ct);
         return Ok(result);
     }
@@ -221,5 +221,54 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         await hub.Clients.All.SendAsync("ScheduleChanged", new { JobId = id });
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Returns schedules for all active machines within a UTC date range.
+    /// Used by the Gantt planning view on the Production Queue page.
+    /// </summary>
+    /// <param name="facilityClient">FacilityService client (method-injected).</param>
+    /// <param name="from">Range start (UTC). Defaults to today.</param>
+    /// <param name="to">Range end (UTC). Defaults to 7 days from now.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>One summary per active machine, each with its list of scheduled jobs.</returns>
+    [HttpGet("schedule")]
+    public async Task<ActionResult<List<MachineScheduleSummaryDto>>> GetAllMachineSchedules(
+        [FromServices] IFacilityServiceClient facilityClient,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        CancellationToken ct)
+    {
+        var rangeFrom = DateTime.SpecifyKind(from ?? DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var rangeTo   = DateTime.SpecifyKind(to   ?? DateTime.UtcNow.Date.AddDays(7), DateTimeKind.Utc);
+
+        var equipment = await facilityClient.GetEquipmentsAsync(status: "Active", pageSize: 200, ct: ct);
+        var machines  = equipment?.Items ?? [];
+
+        var scheduleTasks = machines.Select(async m =>
+        {
+            try
+            {
+                var slots = await client.GetMachineScheduleAsync(m.AssetCode, rangeFrom, rangeTo, ct);
+                var items = slots.Select(s => new PlanningScheduleItemDto(
+                    PlannedDate:      new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
+                    PlannedEndDate:   new DateTimeOffset(s.ScheduledEnd,   TimeSpan.Zero),
+                    JobReference:     s.JobId.ToString("N")[..8].ToUpperInvariant(),
+                    Status:           s.Status,
+                    JobId:            s.JobId,
+                    MachineName:      m.Name,
+                    SetupTimeMinutes: s.SetupMinutes,
+                    PrintTimeMinutes: s.PrintMinutes
+                )).ToList();
+                return new MachineScheduleSummaryDto(m.AssetCode, m.Name, m.Category, items);
+            }
+            catch
+            {
+                return new MachineScheduleSummaryDto(m.AssetCode, m.Name, m.Category, []);
+            }
+        });
+
+        var results = await Task.WhenAll(scheduleTasks);
+        return Ok(results.ToList());
     }
 }

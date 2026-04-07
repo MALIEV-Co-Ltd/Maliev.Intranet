@@ -1,0 +1,334 @@
+@namespace Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Shared.Dtos
+
+@* ── Machine Gantt / Timeline View ────────────────────────────────────────
+   Shows a 7-day scrollable Gantt bar chart for one machine's job queue.
+   Jobs are rendered as proportionally-sized horizontal bars.
+   The proposed slot for the current part is shown as a dashed ghost bar.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<div class="mtv-root">
+
+    @* ── Navigation header (hidden when RangeStart is controlled by parent) ── *@
+    @if (!RangeStart.HasValue)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" OnClick="PrevWeek" />
+            <MudText Typo="Typo.subtitle2" Style="font-weight:700;">
+                @_rangeStart.ToString("d MMM") – @_rangeEnd.AddDays(-1).ToString("d MMM yyyy")
+            </MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" OnClick="NextWeek" />
+        </MudStack>
+    }
+
+    @* ── Day column headers ─────────────────────────────────────────────── *@
+    <div class="mtv-header">
+        <div class="mtv-label-spacer"></div>
+        <div class="mtv-axis">
+            @for (int d = 0; d < DayCount; d++)
+            {
+                var day = _rangeStart.AddDays(d);
+                var isToday = day.Date == DateTime.Today;
+                <div class="mtv-day-col @(isToday ? "mtv-today-col" : "")">
+                    <div class="mtv-day-name">@day.ToString("ddd")</div>
+                    <div class="mtv-day-num @(isToday ? "mtv-today-num" : "")">@day.Day</div>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ── Gantt track ───────────────────────────────────────────────────── *@
+    <div class="mtv-track-wrap">
+        @* Left: machine name label *@
+        <div class="mtv-label">
+            <MudText Typo="Typo.caption" Style="font-weight:600; word-break:break-word;">
+                @MachineName
+            </MudText>
+        </div>
+
+        @* Right: timeline bar area *@
+        <div class="mtv-track" @ref="_trackRef">
+            @* Day background stripes *@
+            @for (int d = 0; d < DayCount; d++)
+            {
+                var day = _rangeStart.AddDays(d);
+                var isToday = day.Date == DateTime.Today;
+                var isWeekend = day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+                <div class="mtv-day-stripe @(isToday ? "mtv-today-stripe" : "") @(isWeekend ? "mtv-weekend-stripe" : "")"
+                     style="left: @(d * DayWidthPct)%; width: @DayWidthPct%"></div>
+            }
+
+            @* Current-time vertical line *@
+            @if (_nowPct is >= 0 and <= 100)
+            {
+                <div class="mtv-now-line" style="left: @_nowPct.ToString("F2")%">
+                    <div class="mtv-now-dot"></div>
+                </div>
+            }
+
+            @* Job bars *@
+            @foreach (var bar in _bars)
+            {
+                var left = bar.LeftPct.ToString("F2");
+                var width = Math.Max(bar.WidthPct, 0.5).ToString("F2");
+                <div class="mtv-bar @bar.ColorClass @(bar.IsProposed ? "mtv-bar-proposed" : "")"
+                     style="left: @left%; width: @width%; top: @(bar.Row * 44 + 8)px;"
+                     title="@bar.Tooltip">
+                    <span class="mtv-bar-label">@bar.Label</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ── Summary footer ────────────────────────────────────────────────── *@
+    <div class="mtv-footer">
+        @if (ProposedSlotStart.HasValue)
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <div class="mtv-legend-proposed"></div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Proposed slot for this part: @ProposedSlotStart.Value.ToString("d MMM, HH:mm") — @(ProposedSlotEnd?.ToString("HH:mm") ?? "TBD")
+                </MudText>
+            </MudStack>
+        }
+        @{
+            var queued  = Items.Count(i => !i.IsProposed && i.Status.Equals("Queued",    StringComparison.OrdinalIgnoreCase));
+            var inProg  = Items.Count(i => !i.IsProposed && i.Status.Equals("InProgress", StringComparison.OrdinalIgnoreCase));
+        }
+        @if (queued + inProg > 0)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @(inProg > 0 ? $"{inProg} in progress · " : "")@queued queued on @MachineName
+            </MudText>
+        }
+    </div>
+</div>
+
+<style>
+    .mtv-root { width: 100%; overflow: hidden; }
+
+    /* ── Header ── */
+    .mtv-header { display: flex; align-items: stretch; }
+    .mtv-label-spacer { width: 120px; flex-shrink: 0; }
+    .mtv-axis { display: flex; flex: 1; border-bottom: 2px solid var(--mud-palette-lines-default); }
+    .mtv-day-col {
+        flex: 1;
+        text-align: center;
+        padding: 2px 0 4px;
+        border-right: 1px solid var(--mud-palette-lines-default);
+        user-select: none;
+    }
+    .mtv-day-col:last-child { border-right: none; }
+    .mtv-today-col { background: color-mix(in srgb, var(--mud-palette-primary) 6%, transparent); }
+    .mtv-day-name { font-size: 9px; color: var(--mud-palette-text-secondary); text-transform: uppercase; letter-spacing: .5px; }
+    .mtv-day-num { font-size: 13px; font-weight: 600; color: var(--mud-palette-text-primary); }
+    .mtv-today-num {
+        background: var(--mud-palette-primary);
+        color: var(--mud-palette-primary-text);
+        border-radius: 50%;
+        width: 22px; height: 22px;
+        line-height: 22px;
+        margin: 0 auto;
+    }
+
+    /* ── Track ── */
+    .mtv-track-wrap { display: flex; align-items: stretch; }
+    .mtv-label {
+        width: 120px; flex-shrink: 0;
+        padding: 8px 8px 8px 0;
+        display: flex; align-items: flex-start; justify-content: flex-end;
+        text-align: right;
+    }
+    .mtv-track {
+        flex: 1;
+        position: relative;
+        min-height: 60px;
+        overflow: hidden;
+    }
+
+    /* Day stripes */
+    .mtv-day-stripe {
+        position: absolute; top: 0; bottom: 0;
+        border-right: 1px solid var(--mud-palette-lines-default);
+    }
+    .mtv-today-stripe { background: color-mix(in srgb, var(--mud-palette-primary) 5%, transparent); }
+    .mtv-weekend-stripe { background: color-mix(in srgb, var(--mud-palette-action-default) 4%, transparent); }
+
+    /* Now line */
+    .mtv-now-line {
+        position: absolute; top: 0; bottom: 0;
+        width: 2px; background: var(--mud-palette-error);
+        z-index: 4; pointer-events: none;
+        transform: translateX(-50%);
+    }
+    .mtv-now-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--mud-palette-error);
+        position: absolute; top: -4px; left: -3px;
+    }
+
+    /* Job bars */
+    .mtv-bar {
+        position: absolute;
+        height: 32px;
+        border-radius: 4px;
+        display: flex; align-items: center;
+        padding: 0 6px;
+        overflow: hidden;
+        cursor: default;
+        z-index: 3;
+        min-width: 4px;
+        transition: opacity .15s;
+    }
+    .mtv-bar:hover { opacity: .85; z-index: 5; }
+    .mtv-bar-label {
+        font-size: 10px; font-weight: 600;
+        color: #fff; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis;
+        pointer-events: none;
+    }
+    .mtv-bar-proposed {
+        border: 2px dashed var(--mud-palette-secondary) !important;
+        background: color-mix(in srgb, var(--mud-palette-secondary) 20%, transparent) !important;
+    }
+    .mtv-bar-proposed .mtv-bar-label { color: var(--mud-palette-secondary); }
+
+    /* Status colors */
+    .mtv-bar-inprogress { background: var(--mud-palette-warning); }
+    .mtv-bar-queued     { background: var(--mud-palette-primary); }
+    .mtv-bar-completed  { background: var(--mud-palette-success); opacity: .65; }
+    .mtv-bar-cancelled  { background: var(--mud-palette-error);   opacity: .5; }
+    .mtv-bar-default    { background: var(--mud-palette-primary); }
+
+    /* Footer */
+    .mtv-footer {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid var(--mud-palette-lines-default);
+        display: flex; flex-direction: column; gap: 2px;
+    }
+    .mtv-legend-proposed {
+        width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+        border: 2px dashed var(--mud-palette-secondary);
+        background: color-mix(in srgb, var(--mud-palette-secondary) 15%, transparent);
+    }
+</style>
+
+@code {
+    [Parameter] public IReadOnlyList<PlanningScheduleItemDto> Items { get; set; } = [];
+    [Parameter] public string MachineName { get; set; } = string.Empty;
+    [Parameter] public DateTimeOffset? ProposedSlotStart { get; set; }
+    [Parameter] public DateTimeOffset? ProposedSlotEnd { get; set; }
+    /// <summary>
+    /// When set by a parent (e.g. ProductionGanttView), overrides the internal week start
+    /// and hides the built-in navigation buttons so the parent controls navigation.
+    /// </summary>
+    [Parameter] public DateTime? RangeStart { get; set; }
+
+    private const int DayCount = 7;
+    private double DayWidthPct => 100.0 / DayCount;
+
+    private DateTime _rangeStart = DateTime.Today;
+    private DateTime _rangeEnd   => _rangeStart.AddDays(DayCount);
+    private double _nowPct;
+    private List<BarModel> _bars = [];
+    private ElementReference _trackRef;
+
+    private sealed record BarModel(
+        double LeftPct, double WidthPct, int Row,
+        string Label, string Tooltip,
+        string ColorClass, bool IsProposed);
+
+    protected override void OnParametersSet()
+    {
+        if (RangeStart.HasValue)
+            _rangeStart = RangeStart.Value;
+        Rebuild();
+    }
+
+    private void Rebuild()
+    {
+        var totalHours = DayCount * 24.0;
+        var rangeStartUtc = DateTime.SpecifyKind(_rangeStart, DateTimeKind.Utc);
+        var rangeEndUtc   = rangeStartUtc.AddDays(DayCount);
+        _nowPct = (DateTime.UtcNow - rangeStartUtc).TotalHours / totalHours * 100.0;
+
+        var jobs = Items
+            .Where(i => !i.IsProposed)
+            .OrderBy(i => i.PlannedDate)
+            .ToList();
+
+        // Proposed item from parameter (not injected into Items)
+        PlanningScheduleItemDto? proposed = null;
+        if (ProposedSlotStart.HasValue)
+        {
+            proposed = new PlanningScheduleItemDto(
+                PlannedDate:      ProposedSlotStart.Value,
+                PlannedEndDate:   ProposedSlotEnd ?? ProposedSlotStart.Value.AddHours(1),
+                JobReference:     "This part",
+                Status:           "Proposed",
+                JobId:            Guid.Empty,
+                MachineName:      MachineName,
+                SetupTimeMinutes: 0,
+                PrintTimeMinutes: 0,
+                IsProposed:       true);
+        }
+
+        _bars = [];
+        // Simple row packing: FDM/SLA machines process one job at a time, so all go on row 0
+        foreach (var item in jobs)
+        {
+            var bar = BuildBar(item, rangeStartUtc, totalHours, row: 0);
+            if (bar != null) _bars.Add(bar);
+        }
+        if (proposed != null)
+        {
+            var bar = BuildBar(proposed, rangeStartUtc, totalHours, row: 0);
+            if (bar != null) _bars.Add(bar);
+        }
+    }
+
+    private BarModel? BuildBar(PlanningScheduleItemDto item, DateTime rangeStart, double totalHours, int row)
+    {
+        var start = item.PlannedDate.UtcDateTime;
+        var end   = item.PlannedEndDate.UtcDateTime;
+        if (end <= rangeStart || start >= rangeStart.AddHours(totalHours))
+            return null;
+
+        // Clip to visible range
+        var clampedStart = start < rangeStart ? rangeStart : start;
+        var clampedEnd   = end   > rangeStart.AddHours(totalHours) ? rangeStart.AddHours(totalHours) : end;
+
+        var leftPct  = (clampedStart - rangeStart).TotalHours / totalHours * 100.0;
+        var widthPct = (clampedEnd   - clampedStart).TotalHours / totalHours * 100.0;
+
+        var colorClass = item.Status.ToUpperInvariant() switch
+        {
+            "INPROGRESS"              => "mtv-bar-inprogress",
+            "QUEUED"                  => "mtv-bar-queued",
+            "COMPLETED" or "COMPLETE" => "mtv-bar-completed",
+            "CANCELLED"               => "mtv-bar-cancelled",
+            _                         => "mtv-bar-default"
+        };
+
+        var duration = (int)(end - start).TotalMinutes;
+        var tooltip  = $"{item.JobReference} · {item.PlannedDate:d MMM HH:mm} – {item.PlannedEndDate:HH:mm} ({duration} min)";
+
+        return new BarModel(leftPct, widthPct, row, item.JobReference, tooltip, colorClass, item.IsProposed);
+    }
+
+    private void PrevWeek()
+    {
+        _rangeStart = _rangeStart.AddDays(-DayCount);
+        Rebuild();
+    }
+
+    private void NextWeek()
+    {
+        _rangeStart = _rangeStart.AddDays(DayCount);
+        Rebuild();
+    }
+
+    // Dynamic height: enough for 1 job row + padding
+    private int TrackHeight => (_bars.Count == 0 ? 1 : (_bars.Max(b => b.Row) + 1)) * 44 + 16;
+}
