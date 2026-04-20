@@ -5,7 +5,7 @@
 @inject LayoutService LayoutService
 @inject ILogger<ModelViewer> Logger
 
-<div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: hidden; contain: layout style;">
+<div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: visible; contain: layout style;" @onclick="CloseAnalysisMenuOutside">
     <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block;"></canvas>
 
     @if (Model != null)
@@ -24,6 +24,10 @@
             else
             {
                 <MudText Typo="Typo.caption" Class="mt-2" Style="display: block; font-style: italic;">Geometry Analysis Pending...</MudText>
+            }
+            @if (_activeAnalysisTool == "measure" && _lastMeasurement != null)
+            {
+                <MudText Typo="Typo.caption" Class="mt-2" Style="display: block; color: #ffd700;">@_lastMeasurement</MudText>
             }
         </div>
     }
@@ -99,6 +103,45 @@
 
             <div class="vp-divider" />
 
+            @* Section view *@
+            <div style="position: relative;">
+                <MudTooltip Text="Section View" Placement="Placement.Top" Arrow="false">
+                    <button class="@($"vp-cube-btn {(_sectionEnabled ? "vp-active" : "")}")"
+                            @onclick="ToggleSectionMenu" @onclick:stopPropagation="true" type="button">
+                        <MudIcon Icon="@Icons.Material.Filled.ContentCut" Size="Size.Small" />
+                    </button>
+                </MudTooltip>
+                @if (_sectionMenuOpen)
+                {
+                    <MudPaper Elevation="16" Class="pa-3"
+                              Style="position: absolute; bottom: 100%; right: 0; margin-bottom: 8px; min-width: 240px; z-index: 1000;"
+                              @onclick:stopPropagation>
+                        <MudSwitch T="bool" Value="_sectionEnabled"
+                                   ValueChanged="@((bool v) => SetSectionEnabledAsync(v))"
+                                   Label="Enable section view"
+                                   Color="Color.Primary" Class="mb-2" />
+                        <div class="d-flex gap-1 mb-2">
+                            @foreach (var ax in new[] { "x", "y", "z" })
+                            {
+                                <button class="@($"vp-cube-btn {(_sectionAxis == ax ? "vp-active" : "")}")"
+                                        @onclick='@(() => SetSectionAxisAsync(ax))' type="button"
+                                        style="width: 56px;">@ax.ToUpperInvariant()</button>
+                            }
+                        </div>
+                        <MudSlider T="double" Min="@SectionMin" Max="@SectionMax" Step="0.5"
+                                   Value="_sectionOffset"
+                                   ValueChanged="@((double v) => SetSectionOffsetAsync(v))">
+                            Offset: @_sectionOffset.ToString("F1") mm
+                        </MudSlider>
+                        <MudCheckBox T="bool" Value="_sectionInverted"
+                                     ValueChanged="@((bool v) => SetSectionInvertedAsync(v))"
+                                     Label="Invert" Color="Color.Primary" />
+                    </MudPaper>
+                }
+            </div>
+
+            <div class="vp-divider" />
+
             @* Rotate model *@
             <MudTooltip Text="Rotate 90°" Placement="Placement.Top" Arrow="false">
                 <button class="@($"vp-cube-btn")"
@@ -111,6 +154,57 @@
                                Class="vp-icon-btn"
                                Size="Size.Small" OnClick="ResetCamera" />
             </MudTooltip>
+
+            <div class="vp-divider" />
+
+            @* Analysis menu *@
+            <div style="position: relative;">
+                <MudTooltip Text="Analysis Tools" Placement="Placement.Top" Arrow="false">
+                    <button class="vp-cube-btn" @onclick="ToggleAnalysisMenu" @onclick:stopPropagation="true"
+                            type="button" style="display: flex; align-items: center; justify-content: center; min-width: 32px;"
+                            @onmouseenter="@(() => _hoveredAnalysisTool = "button")"
+                            @onmouseleave="@(() => _hoveredAnalysisTool = null)">
+                        @if (_activeAnalysisTool != null)
+                        {
+                            <span style="position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--mud-palette-primary); border-radius: 50%;"></span>
+                        }
+                        @((MarkupString)$@"
+                        <svg viewBox=""0 0 24 24"" width=""20"" height=""20"" style=""display:block;"" aria-hidden=""true"">
+                          <path d=""M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"" fill=""currentColor""/>
+                        </svg>")
+                    </button>
+                </MudTooltip>
+                @if (_analysisMenuOpen)
+                {
+                    <MudPaper Elevation="16" Class="pa-2" Style="position: absolute; bottom: 100%; right: 0; margin-bottom: 8px; min-width: 180px; z-index: 1000;" @onclick:stopPropagation>
+                        @foreach (var tool in _analysisTools)
+                        {
+                            <div class="d-flex align-center px-2 py-2"
+                                 style="cursor: pointer; border-radius: 4px; @(_hoveredAnalysisTool == tool.Key ? "background: rgba(var(--mud-palette-primary-rgb), 0.08);" : "")"
+                                 @onclick="@(() => SetAnalysisTool(tool.Key))"
+                                 @onmouseenter="@(() => _hoveredAnalysisTool = tool.Key)"
+                                 @onmouseleave="@(() => _hoveredAnalysisTool = null)">
+                                <MudIcon Icon="@tool.Icon" Size="Size.Small" Class="mr-2" />
+                                <MudText Typo="Typo.body2">@tool.Label</MudText>
+                                <div style="flex: 1;"></div>
+                                @if (_activeAnalysisTool == tool.Key)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Primary" />
+                                }
+                            </div>
+                        }
+                        <MudDivider Class="my-1" />
+                        <div class="d-flex align-center px-2 py-2"
+                             style="cursor: pointer; border-radius: 4px; @(_hoveredAnalysisTool == "clear" ? "background: rgba(var(--mud-palette-primary-rgb), 0.08);" : "")"
+                             @onclick="ClearAnalysisTool"
+                             @onmouseenter="@(() => _hoveredAnalysisTool = "clear")"
+                             @onmouseleave="@(() => _hoveredAnalysisTool = null)">
+                            <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" Class="mr-2" />
+                            <MudText Typo="Typo.body2">Clear</MudText>
+                        </div>
+                    </MudPaper>
+                }
+            </div>
 
         </MudPaper>
     </div>
@@ -125,6 +219,11 @@
     [Parameter] public FileAnalysisDimensionsDto? KnownDimensions { get; set; }
     /// <summary>Invoked when the 3D model fails to load (e.g. 404, network error).</summary>
     [Parameter] public EventCallback<string>       OnLoadFailed  { get; set; }
+    /// <summary>Invoked when a body is clicked in the multi-body viewer.</summary>
+    [Parameter] public EventCallback<int?>        OnBodyPicked   { get; set; }
+
+    /// <summary>Body metadata for multi-body CAD files.</summary>
+    public record BodyViewModel(int Index, string Name, double? VolumeCm3, string? ColorHex);
 
     private string _canvasId    = $"babylon-canvas-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
@@ -135,8 +234,43 @@
     private bool   _edgesEnabled;
     private bool   _bboxEnabled;
     private string? _lastViewerUrl;
+    private bool   _analysisMenuOpen;
+    private string? _activeAnalysisTool;  // "flippedTriangles" | "measure" | "thickness" | null
+    private string? _hoveredAnalysisTool;  // For hover effect in dropdown
+    private string? _lastMeasurement;     // Display last measurement result in overlay
+
+    // ── Section view ─────────────────────────────────────────────────────────
+    private bool   _sectionEnabled;
+    private string _sectionAxis     = "x";
+    private bool   _sectionInverted;
+    private double _sectionOffset;
+    private bool   _sectionMenuOpen;
+
+    private double SectionMin => _sectionAxis switch
+    {
+        "x" => -(KnownDimensions?.X ?? Model?.BoundingBoxX ?? 100.0) / 2.0,
+        "y" => -(KnownDimensions?.Y ?? Model?.BoundingBoxY ?? 100.0) / 2.0,
+        "z" => -(KnownDimensions?.Z ?? Model?.BoundingBoxZ ?? 100.0) / 2.0,
+        _   => -100.0,
+    };
+
+    private double SectionMax => _sectionAxis switch
+    {
+        "x" => (KnownDimensions?.X ?? Model?.BoundingBoxX ?? 100.0) / 2.0,
+        "y" => (KnownDimensions?.Y ?? Model?.BoundingBoxY ?? 100.0) / 2.0,
+        "z" => (KnownDimensions?.Z ?? Model?.BoundingBoxZ ?? 100.0) / 2.0,
+        _   => 100.0,
+    };
 
     private record ViewPreset(string Key, string Label);
+    private record AnalysisTool(string Key, string Label, string Icon);
+
+    private static readonly AnalysisTool[] _analysisTools =
+    [
+        new("flippedTriangles", "Flipped Triangles", Icons.Material.Filled.ChangeHistory),
+        new("measure", "Measure", Icons.Material.Filled.Straighten),
+        new("thickness", "Thickness Analysis", Icons.Material.Filled.Fullscreen),
+    ];
 
     /// <inheritdoc />
     protected override void OnInitialized()
@@ -147,9 +281,18 @@
     [JSInvokable]
     public async Task OnLoadError(string errorMessage)
     {
+        // Clear _lastViewerUrl so that when the parent fetches a fresh signed URL and sets
+        // ViewerUrl again, OnAfterRenderAsync treats it as new and triggers a full reinit.
+        // Without this, StripQueryString would match the same base path and skip the reinit.
+        _lastViewerUrl = null;
         if (OnLoadFailed.HasDelegate)
             await OnLoadFailed.InvokeAsync(errorMessage);
     }
+
+    // Strips query parameters from a URL so that re-signed GCS URLs pointing to the same
+    // file are not treated as a new model, preventing duplicate loading.
+    private static string StripQueryString(string url)
+        => url.Contains('?') ? url[..url.IndexOf('?')] : url;
 
     private static readonly ViewPreset[] _viewPresets =
     [
@@ -284,13 +427,13 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         Logger.LogDebug("OnAfterRenderAsync: ViewerUrl='{ViewerUrl}', _lastViewerUrl='{LastViewerUrl}'", ViewerUrl, _lastViewerUrl);
-        if (!string.IsNullOrEmpty(ViewerUrl) && ViewerUrl != _lastViewerUrl)
+        if (!string.IsNullOrEmpty(ViewerUrl) && StripQueryString(ViewerUrl) != StripQueryString(_lastViewerUrl ?? ""))
         {
-            var previousUrl = _lastViewerUrl;
+            string? previousUrl = _lastViewerUrl;
             _lastViewerUrl = ViewerUrl;
             try
             {
-                _module ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/babylon-viewer.js");
+                _module ??= await JSRuntime.InvokeAsync<IJSObjectReference>(identifier: "import", args: "./js/part-viewer.js");
                 if (previousUrl != null)
                     await _module.InvokeVoidAsync("dispose", _canvasId);
 
@@ -340,6 +483,15 @@
         _renderMode = target;
         // Wireframe is incompatible with edge rendering — clear the edge button state.
         if (target == "wireframe") _edgesEnabled = false;
+
+        // Clear active analysis tools when changing render mode
+        if (_activeAnalysisTool != null)
+        {
+            _activeAnalysisTool = null;
+            _lastMeasurement = null;
+            await ClearAnalysisToolsAsync();
+        }
+
         if (_module != null)
             await _module.InvokeVoidAsync("setRenderMode", _canvasId, target);
     }
@@ -347,6 +499,15 @@
     private async Task ResetCamera()
     {
         _cameraPreset = "iso";
+
+        // Clear active analysis tools when resetting camera
+        if (_activeAnalysisTool != null)
+        {
+            _activeAnalysisTool = null;
+            _lastMeasurement = null;
+            await ClearAnalysisToolsAsync();
+        }
+
         if (_module != null)
         {
             await _module.InvokeVoidAsync("stopAutoRotation", _canvasId);
@@ -356,6 +517,14 @@
 
     private async Task RotateModelAsync(int degrees)
     {
+        // Clear active analysis tools when rotating
+        if (_activeAnalysisTool != null)
+        {
+            _activeAnalysisTool = null;
+            _lastMeasurement = null;
+            await ClearAnalysisToolsAsync();
+        }
+
         if (_module != null)
         {
             await _module.InvokeVoidAsync("stopAutoRotation", _canvasId);
@@ -366,6 +535,15 @@
     private async Task ToggleEdgesAsync()
     {
         _edgesEnabled = !_edgesEnabled;
+
+        // Clear active analysis tools when toggling edges
+        if (_activeAnalysisTool != null)
+        {
+            _activeAnalysisTool = null;
+            _lastMeasurement = null;
+            await ClearAnalysisToolsAsync();
+        }
+
         if (_module != null)
             await _module.InvokeVoidAsync("toggleEdges", _canvasId, _edgesEnabled);
     }
@@ -373,8 +551,83 @@
     private async Task ToggleBoundingBoxAsync()
     {
         _bboxEnabled = !_bboxEnabled;
+
+        // Clear active analysis tools when toggling bounding box
+        if (_activeAnalysisTool != null)
+        {
+            _activeAnalysisTool = null;
+            _lastMeasurement = null;
+            await ClearAnalysisToolsAsync();
+        }
+
         if (_module != null)
             await _module.InvokeVoidAsync("toggleBoundingBox", _canvasId, _bboxEnabled);
+    }
+
+    private void ToggleAnalysisMenu()
+    {
+        _analysisMenuOpen = !_analysisMenuOpen;
+        StateHasChanged();
+    }
+
+    private void CloseAnalysisMenuOutside()
+    {
+        _analysisMenuOpen = false;
+    }
+
+    private async Task SetAnalysisTool(string tool)
+    {
+        // If clicking the same tool, toggle it off
+        if (_activeAnalysisTool == tool)
+        {
+            _activeAnalysisTool = null;
+            _lastMeasurement = null;
+            if (_module != null)
+                await ClearAnalysisToolsAsync();
+        }
+        else
+        {
+            _activeAnalysisTool = tool;
+            _lastMeasurement = null;  // Clear when switching tools
+            _analysisMenuOpen = false;
+            if (_module != null)
+                await EnableAnalysisToolAsync(tool);
+        }
+    }
+
+    private async Task ClearAnalysisTool()
+    {
+        _activeAnalysisTool = null;
+        _analysisMenuOpen = false;
+        _lastMeasurement = null;
+        if (_module != null)
+            await ClearAnalysisToolsAsync();
+    }
+
+    private async Task EnableAnalysisToolAsync(string tool)
+    {
+        if (_module == null) return;
+        // Will be implemented in Phase 2-4
+        switch (tool)
+        {
+            case "flippedTriangles":
+                await _module.InvokeVoidAsync("enableFlippedTriangleView", _canvasId, true);
+                break;
+            case "measure":
+                await _module.InvokeVoidAsync("enableMeasureTool", _canvasId, _dotNetRef);
+                break;
+            case "thickness":
+                await _module.InvokeVoidAsync("enableThicknessAnalysis", _canvasId);
+                break;
+        }
+    }
+
+    private async Task ClearAnalysisToolsAsync()
+    {
+        if (_module == null) return;
+        await _module.InvokeVoidAsync("enableFlippedTriangleView", _canvasId, false);
+        await _module.InvokeVoidAsync("disableMeasureTool", _canvasId);
+        await _module.InvokeVoidAsync("disableThicknessAnalysis", _canvasId);
     }
 
     private async Task SetCameraProjectionAsync(string mode)
@@ -382,6 +635,52 @@
         _cameraProjection = mode;
         if (_module != null)
             await _module.InvokeVoidAsync("setCameraProjection", _canvasId, mode);
+    }
+
+    // ── Section view ─────────────────────────────────────────────────────────
+
+    private void ToggleSectionMenu()
+    {
+        _sectionMenuOpen = !_sectionMenuOpen;
+    }
+
+    private async Task SetSectionEnabledAsync(bool v)
+    {
+        _sectionEnabled = v;
+        await _SendSectionPlane();
+    }
+
+    private async Task SetSectionAxisAsync(string axis)
+    {
+        _sectionAxis   = axis;
+        _sectionOffset = 0; // reset offset to centre when axis changes
+        await _SendSectionPlane();
+    }
+
+    private async Task SetSectionOffsetAsync(double mm)
+    {
+        _sectionOffset = mm;
+        await _SendSectionPlane();
+    }
+
+    private async Task SetSectionInvertedAsync(bool v)
+    {
+        _sectionInverted = v;
+        await _SendSectionPlane();
+    }
+
+    private async Task _SendSectionPlane()
+    {
+        if (_module == null) return;
+        try
+        {
+            await _module.InvokeVoidAsync("setSectionPlane", _canvasId,
+                _sectionEnabled, _sectionAxis, _sectionOffset, _sectionInverted);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] setSectionPlane error: {ex.Message}");
+        }
     }
 
     /// <summary>Loads and toggles a DFM overlay GLB on the 3D model.</summary>
@@ -426,6 +725,76 @@
         {
             Console.WriteLine($"[ModelViewer] clearDfmOverlays error: {ex.Message}");
         }
+    }
+
+    /// <summary>Assigns colors to multiple bodies in a multi-body CAD file.</summary>
+    public async Task SetBodiesAsync(List<BodyViewModel> bodies)
+    {
+        if (_module == null) return;
+        try
+        {
+            var bodyData = bodies.Select(b => new { index = b.Index, name = b.Name }).ToArray();
+            await _module.InvokeVoidAsync("setBodies", _canvasId, bodyData);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] setBodies error: {ex.Message}");
+        }
+    }
+
+    /// <summary>Selects a body by index and highlights it with x-ray mode.</summary>
+    public async Task SelectBodyAsync(int? bodyIndex)
+    {
+        if (_module == null) return;
+        try
+        {
+            // When a body is selected, reset toolbar transparent mode to avoid conflicts
+            if (bodyIndex.HasValue && _renderMode == "transparent")
+            {
+                _renderMode = "solid";
+                await _module.InvokeVoidAsync("setRenderMode", _canvasId, "solid");
+            }
+
+            if (bodyIndex.HasValue)
+                await _module.InvokeVoidAsync("selectBody", _canvasId, bodyIndex.Value);
+            else
+                await _module.InvokeVoidAsync("clearBodySelection", _canvasId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] selectBody error: {ex.Message}");
+        }
+    }
+
+    /// <summary>Enables click-to-select functionality for multi-body picking.</summary>
+    public async Task EnableBodyPickingAsync()
+    {
+        if (_module == null) return;
+        try
+        {
+            await _module.InvokeVoidAsync("enableBodyPicking", _canvasId, _dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] enableBodyPicking error: {ex.Message}");
+        }
+    }
+
+    /// <summary>JSInvokable callback when a body is clicked in the 3D viewer.</summary>
+    [JSInvokable]
+    public async Task NotifyBodyPicked(int? bodyIndex)
+    {
+        if (OnBodyPicked.HasDelegate)
+            await OnBodyPicked.InvokeAsync(bodyIndex);
+    }
+
+    /// <summary>JSInvokable callback when a measurement is completed.</summary>
+    [JSInvokable]
+    public async Task NotifyMeasureResult(string distanceMm, string angleDegrees)
+    {
+        _lastMeasurement = $"Distance: {distanceMm} mm | Angle: {angleDegrees}°";
+        await InvokeAsync(StateHasChanged);
+        Logger.LogDebug("Measurement result: Distance={Distance}mm, Angle={Angle}°", distanceMm, angleDegrees);
     }
 
     public async ValueTask DisposeAsync()

@@ -93,6 +93,7 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
 
         Services.AddSingleton<CookieProvider>();
         Services.AddSingleton<ChatService>();
+        Services.AddSingleton(new UploadSettings());
 
         Render<MudPopoverProvider>();
     }

@@ -70,6 +70,21 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
                 payload.StoragePath, isManifold);
         }
 
+        // Convert body metadata to SignalR format
+        var bodies = payload.Bodies?.Select(b => new SignalRBodyInfo(
+            b.Index,
+            b.Name,
+            b.VolumeCm3,
+            new SignalRBBox(
+                b.BboxMin?.X ?? 0,
+                b.BboxMin?.Y ?? 0,
+                b.BboxMin?.Z ?? 0),
+            new SignalRBBox(
+                b.BboxMax?.X ?? 0,
+                b.BboxMax?.Y ?? 0,
+                b.BboxMax?.Z ?? 0)
+        )).ToList();
+
         var signalRPayload = new FileAnalysisCompletedPayload(
             StoragePath: payload.StoragePath,
             UploadId: payload.FileId,
@@ -80,7 +95,9 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
                 : null,
             PreviewUrls: null,
             Failed: false,
-            ErrorCode: null);
+            ErrorCode: null,
+            BodyCount: payload.BodyCount,
+            Bodies: bodies);
 
         await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
             "FileAnalysisCompleted",

@@ -28,6 +28,12 @@ public sealed class SignalRFileAnalysisPayload
 
     /// <summary>Error code when Failed is true.</summary>
     public string? ErrorCode { get; set; }
+
+    /// <summary>Number of bodies in the CAD file (null if single-body or not computed).</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Per-body metadata for multi-body files (null if single-body or not computed).</summary>
+    public List<SignalRBodyInfo>? Bodies { get; set; }
 }
 
 /// <summary>
@@ -97,6 +103,12 @@ public sealed class SignalRGlbReadyPayload
 
     /// <summary>True when GLB generation failed.</summary>
     public bool Failed { get; set; }
+
+    /// <summary>Number of bodies in the CAD file (null if single-body or not computed).</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Per-body metadata for multi-body files (null if single-body or not computed).</summary>
+    public List<SignalRBodyInfo>? Bodies { get; set; }
 }
 
 /// <summary>
@@ -134,4 +146,41 @@ public sealed class SignalRDfmAnalysisPayload
     /// Number of distinct bodies/shells detected in the mesh. Greater than 1 means multi-body.
     /// </summary>
     public int? BodyCount { get; set; }
+}
+
+/// <summary>
+/// Client-side mirror of SignalRBodyInfo from NotificationHub.
+/// Per-body metadata for multi-body CAD files.
+/// </summary>
+public sealed class SignalRBodyInfo
+{
+    /// <summary>Zero-based body index.</summary>
+    public int Index { get; set; }
+
+    /// <summary>Stable body name from glTF node or generated "Body_NN" format.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Volume of this body in cm³ (null if not computed).</summary>
+    public double? VolumeCm3 { get; set; }
+
+    /// <summary>Minimum XYZ coordinates in mm.</summary>
+    public SignalRBBox BboxMin { get; set; } = new();
+
+    /// <summary>Maximum XYZ coordinates in mm.</summary>
+    public SignalRBBox BboxMax { get; set; } = new();
+}
+
+/// <summary>
+/// 3D bounding box with XYZ dimensions.
+/// </summary>
+public sealed class SignalRBBox
+{
+    /// <summary>Width in millimetres.</summary>
+    public double X { get; set; }
+
+    /// <summary>Depth in millimetres.</summary>
+    public double Y { get; set; }
+
+    /// <summary>Height in millimetres.</summary>
+    public double Z { get; set; }
 }

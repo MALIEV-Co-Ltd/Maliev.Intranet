@@ -4,11 +4,16 @@ using Xunit;
 
 namespace Maliev.Intranet.Tests.Bff.Hubs;
 
-public class SignalRHubIntegrationTests(BffTestWebApplicationFactory factory) : IClassFixture<BffTestWebApplicationFactory>
+/// <summary>
+/// Integration tests for SignalR hub negotiation endpoints.
+/// Uses SignalRTestFactory to strip service discovery DelegatingHandlers
+/// that would otherwise cause DNS resolution hangs during WebApplicationFactory startup.
+/// </summary>
+public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixture<SignalRTestFactory>
 {
-    private readonly BffTestWebApplicationFactory _factory = factory;
+    private readonly SignalRTestFactory _factory = factory;
 
-    [Theory(Skip = "Requires Docker/RabbitMQ — host startup hangs due to service discovery and IAM token provider")]
+    [Theory]
     [InlineData("/hubs/notifications/negotiate")]
     [InlineData("/hubs/chat/negotiate")]
     public async Task HubNegotiate_ReturnsOk_WhenAuthenticated(string url)
@@ -25,7 +30,7 @@ public class SignalRHubIntegrationTests(BffTestWebApplicationFactory factory) : 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    [Theory(Skip = "Requires Docker/RabbitMQ — host startup hangs due to service discovery and IAM token provider")]
+    [Theory]
     [InlineData("/hubs/notifications/negotiate")]
     [InlineData("/hubs/chat/negotiate")]
     public async Task HubNegotiate_ReturnsUnauthorized_WhenNoToken(string url)

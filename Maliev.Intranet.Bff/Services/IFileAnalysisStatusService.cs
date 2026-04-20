@@ -68,6 +68,5 @@ public interface IFileAnalysisStatusService
     /// <param name="oldStoragePath">The original temp-bucket path prefix (e.g. "projects/{guid}/").</param>
     /// <param name="newStoragePath">The new customer-bucket path prefix (e.g. "customers/{guid}/projects/{guid}/").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    // TODO: Remove NoWarn 1591 suppression from Directory.Build.props once all public members have XML docs.
     Task MigrateGlbStoragePathAsync(string oldStoragePath, string newStoragePath, CancellationToken cancellationToken = default);
 }

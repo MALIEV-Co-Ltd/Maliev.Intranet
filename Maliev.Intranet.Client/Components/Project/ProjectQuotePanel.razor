@@ -13,8 +13,9 @@
             }
             <div class="section-header" @onclick="@(() => _leadTimeExpanded = !_leadTimeExpanded)">
                 <span>Lead Time @ltLabel</span>
-                <MudIcon Icon="@(_leadTimeExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
-                         Size="Size.Small" />
+                <MudIcon
+                Icon="@(_leadTimeExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                Size="Size.Small" />
             </div>
 
             @if (_leadTimeExpanded)
@@ -23,9 +24,7 @@
                     @if (!_hasPricedParts)
                     {
                         <div class="pqp-lt-info">
-                            <MudIcon Icon="@Icons.Material.Outlined.Info"
-                                     Size="Size.Small"
-                                     Color="Color.Info"
+                            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Color="Color.Info"
                                      Class="pqp-lt-info-icon" />
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
                                 Configure and price your parts to unlock lead time options.
@@ -51,320 +50,380 @@
                         </div>
                     }
                 </div>
-            } @* end _leadTimeExpanded *@
+            }
+            @* end _leadTimeExpanded *@
         </div>
 
         <div class="pqp-section pqp-order-summary">
             <div class="section-header">
                 <span>Order Summary</span>
-                <span class="pqp-summary-meta">@Parts.Count part@(Parts.Count == 1 ? "" : "s") &bull; @Parts.Sum(p => p.Quantity) unit@(Parts.Sum(p => p.Quantity) == 1 ? "" : "s")</span>
-            </div>
-            <div class="pqp-parts-scroll">
-                @if (Parts.Count == 0)
-                {
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="py-3" Style="text-align:center;">
-                        Add and configure parts to see pricing
-                    </MudText>
-                }
-                else
-                {
-                    @foreach (var part in Parts)
+                <span class="pqp-summary-meta">@Parts.Count part@(Parts.Count == 1 ? "" : "s") &bull; @Parts.Sum(p =>
+                                        p.Quantity) unit@(Parts.Sum(p => p.Quantity) == 1 ? "" : "s")</span>
+                </div>
+                <div class="pqp-parts-scroll gap-1">
+                    @if (Parts.Count == 0)
                     {
-                        <div class="pqp-part-row @(IsActivePart(part) ? "active" : "")" @onclick="@(async () => await OnPartActivated.InvokeAsync(part))">
-                            <div class="pqp-part-info">
-                                <span class="pqp-part-name">@part.Name</span>
-                                <span class="pqp-part-meta">@part.Quantity unit@(part.Quantity == 1 ? "" : "s") x @FormatUnitPrice(part.EstimatedUnitPrice)</span>
-                            </div>
-                            <span class="pqp-part-price">
-                                @if (part.PricingLoading)
-                                {
-                                    <MudSkeleton Width="55px" Height="12px" Animation="Animation.Wave" />
-                                }
-                                else if (part.EstimatedTotalAmount.HasValue)
-                                {
-                                    <span class="pqp-price-amount">@FormatPriceValue(part.EstimatedTotalAmount.Value)</span>
-                                    <span class="pqp-price-currency">@(SelectedCurrency?.Symbol ?? SelectedCurrency?.Code)</span>
-                                }
-                                else
-                                {
-                                    <text>—</text>
-                                }
-                            </span>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="py-3" Style="text-align:center;">
+                            Add and configure parts to see pricing
+                        </MudText>
+                    }
+                    else
+                    {
+                        @foreach (var part in Parts)
+                        {
+                            <div class="pqp-part-row @(IsActivePart(part) ? "active" : "")"
+                                 @onclick="@(async () => await OnPartActivated.InvokeAsync(part))">
+                                <div class="pqp-part-info">
+                                    <span class="pqp-part-name">@part.Name</span>
+                                    <span class="pqp-part-meta">@part.Quantity unit@(part.Quantity == 1 ? "" : "s") x
+                                        @FormatUnitPrice(part.EstimatedUnitPrice)</span>
+                                    </div>
+                                    <span class="pqp-part-price">
+                                        @if (part.PricingLoading)
+                                        {
+                                            <MudSkeleton Width="55px" Height="12px" Animation="Animation.Wave" />
+                                        }
+                                        else if (part.EstimatedTotalAmount.HasValue)
+                                        {
+                                            <span class="pqp-price-amount">@FormatPriceValue(part.EstimatedTotalAmount.Value)</span>
+                                            <span class="pqp-price-currency">@(SelectedCurrency?.Symbol ?? SelectedCurrency?.Code)</span>
+                                        }
+                                        else
+                                        {
+                                            <text>—</text>
+                                        }
+                                    </span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="pqp-footer">
+                @if (_unacknowledgedDfmCount > 0)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Icon="@Icons.Material.Outlined.Warning">
+                        @_unacknowledgedDfmCount part(s) have unacknowledged DFM warnings
+                    </MudAlert>
+                }
+                else if (_dfmAcknowledgedCount > 0)
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true" Icon="@Icons.Material.Outlined.CheckCircle">
+                        All DFM warnings acknowledged
+                    </MudAlert>
+                }
+
+                <div class="pqp-totals">
+                    @if (SelectedLeadTime != null && SelectedLeadTime.PriceMultiplier != 1.0m)
+                    {
+                        <div class="pqp-total-row">
+                            <span>Lead time adjustment</span>
+                            <span>×@SelectedLeadTime.PriceMultiplier.ToString("N2")</span>
                         </div>
                     }
-                }
-            </div>
-        </div>
+                    <div class="pqp-total-grand">
+                        <MudText Typo="Typo.body2">Total</MudText>
+                        <div class="pqp-grand-price">
+                            <MudText Typo="Typo.h4" Color="Color.Primary" Class="pqp-price-amount">
+                                @FormatPriceValue(_quoteTotal)</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pqp-price-currency">
+                                    @(SelectedCurrency?.Symbol ?? SelectedCurrency?.Code)</MudText>
+                                </div>
+                            </div>
+                        </div>
 
-    </div>
-
-    <div class="pqp-footer">
-        @if (_unacknowledgedDfmCount > 0)
-        {
-            <MudAlert Severity="Severity.Warning" Dense="true" Icon="@Icons.Material.Outlined.Warning">
-                @_unacknowledgedDfmCount part(s) have unacknowledged DFM warnings
-            </MudAlert>
-        }
-        else if (_dfmAcknowledgedCount > 0)
-        {
-            <MudAlert Severity="Severity.Success" Dense="true" Icon="@Icons.Material.Outlined.CheckCircle">
-                All DFM warnings acknowledged
-            </MudAlert>
-        }
-
-        <div class="pqp-totals">
-            @if (SelectedLeadTime != null && SelectedLeadTime.PriceMultiplier != 1.0m)
-            {
-                <div class="pqp-total-row">
-                    <span>Lead time adjustment</span>
-                    <span>×@SelectedLeadTime.PriceMultiplier.ToString("N2")</span>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="@(!CanQuote)"
+                                   OnClick="OnQuote" Style="font-size:16px;">
+                            @if (Saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <text>Creating...</text>
+                            }
+                            else
+                            {
+                                <text>Quote</text>
+                            }
+                        </MudButton>
+                    </div>
                 </div>
-            }
-            <div class="pqp-total-grand">
-                <MudText Typo="Typo.body2">Total</MudText>
-                <div class="pqp-grand-price">
-                    <MudText Typo="Typo.h4" Color="Color.Primary" Class="pqp-price-amount">@FormatPriceValue(_quoteTotal)</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pqp-price-currency">@(SelectedCurrency?.Symbol ?? SelectedCurrency?.Code)</MudText>
-                </div>
-            </div>
-        </div>
 
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   FullWidth="true"
-                   Disabled="@(!CanQuote)"
-                   OnClick="OnQuote"
-                   Style="font-size:16px;">
-            @if (Saving)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <text>Creating...</text>
-            }
-            else
-            {
-                <text>Quote</text>
-            }
-        </MudButton>
-    </div>
-</div>
+                <style>
+                    .pqp-root {
+                        width: 340px;
+                        min-width: 340px;
+                        height: 100%;
+                        overflow: hidden;
+                        background: var(--mud-palette-surface);
+                        border-left: 1px solid var(--mud-palette-lines-default);
+                        display: flex;
+                        flex-direction: column;
+                        flex-shrink: 0;
+                    }
 
-<style>
-    .pqp-root {
-        width: 340px;
-        min-width: 340px;
-        height: 100%;
-        overflow: hidden;
-        background: var(--mud-palette-surface);
-        border-left: 1px solid var(--mud-palette-lines-default);
-        display: flex;
-        flex-direction: column;
-        flex-shrink: 0;
-    }
+                    /* ── Scrollable content area ─────────────────────────────────────── */
+                    .pqp-content {
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                        overflow: hidden;
+                        min-height: 0;
+                    }
 
-    /* ── Scrollable content area ─────────────────────────────────────── */
-    .pqp-content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        min-height: 0;
-    }
+                    .pqp-section {
+                        display: flex;
+                        flex-direction: column;
+                        border-bottom: 1px solid var(--mud-palette-lines-default);
+                        flex-shrink: 0;
+                    }
 
-    .pqp-section {
-        display: flex;
-        flex-direction: column;
-        border-bottom: 1px solid var(--mud-palette-lines-default);
-        flex-shrink: 0;
-    }
+                    /* Order Summary grows to fill remaining space */
+                    .pqp-section.pqp-order-summary {
+                        flex: 1;
+                        overflow: hidden;
+                        border-bottom: none;
+                        flex-shrink: unset;
+                    }
 
-    /* Order Summary grows to fill remaining space */
-    .pqp-section.pqp-order-summary {
-        flex: 1;
-        overflow: hidden;
-        border-bottom: none;
-        flex-shrink: unset;
-    }
+                    /* ── Section header ─────────────────────────────────────────────── */
+                    .section-header {
+                        background: var(--mud-palette-background-grey);
+                        padding: 8px 16px;
+                        font-size: var(--mud-typography-overline-size);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                        font-weight: 600;
+                        color: var(--mud-palette-text-primary);
+                        border-bottom: 1px solid var(--mud-palette-lines-default);
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        cursor: pointer;
+                        user-select: none;
+                    }
 
-    /* ── Section header ─────────────────────────────────────────────── */
-    .section-header {
-        background: var(--mud-palette-background-grey);
-        padding: 8px 16px;
-        font-size: var(--mud-typography-overline-size);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 600;
-        color: var(--mud-palette-text-primary);
-        border-bottom: 1px solid var(--mud-palette-lines-default);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        cursor: pointer;
-        user-select: none;
-    }
+                    .section-header:hover {
+                        opacity: 0.85;
+                    }
 
-    .section-header:hover {
-        opacity: 0.85;
-    }
+                    .pqp-summary-meta {
+                        font-size: var(--mud-typography-overline-size);
+                        font-weight: 500;
+                        color: var(--mud-palette-text-secondary);
+                        text-transform: none;
+                        letter-spacing: normal;
+                    }
 
-    .pqp-summary-meta {
-        font-size: var(--mud-typography-overline-size);
-        font-weight: 500;
-        color: var(--mud-palette-text-secondary);
-        text-transform: none;
-        letter-spacing: normal;
-    }
+                    /* ── Section content wrapper ─────────────────────────────────────── */
+                    .pnl-section-content {
+                        padding: 16px;
+                        display: flex;
+                        flex-direction: column;
+                    }
 
-    /* ── Section content wrapper ─────────────────────────────────────── */
-    .pnl-section-content {
-        padding: 16px;
-        display: flex;
-        flex-direction: column;
-    }
+                    /* ── Lead time options ───────────────────────────────────────────── */
+                    /* ── Lead time info card (shown when no parts are priced yet) ───── */
+                    .pqp-lt-info {
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 8px;
+                        padding: 10px 12px;
+                        background: var(--mud-palette-info-lighten);
+                        border: 1px solid var(--mud-palette-info);
+                        border-radius: 6px;
+                        margin: 4px 0 8px;
+                    }
 
-    /* ── Lead time options ───────────────────────────────────────────── */
-    /* ── Lead time info card (shown when no parts are priced yet) ───── */
-    .pqp-lt-info {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        padding: 10px 12px;
-        background: var(--mud-palette-info-lighten);
-        border: 1px solid var(--mud-palette-info);
-        border-radius: 6px;
-        margin: 4px 0 8px;
-    }
+                    .pqp-lt-info-icon {
+                        flex-shrink: 0;
+                        margin-top: 1px;
+                    }
 
-    .pqp-lt-info-icon { flex-shrink: 0; margin-top: 1px; }
+                    .pqp-lt-options {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                    }
 
-    .pqp-lt-options {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
+                    .pqp-lt-card {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 8px 10px;
+                        border: 1px solid var(--mud-palette-lines-default);
+                        border-radius: 6px;
+                        cursor: pointer;
+                        transition: border-color 0.15s, background 0.15s;
+                    }
 
-    .pqp-lt-card {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 10px;
-        border: 1px solid var(--mud-palette-lines-default);
-        border-radius: 6px;
-        cursor: pointer;
-        transition: border-color 0.15s, background 0.15s;
-    }
+                    .pqp-lt-card:hover {
+                        border-color: var(--mud-palette-primary);
+                        background: var(--mud-palette-primary-lighten);
+                    }
 
-    .pqp-lt-card:hover { border-color: var(--mud-palette-primary); background: var(--mud-palette-primary-lighten); }
+                    .pqp-lt-selected {
+                        border-color: var(--mud-palette-primary) !important;
+                        background: var(--mud-palette-primary-lighten);
+                    }
 
-    .pqp-lt-selected { border-color: var(--mud-palette-primary) !important; background: var(--mud-palette-primary-lighten); }
+                    .pqp-lt-card-body {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
+                    }
 
-    .pqp-lt-card-body { display: flex; flex-direction: column; gap: 2px; }
+                    .pqp-lt-name {
+                        font-size: var(--mud-typography-default-size);
+                        font-weight: 600;
+                    }
 
-    .pqp-lt-name { font-size: var(--mud-typography-default-size); font-weight: 600; }
+                    .pqp-lt-days {
+                        font-size: var(--mud-typography-caption-size);
+                        color: var(--mud-palette-text-secondary);
+                    }
 
-    .pqp-lt-days { font-size: var(--mud-typography-caption-size); color: var(--mud-palette-text-secondary); }
+                    .pqp-lt-price {
+                        font-size: var(--mud-typography-default-size);
+                        font-weight: 600;
+                    }
 
-    .pqp-lt-price { font-size: var(--mud-typography-default-size); font-weight: 600; }
+                    /* ── Order summary scrollable list ──────────────────────────────── */
+                    .pqp-parts-scroll {
+                        flex: 1;
+                        overflow-y: auto;
+                        min-height: 0;
+                        padding: 8px 12px 12px 12px;
+                        display: flex;
+                        flex-direction: column;
+                    }
 
-    /* ── Order summary scrollable list ──────────────────────────────── */
-    .pqp-parts-scroll {
-        flex: 1;
-        overflow-y: auto;
-        min-height: 0;
-        padding: 8px 12px 12px 12px;
-        display: flex;
-        flex-direction: column;
-    }
+                    .pqp-part-row {
+                        display: flex;
+                        align-items: flex-start;
+                        justify-content: space-between;
+                        gap: 8px;
+                        padding: 10px 12px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        border: 1px solid transparent;
+                        transition: border-color 0.15s, background 0.15s;
+                    }
 
-    .pqp-part-row {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 8px;
-        padding: 10px 12px;
-        border-radius: 6px;
-        cursor: pointer;
-        border: 1px solid transparent;
-        transition: border-color 0.15s, background 0.15s;
-    }
+                    .pqp-part-row:hover {
+                        background: var(--mud-palette-surface);
+                        border-color: var(--mud-palette-lines-default);
+                    }
 
-    .pqp-part-row:hover {
-        background: var(--mud-palette-surface);
-        border-color: var(--mud-palette-lines-default);
-    }
+                    .pqp-part-row.active {
+                        background: var(--mud-palette-primary-lighten);
+                        border-color: var(--mud-palette-primary);
+                    }
 
-    .pqp-part-row.active {
-        background: var(--mud-palette-primary-lighten);
-        border-color: var(--mud-palette-primary);
-    }
+                    .pqp-part-info {
+                        display: flex;
+                        flex-direction: column;
+                        flex: 1;
+                        min-width: 0;
+                        gap: 1px;
+                    }
 
-    .pqp-part-info {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-width: 0;
-        gap: 1px;
-    }
+                    .pqp-part-name {
+                        font-size: var(--mud-typography-body2-size);
+                        font-weight: 600;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        display: block;
+                    }
 
-    .pqp-part-name {
-        font-size: var(--mud-typography-body2-size);
-        font-weight: 600;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: block;
-    }
+                    .pqp-part-meta {
+                        font-size: var(--mud-typography-caption-size);
+                        color: var(--mud-palette-text-secondary);
+                    }
 
-    .pqp-part-meta { font-size: var(--mud-typography-caption-size); color: var(--mud-palette-text-secondary); }
+                    .pqp-part-price {
+                        font-size: var(--mud-typography-default-size);
+                        font-weight: 600;
+                        flex-shrink: 0;
+                        display: flex;
+                        align-items: baseline;
+                        gap: 4px;
+                    }
 
-    .pqp-part-price { font-size: var(--mud-typography-default-size); font-weight: 600; flex-shrink: 0; display: flex; align-items: baseline; gap: 4px; }
+                    .pqp-price-amount {
+                        font-weight: 600;
+                    }
 
-    .pqp-price-amount { font-weight: 600; }
+                    .pqp-price-currency {
+                        font-size: var(--mud-typography-caption-size);
+                        color: var(--mud-palette-text-secondary);
+                        font-weight: 400;
+                    }
 
-    .pqp-price-currency { font-size: var(--mud-typography-caption-size); color: var(--mud-palette-text-secondary); font-weight: 400; }
+                    .pqp-grand-price {
+                        display: flex;
+                        align-items: baseline;
+                        gap: 4px;
+                    }
 
-    .pqp-grand-price { display: flex; align-items: baseline; gap: 4px; }
+                    /* ── Sticky footer ───────────────────────────────────────────────── */
+                    .pqp-footer {
+                        flex-shrink: 0;
+                        padding: 16px;
+                        border-top: 1px solid var(--mud-palette-lines-default);
+                        background: var(--mud-palette-surface);
+                        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+                        display: flex;
+                        flex-direction: column;
+                        gap: 8px;
+                    }
 
-    /* ── Sticky footer ───────────────────────────────────────────────── */
-    .pqp-footer {
-        flex-shrink: 0;
-        padding: 16px;
-        border-top: 1px solid var(--mud-palette-lines-default);
-        background: var(--mud-palette-surface);
-        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
+                    .pqp-totals {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 4px;
+                    }
 
-    .pqp-totals { display: flex; flex-direction: column; gap: 4px; }
+                    .pqp-total-row {
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: var(--mud-typography-body2-size);
+                    }
 
-    .pqp-total-row { display: flex; justify-content: space-between; font-size: var(--mud-typography-body2-size); }
+                    .pqp-total-grand {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-top: 4px;
+                    }
 
-    .pqp-total-grand { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+                    /* ── Tablet / Mobile ─────────────────────────────────────────────── */
+                    @@media (max-width: 1200px) {
+                        .pqp-root {
+                            order: 2;
+                            width: 100%;
+                            min-width: unset;
+                            height: auto;
+                            border-left: none;
+                            border-top: 1px solid var(--mud-palette-lines-default);
+                        }
 
-    /* ── Tablet / Mobile ─────────────────────────────────────────────── */
-    @@media (max-width: 1200px) {
-        .pqp-root {
-            order: 2;
-            width: 100%;
-            min-width: unset;
-            height: auto;
-            border-left: none;
-            border-top: 1px solid var(--mud-palette-lines-default);
-        }
-        .pqp-content {
-            overflow: visible;
-            min-height: unset;
-        }
-        .pqp-section.pqp-order-summary {
-            overflow: visible;
-            flex-shrink: 0;
-        }
-        .pqp-parts-scroll {
-            overflow-y: visible;
-        }
-    }
-</style>
+                        .pqp-content {
+                            overflow: visible;
+                            min-height: unset;
+                        }
+
+                        .pqp-section.pqp-order-summary {
+                            overflow: visible;
+                            flex-shrink: 0;
+                        }
+
+                        .pqp-parts-scroll {
+                            overflow-y: visible;
+                        }
+                    }
+                </style>
 
 @code {
     /// <summary>The list of parts in the current project quote.</summary>
@@ -394,7 +453,9 @@
     /// <summary>Callback invoked when the user clicks the Quote button.</summary>
     [Parameter] public EventCallback OnQuote { get; set; }
 
-    /// <summary>Callback invoked when the user clicks a part row in the summary, to activate it in the configurator.</summary>
+    /// <summary>
+    /// Callback invoked when the user clicks a part row in the summary, to activate it in the configurator.
+    /// </summary>
     [Parameter] public EventCallback<PartViewModel> OnPartActivated { get; set; }
 
     /// <summary>The index of the currently active/selected part in the Parts list.</summary>

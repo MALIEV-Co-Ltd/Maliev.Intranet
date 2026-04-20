@@ -55,7 +55,9 @@ public class FileAnalyzedConsumerTests
                 MaterialId: Guid.NewGuid(),
                 MaterialCode: "PLA",
                 ManufacturingProcessId: Guid.NewGuid(),
-                ManufacturingProcessName: "FDM"));
+                ManufacturingProcessName: "FDM",
+                BodyCount: null,
+                Bodies: Array.Empty<FileAnalyzedEventPayloadBodiesItem>()));
     }
 
     private static Mock<ConsumeContext<FileAnalyzedEvent>> MakeCtx(FileAnalyzedEvent evt)
@@ -105,6 +107,7 @@ public class FileAnalyzedConsumerTests
             s.SetAnalysisCompletedAsync(
                 "projects/abc/model.stl",
                 "projects/abc/model.stl_viewer.glb",
+                "http://storage.test/model.glb",
                 null,
                 CancellationToken.None),
             Times.Once);

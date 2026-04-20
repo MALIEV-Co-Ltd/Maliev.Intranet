@@ -29,14 +29,16 @@ public class ProjectTopBarTests : BunitContext, IAsyncLifetime
     private RenderedComponent<ProjectTopBar> RenderTopBar(
         bool autoSaving = false,
         DateTimeOffset? lastSavedAt = null,
-        string title = "Test Project")
+        string title = "Test Project",
+        bool hasCustomerSelected = false)
     {
         return Render<ProjectTopBar>(parameters => parameters
             .Add(p => p.Title, title)
             .Add(p => p.AutoSaving, autoSaving)
             .Add(p => p.LastSavedAt, lastSavedAt)
             .Add(p => p.Currencies, Currencies)
-            .Add(p => p.SelectedCurrency, Currencies[0]));
+            .Add(p => p.SelectedCurrency, Currencies[0])
+            .Add(p => p.HasCustomerSelected, hasCustomerSelected));
     }
 
     [Fact]
@@ -50,24 +52,29 @@ public class ProjectTopBarTests : BunitContext, IAsyncLifetime
     [Fact]
     public void TopBar_WhenAutoSaving_ShowsSpinnerIcon()
     {
+        // Component renders MudProgressCircular (not a custom pn-save-icon--spin class)
+        // and shows "Saving" text inside the badge
         var cut = RenderTopBar(autoSaving: true, lastSavedAt: null);
 
-        Assert.Contains("pn-save-icon--spin", cut.Markup);
+        Assert.Contains("Saving", cut.Markup);
+        Assert.Contains("badge", cut.Markup);
     }
 
     [Fact]
     public void TopBar_WhenAutoSaving_ShowsSpinnerEvenWithLastSavedAt()
     {
+        // AutoSaving takes precedence over LastSavedAt — shows spinner badge, not Saved badge
         var cut = RenderTopBar(autoSaving: true, lastSavedAt: DateTimeOffset.UtcNow);
 
-        Assert.Contains("pn-save-icon--spin", cut.Markup);
+        Assert.Contains("Saving", cut.Markup);
         Assert.DoesNotContain("Saved", cut.Markup);
     }
 
     [Fact]
     public void TopBar_WhenSavedAndNotAutoSaving_ShowsSavedBadge()
     {
-        var cut = RenderTopBar(autoSaving: false, lastSavedAt: DateTimeOffset.UtcNow);
+        // HasCustomerSelected = true → shows "Saved" with cloud-done icon
+        var cut = RenderTopBar(autoSaving: false, lastSavedAt: DateTimeOffset.UtcNow, hasCustomerSelected: true);
 
         Assert.Contains("Saved", cut.Markup);
         Assert.Contains("badge", cut.Markup);

@@ -25,7 +25,7 @@
                      Color="Color.Tertiary" />
         }
         @* DFM status indicator overlay *@
-        @if (Part.DfmReport != null && !Part.DfmAcknowledged)
+        @if (Part.HasProcessRelevantDfmIssues && !Part.DfmAcknowledged)
         {
             <div class="mc-indicator warn">
                 <MudIcon Icon="@Icons.Material.Filled.WarningAmber"
@@ -70,6 +70,10 @@
                 <MudText Typo="Typo.caption" Style="font-weight:700;" Class="pmc-price">
                     @(Part.EstimatedUnitPrice.HasValue ? $"{CurrencyCode} {Part.EstimatedUnitPrice.Value * ExchangeRate:N2}" : "—")
                 </MudText>
+            }
+            @if (Part.BodyCount.HasValue && Part.BodyCount.Value > 1)
+            {
+                <div class="mc-bodies">@Part.BodyCount bodies</div>
             }
             <MudText Typo="Typo.caption" Class="mc-qty">
                 ×@Part.Quantity
@@ -167,6 +171,14 @@
         font-size: 11px;
         color: var(--mud-palette-primary);
         font-weight: 600;
+    }
+    .mc-bodies {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--mud-palette-primary);
+        background: var(--mud-palette-primary-bg);
+        padding: 2px 6px;
+        border-radius: 4px;
     }
     .pmc-price { flex-shrink: 0; }
     .pmc-remove {

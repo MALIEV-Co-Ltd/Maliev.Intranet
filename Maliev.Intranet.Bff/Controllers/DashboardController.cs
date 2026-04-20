@@ -51,12 +51,6 @@ public class DashboardController(
 
         await Task.WhenAll(revenueTask, ordersTask, quotesTask, employeesTask);
 
-        // TODO: LINE OA Integration - Add a "LineInquiries" widget data source here.
-        // When LINE Messaging API webhook is active, a LineChatService (or dedicated endpoint) should expose:
-        //   GET /line/v1/inquiries/count?status=Unread   -> count of unread LINE messages awaiting employee response
-        // Include in the parallel task block above and render as a badge widget on the dashboard.
-        // This gives employees an at-a-glance count of pending LINE OA customer inquiries.
-
         if (requestedWidgets.Contains("Revenue"))
         {
             var stats = await revenueTask;

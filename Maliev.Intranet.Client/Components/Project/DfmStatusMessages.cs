@@ -13,6 +13,7 @@ internal static class DfmStatusMessages
         "GEOMETRY_WORKER_CRASH"     => "Analysis failed for this geometry.",
         "DFM_ANALYZER_FAILED"       => "DFM analysis could not be completed for this geometry.",
         "GEOMETRY_NO_RESULT"        => "Analysis did not produce a result. Try re-uploading the file.",
+        "CLIENT_TIMEOUT"            => "Analysis is taking longer than expected. Try re-uploading the file.",
         _                           => "Analysis unavailable.",
     };
 
@@ -26,6 +27,7 @@ internal static class DfmStatusMessages
         "GEOMETRY_WORKER_CRASH"     => "Analysis failed",
         "DFM_ANALYZER_FAILED"       => "DFM analysis failed",
         "GEOMETRY_NO_RESULT"        => "Analysis failed",
+        "CLIENT_TIMEOUT"            => "Analysis timed out",
         _                           => "Analysis failed",
     };
 }

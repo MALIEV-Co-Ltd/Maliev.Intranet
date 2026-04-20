@@ -38,7 +38,7 @@ public class QuickControllerTests
     public async Task Orders_Get_ReturnsOk()
     {
         var controller = new OrdersController(new OrderServiceClient(CreateClient(new PagedResponse<OrderSummaryDto>())));
-        var result = await controller.Get(null, 1, CancellationToken.None);
+        var result = await controller.Get(null, 1, null, CancellationToken.None);
         Assert.IsType<OkObjectResult>(result.Result);
     }
 

@@ -7,6 +7,16 @@ namespace Maliev.Intranet.Bff.Extensions;
 /// </summary>
 public static class BffHttpClientExtensions
 {
+    // Standard fast-service resilience: 3 retries, 30 s per attempt, 180 s total.
+    // AttemptTimeout (30 s) × (1 + MaxRetryAttempts 3) = 120 s < TotalRequestTimeout 180 s ✓
+    private static void ConfigureStandardResilience(HttpStandardResilienceOptions options)
+    {
+        options.AttemptTimeout.Timeout        = TimeSpan.FromSeconds(30);
+        options.TotalRequestTimeout.Timeout   = TimeSpan.FromSeconds(180);
+        options.Retry.MaxRetryAttempts        = 3;
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(300);
+    }
+
     /// <summary>
     /// Registers a typed HTTP client for a BFF service with an interface, user context forwarding,
     /// service discovery, and standard resilience.
@@ -27,29 +37,20 @@ public static class BffHttpClientExtensions
         {
             var config = sp.GetRequiredService<IConfiguration>();
             var explicitUrl = config[$"Services:{serviceName}:BaseUrl"];
-            if (!string.IsNullOrEmpty(explicitUrl))
-                client.BaseAddress = new Uri(explicitUrl);
-            else
-                client.BaseAddress = new Uri($"http://{serviceName}");
+            client.BaseAddress = !string.IsNullOrEmpty(explicitUrl)
+                ? new Uri(explicitUrl)
+                : new Uri($"http://{serviceName}");
 
-            client.Timeout = TimeSpan.FromSeconds(90);
+            // HttpClient.Timeout must not be set when using resilience handlers —
+            // it fires as TaskCanceledException that bypasses the resilience pipeline.
+            // TotalRequestTimeout in the resilience options acts as the outer bound instead.
+            client.Timeout = Timeout.InfiniteTimeSpan;
             configureClient?.Invoke(client);
         })
         .AddHttpMessageHandler<UserContextHandler>()
         .AddServiceDiscovery()
-        .AddStandardResilienceHandler(options =>
-        {
-            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(120);
-            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(300);
-            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(180);
-            options.Retry.MaxRetryAttempts = 3;
-        });
+        .AddStandardResilienceHandler(ConfigureStandardResilience);
     }
-
-    /// <summary>
-    /// Registers a typed HTTP client for a BFF service with user context forwarding,
-    /// service discovery, and standard resilience.
-    /// </summary>
 
     /// <typeparam name="TClient">The typed HTTP client class.</typeparam>
     /// <param name="builder">The host application builder.</param>
@@ -65,22 +66,55 @@ public static class BffHttpClientExtensions
         {
             var config = sp.GetRequiredService<IConfiguration>();
             var explicitUrl = config[$"Services:{serviceName}:BaseUrl"];
-            if (!string.IsNullOrEmpty(explicitUrl))
-                client.BaseAddress = new Uri(explicitUrl);
-            else
-                client.BaseAddress = new Uri($"http://{serviceName}");
+            client.BaseAddress = !string.IsNullOrEmpty(explicitUrl)
+                ? new Uri(explicitUrl)
+                : new Uri($"http://{serviceName}");
 
-            client.Timeout = TimeSpan.FromSeconds(90);
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            configureClient?.Invoke(client);
+        })
+        .AddHttpMessageHandler<UserContextHandler>()
+        .AddServiceDiscovery()
+        .AddStandardResilienceHandler(ConfigureStandardResilience);
+    }
+
+    /// <summary>
+    /// Registers a typed HTTP client for a long-running BFF service (no retries, high timeouts).
+    /// Use this for services that run expensive, non-idempotent operations like DFM analysis.
+    /// </summary>
+    public static void AddBffLongRunningServiceClient<TClient>(
+        this IHostApplicationBuilder builder,
+        string serviceName,
+        TimeSpan? attemptTimeout = null,
+        Action<HttpClient>? configureClient = null)
+        where TClient : class
+    {
+        var perAttempt = attemptTimeout ?? TimeSpan.FromSeconds(300);
+
+        // SamplingDuration must be ≥ 2 × AttemptTimeout (framework validation constraint).
+        var samplingDuration = perAttempt + perAttempt;
+        // TotalRequestTimeout must comfortably cover 1 retry (minimum MaxRetryAttempts = 1).
+        var totalTimeout = perAttempt + perAttempt + TimeSpan.FromSeconds(30);
+
+        builder.Services.AddHttpClient<TClient>(serviceName, (sp, client) =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+            var explicitUrl = config[$"Services:{serviceName}:BaseUrl"];
+            client.BaseAddress = !string.IsNullOrEmpty(explicitUrl)
+                ? new Uri(explicitUrl)
+                : new Uri($"http://{serviceName}");
+
+            client.Timeout = Timeout.InfiniteTimeSpan;
             configureClient?.Invoke(client);
         })
         .AddHttpMessageHandler<UserContextHandler>()
         .AddServiceDiscovery()
         .AddStandardResilienceHandler(options =>
         {
-            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(120);
-            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(300);
-            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(180);
-            options.Retry.MaxRetryAttempts = 3;
+            options.AttemptTimeout.Timeout          = perAttempt;
+            options.TotalRequestTimeout.Timeout     = totalTimeout;
+            options.Retry.MaxRetryAttempts          = 1;  // framework min is 1; expensive ops rarely benefit from retrying
+            options.CircuitBreaker.SamplingDuration = samplingDuration;
         });
     }
 }

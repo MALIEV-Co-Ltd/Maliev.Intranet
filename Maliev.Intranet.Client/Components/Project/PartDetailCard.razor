@@ -9,7 +9,41 @@
 @inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
 
 <div class="pdc-container">
-    <div class="pdc-viewer-wrap pdc-polkadot">
+    @* ── Body Selection Panel (multi-body files only) ──────────────────────────────────── *@
+    @if (Part.BodyCount > 1 && Part.Bodies.Count > 0)
+    {
+        <div class="pdc-body-panel">
+            <div class="pdc-body-header">
+                <MudText Typo="Typo.subtitle2" Class="fw-bold">Bodies (@Part.BodyCount)</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Click to select</MudText>
+            </div>
+            <div class="pdc-body-list">
+                @foreach (var body in Part.Bodies)
+                {
+                    <div class="pdc-body-item @(Part.SelectedBodyIndex == body.Index ? "pdc-body-item--selected" : "")"
+                         @onclick="@(() => SelectBodyAsync(body.Index))">
+                        <div class="pdc-body-color" style="background-color: @(body.ColorHex ?? "#888");"></div>
+                        <div class="pdc-body-info">
+                            <MudText Typo="Typo.body2" Class="pdc-body-name">@body.Name</MudText>
+                            @if (body.VolumeCm3.HasValue)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@body.VolumeCm3.Value:F2 cm³</MudText>
+                            }
+                        </div>
+                        @if (Part.SelectedBodyIndex == body.Index)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                                     Size="Size.Small"
+                                     Color="Color.Primary"
+                                     Class="pdc-body-check" />
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="pdc-viewer-wrap pdc-polkadot @(Part.BodyCount > 1 ? "pdc-viewer-wrap--with-bodies" : "")">
         @* Thumbnail area *@
         <div class="pdc-thumb-area">
 
@@ -22,7 +56,8 @@
                         <ModelViewer @ref="_modelViewer"
                                      ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
                                      KnownDimensions="@Part.Dimensions"
-                                     OnLoadFailed="HandleViewerLoadFailed" />
+                                     OnLoadFailed="HandleViewerLoadFailed"
+                                     OnBodyPicked="HandleBodyPickedAsync" />
                     }
                     else if (_viewerLoadFailed)
                     {
@@ -81,7 +116,7 @@
             <DfmOverlayPanel @ref="_dfmPanel"
                              DfmIssues="@_dfmIssues"
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
-                             Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged)"
+                             Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged && !string.IsNullOrEmpty(Part.ProcessCode))"
                              TimedOut="@Part.DfmAnalysisTimedOut"
                              ErrorMessage="@(Part.DfmAnalysisTimedOut ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
                              AllClear="@(_dfmIssues.Count == 0 && Part.DfmReport != null && !Part.DfmAcknowledged && !string.IsNullOrEmpty(Part.ProcessCode))"
@@ -205,6 +240,83 @@
         height: 100%;
         color: var(--mud-palette-text-disabled);
     }
+
+    /* ── Body Selection Panel ─────────────────────────────────────────────────────────── */
+    .pdc-body-panel {
+        width: 280px;
+        background: var(--mud-palette-surface);
+        border-left: 1px solid var(--mud-palette-lines-default);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .pdc-body-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .pdc-body-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .pdc-body-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        border: 2px solid transparent;
+    }
+    .pdc-body-item:hover {
+        background: var(--mud-palette-action-hover);
+    }
+    .pdc-body-item--selected {
+        background: var(--mud-palette-primary-lighten) !important;
+        border-color: var(--mud-palette-primary) !important;
+    }
+    .pdc-body-color {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        border: 1px solid var(--mud-palette-lines-default);
+        flex-shrink: 0;
+    }
+    .pdc-body-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .pdc-body-name {
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .pdc-body-check {
+        flex-shrink: 0;
+    }
+    .pdc-viewer-wrap--with-bodies {
+        flex-direction: row;
+    }
+    @@media (max-width: 900px) {
+        .pdc-body-panel {
+            width: 100%;
+            height: 200px;
+            border-left: none;
+            border-top: 1px solid var(--mud-palette-lines-default);
+        }
+        .pdc-viewer-wrap--with-bodies {
+            flex-direction: column;
+        }
+    }
 </style>
 
 @code {
@@ -239,6 +351,7 @@
     private const int DfmTimeoutSeconds = 600;
     private ModelViewer? _modelViewer;
     private DfmOverlayPanel? _dfmPanel;
+    private bool _multiBodyInitialized;
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
@@ -265,6 +378,12 @@
         {
             _viewerLoadFailed = false;
             _viewerErrorMessage = null;
+
+            // Initialize multi-body viewer when bodies are available
+            if (Part.BodyCount > 1 && Part.Bodies.Count > 0 && !_multiBodyInitialized)
+            {
+                _ = InitializeMultiBodyViewerAsync();
+            }
         }
 
         // DFM watchdog: arm as soon as upload completes (StoragePath assigned), not only when
@@ -359,16 +478,30 @@
     {
         _viewerLoadFailed = true;
         _viewerErrorMessage = errorMessage;
-        Snackbar.Add($"3D preview unavailable: {errorMessage}", Severity.Warning);
 
-        if (!string.IsNullOrEmpty(Part.GlbStoragePath) && OnRequestFreshViewerUrl.HasDelegate)
+        // BabylonJS internal errors (TypeError, WebGL issues) are NOT retryable -
+        // retrying just creates an infinite flash loop. Only retry for recoverable errors.
+        var isRetryable = errorMessage != null &&
+            !errorMessage.Contains("TypeError") &&
+            !errorMessage.Contains("backbuffer") &&
+            !errorMessage.Contains("WebGL");
+
+        if (isRetryable)
         {
-            await OnRequestFreshViewerUrl.InvokeAsync(Part.GlbStoragePath);
+            var storagePath = Part.GlbStoragePath ?? Part.StoragePath;
+            if (!string.IsNullOrEmpty(storagePath) && OnRequestFreshViewerUrl.HasDelegate)
+            {
+                await OnRequestFreshViewerUrl.InvokeAsync(storagePath);
+                _viewerLoadFailed = false;
+                _viewerErrorMessage = null;
+            }
         }
         else
         {
-            await InvokeAsync(StateHasChanged);
+            Snackbar.Add($"3D preview unavailable: {errorMessage}", Severity.Warning);
         }
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private List<DfmIssue> BuildDfmIssues()
@@ -440,6 +573,16 @@
         var isActive = _dfmPanel?._activeOverlays.Contains(issue.OverlayKey) ?? false;
         await _modelViewer.ToggleDfmOverlayAsync(issue.OverlayKey, issue.OverlayUrl, isActive);
 
+        // Co-toggle the support-tower overlay whenever an overhang overlay is toggled.
+        // Support key is the same key with "_support" appended to the "__overhang" suffix.
+        if (issue.Category == "overhang" && issue.OverlayKey.EndsWith("__overhang"))
+        {
+            var supportKey = issue.OverlayKey + "_support";
+            var supportUrl = Part.OverlayUrls?.GetValueOrDefault(supportKey);
+            if (supportUrl != null)
+                await _modelViewer.ToggleDfmOverlayAsync(supportKey, supportUrl, isActive);
+        }
+
         // Show/hide the grid floor when overhang overlay is toggled
         if (issue.Category == "overhang")
         {
@@ -499,5 +642,65 @@
         }
 
         return issues;
+    }
+
+    /// <summary>
+    /// Initializes multi-body viewer functionality when bodies are available.
+    /// </summary>
+    private async Task InitializeMultiBodyViewerAsync()
+    {
+        if (_modelViewer == null || Part.Bodies.Count == 0)
+            return;
+
+        try
+        {
+            // Convert bodies to the format expected by ModelViewer
+            var bodyViewModels = Part.Bodies.Select(b =>
+                new ModelViewer.BodyViewModel(b.Index, b.Name, b.VolumeCm3, b.ColorHex)).ToList();
+
+            // Assign colors to all bodies
+            await _modelViewer.SetBodiesAsync(bodyViewModels);
+
+            // Enable click-to-select functionality
+            await _modelViewer.EnableBodyPickingAsync();
+
+            _multiBodyInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to initialize multi-body viewer: {ex.Message}", Severity.Error);
+        }
+    }
+
+    /// <summary>
+    /// Handles body selection from the body list panel.
+    /// </summary>
+    private async Task SelectBodyAsync(int bodyIndex)
+    {
+        // Update selected state in the view model
+        Part.SelectedBodyIndex = Part.SelectedBodyIndex == bodyIndex ? null : bodyIndex;
+
+        // Update the viewer to highlight the selected body
+        if (_modelViewer != null)
+        {
+            await _modelViewer.SelectBodyAsync(Part.SelectedBodyIndex);
+        }
+
+        // Notify parent of part state change
+        await OnPartChanged.InvokeAsync(Part);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Handles body picking callback from the 3D viewer.
+    /// Called by ModelViewer when user clicks on a body in the 3D scene.
+    /// </summary>
+    private async Task HandleBodyPickedAsync(int? bodyIndex)
+    {
+        Part.SelectedBodyIndex = bodyIndex;
+
+        // Notify parent of part state change
+        await OnPartChanged.InvokeAsync(Part);
+        await InvokeAsync(StateHasChanged);
     }
 }

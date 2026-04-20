@@ -143,21 +143,13 @@
 
     private async Task<IEnumerable<OrderSummaryDto>> SearchOrders(string value, CancellationToken cancellationToken)
     {
-        // TODO: Implement search in OrdersController/Client. For now fetching paged.
-        // Or if API supports search param, use it.
-        // Assuming GetOrdersAsync(page: 1) returns recent orders.
-        // In real app, we need a search endpoint.
         try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>($"api/orders?page=1", cancellationToken);
-            var items = response?.Data ?? Enumerable.Empty<OrderSummaryDto>();
-            
+            var url = "api/orders?page=1";
             if (!string.IsNullOrWhiteSpace(value))
-            {
-                items = items.Where(o => o.OrderNumber.Contains(value, StringComparison.OrdinalIgnoreCase) || 
-                                         o.CustomerName.Contains(value, StringComparison.OrdinalIgnoreCase));
-            }
-            return items;
+                url += $"&search={Uri.EscapeDataString(value)}";
+            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>(url, cancellationToken);
+            return response?.Data ?? Enumerable.Empty<OrderSummaryDto>();
         }
         catch
         {

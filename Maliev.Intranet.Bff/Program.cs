@@ -358,6 +358,9 @@ try
     builder.AddBffServiceClient<ProjectServiceClient>("ProjectService");
     builder.AddBffServiceClient<JobServiceClient>("JobService");
     builder.AddBffServiceClient<CurrencyServiceClient>("CurrencyService");
+    // GeometryService runs DFM analysis + overlay generation — long-running, non-retryable.
+    builder.AddBffLongRunningServiceClient<GeometryServiceClient>("GeometryService",
+        attemptTimeout: TimeSpan.FromSeconds(300));
 
     // Named HTTP client with service account authentication for reference data
     builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>
@@ -433,7 +436,15 @@ try
     builder.Services.AddHttpClient("BffInternal")
     .AddHttpMessageHandler<Maliev.Intranet.Bff.Handlers.CookieForwardingHandler>()
     .AddServiceDiscovery()
-    .AddStandardResilienceHandler();
+    .AddStandardResilienceHandler(options =>
+    {
+        // DFM analysis takes 10–30 s — the default 10 s AttemptTimeout triggers spurious retries.
+        // 30 s covers typical workloads; for longer analyses the retry + cache hit handles recovery.
+        options.AttemptTimeout.Timeout          = TimeSpan.FromSeconds(30);
+        options.TotalRequestTimeout.Timeout     = TimeSpan.FromSeconds(150);
+        options.Retry.MaxRetryAttempts          = 3;
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(90); // ≥ 2 × AttemptTimeout
+    });
 
     builder.Services.AddScoped(sp =>
     {

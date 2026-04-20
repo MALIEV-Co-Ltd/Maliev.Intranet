@@ -139,6 +139,30 @@ public class PartViewModel
     /// </summary>
     public int? BodyCount { get; set; }
 
+    /// <summary>Per-body metadata for multi-body files. Populated from SignalR events.</summary>
+    public List<BodyInfo> Bodies { get; set; } = [];
+
+    /// <summary>Zero-based index of the currently selected body. Null when no body is selected.</summary>
+    public int? SelectedBodyIndex { get; set; }
+
+    /// <summary>
+    /// Per-body metadata for multi-body CAD files. Matches SignalRBodyInfo structure from BFF.
+    /// </summary>
+    /// <param name="Index">Zero-based body index.</param>
+    /// <param name="Name">Stable body name from glTF node or generated "Body_NN" format.</param>
+    /// <param name="VolumeCm3">Volume of this body in cm³ (null if not computed).</param>
+    /// <param name="BboxMin">Minimum XYZ coordinates in mm.</param>
+    /// <param name="BboxMax">Maximum XYZ coordinates in mm.</param>
+    /// <param name="ColorHex">Hex color code assigned by viewer (e.g. "#4488CC").</param>
+    public record BodyInfo(
+        int Index,
+        string Name,
+        double? VolumeCm3,
+        double[] BboxMin,
+        double[] BboxMax,
+        string? ColorHex
+    );
+
     /// <summary>
     /// Resolves <see cref="DfmReport"/> from the per-process DFM report properties
     /// based on the currently selected <see cref="ProcessCode"/>.
@@ -260,6 +284,64 @@ public class PartViewModel
     public bool IsFullyConfigured =>
         ProcessId.HasValue && MaterialId.HasValue && FileId != Guid.Empty && Error == null;
 
+    /// <summary>
+    /// True when this part has DFM issues that should be surfaced to the user.
+    /// Mirrors the logic from PartDetailCard.BuildDfmIssues to ensure consistency
+    /// between the mini-card thumbnail and the detail overlay panel.
+    /// </summary>
+    /// <remarks>
+    /// Process-agnostic mesh issues (non-manifold, multi-body without selection) always surface.
+    /// Process-specific issues (thin walls, overhangs, etc.) only surface when a process is selected.
+    /// This prevents the mini-card from showing a warning before the user picks a manufacturing process.
+    /// </remarks>
+    public bool HasProcessRelevantDfmIssues
+    {
+        get
+        {
+            // Process-agnostic mesh issues — mirror BuildGeneralMeshIssues.
+            if (IsManifold == false) return true;
+            if (BodyCount is > 1 && SelectedBodyIndex is null) return true;
+
+            // Process-specific issues — only when a process is chosen.
+            if (string.IsNullOrEmpty(ProcessCode)) return false;
+            var report = DfmReport;
+            if (report is null) return false;
+            return ReportHasAnyIssue(report);
+        }
+    }
+
+    /// <summary>
+    /// Checks whether a DFM report payload contains any issues.
+    /// Mirrors the logic from PartDetailCard.GetDfmIssueDetailSummary.
+    /// </summary>
+    private static bool ReportHasAnyIssue(object? dfmReport)
+    {
+        if (dfmReport == null) return false;
+
+        return dfmReport switch
+        {
+            FdmDfmReportPayload fdm =>
+                fdm.ThinWallCount > 0 ||
+                fdm.OverhangFaceCount > 0 ||
+                fdm.SmallDetailCount > 0,
+
+            SlaDfmReportPayload sla =>
+                sla.ThinWallCount > 0 ||
+                sla.ResinTrappingRisk ||
+                sla.SuctionRisk ||
+                (sla.HollowRegions?.Count ?? 0) > 0,
+
+            CncDfmReportPayload cnc =>
+                cnc.SharpCornerCount > 0 ||
+                cnc.HasUndercuts ||
+                (cnc.HasDrillHoles && cnc.DrillHoleCount > 0) ||
+                cnc.RequiresEdm ||
+                cnc.RequiresGrinding,
+
+            _ => false
+        };
+    }
+
     /// <summary>Maps this view model to a <see cref="DraftPartState"/> for session storage persistence.</summary>
     public DraftPartState ToDraftPartState() => new()
     {
@@ -286,6 +368,8 @@ public class PartViewModel
         ThumbnailSmallGcsPath = ThumbnailSmallGcsPath,
         ThumbnailLargeGcsPath = ThumbnailLargeGcsPath,
         GlbStoragePath = GlbStoragePath,
+        GlbSignedUrl = GlbSignedUrl,
+        ViewerUrl = ViewerUrl,
         DrawingFiles = DrawingFiles,
         SupplementaryFiles = SupplementaryFiles,
         RoughnessCode = RoughnessCode,
@@ -308,6 +392,9 @@ public class PartViewModel
         SlaDfmReportJson = SlaDfmReport is SlaDfmReportPayload sla ? JsonSerializer.Serialize(sla) : null,
         CncDfmReportJson = CncDfmReport is CncDfmReportPayload cnc ? JsonSerializer.Serialize(cnc) : null,
         OverlayPaths = OverlayPaths,
+        BodyCount = BodyCount,
+        BodiesJson = Bodies.Count > 0 ? JsonSerializer.Serialize(Bodies) : null,
+        SelectedBodyIndex = SelectedBodyIndex,
     };
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
@@ -338,6 +425,8 @@ public class PartViewModel
             ThumbnailSmallGcsPath = s.ThumbnailSmallGcsPath,
             ThumbnailLargeGcsPath = s.ThumbnailLargeGcsPath,
             GlbStoragePath = s.GlbStoragePath,
+            GlbSignedUrl = s.GlbSignedUrl,
+            ViewerUrl = s.ViewerUrl,
             DrawingFiles = s.DrawingFiles,
             SupplementaryFiles = s.SupplementaryFiles,
             RoughnessCode = s.RoughnessCode,
@@ -360,7 +449,13 @@ public class PartViewModel
             EstimatedUnitPrice = s.EstimatedUnitPrice,
             EstimatedTotalAmount = s.EstimatedTotalAmount,
             OverlayPaths = s.OverlayPaths,
+            BodyCount = s.BodyCount,
+            SelectedBodyIndex = s.SelectedBodyIndex,
         };
+
+        // Deserialise body metadata from JSON
+        if (!string.IsNullOrEmpty(s.BodiesJson))
+            vm.Bodies = JsonSerializer.Deserialize<List<BodyInfo>>(s.BodiesJson) ?? [];
 
         // Deserialise DFM reports from JSON so BuildDfmIssues pattern-matching works correctly.
         // Without this, the reports arrive as JsonElement after catch-up which never matches

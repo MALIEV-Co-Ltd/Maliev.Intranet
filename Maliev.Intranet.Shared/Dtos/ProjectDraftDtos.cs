@@ -162,6 +162,12 @@ public sealed class DraftPartState
     /// <summary>GCS storage path of the GLB artifact. Non-null when analysis produced a 3D model.</summary>
     public string? GlbStoragePath { get; set; }
 
+    /// <summary>Signed URL for GLB viewer. Restores instantly on page reload.</summary>
+    public string? ViewerUrl { get; set; }
+
+    /// <summary>Pre-signed GLB URL delivered by GlbReady SignalR event.</summary>
+    public string? GlbSignedUrl { get; set; }
+
     /// <summary>Technical drawing files attached to this part (PDF, DXF, DWG, images).</summary>
     public List<DraftProjectAttachmentDto> DrawingFiles { get; set; } = [];
 
@@ -213,6 +219,21 @@ public sealed class DraftPartState
     /// Persisted instead of signed URLs so they survive expiry. Re-signed on restore.
     /// </summary>
     public Dictionary<string, string>? OverlayPaths { get; set; }
+
+    /// <summary>
+    /// Number of distinct bodies in the CAD file. Null if not computed or single-body.
+    /// </summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>
+    /// Per-body metadata serialised as JSON. Null if not computed or single-body.
+    /// </summary>
+    public string? BodiesJson { get; set; }
+
+    /// <summary>
+    /// Zero-based index of the currently selected body. Null when no body is selected.
+    /// </summary>
+    public int? SelectedBodyIndex { get; set; }
 }
 
 /// <summary>

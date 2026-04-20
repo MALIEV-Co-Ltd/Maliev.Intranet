@@ -1,7 +1,6 @@
 /* Viewer toolbar — responsive to light/dark mode via MudBlazor palette vars */
 .model-viewer-container ::deep .vp-toolbar-paper {
     border-radius: 12px !important;
-    backdrop-filter: blur(8px) !important;
     background: rgba(255,255,255,0.85) !important;
     gap: 4px;
     border: 1px solid var(--mud-palette-lines-default) !important;

@@ -54,6 +54,8 @@ public class NotificationHub : Hub
 /// <param name="PreviewUrls">Signed URLs for the six rendered preview images (front/back/left/right/top/bottom).</param>
 /// <param name="Failed">True when geometry analysis failed (no preview or dimensions available).</param>
 /// <param name="ErrorCode">Error code from the analysis failure, or null on success.</param>
+/// <param name="BodyCount">Number of bodies in the CAD file (null if single-body or not computed).</param>
+/// <param name="Bodies">Per-body metadata for multi-body files (null if single-body or not computed).</param>
 public record FileAnalysisCompletedPayload(
     string StoragePath,
     string? UploadId,
@@ -62,7 +64,9 @@ public record FileAnalysisCompletedPayload(
     FileAnalysisDimensions? Dimensions,
     FileAnalysisPreviewUrls? PreviewUrls,
     bool Failed,
-    string? ErrorCode);
+    string? ErrorCode,
+    int? BodyCount = null,
+    IReadOnlyList<SignalRBodyInfo>? Bodies = null);
 
 /// <summary>
 /// Bounding-box dimensions from geometry analysis.
@@ -102,7 +106,33 @@ public record FileAnalysisPreviewUrls(
 /// <param name="StoragePath">GCS path of the original file (join key).</param>
 /// <param name="GlbUrl">Signed URL to the GLB file, or null if generation failed.</param>
 /// <param name="Failed">True when GLB generation failed.</param>
-public record GlbReadyPayload(string StoragePath, string? GlbUrl, bool Failed);
+/// <param name="BodyCount">Number of bodies in the CAD file (null if single-body or not computed).</param>
+/// <param name="Bodies">Per-body metadata for multi-body files (null if single-body or not computed).</param>
+public record GlbReadyPayload(
+    string StoragePath,
+    string? GlbUrl,
+    bool Failed,
+    int? BodyCount = null,
+    IReadOnlyList<SignalRBodyInfo>? Bodies = null);
+
+/// <summary>Per-body metadata for multi-body CAD files, sent via SignalR.</summary>
+/// <param name="Index">Zero-based body index.</param>
+/// <param name="Name">Stable body name from glTF node or generated "Body_NN" format.</param>
+/// <param name="VolumeCm3">Volume of this body in cm³ (null if not computed).</param>
+/// <param name="BboxMin">Minimum XYZ coordinates in mm.</param>
+/// <param name="BboxMax">Maximum XYZ coordinates in mm.</param>
+public record SignalRBodyInfo(
+    int Index,
+    string Name,
+    double? VolumeCm3,
+    SignalRBBox BboxMin,
+    SignalRBBox BboxMax);
+
+/// <summary>3D bounding box with XYZ dimensions.</summary>
+/// <param name="X">Width in millimetres.</param>
+/// <param name="Y">Depth in millimetres.</param>
+/// <param name="Z">Height in millimetres.</param>
+public record SignalRBBox(double X, double Y, double Z);
 
 /// <summary>Payload pushed when DFM analysis results are ready for all process types.</summary>
 /// <param name="StoragePath">GCS path of the original file (join key).</param>

@@ -30,7 +30,7 @@ public class OrdersControllerTests
         var response = new PagedResponse<OrderSummaryDto> { Data = new List<OrderSummaryDto>() };
         var controller = new OrdersController(CreateClient(response));
 
-        var result = await controller.Get(null, 1, CancellationToken.None);
+        var result = await controller.Get(null, 1, null, CancellationToken.None);
 
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         Assert.NotNull(okResult.Value);
@@ -43,7 +43,7 @@ public class OrdersControllerTests
         var response = new PagedResponse<OrderSummaryDto>();
         var controller = new OrdersController(CreateClient(response));
 
-        var result = await controller.Get(null, 1, CancellationToken.None);
+        var result = await controller.Get(null, 1, null, CancellationToken.None);
 
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         Assert.IsType<PagedResponse<OrderSummaryDto>>(okResult.Value);

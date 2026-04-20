@@ -60,6 +60,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         draftServiceMock.Setup(s => s.SaveDraftAsync(It.IsAny<DraftProjectState>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
         draftServiceMock.Setup(s => s.ClearDraftAsync(It.IsAny<string?>())).Returns(Task.CompletedTask);
         Services.AddSingleton(draftServiceMock.Object);
+        Services.AddSingleton(new UploadSettings());
         _httpHandler.HandlerFunc = DefaultHandler;
         var client = new HttpClient(_httpHandler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);

@@ -238,10 +238,29 @@ public partial class ProjectNew : IAsyncDisposable
                 TriggerAutoSave();
             }
 
+            // Handle body metadata for multi-body files
+            if (payload.BodyCount.HasValue && payload.BodyCount.Value > 1 && payload.Bodies != null)
+            {
+                part.BodyCount = payload.BodyCount.Value;
+                part.Bodies = payload.Bodies.Select(b => new PartViewModel.BodyInfo(
+                    b.Index,
+                    b.Name,
+                    b.VolumeCm3,
+                    new[] { b.BboxMin.X, b.BboxMin.Y, b.BboxMin.Z },
+                    new[] { b.BboxMax.X, b.BboxMax.Y, b.BboxMax.Z },
+                    null  // Color assigned by viewer
+                )).ToList();
+                TriggerAutoSave();
+            }
+
             if (payload.PreviewUrls != null)
             {
-                part.ThumbnailSmallUrl = payload.PreviewUrls.ThumbnailSmall ?? part.ThumbnailSmallUrl;
-                part.ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge ?? payload.HiResThumbnailUrl;
+                if (!string.IsNullOrEmpty(payload.PreviewUrls.ThumbnailSmall))
+                    part.ThumbnailSmallUrl = payload.PreviewUrls.ThumbnailSmall;
+                if (!string.IsNullOrEmpty(payload.PreviewUrls.ThumbnailLarge))
+                    part.ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge;
+                else if (!string.IsNullOrEmpty(payload.HiResThumbnailUrl))
+                    part.ThumbnailLargeUrl = payload.HiResThumbnailUrl;
                 part.ThumbnailSmallGcsPath = payload.PreviewUrls.ThumbnailSmallGcsPath;
                 part.ThumbnailLargeGcsPath = payload.PreviewUrls.ThumbnailLargeGcsPath;
                 part.AwaitingPreview = false;
@@ -260,7 +279,22 @@ public partial class ProjectNew : IAsyncDisposable
             {
                 part.GlbSignedUrl = payload.GlbUrl;
                 part.GlbStoragePath ??= payload.StoragePath;
-                part.ViewerUrl = payload.GlbUrl;
+                part.ViewerUrl ??= payload.GlbUrl;
+
+                // Handle body metadata for multi-body files
+                if (payload.BodyCount.HasValue && payload.BodyCount.Value > 1 && payload.Bodies != null)
+                {
+                    part.BodyCount = payload.BodyCount.Value;
+                    part.Bodies = payload.Bodies.Select(b => new PartViewModel.BodyInfo(
+                        b.Index,
+                        b.Name,
+                        b.VolumeCm3,
+                        new[] { b.BboxMin.X, b.BboxMin.Y, b.BboxMin.Z },
+                        new[] { b.BboxMax.X, b.BboxMax.Y, b.BboxMax.Z },
+                        null  // Color assigned by viewer
+                    )).ToList();
+                    TriggerAutoSave();
+                }
             }
             await InvokeAsync(StateHasChanged);
         });
@@ -372,6 +406,17 @@ public partial class ProjectNew : IAsyncDisposable
                 continue;
             }
 
+            // Validate file size BEFORE adding to carousel
+            if (file.Size > UploadSettings.ThreeDModelLimit)
+            {
+                var sizeMB = file.Size / (1024.0 * 1024.0);
+                Snackbar.Add(
+                    $"File '{file.Name}' ({sizeMB:F1} MB) exceeds the {UploadSettings.ThreeDModelLimit / (1024.0 * 1024.0):F0} MB limit.",
+                    Severity.Error
+                );
+                continue; // Skip this file, don't add to carousel
+            }
+
             var part = new PartViewModel
             {
                 Name = file.Name,
@@ -400,7 +445,7 @@ public partial class ProjectNew : IAsyncDisposable
             _uploadCallbacks[uploadId] = callbackRef;
 
             using var memoryStream = new MemoryStream();
-            await using var readStream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+            await using var readStream = file.OpenReadStream(maxAllowedSize: UploadSettings.ThreeDModelLimit);
             await readStream.CopyToAsync(memoryStream);
             var fileBytes = memoryStream.ToArray();
 
@@ -463,15 +508,23 @@ public partial class ProjectNew : IAsyncDisposable
 
     private sealed record UploadResult(int Status, string Body);
 
+    // Maximum wall-clock time to wait for DFM analysis before declaring a client-side
+    // timeout. Chosen to exceed the server's Phase 1 (300 s) + Phase 2 (360 s) hard
+    // limits with headroom for network latency and queue time.
+    private const int DfmHardTimeoutMs = 8 * 60 * 1000; // 8 minutes
+
     /// <summary>
     /// Polls <c>analysis-status</c> on a 30 s interval until a terminal state is reached or the
     /// token is cancelled. Handles the case where a SignalR event is missed due to reconnect timing.
     /// The first fetch is delayed by <see cref="CatchUpDelayMs"/> (5 s) to let SignalR deliver first.
+    /// After <see cref="DfmHardTimeoutMs"/> the watchdog declares a client-side timeout so the
+    /// DFM overlay never spins indefinitely regardless of server state.
     /// </summary>
     private async Task StatusWatchdogLoopAsync(PartViewModel part, string storagePath, CancellationToken ct)
     {
         try
         {
+            var started = DateTime.UtcNow;
             await Task.Delay(CatchUpDelayMs, ct);
             while (!ct.IsCancellationRequested)
             {
@@ -484,6 +537,16 @@ public partial class ProjectNew : IAsyncDisposable
                     || (!part.AwaitingPreview && part.StatusText == "Ready")
                     || !_parts.Contains(part))
                     break;
+
+                // Client-side hard timeout: declare failure if the server never sends
+                // a terminal event, so the DFM overlay is never stuck forever.
+                if ((DateTime.UtcNow - started).TotalMilliseconds >= DfmHardTimeoutMs)
+                {
+                    part.DfmAnalysisTimedOut = true;
+                    part.StatusText = DfmStatusMessages.GetStatusText("CLIENT_TIMEOUT");
+                    await InvokeAsync(StateHasChanged);
+                    break;
+                }
 
                 await Task.Delay(StatusPollIntervalMs, ct);
             }
@@ -558,15 +621,17 @@ public partial class ProjectNew : IAsyncDisposable
 
             if (status.PreviewUrls != null)
             {
-                part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall
-                    ?? status.ThumbnailUrl
-                    ?? status.PreviewUrls.ThumbnailLargeUrl
-                    ?? status.HiResThumbnailUrl;
-                part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl
-                    ?? status.HiResThumbnailUrl;
+                // Only update if not empty (preserves existing thumbnail from earlier SignalR event)
+                if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailSmall))
+                    part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall;
+                if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailLargeUrl))
+                    part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl;
+                else if (!string.IsNullOrEmpty(status.HiResThumbnailUrl))
+                    part.ThumbnailLargeUrl = status.HiResThumbnailUrl;
             }
             else if (!string.IsNullOrEmpty(status.ThumbnailUrl))
             {
+                // Legacy single thumbnail - treat as small (256px)
                 part.ThumbnailSmallUrl = status.ThumbnailUrl;
                 part.ThumbnailLargeUrl = status.HiResThumbnailUrl ?? status.ThumbnailUrl;
             }
@@ -681,7 +746,11 @@ public partial class ProjectNew : IAsyncDisposable
     private async Task RequestFreshViewerUrlAsync(string storagePath)
     {
         var part = _parts.FirstOrDefault(p => p.GlbStoragePath == storagePath || p.StoragePath == storagePath);
-        if (part == null) return;
+        if (part == null)
+        {
+            Snackbar.Add("Part not found for URL refresh.", Severity.Warning);
+            return;
+        }
 
         try
         {
@@ -696,11 +765,17 @@ public partial class ProjectNew : IAsyncDisposable
                     part.ViewerUrl = resolvedUrl;
                     part.GlbSignedUrl = resolvedUrl;
                     await InvokeAsync(StateHasChanged);
+                    return;
                 }
+            }
+            
+            if (viewerResp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Snackbar.Add("Session expired. Please refresh the page and log in again.", Severity.Error);
             }
             else
             {
-                Snackbar.Add("Failed to refresh 3D viewer URL. Please try again.", Severity.Warning);
+                Snackbar.Add("Failed to refresh 3D viewer URL. Please refresh the page.", Severity.Warning);
             }
         }
         catch (Exception ex)

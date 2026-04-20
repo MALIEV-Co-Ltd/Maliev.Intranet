@@ -15,12 +15,14 @@ public class OrderServiceClient(HttpClient httpClient)
     /// </summary>
     /// <param name="customerId">Optional customer ID filter.</param>
     /// <param name="page">The page number to retrieve.</param>
+    /// <param name="search">Optional free-text search term matched against order number and customer name.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A paged response containing order summaries.</returns>
-    public async Task<PagedResponse<OrderSummaryDto>?> GetOrdersAsync(Guid? customerId = null, int page = 1, CancellationToken ct = default)
+    public async Task<PagedResponse<OrderSummaryDto>?> GetOrdersAsync(Guid? customerId = null, int page = 1, string? search = null, CancellationToken ct = default)
     {
         var url = $"/order/v1/orders?page={page}";
         if (customerId.HasValue) url += $"&customerId={customerId.Value}";
+        if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search)}";
         return await httpClient.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>(url, ct);
     }
 

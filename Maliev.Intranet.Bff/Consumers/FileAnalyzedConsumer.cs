@@ -83,10 +83,27 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
                     "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}, GlbSignedUrl={HasGlbSignedUrl}, hasDfmReport={HasDfmReport}",
                     gcsStoragePath, payload.GlbStoragePath, !string.IsNullOrEmpty(glbUrl), payload.DfmReport != null);
 
+                // Convert body metadata to SignalR format
+                var bodies = payload.Bodies?.Select(b => new SignalRBodyInfo(
+                    b.Index,
+                    b.Name,
+                    b.VolumeCm3,
+                    new SignalRBBox(
+                        b.BboxMin?.X ?? 0,
+                        b.BboxMin?.Y ?? 0,
+                        b.BboxMin?.Z ?? 0),
+                    new SignalRBBox(
+                        b.BboxMax?.X ?? 0,
+                        b.BboxMax?.Y ?? 0,
+                        b.BboxMax?.Z ?? 0)
+                )).ToList();
+
                 await _hub.Clients.Group($"file:{gcsStoragePath}").SendAsync("GlbReady", new GlbReadyPayload(
                     StoragePath: gcsStoragePath,
                     GlbUrl: glbUrl,
-                    Failed: string.IsNullOrEmpty(glbUrl)
+                    Failed: string.IsNullOrEmpty(glbUrl),
+                    BodyCount: payload.BodyCount,
+                    Bodies: bodies
                 ), context.CancellationToken);
             }
             catch (Exception ex)

@@ -63,6 +63,13 @@ public partial class PartConfigSidebar : ComponentBase
     private readonly Dictionary<Guid, List<BulkPricingTable.BulkTier>> _bulkTiersByPart = new();
     private int _lastQuantity;
 
+    // ── Two-phase DFM analysis state ─────────────────────────────────────
+    private bool _isAnalyzingDfm;
+    private string _analyzingProcessName = string.Empty;
+    private Dictionary<string, DfmAnalysisResponse> _dfmReports = new();
+    /// <summary>Logger for two-phase DFM operations.</summary>
+    [Inject] public ILogger<PartConfigSidebar> Logger { get; set; } = null!;
+
     // ── Computed properties ───────────────────────────────────────────────
 
     private ProcessDto? SelectedProcess =>
@@ -182,14 +189,27 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task OnProcessChanged(ProcessDto? p)
     {
-        if (Part == null) return;
-        Part.ProcessCode = p?.Code;
-        Part.ProcessId = p?.Id;
-        Part.ResolveDfmReport();
-        Part.AvailableMaterials = [];
-        Part.AvailableFinishes = [];
-        Part.AvailableTolerances = [];
-        await OnPartChanged.InvokeAsync(Part);
+        if (Part == null || p == null) return;
+
+        // Store previous process to detect changes
+        var previousProcess = Part.ProcessCode;
+        Part.ProcessCode = p.Code;
+        Part.ProcessId = p.Id;
+
+        // Check if we already have results for this process
+        if (_dfmReports.ContainsKey(p.Code))
+        {
+            Logger?.LogInformation("Using cached DFM results for process {ProcessCode}", p.Code);
+            Part.ResolveDfmReport();
+            Part.AvailableMaterials = [];
+            Part.AvailableFinishes = [];
+            Part.AvailableTolerances = [];
+            await OnPartChanged.InvokeAsync(Part);
+            return;
+        }
+
+        // Trigger two-phase DFM analysis for selected process
+        await AnalyzeProcessForDfm(p);
     }
 
     private async Task OnMaterialChanged(CatalogMaterialDto? m)
@@ -286,6 +306,117 @@ public partial class PartConfigSidebar : ComponentBase
         };
         DialogService.ShowAsync<ScheduleDialogContent>("Planning Schedule", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+    }
+
+    // ── Two-phase DFM analysis ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Analyze the part for a specific manufacturing process using two-phase DFM API
+    /// </summary>
+    private async Task AnalyzeProcessForDfm(ProcessDto process)
+    {
+        if (Part == null || Part.FileId == Guid.Empty)
+        {
+            // No upload ID available, fall back to old behavior
+            Logger?.LogWarning("No upload ID available for two-phase DFM analysis");
+            if (Part != null)
+            {
+                Part.ResolveDfmReport();
+                Part.AvailableMaterials = [];
+                Part.AvailableFinishes = [];
+                Part.AvailableTolerances = [];
+                await OnPartChanged.InvokeAsync(Part);
+            }
+            return;
+        }
+
+        // From here on, Part is guaranteed non-null
+        var part = Part!;
+
+        // Show loading state
+        _isAnalyzingDfm = true;
+        _analyzingProcessName = process.Name;
+        StateHasChanged();
+
+        try
+        {
+            Logger?.LogInformation("Starting DFM analysis for upload {UploadId}, process {ProcessCode}",
+                part.FileId, process.Code);
+
+            // Call BFF endpoint to trigger process-specific DFM analysis
+            var response = await Http.PostAsJsonAsync(
+                $"api/geometry/{part.FileId}/dfm/{process.Code}",
+                new GeometryAnalysisRequest { StoragePath = part.StoragePath }
+            );
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<DfmAnalysisResponse>();
+
+                if (result != null && result.Status == "analysis_complete")
+                {
+                    // Cache results locally so switching back to this process skips re-analysis.
+                    // The DFM overlay panel (populated via SignalR) shows the actual issues to the user.
+                    _dfmReports[process.Code] = result;
+
+                    Logger?.LogInformation("DFM analysis complete for {ProcessCode}: {IssueCount} issues found in {Time:F2}s",
+                        process.Code, result.DfmReport.Issues.Count, result.DfmReport.AnalysisTimeSeconds);
+                }
+                else if (result != null && result.Status == "timeout")
+                {
+                    Logger?.LogWarning("DFM analysis timed out for upload {UploadId}, process {ProcessCode}",
+                        part.FileId, process.Code);
+
+                    part.DfmAnalysisTimedOut = true;
+                    part.AnalysisErrorCode = "GEOMETRY_PHASE2_TIMEOUT";
+                }
+                else
+                {
+                    Logger?.LogError("DFM analysis failed with status {Status}", result?.Status ?? "unknown");
+
+                    part.DfmAnalysisTimedOut = true;
+                    part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+                }
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger?.LogError("DFM analysis HTTP request failed: {StatusCode} - {Error}",
+                    response.StatusCode, errorContent);
+
+                part.DfmAnalysisTimedOut = true;
+                part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The resilience pipeline (BffInternal AttemptTimeout) cancelled the request after retries,
+            // or the user navigated away. The analysis may still complete and arrive via SignalR.
+            Logger?.LogDebug("DFM analysis HTTP request cancelled for upload {UploadId}, process {ProcessCode} — result expected via SignalR",
+                part.FileId, process.Code);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "DFM analysis error for upload {UploadId}, process {ProcessCode}",
+                part.FileId, process.Code);
+
+            part.DfmAnalysisTimedOut = true;
+            part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+        }
+        finally
+        {
+            _isAnalyzingDfm = false;
+            _analyzingProcessName = string.Empty;
+
+            // Update part state
+            part.ResolveDfmReport();
+            part.AvailableMaterials = [];
+            part.AvailableFinishes = [];
+            part.AvailableTolerances = [];
+
+            StateHasChanged();
+            await OnPartChanged.InvokeAsync(part);
+        }
     }
 
 }

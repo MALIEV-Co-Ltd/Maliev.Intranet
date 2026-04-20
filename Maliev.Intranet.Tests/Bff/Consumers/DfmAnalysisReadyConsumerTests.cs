@@ -44,7 +44,8 @@ public class DfmAnalysisReadyConsumerTests
             SlaReport:   null!,
             CncReport:   null!,
             AnalyzedAt:  DateTimeOffset.UtcNow,
-            OverlayPaths: null!);
+            OverlayPaths: null!,
+            BodyCount:   null);
 
         return new DfmAnalysisReadyEvent(
             MessageId:      Guid.NewGuid(),

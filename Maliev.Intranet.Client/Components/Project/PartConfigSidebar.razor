@@ -89,12 +89,96 @@
                            Variant="Variant.Outlined"
                            Margin="Margin.Dense"
                            Label=""
-                           Placeholder="">
+                           Placeholder=""
+                           Disabled="@_isAnalyzingDfm">
                     @foreach (var proc in Processes)
                     {
                         <MudSelectItem T="ProcessDto" Value="@proc">@proc.Name</MudSelectItem>
                     }
                 </MudSelect>
+
+                @* Two-phase DFM: Loading indicator during analysis *@
+                @if (_isAnalyzingDfm)
+                {
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-2" />
+                    <MudText Typo="Typo.caption" Color="Color.Primary" Class="mt-1">
+                        Analyzing @_analyzingProcessName requirements...
+                    </MudText>
+                }
+
+                @* Two-phase DFM: Display DFM results when available *@
+                @if (Part!.FileId != Guid.Empty && _dfmReports.Count > 0 && SelectedProcess != null)
+                {
+                    var selectedProcCode = SelectedProcess.Code;
+                    @if (selectedProcCode != null && _dfmReports.ContainsKey(selectedProcCode))
+                    {
+                        var report = _dfmReports[selectedProcCode].DfmReport;
+                        var issuesBySeverity = report.Issues
+                            .GroupBy(i => i.Severity)
+                            .ToDictionary(g => g.Key, g => g.ToList());
+
+                        @if (issuesBySeverity.ContainsKey("error") || issuesBySeverity.ContainsKey("warning"))
+                        {
+                            <MudPaper Outlined="true" Class="mt-3 pa-2">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                                    DFM Analysis (@selectedProcCode)
+                                </MudText>
+
+                                @if (report.AnalysisTimeSeconds > 0)
+                                {
+                                    <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
+                                        Analyzed in @report.AnalysisTimeSeconds.ToString("F2")s
+                                    </MudText>
+                                }
+
+                                @if (issuesBySeverity.ContainsKey("error"))
+                                {
+                                    @foreach (var issue in issuesBySeverity["error"])
+                                    {
+                                        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">
+                                            <MudText Typo="Typo.body2">
+                                                <strong>@issue.Title</strong>
+                                            </MudText>
+                                            @if (!string.IsNullOrEmpty(issue.Description))
+                                            {
+                                                <MudText Typo="Typo.caption" Class="mt-1">
+                                                    @issue.Description
+                                                </MudText>
+                                            }
+                                        </MudAlert>
+                                    }
+                                }
+
+                                @if (issuesBySeverity.ContainsKey("warning"))
+                                {
+                                    @foreach (var issue in issuesBySeverity["warning"])
+                                    {
+                                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                                            <MudText Typo="Typo.body2">
+                                                <strong>@issue.Title</strong>
+                                            </MudText>
+                                            @if (!string.IsNullOrEmpty(issue.Description))
+                                            {
+                                                <MudText Typo="Typo.caption" Class="mt-1">
+                                                    @issue.Description
+                                                </MudText>
+                                            }
+                                        </MudAlert>
+                                    }
+                                }
+
+                                @if (report.Issues.Count == 0)
+                                {
+                                    <MudAlert Severity="Severity.Success" Dense="true">
+                                        <MudText Typo="Typo.body2">
+                                            No DFM issues found for @SelectedProcess.Name
+                                        </MudText>
+                                    </MudAlert>
+                                }
+                            </MudPaper>
+                        }
+                    }
+                }
             </div>
 
             <div class="pcs-field">

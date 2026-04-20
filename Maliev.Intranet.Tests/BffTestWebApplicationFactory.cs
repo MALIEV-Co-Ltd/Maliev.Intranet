@@ -27,9 +27,9 @@ public class BffTestWebApplicationFactory : WebApplicationFactory<Program>
                 ["Services:AuthService:BaseUrl"] = "http://auth-service",
                 ["Services:CustomerService:BaseUrl"] = "http://customer-service",
                 ["Jwt:SecurityKey"] = "test-security-key-for-integration-tests-min32chars",
-                // In-memory MassTransit for future use when integration tests are re-enabled
-                // Currently skipped due to service discovery and IAM token provider blocking
+                // In-memory MassTransit for integration tests
                 ["MassTransit:UseInMemory"] = "true",
+                ["MASSTRANSIT_INMEMORY"] = "true", // Alternate key checked by extension
                 ["MassTransit:SkipBusWait"] = "true",
             });
         });
