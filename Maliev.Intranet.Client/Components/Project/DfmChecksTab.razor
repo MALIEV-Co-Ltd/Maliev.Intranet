@@ -1,0 +1,338 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Shared.Dtos
+@using Maliev.MessagingContracts.Contracts.Geometry
+@using MudBlazor
+
+@if (string.IsNullOrEmpty(Part.ProcessCode))
+{
+    <div class="dfm-empty-state">
+        <MudIcon Icon="@Icons.Material.Outlined.Science" Color="Color.Default" Size="Size.Large" />
+        <span>Select a manufacturing process to run DFM analysis</span>
+    </div>
+}
+else
+{
+    <div class="dfm-tab-root">
+        <div class="dfm-tab-container">
+        @* ── Header ── *@
+        <div class="dfm-header">
+            <div class="dfm-header-top">
+                <span class="dfm-title">Design for Manufacturability</span>
+                <div class="dfm-badge @(AnalysisFailed ? "dfm-badge--error" : AllPassed ? "dfm-badge--ok" : "dfm-badge--warn")">
+                    <MudIcon Icon="@(AnalysisFailed ? Icons.Material.Filled.Error : AllPassed ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Warning)"
+                             Color="@(AnalysisFailed ? Color.Error : AllPassed ? Color.Success : Color.Warning)"
+                             Size="Size.Small" Class="dfm-badge-icon" />
+                    <span>@(AnalysisFailed ? "Analysis failed" : $"{PassedCount}/{TotalCount} checks passed")</span>
+                </div>
+            </div>
+            <div class="dfm-caption">Automated analysis against shop-floor tooling library. No sign-off required.</div>
+        </div>
+
+        @* ── Checks list ── *@
+        <div class="dfm-checks-list">
+            @if (Part.DfmReport == null && !AnalysisFailed && !string.IsNullOrEmpty(Part.ProcessCode))
+            {
+                @for (var i = 0; i < TotalCount; i++)
+                {
+                    <div class="dfm-check-row--skeleton">
+                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="20px" Height="20px" />
+                        <div style="flex:1;">
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="120px" />
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="200px" />
+                        </div>
+                    </div>
+                }
+            }
+            else if (AnalysisFailed)
+            {
+                <MudAlert Severity="Severity.Error" Class="ma-3">
+                    DFM analysis failed or timed out. Select the process again to retry.
+                </MudAlert>
+            }
+            else
+            {
+                @* Failed checks — expandable *@
+                @if (FailedChecks.Any())
+                {
+                    <MudExpansionPanels MultiExpansion="true" Dense="true" Elevation="0" Class="dfm-expansions">
+                        @foreach (var check in FailedChecks)
+                        {
+                            var detail = GetCheckDetail(check);
+                            <MudExpansionPanel Class="dfm-expansion-panel dfm-expansion-panel--fail">
+                                <TitleContent>
+                                    <div class="dfm-panel-header">
+                                        <MudIcon Icon="@Icons.Material.Filled.Warning"
+                                                 Color="Color.Warning"
+                                                 Size="Size.Small"
+                                                 Style="flex-shrink:0;" />
+                                        <span class="dfm-panel-title">@check.Label</span>
+                                        <span class="dfm-panel-summary">@detail.FailSummary</span>
+                                    </div>
+                                </TitleContent>
+                                <ChildContent>
+                                    <div class="dfm-detail-body">
+                                        <div class="dfm-detail-section">
+                                            <div class="dfm-detail-section-label">Description</div>
+                                            <div class="dfm-detail-desc">@detail.Description</div>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(detail.MeasuredLabel))
+                                        {
+                                            <div class="dfm-detail-section">
+                                                <div class="dfm-detail-section-label">Why it failed</div>
+                                                <div class="dfm-measure-grid">
+                                                    <span class="dfm-measure-label">Detected</span>
+                                                    <span class="dfm-measure-value dfm-measure-value--fail">@detail.MeasuredLabel</span>
+                                                    @if (!string.IsNullOrEmpty(detail.RecommendedLabel))
+                                                    {
+                                                        <span class="dfm-measure-label">Recommended</span>
+                                                        <span class="dfm-measure-value">@detail.RecommendedLabel</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                        @if (detail.Fixes.Count > 0)
+                                        {
+                                            <div class="dfm-detail-section">
+                                                <div class="dfm-detail-section-label">How to fix</div>
+                                                <ul class="dfm-fix-list">
+                                                    @foreach (var fix in detail.Fixes)
+                                                    {
+                                                        <li class="dfm-fix-item">
+                                                            <div class="dfm-fix-bullet"></div>
+                                                            <span>@fix</span>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </div>
+                                        }
+                                    </div>
+                                </ChildContent>
+                            </MudExpansionPanel>
+                        }
+                    </MudExpansionPanels>
+                }
+
+                @* Passed checks — static rows, no expansion *@
+                @foreach (var check in PassedChecks)
+                {
+                    <div class="dfm-pass-row">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                                 Color="Color.Success"
+                                 Size="Size.Small"
+                                 Style="flex-shrink:0;" />
+                        <div class="dfm-pass-text">
+                            <div class="dfm-pass-title">@check.Label</div>
+                            <div class="dfm-pass-desc">@check.PassDescription</div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public PartViewModel Part { get; set; } = null!;
+
+    private record CheckDef(string Category, string Label, string PassDescription);
+
+    private record CheckDetail(
+        string Description,
+        string FailSummary,
+        string? MeasuredLabel,
+        string? RecommendedLabel,
+        List<string> Fixes);
+
+    private static readonly IReadOnlyList<CheckDef> FdmChecks =
+    [
+        new("thin_wall",    "Thin walls",            "All wall thicknesses are within printable limits"),
+        new("overhang",     "Overhangs / supports",   "No overhangs exceed the printable angle limit"),
+        new("small_feature","Small features",         "All fine details are within resolution limits"),
+        new("non_manifold", "Mesh integrity",         "Mesh is manifold (watertight) and printable"),
+        new("multi_body",   "Single body",            "File contains a single printable body"),
+        new("bridge",       "Bridge length",          "Bridge spans are within unsupported printing limits"),
+    ];
+
+    private static readonly IReadOnlyList<CheckDef> CncChecks =
+    [
+        new("internal_radius","Internal radii",      "Inside corners are compatible with standard end mills"),
+        new("undercut",       "Undercuts",            "No undercut features requiring special tooling"),
+        new("drill_hole",     "Drill holes",          "Hole geometry is compatible with standard drill sizes"),
+        new("edm",            "EDM required",         "No complex features requiring EDM"),
+        new("grinding",       "Surface grinding",     "No tight-tolerance surfaces requiring grinding"),
+        new("non_manifold",   "Mesh integrity",       "Mesh is manifold and suitable for CNC"),
+    ];
+
+    private static readonly IReadOnlyList<CheckDef> SlaChecks =
+    [
+        new("thin_wall",     "Thin walls",            "All walls are thick enough for resin printing"),
+        new("escape_hole",   "Resin drainage",        "No enclosed cavities trapping resin"),
+        new("overhang",      "Suction risk",           "No large flat surfaces causing suction during peeling"),
+        new("hollow",        "Hollow regions",         "No hollow regions without drainage holes"),
+        new("non_manifold",  "Mesh integrity",         "Mesh is manifold (watertight) and printable"),
+        new("multi_body",    "Single body",            "File contains a single printable body"),
+    ];
+
+    private IReadOnlyList<CheckDef> Checks => Part.ProcessCode?.ToUpperInvariant() switch
+    {
+        "CNC" or "CNC_MILL" or "CNC_TURN" => CncChecks,
+        "SLA" or "SLA_DLP" or "DLP"       => SlaChecks,
+        _                                  => FdmChecks,
+    };
+
+    private HashSet<string> FailedCategories
+    {
+        get
+        {
+            var cats = new HashSet<string>();
+            if (Part.IsManifold == false) cats.Add("non_manifold");
+            if (Part.BodyCount > 1) cats.Add("multi_body");
+
+            switch (Part.DfmReport)
+            {
+                case FdmDfmReportPayload fdm:
+                    if (fdm.ThinWallCount > 0) cats.Add("thin_wall");
+                    if (fdm.OverhangFaceCount > 0 || fdm.SupportRequired) cats.Add("overhang");
+                    if (fdm.SmallDetailCount > 0) cats.Add("small_feature");
+                    break;
+                case SlaDfmReportPayload sla:
+                    if (sla.ThinWallCount > 0) cats.Add("thin_wall");
+                    if (sla.ResinTrappingRisk) cats.Add("escape_hole");
+                    if (sla.SuctionRisk) cats.Add("overhang");
+                    if (sla.HollowRegions?.Count > 0) cats.Add("hollow");
+                    break;
+                case CncDfmReportPayload cnc:
+                    if (cnc.SharpCornerCount > 0) cats.Add("internal_radius");
+                    if (cnc.HasUndercuts) cats.Add("undercut");
+                    if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0) cats.Add("drill_hole");
+                    if (cnc.RequiresEdm) cats.Add("edm");
+                    if (cnc.RequiresGrinding) cats.Add("grinding");
+                    break;
+            }
+            return cats;
+        }
+    }
+
+    private IEnumerable<CheckDef> FailedChecks =>
+        Checks.Where(ch => FailedCategories.Contains(ch.Category));
+
+    private IEnumerable<CheckDef> PassedChecks =>
+        Checks.Where(ch => !FailedCategories.Contains(ch.Category));
+
+    private int TotalCount => Checks.Count;
+    private int PassedCount => TotalCount - FailedCategories.Count(c => Checks.Any(ch => ch.Category == c));
+    private bool AnalysisFailed => Part.DfmAnalysisTimedOut;
+    private bool AllPassed => !AnalysisFailed && PassedCount == TotalCount;
+
+    private CheckDetail GetCheckDetail(CheckDef check) => check.Category switch
+    {
+        "thin_wall" => BuildThinWallDetail(),
+        "overhang" when Part.ProcessCode?.ToUpperInvariant() is "SLA" or "SLA_DLP" or "DLP" => new CheckDetail(
+            "Large flat horizontal surfaces create a suction force during the peeling step of SLA printing, which can distort or detach the part from the build plate.",
+            "Suction risk on large flats",
+            "Flat surface area at risk", "Add tilt or drainage cutouts",
+            ["Tilt the part 10–15° to reduce peel force", "Add small drainage/relief holes to large flat surfaces", "Discuss orientation with your engineer"]),
+        "overhang" => BuildOverhangDetail(),
+        "small_feature" => new CheckDetail(
+            "Fine details smaller than the printer's minimum feature resolution may not reproduce accurately, resulting in missing or distorted geometry.",
+            GetThinWallFailSummary() ?? "Fine details detected",
+            null, null,
+            ["Increase minimum feature size to ≥ 0.4 mm for FDM", "Consider SLA/SLS for higher resolution", "Simplify small decorative details"]),
+        "non_manifold" => new CheckDetail(
+            "A manifold (watertight) mesh has no holes, duplicate faces, or self-intersections. Non-manifold geometry can cause slicing failures or machining errors.",
+            "Mesh has geometry issues",
+            "Non-manifold edges or holes detected", "Manifold (zero errors)",
+            ["Use mesh repair tools (Meshmixer, Netfabb, or PrusaSlicer)", "Check for intersecting bodies and Boolean them together", "Fill any holes or open edges before export"]),
+        "multi_body" => new CheckDetail(
+            "Most additive processes expect a single contiguous solid body per file. Multiple disconnected bodies may not print correctly or may be costed as separate parts.",
+            $"{Part.BodyCount} bodies found",
+            $"{Part.BodyCount} separate bodies", "1 body",
+            ["Merge all bodies into one solid before export", "Upload each body as a separate part", "Use a Boolean Union operation in your CAD tool"]),
+        "escape_hole" => new CheckDetail(
+            "Enclosed cavities trap liquid resin during SLA printing. If uncured resin is trapped inside the part it can crack the part or cause print failure.",
+            "Enclosed cavities detected",
+            "Resin escape holes missing", "≥ 2 mm drainage holes",
+            ["Add drainage holes (≥ 2 mm diameter) to enclosed cavities", "Orient the part so cavities face downward", "Consider redesigning hollow regions as open pockets"]),
+        "hollow" => new CheckDetail(
+            "Hollow regions inside a resin print can trap liquid resin, leading to internal pressure, cracking, or uncured material affecting structural integrity.",
+            "Hollow regions without drainage",
+            "Hollow regions detected", "Open or drained cavities",
+            ["Add 2 mm drainage holes at the lowest print point", "Fill hollow regions if structural", "Re-orient so drainage is natural during printing"]),
+        "internal_radius" => new CheckDetail(
+            "CNC end mills are cylindrical, so they cannot cut perfectly sharp internal corners. The minimum internal radius equals at least half the tool diameter.",
+            "Sharp corners incompatible with end mills",
+            $"{(Part.DfmReport is CncDfmReportPayload c ? c.SharpCornerCount : 0)} sharp corner(s)", "Radius ≥ tool radius",
+            ["Add fillet radius ≥ 1 mm to all internal corners", "Specify the acceptable corner radius in your drawing", "Use undercut relief (\"dogbone\") cutouts to accommodate tool geometry"]),
+        "undercut" => new CheckDetail(
+            "Undercut features — geometry hidden from a straight cutting path — require special tooling such as T-slot cutters, EDM, or multi-axis strategies.",
+            "Undercut features need special tooling",
+            "Undercuts detected", "Accessible by 3-axis CNC",
+            ["Redesign undercut geometry as open pockets where possible", "Split the part and machine in multiple setups", "Accept EDM or 5-axis machining — it will be reflected in the quote"]),
+        "drill_hole" => new CheckDetail(
+            "Drill holes should align with standard drill bit sizes for reliable, cost-effective machining. Non-standard diameters require custom end-mill plunging.",
+            "Drill holes detected",
+            $"{(Part.DfmReport is CncDfmReportPayload cnc ? cnc.DrillHoleCount : 0)} hole(s) to machine", "Standard drill size preferred",
+            ["Specify hole tolerances on drawing (H7 for fits, free for clearance)", "Align diameters to standard drill sizes where possible", "Add thread callouts if threaded holes are needed"]),
+        "edm" => new CheckDetail(
+            "Electrical Discharge Machining (EDM) is required for very narrow slots, blind cavities, or hard materials that conventional cutting cannot reach.",
+            "EDM required for internal geometry",
+            "EDM-only features detected", "Conventional CNC accessible",
+            ["Widen slots to ≥ 1 mm to allow end-mill access", "Replace blind cavities with through-features where functional", "Accept EDM processing — it will be quoted separately"]),
+        "grinding" => new CheckDetail(
+            "CNC milling leaves a Ra 1.6–3.2 µm surface finish. Tighter tolerances or smoother surfaces (Ra < 0.8 µm) require surface grinding.",
+            "Grinding required for tight tolerances",
+            "Ground surfaces required", "Ra ≤ 0.8 µm or IT6 tolerance",
+            ["Specify tolerances only where functionally necessary", "Use H7/h6 fits rather than tighter unless required", "Accept grinding operation — add to drawing notes"]),
+        "bridge" => new CheckDetail(
+            "FDM can print short unsupported spans (bridges) up to ~50–80 mm depending on material and settings. Longer bridges sag during printing.",
+            "Bridge span may sag without support",
+            "Long bridge span detected", "≤ 50 mm unsupported",
+            ["Add a mid-span support column if the bridge is structural", "Orient the print so the bridge is minimized", "Accept support material under long bridges"]),
+        _ => new CheckDetail(check.PassDescription, "Issue detected", null, null, []),
+    };
+
+    private string? BuildThinWallDetail_FailSummary() =>
+        Part.DfmReport switch
+        {
+            FdmDfmReportPayload fdm => $"{fdm.ThinWallCount} thin region(s)",
+            SlaDfmReportPayload sla => $"{sla.ThinWallCount} thin region(s)",
+            _ => "Thin walls detected"
+        };
+
+    private CheckDetail BuildThinWallDetail()
+    {
+        var processCode = Part.ProcessCode?.ToUpperInvariant() ?? "";
+        var isSla = processCode is "SLA" or "SLA_DLP" or "DLP";
+        return new CheckDetail(
+            isSla
+                ? "Walls thinner than the resin printer's minimum may fail to cure correctly, resulting in fragile or missing features."
+                : "Walls thinner than the FDM minimum may not extrude reliably, causing weak or missing sections in the printed part.",
+            BuildThinWallDetail_FailSummary() ?? "Thin walls detected",
+            BuildThinWallDetail_FailSummary(),
+            isSla ? "≥ 0.5 mm wall thickness" : "≥ 1.2 mm wall thickness",
+            isSla
+                ? ["Increase all wall thicknesses to ≥ 0.5 mm", "Use SLS instead of SLA for thin flexible features", "Add internal ribs for stiffness instead of increasing overall wall thickness"]
+                : ["Increase wall thickness to ≥ 1.2 mm (preferred ≥ 1.5 mm)", "Use a stiffer material to allow thinner walls", "Add ribs or gussets to maintain stiffness with less material"]);
+    }
+
+    private string? GetThinWallFailSummary() =>
+        Part.DfmReport switch
+        {
+            FdmDfmReportPayload fdm => $"{fdm.SmallDetailCount} detail(s) below resolution",
+            _ => null
+        };
+
+    private CheckDetail BuildOverhangDetail()
+    {
+        var fdm = Part.DfmReport as FdmDfmReportPayload;
+        var summary = fdm?.OverhangFaceCount > 0
+            ? $"{fdm.OverhangFaceCount} overhang region(s)"
+            : "Support required";
+        return new CheckDetail(
+            "FDM printers cannot print unsupported material past ~45°. Material beyond this angle needs support structures, which add cost and leave surface marks where removed.",
+            summary,
+            summary, "≤ 45° self-supporting",
+            ["Redesign overhangs to ≤ 45° where possible", "Split the part along the overhang and bond after printing", "Accept support material — it will be quoted and removed"]);
+    }
+}

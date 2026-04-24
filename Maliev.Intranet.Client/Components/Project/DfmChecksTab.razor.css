@@ -1,0 +1,251 @@
+.dfm-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--fq-muted);
+    font-size: 13px;
+    background: var(--fq-bg);
+}
+
+.dfm-tab-root {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--fq-bg);
+    align-items: center;
+}
+
+.dfm-tab-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    max-width: 1100px;
+    padding: 0 16px;
+    overflow: hidden;
+}
+
+.dfm-header {
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid var(--fq-border);
+    background: var(--fq-panel);
+    flex-shrink: 0;
+}
+
+.dfm-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 3px;
+}
+
+.dfm-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--fq-ink);
+}
+
+.dfm-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.dfm-badge--ok {
+    background: var(--fq-ok-bg);
+    color: var(--fq-ok);
+}
+
+.dfm-badge--warn {
+    background: var(--fq-warn-bg);
+    color: var(--fq-warn);
+}
+
+.dfm-badge--error {
+    background: color-mix(in oklch, var(--mud-palette-error) 12%, transparent);
+    color: var(--mud-palette-error);
+}
+
+.dfm-badge-icon {
+    font-size: 12px !important;
+    width: 12px !important;
+    height: 12px !important;
+}
+
+.dfm-caption {
+    font-size: 10.5px;
+    color: var(--fq-muted);
+    line-height: 1.4;
+}
+
+/* ── Checks list ── */
+.dfm-checks-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+/* ── Skeleton rows (loading state) ── */
+.dfm-check-row--skeleton {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+/* ── Expansion panel header ── */
+.dfm-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.dfm-panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fq-ink);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dfm-panel-summary {
+    font-size: 10.5px;
+    color: var(--fq-muted);
+    flex-shrink: 0;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Expansion panel body sections ── */
+.dfm-detail-body {
+    padding: 4px 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dfm-detail-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dfm-detail-section-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--fq-muted-2, var(--fq-muted));
+}
+
+.dfm-detail-desc {
+    font-size: 11.5px;
+    color: var(--fq-ink-2, var(--fq-ink));
+    line-height: 1.5;
+}
+
+/* ── Measured / recommended value table ── */
+.dfm-measure-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    font-size: 11.5px;
+}
+
+.dfm-measure-label {
+    color: var(--fq-muted);
+    font-size: 10.5px;
+    padding-top: 1px;
+}
+
+.dfm-measure-value {
+    color: var(--fq-ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.dfm-measure-value--fail {
+    color: var(--fq-warn);
+    font-weight: 600;
+}
+
+/* ── Fix recommendations list ── */
+.dfm-fix-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.dfm-fix-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--fq-ink-2, var(--fq-ink));
+    line-height: 1.5;
+}
+
+.dfm-fix-bullet {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--mud-palette-primary);
+    flex-shrink: 0;
+    margin-top: 6px;
+}
+
+/* ── Pass row (collapsed, no expansion) ── */
+.dfm-pass-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: var(--fq-panel);
+    border: 1px solid var(--fq-border);
+}
+
+.dfm-pass-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.dfm-pass-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fq-ink);
+}
+
+.dfm-pass-desc {
+    font-size: 10.5px;
+    color: var(--fq-muted);
+    margin-top: 1px;
+}
