@@ -46,7 +46,7 @@ else
             else if (AnalysisFailed)
             {
                 <MudAlert Severity="Severity.Error" Class="ma-3">
-                    DFM analysis failed or timed out. Select the process again to retry.
+                    @DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) Select the process again to retry.
                 </MudAlert>
             }
             else
@@ -223,7 +223,7 @@ else
     private int TotalCount => Checks.Count;
     private int PassedCount => TotalCount - FailedCategories.Count(c => Checks.Any(ch => ch.Category == c));
     private bool AnalysisFailed => Part.DfmAnalysisTimedOut;
-    private bool AllPassed => !AnalysisFailed && PassedCount == TotalCount;
+    private bool AllPassed => !AnalysisFailed && Part.DfmReport != null && PassedCount == TotalCount;
 
     private CheckDetail GetCheckDetail(CheckDef check) => check.Category switch
     {
