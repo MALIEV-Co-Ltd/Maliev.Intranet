@@ -214,9 +214,6 @@
     .topbar-search-input::placeholder { color: var(--fq-muted-2); }
     .topbar-search-input:focus { border-color: var(--mud-palette-primary); }
 
-    /* Ensure currency popover renders above the appbar */
-    .mud-popover-open { z-index: 1400 !important; }
-
     /* Currency autocomplete */
     .topbar-currency-autocomplete {
         min-width: 120px;
@@ -226,7 +223,8 @@
         font-family: 'JetBrains Mono', monospace;
     }
 
-    .topbar-currency-popover { min-width: 220px !important; }
+    /* Scoped z-index for currency popover only */
+    .topbar-currency-popover { min-width: 220px; z-index: 1400 !important; }
     .topbar-currency-popover .mud-list-item-text { white-space: normal; line-height: 1.3; }
 
     .topbar-currency-item { display: flex; flex-direction: column; gap: 1px; padding: 2px 0; }
