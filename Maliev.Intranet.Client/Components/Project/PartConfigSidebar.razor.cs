@@ -43,9 +43,6 @@ public partial class PartConfigSidebar : ComponentBase
     /// </summary>
     [Parameter] public Guid? CustomerId { get; set; }
 
-    /// <summary>The currency symbol for displaying prices (e.g. "฿").</summary>
-    [Parameter] public string CurrencySymbol { get; set; } = "฿";
-
     /// <summary>Callback invoked after any mutation to the part configuration.</summary>
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
 
@@ -64,8 +61,6 @@ public partial class PartConfigSidebar : ComponentBase
     private int _lastQuantity;
 
     // ── Two-phase DFM analysis state ─────────────────────────────────────
-    private bool _isAnalyzingDfm;
-    private string _analyzingProcessName = string.Empty;
     private Dictionary<string, DfmAnalysisResponse> _dfmReports = new();
     /// <summary>Logger for two-phase DFM operations.</summary>
     [Inject] public ILogger<PartConfigSidebar> Logger { get; set; } = null!;
@@ -191,8 +186,6 @@ public partial class PartConfigSidebar : ComponentBase
     {
         if (Part == null || p == null) return;
 
-        // Store previous process to detect changes
-        var previousProcess = Part.ProcessCode;
         Part.ProcessCode = p.Code;
         Part.ProcessId = p.Id;
 
@@ -208,7 +201,13 @@ public partial class PartConfigSidebar : ComponentBase
             return;
         }
 
-        // Trigger two-phase DFM analysis for selected process
+        // Clear options and immediately trigger material loading (don't wait for DFM).
+        Part.AvailableMaterials = [];
+        Part.AvailableFinishes = [];
+        Part.AvailableTolerances = [];
+        await OnPartChanged.InvokeAsync(Part);   // materials load NOW
+
+        // DFM runs after materials are already loading. finally block fires OnPartChanged again with DFM state.
         await AnalyzeProcessForDfm(p);
     }
 
@@ -333,9 +332,7 @@ public partial class PartConfigSidebar : ComponentBase
         // From here on, Part is guaranteed non-null
         var part = Part!;
 
-        // Show loading state
-        _isAnalyzingDfm = true;
-        _analyzingProcessName = process.Name;
+        // Note: AvailableMaterials/Finishes/Tolerances already cleared in OnProcessChanged before this method was awaited
         StateHasChanged();
 
         try
@@ -405,9 +402,6 @@ public partial class PartConfigSidebar : ComponentBase
         }
         finally
         {
-            _isAnalyzingDfm = false;
-            _analyzingProcessName = string.Empty;
-
             // Update part state
             part.ResolveDfmReport();
             part.AvailableMaterials = [];

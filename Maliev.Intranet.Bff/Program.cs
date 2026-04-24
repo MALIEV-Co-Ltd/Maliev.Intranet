@@ -45,6 +45,7 @@ try
     // Add services to the container.
     builder.Services.AddSingleton<BffMetrics>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.LayoutService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.CurrencyService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.BreadcrumbService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.CookieProvider>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
@@ -438,12 +439,12 @@ try
     .AddServiceDiscovery()
     .AddStandardResilienceHandler(options =>
     {
-        // DFM analysis takes 10–30 s — the default 10 s AttemptTimeout triggers spurious retries.
-        // 30 s covers typical workloads; for longer analyses the retry + cache hit handles recovery.
-        options.AttemptTimeout.Timeout          = TimeSpan.FromSeconds(30);
-        options.TotalRequestTimeout.Timeout     = TimeSpan.FromSeconds(150);
-        options.Retry.MaxRetryAttempts          = 3;
-        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(90); // ≥ 2 × AttemptTimeout
+        // DFM analysis takes 30–300 s — a long-running, non-idempotent operation that should not be retried frequently.
+        // 300 s covers typical DFM workloads; GeometryService has its own 300 s timeout for actual processing.
+        options.AttemptTimeout.Timeout          = TimeSpan.FromSeconds(300);
+        options.TotalRequestTimeout.Timeout     = TimeSpan.FromSeconds(630);
+        options.Retry.MaxRetryAttempts          = 1;
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(660); // ≥ 2 × AttemptTimeout
     });
 
     builder.Services.AddScoped(sp =>
