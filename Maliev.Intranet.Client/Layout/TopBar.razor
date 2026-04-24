@@ -1,0 +1,449 @@
+@using MudBlazor
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject LayoutService LayoutService
+@inject CurrencyService CurrencyService
+@implements IDisposable
+
+<header class="topbar-root">
+    @* ── Left: Logo ── *@
+    <div class="topbar-left">
+        <MudImage Src="@LogoUrl" Alt="Maliev" Height="22" Style="cursor: pointer;"
+                  @onclick="@(() => Navigation.NavigateTo("/"))" />
+    </div>
+
+    @* ── Divider ── *@
+    <div class="topbar-logo-divider" />
+
+    @* ── Center: Navigation ── *@
+    <nav class="topbar-nav">
+        <MudNavLink Href="" Match="NavLinkMatch.All">Dashboard</MudNavLink>
+        <MudNavLink Href="sales/projects" Match="NavLinkMatch.Prefix">Projects</MudNavLink>
+        @foreach (var item in _navItems)
+        {
+            <MudNavLink Href="@item.Href" Match="NavLinkMatch.Prefix">@item.Label</MudNavLink>
+        }
+    </nav>
+
+    @* ── Search ── *@
+    <div class="topbar-search">
+        <div class="topbar-search-wrap">
+            <svg class="topbar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="topbar-search-input"
+                   placeholder="Search parts, quotes…"
+                   value="@_searchString"
+                   @oninput="@(e => _searchString = e.Value?.ToString() ?? "")"
+                   @onkeydown="@OnSearchKeyDown" />
+        </div>
+    </div>
+
+    <div style="flex: 1;" />
+
+    @* ── Right: Actions ── *@
+    <div class="topbar-right">
+        @* Currency selector *@
+        <MudAutocomplete T="CurrencyDto"
+                         Value="@_selectedCurrency"
+                         ValueChanged="@SetCurrencyAsync"
+                         SearchFunc="@SearchCurrenciesAsync"
+                         ToStringFunc="@(c => c is null ? "" : $"{c.Code} {c.Symbol}")"
+                         Variant="Variant.Text"
+                         Margin="Margin.None"
+                         Dense="true"
+                         CoerceText="false"
+                         ResetValueOnEmptyText="false"
+                         ShowProgressIndicator="false"
+                         Disabled="@(CurrencyService.Currencies.Count == 0)"
+                         Placeholder="@(CurrencyService.Currencies.Count == 0 ? "…" : CurrencyService.Code)"
+                         Class="topbar-currency-autocomplete"
+                         PopoverClass="topbar-currency-popover"
+                         AdornmentIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                         Adornment="Adornment.End"
+                         AdornmentColor="Color.Default">
+            <ItemTemplate Context="c">
+                <div class="topbar-currency-item">
+                    <span class="fq-mono topbar-currency-code" style="font-weight:@(c.Code == CurrencyService.Code ? "700" : "400")">@c.Code @c.Symbol</span>
+                    <span class="topbar-currency-name">@c.Name</span>
+                </div>
+            </ItemTemplate>
+        </MudAutocomplete>
+
+        @* Theme toggle *@
+        <MudTooltip Text="@GetThemeLabel()" Placement="Placement.Bottom">
+            <MudIconButton Icon="@GetThemeIcon()"
+                           Size="Size.Medium"
+                           OnClick="@OnToggleTheme"
+                           Color="Color.Default" />
+        </MudTooltip>
+
+        @* AI Assistant *@
+        <MudTooltip Text="AI Assistant" Placement="Placement.Bottom">
+            <MudIconButton Icon="@Icons.Material.Outlined.Chat"
+                           Size="Size.Medium"
+                           OnClick="@ToggleChat"
+                           Color="@(ChatDrawerOpen ? Color.Primary : Color.Default)" />
+        </MudTooltip>
+
+        <div class="topbar-divider" />
+
+        @* Profile ── *@
+        <AuthorizeView Context="auth">
+            <Authorized>
+                <MudMenu AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" LockScroll="true">
+                    <ActivatorContent>
+                        <div class="topbar-profile">
+                            <div class="topbar-avatar">
+                                @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
+                                {
+                                    <MudImage Src="@auth.User.FindFirst("picture")?.Value" Alt="Avatar" />
+                                }
+                                else
+                                {
+                                    @GetInitials(auth.User.Identity?.Name)
+                                }
+                            </div>
+                            <div class="topbar-profile-info">
+                                <span class="topbar-profile-name">@(auth.User.Identity?.Name ?? "User")</span>
+                                <span class="topbar-profile-role">@(GetJobTitle(auth.User))</span>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" Color="Color.Default" />
+                        </div>
+                    </ActivatorContent>
+                    <ChildContent>
+                        <MudMenuItem OnClick="@HandleLogout">Logout</MudMenuItem>
+                    </ChildContent>
+                </MudMenu>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+</header>
+
+<style>
+    .topbar-root {
+        height: 52px;
+        border-bottom: 1px solid var(--fq-border);
+        background: var(--fq-panel);
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        gap: 12px;
+        flex-shrink: 0;
+        z-index: 1300;
+    }
+
+    .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .topbar-logo-divider {
+        width: 1px;
+        height: 20px;
+        background: var(--fq-border);
+        margin: 0 4px;
+        flex-shrink: 0;
+    }
+
+    .topbar-nav {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .topbar-nav .mud-nav-link {
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 4px;
+        min-height: unset;
+        white-space: nowrap;
+        color: var(--fq-muted);
+        --mud-nav-link-padding: 0;
+    }
+
+    /* Remove the default icon-gutter left margin MudBlazor adds */
+    .topbar-nav .mud-nav-link-text {
+        margin-left: 0 !important;
+    }
+
+    .topbar-nav .mud-nav-link:hover {
+        background: var(--fq-panel-3);
+        color: var(--fq-ink);
+    }
+
+    .topbar-nav .mud-nav-link.active {
+        background: var(--fq-panel-3);
+        color: var(--fq-ink);
+        font-weight: 600;
+    }
+
+    /* Search */
+    .topbar-search { flex-shrink: 0; }
+
+    .topbar-search-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .topbar-search-icon {
+        position: absolute;
+        left: 9px;
+        color: var(--fq-muted-2);
+        pointer-events: none;
+    }
+
+    .topbar-search-input {
+        width: 240px;
+        height: 32px;
+        padding: 0 10px 0 30px;
+        border: 1px solid var(--fq-border);
+        border-radius: 5px;
+        background: var(--fq-panel-2);
+        font-size: 13px;
+        font-family: inherit;
+        color: var(--fq-ink);
+        outline: none;
+    }
+
+    .topbar-search-input::placeholder { color: var(--fq-muted-2); }
+    .topbar-search-input:focus { border-color: var(--mud-palette-primary); }
+
+    /* Ensure currency popover renders above the appbar */
+    .mud-popover-open { z-index: 1400 !important; }
+
+    /* Currency autocomplete */
+    .topbar-currency-autocomplete {
+        min-width: 120px;
+        width: auto;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .topbar-currency-popover { min-width: 220px !important; }
+    .topbar-currency-popover .mud-list-item-text { white-space: normal; line-height: 1.3; }
+
+    .topbar-currency-item { display: flex; flex-direction: column; gap: 1px; padding: 2px 0; }
+    .topbar-currency-code { font-size: 12px; }
+    .topbar-currency-name { font-size: 11px; color: var(--fq-muted); }
+
+    .topbar-currency-autocomplete .mud-input {
+        border: 1px solid var(--fq-border);
+        border-radius: 5px;
+        background: var(--fq-panel-2);
+        height: 32px;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 0 4px 0 8px;
+    }
+
+    .topbar-currency-autocomplete .mud-input:hover {
+        background: var(--fq-panel-3);
+    }
+
+    .topbar-currency-autocomplete .mud-input-adornment {
+        margin-right: 0;
+    }
+
+    .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .topbar-divider {
+        width: 1px;
+        height: 20px;
+        background: var(--fq-border);
+        margin: 0 4px;
+    }
+
+    .topbar-profile {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 10px 4px 4px;
+        border-radius: 16px;
+        background: var(--fq-panel-3);
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .topbar-profile:hover { background: var(--fq-panel-2); }
+
+    .topbar-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--mud-palette-primary), oklch(0.58 0.17 300));
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 600;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .topbar-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .topbar-profile-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.1;
+    }
+
+    .topbar-profile-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--fq-ink);
+    }
+
+    .topbar-profile-role {
+        font-size: 10px;
+        color: var(--fq-muted-2);
+    }
+
+    @@media (max-width: 960px) {
+        .topbar-nav { display: none; }
+        .topbar-search { display: none; }
+        .topbar-logo-divider { display: none; }
+        .topbar-profile-info { display: none; }
+    }
+</style>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthStateTask { get; set; } = null!;
+
+    [Parameter] public bool ChatDrawerOpen { get; set; }
+    [Parameter] public EventCallback<bool> ChatDrawerOpenChanged { get; set; }
+    [Parameter] public EventCallback OnToggleTheme { get; set; }
+
+    private string _searchString = "";
+
+    private record NavItem(string Label, string Href);
+
+    private readonly List<NavItem> _navItems =
+    [
+        new("Customers", "sales/customers"),
+    ];
+
+    private string LogoUrl => LayoutService.IsDarkMode
+        ? "images/logo-white.svg"
+        : "images/logo.svg";
+
+    private string GetThemeIcon() => LayoutService.CurrentMode switch
+    {
+        ThemeMode.Dark => Icons.Material.Outlined.DarkMode,
+        ThemeMode.Light => Icons.Material.Outlined.LightMode,
+        _ => Icons.Material.Filled.AutoMode
+    };
+
+    private string GetThemeLabel() => LayoutService.CurrentMode switch
+    {
+        ThemeMode.Dark => "Dark Theme",
+        ThemeMode.Light => "Light Theme",
+        _ => "Auto Theme"
+    };
+
+    private CurrencyDto? _selectedCurrency;
+
+    private static readonly string[] PriorityCodes = ["THB", "USD", "EUR", "GBP", "JPY"];
+
+    protected override void OnInitialized()
+    {
+        LayoutService.MajorUpdateOccurred += OnLayoutUpdate;
+        CurrencyService.Changed += OnCurrencyChanged;
+    }
+
+    public void Dispose()
+    {
+        LayoutService.MajorUpdateOccurred -= OnLayoutUpdate;
+        CurrencyService.Changed -= OnCurrencyChanged;
+    }
+
+    private void OnLayoutUpdate(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
+
+    private void OnCurrencyChanged(object? sender, EventArgs e)
+    {
+        _selectedCurrency = CurrencyService.Currencies.FirstOrDefault(c => c.Code == CurrencyService.Code);
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (_selectedCurrency == null && CurrencyService.Currencies.Count > 0)
+            _selectedCurrency = CurrencyService.Currencies.FirstOrDefault(c => c.Code == CurrencyService.Code);
+    }
+
+    private Task<IEnumerable<CurrencyDto>> SearchCurrenciesAsync(string? query, CancellationToken _)
+    {
+        var active = CurrencyService.Currencies.Where(c => c.IsActive).ToList();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            var priority = PriorityCodes
+                .Select(code => active.FirstOrDefault(c => c.Code == code))
+                .Where(c => c != null)
+                .Cast<CurrencyDto>();
+            var rest = active.Where(c => !PriorityCodes.Contains(c.Code));
+            return Task.FromResult(priority.Concat(rest));
+        }
+        var q = query.Trim();
+        var matches = active.Where(c =>
+            c.Code.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+            c.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+            c.Symbol.Contains(q, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(matches);
+    }
+
+    private async Task SetCurrencyAsync(CurrencyDto? c)
+    {
+        if (c == null) return;
+        _selectedCurrency = c;
+        await CurrencyService.SetCurrencyAsync(c);
+    }
+
+    private void ExecuteSearch()
+    {
+        if (!string.IsNullOrWhiteSpace(_searchString))
+            Navigation.NavigateTo($"/sales/customers?search={Uri.EscapeDataString(_searchString)}");
+    }
+
+    private void OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") ExecuteSearch();
+    }
+
+    private async Task ToggleChat() => await ChatDrawerOpenChanged.InvokeAsync(!ChatDrawerOpen);
+
+    private void HandleLogout() => Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
+
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "U";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant();
+        return parts[0].Length >= 2
+            ? $"{parts[0][0]}{parts[0][1]}".ToUpperInvariant()
+            : parts[0][0].ToString().ToUpperInvariant();
+    }
+
+    private static string GetJobTitle(System.Security.Claims.ClaimsPrincipal user)
+    {
+        return user.FindFirst("job_title")?.Value
+            ?? user.FindFirst("title")?.Value
+            ?? user.FindFirst("position")?.Value
+            ?? "Employee";
+    }
+}
