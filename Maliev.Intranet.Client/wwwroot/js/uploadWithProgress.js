@@ -59,3 +59,41 @@ window.uploadWithProgress = function (url, fileBytes, fileName, dotNetHelper) {
         xhr.send(formData);
     });
 };
+
+/**
+ * Uploads multiple files in a single multipart/form-data request with aggregate progress.
+ * @param {string} url - The batch upload endpoint URL.
+ * @param {Array<{bytes: Uint8Array, name: string}>} files - Array of file objects.
+ * @param {object} dotNetHelper - .NET interop reference for progress callbacks.
+ * @returns {Promise<{status: number, body: string}>}
+ */
+window.uploadBatchWithProgress = function (url, files, dotNetHelper) {
+    return new Promise(function (resolve, reject) {
+        var formData = new FormData();
+        for (var i = 0; i < files.length; i++) {
+            var blob = new Blob([files[i].bytes]);
+            formData.append('files', blob, files[i].name);
+        }
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.withCredentials = true;
+
+        xhr.upload.onprogress = function (e) {
+            if (e.lengthComputable) {
+                var pct = Math.round((e.loaded / e.total) * 100);
+                dotNetHelper.invokeMethodAsync('OnUploadProgress', pct);
+            }
+        };
+
+        xhr.onload = function () {
+            resolve({ status: xhr.status, body: xhr.responseText });
+        };
+
+        xhr.onerror = function () {
+            reject('Network error during batch upload');
+        };
+
+        xhr.send(formData);
+    });
+};

@@ -1,5 +1,5 @@
 @page "/sales/projects/new"
-@layout EmptyLayout
+@layout MainLayout
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.Intranet.Client.Components.Shared
@@ -16,121 +16,81 @@
 <div class="pn-root">
     <ErrorBoundary>
         <ChildContent>
-            <ProjectTopBar
-                Title="@_title"
-                OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
-                SelectedCurrency="@_selectedCurrency"
-                Currencies="@_currencies"
-                OnCurrencyChanged="@OnCurrencyChangedAsync"
-                AutoSaving="@_autoSaving"
-                LastSavedAt="@_lastSavedAt"
-                HasCustomerSelected="@(_selectedCustomer != null)"
-                LayoutMode="@_layoutMode"
-                OnLayoutModeChanged="@(m => _layoutMode = m)"
-                OnDuplicate="DuplicateProject" />
-
             <div class="pn-body">
-                <ErrorBoundary>
-                    <ChildContent>
-                        <ProjectLeftPanel
-                            @ref="_leftPanel"
-                            SelectedCustomer="@_selectedCustomer"
-                            ShowCustomerSearch="@_showCustomerSearch"
-                            OnCustomerSelected="OnCustomerSelected"
-                            OnShowSearchChanged="@(v => _showCustomerSearch = v)"
-                            Description="@_description"
-                            OnDescriptionChanged="@(v => { _description = v; ValidateDescription(); TriggerAutoSave(); })"
-                            OnOpenFilePicker="OpenFilePicker"
-                            SearchCustomersFunc="SearchCustomersAsync"
-                            OnProjectClicked="OnRecentProjectClicked"
-                            LoadRecentProjectsFunc="LoadRecentProjectsAsync" />
-                    </ChildContent>
-                    <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Left panel error.</MudAlert></ErrorContent>
-                </ErrorBoundary>
+                @* ── Left: Parts List ─────────────────────────────────────── *@
+                <PartsListPanel
+                    Parts="@_parts"
+                    SelectedIndex="@_selectedPartIndex"
+                    Title="@_title"
+                    OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
+                    OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
+                    AutoSaving="@_autoSaving"
+                    LastSavedAt="@_lastSavedAt"
+                    HasCustomerSelected="@(_selectedCustomer != null)"
+                    OnDuplicate="DuplicateProject"
+                    OnSelectPart="@(i => { _selectedPartIndex = i; StateHasChanged(); })"
+                    OnAddPart="OpenFilePicker"
+                    OnRemovePart="RemovePart"
+                    OnDuplicatePart="DuplicateSinglePart" />
 
+                @* ── Center: Viewer + Detail ─────────────────────────────── *@
                 <div class="pn-center">
-                    @if (_layoutMode == LayoutMode.Configurator)
+                    @if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)
                     {
-                        @if (_parts.Count > 0)
-                        {
-                            <PartCarousel
-                                Parts="@_parts"
-                                SelectedIndex="@_selectedPartIndex"
-                                CurrencyCode="@(_selectedCurrency?.Code ?? "THB")"
-                                ExchangeRate="@_exchangeRate"
-                                OnSelectPart="@(i => { _selectedPartIndex = i; StateHasChanged(); })"
-                                OnRemovePart="RemovePart"
-                                OnAddPart="OpenFilePicker" />
-                        }
-
-                        @if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)
-                        {
-                            <div class="pn-detail-row">
-                                <ErrorBoundary>
-                                    <ChildContent>
-                                        <PartDetailCard
-                                            Part="@_parts[_selectedPartIndex]"
-                                            TempProjectId="@_tempProjectId"
-                                            OnPartChanged="OnPartChanged"
-                                            OnOpenViewer="OpenBabylonViewer"
-                                            OnRequestFreshViewerUrl="RequestFreshViewerUrlAsync" />
-                                    </ChildContent>
-                                    <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Detail panel error.</MudAlert></ErrorContent>
-                                </ErrorBoundary>
-                                <PartConfigSidebar
-                                    Part="@_parts[_selectedPartIndex]"
-                                    Processes="@_processes"
-                                    TempProjectId="@_tempProjectId"
-                                    CustomerId="@_selectedCustomerId"
-                                    OnPartChanged="OnPartChanged"
-                                    CurrencySymbol="@(_selectedCurrency?.Symbol ?? "฿")" />
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="pn-empty-state">
-                                <FileUploadDropzone Icon="@Icons.Material.Outlined.CloudUpload"
-                                                   Label="Drop files here or click to upload"
-                                                   SubLabel="@FileTypes.ThreeDSubLabel"
-                                                   MaxFileSizeLabel="max 100 MB"
-                                                   Class="pn-empty-dropzone"
-                                                   OnClick="OpenFilePicker"
-                                                   OnFilesDropped="OpenFilePicker" />
-                            </div>
-                        }
+                        <div class="pn-detail-row">
+                            <ErrorBoundary>
+                                <ChildContent>
+                                    <PartDetailCard
+                                        Part="@_parts[_selectedPartIndex]"
+                                        TempProjectId="@_tempProjectId"
+                                        OnPartChanged="OnPartChanged"
+                                        OnOpenViewer="OpenBabylonViewer"
+                                        OnRequestFreshViewerUrl="RequestFreshViewerUrlAsync"
+                                        OnRemovePart="RemovePart" />
+                                </ChildContent>
+                                <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Detail panel error.</MudAlert></ErrorContent>
+                            </ErrorBoundary>
+                            <PartConfigSidebar
+                                Part="@_parts[_selectedPartIndex]"
+                                Processes="@_processes"
+                                TempProjectId="@_tempProjectId"
+                                CustomerId="@_selectedCustomerId"
+                                OnPartChanged="OnPartChanged" />
+                        </div>
                     }
                     else
                     {
-                        <div class="pn-list-view">
-                            <PartListView Parts="@_parts"
-                                          Processes="@_processes"
-                                          TempProjectId="@_tempProjectId"
-                                          OnPartActivated="ActivatePartFromList"
-                                          OnRemovePart="RemovePart"
-                                          OnAddPart="OpenFilePicker"
-                                          OnPartChanged="OnPartChanged" />
+                        <div class="pn-empty-state">
+                            <FileUploadDropzone Icon="@Icons.Material.Outlined.CloudUpload"
+                                               Label="Drop files here or click to upload"
+                                               SubLabel="@FileTypes.ThreeDSubLabel"
+                                               MaxFileSizeLabel="max 100 MB"
+                                               Class="pn-empty-dropzone"
+                                               OnClick="OpenFilePicker"
+                                               OnFilesDropped="OpenFilePicker" />
                         </div>
                     }
                 </div>
-
-                <ErrorBoundary>
-                    <ChildContent>
-                        <ProjectQuotePanel
-                            Parts="@_parts"
-                            LeadTimeOptions="@_leadTimeOptions"
-                            SelectedLeadTime="@_selectedLeadTime"
-                            OnLeadTimeChanged="@(async lt => { _selectedLeadTime = lt; TriggerAutoSave(); foreach (var p in _parts) { await TriggerRoutingFetchAsync(p); } })"
-                            SelectedCurrency="@_selectedCurrency"
-                            ExchangeRate="@_exchangeRate"
-                            CanQuote="@CanSubmit"
-                            Saving="@_saving"
-                            OnQuote="CreateProjectAndQuoteAsync"
-                            OnPartActivated="ActivatePartFromList"
-                            SelectedPartIndex="@_selectedPartIndex" />
-                    </ChildContent>
-                    <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Quote panel error.</MudAlert></ErrorContent>
-                </ErrorBoundary>
             </div>
+
+            @* ── Bottom: Quote Summary ───────────────────────────────────── *@
+            <ErrorBoundary>
+                <ChildContent>
+                    <QuoteSummaryBar
+                        SelectedCustomer="@_selectedCustomer"
+                        SearchCustomers="@SearchCustomersAsync"
+                        OnCustomerSelected="@OnCustomerSelected"
+                        Parts="@_parts"
+                        LeadTimeOptions="@_leadTimeOptions"
+                        SelectedLeadTime="@_selectedLeadTime"
+                        OnLeadTimeChanged="@(async lt => { _selectedLeadTime = lt; TriggerAutoSave(); foreach (var p in _parts) { TriggerPricingAsync(p); await TriggerRoutingFetchAsync(p); } })"
+                        CanQuote="@CanSubmit"
+                        Saving="@_saving"
+                        OnQuote="CreateProjectAndQuoteAsync"
+                        OnGeneratePdf="GenerateDraftPdfAsync" />
+                </ChildContent>
+                <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Quote panel error.</MudAlert></ErrorContent>
+            </ErrorBoundary>
         </ChildContent>
         <ErrorContent>
             <MudAlert Severity="Severity.Error" Class="ma-4">An unexpected error occurred. Please refresh.</MudAlert>
@@ -146,86 +106,3 @@
                Hidden="true"
                Style="display:none;" />
 
-<style>
-    .pn-root {
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        overflow: hidden;
-        background: var(--mud-palette-background-grey);
-    }
-    .pn-body {
-        flex: 1;
-        display: flex;
-        overflow: hidden;
-        min-height: 0;
-    }
-    .pn-center {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-        min-height: 0;
-    }
-    .pn-empty-detail {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .pn-empty-state {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-    }
-    /* Hero dropzone — overrides FileUploadDropzone defaults for the empty-state CTA */
-    .pn-empty-dropzone {
-        padding: 60px 40px !important;
-        border-radius: 16px !important;
-        max-width: 600px;
-        width: 100%;
-    }
-    .pn-table-placeholder {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .pn-detail-row {
-        flex: 1;
-        display: flex;
-        overflow: hidden;
-        min-height: 0;
-    }
-    .pn-list-view {
-        flex: 1;
-        overflow-y: auto;
-        padding: 12px;
-    }
-
-    /* ── Tablet / Mobile ─────────────────────────────────────────────── */
-    @@media (max-width: 1200px) {
-        .pn-root {
-            height: auto;
-            min-height: 100dvh;
-            overflow-y: auto;
-        }
-        .pn-body {
-            flex-direction: column;
-            overflow: visible;
-            min-height: unset;
-        }
-        .pn-center {
-            order: 1;
-            overflow: visible;
-            min-height: unset;
-        }
-        .pn-detail-row {
-            flex-direction: column;
-            overflow: visible;
-            min-height: unset;
-        }
-    }
-</style>

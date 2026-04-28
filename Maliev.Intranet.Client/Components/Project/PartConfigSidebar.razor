@@ -2,391 +2,729 @@
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Client.Helpers
+@inject CurrencyService CurrencyService
 
 @if (Part == null)
 {
-    <div class="pcs-sidebar pcs-empty-state">
-        <div class="pcs-empty">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Select a part to configure</MudText>
-        </div>
+    <div class="pcs-empty-state">
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Select a part to configure</MudText>
     </div>
     return;
 }
 
-<div class="pcs-sidebar @(DisplayMode == PartConfigSidebarDisplayMode.Inline ? "pcs-inline" : "")">
-    @if (DisplayMode == PartConfigSidebarDisplayMode.Sidebar)
-    {
+<div class="pcs-root">
     <div class="pcs-header">
-        <MudText Typo="Typo.h6" Class="pcs-part-name">@Part!.Name</MudText>
-        @if (Part!.FileId != Guid.Empty && Part!.Dimensions == null)
-        {
-            <MudSkeleton Width="120px" Height="12px" Class="mb-1" />
-            <MudSkeleton Width="80px" Height="10px" />
-        }
-        else if (Part!.Dimensions != null)
-        {
-            var dims = Part!.Dimensions;
-            <MudText Typo="Typo.caption" Class="pcs-dim">
-                @($"{dims.X:N1} × {dims.Y:N1} × {dims.Z:N1} mm")
-                @if (Part!.VolumeMm3.HasValue)
-                {
-                    <text> · @((Part!.VolumeMm3.Value / 1000.0).ToString("F2")) cm³</text>
-                }
-            </MudText>
-        }
+        <div class="pcs-header-label">Configure</div>
+        <div class="pcs-header-name" title="@Part!.Name">@Part!.Name</div>
+        <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Class="pcs-header-info" />
     </div>
-    }
 
     <div class="pcs-scroll">
-
-        @* ── Section A: Logistics & Pricing ──────────────────────────────── *@
-        <div class="pcs-section">
-            <MudText Typo="Typo.overline" Class="pcs-section-label">Logistics &amp; Pricing</MudText>
-
-            <div class="pcs-qty-row">
-                <div class="pcs-field" style="flex: 1;">
-                    <MudText Typo="Typo.caption" Class="pcs-field-label">Quantity</MudText>
-                    <MudNumericField T="int"
-                                     Value="@Part!.Quantity"
-                                     ValueChanged="@((int qty) => OnQuantityChanged(qty))"
-                                     Min="1"
-                                     Max="999999"
-                                     Immediate="true"
-                                     DebounceInterval="500"
-                                     Variant="Variant.Outlined"
-                                     Margin="Margin.Dense" />
-                </div>
-                <div class="pcs-field pcs-bag-field" style="flex: 2;">
-                    <MudChipSet T="string"
-                                SelectionMode="SelectionMode.ToggleSelection"
-                                CheckMark="true"
-                                Color="Color.Default"
-                                SelectedColor="Color.Primary"
-                                Size="Size.Small"
-                                SelectedValues="@(Part!.BagAndTag ? ["BagAndTag"] : [])"
-                                SelectedValuesChanged="@OnBagAndTagChanged">
-                        <MudChip T="string" Value="@("BagAndTag")">Bag &amp; Tag</MudChip>
-                    </MudChipSet>
-                </div>
+        @* ── Manufacturing Process ─────────────────────────────────────── *@
+        <section class="pcs-section">
+            <div class="pcs-section-header">
+                <span class="pcs-section-title">Manufacturing Process</span>
+            </div>
+            <div class="pcs-process-grid">
+                @foreach (var proc in Processes)
+                {
+                    var active = SelectedProcess?.Code == proc.Code;
+                    <button class="pcs-process-card @(active ? "pcs-process-card--active" : "")"
+                            @onclick="@(() => OnProcessChanged(proc))">
+                        @if (active)
+                        {
+                            <div class="pcs-process-check">
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            </div>
+                        }
+                        <div class="pcs-process-icon">
+                            @((MarkupString)ProcessIconHelper.GetProcessSvg(proc.Code))
+                        </div>
+                        <div class="pcs-process-name">@proc.Name</div>
+                    </button>
+                }
             </div>
 
-            @if (_bulkTiers.Count > 0)
-            {
-                <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" CurrencySymbol="@CurrencySymbol" />
+        </section>
+
+        @* ── Material ─────────────────────────────────────────────────── *@
+        <section class="pcs-section">
+            <div class="pcs-section-header">
+                <span class="pcs-section-title">Material</span>
+                <span class="pcs-section-count">@Part!.AvailableMaterials.Count options</span>
+            </div>
+            <div class="pcs-cards">
+                @foreach (var mat in Part!.AvailableMaterials)
+                {
+                    var active = SelectedMaterial?.Id == mat.Id;
+                    <button class="pcs-mat-card @(active ? "pcs-mat-card--active" : "")"
+                            @onclick="@(() => OnMaterialChanged(mat))">
+                        <div class="pcs-mat-swatch" style="background: @GetMaterialGradient(mat.Code)" />
+                        <div class="pcs-mat-info">
+                            <div class="pcs-mat-name">@mat.Name</div>
+                            @if (!string.IsNullOrEmpty(mat.Description))
+                            {
+                                <div class="pcs-mat-sub">@mat.Description</div>
+                            }
+                        </div>
+                        @if (active)
+                        {
+                            <div class="pcs-card-check">
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            </div>
+                        }
+                    </button>
+                }
+            </div>
+        </section>
+
+        @* ── Surface Finish ───────────────────────────────────────────── *@
+        <section class="pcs-section">
+            <div class="pcs-section-header">
+                <span class="pcs-section-title">Surface Finish</span>
+            </div>
+            <div class="pcs-cards">
+                @foreach (var fin in Part!.AvailableFinishes)
+                {
+                    var active = SelectedFinish?.Id == fin.Id;
+                    <button class="pcs-fin-card @(active ? "pcs-fin-card--active" : "")"
+                            @onclick="@(() => OnFinishChanged(fin))">
+                        <div class="pcs-fin-swatch" style="background: @GetFinishGradient(fin.Code)" />
+                        <div class="pcs-fin-info">
+                            <div class="pcs-fin-name">@fin.Name</div>
+                            @if (!string.IsNullOrEmpty(fin.Description))
+                            {
+                                <div class="pcs-fin-sub">@fin.Description</div>
+                            }
+                        </div>
+                        <div class="pcs-fin-price">@(fin.AdditionalCostPercent > 0 ?
+                                                    $"+{fin.AdditionalCostPercent.ToString("P0")}" : "incl.")</div>
+                            @if (active)
+                            {
+                                <div class="pcs-card-check">
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                </div>
+                            }
+                        </button>
+                    }
+                </div>
+            </section>
+
+            @* ── Tolerance ─────────────────────────────────────────────────── *@
+            <section class="pcs-section">
+                <div class="pcs-section-header">
+                    <span class="pcs-section-title">Tolerance</span>
+                </div>
+                <div class="pcs-tol-grid">
+                    @foreach (var tol in Part!.AvailableTolerances)
+                    {
+                        var active = SelectedTolerance?.Id == tol.Id;
+                        var (tolHead, tolTail) = ToleranceNameHelper.Split(tol.Name);
+                        <button class="pcs-tol-card @(active ? "pcs-tol-card--active" : "")"
+                                @onclick="@(() => OnToleranceChanged(tol))">
+                            <div class="pcs-tol-name">@tolHead</div>
+                            <div class="pcs-tol-grade">@(string.IsNullOrEmpty(tolTail) ? tol.Grade : tolTail)</div>
+                            @if (active)
+                            {
+                                <div class="pcs-tol-check">
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:10px;width:10px;height:10px;" />
+                                </div>
+                            }
+                        </button>
+                    }
+                </div>
+            </section>
+
+            @* ── Quantity ─────────────────────────────────────────────────── *@
+            <section class="pcs-section">
+                <div class="pcs-section-header">
+                    <span class="pcs-section-title">Quantity</span>
+                    @if (_bulkTiers.Count > 0)
+                    {
+                        <span class="pcs-bulk-badge">@(ComputeBulkDiscount())% bulk off</span>
+                    }
+                </div>
+                <div class="pcs-qty-row">
+                    <button class="pcs-qty-btn"
+                            @onclick="@(() => OnQuantityChanged(Math.Max(1, Part!.Quantity - 1)))">−</button>
+                    <input type="number" class="pcs-qty-input" value="@Part!.Quantity" min="1" max="999999"
+                           @onchange="@(e => OnQuantityChanged(int.TryParse(e.Value?.ToString(), out var q) ? Math.Max(1, q) : 1))" />
+                    <button class="pcs-qty-btn" @onclick="@(() => OnQuantityChanged(Part!.Quantity + 1))">+</button>
+                </div>
+                <div class="pcs-qty-presets">
+                    @foreach (var q in new[] { 1, 10, 25, 50, 100 })
+                    {
+                        <button class="pcs-qty-preset @(Part!.Quantity == q ? "pcs-qty-preset--active" : "")"
+                                @onclick="@(() => OnQuantityChanged(q))">@q</button>
+                    }
+                </div>
+                @if (_bulkTiers.Count > 0)
+                {
+                    <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" />
+                }
+            </section>
+        </div>
+
+        @* ── Production Routing ───────────────────────────────────────────── *@
+        @if (Part!.ProductionRouting != null || Part.ProductionRoutingLoading)
+        {
+            <div class="pcs-footer">
+                <div class="pcs-routing-card">
+                    <div class="pcs-routing-header" role="button" tabindex="0"
+                         @onclick="@(() => _routingExpanded = !_routingExpanded)"
+                         @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") _routingExpanded = !_routingExpanded; })">
+                        <div class="pcs-routing-title">
+                            <MudIcon Icon="@Icons.Material.Filled.Route" Size="Size.Small" />
+                            <MudText Typo="Typo.caption" Class="pcs-routing-title-text">Production Routing &amp; Queue</MudText>
+                        </div>
+                        <MudIcon
+                        Icon="@(_routingExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" />
+                    </div>
+                    <div class="pcs-routing-body @(_routingExpanded ? "" : "pcs-collapsed")">
+                        @if (Part!.ProductionRoutingLoading)
+                        {
+                            <MudProgressLinear Indeterminate="true" Class="mb-2" />
+                        }
+                        else if (Part!.ProductionRouting != null)
+                        {
+                            <div class="pcs-routing-row">
+                                <span>@Part!.ProductionRouting?.MachineCode — @Part!.ProductionRouting?.MachineName</span>
+                            </div>
+                            <div class="pcs-routing-row">
+                                <span>Queue Position</span>
+                                <span class="pcs-routing-warn">@Part!.ProductionRouting?.QueueAhead
+                                    job@(Part!.ProductionRouting?.QueueAhead == 1 ? "" : "s") ahead</span>
+                                </div>
+                                <div class="pcs-routing-row">
+                                    <span>Est. Start Date</span>
+                                    <span>@Part!.ProductionRouting?.EstimatedStartDate.ToString("d MMM yyyy")</span>
+                                </div>
+                                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.CalendarMonth"
+                                           OnClick="OpenScheduleDialog" Class="pcs-schedule-btn">
+                                    View Planning Schedule
+                                </MudButton>
+                            }
+                        </div>
+                    </div>
+                </div>
             }
         </div>
 
-        @* ── Section B: Manufacturing ─────────────────────────────────────── *@
-        <div class="pcs-section">
-            <MudText Typo="Typo.overline" Class="pcs-section-label">Manufacturing</MudText>
+        <style>
+            .pcs-root {
+                width: 340px;
+                flex: 0 0 340px;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                overflow: hidden;
+                background: var(--maliev-panel);
+                border-left: 1px solid var(--maliev-border);
+            }
 
-            <div class="pcs-field">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Process</MudText>
-                <MudSelect T="ProcessDto"
-                           Value="@SelectedProcess"
-                           ValueChanged="@((ProcessDto? p) => OnProcessChanged(p))"
-                           ToStringFunc="@(p => p?.Name ?? string.Empty)"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Label=""
-                           Placeholder=""
-                           Disabled="@_isAnalyzingDfm">
-                    @foreach (var proc in Processes)
-                    {
-                        <MudSelectItem T="ProcessDto" Value="@proc">@proc.Name</MudSelectItem>
-                    }
-                </MudSelect>
+            .pcs-empty-state {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                color: var(--maliev-muted);
+            }
 
-                @* Two-phase DFM: Loading indicator during analysis *@
-                @if (_isAnalyzingDfm)
-                {
-                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-2" />
-                    <MudText Typo="Typo.caption" Color="Color.Primary" Class="mt-1">
-                        Analyzing @_analyzingProcessName requirements...
-                    </MudText>
+            .pcs-header {
+                padding: 10px 14px;
+                border-bottom: 1px solid var(--maliev-border);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                background: var(--maliev-panel-3);
+                flex-shrink: 0;
+            }
+
+            .pcs-header-label {
+                font-size: 10.5px;
+                font-weight: 600;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: var(--maliev-muted);
+            }
+
+            .pcs-header-name {
+                flex: 1;
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--maliev-ink);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .pcs-header-info {
+                color: var(--maliev-muted);
+                cursor: pointer;
+            }
+
+            .pcs-scroll {
+                flex: 1;
+                overflow-y: auto;
+                padding: 4px 0;
+                min-height: 0;
+            }
+
+            .pcs-section {
+                padding: 10px 8px;
+                border-bottom: 1px solid var(--maliev-border);
+            }
+
+            .pcs-section-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+                margin-bottom: 8px;
+            }
+
+            .pcs-section-title {
+                font-size: 10.5px;
+                font-weight: 600;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: var(--maliev-muted);
+            }
+
+            .pcs-section-count {
+                font-size: 10.5px;
+                color: var(--maliev-muted);
+                font-family: 'JetBrains Mono', monospace;
+            }
+
+            /* ── Process Grid ──────────────────────────────────────────────────── */
+            .pcs-process-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
+            }
+
+            .pcs-process-card {
+                padding: 10px 6px;
+                border: 1px solid var(--maliev-border);
+                background: var(--maliev-panel);
+                border-radius: 5px;
+                cursor: pointer;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+                font-size: 11px;
+                font-weight: 500;
+                color: var(--maliev-muted);
+                position: relative;
+                transition: all 0.15s;
+                text-align: center;
+            }
+
+            .pcs-process-card:hover {
+                background: var(--maliev-panel-3);
+            }
+
+            .pcs-process-card--active {
+                border-color: var(--mud-palette-primary);
+                background: color-mix(in oklch, var(--mud-palette-primary) 12%, transparent);
+                color: var(--mud-palette-primary);
+                font-weight: 600;
+            }
+
+            .pcs-process-check {
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: var(--mud-palette-primary);
+                display: grid;
+                place-items: center;
+                color: #fff;
+                font-size: 10px;
+                line-height: 1;
+            }
+
+            .pcs-process-check .mud-icon-root {
+                font-size: 10px !important;
+                width: 10px !important;
+                height: 10px !important;
+            }
+
+            .pcs-process-icon {
+                color: inherit;
+            }
+            .pcs-process-icon ::deep svg {
+                width: 24px;
+                height: 24px;
+            }
+
+            .pcs-process-name {
+                line-height: 1.1;
+                text-align: center;
+            }
+
+            /* ── Material / Finish Cards ───────────────────────────────────────── */
+            .pcs-cards {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .pcs-mat-card,
+            .pcs-fin-card {
+                padding: 8px 10px;
+                border: 1px solid var(--maliev-border);
+                background: var(--maliev-panel);
+                border-radius: 5px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                text-align: left;
+                transition: all 0.15s;
+                position: relative;
+            }
+
+            .pcs-mat-card:hover,
+            .pcs-fin-card:hover {
+                background: var(--maliev-panel-3);
+            }
+
+            .pcs-mat-card--active,
+            .pcs-fin-card--active {
+                border-color: var(--mud-palette-primary);
+                background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent);
+            }
+
+            .pcs-mat-swatch,
+            .pcs-fin-swatch {
+                width: 28px;
+                height: 28px;
+                border-radius: 4px;
+                flex-shrink: 0;
+                box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+                border: 1px solid rgba(0, 0, 0, 0.08);
+            }
+
+            .pcs-fin-swatch {
+                width: 22px;
+                height: 22px;
+                border-radius: 3px;
+            }
+
+            .pcs-mat-info,
+            .pcs-fin-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .pcs-mat-name,
+            .pcs-fin-name {
+                font-size: 12.5px;
+                font-weight: 600;
+                color: var(--maliev-ink);
+            }
+
+            .pcs-mat-sub,
+            .pcs-fin-sub {
+                font-size: 10.5px;
+                color: var(--maliev-muted);
+            }
+
+            .pcs-fin-price {
+                font-size: 10.5px;
+                color: var(--maliev-muted);
+                font-family: 'JetBrains Mono', monospace;
+                flex-shrink: 0;
+            }
+
+            .pcs-card-check {
+                color: var(--mud-palette-primary);
+                flex-shrink: 0;
+            }
+
+            /* ── Tolerance Grid ─────────────────────────────────────────────────── */
+            .pcs-tol-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 4px;
+            }
+
+            .pcs-tol-card {
+                padding: 7px 8px;
+                border: 1px solid var(--maliev-border);
+                background: var(--maliev-panel);
+                border-radius: 5px;
+                cursor: pointer;
+                text-align: left;
+                transition: all 0.15s;
+                display: grid;
+                grid-template-columns: 1fr auto;
+                grid-template-rows: auto auto;
+                align-items: center;
+                gap: 0 4px;
+            }
+
+            .pcs-tol-card:hover {
+                background: var(--maliev-panel-3);
+            }
+
+            .pcs-tol-card--active {
+                border-color: var(--mud-palette-primary);
+                background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent);
+            }
+
+            .pcs-tol-name {
+                grid-column: 1;
+                grid-row: 1;
+                font-size: 11.5px;
+                font-weight: 600;
+                color: var(--maliev-ink);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                min-width: 0;
+            }
+
+            .pcs-tol-grade {
+                grid-column: 1;
+                grid-row: 2;
+                font-size: 10px;
+                color: var(--maliev-muted);
+                font-family: 'JetBrains Mono', monospace;
+                margin-top: 1px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                min-width: 0;
+            }
+
+            .pcs-tol-check {
+                grid-column: 2;
+                grid-row: 1 / 3;
+                display: grid;
+                place-items: center;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: var(--mud-palette-primary);
+                color: #fff;
+                align-self: center;
+            }
+
+            /* ── Quantity ─────────────────────────────────────────────────────── */
+            .pcs-bulk-badge {
+                font-size: 10.5px;
+                color: var(--maliev-ok);
+                font-weight: 600;
+            }
+
+            .pcs-qty-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 8px;
+            }
+
+            .pcs-qty-btn {
+                width: 30px;
+                height: 30px;
+                border: 1px solid var(--maliev-border);
+                border-radius: 4px;
+                background: var(--maliev-panel);
+                font-size: 16px;
+                color: var(--maliev-muted);
+                cursor: pointer;
+                font-weight: 500;
+                display: grid;
+                place-items: center;
+            }
+
+            .pcs-qty-btn:hover {
+                background: var(--maliev-panel-3);
+            }
+
+            .pcs-qty-input {
+                flex: 1;
+                height: 30px;
+                border: 1px solid var(--maliev-border);
+                border-radius: 4px;
+                text-align: center;
+                font-size: 14px;
+                font-weight: 600;
+                font-family: 'JetBrains Mono', monospace;
+                color: var(--maliev-ink);
+                background: var(--maliev-panel);
+                outline: none;
+            }
+
+            .pcs-qty-input:focus {
+                border-color: var(--mud-palette-primary);
+            }
+
+            .pcs-qty-presets {
+                display: flex;
+                gap: 4px;
+                margin-bottom: 8px;
+            }
+
+            .pcs-qty-preset {
+                flex: 1;
+                padding: 5px 0;
+                border: 1px solid var(--maliev-border);
+                background: var(--maliev-panel);
+                color: var(--maliev-muted);
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: 600;
+                cursor: pointer;
+                font-family: 'JetBrains Mono', monospace;
+                transition: all 0.15s;
+            }
+
+            .pcs-qty-preset:hover {
+                background: var(--maliev-panel-3);
+                color: var(--maliev-ink);
+            }
+
+            .pcs-qty-preset--active {
+                border-color: var(--mud-palette-primary);
+                background: color-mix(in oklch, var(--mud-palette-primary) 12%, transparent);
+                color: var(--mud-palette-primary);
+            }
+
+            /* ── Production Routing Footer ────────────────────────────────────── */
+            .pcs-footer {
+                border-top: 1px solid var(--maliev-border);
+                background: var(--maliev-panel);
+                flex-shrink: 0;
+            }
+
+            .pcs-routing-card {
+                padding: 0;
+            }
+
+            .pcs-routing-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 14px;
+                cursor: pointer;
+                user-select: none;
+            }
+
+            .pcs-routing-title {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .pcs-routing-title-text {
+                margin: 0;
+            }
+
+            .pcs-routing-body {
+                padding: 0 14px 10px;
+                transition: all 0.2s;
+            }
+
+            .pcs-routing-body.pcs-collapsed {
+                display: none;
+            }
+
+            .pcs-routing-row {
+                display: flex;
+                justify-content: space-between;
+                font-size: 12px;
+                color: var(--maliev-muted);
+                padding: 3px 0;
+            }
+
+            .pcs-routing-warn {
+                color: var(--maliev-warn);
+                font-weight: 600;
+            }
+
+            .pcs-schedule-btn {
+                width: 100%;
+                margin-top: 12px;
+                height: 36px;
+                font-weight: 600;
+                color: var(--mud-palette-primary) !important;
+                background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent) !important;
+                border: 1px dashed var(--mud-palette-primary) !important;
+            }
+
+            @@media (max-width: 1200px) {
+                .pcs-root {
+                    width: 100%;
+                    flex: 1 1 auto;
+                    border-left: none;
+                    border-top: 1px solid var(--maliev-border);
                 }
+            }
+        </style>
 
-                @* Two-phase DFM: Display DFM results when available *@
-                @if (Part!.FileId != Guid.Empty && _dfmReports.Count > 0 && SelectedProcess != null)
-                {
-                    var selectedProcCode = SelectedProcess.Code;
-                    @if (selectedProcCode != null && _dfmReports.ContainsKey(selectedProcCode))
-                    {
-                        var report = _dfmReports[selectedProcCode].DfmReport;
-                        var issuesBySeverity = report.Issues
-                            .GroupBy(i => i.Severity)
-                            .ToDictionary(g => g.Key, g => g.ToList());
-
-                        @if (issuesBySeverity.ContainsKey("error") || issuesBySeverity.ContainsKey("warning"))
-                        {
-                            <MudPaper Outlined="true" Class="mt-3 pa-2">
-                                <MudText Typo="Typo.subtitle2" Class="mb-2">
-                                    DFM Analysis (@selectedProcCode)
-                                </MudText>
-
-                                @if (report.AnalysisTimeSeconds > 0)
-                                {
-                                    <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
-                                        Analyzed in @report.AnalysisTimeSeconds.ToString("F2")s
-                                    </MudText>
-                                }
-
-                                @if (issuesBySeverity.ContainsKey("error"))
-                                {
-                                    @foreach (var issue in issuesBySeverity["error"])
-                                    {
-                                        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">
-                                            <MudText Typo="Typo.body2">
-                                                <strong>@issue.Title</strong>
-                                            </MudText>
-                                            @if (!string.IsNullOrEmpty(issue.Description))
-                                            {
-                                                <MudText Typo="Typo.caption" Class="mt-1">
-                                                    @issue.Description
-                                                </MudText>
-                                            }
-                                        </MudAlert>
-                                    }
-                                }
-
-                                @if (issuesBySeverity.ContainsKey("warning"))
-                                {
-                                    @foreach (var issue in issuesBySeverity["warning"])
-                                    {
-                                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
-                                            <MudText Typo="Typo.body2">
-                                                <strong>@issue.Title</strong>
-                                            </MudText>
-                                            @if (!string.IsNullOrEmpty(issue.Description))
-                                            {
-                                                <MudText Typo="Typo.caption" Class="mt-1">
-                                                    @issue.Description
-                                                </MudText>
-                                            }
-                                        </MudAlert>
-                                    }
-                                }
-
-                                @if (report.Issues.Count == 0)
-                                {
-                                    <MudAlert Severity="Severity.Success" Dense="true">
-                                        <MudText Typo="Typo.body2">
-                                            No DFM issues found for @SelectedProcess.Name
-                                        </MudText>
-                                    </MudAlert>
-                                }
-                            </MudPaper>
-                        }
-                    }
-                }
-            </div>
-
-            <div class="pcs-field">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Material</MudText>
-                <MudSelect T="CatalogMaterialDto"
-                           Value="@SelectedMaterial"
-                           ValueChanged="@((CatalogMaterialDto? m) => OnMaterialChanged(m))"
-                           ToStringFunc="@(m => m?.Name ?? string.Empty)"
-                           Disabled="@(Part!.AvailableMaterials.Count == 0)"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Label=""
-                           Placeholder="">
-                    @foreach (var mat in Part!.AvailableMaterials)
-                    {
-                        <MudSelectItem T="CatalogMaterialDto" Value="@mat">@mat.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-
-            <div class="pcs-field">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Surface Finish</MudText>
-                <MudSelect T="CatalogSurfaceFinishDto"
-                           Value="@SelectedFinish"
-                           ValueChanged="@((CatalogSurfaceFinishDto? f) => OnFinishChanged(f))"
-                           ToStringFunc="@(f => f?.Name ?? string.Empty)"
-                           Disabled="@(Part!.AvailableFinishes.Count == 0)"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Label=""
-                           Placeholder="">
-                    @foreach (var fin in Part!.AvailableFinishes)
-                    {
-                        <MudSelectItem T="CatalogSurfaceFinishDto" Value="@fin">@fin.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-        </div>
-
-        @* ── Section C: Design & Features ────────────────────────────────── *@
-        <div class="pcs-section">
-            <MudText Typo="Typo.overline" Class="pcs-section-label">Design &amp; Features</MudText>
-
-            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-3">
-                <div style="flex: 1;">
-                    <MudText Typo="Typo.caption" Class="pcs-field-label">Tolerance</MudText>
-                    <MudSelect T="CatalogToleranceDto"
-                               Value="@SelectedTolerance"
-                               ValueChanged="@((CatalogToleranceDto? t) => OnToleranceChanged(t))"
-                               ToStringFunc="@(t => t?.Name ?? string.Empty)"
-                               Disabled="@(Part!.AvailableTolerances.Count == 0)"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Label=""
-                               Placeholder="">
-                        @foreach (var tol in Part!.AvailableTolerances)
-                        {
-                            <MudSelectItem T="CatalogToleranceDto" Value="@tol">@tol.Name</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
-                <div style="flex: 1;">
-                    <MudText Typo="Typo.caption" Class="pcs-field-label">Part Marking</MudText>
-                    <MudSelect T="PartMarkingType"
-                               Value="@Part!.MarkingType"
-                               ValueChanged="@((PartMarkingType v) => OnPartMarkingChanged(v))"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Label=""
-                               Placeholder="">
-                        <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.None">None</MudSelectItem>
-                        <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.Laser">Laser Marking</MudSelectItem>
-                        <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.Printing">Silkscreen</MudSelectItem>
-                        <MudSelectItem T="PartMarkingType" Value="@PartMarkingType.Engraving">CNC Engraving</MudSelectItem>
-                    </MudSelect>
-                </div>
-            </MudStack>
-
-            <MudText Typo="Typo.caption" Class="pcs-field-label">Features</MudText>
-            <MudChipSet T="string"
-                        SelectionMode="SelectionMode.MultiSelection"
-                        CheckMark="true"
-                        Color="Color.Default"
-                        SelectedColor="Color.Primary"
-                        Size="Size.Small"
-                        SelectedValues="@_selectedFeatures"
-                        SelectedValuesChanged="@OnFeaturesChanged">
-                <MudChip T="string" Value="@("ThreadedHoles")">Threaded Holes</MudChip>
-                <MudChip T="string" Value="@("Inserts")">Inserts</MudChip>
-            </MudChipSet>
-
-            <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
-                                Icon="@Icons.Material.Outlined.UploadFile"
-                                Label="Upload Revised Model"
-                                SubLabel="Preserves configuration &amp; notes"
-                                MaxFileSizeLabel="max 100 MB"
-                                OnClick="@OnReviseModel"
-                                OnFilesDropped="@OnReviseModel"
-                                Class="mb-3" />
-
-            <DrawingUploadSection PartId="@Part!.FileId"
-                                  ProjectId="@TempProjectId"
-                                  CustomerId="@CustomerId"
-                                  Attachments="@Part!.DrawingFiles"
-                                  AttachmentsChanged="@OnDrawingsChanged" />
-
-            <div class="pcs-field" style="margin-top: 12px;">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Remarks</MudText>
-                <MudTextField T="string"
-                              Value="@Part!.PartNotes"
-                              ValueChanged="@((string? v) => OnNotesChanged(v))"
-                              Lines="3"
-                              MaxLength="1000"
-                              Immediate="true"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Label=""
-                              Placeholder="Add special instructions, notes, or requirements..." />
-            </div>
-        </div>
-
-        @* ── Section D: Quality & Compliance ─────────────────────────────── *@
-        <div class="pcs-section">
-            <MudText Typo="Typo.overline" Class="pcs-section-label">Quality &amp; Compliance</MudText>
-
-            <div class="pcs-field">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Inspection Level</MudText>
-                <MudSelect T="InspectionLevel"
-                           Value="@Part!.InspectionLevel"
-                           ValueChanged="@((InspectionLevel level) => OnInspectionChanged(level))"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Label=""
-                           Placeholder="">
-                    <MudSelectItem T="InspectionLevel" Value="@InspectionLevel.Standard">Standard</MudSelectItem>
-                    <MudSelectItem T="InspectionLevel" Value="@InspectionLevel.Dimensional">Dimensional</MudSelectItem>
-                    <MudSelectItem T="InspectionLevel" Value="@InspectionLevel.FullCmm">Full CMM</MudSelectItem>
-                </MudSelect>
-            </div>
-
-            <div class="pcs-field">
-                <MudText Typo="Typo.caption" Class="pcs-field-label">Certificates</MudText>
-                <MudSelect T="string"
-                           MultiSelection="true"
-                           Disabled="true"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Label=""
-                           Placeholder="Select certificates">
-                    <MudSelectItem T="string" Value="@("ISO9001")" Disabled="true">ISO 9001</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("MaterialCert")" Disabled="true">Material Certificate</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("AS9100")" Disabled="true">AS9100</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("ITAR")" Disabled="true">ITAR / EAR</MudSelectItem>
-                </MudSelect>
-            </div>
-        </div>
-
-    </div>
-
-    @* ── Production Routing (collapsible sticky footer) ───────────── *@
-    @if (Part!.ProductionRouting != null || Part.ProductionRoutingLoading)
+@code {
+    private static readonly Dictionary<string, string> MaterialGradients = new()
     {
-        <div class="pcs-footer">
-            <div class="pcs-price-card">
-                <div class="pcs-routing-header"
-                     role="button"
-                     tabindex="0"
-                     @onclick="@(() => _routingExpanded = !_routingExpanded)"
-                     @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") _routingExpanded = !_routingExpanded; })">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <MudIcon Icon="@Icons.Material.Filled.Route" Size="Size.Small" />
-                        <MudText Typo="Typo.overline" style="margin: 0;">
-                            Production Routing &amp; Queue
-                        </MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.ExpandLess"
-                             Class="@(_routingExpanded ? "pcs-routing-chevron" : "pcs-routing-chevron collapsed")" />
-                </div>
-                <div class="pcs-routing-content @(_routingExpanded ? "" : "collapsed")">
-                    @if (Part!.ProductionRoutingLoading)
-                    {
-                        <MudProgressLinear Indeterminate="true" Class="mb-2" />
-                    }
-                    else if (Part!.ProductionRouting != null)
-                    {
-                        <div class="pcs-routing-row">
-                            <span>@Part!.ProductionRouting?.MachineCode — @Part!.ProductionRouting?.MachineName</span>
-                        </div>
-                        <div class="pcs-routing-row">
-                            <span>Queue Position</span>
-                            <span style="color: var(--mud-palette-warning); font-weight: 600;">@Part!.ProductionRouting?.QueueAhead job@(Part!.ProductionRouting?.QueueAhead == 1 ? "" : "s") ahead</span>
-                        </div>
-                        <div class="pcs-routing-row">
-                            <span>Est. Start Date</span>
-                            <span>@Part!.ProductionRouting?.EstimatedStartDate.ToString("d MMM yyyy")</span>
-                        </div>
-                        <MudButton Variant="Variant.Outlined"
-                                   Size="Size.Small"
-                                   StartIcon="@Icons.Material.Filled.CalendarMonth"
-                                   OnClick="OpenScheduleDialog"
-                                   Style="width: 100%; margin-top: 12px; height: 36px; font-weight: 600; color: var(--mud-palette-primary); background: var(--mud-palette-primary-lighten-5); border: 1px dashed var(--mud-palette-primary);">
-                            View Planning Schedule
-                        </MudButton>
-                    }
-                </div>
-            </div>
-        </div>
+        ["al6061"] = "linear-gradient(135deg, #d8dce4, #a8aeb8)",
+        ["al7075"] = "linear-gradient(135deg, #cfd4dc, #9ba0ab)",
+        ["ss304"] = "linear-gradient(135deg, #e8ecf0, #b5bac5)",
+        ["ss316"] = "linear-gradient(135deg, #dfe3ea, #a7adba)",
+        ["brass"] = "linear-gradient(135deg, #e6cf8e, #b4954a)",
+        ["delrin"] = "linear-gradient(135deg, #fafafa, #dcdcdc)",
+        ["pla"] = "linear-gradient(135deg, #2a6df4, #1a4dc4)",
+        ["petg"] = "linear-gradient(135deg, #cff4f0, #7ac6c0)",
+        ["abs"] = "linear-gradient(135deg, #333, #111)",
+        ["nylon"] = "linear-gradient(135deg, #4a4a50, #1a1a20)",
+        ["tough-2000"] = "linear-gradient(135deg, #e8e2d4, #b8ae9a)",
+        ["clear"] = "linear-gradient(135deg, #eef4fb, #b8ccdd)",
+        ["high-temp"] = "linear-gradient(135deg, #dcc8b4, #8a6b4a)",
+        ["pa12"] = "linear-gradient(135deg, #f0ede4, #c8c4b4)",
+        ["steel-mild"] = "linear-gradient(135deg, #8a909a, #4a505a)",
+    };
+
+    private static readonly Dictionary<string, string> FinishGradients = new()
+    {
+        ["machined"] = "linear-gradient(135deg, #e8ecf2, #c0c6d0)",
+        ["bead-blast"] = "#d4d8e0",
+        ["anodized-clear"] = "linear-gradient(135deg, #cdd2da, #959aa4)",
+        ["anodized-black"] = "linear-gradient(135deg, #2a2e36, #0a0e14)",
+        ["powder"] = "linear-gradient(135deg, #2a3040, #10141c)",
+        ["as-printed"] = "repeating-linear-gradient(0deg, #d4d8e0, #d4d8e0 2px, #c4c8d0 2px, #c4c8d0 3px)",
+        ["sanded"] = "linear-gradient(135deg, #e2e6ec, #b8bcc4)",
+        ["uv-cured"] = "linear-gradient(135deg, #e8e2d4, #a8a294)",
+        ["painted"] = "linear-gradient(135deg, #2a6df4, #1a4dc4)",
+        ["natural"] = "linear-gradient(135deg, #f0ede4, #c8c4b4)",
+        ["turned"] = "repeating-linear-gradient(90deg, #d4d8e0, #d4d8e0 1px, #b8bcc4 1px, #b8bcc4 2px)",
+        ["raw"] = "linear-gradient(135deg, #9aa0aa, #6a7080)",
+    };
+
+    private static readonly string DefaultGradient = "linear-gradient(135deg, #d8dce4, #a8aeb8)";
+
+    private static string GetMaterialGradient(string? code) =>
+        string.IsNullOrEmpty(code) || !MaterialGradients.TryGetValue(code, out var g)
+            ? DefaultGradient : g;
+
+    private static string GetFinishGradient(string? code) =>
+        string.IsNullOrEmpty(code) || !FinishGradients.TryGetValue(code, out var g)
+            ? FinishGradients["machined"]! : g;
+
+    private int ComputeBulkDiscount()
+    {
+        if (Part == null || _bulkTiers.Count == 0) return 0;
+        var activeTier = _bulkTiers.Where(t => t.Quantity <= Part.Quantity)
+            .OrderByDescending(t => t.Quantity)
+            .FirstOrDefault();
+        if (activeTier == null) return 0;
+        var firstTier = _bulkTiers.OrderBy(t => t.Quantity).FirstOrDefault();
+        if (firstTier == null || firstTier.UnitPrice == 0) return 0;
+        return (int)Math.Round((1 - activeTier.UnitPrice / firstTier.UnitPrice) * 100);
     }
-</div>
-
-
+}

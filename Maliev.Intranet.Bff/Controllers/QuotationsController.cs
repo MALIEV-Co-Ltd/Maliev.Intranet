@@ -155,4 +155,23 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
 
         return pdfUrl != null ? Ok(pdfUrl) : BadRequest("Failed to generate PDF");
     }
+
+    /// <summary>
+    /// Generates a draft quotation PDF from the current project state (no quotation ID required).
+    /// </summary>
+    /// <param name="pdfData">The quotation data to render.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The PDF storage URL.</returns>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("draft-pdf")]
+    public async Task<ActionResult> GenerateDraftPdf([FromBody] QuotationPdfData pdfData, CancellationToken ct)
+    {
+        var referenceId = Guid.NewGuid().ToString();
+        var pdfUrl = await pdfClient.GeneratePdfAsync(
+            PdfDocumentType.Quotation,
+            referenceId,
+            pdfData,
+            ct: ct);
+        return pdfUrl != null ? Ok(new { storageUrl = pdfUrl }) : BadRequest("Failed to generate PDF");
+    }
 }

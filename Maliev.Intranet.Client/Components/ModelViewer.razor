@@ -10,7 +10,7 @@
 
     @if (Model != null)
     {
-        <div class="overlay-info" style="position: absolute; top: 12px; left: 12px; background: var(--mud-palette-overlay-dark); color: var(--mud-palette-white); padding: 12px; border-radius: 8px; backdrop-filter: blur(4px); pointer-events: none;">
+        <div class="overlay-info" style="position: absolute; top: 12px; left: 12px; background: var(--mud-palette-overlay-dark); color: var(--mud-palette-white); padding: 12px; border-radius: var(--maliev-radius-sm); backdrop-filter: blur(4px); pointer-events: none;">
             <MudText Typo="Typo.subtitle1" Class="fw-bold">@Model.FileName</MudText>
             @if (Model.GeometryAnalyzed)
             {
@@ -573,6 +573,7 @@
     private void CloseAnalysisMenuOutside()
     {
         _analysisMenuOpen = false;
+        _sectionMenuOpen = false;
     }
 
     private async Task SetAnalysisTool(string tool)

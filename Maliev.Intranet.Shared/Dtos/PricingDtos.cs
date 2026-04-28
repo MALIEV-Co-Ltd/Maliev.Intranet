@@ -212,6 +212,9 @@ public record PricingRequestDto
 
     /// <summary>The GCS storage path of the 3D file, used as a join key for SignalR events.</summary>
     public string? StoragePath { get; init; }
+
+    /// <summary>The selected lead time code (e.g., "STANDARD", "EXPRESS", "RUSH").</summary>
+    public string? LeadTimeCode { get; init; }
 }
 
 /// <summary>

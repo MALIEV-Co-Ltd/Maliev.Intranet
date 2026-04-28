@@ -50,6 +50,9 @@ const CONFIG = {
     /** Maximum camera distance as fraction of mesh radius (50 = 50x radius) */
     CAMERA_UPPER_RADIUS_LIMIT: 50,
 
+    /** Near clipping plane as fraction of mesh radius (0.0001 = 0.01%, prevents mesh clipping on close zoom) */
+    CAMERA_NEAR_PLANE: 0.0001,
+
     /** Far clipping plane as fraction of mesh radius (prevents far objects from disappearing) */
     CAMERA_FAR_PLANE: 500,
 
@@ -344,6 +347,8 @@ function updateLabelPosition(div, worldPos, canvasId) {
 // ── Per-canvas state ──────────────────────────────────────────────────────────
 // ── Section-view state ───────────────────────────────────────────────────────
 const sectionEdgeMeshes     = {};   // canvasId → BABYLON.LinesMesh | null
+const sectionHatchMeshes    = {};   // canvasId → BABYLON.LinesMesh | null (cross-hatch fill)
+const sectionGhostMeshes    = {};   // canvasId → BABYLON.Mesh[] (xray clones of hidden half)
 const sectionObservers      = {};   // canvasId → scene.onBeforeRenderObservable handle
 let   _sectionRebuildPending = {};  // canvasId → boolean (debounce flag)
 
@@ -1193,11 +1198,18 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
                 // Capture immutable baseline for "default solid look" — never overwritten.
                 // Used by setRenderMode('solid') and flipped-triangles disable to restore a clean state.
+                // For single-body models, always use the uniform CAD gray so all files look consistent.
+                // For multi-body models, preserve per-body palette colors.
                 if (!defaultSolidMaterials[canvasId]) defaultSolidMaterials[canvasId] = new Map();
                 const defMap = defaultSolidMaterials[canvasId];
+                const bodyMap = perCanvasBodyMap[canvasId];
+                const isMultiBody = bodyMap && bodyMap.size > 1;
+                const cadGray = getCadMaterial(_scene);
                 _scene.meshes.forEach(m => {
                     if (m.material && !defMap.has(m.uniqueId) && !isSystemMesh(m) && m.name !== '__root__' && !m.name.startsWith('__axis')) {
-                        defMap.set(m.uniqueId, m.material);
+                        defMap.set(m.uniqueId, isMultiBody ? m.material : cadGray);
+                        // Apply CAD gray immediately for single-body so the initial view is uniform
+                        if (!isMultiBody) m.material = cadGray;
                     }
                 });
 
@@ -1817,6 +1829,86 @@ function getOrCreateBodySelectionXrayMaterial(scene) {
 }
 
 /**
+ * Returns a dedicated xray material for the section-view ghost (hidden half).
+ * Separate from the toolbar xray so alpha and clip plane can differ independently.
+ * @param {BABYLON.Scene} scene
+ * @returns {BABYLON.StandardMaterial}
+ */
+function _getOrCreateSectionGhostMaterial(scene) {
+    const name = '__section_ghost__';
+    const existing = scene.getMaterialByName(name);
+    if (existing) return existing;
+
+    const mat = new BABYLON.StandardMaterial(name, scene);
+    mat.diffuseColor     = new BABYLON.Color3(0.55, 0.62, 0.72);
+    mat.emissiveColor    = new BABYLON.Color3(0.05, 0.07, 0.12);
+    mat.alpha            = 0.08;
+    mat.backFaceCulling  = false;
+    mat.twoSidedLighting = true;
+    return mat;
+}
+
+/**
+ * Creates ghost (xray) clones of every visible body mesh with the clip plane inverted,
+ * so the hidden half appears as a faint see-through silhouette.
+ * @param {string}  canvasId
+ * @param {BABYLON.Scene} scene
+ * @param {number}  nx  plane normal x
+ * @param {number}  ny  plane normal y
+ * @param {number}  nz  plane normal z
+ * @param {number}  d   plane constant
+ */
+function _createSectionGhosts(canvasId, scene, nx, ny, nz, d) {
+    _disposeSectionGhosts(canvasId);
+
+    const ghostMat = _getOrCreateSectionGhostMaterial(scene);
+    // Each ghost material instance needs its own clipPlane, so clone per call
+    // (but we reuse the same ghost mat with a per-mesh override via material.clipPlane)
+    const invertedPlane = new BABYLON.Plane(-nx, -ny, -nz, -d);
+
+    const overlayMeshIds = new Set();
+    const overlayMap = overlayMeshes[canvasId];
+    if (overlayMap) {
+        for (const [, meshArr] of overlayMap) {
+            for (const m of meshArr) overlayMeshIds.add(m.uniqueId);
+        }
+    }
+
+    const ghosts = [];
+    for (const mesh of scene.meshes) {
+        if (!mesh.isVisible || mesh.getTotalVertices() === 0) continue;
+        if (isSystemMesh(mesh)) continue;
+        if (overlayMeshIds.has(mesh.uniqueId)) continue;
+        if (mesh.name.startsWith('__section_ghost')) continue;
+
+        const clone = mesh.clone(`__section_ghost_${mesh.uniqueId}`, null, false);
+        if (!clone) continue;
+
+        // Create a per-clone material so clipPlane is independent of the shared mat
+        const cloneMat = ghostMat.clone(`__section_ghost_mat_${mesh.uniqueId}`);
+        cloneMat.clipPlane = invertedPlane;
+        clone.material = cloneMat;
+        clone.isPickable = false;
+        ghosts.push(clone);
+    }
+    sectionGhostMeshes[canvasId] = ghosts;
+}
+
+/**
+ * Disposes all section ghost meshes (and their per-clone materials) for a canvas.
+ * @param {string} canvasId
+ */
+function _disposeSectionGhosts(canvasId) {
+    const ghosts = sectionGhostMeshes[canvasId];
+    if (!ghosts) return;
+    for (const g of ghosts) {
+        if (g.material) g.material.dispose();
+        g.dispose();
+    }
+    sectionGhostMeshes[canvasId] = null;
+}
+
+/**
  * Checks if a mesh is a system mesh (grid, axis gizmo, bounding box) that should be skipped.
  * @param {BABYLON.AbstractMesh} mesh
  * @returns {boolean}
@@ -2373,8 +2465,8 @@ export function setCameraProjection(canvasId, mode) {
     cameraProjection[canvasId] = mode;
 
     if (mode === 'orthographic') {
-        const initialRadius = fitRadiusMap[canvasId] || cam.radius;
-        orthoZoomFactors[canvasId] = cam.radius / initialRadius;
+        const meshRadius = fitRadiusMap[canvasId] || cam.radius;
+        orthoZoomFactors[canvasId] = cam.radius / meshRadius;
         const aspect = engine.getAspectRatio(cam);
         const half   = cam.radius * ORTHO_RADIUS_FACTOR;
         cam.mode        = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
@@ -2382,7 +2474,7 @@ export function setCameraProjection(canvasId, mode) {
         cam.orthoRight  =  half * aspect;
         cam.orthoTop    =  half;
         cam.orthoBottom = -half;
-        cam.minZ        = initialRadius * 0.0001;
+        cam.minZ        = Math.max(meshRadius * CONFIG.CAMERA_NEAR_PLANE, 0.01);
 
         // Keep ortho bounds in sync when the user zooms — but do NOT move camera!
         // Accumulate zoom factor and compute ortho bounds from it, then reset cam.radius.
@@ -2408,7 +2500,7 @@ export function setCameraProjection(canvasId, mode) {
                 // Reset camera to initial distance — prevents camera from moving into model
                 _orthoGuard = true;
                 cam.radius = initialRadius;
-                cam.minZ    = initialRadius * 0.0001;
+                cam.minZ    = Math.max(meshRadius * CONFIG.CAMERA_NEAR_PLANE, 0.01);
                 _orthoGuard = false;
             });
         }
@@ -2575,10 +2667,14 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
-    // Dispose any existing cut-edge lines and observer
+    // Dispose any existing cut-edge lines, hatch lines, and observer
     if (sectionEdgeMeshes[canvasId]) {
         sectionEdgeMeshes[canvasId].dispose();
         sectionEdgeMeshes[canvasId] = null;
+    }
+    if (sectionHatchMeshes[canvasId]) {
+        sectionHatchMeshes[canvasId].dispose();
+        sectionHatchMeshes[canvasId] = null;
     }
     if (sectionObservers[canvasId]) {
         scene.onBeforeRenderObservable.remove(sectionObservers[canvasId]);
@@ -2588,6 +2684,7 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
 
     if (!enabled) {
         scene.clipPlane = null;
+        _disposeSectionGhosts(canvasId);
         return;
     }
 
@@ -2611,18 +2708,15 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     const d = -(nx * worldOffset + ny * worldOffset + nz * worldOffset);
     scene.clipPlane = new BABYLON.Plane(nx, ny, nz, d);
 
-    // Build cut-edge lines immediately and re-build on every frame while active
-    // (so they track model rotation). Debounced to once per frame.
+    // Create ghost clones for the hidden half (xray silhouette)
+    _createSectionGhosts(canvasId, scene, nx, ny, nz, d);
+
+    // Build cut-edge lines once — edges are world-space segments that don't change
+    // when the ArcRotateCamera orbits. No per-frame rebuild needed.
     _rebuildSectionEdges(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
 
-    sectionObservers[canvasId] = scene.onBeforeRenderObservable.add(() => {
-        if (!_sectionRebuildPending[canvasId]) {
-            _sectionRebuildPending[canvasId] = true;
-            // Rebuild at the start of the next frame
-            _rebuildSectionEdges(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
-            _sectionRebuildPending[canvasId] = false;
-        }
-    });
+    // Build cross-hatch lines on the section face to indicate solid material
+    _rebuildSectionHatch(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
 }
 
 /**
@@ -2707,6 +2801,183 @@ function _rebuildSectionEdges(canvasId, scene, planeNormal, planeD) {
     linesMesh.color = new BABYLON.Color3(c4.r, c4.g, c4.b);
     linesMesh.isPickable = false;
     sectionEdgeMeshes[canvasId] = linesMesh;
+}
+
+/**
+ * Draws parallel diagonal hatch lines clipped to the section polygon.
+ * This creates the traditional engineering cross-section fill pattern.
+ */
+function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
+    if (sectionHatchMeshes[canvasId]) {
+        sectionHatchMeshes[canvasId].dispose();
+        sectionHatchMeshes[canvasId] = null;
+    }
+
+    // Collect intersection segments from all meshes (same logic as _rebuildSectionEdges)
+    const overlayMeshIds = new Set();
+    const overlayMap = overlayMeshes[canvasId];
+    if (overlayMap) {
+        for (const [, meshArr] of overlayMap) {
+            for (const m of meshArr) overlayMeshIds.add(m.uniqueId);
+        }
+    }
+
+    // Collect all intersection points as line segments
+    const allSegments = [];
+    for (const mesh of scene.meshes) {
+        if (!mesh.isVisible || mesh.getTotalVertices() === 0) continue;
+        if (isSystemMesh(mesh)) continue;
+        if (overlayMeshIds.has(mesh.uniqueId)) continue;
+
+        const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+        const indices = mesh.getIndices();
+        if (!positions || !indices || indices.length === 0) continue;
+
+        const worldMatrix = mesh.getWorldMatrix();
+
+        for (let i = 0; i < indices.length; i += 3) {
+            const i0 = indices[i], i1 = indices[i + 1], i2 = indices[i + 2];
+            const wv0 = BABYLON.Vector3.TransformCoordinates(
+                new BABYLON.Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]), worldMatrix);
+            const wv1 = BABYLON.Vector3.TransformCoordinates(
+                new BABYLON.Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]), worldMatrix);
+            const wv2 = BABYLON.Vector3.TransformCoordinates(
+                new BABYLON.Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]), worldMatrix);
+
+            const d0 = BABYLON.Vector3.Dot(planeNormal, wv0) + planeD;
+            const d1 = BABYLON.Vector3.Dot(planeNormal, wv1) + planeD;
+            const d2 = BABYLON.Vector3.Dot(planeNormal, wv2) + planeD;
+
+            const pts = [];
+            const edges = [[wv0, wv1, d0, d1], [wv1, wv2, d1, d2], [wv2, wv0, d2, d0]];
+            for (const [va, vb, da, db] of edges) {
+                if (da * db < 0) {
+                    const t = -da / (db - da);
+                    pts.push(BABYLON.Vector3.Lerp(va, vb, t));
+                }
+            }
+            if (pts.length === 2) {
+                allSegments.push([pts[0], pts[1]]);
+            }
+        }
+    }
+
+    if (allSegments.length === 0) return;
+
+    // Project all intersection points to 2D on the section plane
+    // Choose two perpendicular axes on the plane
+    let uAxis, vAxis;
+    const absX = Math.abs(planeNormal.x), absY = Math.abs(planeNormal.y), absZ = Math.abs(planeNormal.z);
+    if (absX <= absY && absX <= absZ) {
+        uAxis = new BABYLON.Vector3(1, 0, 0);
+    } else if (absY <= absZ) {
+        uAxis = new BABYLON.Vector3(0, 1, 0);
+    } else {
+        uAxis = new BABYLON.Vector3(0, 0, 1);
+    }
+    // vAxis = planeNormal × uAxis, then normalize
+    vAxis = BABYLON.Vector3.Cross(planeNormal, uAxis);
+    vAxis.normalize();
+    uAxis = BABYLON.Vector3.Cross(vAxis, planeNormal);
+    uAxis.normalize();
+
+    // Compute 2D bounding box of all intersection points
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    const points2D = [];
+    for (const seg of allSegments) {
+        for (const p of seg) {
+            const pu = BABYLON.Vector3.Dot(p, uAxis);
+            const pv = BABYLON.Vector3.Dot(p, vAxis);
+            minU = Math.min(minU, pu);
+            maxU = Math.max(maxU, pu);
+            minV = Math.min(minV, pv);
+            maxV = Math.max(maxV, pv);
+        }
+    }
+
+    // Generate diagonal hatch lines across the bounding box
+    const hatchSpacing = 0.003; // ~3mm in Babylon units
+    const hatchAngle = Math.PI / 4; // 45 degrees
+    const hatchLines = [];
+
+    // Project the diagonal direction: hatch lines run along (cos45, sin45) in UV space
+    const cosA = Math.cos(hatchAngle);
+    const sinA = Math.sin(hatchAngle);
+    // Perpendicular to hatch direction = normal of hatch lines = (-sin45, cos45)
+    const perpU = -sinA;
+    const perpV = cosA;
+
+    // For each triangle that crosses the section plane, check if a hatch line intersects it
+    // Simpler approach: for each hatch line, test intersection with each edge segment
+    const hatchExtent = Math.max(maxU - minU, maxV - minV) * 1.5;
+
+    for (let offset = -hatchExtent; offset <= hatchExtent; offset += hatchSpacing) {
+        // This hatch line passes through: (u, v) where perpU * u + perpV * v = offset
+        // Parameterize as: u = offset * cosA + t * sinA, v = offset * sinA - t * cosA (or similar)
+        // Actually: line is { (u,v) | perpU*u + perpV*v = offset }
+        // Direction along line: (cosA, sinA)
+        // So: u = (offset * perpU + t * cosA) ... let me just do proper intersection
+
+        const intersectPts = [];
+        for (const seg of allSegments) {
+            // Project segment endpoints to 2D
+            const u0 = BABYLON.Vector3.Dot(seg[0], uAxis);
+            const v0 = BABYLON.Vector3.Dot(seg[0], vAxis);
+            const u1 = BABYLON.Vector3.Dot(seg[1], uAxis);
+            const v1 = BABYLON.Vector3.Dot(seg[1], vAxis);
+
+            // Distance of each endpoint from the hatch line
+            const d0 = perpU * u0 + perpV * v0 - offset;
+            const d1 = perpU * u1 + perpV * v1 - offset;
+
+            if (d0 * d1 < 0) {
+                // Edge crosses the hatch line
+                const t = -d0 / (d1 - d0);
+                const hu = u0 + t * (u1 - u0);
+                const hv = v0 + t * (v1 - v0);
+                // Convert back to 3D: point = origin + hu*uAxis + hv*vAxis
+                // But we need a reference point on the plane
+                // Use the centroid of the first segment as a reference
+                intersectPts.push({ u: hu, v: hv, t: t });
+            }
+        }
+
+        // Sort intersection points along the hatch line direction and pair them
+        if (intersectPts.length >= 2) {
+            intersectPts.sort((a, b) => cosA * (a.u - b.u) + sinA * (a.v - b.v));
+            for (let i = 0; i < intersectPts.length - 1; i += 2) {
+                const p1 = intersectPts[i];
+                const p2 = intersectPts[i + 1];
+                // Convert 2D back to 3D
+                // Point on plane = somePointOnPlane + p.u * uAxis + p.v * vAxis
+                // We can reconstruct using the plane equation
+                const pt1 = new BABYLON.Vector3(
+                    p1.u * uAxis.x + p1.v * vAxis.x - planeD * planeNormal.x,
+                    p1.u * uAxis.y + p1.v * vAxis.y - planeD * planeNormal.y,
+                    p1.u * uAxis.z + p1.v * vAxis.z - planeD * planeNormal.z
+                );
+                const pt2 = new BABYLON.Vector3(
+                    p2.u * uAxis.x + p2.v * vAxis.x - planeD * planeNormal.x,
+                    p2.u * uAxis.y + p2.v * vAxis.y - planeD * planeNormal.y,
+                    p2.u * uAxis.z + p2.v * vAxis.z - planeD * planeNormal.z
+                );
+                hatchLines.push([pt1, pt2]);
+            }
+        }
+    }
+
+    if (hatchLines.length === 0) return;
+
+    const dark = isDarkMode(canvasId);
+    const hatchColor = dark ? { r: 0.45, g: 0.45, b: 0.55 } : { r: 0.65, g: 0.65, b: 0.70 };
+    const hatchMesh = BABYLON.MeshBuilder.CreateLineSystem(
+        `__section_hatch_${canvasId}__`,
+        { lines: hatchLines, updatable: false },
+        scene
+    );
+    hatchMesh.color = new BABYLON.Color3(hatchColor.r, hatchColor.g, hatchColor.b);
+    hatchMesh.isPickable = false;
+    sectionHatchMeshes[canvasId] = hatchMesh;
 }
 
 // ── rotateModel ─────────────────────────────────────────────────────────────────

@@ -74,6 +74,49 @@ public class UploadsController(
     }
 
     /// <summary>
+    /// Uploads multiple project files in a single request, performing the permission check once.
+    /// Each file is forwarded to the UploadService individually, but the authorization overhead
+    /// is amortized across all files in the batch.
+    /// </summary>
+    [HttpPost("batch")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<ActionResult<List<BffUploadResponse>>> UploadBatchAsync(
+        List<IFormFile> files,
+        [FromQuery] Guid projectId,
+        [FromQuery] Guid? customerId,
+        CancellationToken ct)
+    {
+        if (files == null || files.Count == 0)
+            return BadRequest("No files uploaded.");
+
+        if (projectId == Guid.Empty)
+            return BadRequest("projectId is required.");
+
+        var results = new List<BffUploadResponse>(files.Count);
+
+        foreach (var file in files)
+        {
+            if (file.Length == 0) continue;
+
+            var contentType = file.ContentType;
+            if (string.IsNullOrWhiteSpace(contentType))
+                contentType = GetMimeTypeFromExtension(Path.GetExtension(file.FileName));
+
+            using var stream = file.OpenReadStream();
+            var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+            var path = customerId.HasValue
+                ? $"customers/{customerId}/projects/{projectId}/{uniquePrefix}_{file.FileName}"
+                : $"projects/{projectId}/{uniquePrefix}_{file.FileName}";
+
+            var result = await uploadClient.UploadFileAsync(file.FileName, stream, contentType, path, true, ct);
+            if (result != null)
+                results.Add(result);
+        }
+
+        return Ok(results);
+    }
+
+    /// <summary>
     /// Gets the analysis status for an uploaded file by its GCS storage path.
     /// Used by clients to poll for geometry analysis completion.
     /// </summary>

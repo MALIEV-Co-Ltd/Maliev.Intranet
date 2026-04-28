@@ -6,9 +6,108 @@
 @using Microsoft.AspNetCore.Components
 @using System.Text.Json
 @using MudBlazor
-@inject Maliev.Intranet.Client.Services.FileTypesSettings FileTypes
+@using Maliev.Intranet.Client.Services
+@inject FileTypesSettings FileTypes
+@inject CurrencyService CurrencyService
+@inject HttpClient Http
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="pdc-root">
+@* ── Header Row ────────────────────────────────────────────────────────────────────── *@
+<div class="pdc-header">
+    <div class="pdc-header-left">
+        <div class="pdc-header-meta">
+            <div class="pdc-header-name-row">
+                <span class="pdc-header-name" title="@Part.Name">@System.IO.Path.GetFileNameWithoutExtension(Part.Name)</span>
+                @if (GetStatusLabel() == "ANALYZED")
+                {
+                    <span class="pdc-status-pill pdc-status--ok pdc-status--analyzed">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="font-size:10px;width:10px;height:10px;" />
+                        ANALYZED
+                    </span>
+                }
+                else
+                {
+                    <span class="pdc-status-pill pdc-status--@GetStatusClass()">@GetStatusLabel()</span>
+                }
+            </div>
+            <div class="pdc-header-subline">
+                @GetUploadedLabel()
+                @if (!string.IsNullOrEmpty(GetFormatLabel()))
+                {
+                    <span class="pdc-subline-sep">·</span>
+                    <span>@GetFormatLabel()</span>
+                }
+                @if (GetFileSize() > 0)
+                {
+                    <span class="pdc-subline-sep">·</span>
+                    <span>@FormatFileSize(GetFileSize())</span>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="pdc-header-tabs">
+        <button class="pdc-tab @(_activeTab == 0 ? "pdc-tab--active" : "")" @onclick="@(() => _activeTab = 0)">
+            <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Class="pdc-tab-icon" />
+            3D Model
+        </button>
+        <button class="pdc-tab @(_activeTab == 1 ? "pdc-tab--active" : "")" @onclick="@(() => _activeTab = 1)">
+            <MudIcon Icon="@Icons.Material.Outlined.Description" Size="Size.Small" Class="pdc-tab-icon" />
+            Drawing
+        </button>
+        <button class="pdc-tab @(_activeTab == 2 ? "pdc-tab--active" : "")" @onclick="@(() => _activeTab = 2)">
+            <MudIcon Icon="@Icons.Material.Outlined.Science" Size="Size.Small" Class="pdc-tab-icon" />
+            DFM
+            @if (_dfmIssues.Count > 0)
+            {
+                <span class="pdc-tab-badge">@_dfmIssues.Count</span>
+            }
+        </button>
+    </div>
+    <div class="pdc-header-right">
+        @if (!string.IsNullOrEmpty(Part.StoragePath))
+        {
+            <button class="pdc-icon-btn" title="Download original file" @onclick="DownloadOriginalAsync" disabled="@_downloading">
+                @if (_downloading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Outlined.Download" Size="Size.Small" />
+                }
+            </button>
+        }
+        @if (OnRemovePart.HasDelegate)
+        {
+            <button class="pdc-icon-btn pdc-icon-btn--danger" title="Remove part"
+                    @onclick="@(() => OnRemovePart.InvokeAsync(Part))">
+                <MudIcon Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" />
+            </button>
+        }
+    </div>
+</div>
 
 <div class="pdc-container">
+    @* ── Tab: DFM Checks ───────────────────────────────────────────────────────────── *@
+    @if (_activeTab == 2)
+    {
+        <DfmChecksTab Part="@Part" />
+    }
+
+    @* ── Tab: Drawing Files ─────────────────────────────────────────────────────────────── *@
+    @if (_activeTab == 1)
+    {
+        <DrawingAttachmentsTab Part="@Part"
+                               TempProjectId="@TempProjectId"
+                               OnPartChanged="@OnPartChanged" />
+    }
+
+    @* ── Tab: 3D Viewer + Body Selection ───────────────────────────────────────────────── *@
+    @if (_activeTab == 0)
+    {
+
     @* ── Body Selection Panel (multi-body files only) ──────────────────────────────────── *@
     @if (Part.BodyCount > 1 && Part.Bodies.Count > 0)
     {
@@ -125,204 +224,61 @@
         </div>
 
     </div>
+
+    } @* end _activeTab == 0 *@
 </div>
 
-<style>
-    @@keyframes blur-pulse {
-        0%   { filter: blur(8px); }
-        100% { filter: blur(3px); }
-    }
-    @@keyframes fade-in {
-        from { opacity: 0; }
-        to   { opacity: 1; }
-    }
-    .pdc-container {
-        display: flex;
-        flex: 1;
-        min-height: 0;
-        overflow: hidden;
-    }
-    .pdc-viewer-wrap {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-height: 0;
-        overflow: hidden;
-    }
-    .pdc-polkadot {
-        background-color: var(--mud-palette-background);
-        background-image: radial-gradient(circle, var(--mud-palette-lines-default) 1px, transparent 1px);
-        background-size: 20px 20px;
-        position: relative;
-    }
-    .pdc-thumb-area {
-        position: relative;
-        flex: 1;
-        background: transparent;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        min-height: 200px;
-    }
+@* ── Footer Row ─────────────────────────────────────────────────────────────────────── *@
+@if (!Part.Uploading && !Part.AwaitingPreview && !string.IsNullOrEmpty(Part.ProcessCode))
+{
+    <div class="pdc-footer">
+        <div class="pdc-footer-chips">
+            @if (!string.IsNullOrEmpty(Part.ProcessCode))
+            {
+                <div class="pdc-chip pdc-chip--process">
+                    @((MarkupString)ProcessIconHelper.GetProcessSvg(Part.ProcessCode))
+                    <span class="pdc-chip-process-label">@GetProcessName(Part.ProcessCode)</span>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(Part.MaterialCode))
+            {
+                <span class="pdc-chip-sep">·</span>
+                <span class="pdc-chip pdc-chip--material">@Part.MaterialCode</span>
+            }
+            @if (!string.IsNullOrEmpty(Part.FinishCode))
+            {
+                <span class="pdc-chip-sep">·</span>
+                <span class="pdc-chip pdc-chip--finish">@FinishDisplay.Humanize(Part.FinishCode)</span>
+            }
+        </div>
+        <div style="flex:1;" />
+        @if (Part.EstimatedUnitPrice.HasValue)
+        {
+            <div class="pdc-footer-vdivider"></div>
+            <span class="pdc-footer-price">
+                @if (CurrencyService.IsConverting)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Text" Width="120px" Height="16px" />
+                }
+                else
+                {
+                    <span class="pdc-footer-unit maliev-mono">@CurrencyService.Format(Part.EstimatedUnitPrice.Value) / ea</span>
+                    <span class="pdc-footer-sep">·</span>
+                    <span class="pdc-footer-total maliev-mono">@CurrencyService.Format(Part.EstimatedUnitPrice.Value * Part.Quantity) total</span>
+                }
+            </span>
+        }
+        else if (Part.PricingLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+    </div>
+}
 
-    @@media (max-width: 1200px) {
-        .pdc-thumb-area {
-            min-height: 360px;
-        }
-    }
-    .pdc-thumb-blurred {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        animation: blur-pulse 1.8s ease-in-out alternate infinite;
-    }
-    .pdc-thumb-sharp {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    .pdc-thumb-fade-in {
-        animation: fade-in 0.4s ease-in-out forwards;
-    }
-    .pdc-upload-progress {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        z-index: 1;
-    }
-    .pdc-3d-viewer-container {
-        position: absolute;
-        inset: 0;
-        z-index: 3;
-        background: transparent;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .pdc-3d-back-btn {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        z-index: 10;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: rgba(0,0,0,0.5);
-        color: white;
-        border: none;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.15s;
-    }
-    .pdc-3d-back-btn:hover { background: rgba(0,0,0,0.7); }
-    .pdc-cube-overlay {
-        position: absolute;
-        bottom: 16px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 2;
-        animation: fade-in 0.2s ease-in-out;
-    }
-    .pdc-viewer-error {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        height: 100%;
-        color: var(--mud-palette-text-disabled);
-    }
+</div>@* end pdc-root *@
 
-    /* ── Body Selection Panel ─────────────────────────────────────────────────────────── */
-    .pdc-body-panel {
-        width: 280px;
-        background: var(--mud-palette-surface);
-        border-left: 1px solid var(--mud-palette-lines-default);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        flex-shrink: 0;
-    }
-    .pdc-body-header {
-        padding: 16px;
-        border-bottom: 1px solid var(--mud-palette-lines-default);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .pdc-body-list {
-        flex: 1;
-        overflow-y: auto;
-        padding: 8px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-    .pdc-body-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 12px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: background 0.15s, border-color 0.15s;
-        border: 2px solid transparent;
-    }
-    .pdc-body-item:hover {
-        background: var(--mud-palette-action-hover);
-    }
-    .pdc-body-item--selected {
-        background: var(--mud-palette-primary-lighten) !important;
-        border-color: var(--mud-palette-primary) !important;
-    }
-    .pdc-body-color {
-        width: 24px;
-        height: 24px;
-        border-radius: 4px;
-        border: 1px solid var(--mud-palette-lines-default);
-        flex-shrink: 0;
-    }
-    .pdc-body-info {
-        flex: 1;
-        min-width: 0;
-    }
-    .pdc-body-name {
-        font-weight: 500;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .pdc-body-check {
-        flex-shrink: 0;
-    }
-    .pdc-viewer-wrap--with-bodies {
-        flex-direction: row;
-    }
-    @@media (max-width: 900px) {
-        .pdc-body-panel {
-            width: 100%;
-            height: 200px;
-            border-left: none;
-            border-top: 1px solid var(--mud-palette-lines-default);
-        }
-        .pdc-viewer-wrap--with-bodies {
-            flex-direction: column;
-        }
-    }
-</style>
 
 @code {
-    /// <summary>Injected HTTP client for refreshing signed thumbnail URLs.</summary>
-    [Inject] private HttpClient Http { get; set; } = null!;
-
     /// <summary>Injected snackbar service for user notifications.</summary>
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
@@ -341,11 +297,111 @@
     /// <summary>The temporary project ID used for file upload endpoints.</summary>
     [Parameter] public Guid TempProjectId { get; set; }
 
+    /// <summary>Callback invoked when the user clicks the remove button.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
+
+    private int _activeTab = 0;
+
+    protected override void OnInitialized() => CurrencyService.Changed += OnCurrencyChanged;
+    public void Dispose() => CurrencyService.Changed -= OnCurrencyChanged;
+    private void OnCurrencyChanged(object? s, EventArgs e) => InvokeAsync(StateHasChanged);
+
+    private string GetStatusClass() => Part switch
+    {
+        { Uploading: true } => "muted",
+        { AwaitingPreview: true } => "warn",
+        { Error: not null } => "error",
+        { DfmReport: not null } => "ok",
+        _ when !string.IsNullOrEmpty(Part.ViewerUrl) || !string.IsNullOrEmpty(Part.ThumbnailLargeUrl) => "ok",
+        _ => "muted"
+    };
+
+    private string GetStatusLabel() => Part switch
+    {
+        { Uploading: true } => "UPLOADING",
+        { AwaitingPreview: true } => "PROCESSING",
+        { Error: not null } => "ERROR",
+        { DfmReport: not null } => "ANALYZED",
+        _ when !string.IsNullOrEmpty(Part.ViewerUrl) || !string.IsNullOrEmpty(Part.ThumbnailLargeUrl) => "READY",
+        _ => "PENDING"
+    };
+
+    private string GetUploadedLabel()
+    {
+        if (Part.Uploading) return "Uploading…";
+        if (Part.AwaitingPreview) return "Processing…";
+        if (Part.UploadedAt.HasValue)
+            return $"Uploaded {FormatRelative(Part.UploadedAt.Value)}";
+        return "Uploaded";
+    }
+
+    private static string FormatRelative(DateTimeOffset t)
+    {
+        var elapsed = DateTimeOffset.UtcNow - t;
+        if (elapsed.TotalSeconds < 60) return "just now";
+        if (elapsed.TotalMinutes < 60) return $"{(int)elapsed.TotalMinutes} min ago";
+        if (elapsed.TotalHours < 24) return $"{(int)elapsed.TotalHours} hr ago";
+        return $"{(int)elapsed.TotalDays}d ago";
+    }
+
+    private string GetFormatLabel()
+    {
+        var ext = System.IO.Path.GetExtension(Part.Name).ToLowerInvariant();
+        return ext switch
+        {
+            ".step" or ".stp" => "STEP AP214",
+            ".iges" or ".igs" => "IGES",
+            ".stl"            => "STL",
+            ".3mf"            => "3MF",
+            ".glb"            => "GLB",
+            ".obj"            => "OBJ",
+            _                 => ext.TrimStart('.').ToUpperInvariant(),
+        };
+    }
+
+    private long GetFileSize() => Part.FileSizeBytes ?? 0;
+
+    private static string FormatFileSize(long bytes) => bytes switch
+    {
+        >= 1048576 => $"{bytes / 1048576.0:F1} MB",
+        >= 1024    => $"{bytes / 1024} KB",
+        > 0        => $"{bytes} B",
+        _          => string.Empty,
+    };
+
     private readonly Dictionary<string, string> _resolvedUrls = [];
     private Guid _lastPartId;
     private string? _lastProcessCode;
     private List<DfmIssue> _dfmIssues = [];
     private bool _viewerLoadFailed;
+    private bool _downloading;
+
+    private async Task DownloadOriginalAsync()
+    {
+        if (string.IsNullOrEmpty(Part.StoragePath)) return;
+        _downloading = true;
+        try
+        {
+            var response = await Http.GetAsync($"api/uploads/preview-url?storagePath={Uri.EscapeDataString(Part.StoragePath)}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+                if (result.TryGetProperty("url", out var urlProp))
+                {
+                    var url = urlProp.GetString();
+                    if (url != null) await JS.InvokeVoidAsync("window.open", url, "_blank");
+                }
+            }
+        }
+        catch
+        {
+            // Silent — the button is already disabled
+        }
+        finally
+        {
+            _downloading = false;
+        }
+    }
     private string? _viewerErrorMessage;
     private CancellationTokenSource? _dfmTimeoutCts;
     private const int DfmTimeoutSeconds = 600;
@@ -543,11 +599,18 @@
         var issues = new List<DfmIssue>();
 
         if (Part.IsManifold == false)
+        {
+            var nmDesc = Part.NonManifoldReason is { Length: > 0 } reason
+                ? $"Mesh geometry issue: {reason}."
+                  + (Part.NonManifoldFaceCount is { } fc ? $" Approximately {fc} affected face(s)." : string.Empty)
+                  + " This may cause problems during manufacturing."
+                : "The mesh has holes or overlapping geometry. This may cause issues during manufacturing regardless of process.";
             issues.Add(new DfmIssue(
                 Icon: Icons.Material.Filled.WarningAmber,
                 Title: "Non-manifold mesh",
-                Description: "The mesh has holes or overlapping geometry. This may cause issues during manufacturing regardless of process.",
+                Description: nmDesc,
                 Severity: DfmIssueSeverity.Warning));
+        }
 
         if (Part.BodyCount > 1)
         {
@@ -639,6 +702,28 @@
                 if (cnc.RequiresGrinding)
                     issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces", "Flat surfaces require grinding for tight tolerance", null));
                 break;
+
+            // Fallback for DfmReport DTO (from HTTP on-demand analysis path).
+            // Maps raw issue categories to the same icon/text/category tuples as the typed payloads above.
+            case DfmReport dto:
+                foreach (var issue in dto.Issues)
+                {
+                    var (icon, text, desc, cat) = issue.Category switch
+                    {
+                        "thin_wall"        => (Icons.Material.Filled.Rectangle,     issue.Title, issue.Description, "thin_wall"),
+                        "overhang"         => (Icons.Material.Filled.Layers,        issue.Title, issue.Description, "overhang"),
+                        "small_feature"    => (Icons.Material.Filled.ZoomOutMap,    issue.Title, issue.Description, "small_feature"),
+                        "hole"             => (Icons.Material.Filled.RadioButtonUnchecked, issue.Title, issue.Description, "hole"),
+                        "internal_radius"  => (Icons.Material.Filled.BugReport,     issue.Title, issue.Description, "internal_radius"),
+                        "undercut"         => (Icons.Material.Filled.ContentCut,    issue.Title, issue.Description, "undercut"),
+                        "escape_hole"      => (Icons.Material.Filled.Water,         issue.Title, issue.Description, "escape_hole"),
+                        "connecting_clearance" => (Icons.Material.Filled.Compress, issue.Title, issue.Description, "connecting_clearance"),
+                        "drill_hole"       => (Icons.Material.Filled.Handyman,      issue.Title, issue.Description, null),
+                        _                  => (Icons.Material.Filled.Warning,       issue.Title, issue.Description, issue.Category.Length > 0 ? issue.Category : null),
+                    };
+                    issues.Add((icon, text, desc, cat));
+                }
+                break;
         }
 
         return issues;
@@ -703,4 +788,19 @@
         await OnPartChanged.InvokeAsync(Part);
         await InvokeAsync(StateHasChanged);
     }
+
+    private static string GetProcessName(string? code) => code?.ToUpperInvariant() switch
+    {
+        "FDM" or "FFF"                     => "FDM",
+        "3D_PRINTING"                      => "3D Print",
+        "SLA" or "SLA_DLP"                 => "SLA",
+        "DLP"                              => "DLP",
+        "SLS" or "SLS_PA"                  => "SLS",
+        "CNC" or "CNC_MILL"               => "CNC Milling",
+        "CNC_TURN"                         => "CNC Turning",
+        "SHEET_METAL" or "SHEET-METAL"     => "Sheet Metal",
+        "INJECTION_MOLDING"                => "Injection Molding",
+        "CASTING" or "DIE_CASTING"         => "Die Casting",
+        _                                  => code?.ToUpperInvariant() ?? "—",
+    };
 }

@@ -1,0 +1,399 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Shared.Dtos
+@inject CurrencyService CurrencyService
+@implements IDisposable
+
+<div class="qsb-root">
+    @* ── Zone 0: Customer ─────────────────────────────────────────────────── *@
+    <div class="qsb-zone-customer">
+        <div class="qsb-zone-label">Customer</div>
+        @if (SelectedCustomer != null)
+        {
+            <CustomerCardCompact Customer="@SelectedCustomer"
+                                 OnClear="@(() => OnCustomerSelected.InvokeAsync(null))" />
+        }
+        else
+        {
+            <MudAutocomplete T="CustomerSummaryDto"
+                             Value="@SelectedCustomer"
+                             ValueChanged="@OnCustomerSelected"
+                             ToStringFunc="@(c => c?.Name ?? "")"
+                             SearchFunc="@SearchCustomers"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             Dense="true"
+                             Clearable="false"
+                             ShowProgressIndicator="true"
+                             DebounceInterval="300"
+                             CoerceText="true"
+                             Placeholder="Search customer…"
+                             Class="qsb-customer-search">
+                <ItemTemplate Context="item">
+                    <MudText Typo="Typo.body2">@item.Name</MudText>
+                    @if (!string.IsNullOrEmpty(item.CompanyName))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@item.CompanyName</MudText>
+                    }
+                </ItemTemplate>
+            </MudAutocomplete>
+        }
+    </div>
+
+    <div class="qsb-divider" />
+
+    @* ── Zone 1: Lead Time ────────────────────────────────────────────────── *@
+    <div class="qsb-zone-lead">
+        <div class="qsb-zone-label">
+            <MudIcon Icon="@Icons.Material.Outlined.Schedule" Size="Size.Small" />
+            Lead Time
+        </div>
+        <div class="qsb-lead-options">
+            @if (LeadTimeOptions.Count == 0)
+            {
+                @for (var i = 0; i < 3; i++)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="52px" Class="rounded" />
+                }
+            }
+            @foreach (var lt in LeadTimeOptions)
+            {
+                var active = SelectedLeadTime?.Code == lt.Code;
+                <button class="qsb-lead-btn @(active ? "qsb-lead-btn--active" : "")"
+                        @onclick="@(() => OnLeadTimeChanged.InvokeAsync(lt))">
+                    <div class="qsb-lead-row">
+                        <span class="qsb-lead-name">@lt.Name</span>
+                        <span class="qsb-lead-mult">@(lt.PriceMultiplier < 1 ? $"-{Math.Round((1 - lt.PriceMultiplier) * 100)}%" : lt.PriceMultiplier > 1 ? $"+{Math.Round((lt.PriceMultiplier - 1) * 100)}%" : "base")</span>
+                    </div>
+                    <div class="qsb-lead-days">@lt.MinDays business days</div>
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="qsb-divider" />
+
+    @* ── Zone 2: Total + Actions ──────────────────────────────────────────── *@
+    <div class="qsb-zone-total">
+        <div class="qsb-total-top">
+            <div class="qsb-total-ships">
+                <div class="qsb-zone-label">Quote Total</div>
+                <div class="qsb-ships-by">
+                    Ships by&nbsp;
+                    @if (LeadTimeOptions.Count == 0)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Text" Width="48px" Style="display:inline-block;" />
+                    }
+                    else
+                    {
+                        <span class="qsb-ship-date">@ComputeShipDate()</span>
+                    }
+                </div>
+            </div>
+            @if (Parts.Any(p => p.PricingLoading))
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Text" Width="120px" Height="36px" />
+            }
+            else
+            {
+                var total = ComputeSubtotal();
+                <div class="qsb-total-amount">
+                    @if (total == 0 && Parts.Count == 0)
+                    {
+                        <span>—</span>
+                    }
+                    else if (CurrencyService.IsConverting)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Text" Width="80px" Height="18px" />
+                    }
+                    else
+                    {
+                        @($"{CurrencyService.Symbol} {total:N2}")
+                    }
+                </div>
+            }
+        </div>
+        <div class="qsb-actions">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Outlined.PictureAsPdf"
+                       Disabled="@(!CanQuote || Parts.Count == 0 || _generatingPdf)"
+                       OnClick="@HandleGeneratePdfAsync"
+                       Class="qsb-btn-pdf">
+                @if (_generatingPdf)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                }
+                PDF
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       Disabled="@(!CanQuote || Parts.Count == 0 || Saving)"
+                       OnClick="@OnQuote"
+                       Class="qsb-btn-checkout">
+                @if (Saving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                }
+                Generate Quote
+                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+            </MudButton>
+        </div>
+    </div>
+</div>
+
+<style>
+    .qsb-root {
+        display: flex;
+        align-items: stretch;
+        background: var(--maliev-panel);
+        border-top: 1px solid var(--maliev-border);
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .qsb-divider {
+        width: 1px;
+        background: var(--maliev-border);
+        flex-shrink: 0;
+    }
+
+    .qsb-zone-label {
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--maliev-muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 6px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* ── Zone 0: Customer ─────────────────────────────────────────────────── */
+    .qsb-zone-customer {
+        flex: 1 1 220px;
+        max-width: 270px;
+        padding: 10px 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .qsb-customer-search { width: 100%; }
+
+    /* ── Zone 1: Lead Time ────────────────────────────────────────────────── */
+    .qsb-zone-lead {
+        flex: 1;
+        padding: 10px 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+    }
+
+    .qsb-lead-options {
+        display: flex;
+        gap: 6px;
+        align-items: stretch;
+    }
+
+    .qsb-lead-btn {
+        flex: 1;
+        min-width: 0;
+        padding: 6px 10px;
+        border: 1px solid var(--maliev-border);
+        background: transparent;
+        border-radius: 5px;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.15s;
+        color: var(--maliev-ink);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        gap: 1px;
+        font-family: inherit;
+    }
+
+    .qsb-lead-btn:hover {
+        background: var(--maliev-panel-3);
+    }
+
+    .qsb-lead-btn--active {
+        background: color-mix(in oklch, var(--mud-palette-primary) 12%, transparent);
+        border-color: var(--mud-palette-primary);
+        color: var(--mud-palette-primary);
+    }
+
+    .qsb-lead-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        width: 100%;
+        gap: 6px;
+    }
+
+    .qsb-lead-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .qsb-lead-mult {
+        font-size: 10px;
+        color: var(--maliev-muted);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .qsb-lead-btn--active .qsb-lead-mult {
+        color: var(--mud-palette-primary);
+    }
+
+    .qsb-lead-days {
+        font-size: 10.5px;
+        color: var(--maliev-muted);
+        font-family: 'JetBrains Mono', monospace;
+        margin-top: 1px;
+    }
+
+    .qsb-lead-btn--active .qsb-lead-days {
+        color: var(--maliev-ink);
+        font-weight: 600;
+    }
+
+    /* ── Zone 2: Total + Actions ─────────────────────────────────────────── */
+    .qsb-zone-total {
+        width: 340px;
+        padding: 8px 16px 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        flex-shrink: 0;
+        gap: 4px;
+    }
+
+    .qsb-total-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .qsb-total-ships {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .qsb-ships-by {
+        font-size: 10.5px;
+        color: var(--maliev-muted);
+    }
+
+    .qsb-ship-date {
+        font-weight: 600;
+        color: var(--maliev-ink);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .qsb-total-amount {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--maliev-ink);
+        font-family: 'JetBrains Mono', monospace;
+        letter-spacing: -0.02em;
+    }
+
+    .qsb-actions {
+        display: flex;
+        gap: 6px;
+    }
+
+    .qsb-btn-pdf {
+        padding: 0 12px;
+        height: 32px;
+        border: 1px solid var(--maliev-border) !important;
+        border-radius: 5px !important;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--maliev-muted) !important;
+    }
+
+    .qsb-btn-checkout {
+        flex: 1;
+        height: 32px;
+        border-radius: 5px !important;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    @@media (max-width: 960px) {
+        .qsb-root {
+            height: auto;
+            flex-wrap: wrap;
+            padding: 10px 16px;
+            gap: 10px;
+        }
+        .qsb-divider { display: none; }
+        .qsb-zone-lead { width: 100%; border-right: none; }
+        .qsb-zone-total { width: 100%; }
+    }
+</style>
+
+@code {
+    [Parameter] public CustomerSummaryDto? SelectedCustomer { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IEnumerable<CustomerSummaryDto>>>? SearchCustomers { get; set; }
+    [Parameter] public EventCallback<CustomerSummaryDto?> OnCustomerSelected { get; set; }
+
+    [Parameter, EditorRequired] public List<PartViewModel> Parts { get; set; } = [];
+    [Parameter] public List<LeadTimeOptionDto> LeadTimeOptions { get; set; } = [];
+    [Parameter] public LeadTimeOptionDto? SelectedLeadTime { get; set; }
+    [Parameter] public EventCallback<LeadTimeOptionDto> OnLeadTimeChanged { get; set; }
+    [Parameter] public bool CanQuote { get; set; }
+    [Parameter] public bool Saving { get; set; }
+    [Parameter] public EventCallback OnQuote { get; set; }
+    [Parameter] public EventCallback OnGeneratePdf { get; set; }
+
+    private bool _generatingPdf;
+
+    private async Task HandleGeneratePdfAsync()
+    {
+        _generatingPdf = true;
+        StateHasChanged();
+        try
+        {
+            await OnGeneratePdf.InvokeAsync();
+        }
+        finally
+        {
+            _generatingPdf = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnInitialized() => CurrencyService.Changed += OnCurrencyChanged;
+
+    public void Dispose() => CurrencyService.Changed -= OnCurrencyChanged;
+
+    private void OnCurrencyChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
+
+    private decimal ComputeSubtotal() =>
+        Parts.Sum(p => (p.EstimatedTotalAmount ?? 0) * CurrencyService.ExchangeRate);
+
+    private string ComputeShipDate()
+    {
+        if (SelectedLeadTime == null || SelectedLeadTime.MinDays <= 0)
+            return "—";
+        var days = SelectedLeadTime.MinDays;
+        var shipDate = DateTime.UtcNow.Date.AddDays(days);
+        return shipDate.ToString("MMM d");
+    }
+}
