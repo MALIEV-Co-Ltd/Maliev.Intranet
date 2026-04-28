@@ -1,0 +1,482 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Shared.Dtos
+@inject CurrencyService CurrencyService
+@inject FileTypesSettings FileTypes
+@inject UploadSettings UploadSettings
+@implements IDisposable
+
+<div class="plp-root">
+    @* ── Page Header: title + duplicate ────────────────────────────────── *@
+    <div class="plp-page-header">
+        <input type="text" value="@Title"
+               @onchange="@(e => OnTitleChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty))" @onblur="@OnTitleCommit"
+               class="plp-title-input" size="14" title="Project title" />
+        <button class="plp-duplicate-btn" title="Duplicate project" @onclick="@OnDuplicate">
+            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" />
+        </button>
+    </div>
+
+    @* ── File Upload Dropzone ───────────────────────────────────────────── *@
+    <div class="plp-upload-section">
+        <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
+                            Icon="@Icons.Material.Outlined.CloudUpload" Label="Drop CAD files to quote"
+                            SubLabel="@FileTypes.ThreeDSubLabel"
+                            MaxFileSizeLabel="@($"max {UploadSettings.ThreeDModelLimit / 1048576} MB")" Class="plp-dropzone"
+                            OnClick="@OnAddPart" OnFilesDropped="@OnAddPart" />
+    </div>
+
+    @* ── Parts Count Header ─────────────────────────────────────────────── *@
+    <div class="plp-headers">
+        <span class="plp-headers-label">Parts</span>
+        <span class="plp-headers-count">@Parts.Count part(s)</span>
+    </div>
+
+    @* ── Parts List ─────────────────────────────────────────────────────── *@
+    <div class="plp-list">
+        @foreach (var part in Parts)
+        {
+            var isSelected = Parts.IndexOf(part) == SelectedIndex;
+            var unitPrice = (part.EstimatedUnitPrice ?? 0m) * CurrencyService.ExchangeRate;
+            var totalPrice = unitPrice * part.Quantity;
+            <div class="plp-part @(isSelected ? "plp-part--selected" : "")"
+                 @onclick="@(() => OnSelectPart.InvokeAsync(Parts.IndexOf(part)))">
+
+                @* Row 1: thumb + info *@
+                <div class="plp-part-main">
+                    <div class="plp-thumb">
+                        @if (part.Uploading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="false" Value="@part.ProgressPercent"
+                                                 Color="Color.Primary" />
+                        }
+                        else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
+                        {
+                            <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="plp-thumb-img"
+                                 onerror="this.style.display='none'" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Color="Color.Tertiary" />
+                        }
+                    </div>
+
+                    <div class="plp-info">
+                        <div class="plp-name">@part.Name</div>
+                        @if (part.Dimensions != null)
+                        {
+                            <div class="plp-dims">
+                                @($"{part.Dimensions.X:F0} × {part.Dimensions.Y:F0} × {part.Dimensions.Z:F0} mm")
+                            </div>
+                        }
+                        <div class="plp-meta">
+                            @if (!string.IsNullOrEmpty(part.ProcessCode))
+                            {
+                                <span class="plp-process-badge">@part.ProcessCode.ToUpperInvariant()</span>
+                            }
+                            <span class="plp-qty">× @part.Quantity</span>
+                            @if (part.HasProcessRelevantDfmIssues && !part.DfmAcknowledged)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.WarningAmber" Size="Size.Small" Color="Color.Warning"
+                                         Class="plp-warn" />
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @* Row 2: unit / ea · total *@
+                @if (part.EstimatedUnitPrice.HasValue)
+                {
+                    <div class="plp-part-price-row">
+                        @if (CurrencyService.IsConverting)
+                        {
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="80px" Height="13px" />
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="60px" Height="13px" />
+                        }
+                        else
+                        {
+                            <span class="plp-unit-ea">@CurrencyService.Symbol@unitPrice.ToString("N2") / ea</span>
+                            <span class="plp-total">@CurrencyService.Symbol@totalPrice.ToString("N2")</span>
+                        }
+                    </div>
+                }
+
+                @* Hover Actions *@
+                <div class="plp-actions">
+                    <button class="plp-action-btn" title="Duplicate" @onclick:stopPropagation="true"
+                            @onclick="@(() => OnDuplicatePart.InvokeAsync(part))">
+                        <MudIcon Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" />
+                    </button>
+                    <button class="plp-action-btn plp-action-btn--danger" title="Delete" @onclick:stopPropagation="true"
+                            @onclick="@(() => OnRemovePart.InvokeAsync(part))">
+                        <MudIcon Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" />
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* ── Footer: Total Parts ───────────────────────────────────────────── *@
+    <div class="plp-footer">
+        <span>Total parts</span>
+        <span class="plp-footer-count">@Parts.Sum(p => p.Quantity) pcs</span>
+    </div>
+</div>
+
+<style>
+    .plp-root {
+        width: 270px;
+        min-width: 270px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--maliev-panel);
+        border-right: 1px solid var(--maliev-border);
+        box-sizing: border-box;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    /* ── Page Header ────────────────────────────────────────────────────── */
+    .plp-page-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px 6px 8px;
+        border-bottom: 1px solid var(--maliev-border);
+        background: var(--maliev-panel);
+        flex-shrink: 0;
+    }
+
+    .plp-title-input {
+        flex: 1;
+        min-width: 0;
+        border: none;
+        background: transparent;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--maliev-ink);
+        outline: none;
+        padding: 2px 4px;
+        border-radius: 3px;
+    }
+
+    .plp-title-input:focus {
+        background: var(--maliev-panel-3);
+    }
+
+    .plp-duplicate-btn {
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 4px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--maliev-muted);
+        flex-shrink: 0;
+        transition: background 0.15s;
+    }
+
+    .plp-duplicate-btn:hover {
+        background: var(--maliev-panel-3);
+        color: var(--maliev-ink);
+    }
+
+    /* ── Upload Section ─────────────────────────────────────────────────── */
+    .plp-upload-section {
+        padding: 12px;
+        flex-shrink: 0;
+    }
+
+    .plp-dropzone {
+        border-color: color-mix(in oklch, var(--mud-palette-primary) 35%, transparent) !important;
+        background: var(--maliev-accent-softer) !important;
+    }
+
+    .plp-dropzone:hover {
+        background: var(--maliev-accent-soft) !important;
+        border-color: var(--mud-palette-primary) !important;
+    }
+
+    /* ── Parts Header ─────────────────────────────────────────────────── */
+    .plp-headers {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 14px;
+        border-top: 1px solid var(--maliev-border);
+        border-bottom: 1px solid var(--maliev-border);
+        background: var(--maliev-panel-3);
+        flex-shrink: 0;
+    }
+
+    .plp-headers-label {
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--maliev-muted);
+    }
+
+    .plp-headers-count {
+        font-size: 10.5px;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--maliev-ink);
+        font-weight: 600;
+        margin-left: 4px;
+    }
+
+    .plp-add-btn {
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--maliev-muted);
+        padding: 0;
+    }
+
+    .plp-add-btn:hover {
+        background: var(--maliev-panel-3);
+        color: var(--mud-palette-primary);
+    }
+
+    /* ── Parts List ────────────────────────────────────────────────────── */
+    .plp-list {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    .plp-part {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--maliev-border-subtle);
+        cursor: pointer;
+        position: relative;
+        transition: background 0.1s;
+        border-left: 2px solid transparent;
+    }
+
+    /* Row 1: thumb + info side by side */
+    .plp-part-main {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    /* Row 2: price — dashed top border, like design */
+    .plp-part-price-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px dashed var(--maliev-border-subtle);
+    }
+
+    .plp-unit-ea {
+        font-size: 10px;
+        color: var(--maliev-muted-2);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .plp-total {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--maliev-ink);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .plp-part:hover {
+        background: var(--maliev-panel-3);
+    }
+
+    .plp-part--selected {
+        background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent);
+        border-left-color: var(--mud-palette-primary);
+    }
+
+    .plp-part--selected:hover {
+        background: color-mix(in oklch, var(--mud-palette-primary) 12%, transparent);
+    }
+
+    /* ── Thumbnail ─────────────────────────────────────────────────────── */
+    .plp-thumb {
+        width: 48px;
+        height: 48px;
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        background: var(--maliev-panel-2);
+        border: 1px solid var(--maliev-border);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .plp-thumb-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* ── Info ─────────────────────────────────────────────────────────── */
+    .plp-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .plp-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--maliev-ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .plp-dims {
+        font-size: 10.5px;
+        color: var(--maliev-muted);
+        font-family: 'JetBrains Mono', monospace;
+        margin-top: 2px;
+    }
+
+    .plp-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+    }
+
+    .plp-process-badge {
+        font-size: 10px;
+        padding: 1px 5px;
+        background: color-mix(in oklch, var(--mud-palette-primary) 15%, transparent);
+        color: var(--mud-palette-primary);
+        border-radius: 3px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+
+    .plp-qty {
+        font-size: 10.5px;
+        color: var(--maliev-muted);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .plp-warn {
+        margin-left: 2px;
+    }
+
+    /* ── Hover Actions ────────────────────────────────────────────────── */
+    .plp-actions {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: none;
+        gap: 2px;
+        background: var(--maliev-panel);
+        border-radius: 4px;
+        box-shadow: var(--maliev-shadow-sm);
+        border: 1px solid var(--maliev-border);
+        padding: 2px;
+    }
+
+    .plp-part:hover .plp-actions {
+        display: flex;
+    }
+
+    .plp-action-btn {
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        color: var(--maliev-muted);
+        padding: 0;
+    }
+
+    .plp-action-btn:hover {
+        background: var(--maliev-panel-3);
+        color: var(--mud-palette-primary);
+    }
+
+    .plp-action-btn--danger:hover {
+        color: var(--maliev-danger);
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
+    .plp-footer {
+        padding: 10px 14px;
+        border-top: 1px solid var(--maliev-border);
+        background: var(--maliev-panel-3);
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-shrink: 0;
+        font-size: 11px;
+        color: var(--maliev-muted);
+    }
+
+    .plp-footer-count {
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--maliev-ink);
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    /// <summary>Project title shown in the header.</summary>
+    [Parameter] public string Title { get; set; } = string.Empty;
+
+    /// <summary>Fired when the title text changes.</summary>
+    [Parameter] public EventCallback<string> OnTitleChanged { get; set; }
+
+    /// <summary>Commits the title (called on blur/enter).</summary>
+    [Parameter] public EventCallback OnTitleCommit { get; set; }
+
+    /// <summary>True while an auto-save is in progress.</summary>
+    [Parameter] public bool AutoSaving { get; set; }
+
+    /// <summary>Timestamp of the last save.</summary>
+    [Parameter] public DateTimeOffset? LastSavedAt { get; set; }
+
+    /// <summary>True when a customer has been selected (i.e. saved, not just draft).</summary>
+    [Parameter] public bool HasCustomerSelected { get; set; }
+
+    /// <summary>Fired when the duplicate-project button is clicked.</summary>
+    [Parameter] public EventCallback OnDuplicate { get; set; }
+
+    /// <summary>All parts in the project.</summary>
+    [Parameter, EditorRequired] public List<PartViewModel> Parts { get; set; } = [];
+
+    /// <summary>Index of the currently selected part.</summary>
+    [Parameter] public int SelectedIndex { get; set; }
+
+    /// <summary>Fired when a part is selected (passes the part index).</summary>
+    [Parameter] public EventCallback<int> OnSelectPart { get; set; }
+
+    /// <summary>Fired when the add-part/upload CTA is clicked.</summary>
+    [Parameter] public EventCallback OnAddPart { get; set; }
+
+    /// <summary>Fired when a part's delete button is clicked.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
+
+    /// <summary>Fired when a part's duplicate button is clicked.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnDuplicatePart { get; set; }
+
+    protected override void OnInitialized() => CurrencyService.Changed += OnCurrencyChanged;
+    public void Dispose() => CurrencyService.Changed -= OnCurrencyChanged;
+    private void OnCurrencyChanged(object? s, EventArgs e) => InvokeAsync(StateHasChanged);
+}

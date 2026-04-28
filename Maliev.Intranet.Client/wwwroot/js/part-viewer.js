@@ -1202,8 +1202,8 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 // For multi-body models, preserve per-body palette colors.
                 if (!defaultSolidMaterials[canvasId]) defaultSolidMaterials[canvasId] = new Map();
                 const defMap = defaultSolidMaterials[canvasId];
-                const bodyMap = perCanvasBodyMap[canvasId];
-                const isMultiBody = bodyMap && bodyMap.size > 1;
+                const existingBodyMap = perCanvasBodyMap[canvasId];
+                const isMultiBody = existingBodyMap && existingBodyMap.size > 1;
                 const cadGray = getCadMaterial(_scene);
                 _scene.meshes.forEach(m => {
                     if (m.material && !defMap.has(m.uniqueId) && !isSystemMesh(m) && m.name !== '__root__' && !m.name.startsWith('__axis')) {
