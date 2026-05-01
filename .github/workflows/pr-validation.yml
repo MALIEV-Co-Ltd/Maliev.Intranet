@@ -45,7 +45,7 @@ jobs:
           if ["$BASE_BRANCH" == "main"]; then
             VERSION_FORMAT="1.0.*"
           else
-            VERSION_FORMAT="1.0.*-*"
+            VERSION_FORMAT="1.0.*-alpha*"
           fi
 
           echo "Target branch is $BASE_BRANCH. Using version format: $VERSION_FORMAT"

@@ -9,11 +9,11 @@ RUN --mount=type=secret,id=nuget_username \
     --mount=type=secret,id=nuget_password \
     NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
     NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
-    dotnet restore "Maliev.Intranet.Bff/Maliev.Intranet.Bff.csproj" /p:GITHUB_ACTIONS=true -p:SharedLibraryVersion=1.0.*-*
+    dotnet restore "Maliev.Intranet.Bff/Maliev.Intranet.Bff.csproj" /p:GITHUB_ACTIONS=true -p:SharedLibraryVersion=1.0.*-alpha*
 
 COPY . .
 WORKDIR "/Maliev.Intranet.Bff"
-RUN dotnet publish -c Release -o /app/publish --no-restore /p:GITHUB_ACTIONS=true -p:SharedLibraryVersion=1.0.*-*
+RUN dotnet publish -c Release -o /app/publish --no-restore /p:GITHUB_ACTIONS=true -p:SharedLibraryVersion=1.0.*-alpha*
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
