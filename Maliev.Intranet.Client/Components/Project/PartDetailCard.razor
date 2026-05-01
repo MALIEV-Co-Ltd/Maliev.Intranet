@@ -48,7 +48,7 @@
         </div>
     </div>
     <div class="pdc-header-tabs">
-        <button class="pdc-tab @(_activeTab == 0 ? "pdc-tab--active" : "")" @onclick="@(() => _activeTab = 0)">
+        <button class="pdc-tab @(_activeTab == 0 ? "pdc-tab--active" : "")" @onclick="@(async () => { _activeTab = 0; await Task.Yield(); if (_modelViewer != null) await _modelViewer.NotifyVisibleAsync(); })">
             <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Class="pdc-tab-icon" />
             3D Model
         </button>
@@ -105,9 +105,9 @@
     }
 
     @* ── Tab: 3D Viewer + Body Selection ───────────────────────────────────────────────── *@
-    @if (_activeTab == 0)
-    {
-    <div class="pdc-viewer-wrap pdc-polkadot">
+    @* Retain-and-hide: keep the Babylon engine alive across tab switches so GLB isn't reloaded. *@
+    <div class="pdc-viewer-wrap pdc-polkadot" style="@(_activeTab == 0 ? "" : "display:none")"
+         aria-hidden="@(_activeTab != 0 ? "true" : null)">
 
         @* Thumbnail area *@
         <div class="pdc-thumb-area">
@@ -232,7 +232,7 @@
 
     </div>
 
-    } @* end _activeTab == 0 *@
+    @* end viewer wrap — always in DOM, hidden via CSS when not on the 3D tab *@
 </div>
 
 @* ── Footer Row ─────────────────────────────────────────────────────────────────────── *@

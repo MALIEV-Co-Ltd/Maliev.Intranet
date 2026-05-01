@@ -714,6 +714,14 @@
         catch (Exception ex) { Console.WriteLine($"[ModelViewer] hideGrid error: {ex.Message}"); }
     }
 
+    /// <summary>Notifies the viewer it has become visible after being hidden. Triggers engine resize.</summary>
+    public async Task NotifyVisibleAsync()
+    {
+        if (_module == null) return;
+        try { await _module.InvokeVoidAsync("notifyViewerVisible", _canvasId); }
+        catch { /* best-effort */ }
+    }
+
     /// <summary>Removes all DFM overlay meshes for the given part from the 3D scene.</summary>
     public async Task ClearDfmOverlaysAsync(string? partKey = null)
     {

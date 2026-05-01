@@ -352,6 +352,29 @@ const sectionGhostMeshes    = {};   // canvasId → BABYLON.Mesh[] (xray clones 
 const sectionObservers      = {};   // canvasId → scene.onBeforeRenderObservable handle
 let   _sectionRebuildPending = {};  // canvasId → boolean (debounce flag)
 
+// In-memory GLB cache: key = storage path (without signed-URL query params), value = blob URL.
+// Allows instant re-render when switching back to a previously loaded part.
+const _glbBlobCache = new Map(); // Map<pathKey, blobUrl>
+const _GLB_CACHE_MAX = 8;
+function _glbCacheKey(url) {
+    try { return new URL(url).pathname; } catch (_) { return url; }
+}
+async function _fetchGlbCached(url) {
+    const key = _glbCacheKey(url);
+    if (_glbBlobCache.has(key)) return _glbBlobCache.get(key);
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`GLB fetch ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    const blobUrl = URL.createObjectURL(new Blob([buf], { type: 'model/gltf-binary' }));
+    if (_glbBlobCache.size >= _GLB_CACHE_MAX) {
+        const oldKey = _glbBlobCache.keys().next().value;
+        URL.revokeObjectURL(_glbBlobCache.get(oldKey));
+        _glbBlobCache.delete(oldKey);
+    }
+    _glbBlobCache.set(key, blobUrl);
+    return blobUrl;
+}
+
 const engines               = {};   // canvasId → BABYLON.Engine
 const scenes                = {};   // canvasId → BABYLON.Scene
 const mainCameras           = {};   // canvasId → main ArcRotateCamera  (FIX: replaces scene.activeCamera)
@@ -929,6 +952,19 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         const forcedExt = resolveExtension(fileUrl, fileExt);
         BABYLON.SceneLoader.ShowLoadingScreen = false;
 
+        // Attempt to pre-fetch the GLB into a local blob URL. This allows instant
+        // re-render on subsequent tab switches to the same part (blob URL never expires).
+        let _resolvedUrl = fileUrl;
+        if (fileUrl && (fileUrl.endsWith('.glb') || fileUrl.includes('.glb?'))) {
+            try {
+                _resolvedUrl = await _fetchGlbCached(fileUrl);
+            } catch (_fetchErr) {
+                console.warn('[BabylonViewer] GLB pre-fetch failed, falling back to direct URL:', _fetchErr.message);
+                _resolvedUrl = fileUrl;
+            }
+        }
+        const _effectiveFileUrl = _resolvedUrl;
+
         // Retry-with-backoff: the GLB may not yet be in GCS when the signed URL arrives
         // (race between the geometry worker writing the file and the SignalR event).
         // Retry up to 4 times on 404 with exponential backoff before surfacing the error to the UI.
@@ -939,7 +975,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 console.warn(`[BabylonViewer] Stale load attempt ${attempt} cancelled (gen mismatch)`);
                 return;
             }
-            BABYLON.SceneLoader.Append('', fileUrl, scene,
+            BABYLON.SceneLoader.Append('', _effectiveFileUrl, scene,
                 (_scene) => {
                 // Check again inside the async success callback — dispose() may have run while loading
                 if (loadGenerations[canvasId] !== currentGen) {
@@ -4101,6 +4137,18 @@ export function disableThicknessAnalysis(canvasId) {
 
     delete thicknessStates[canvasId];
     console.log(`[BabylonViewer] Thickness analysis disabled for canvas ${canvasId}`);
+}
+
+/**
+ * Call this when the viewer container is shown after being hidden (display:none → visible).
+ * Triggers engine resize so the canvas fills its container correctly.
+ * @param {string} canvasId
+ */
+export function notifyViewerVisible(canvasId) {
+    const engine = engines[canvasId];
+    if (engine) {
+        requestAnimationFrame(() => engine.resize());
+    }
 }
 
 // Debug handle
