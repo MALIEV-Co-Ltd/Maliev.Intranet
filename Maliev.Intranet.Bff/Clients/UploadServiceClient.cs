@@ -36,22 +36,65 @@ public class UploadServiceClient
     /// </summary>
     public async Task<BffUploadResponse?> UploadFileAsync(string fileName, Stream content, string contentType, string path, bool overwrite = true, CancellationToken ct = default)
     {
-        using var requestContent = new MultipartFormDataContent();
-        var fileContent = new StreamContent(content);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        var totalSize = GetStreamLength(content);
+        var initiateRequest = new InitiateResumableUploadRequest(
+            Path: path,
+            FileName: fileName,
+            ServiceName: "Intranet",
+            ContentType: contentType,
+            TotalSize: totalSize,
+            Overwrite: overwrite);
 
-        requestContent.Add(fileContent, "File", fileName);
-        requestContent.Add(new StringContent(path), "Path");
-        requestContent.Add(new StringContent(overwrite.ToString().ToLower()), "Overwrite");
-
-        var response = await _httpClient.PostAsync("/upload/v1/uploads", requestContent, ct);
-
-        if (response.IsSuccessStatusCode)
+        var initiateResponse = await _httpClient.PostAsJsonAsync("/upload/v1/uploads/resumable", initiateRequest, ct);
+        if (!initiateResponse.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<BffUploadResponse>(cancellationToken: ct);
+            return null;
         }
 
-        return null;
+        var session = await initiateResponse.Content.ReadFromJsonAsync<InitiateResumableUploadResponse>(cancellationToken: ct);
+        if (session == null || string.IsNullOrWhiteSpace(session.SessionUri))
+        {
+            return null;
+        }
+
+        if (content.CanSeek)
+        {
+            content.Position = 0;
+        }
+
+        using var gcsClient = new HttpClient();
+        using var uploadContent = new StreamContent(content);
+        uploadContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        uploadContent.Headers.ContentLength = totalSize;
+        uploadContent.Headers.ContentRange = new ContentRangeHeaderValue(0, totalSize - 1, totalSize);
+
+        var uploadResponse = await gcsClient.PutAsync(session.SessionUri, uploadContent, ct);
+        if (!uploadResponse.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var completeResponse = await _httpClient.PostAsJsonAsync(
+            $"/upload/v1/uploads/resumable/{session.UploadId}/complete",
+            new { },
+            ct);
+
+        if (!completeResponse.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await completeResponse.Content.ReadFromJsonAsync<BffUploadResponse>(cancellationToken: ct);
+    }
+
+    private static long GetStreamLength(Stream content)
+    {
+        if (!content.CanSeek)
+        {
+            throw new InvalidOperationException("Direct GCS uploads require a seekable stream so Content-Length and Content-Range can be set.");
+        }
+
+        return content.Length;
     }
 
     /// <summary>
@@ -225,3 +268,17 @@ public class MigratedFileEntry
     /// <summary>Gets or sets the new storage path after migration.</summary>
     public string NewPath { get; set; } = string.Empty;
 }
+
+internal sealed record InitiateResumableUploadRequest(
+    string Path,
+    string FileName,
+    string ServiceName,
+    string ContentType,
+    long TotalSize,
+    bool Overwrite);
+
+internal sealed record InitiateResumableUploadResponse(
+    string UploadId,
+    string SessionUri,
+    DateTime ExpiresAt,
+    long TotalSize);
