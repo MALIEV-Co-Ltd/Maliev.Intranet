@@ -1004,6 +1004,9 @@ public partial class ProjectNew : IAsyncDisposable
                 LeadTimeCode = _selectedLeadTime?.Code,
                 FinishId = part.FinishId,
                 ProcessOptionValues = part.ProcessOptionValues.Count > 0 ? part.ProcessOptionValues : null,
+                ToleranceCode = part.ToleranceCode,
+                ToleranceAdditionalCostPercent = part.AvailableTolerances
+                    .FirstOrDefault(t => t.Code == part.ToleranceCode)?.AdditionalCostPercent,
             };
 
             var response = await Http.PostAsJsonAsync("api/pricing/calculate", request, ct);

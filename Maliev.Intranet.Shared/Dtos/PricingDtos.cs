@@ -224,6 +224,12 @@ public record PricingRequestDto
 
     /// <summary>Dynamic process configuration option values keyed by ConfigKey (e.g. "anodize_color" → "BLACK"). Null when no options were set.</summary>
     public Dictionary<string, string?>? ProcessOptionValues { get; init; }
+
+    /// <summary>The selected tolerance class code (e.g. "IT6", "ISO2768_M"). Informational; the cost impact is carried by <see cref="ToleranceAdditionalCostPercent"/>.</summary>
+    public string? ToleranceCode { get; init; }
+
+    /// <summary>The additional cost percentage for the selected tolerance class (e.g. 60 for IT6 = +60%). Applied as a multiplier by the pricing engine.</summary>
+    public decimal? ToleranceAdditionalCostPercent { get; init; }
 }
 
 /// <summary>
