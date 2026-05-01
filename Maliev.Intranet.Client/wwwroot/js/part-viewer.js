@@ -2530,19 +2530,20 @@ export function setCameraProjection(canvasId, mode) {
 // ── DFM Overlays ──────────────────────────────────────────────────────────────
 // overlayMeshes[canvasId] → Map<overlayKey, BABYLON.AbstractMesh[]>
 // overlayLoading[canvasId] → Set<overlayKey> (prevents concurrent loads)
-const overlayMeshes  = {};
-const overlayLoading = {};
+// overlayIntendedVisible[canvasId] → Map<overlayKey, boolean> (handles race: hide before lazy load)
+const overlayMeshes          = {};
+const overlayLoading         = {};
+const overlayIntendedVisible = {};
 
-/**
 // Per-category PBR material overrides for DFM overlays.
 // Keys are the category suffix (everything after the last "__" in the overlay key).
 // If a key is absent the default red style is used.
 const OVERLAY_STYLES = {
     overhang_support: {
-        albedo:   () => new BABYLON.Color3(0.68, 0.85, 0.95), // light blue
-        alpha:    0.35,
-        emissive: () => new BABYLON.Color3(0.02, 0.08, 0.12),
-        zOffset:  0, // support towers sit below the surface — no depth bias needed
+        albedo:   () => new BABYLON.Color3(0.55, 0.78, 0.95), // cool blue-grey
+        alpha:    0.18,
+        emissive: () => new BABYLON.Color3(0.04, 0.10, 0.18),
+        zOffset:  0,
     },
 };
 
@@ -2553,23 +2554,29 @@ const OVERLAY_STYLES = {
  * @param {string} glbUrl      Signed URL to the overlay GLB
  * @param {boolean} visible    true = show, false = hide
  */
-export async function toggleDfmOverlay(canvasId, overlayKey, glbUrl, visible) {
+export async function toggleDfmOverlay(canvasId, partKey, overlayKey, glbUrl, visible) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
-    overlayMeshes[canvasId]  ??= new Map();
-    overlayLoading[canvasId] ??= new Set();
+    // Use a composite slot so each part's overlays never collide with another part's.
+    const slot = `${canvasId}::${partKey}`;
+    overlayMeshes[slot]          ??= new Map();
+    overlayLoading[slot]         ??= new Set();
+    overlayIntendedVisible[slot] ??= new Map();
 
-    const existing = overlayMeshes[canvasId].get(overlayKey);
+    // Always record the intended visibility so the post-load callback can apply it.
+    overlayIntendedVisible[slot].set(overlayKey, visible);
+
+    const existing = overlayMeshes[slot].get(overlayKey);
     if (existing) {
         existing.forEach(m => { m.isVisible = visible; });
         return;
     }
 
-    if (!visible) return; // nothing to hide if not loaded yet
+    if (!visible) return; // nothing to load for a hide-before-load request
 
-    if (overlayLoading[canvasId].has(overlayKey)) return; // already loading
-    overlayLoading[canvasId].add(overlayKey);
+    if (overlayLoading[slot].has(overlayKey)) return; // already loading
+    overlayLoading[slot].add(overlayKey);
 
     try {
         const result = await BABYLON.SceneLoader.ImportMeshAsync('', '', glbUrl, scene, null, '.glb');
@@ -2632,11 +2639,14 @@ export async function toggleDfmOverlay(canvasId, overlayKey, glbUrl, visible) {
             mesh.isPickable = false;
         });
 
-        overlayMeshes[canvasId].set(overlayKey, meshes);
+        overlayMeshes[slot].set(overlayKey, meshes);
+        // Apply the most-recent intended visibility (may have been toggled off while loading).
+        const shouldShow = overlayIntendedVisible[slot]?.get(overlayKey) ?? true;
+        if (!shouldShow) meshes.forEach(m => { m.isVisible = false; });
     } catch (err) {
         console.error(`[BabylonViewer] Failed to load overlay ${overlayKey}:`, err);
     } finally {
-        overlayLoading[canvasId].delete(overlayKey);
+        overlayLoading[slot].delete(overlayKey);
     }
 }
 
@@ -2644,12 +2654,16 @@ export async function toggleDfmOverlay(canvasId, overlayKey, glbUrl, visible) {
  * Removes all DFM overlay meshes for the given canvas.
  * @param {string} canvasId
  */
-export function clearDfmOverlays(canvasId) {
-    const map = overlayMeshes[canvasId];
-    if (!map) return;
-    map.forEach(meshes => meshes.forEach(m => m.dispose()));
-    map.clear();
-    if (overlayLoading[canvasId]) overlayLoading[canvasId].clear();
+export function clearDfmOverlays(canvasId, partKey) {
+    const slot = partKey ? `${canvasId}::${partKey}` : canvasId;
+    const map = overlayMeshes[slot];
+    if (map) {
+        map.forEach(meshes => meshes.forEach(m => m.dispose()));
+        map.clear();
+        delete overlayMeshes[slot];
+    }
+    if (overlayLoading[slot]) { overlayLoading[slot].clear(); delete overlayLoading[slot]; }
+    if (overlayIntendedVisible[slot]) { overlayIntendedVisible[slot].clear(); delete overlayIntendedVisible[slot]; }
 }
 
 // ── setSectionPlane ──────────────────────────────────────────────────────────
@@ -3213,9 +3227,18 @@ export function dispose(canvasId) {
     delete autoSpeedCurrent[canvasId];
     delete autoSpeedTarget[canvasId];
 
-    clearDfmOverlays(canvasId);
-    delete overlayMeshes[canvasId];
-    delete overlayLoading[canvasId];
+    // Clean up all per-part overlay slots for this canvas.
+    const prefix = `${canvasId}::`;
+    [overlayMeshes, overlayLoading, overlayIntendedVisible].forEach(obj => {
+        Object.keys(obj).forEach(k => {
+            if (k === canvasId || k.startsWith(prefix)) {
+                if (obj === overlayMeshes && obj[k] instanceof Map) {
+                    obj[k].forEach(meshes => meshes.forEach(m => m.dispose()));
+                }
+                delete obj[k];
+            }
+        });
+    });
     delete modelScaleFactors[canvasId];
     delete modelCenterOffsets[canvasId];
 

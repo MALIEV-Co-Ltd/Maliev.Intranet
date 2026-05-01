@@ -426,6 +426,7 @@
     {
         var partChanged = Part.FileId != _lastPartId;
         var processChanged = Part.ProcessCode != _lastProcessCode;
+        var prevPartId = _lastPartId;
         _lastPartId = Part.FileId;
         _lastProcessCode = Part.ProcessCode;
 
@@ -433,7 +434,7 @@
         {
             _dfmPanel?.ResetOverlays();
             if (_modelViewer != null)
-                await _modelViewer.ClearDfmOverlaysAsync();
+                await _modelViewer.ClearDfmOverlaysAsync(prevPartId.ToString());
             if (partChanged)
             {
                 _viewerLoadFailed = false;
@@ -646,7 +647,8 @@
         if (_modelViewer == null || issue.OverlayKey == null || issue.OverlayUrl == null) return;
         // _dfmPanel tracks active state; just check if the key is now active
         var isActive = _dfmPanel?._activeOverlays.Contains(issue.OverlayKey) ?? false;
-        await _modelViewer.ToggleDfmOverlayAsync(issue.OverlayKey, issue.OverlayUrl, isActive);
+        var fileId = Part.FileId.ToString();
+        await _modelViewer.ToggleDfmOverlayAsync(fileId, issue.OverlayKey, issue.OverlayUrl, isActive);
 
         // Co-toggle the support-tower overlay whenever an overhang overlay is toggled.
         // Support key is the same key with "_support" appended to the "__overhang" suffix.
@@ -657,9 +659,9 @@
             // For hide, pass empty URL — the JS only needs the key to set isVisible=false.
             // For show, we need the actual URL; skip if unavailable.
             if (!isActive)
-                await _modelViewer.ToggleDfmOverlayAsync(supportKey, supportUrl ?? string.Empty, false);
+                await _modelViewer.ToggleDfmOverlayAsync(fileId, supportKey, supportUrl ?? string.Empty, false);
             else if (supportUrl != null)
-                await _modelViewer.ToggleDfmOverlayAsync(supportKey, supportUrl, true);
+                await _modelViewer.ToggleDfmOverlayAsync(fileId, supportKey, supportUrl, true);
         }
 
         // Show/hide the grid floor when overhang overlay is toggled
