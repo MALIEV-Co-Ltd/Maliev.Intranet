@@ -1,0 +1,234 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Client.Components.Shared
+@using System.Net.Http.Json
+@using MudBlazor
+@inject HttpClient Http
+@inject FileTypesSettings FileTypes
+@inject UploadSettings UploadSettings
+@inject ISnackbar Snackbar
+
+<div class="dat-root">
+    @* ── Left column: dropzone + file list ── *@
+    <div class="dat-list-col">
+        <div class="dat-dropzone-wrap">
+            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                           FilesChanged="@HandleFilesSelected"
+                           Accept="@FileTypes.DrawingAcceptString"
+                           MaximumFileCount="10"
+                           Disabled="@_uploading">
+                <CustomContent>
+                    <div style="opacity:@(_uploading ? "0.5" : "1"); pointer-events:@(_uploading ? "none" : "auto");">
+                        <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
+                                            MaxFileSizeLabel="@($"max {UploadSettings.DrawingLimit / 1048576} MB")"
+                                            Label="Drop drawings here or click to upload"
+                                            SubLabel="@FileTypes.DrawingSubLabel"
+                                            OnFilesDropped="@(() => context.OpenFilePickerAsync())"
+                                            OnClick="@(() => context.OpenFilePickerAsync())" />
+                    </div>
+                </CustomContent>
+            </MudFileUpload>
+        </div>
+
+        @if (_uploading)
+        {
+            <div class="dat-uploading">
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                <span class="dat-uploading-label">Uploading…</span>
+            </div>
+        }
+
+        @if (Part.DrawingFiles.Count > 0)
+        {
+            <div class="dat-list">
+                @foreach (var file in Part.DrawingFiles)
+                {
+                    var selected = _selectedFileId == file.FileId;
+                    var f = file;
+                    <div class="dat-row @(selected ? "dat-row--active" : "")"
+                         @onclick="@(() => SelectDrawingAsync(f))"
+                         @onmouseenter="@(() => _hoveredFileId = f.FileId)"
+                         @onmouseleave="@(() => _hoveredFileId = null)">
+                        <MudIcon Icon="@GetFileIcon(f.Name)"
+                                 Size="Size.Small"
+                                 Color="@(selected ? Color.Primary : Color.Default)"
+                                 Class="dat-row-icon" />
+                        <div class="dat-row-info">
+                            <div class="dat-row-name" title="@f.Name">@f.Name</div>
+                            <div class="dat-row-meta">
+                                <span class="dat-row-ext">@System.IO.Path.GetExtension(f.Name).TrimStart('.').ToUpperInvariant()</span>
+                                <span class="dat-row-sep">·</span>
+                                <span class="dat-row-size">@FormatSize(f.FileSizeBytes)</span>
+                                <span class="dat-row-sep">·</span>
+                                <span class="dat-row-date" title="@f.UploadedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")">@f.UploadedAt.ToLocalTime().ToString("MMM d")</span>
+                            </div>
+                        </div>
+                        @if (_hoveredFileId == f.FileId)
+                        {
+                            <button class="dat-row-delete" title="Remove" @onclick:stopPropagation
+                                    @onclick="@(() => DeleteDrawingAsync(f))">
+                                <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else if (!_uploading)
+        {
+            <div class="dat-empty">
+                <MudIcon Icon="@Icons.Material.Outlined.Image" Color="Color.Default" Size="Size.Large" />
+                <span>No drawings uploaded yet</span>
+            </div>
+        }
+    </div>
+
+    @* ── Right column: preview ── *@
+    <div class="dat-preview-col">
+        @if (_previewUrl != null)
+        {
+            <iframe src="@_previewUrl" class="dat-preview-iframe" title="Drawing preview" />
+        }
+        else
+        {
+            <div class="dat-preview-placeholder">
+                <MudIcon Icon="@Icons.Material.Outlined.Preview" Color="Color.Default" Size="Size.Large" />
+                <span>Select a file to preview</span>
+            </div>
+        }
+    </div>
+</div>
+
+
+@code {
+    [Parameter, EditorRequired] public PartViewModel Part { get; set; } = null!;
+    [Parameter] public Guid TempProjectId { get; set; }
+    [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
+
+    private bool _uploading;
+    private Guid? _selectedFileId;
+    private Guid? _hoveredFileId;
+    private string? _previewUrl;
+
+    private async Task HandleFilesSelected(IReadOnlyList<IBrowserFile> files) => await UploadFilesAsync(files);
+
+    private async Task UploadFilesAsync(IReadOnlyList<IBrowserFile>? files)
+    {
+        if (files == null || files.Count == 0) return;
+        _uploading = true;
+        StateHasChanged();
+
+        foreach (var file in files)
+        {
+            if (file.Size > UploadSettings.DrawingLimit)
+            {
+                Snackbar.Add($"{file.Name} exceeds the {UploadSettings.DrawingLimit / 1048576} MB limit", Severity.Warning);
+                continue;
+            }
+
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                var stream = file.OpenReadStream(UploadSettings.DrawingLimit);
+                content.Add(new StreamContent(stream), "files", file.Name);
+
+                var url = $"api/uploads/attachments?projectId={TempProjectId}&partId={Part.FileId}&kind=Drawing";
+                var resp = await Http.PostAsync(url, content);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var added = await resp.Content.ReadFromJsonAsync<List<DraftProjectAttachmentDto>>();
+                    if (added != null)
+                    {
+                        Part.DrawingFiles.AddRange(added);
+                        await OnPartChanged.InvokeAsync(Part);
+                    }
+                }
+                else
+                {
+                    Snackbar.Add($"Failed to upload {file.Name}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error uploading {file.Name}: {ex.Message}", Severity.Error);
+            }
+        }
+
+        _uploading = false;
+        StateHasChanged();
+    }
+
+    private async Task SelectDrawingAsync(DraftProjectAttachmentDto file)
+    {
+        if (_selectedFileId == file.FileId)
+        {
+            _selectedFileId = null;
+            _previewUrl = null;
+            return;
+        }
+
+        _selectedFileId = file.FileId;
+        _previewUrl = null;
+
+        try
+        {
+            var resp = await Http.GetAsync($"api/uploads/preview-url?storagePath={Uri.EscapeDataString(file.StoragePath)}");
+            if (resp.IsSuccessStatusCode)
+            {
+                var doc = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
+                _previewUrl = doc?.RootElement.GetProperty("url").GetString();
+            }
+        }
+        catch
+        {
+            Snackbar.Add("Could not load preview", Severity.Warning);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task DeleteDrawingAsync(DraftProjectAttachmentDto file)
+    {
+        try
+        {
+            var resp = await Http.DeleteAsync($"api/uploads/attachments/{file.FileId}");
+            if (resp.IsSuccessStatusCode)
+            {
+                Part.DrawingFiles.Remove(file);
+                if (_selectedFileId == file.FileId)
+                {
+                    _selectedFileId = null;
+                    _previewUrl = null;
+                }
+                await OnPartChanged.InvokeAsync(Part);
+            }
+            else
+            {
+                Snackbar.Add("Failed to remove drawing", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+
+        StateHasChanged();
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1048576 => $"{bytes / 1048576.0:F1} MB",
+        >= 1024    => $"{bytes / 1024} KB",
+        _          => $"{bytes} B",
+    };
+
+    private static string GetFileIcon(string name) =>
+        System.IO.Path.GetExtension(name).ToLowerInvariant() switch
+        {
+            ".pdf"          => Icons.Material.Outlined.PictureAsPdf,
+            ".dwg" or ".dxf"=> Icons.Material.Outlined.Architecture,
+            ".png" or ".jpg" or ".jpeg" or ".webp" => Icons.Material.Outlined.Image,
+            _               => Icons.Material.Outlined.InsertDriveFile,
+        };
+}

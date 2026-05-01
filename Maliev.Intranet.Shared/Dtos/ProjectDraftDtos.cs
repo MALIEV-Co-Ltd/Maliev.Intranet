@@ -147,6 +147,12 @@ public sealed class DraftPartState
     /// <summary>Whether the part mesh is manifold (watertight). Null until analysis completes.</summary>
     public bool? IsManifold { get; set; }
 
+    /// <summary>Human-readable explanation of why the mesh is non-manifold. Null when manifold or not yet determined.</summary>
+    public string? NonManifoldReason { get; set; }
+
+    /// <summary>Approximate count of broken/non-manifold faces. Null when manifold or not determined.</summary>
+    public int? NonManifoldFaceCount { get; set; }
+
     /// <summary>Signed URL to the small (~256px) isometric thumbnail. Restored to avoid re-fetching on reload.</summary>
     public string? ThumbnailSmallUrl { get; set; }
 
@@ -269,6 +275,9 @@ public sealed class DraftProjectAttachmentDto
 
     /// <summary>The kind of attachment (Drawing or Supplementary).</summary>
     public DraftAttachmentKind Kind { get; set; }
+
+    /// <summary>UTC timestamp when the file was uploaded.</summary>
+    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>Describes the type of marking applied to a manufactured part.</summary>

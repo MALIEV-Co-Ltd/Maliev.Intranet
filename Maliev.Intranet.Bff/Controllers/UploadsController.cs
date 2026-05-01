@@ -260,6 +260,7 @@ public class UploadsController(
                 FileType = contentType,
                 FileSizeBytes = file.Length,
                 Kind = kind == "Drawing" ? DraftAttachmentKind.Drawing : DraftAttachmentKind.Supplementary,
+                UploadedAt = DateTime.UtcNow,
             });
         }
 
