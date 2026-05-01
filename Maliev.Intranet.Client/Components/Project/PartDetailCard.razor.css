@@ -46,8 +46,26 @@
 }
 
 @media (max-width: 1200px) {
+    .pdc-root,
+    .pdc-container,
+    .pdc-viewer-wrap {
+        overflow: visible;
+        min-height: unset;
+    }
+
+    .pdc-container,
+    .pdc-viewer-wrap {
+        display: block;
+    }
+
     .pdc-thumb-area {
-        min-height: 360px;
+        position: sticky;
+        top: 51px;
+        z-index: 5;
+        height: 45dvh;
+        min-height: 320px;
+        max-height: 520px;
+        background: var(--maliev-panel-2);
     }
 }
 .pdc-thumb-blurred {
@@ -225,10 +243,39 @@
     font-weight: 700;
 }
 @media (max-width: 600px) {
+    .pdc-header {
+        height: auto;
+        min-height: 44px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: 8px;
+    }
+
+    .pdc-header-left {
+        flex-basis: 100%;
+    }
+
+    .pdc-header-tabs {
+        order: 3;
+        width: 100%;
+    }
+
+    .pdc-tab {
+        flex: 1;
+        justify-content: center;
+        padding-inline: 6px;
+    }
+
     .pdc-body-tree {
         top: 8px;
         right: 8px;
         max-width: calc(50% - 12px);
+    }
+
+    .pdc-thumb-area {
+        top: 84px;
+        height: 42dvh;
+        min-height: 280px;
     }
 }
 

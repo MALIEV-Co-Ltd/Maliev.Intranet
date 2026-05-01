@@ -10,9 +10,10 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.Services.AddAuthorizationCore();
 
 // Use PersistentAuthenticationStateProvider: reads claims persisted during SSR (fast path),
-// falls back to GET /api/auth/user only when persisted state is unavailable.
+// falls back to GET /api/v1/auth/user only when persisted state is unavailable.
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
+builder.Services.AddScoped<CurrencyService>();
 builder.Services.AddScoped<IProjectDraftService, ProjectDraftService>();
 builder.Services.AddScoped<CookieProvider>();
 builder.Services.AddScoped<ChatService>();

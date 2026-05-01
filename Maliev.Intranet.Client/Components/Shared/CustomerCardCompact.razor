@@ -1,0 +1,40 @@
+@namespace Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Shared.Dtos
+
+<div class="ccc-root">
+    <div class="ccc-avatar">@GetInitials(Customer.Name)</div>
+    <div class="ccc-info">
+        <div class="ccc-name">@Customer.Name</div>
+        @if (!string.IsNullOrEmpty(Customer.CompanyName))
+        {
+            <div class="ccc-sub">@Customer.CompanyName</div>
+        }
+        else if (!string.IsNullOrEmpty(Customer.Email))
+        {
+            <div class="ccc-sub">@Customer.Email</div>
+        }
+    </div>
+    <button class="ccc-clear" title="Change customer" @onclick="@(() => OnClear.InvokeAsync())">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+    </button>
+</div>
+
+
+@code {
+    [Parameter, EditorRequired] public CustomerSummaryDto Customer { get; set; } = null!;
+    [Parameter] public EventCallback OnClear { get; set; }
+
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+            : name.Length >= 2
+                ? $"{name[0]}{name[1]}".ToUpperInvariant()
+                : name[0].ToString().ToUpperInvariant();
+    }
+}

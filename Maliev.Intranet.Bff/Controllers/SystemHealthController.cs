@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -11,7 +12,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 [RequirePermission(MalievPermissions.System.HealthRead, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/system-health")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/system-health")]
 public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfiguration configuration) : ControllerBase
 {
     private static readonly string[] ServicesToCheck =

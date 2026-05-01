@@ -18,22 +18,22 @@ public class JobsControllerTests
 {
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
-    private static readonly Guid JobId     = Guid.NewGuid();
+    private static readonly Guid JobId = Guid.NewGuid();
     private static readonly Guid MachineId = Guid.NewGuid();
 
     private static JobSummaryDto SampleJob() => new()
     {
-        Id          = JobId,
-        JobNumber   = "JOB-1042",
-        Status      = "InProgress",
-        Priority    = "High",
+        Id = JobId,
+        JobNumber = "JOB-1042",
+        Status = "InProgress",
+        Priority = "High",
         ProcessType = "FDM",
         CustomerName = "Acme Corp"
     };
 
     private static ProductionQueueDto SampleQueue() => new()
     {
-        Jobs  = new() { SampleJob() },
+        Jobs = new() { SampleJob() },
         Stats = new() { InProgressCount = 1 }
     };
 
@@ -41,7 +41,7 @@ public class JobsControllerTests
     {
         var handler = new MockHttpMessageHandler((_, _) =>
             Task.FromResult(new HttpResponseMessage(code)
-                { Content = JsonContent.Create(responseBody) }));
+            { Content = JsonContent.Create(responseBody) }));
         return new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
     }
 
@@ -56,7 +56,7 @@ public class JobsControllerTests
     {
         var handler = new MockHttpMessageHandler((_, _) =>
             Task.FromResult(new HttpResponseMessage(code)
-                { Content = JsonContent.Create(responseBody) }));
+            { Content = JsonContent.Create(responseBody) }));
         return new OrderServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
     }
 
@@ -64,7 +64,7 @@ public class JobsControllerTests
     {
         var handler = new MockHttpMessageHandler((_, _) =>
             Task.FromResult(new HttpResponseMessage(code)
-                { Content = JsonContent.Create(responseBody) }));
+            { Content = JsonContent.Create(responseBody) }));
         return new UploadServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
     }
 

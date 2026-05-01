@@ -77,14 +77,14 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                 return (url, false);
             }
 
-            var frontResult          = await ResolveUrlAsync(previews.FrontSmall);
+            var frontResult = await ResolveUrlAsync(previews.FrontSmall);
             var thumbnailSmallResult = await ResolveUrlAsync(previews.ThumbnailSmall);
             var thumbnailLargeResult = await ResolveUrlAsync(previews.ThumbnailLarge);
-            var backResult           = await ResolveUrlAsync(previews.BackSmall);
-            var leftResult           = await ResolveUrlAsync(previews.LeftSmall);
-            var rightResult          = await ResolveUrlAsync(previews.RightSmall);
-            var topResult            = await ResolveUrlAsync(previews.TopSmall);
-            var bottomResult         = await ResolveUrlAsync(previews.BottomSmall);
+            var backResult = await ResolveUrlAsync(previews.BackSmall);
+            var leftResult = await ResolveUrlAsync(previews.LeftSmall);
+            var rightResult = await ResolveUrlAsync(previews.RightSmall);
+            var topResult = await ResolveUrlAsync(previews.TopSmall);
+            var bottomResult = await ResolveUrlAsync(previews.BottomSmall);
 
             bool anyUrlFailed = frontResult.Failed || thumbnailSmallResult.Failed || thumbnailLargeResult.Failed
                 || backResult.Failed || leftResult.Failed || rightResult.Failed || topResult.Failed || bottomResult.Failed;
@@ -95,16 +95,16 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
 
             var previewUrlsDto = new FileAnalysisPreviewUrlsDto
             {
-                FrontSmall            = frontResult.Url,
-                BackSmall             = backResult.Url,
-                LeftSmall             = leftResult.Url,
-                RightSmall            = rightResult.Url,
-                TopSmall              = topResult.Url,
-                BottomSmall           = bottomResult.Url,
-                ThumbnailSmall        = thumbnailSmallResult.Url,
-                ThumbnailLargeUrl      = thumbnailLargeResult.Url,
-                ThumbnailSmallGcsPath  = previews.ThumbnailSmall,
-                ThumbnailLargeGcsPath  = previews.ThumbnailLarge,
+                FrontSmall = frontResult.Url,
+                BackSmall = backResult.Url,
+                LeftSmall = leftResult.Url,
+                RightSmall = rightResult.Url,
+                TopSmall = topResult.Url,
+                BottomSmall = bottomResult.Url,
+                ThumbnailSmall = thumbnailSmallResult.Url,
+                ThumbnailLargeUrl = thumbnailLargeResult.Url,
+                ThumbnailSmallGcsPath = previews.ThumbnailSmall,
+                ThumbnailLargeGcsPath = previews.ThumbnailLarge,
             };
 
             bool overallFailed = payload.Failed || anyUrlFailed;

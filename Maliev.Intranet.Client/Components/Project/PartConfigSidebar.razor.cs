@@ -27,8 +27,8 @@ public partial class PartConfigSidebar : ComponentBase
     [Inject] public IDialogService DialogService { get; set; } = null!;
     /// <summary>JavaScript runtime for browser interop.</summary>
     [Inject] public IJSRuntime JSRuntime { get; set; } = null!;
-    
-    
+
+
     /// <summary>The part to configure. When null, an empty state message is shown.</summary>
     [Parameter] public PartViewModel? Part { get; set; }
 
@@ -146,7 +146,7 @@ public partial class PartConfigSidebar : ComponentBase
         try
         {
             var request = new BulkPricingRequestDto { BaseUnitPrice = basePrice, Quantities = [1, 2, 5, 10, 25, 50, 100] };
-            var response = await Http.PostAsJsonAsync("api/pricing/bulk", request);
+            var response = await Http.PostAsJsonAsync("api/v1/pricing/bulk", request);
             if (response.IsSuccessStatusCode)
             {
                 var tiers = await response.Content.ReadFromJsonAsync<List<BulkPriceTierDto>>();
@@ -304,7 +304,7 @@ public partial class PartConfigSidebar : ComponentBase
                 BaseUnitPrice = Part.EstimatedUnitPrice.Value,
                 FinishIds = Part.AvailableFinishes.Select(f => f.Id).ToList(),
             };
-            var response = await Http.PostAsJsonAsync("api/pricing/finish-options", request);
+            var response = await Http.PostAsJsonAsync("api/v1/pricing/finish-options", request);
             if (response.IsSuccessStatusCode)
             {
                 var items = await response.Content.ReadFromJsonAsync<List<FinishPriceItemDto>>();
@@ -430,7 +430,7 @@ public partial class PartConfigSidebar : ComponentBase
                 part.FileId, process.Code);
 
             var response = await Http.PostAsJsonAsync(
-                $"api/geometry/{part.FileId}/dfm/{process.Code}",
+                $"api/v1/geometry/{part.FileId}/dfm/{process.Code}",
                 new GeometryAnalysisRequest { StoragePath = part.StoragePath },
                 token
             );
@@ -538,7 +538,7 @@ public partial class PartConfigSidebar : ComponentBase
             try
             {
                 var resp = await Http.GetAsync(
-                    $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(path)}");
+                    $"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(path)}");
                 if (resp.IsSuccessStatusCode)
                 {
                     var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();

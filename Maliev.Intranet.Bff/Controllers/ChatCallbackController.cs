@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// and pushes them to SignalR clients.
 /// </summary>
 [ApiController]
-[Route("api/chat/callback")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/chat/callback")]
 [AllowAnonymous] // Internal service-to-service call
 public class ChatCallbackController(ChatHubService chatHubService, ILogger<ChatCallbackController> logger) : ControllerBase
 {

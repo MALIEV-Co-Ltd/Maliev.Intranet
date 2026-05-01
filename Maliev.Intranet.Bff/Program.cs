@@ -40,6 +40,7 @@ try
 
     // Add Service Defaults (OpenTelemetry, health checks, etc.)
     builder.AddServiceDefaults();
+    builder.Services.AddDefaultApiVersioning();
     builder.AddServiceMeters("intranet-meter");
 
     // Add services to the container.
@@ -232,6 +233,7 @@ try
                         identity?.AddClaim(new System.Security.Claims.Claim("access_token", accessToken));
 
                         // Do NOT add roles/permissions to cookie - they will be read from JWT during authorization
+                        identity?.AddClaim(new System.Security.Claims.Claim("permissions", MalievPermissions.Auth.SessionsRead));
 
                         // Auto-bootstrap: promote first employee to platform owner in Development.
                         // After a successful promote, re-exchange the token so the cookie JWT
@@ -441,9 +443,9 @@ try
     {
         // DFM analysis takes 30–300 s — a long-running, non-idempotent operation that should not be retried frequently.
         // 300 s covers typical DFM workloads; GeometryService has its own 300 s timeout for actual processing.
-        options.AttemptTimeout.Timeout          = TimeSpan.FromSeconds(300);
-        options.TotalRequestTimeout.Timeout     = TimeSpan.FromSeconds(630);
-        options.Retry.MaxRetryAttempts          = 1;
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(300);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(630);
+        options.Retry.MaxRetryAttempts = 1;
         options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(660); // ≥ 2 × AttemptTimeout
     });
 
@@ -552,7 +554,7 @@ try
     else if (app.Environment.IsDevelopment())
         app.UseExceptionHandler();
     else
-        { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }
+    { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }
 
     if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
     app.UseStaticFiles();

@@ -71,7 +71,7 @@
         _isSaving = true;
         try
         {
-            var response = await Http.PostAsJsonAsync($"api/equipments/{EquipmentId}/attachments", _request);
+            var response = await Http.PostAsJsonAsync($"api/v1/equipments/{EquipmentId}/attachments", _request);
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Attachment added.", Severity.Success);

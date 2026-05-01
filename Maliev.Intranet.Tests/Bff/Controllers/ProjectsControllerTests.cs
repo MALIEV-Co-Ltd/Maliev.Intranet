@@ -76,7 +76,7 @@ public class ProjectsControllerTests
                 Content = JsonContent.Create(new PagedResponse<ProjectSummaryDto>())
             });
         });
-        var client     = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+        var client = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
         var controller = new ProjectsController(client, StubJobClient(), StubFacilityClient(), Logger);
 
         await controller.Get(status: "Configuring", ct: CancellationToken.None);
@@ -120,7 +120,7 @@ public class ProjectsControllerTests
         var result = await controller.Create(new CreateProjectRequest
         {
             CustomerId = Guid.NewGuid(),
-            Title      = "Test Project"
+            Title = "Test Project"
         }, CancellationToken.None);
 
         Assert.IsType<CreatedAtActionResult>(result.Result);
@@ -134,7 +134,7 @@ public class ProjectsControllerTests
         var result = await controller.Create(new CreateProjectRequest
         {
             CustomerId = Guid.NewGuid(),
-            Title      = "Test"
+            Title = "Test"
         }, CancellationToken.None);
 
         var status = Assert.IsType<ObjectResult>(result.Result);
@@ -181,7 +181,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task AddPart_WhenSuccessful_ShouldReturnOk()
     {
-        var part       = new ProjectPartDto { Id = Guid.NewGuid(), FileName = "bracket.stl" };
+        var part = new ProjectPartDto { Id = Guid.NewGuid(), FileName = "bracket.stl" };
         var controller = new ProjectsController(CreateClient(part), StubJobClient(), StubFacilityClient(), Logger);
 
         var result = await controller.AddPart(Guid.NewGuid(),
@@ -219,7 +219,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task GetPartPrice_WhenSuccessful_ShouldReturnBreakdown()
     {
-        var breakdown  = new ProjectPriceBreakdownDto { TotalPerUnit = 250m };
+        var breakdown = new ProjectPriceBreakdownDto { TotalPerUnit = 250m };
         var controller = new ProjectsController(CreateClient(breakdown), StubJobClient(), StubFacilityClient(), Logger);
 
         var result = await controller.GetPartPrice(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -311,7 +311,7 @@ public class ProjectsControllerTests
     [Fact]
     public async Task GetPartRouting_BothServicesSucceed_ReturnsRoutingWithQueueAndMachine()
     {
-        var queueJson   = "{\"FDM\":3}";
+        var queueJson = "{\"FDM\":3}";
         var machineJson = "{\"Items\":[{\"Id\":\"11111111-1111-1111-1111-111111111111\",\"AssetCode\":\"MAL-FDM-001\",\"Name\":\"Bambu X1C\",\"Category\":\"FdmPrinter\",\"Status\":\"Active\",\"UpdatedAt\":\"2026-01-01T00:00:00Z\"}],\"TotalCount\":1,\"Page\":1}";
 
         var jobHandler = new MockHttpMessageHandler((req, _) =>
@@ -328,7 +328,7 @@ public class ProjectsControllerTests
 
         var result = await controller.GetPartRouting(Guid.NewGuid(), Guid.NewGuid(), processType: "FDM", CancellationToken.None);
 
-        var ok  = Assert.IsType<OkObjectResult>(result.Result);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<ProductionRoutingDto>(ok.Value);
         Assert.Equal(3, dto.QueueAhead);
         Assert.Equal("MAL-FDM-001", dto.MachineCode);
@@ -352,7 +352,7 @@ public class ProjectsControllerTests
 
         var result = await controller.GetPartRouting(Guid.NewGuid(), Guid.NewGuid(), processType: "FDM", CancellationToken.None);
 
-        var ok  = Assert.IsType<OkObjectResult>(result.Result);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<ProductionRoutingDto>(ok.Value);
         Assert.Equal(0, dto.QueueAhead);
         Assert.Equal("MAL-FDM-002", dto.MachineCode);
@@ -371,7 +371,7 @@ public class ProjectsControllerTests
 
         var result = await controller.GetPartRouting(Guid.NewGuid(), Guid.NewGuid(), processType: "FDM", CancellationToken.None);
 
-        var ok  = Assert.IsType<OkObjectResult>(result.Result);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<ProductionRoutingDto>(ok.Value);
         Assert.Equal(1, dto.QueueAhead);
         Assert.Equal("TBD", dto.MachineCode);
@@ -387,7 +387,7 @@ public class ProjectsControllerTests
 
         var result = await controller.GetPartRouting(Guid.NewGuid(), Guid.NewGuid(), processType: "CNC_MILL", CancellationToken.None);
 
-        var ok  = Assert.IsType<OkObjectResult>(result.Result);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<ProductionRoutingDto>(ok.Value);
         Assert.True(dto.EstimatedStartDate >= before);
     }
@@ -399,7 +399,7 @@ public class ProjectsControllerTests
 
         var result = await controller.GetPartRouting(Guid.NewGuid(), Guid.NewGuid(), processType: "UNKNOWN_PROCESS", CancellationToken.None);
 
-        var ok  = Assert.IsType<OkObjectResult>(result.Result);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<ProductionRoutingDto>(ok.Value);
         Assert.Equal("TBD", dto.MachineCode);
         Assert.Equal("Unassigned", dto.MachineName);

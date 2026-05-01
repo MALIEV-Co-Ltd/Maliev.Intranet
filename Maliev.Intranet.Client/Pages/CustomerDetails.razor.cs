@@ -45,7 +45,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
     private bool _isSaving = false;
     private bool _canChangeEmail = false;
     private int _activeTabIndex = 0;
-    
+
     private int _activityPage = 1;
     private bool _activityHasNextPage = false;
     private bool _loadingMoreActivities = false;
@@ -89,7 +89,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
     {
         await InvokeAsync(async () =>
         {
-            if (!_isEditMode) 
+            if (!_isEditMode)
             {
                 await LoadCustomerData();
                 await LoadInitialActivities();
@@ -105,7 +105,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         var address = dropInfo.Item;
         string newType = address.Type;
         bool newIsDefault = address.IsDefault;
-        
+
         if (dropInfo.DropzoneIdentifier == "billing-default") { newType = "Billing"; newIsDefault = true; }
         else if (dropInfo.DropzoneIdentifier == "shipping-default") { newType = "Shipping"; newIsDefault = true; }
         else if (dropInfo.DropzoneIdentifier == "others") { newIsDefault = false; }
@@ -118,18 +118,19 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                 // other addresses of the same type are no longer marked as default.
                 if (newIsDefault)
                 {
-                    var updatedAddresses = _customer.Addresses.Select(a => {
-                        if (a.Id == address.Id) 
+                    var updatedAddresses = _customer.Addresses.Select(a =>
+                    {
+                        if (a.Id == address.Id)
                             return new CreateAddressRequest { Id = a.Id, Type = newType, IsDefault = true, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version };
-                        
+
                         if (a.Type == newType)
                             return new CreateAddressRequest { Id = a.Id, Type = a.Type, IsDefault = false, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version };
-                        
+
                         return new CreateAddressRequest { Id = a.Id, Type = a.Type, IsDefault = a.IsDefault, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version };
                     }).ToList();
 
                     var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CompanyId = _customer.CompanyId, CommunicationPreferences = _customer.CommunicationPreferences }, Addresses = updatedAddresses };
-                    var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
+                    var response = await Http.PutAsJsonAsync($"api/v1/customers/{Id}/full", onboardingRequest);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -146,8 +147,8 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                 else
                 {
                     // Just unsetting default or changing type without setting default can be a simple PATCH
-                    var updateRequest = new UpdateAddressRequest { Type = newType, IsDefault = newIsDefault, Version = address.Version } ;
-                    var response = await Http.PatchAsJsonAsync($"api/customers/addresses/{address.Id}", updateRequest);
+                    var updateRequest = new UpdateAddressRequest { Type = newType, IsDefault = newIsDefault, Version = address.Version };
+                    var response = await Http.PatchAsJsonAsync($"api/v1/customers/addresses/{address.Id}", updateRequest);
                     if (response.IsSuccessStatusCode)
                     {
                         Snackbar.Add("Address updated successfully", Severity.Success);
@@ -162,13 +163,13 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         }
     }
 
-    private async Task LoadCountries() { try { _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/customers/countries") ?? []; } catch { } }
-    
+    private async Task LoadCountries() { try { _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/v1/customers/countries") ?? []; } catch { } }
+
     private async ValueTask<ItemsProviderResult<CustomerActivityResponse>> LoadActivitiesProvider(ItemsProviderRequest request)
     {
         try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/customers/{Id}/history?skip={request.StartIndex}&take={request.Count}", request.CancellationToken);
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/v1/customers/{Id}/history?skip={request.StartIndex}&take={request.Count}", request.CancellationToken);
             if (response != null)
             {
                 return new ItemsProviderResult<CustomerActivityResponse>(response.Data, response.Meta.TotalItems);
@@ -203,18 +204,18 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         {
             var take = 10;
             var skip = (_activityPage - 1) * take;
-            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/customers/{Id}/history?skip={skip}&take={take}");
-            
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/v1/customers/{Id}/history?skip={skip}&take={take}");
+
             if (response != null)
             {
                 if (_activityPage == 1) _activities = response.Data.ToList();
                 else _activities.AddRange(response.Data);
-                
+
                 _activityHasNextPage = response.Data.Count() == take; // Simple check, assumption: if full page returned, likely more exists
                 // Or better calculate based on total items if available in PagedResponse
-                if (response.Meta != null) 
+                if (response.Meta != null)
                 {
-                   _activityHasNextPage = _activities.Count < response.Meta.TotalItems;
+                    _activityHasNextPage = _activities.Count < response.Meta.TotalItems;
                 }
             }
         }
@@ -236,10 +237,10 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
     private async Task LoadCustomerData()
     {
         // Don't clear _customer here to avoid "Customer not found" flash
-        _loading = _customer == null; 
+        _loading = _customer == null;
         try
         {
-            var result = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/customers/{Id}");
+            var result = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/v1/customers/{Id}");
             if (result != null)
             {
                 _customer = result;
@@ -300,7 +301,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                     Version = a.Version
                 }).ToList() ?? []
             };
-            var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
+            var response = await Http.PutAsJsonAsync($"api/v1/customers/{Id}/full", onboardingRequest);
             if (response.IsSuccessStatusCode) { Snackbar.Add("Customer updated successfully!", Severity.Success); _isEditMode = false; await LoadCustomerData(); await LoadInitialActivities(); }
             else { var err = await response.Content.ReadAsStringAsync(); Snackbar.Add($"Failed to save: {err}", Severity.Error); }
         }
@@ -319,7 +320,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         {
             try
             {
-                var response = await Http.PostAsJsonAsync($"api/customers/{Id}/addresses", new List<CreateAddressRequest> { newAddress });
+                var response = await Http.PostAsJsonAsync($"api/v1/customers/{Id}/addresses", new List<CreateAddressRequest> { newAddress });
                 if (response.IsSuccessStatusCode) { Snackbar.Add("Address added successfully", Severity.Success); await LoadCustomerData(); _dropContainer?.Refresh(); await LoadInitialActivities(); }
             }
             catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
@@ -338,7 +339,8 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         {
             try
             {
-                var addresses = _customer.Addresses.Select(a => {
+                var addresses = _customer.Addresses.Select(a =>
+                {
                     if (a.Id == currentAddress.Id) return updatedAddress;
                     // If updated is set to default, unset others of same type
                     if (updatedAddress.IsDefault && a.Type == updatedAddress.Type)
@@ -349,9 +351,10 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                 }).ToList();
 
                 var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CompanyId = _customer.CompanyId, CommunicationPreferences = _customer.CommunicationPreferences }, Addresses = addresses };
-                var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
+                var response = await Http.PutAsJsonAsync($"api/v1/customers/{Id}/full", onboardingRequest);
                 if (response.IsSuccessStatusCode) { Snackbar.Add("Address updated successfully", Severity.Success); await LoadCustomerData(); _dropContainer?.Refresh(); await LoadInitialActivities(); }
-            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
@@ -364,9 +367,10 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
             try
             {
                 var onboardingRequest = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest { FirstName = _customer.FirstName, LastName = _customer.LastName, Email = _customer.Email, Mobile = _customer.Mobile, Landline = _customer.Landline, Extension = _customer.Extension, Segment = _customer.Segment, Tier = _customer.Tier, PreferredLanguage = _customer.PreferredLanguage, Timezone = _customer.Timezone, CompanyId = _customer.CompanyId }, Addresses = _customer.Addresses.Where(a => a.Id != address.Id).Select(a => new CreateAddressRequest { Id = a.Id, Type = a.Type, IsDefault = a.IsDefault, AddressLine1 = a.AddressLine1, AddressLine2 = a.AddressLine2, AddressLine3 = a.AddressLine3, District = a.District, City = a.City, StateProvince = a.StateProvince, PostalCode = a.PostalCode, CountryId = a.CountryId, RecipientName = a.RecipientName, RecipientPhone = a.RecipientPhone, Version = a.Version }).ToList() };
-                var response = await Http.PutAsJsonAsync($"api/customers/{Id}/full", onboardingRequest);
+                var response = await Http.PutAsJsonAsync($"api/v1/customers/{Id}/full", onboardingRequest);
                 if (response.IsSuccessStatusCode) { Snackbar.Add("Address deleted successfully", Severity.Success); await LoadCustomerData(); _dropContainer?.Refresh(); await LoadInitialActivities(); }
-            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
@@ -404,7 +408,8 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                     var ndaDoc = _customer?.Documents?.FirstOrDefault(d =>
                         d.FileReference == uploadId && d.DocumentCategory == "NDA");
 
-                    await Http.PostAsJsonAsync("api/customers/ndas", new {
+                    await Http.PostAsJsonAsync("api/v1/customers/ndas", new
+                    {
                         customerId = Id,
                         status = "Draft",
                         documentReferenceId = ndaDoc?.Id
@@ -444,7 +449,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                 var revokedAt = (DateTime?)data.GetType().GetProperty("RevokedAt")?.GetValue(data);
 
                 // Update status and expiration date via /status endpoint (now supports expiresAt)
-                var response = await Http.PatchAsJsonAsync($"api/customers/ndas/{_customer.Nda.Id}/status", new { status, expiresAt, version, signedAt, signedBy, revokeReason, revokedAt });
+                var response = await Http.PatchAsJsonAsync($"api/v1/customers/ndas/{_customer.Nda.Id}/status", new { status, expiresAt, version, signedAt, signedBy, revokeReason, revokedAt });
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -457,11 +462,12 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                     var error = await response.Content.ReadAsStringAsync();
                     Snackbar.Add($"Failed to update NDA: {error}", Severity.Error);
                 }
-            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
-    private async Task<string?> GetDocumentPreviewUrl(string fileReference) { try { var response = await Http.GetFromJsonAsync<DownloadUrlResponse>($"api/aiprocessing/download-url/{fileReference}"); return response?.Url; } catch { return null; } }
+    private async Task<string?> GetDocumentPreviewUrl(string fileReference) { try { var response = await Http.GetFromJsonAsync<DownloadUrlResponse>($"api/v1/aiprocessing/download-url/{fileReference}"); return response?.Url; } catch { return null; } }
 
     private async Task OpenSignedNdaUpload(NDAResponse nda)
     {
@@ -486,21 +492,21 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
 
                     if (newDoc != null)
                     {
-                        var response = await Http.PatchAsJsonAsync($"api/customers/ndas/{nda.Id}/status", new 
-                        { 
-                            status = "Signed", 
-                            version = nda.Version, 
-                            signedAt = DateTime.UtcNow, 
-                            signedBy = _customer?.Name, 
+                        var response = await Http.PatchAsJsonAsync($"api/v1/customers/ndas/{nda.Id}/status", new
+                        {
+                            status = "Signed",
+                            version = nda.Version,
+                            signedAt = DateTime.UtcNow,
+                            signedBy = _customer?.Name,
                             expiresAt = expiresAt,
                             documentReferenceId = newDoc.Id
                         });
 
-                        if (response.IsSuccessStatusCode) 
-                        { 
-                            Snackbar.Add("NDA signed and uploaded successfully", Severity.Success); 
-                            await LoadCustomerData(); 
-                            await LoadInitialActivities(); 
+                        if (response.IsSuccessStatusCode)
+                        {
+                            Snackbar.Add("NDA signed and uploaded successfully", Severity.Success);
+                            await LoadCustomerData();
+                            await LoadInitialActivities();
                         }
                         else
                         {
@@ -508,7 +514,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                         }
                     }
                 }
-            } 
+            }
             catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
@@ -535,10 +541,10 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
 
                     if (ndaDoc != null)
                     {
-                         var response = await Http.PatchAsJsonAsync($"api/customers/ndas/{nda.Id}/status", new 
-                        { 
+                        var response = await Http.PatchAsJsonAsync($"api/v1/customers/ndas/{nda.Id}/status", new
+                        {
                             status = nda.Status, // Keep existing status (Draft)
-                            version = nda.Version, 
+                            version = nda.Version,
                             documentReferenceId = ndaDoc.Id
                         });
 
@@ -566,9 +572,10 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
             try
             {
                 var versionBase64 = Convert.ToBase64String(nda.Version ?? []);
-                var response = await Http.DeleteAsync($"api/customers/ndas/{nda.Id}?version={Uri.EscapeDataString(versionBase64)}");
+                var response = await Http.DeleteAsync($"api/v1/customers/ndas/{nda.Id}?version={Uri.EscapeDataString(versionBase64)}");
                 if (response.IsSuccessStatusCode) { Snackbar.Add("NDA deleted", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); }
-            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
@@ -579,9 +586,10 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         {
             try
             {
-                var response = await Http.DeleteAsync($"api/customers/documents/{doc.Id}?version={doc.Version}");
+                var response = await Http.DeleteAsync($"api/v1/customers/documents/{doc.Id}?version={doc.Version}");
                 if (response.IsSuccessStatusCode) { Snackbar.Add("Document deleted", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); }
-            } catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
@@ -589,9 +597,10 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
     {
         try
         {
-            var response = await Http.GetFromJsonAsync<DownloadUrlResponse>($"api/aiprocessing/download-url/{fileReference}");
+            var response = await Http.GetFromJsonAsync<DownloadUrlResponse>($"api/v1/aiprocessing/download-url/{fileReference}");
             if (response?.Url != null) await JSRuntime.InvokeVoidAsync("open", response.Url, "_blank");
-        } catch (Exception ex) { Snackbar.Add($"Download error: {ex.Message}", Severity.Error); }
+        }
+        catch (Exception ex) { Snackbar.Add($"Download error: {ex.Message}", Severity.Error); }
     }
 
     private class DownloadUrlResponse { public string? Url { get; set; } }
@@ -599,7 +608,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
     private async Task<IEnumerable<RegistryThaiLocation>> SearchThaiLocations(string? query, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query) || query.Length < 2) return [];
-        try { return await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/customers/locations/thai?query={Uri.EscapeDataString(query)}&limit=10") ?? []; }
+        try { return await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/v1/customers/locations/thai?query={Uri.EscapeDataString(query)}&limit=10") ?? []; }
         catch { return []; }
     }
 
@@ -646,7 +655,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         {
             if (_isNewNote)
             {
-                var response = await Http.PostAsJsonAsync($"api/customers/{Id}/notes", new { ownerType = "Customer", ownerId = Id, noteText = _editingNoteText });
+                var response = await Http.PostAsJsonAsync($"api/v1/customers/{Id}/notes", new { ownerType = "Customer", ownerId = Id, noteText = _editingNoteText });
                 if (response.IsSuccessStatusCode)
                 {
                     Snackbar.Add("Note added successfully", Severity.Success);
@@ -662,7 +671,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                 {
                     if (note.NoteText == _editingNoteText) return;
 
-                    var response = await Http.PatchAsJsonAsync($"api/customers/notes/{note.Id}", new { noteText = _editingNoteText, version = note.Version });
+                    var response = await Http.PatchAsJsonAsync($"api/v1/customers/notes/{note.Id}", new { noteText = _editingNoteText, version = note.Version });
                     if (response.IsSuccessStatusCode)
                     {
                         Snackbar.Add("Note updated successfully", Severity.Success);
@@ -683,7 +692,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         var result = await DialogService.ShowMessageBoxAsync("Delete Note", "Are you sure you want to delete this internal note?", yesText: "Delete", noText: "Cancel");
         if (result == true)
         {
-            try { var response = await Http.DeleteAsync($"api/customers/notes/{note.Id}"); if (response.IsSuccessStatusCode) { Snackbar.Add("Note deleted successfully", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); } }
+            try { var response = await Http.DeleteAsync($"api/v1/customers/notes/{note.Id}"); if (response.IsSuccessStatusCode) { Snackbar.Add("Note deleted successfully", Severity.Success); await LoadCustomerData(); await LoadInitialActivities(); } }
             catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
@@ -810,7 +819,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                     Version = nda.Version
                 };
 
-                var response = await Http.PatchAsJsonAsync($"api/customer/v1/ndas/{nda.Id}/status", request);
+                var response = await Http.PatchAsJsonAsync($"api/v1/customers/ndas/{nda.Id}/status", request);
                 if (response.IsSuccessStatusCode)
                 {
                     Snackbar.Add("NDA revoked successfully", Severity.Success);
@@ -835,7 +844,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
         else _uploadingCustomerDoc = true;
 
         var progressList = isNda ? _ndaUploadFiles : _customerDocUploadFiles;
-        
+
         try
         {
             var uploadTasks = progressList.Select(fileProgress => UploadSingleFileAsync(fileProgress, category, isNda)).ToList();
@@ -885,7 +894,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
             fileProgress.Progress = 30;
             await InvokeAsync(StateHasChanged);
 
-            var url = $"api/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}";
+            var url = $"api/v1/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}";
             var response = await Http.PostAsync(url, content);
 
             if (response.IsSuccessStatusCode)
@@ -910,7 +919,7 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                     fileProgress.Progress = 80;
                     await InvokeAsync(StateHasChanged);
 
-                    var linkUrl = $"/api/aiprocessing/link-documents?ownerType=Customer&ownerId={Id}";
+                    var linkUrl = $"/api/v1/aiprocessing/link-documents?ownerType=Customer&ownerId={Id}";
                     var linkResponse = await Http.PostAsJsonAsync(linkUrl, new List<CreateDocumentRequest> { document });
 
                     if (linkResponse.IsSuccessStatusCode)
@@ -922,13 +931,14 @@ public partial class CustomerDetails : ComponentBase, IAsyncDisposable
                             // so we'll do it once in the main loop or handle it specifically.
                             // But we need the Document ID from the linked document.
                             // The link endpoint should return the created documents with IDs.
-                            
+
                             var linkedDocs = await linkResponse.Content.ReadFromJsonAsync<List<DocumentResponse>>();
                             var createdDoc = linkedDocs?.FirstOrDefault();
-                            
+
                             if (createdDoc != null)
                             {
-                                await Http.PostAsJsonAsync("api/customers/ndas", new {
+                                await Http.PostAsJsonAsync("api/v1/customers/ndas", new
+                                {
                                     customerId = Id,
                                     status = "Draft",
                                     documentReferenceId = createdDoc.Id

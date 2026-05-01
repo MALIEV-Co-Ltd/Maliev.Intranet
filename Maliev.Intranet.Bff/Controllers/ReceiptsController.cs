@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -10,7 +11,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for receipt-related operations, proxying to the Receipt Service.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class ReceiptsController(IReceiptServiceClient client) : ControllerBase
 {
     /// <summary>

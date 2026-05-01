@@ -394,7 +394,7 @@
         _downloading = true;
         try
         {
-            var response = await Http.GetAsync($"api/uploads/preview-url?storagePath={Uri.EscapeDataString(Part.StoragePath)}");
+            var response = await Http.GetAsync($"api/v1/uploads/preview-url?storagePath={Uri.EscapeDataString(Part.StoragePath)}");
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -512,7 +512,7 @@
 
         try
         {
-            var resp = await Http.GetAsync($"api/uploads/preview-url?storagePath={Uri.EscapeDataString(currentSrc)}");
+            var resp = await Http.GetAsync($"api/v1/uploads/preview-url?storagePath={Uri.EscapeDataString(currentSrc)}");
             if (resp.IsSuccessStatusCode)
             {
                 var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();

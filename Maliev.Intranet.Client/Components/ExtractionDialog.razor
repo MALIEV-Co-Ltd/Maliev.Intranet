@@ -144,7 +144,7 @@
                     content.Add(fileContent, "files", file.Name);
                 }
 
-                var response = await Http.PostAsync("api/aiprocessing/extract-customer", content);
+                var response = await Http.PostAsync("api/v1/aiprocessing/extract-customer", content);
                 
                 if (response.IsSuccessStatusCode)
                 {

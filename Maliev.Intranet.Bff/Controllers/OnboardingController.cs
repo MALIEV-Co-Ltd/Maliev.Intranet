@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -10,7 +11,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for onboarding-related operations, proxying to the Lifecycle Service.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class OnboardingController(ILifecycleServiceClient client) : ControllerBase
 {
     /// <summary>

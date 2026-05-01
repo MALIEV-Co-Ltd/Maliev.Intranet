@@ -34,3 +34,21 @@ public class BulkPricingRequestDto
     /// <summary>Optional lead time code (e.g. "STANDARD").</summary>
     public string? LeadTimeCode { get; set; }
 }
+
+/// <summary>Request to calculate absolute additional cost for surface finish options.</summary>
+public record FinishPriceRequestDto
+{
+    /// <summary>Manufacturing process code (e.g. "FDM", "CNC_MILL").</summary>
+    public required string ProcessCode { get; init; }
+    /// <summary>Selected material identifier.</summary>
+    public required Guid MaterialId { get; init; }
+    /// <summary>Selected tolerance identifier.</summary>
+    public required Guid ToleranceId { get; init; }
+    /// <summary>Base unit price in THB from the pricing engine, before finish upcharge.</summary>
+    public required decimal BaseUnitPrice { get; init; }
+    /// <summary>Finish identifiers to price.</summary>
+    public required IReadOnlyList<Guid> FinishIds { get; init; }
+}
+
+/// <summary>Absolute upcharge for a single surface finish option.</summary>
+public record FinishPriceItemDto(Guid FinishId, decimal AdditionalUnitCost, string Currency);

@@ -1,0 +1,12 @@
+.sdc-detail-panel { padding: 4px 0; }
+
+.sdc-time-bar {
+    height: 6px;
+    border-radius: var(--maliev-radius-xs);
+    overflow: hidden;
+    display: flex;
+    background: var(--mud-palette-lines-default);
+}
+
+.sdc-setup { background: var(--mud-palette-warning); }
+.sdc-print { background: var(--mud-palette-primary); }

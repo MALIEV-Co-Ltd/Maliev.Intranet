@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
@@ -12,9 +13,9 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <summary>
 /// Controller for customer management operations.
 /// </summary>
-[Authorize(AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class CustomersController(
     CustomerServiceClient client,
     RegistryServiceClient registryClient,

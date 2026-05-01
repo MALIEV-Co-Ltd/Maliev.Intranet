@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -15,7 +16,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="logger">The logger instance.</param>
 [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class ProjectsController(
     ProjectServiceClient client,
     JobServiceClient jobClient,
@@ -69,8 +71,8 @@ public class ProjectsController(
     /// <param name="request">Project creation payload.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created project detail.</returns>
-    [HttpPost]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost]
     public async Task<ActionResult<ProjectDetailDto>> Create([FromBody] CreateProjectRequest request, CancellationToken ct)
     {
         _logger.LogInformation("Creating project: CustomerId={CustomerId}, CustomerName={CustomerName}, Title={Title}",
@@ -111,8 +113,8 @@ public class ProjectsController(
     /// <param name="request">Fields to update.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpPut("{id:guid}")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] object request, CancellationToken ct)
     {
         var response = await client.UpdateProjectAsync(id, request, ct);
@@ -125,8 +127,8 @@ public class ProjectsController(
     /// <param name="id">The project GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpDelete("{id:guid}")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         var response = await client.DeleteProjectAsync(id, ct);
@@ -142,8 +144,8 @@ public class ProjectsController(
     /// <param name="request">Part creation payload.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created project part details.</returns>
-    [HttpPost("{id:guid}/parts")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/parts")]
     public async Task<ActionResult<ProjectPartDto>> AddPart(Guid id, [FromBody] AddProjectPartRequest request, CancellationToken ct)
     {
         var result = await client.AddPartAsync(id, request, ct);
@@ -158,8 +160,8 @@ public class ProjectsController(
     /// <param name="request">Configuration update payload.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpPut("{id:guid}/parts/{partId:guid}")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("{id:guid}/parts/{partId:guid}")]
     public async Task<IActionResult> UpdatePart(Guid id, Guid partId, [FromBody] UpdateProjectPartRequest request, CancellationToken ct)
     {
         var response = await client.UpdatePartAsync(id, partId, request, ct);
@@ -173,8 +175,8 @@ public class ProjectsController(
     /// <param name="partId">The part GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpDelete("{id:guid}/parts/{partId:guid}")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpDelete("{id:guid}/parts/{partId:guid}")]
     public async Task<IActionResult> DeletePart(Guid id, Guid partId, CancellationToken ct)
     {
         var response = await client.DeletePartAsync(id, partId, ct);
@@ -190,8 +192,8 @@ public class ProjectsController(
     /// <param name="partId">The part GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Price breakdown DTO.</returns>
-    [HttpPost("{id:guid}/parts/{partId:guid}/price")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/parts/{partId:guid}/price")]
     public async Task<ActionResult<ProjectPriceBreakdownDto>> GetPartPrice(Guid id, Guid partId, CancellationToken ct)
     {
         var result = await client.GetPartPriceAsync(id, partId, ct);
@@ -206,8 +208,8 @@ public class ProjectsController(
     /// <param name="request">Confirmed price and optional override reason.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpPost("{id:guid}/parts/{partId:guid}/confirm-price")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/parts/{partId:guid}/confirm-price")]
     public async Task<IActionResult> ConfirmPartPrice(Guid id, Guid partId, [FromBody] ConfirmPartPriceRequest request, CancellationToken ct)
     {
         var response = await client.ConfirmPartPriceAsync(id, partId, request, ct);
@@ -223,8 +225,8 @@ public class ProjectsController(
     /// <param name="id">The project GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpPost("{id:guid}/generate-quotation")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/generate-quotation")]
     public async Task<IActionResult> GenerateQuotation(Guid id, CancellationToken ct)
     {
         var response = await client.GenerateQuotationAsync(id, ct);
@@ -237,8 +239,8 @@ public class ProjectsController(
     /// <param name="id">The project GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpPost("{id:guid}/accept-quotation")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/accept-quotation")]
     public async Task<IActionResult> AcceptQuotation(Guid id, CancellationToken ct)
     {
         var response = await client.AcceptQuotationAsync(id, ct);
@@ -320,12 +322,12 @@ public class ProjectsController(
                     var best = results.MinBy(r => r.Slots.Count);
                     machine = best.Machine;
                     scheduleItems = best.Slots.Select(s => new PlanningScheduleItemDto(
-                        PlannedDate:      new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
-                        PlannedEndDate:   new DateTimeOffset(s.ScheduledEnd, TimeSpan.Zero),
-                        JobReference:     s.JobId.ToString("N")[..8].ToUpperInvariant(),
-                        Status:           s.Status,
-                        JobId:            s.JobId,
-                        MachineName:      best.Machine.Name,
+                        PlannedDate: new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
+                        PlannedEndDate: new DateTimeOffset(s.ScheduledEnd, TimeSpan.Zero),
+                        JobReference: s.JobId.ToString("N")[..8].ToUpperInvariant(),
+                        Status: s.Status,
+                        JobId: s.JobId,
+                        MachineName: best.Machine.Name,
                         SetupTimeMinutes: s.SetupMinutes,
                         PrintTimeMinutes: s.PrintMinutes
                     )).ToList();
@@ -370,27 +372,27 @@ public class ProjectsController(
         }
 
         return Ok(new ProductionRoutingDto(
-            MachineId:          machine?.Id ?? Guid.Empty,
-            MachineCode:        machine?.AssetCode ?? "TBD",
-            MachineName:        machine?.Name ?? "Unassigned",
-            QueueAhead:         queueAhead,
+            MachineId: machine?.Id ?? Guid.Empty,
+            MachineCode: machine?.AssetCode ?? "TBD",
+            MachineName: machine?.Name ?? "Unassigned",
+            QueueAhead: queueAhead,
             EstimatedStartDate: estimatedStart,
-            ScheduleItems:      scheduleItems,
-            ProposedSlotStart:  proposedSlotStart,
-            ProposedSlotEnd:    proposedSlotEnd));
+            ScheduleItems: scheduleItems,
+            ProposedSlotStart: proposedSlotStart,
+            ProposedSlotEnd: proposedSlotEnd));
     }
 
     private static string? MapProcessToEquipmentCategory(string processType) => processType switch
     {
-        "FDM"      => "FdmPrinter",
-        "SLA_DLP"  => "SlaPrinter",
-        "SLS"      => "SlsPrinter",
-        "MJF"      => "MjfPrinter",
-        "MJ"       => "MjPrinter",
-        "BJ"       => "BjPrinter",
-        "DMLS"     => "DmlsPrinter",
+        "FDM" => "FdmPrinter",
+        "SLA_DLP" => "SlaPrinter",
+        "SLS" => "SlsPrinter",
+        "MJF" => "MjfPrinter",
+        "MJ" => "MjPrinter",
+        "BJ" => "BjPrinter",
+        "DMLS" => "DmlsPrinter",
         "CNC_MILL" => "CncMachine",
         "CNC_TURN" => "CncMachine",
-        _          => null,
+        _ => null,
     };
 }

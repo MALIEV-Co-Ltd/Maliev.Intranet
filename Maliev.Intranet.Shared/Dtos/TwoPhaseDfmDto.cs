@@ -87,6 +87,16 @@ public class QualityMetrics
     /// Optional B-Rep face count (if CAD file provided)
     /// </summary>
     public int? BrepFaceCount { get; set; }
+
+    /// <summary>
+    /// Human-readable explanation of why the mesh is non-manifold (null when IsManifold=true)
+    /// </summary>
+    public string? NonManifoldReason { get; set; }
+
+    /// <summary>
+    /// Approximate number of broken/non-manifold faces (null when IsManifold=true)
+    /// </summary>
+    public int? NonManifoldFaceCount { get; set; }
 }
 
 /// <summary>
@@ -134,6 +144,22 @@ public class DfmAnalysisResponse
     /// DFM analysis report
     /// </summary>
     public DfmReport DfmReport { get; set; } = new();
+
+    /// <summary>
+    /// GCS overlay paths keyed by "{PROCESS}__{category}" (e.g. "FDM__overhang").
+    /// Present when the backend generated overlay GLBs for visualization.
+    /// </summary>
+    public Dictionary<string, string> OverlayPaths { get; set; } = new();
+
+    /// <summary>
+    /// Whether results came from cache (affects whether overlay_paths are fresh)
+    /// </summary>
+    public string CacheStatus { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Number of bodies in the CAD file (null if single-body or not computed).
+    /// </summary>
+    public int? BodyCount { get; set; }
 }
 
 /// <summary>

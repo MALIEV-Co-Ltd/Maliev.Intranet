@@ -28,6 +28,24 @@ public static class MalievPermissions
     }
 
     /// <summary>
+    /// Permissions for BFF authentication session endpoints.
+    /// </summary>
+    public static class Auth
+    {
+        /// <summary>Permission to read the current authenticated session.</summary>
+        public const string SessionsRead = "auth.sessions.read";
+    }
+
+    /// <summary>
+    /// Permissions for chat sessions and messages.
+    /// </summary>
+    public static class Chat
+    {
+        /// <summary>Permission to create chat sessions and messages.</summary>
+        public const string SessionsCreate = "chat.sessions.create";
+    }
+
+    /// <summary>
     /// Permissions for customer management and profile operations.
     /// </summary>
     public static class Customer

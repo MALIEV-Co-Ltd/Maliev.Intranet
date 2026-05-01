@@ -61,9 +61,11 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         draftServiceMock.Setup(s => s.ClearDraftAsync(It.IsAny<string?>())).Returns(Task.CompletedTask);
         Services.AddSingleton(draftServiceMock.Object);
         Services.AddSingleton(new UploadSettings());
+        Services.AddLogging();
         _httpHandler.HandlerFunc = DefaultHandler;
         var client = new HttpClient(_httpHandler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);
+        Services.AddScoped<CurrencyService>();
         Render<MudPopoverProvider>();
     }
 
@@ -155,16 +157,26 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var customerId = Guid.NewGuid();
         var draftProject = new ProjectSummaryDto
         {
-            Id = Guid.NewGuid(), Title = "Draft", Status = "Draft",
-            CustomerId = customerId, CustomerName = "Test",
-            ProjectNumber = "PRJ-001", PartsCount = 0, TotalPrice = 0m,
+            Id = Guid.NewGuid(),
+            Title = "Draft",
+            Status = "Draft",
+            CustomerId = customerId,
+            CustomerName = "Test",
+            ProjectNumber = "PRJ-001",
+            PartsCount = 0,
+            TotalPrice = 0m,
             CreatedAt = DateTime.UtcNow,
         };
         var configuringProject = new ProjectSummaryDto
         {
-            Id = Guid.NewGuid(), Title = "Configuring", Status = "Configuring",
-            CustomerId = customerId, CustomerName = "Test",
-            ProjectNumber = "PRJ-002", PartsCount = 1, TotalPrice = 100m,
+            Id = Guid.NewGuid(),
+            Title = "Configuring",
+            Status = "Configuring",
+            CustomerId = customerId,
+            CustomerName = "Test",
+            ProjectNumber = "PRJ-002",
+            PartsCount = 1,
+            TotalPrice = 100m,
             CreatedAt = DateTime.UtcNow,
         };
         _httpHandler.HandlerFunc = (request, ct) =>

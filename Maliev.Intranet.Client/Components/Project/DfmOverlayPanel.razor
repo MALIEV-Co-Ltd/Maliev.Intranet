@@ -96,7 +96,7 @@ else if (IsVisible && DfmIssues.Count > 0)
         top: 16px;
         left: 16px;
         max-width: 320px;
-        background: rgba(255,255,255,0.5);
+        background: color-mix(in srgb, var(--mud-palette-surface) 80%, transparent);
         backdrop-filter: blur(8px);
         border: 1px solid var(--mud-palette-lines-default);
         border-top: 4px solid var(--mud-palette-warning);
@@ -111,11 +111,11 @@ else if (IsVisible && DfmIssues.Count > 0)
     }
     .dfm-overlay--timed-out {
         border-top-color: var(--mud-palette-lines-default);
-        background: rgba(200,200,200,0.35);
+        background: color-mix(in srgb, var(--mud-palette-surface) 70%, transparent);
     }
     .dfm-overlay--all-clear {
         border-top-color: var(--mud-palette-success);
-        background: rgba(220,255,220,0.5);
+        background: color-mix(in srgb, var(--mud-palette-success) 12%, var(--mud-palette-surface));
     }
     .dfm-overlay--fade-out {
         opacity: 0;

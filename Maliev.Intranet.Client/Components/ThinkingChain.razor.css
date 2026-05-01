@@ -1,0 +1,18 @@
+.thinking-chain {
+    transition: all 0.2s ease;
+    border: 1px solid var(--maliev-border);
+    overflow: hidden;
+}
+
+.thinking-chain-header {
+    background-color: var(--maliev-panel-3);
+    user-select: none;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.cursor-pointer:hover {
+    opacity: 0.85;
+}

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +11,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Requires user authentication - uses the logged-in user's JWT token for API calls.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [AllowAnonymous]
 public class SeedController(
     IHttpClientFactory httpClientFactory,

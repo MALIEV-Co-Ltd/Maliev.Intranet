@@ -34,6 +34,12 @@ public sealed class SignalRFileAnalysisPayload
 
     /// <summary>Per-body metadata for multi-body files (null if single-body or not computed).</summary>
     public List<SignalRBodyInfo>? Bodies { get; set; }
+
+    /// <summary>Human-readable explanation of why the mesh is non-manifold (null when manifold).</summary>
+    public string? NonManifoldReason { get; set; }
+
+    /// <summary>Approximate count of broken/non-manifold faces (null when manifold).</summary>
+    public int? NonManifoldFaceCount { get; set; }
 }
 
 /// <summary>
@@ -146,6 +152,12 @@ public sealed class SignalRDfmAnalysisPayload
     /// Number of distinct bodies/shells detected in the mesh. Greater than 1 means multi-body.
     /// </summary>
     public int? BodyCount { get; set; }
+
+    /// <summary>Human-readable mesh-integrity description forwarded from tessellation; null when manifold.</summary>
+    public string? NonManifoldReason { get; set; }
+
+    /// <summary>Approximate count of broken/non-manifold faces; null when manifold.</summary>
+    public int? NonManifoldFaceCount { get; set; }
 }
 
 /// <summary>

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -11,7 +12,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Proxies requests to GeometryService for lazy DFM analysis when user selects a manufacturing process.
 /// </summary>
 [ApiController]
-[Route("api/geometry")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/geometry")]
 public class GeometryController(
     GeometryServiceClient geometryServiceClient,
     UploadServiceClient uploadServiceClient,
@@ -36,39 +38,50 @@ public class GeometryController(
         CancellationToken ct = default)
     {
         logger.LogInformation(
-            "DFM analysis requested for upload {UploadId}, process {ProcessCode}, hasStoragePath: {HasStoragePath}",
-            uploadId, processCode, !string.IsNullOrEmpty(request?.StoragePath));
+            "DFM analysis requested for upload {UploadId}, process {ProcessCode}",
+            uploadId, processCode);
 
-        // If request has StoragePath but no DownloadUrl, generate a signed URL
-        if (request != null && !string.IsNullOrEmpty(request.StoragePath) && string.IsNullOrEmpty(request.DownloadUrl))
+        request ??= new();
+
+        // Resolve the authoritative current storage path from UploadService by uploadId.
+        // The client's StoragePath may be stale (temp lifecycle expiry, post-migration path change,
+        // or geometry-service restart clearing the in-memory cache).
+        var currentPath = await uploadServiceClient.GetStoragePathAsync(uploadId, ct);
+        if (string.IsNullOrEmpty(currentPath))
         {
-            try
-            {
-                var signedUrl = await uploadServiceClient.GetDownloadUrlByPathAsync(request.StoragePath, ct);
-                if (!string.IsNullOrEmpty(signedUrl))
-                {
-                    request.DownloadUrl = signedUrl;
-                    logger.LogDebug(
-                        "Generated signed URL for storage path {StoragePath}",
-                        request.StoragePath);
-                }
-                else
-                {
-                    logger.LogWarning(
-                        "Failed to generate signed URL for storage path {StoragePath}",
-                        request.StoragePath);
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex,
-                    "Error generating signed URL for storage path {StoragePath}",
-                    request.StoragePath);
-                // Continue without signed URL - GeometryService will return 400 if needed
-            }
+            logger.LogWarning(
+                "Upload {UploadId} not found in UploadService — file is missing or never registered",
+                uploadId);
+            return StatusCode(410, BuildFileMissingResponse(uploadId, processCode));
         }
 
-        var result = await geometryServiceClient.AnalyzeForProcessAsync(uploadId, processCode, request ?? new(), ct);
+        request.StoragePath = currentPath;
+
+        // Generate a fresh signed URL for the authoritative path.
+        try
+        {
+            var signedUrl = await uploadServiceClient.GetDownloadUrlByPathAsync(currentPath, ct);
+            if (!string.IsNullOrEmpty(signedUrl))
+            {
+                request.DownloadUrl = signedUrl;
+                logger.LogDebug("Generated signed URL for storage path {StoragePath}", currentPath);
+            }
+            else
+            {
+                // 410 from UploadService means the object is gone in GCS (existence check failed).
+                logger.LogWarning(
+                    "UploadService could not produce a signed URL for {StoragePath} (file likely deleted from GCS)",
+                    currentPath);
+                return StatusCode(410, BuildFileMissingResponse(uploadId, processCode));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error generating signed URL for storage path {StoragePath}", currentPath);
+            // Continue without signed URL — GeometryService will return 400 if download_url absent.
+        }
+
+        var result = await geometryServiceClient.AnalyzeForProcessAsync(uploadId, processCode, request, ct);
 
         if (result == null)
         {
@@ -100,11 +113,36 @@ public class GeometryController(
         return result.Status switch
         {
             "analysis_complete" => Ok(result),
+            "file_missing" => StatusCode(410, result),
             "timeout" => StatusCode(504, result),
             "error" when result.DfmReport?.Issues.Any(i => i.Severity == "error") == true =>
                 StatusCode(500, result),
-            "error" => Ok(result), // Non-error status codes return OK
+            "error" => Ok(result),
             _ => Ok(result)
         };
     }
+
+    private static DfmAnalysisResponse BuildFileMissingResponse(string uploadId, string processCode) =>
+        new()
+        {
+            UploadId = uploadId,
+            ProcessCode = processCode,
+            Status = "file_missing",
+            DfmReport = new DfmReport
+            {
+                ReportType = processCode,
+                Issues =
+                [
+                    new DfmIssue
+                    {
+                        Category = "system",
+                        Severity = "error",
+                        Title = "File no longer in storage",
+                        Description = "The uploaded CAD file is no longer available. Please re-upload the file to run DFM analysis.",
+                        Value = 0,
+                        Threshold = 0
+                    }
+                ]
+            }
+        };
 }

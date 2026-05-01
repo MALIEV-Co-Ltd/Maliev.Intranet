@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -16,7 +17,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="uploadClient">The typed UploadService client, used to resolve GCS storage paths to signed URLs.</param>
 [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class JobsController(JobServiceClient client, OrderServiceClient orderClient, UploadServiceClient uploadClient) : ControllerBase
 {
     // ── Queue ─────────────────────────────────────────────────────────────────
@@ -96,11 +98,11 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
                 if (string.IsNullOrEmpty(url)) continue;
                 switch (preview.Side)
                 {
-                    case "Front":  result.PreviewFrontUrl  = url; break;
-                    case "Back":   result.PreviewBackUrl   = url; break;
-                    case "Left":   result.PreviewLeftUrl   = url; break;
-                    case "Right":  result.PreviewRightUrl  = url; break;
-                    case "Top":    result.PreviewTopUrl    = url; break;
+                    case "Front": result.PreviewFrontUrl = url; break;
+                    case "Back": result.PreviewBackUrl = url; break;
+                    case "Left": result.PreviewLeftUrl = url; break;
+                    case "Right": result.PreviewRightUrl = url; break;
+                    case "Top": result.PreviewTopUrl = url; break;
                     case "Bottom": result.PreviewBottomUrl = url; break;
                 }
             }
@@ -134,8 +136,8 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpPatch("{id:guid}/status")]
     [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> UpdateStatus(
         Guid id,
         [FromBody] UpdateJobStatusRequest request,
@@ -159,8 +161,8 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpPost("{id:guid}/assign-machine")]
     [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/assign-machine")]
     public async Task<IActionResult> AssignMachine(
         Guid id,
         [FromBody] AssignMachineRequest request,
@@ -207,8 +209,8 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [HttpPatch("{id:guid}/reorder")]
     [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}/reorder")]
     public async Task<IActionResult> Reorder(
         Guid id,
         [FromBody] ReorderJobRequest request,
@@ -240,10 +242,10 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         CancellationToken ct)
     {
         var rangeFrom = DateTime.SpecifyKind(from ?? DateTime.UtcNow.Date, DateTimeKind.Utc);
-        var rangeTo   = DateTime.SpecifyKind(to   ?? DateTime.UtcNow.Date.AddDays(7), DateTimeKind.Utc);
+        var rangeTo = DateTime.SpecifyKind(to ?? DateTime.UtcNow.Date.AddDays(7), DateTimeKind.Utc);
 
         var equipment = await facilityClient.GetEquipmentsAsync(status: "Active", pageSize: 200, ct: ct);
-        var machines  = equipment?.Items ?? [];
+        var machines = equipment?.Items ?? [];
 
         var scheduleTasks = machines.Select(async m =>
         {
@@ -251,12 +253,12 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
             {
                 var slots = await client.GetMachineScheduleAsync(m.AssetCode, rangeFrom, rangeTo, ct);
                 var items = slots.Select(s => new PlanningScheduleItemDto(
-                    PlannedDate:      new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
-                    PlannedEndDate:   new DateTimeOffset(s.ScheduledEnd,   TimeSpan.Zero),
-                    JobReference:     s.JobId.ToString("N")[..8].ToUpperInvariant(),
-                    Status:           s.Status,
-                    JobId:            s.JobId,
-                    MachineName:      m.Name,
+                    PlannedDate: new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
+                    PlannedEndDate: new DateTimeOffset(s.ScheduledEnd, TimeSpan.Zero),
+                    JobReference: s.JobId.ToString("N")[..8].ToUpperInvariant(),
+                    Status: s.Status,
+                    JobId: s.JobId,
+                    MachineName: m.Name,
                     SetupTimeMinutes: s.SetupMinutes,
                     PrintTimeMinutes: s.PrintMinutes
                 )).ToList();

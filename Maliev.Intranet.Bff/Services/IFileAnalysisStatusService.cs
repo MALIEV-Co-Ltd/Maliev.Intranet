@@ -16,7 +16,7 @@ public interface IFileAnalysisStatusService
     /// <summary>
     /// Sets the dimensions and manifold state after geometry analysis completes.
     /// </summary>
-    Task SetDimensionsAsync(string uploadId, FileAnalysisDimensionsDto dimensions, bool isManifold, CancellationToken cancellationToken = default);
+    Task SetDimensionsAsync(string uploadId, FileAnalysisDimensionsDto dimensions, bool isManifold, string? nonManifoldReason = null, int? nonManifoldFaceCount = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Sets the preview URLs after preview images are generated.

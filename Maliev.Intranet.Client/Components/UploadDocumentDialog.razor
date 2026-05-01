@@ -243,7 +243,7 @@
                 file.Progress = 30;
                 StateHasChanged();
 
-                var response = await Http.PostAsync($"api/aiprocessing/upload-documents?category={Category}&customerId={CustomerId}", content);
+                var response = await Http.PostAsync($"api/v1/aiprocessing/upload-documents?category={Category}&customerId={CustomerId}", content);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -265,7 +265,7 @@
                             }
                         };
 
-                        var linkResponse = await Http.PostAsJsonAsync($"api/aiprocessing/link-documents?ownerType=Customer&ownerId={CustomerId}", docs);
+                        var linkResponse = await Http.PostAsJsonAsync($"api/v1/aiprocessing/link-documents?ownerType=Customer&ownerId={CustomerId}", docs);
                         if (linkResponse.IsSuccessStatusCode)
                         {
                             file.IsCompleted = true;
@@ -326,7 +326,7 @@
             fileContent.Headers.ContentType = new MediaTypeHeaderValue(firstCompleted.BrowserFile.ContentType);
             content.Add(fileContent, "file", firstCompleted.Name);
 
-            var response = await Http.PostAsync("api/aiprocessing/summarize-nda", content);
+            var response = await Http.PostAsync("api/v1/aiprocessing/summarize-nda", content);
             if (response.IsSuccessStatusCode)
             {
                 _ndaSummary = await response.Content.ReadFromJsonAsync<NdaSummaryResponse>();

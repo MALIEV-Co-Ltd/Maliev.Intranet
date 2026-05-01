@@ -25,8 +25,8 @@ public partial class CustomerNew : ComponentBase
     [Inject] public IDialogService DialogService { get; set; } = null!;
     /// <summary>JavaScript runtime for browser interop.</summary>
     [Inject] public IJSRuntime JSRuntime { get; set; } = null!;
-    
-    
+
+
     private MudForm? _form;
 
     // Customer data
@@ -40,7 +40,7 @@ public partial class CustomerNew : ComponentBase
             Timezone = "Asia/Bangkok"
         }
     };
-    
+
     // Company data
     private CreateCompanyRequest _newCompany = new() { Segment = "Retail", Tier = "Bronze" };
     private string _companyOfficeType = "head";
@@ -48,33 +48,33 @@ public partial class CustomerNew : ComponentBase
     private bool _showCompanyFields = false;
     private bool _companyIsManualEntry = false;
     private RegistryCompanyProfile? _selectedCompany;
-    
+
     // Address data
     private Dictionary<int, CountryDto?> _selectedCountries = new();
     private Dictionary<int, RegistryThaiLocation?> _selectedLocations = new();
     private List<CountryDto> _allCountries = new();
-    
+
     // Communication preferences
     private bool _emailOptIn = true;
     private bool _smsOptIn = false;
     private bool _marketingOptIn = false;
-    
+
     // NDA
     private bool _includeNda = false;
     private DateTime? _ndaExpiryDate = DateTime.Now.AddYears(1);
     private List<IBrowserFile> _ndaFiles = new();
     private List<CreateDocumentRequest> _uploadedNdaDocs = new();
     private bool _isUploadingNda = false;
-    
+
     // Customer documents
     private List<IBrowserFile> _customerDocFiles = new();
     private List<CreateDocumentRequest> _uploadedCustomerDocs = new();
     private string _customerDocCategory = "General";
     private bool _isUploadingCustomerDocs = false;
-    
+
     // AI Extraction
     private bool _chatbotServiceAvailable = false;
-    
+
     // Submission
     private bool _isSubmitting = false;
 
@@ -89,7 +89,7 @@ public partial class CustomerNew : ComponentBase
     {
         try
         {
-            var response = await Http.GetAsync("api/aiprocessing/health");
+            var response = await Http.GetAsync("api/v1/aiprocessing/health");
             if (response.IsSuccessStatusCode)
             {
                 var healthData = await response.Content.ReadFromJsonAsync<AiHealthResponse>();
@@ -119,8 +119,8 @@ public partial class CustomerNew : ComponentBase
     {
         try
         {
-            _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/customers/countries") ?? new();
-            
+            _allCountries = await Http.GetFromJsonAsync<List<CountryDto>>("api/v1/customers/countries") ?? new();
+
             var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
             if (thailand != null)
             {
@@ -134,7 +134,7 @@ public partial class CustomerNew : ComponentBase
     }
 
     #region AI Extraction
-    
+
     private async Task OpenExtractionDialog()
     {
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
@@ -158,7 +158,7 @@ public partial class CustomerNew : ComponentBase
         if (!string.IsNullOrWhiteSpace(extracted.Landline)) _customerData.Customer.Landline = extracted.Landline;
         if (!string.IsNullOrWhiteSpace(extracted.Extension)) _customerData.Customer.Extension = extracted.Extension;
         if (!string.IsNullOrWhiteSpace(extracted.Segment)) _customerData.Customer.Segment = extracted.Segment;
-        
+
         // Company fields
         if (!string.IsNullOrWhiteSpace(extracted.CompanyName))
         {
@@ -167,14 +167,14 @@ public partial class CustomerNew : ComponentBase
             _newCompany.Name = extracted.CompanyName;
             if (!string.IsNullOrWhiteSpace(extracted.VatNumber)) _newCompany.VatNumber = extracted.VatNumber;
             if (!string.IsNullOrWhiteSpace(extracted.CompanyPhone)) _newCompany.ContactPhone = extracted.CompanyPhone;
-            
+
             if (!string.IsNullOrWhiteSpace(extracted.BranchNumber))
             {
                 var branch = extracted.BranchNumber.Trim();
-                var isHeadOffice = branch == "00000" || 
-                                   branch.Equals("Head Office", StringComparison.OrdinalIgnoreCase) || 
+                var isHeadOffice = branch == "00000" ||
+                                   branch.Equals("Head Office", StringComparison.OrdinalIgnoreCase) ||
                                    branch.Equals("สำนักงานใหญ่", StringComparison.OrdinalIgnoreCase);
-                
+
                 if (isHeadOffice)
                 {
                     _companyOfficeType = "head";
@@ -187,13 +187,13 @@ public partial class CustomerNew : ComponentBase
                 }
             }
         }
-        
+
         // Addresses
         if (extracted.Addresses?.Any() == true)
         {
             _customerData.Addresses.Clear();
             var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
-            
+
             foreach (var addr in extracted.Addresses)
             {
                 var type = addr.Type ?? "Billing";
@@ -212,29 +212,29 @@ public partial class CustomerNew : ComponentBase
                     RecipientName = addr.RecipientName,
                     RecipientPhone = addr.RecipientPhone
                 };
-                
+
                 if (addr.Location != null)
                 {
                     _selectedLocations[_customerData.Addresses.Count] = addr.Location;
                 }
-                
+
                 if (thailand != null)
                 {
                     newAddr.CountryId = thailand.Id;
                     _selectedCountries[_customerData.Addresses.Count] = thailand;
                 }
-                
+
                 _customerData.Addresses.Add(newAddr);
             }
 
             UpdateAddressDefaults();
         }
     }
-    
+
     #endregion
 
     #region Address Management
-    
+
     private async Task<IEnumerable<RegistryThaiLocation>> SearchThaiLocations(string? query, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
@@ -243,7 +243,7 @@ public partial class CustomerNew : ComponentBase
         try
         {
             var results = await Http.GetFromJsonAsync<List<RegistryThaiLocation>>(
-                $"api/customers/locations/thai?query={Uri.EscapeDataString(query)}&limit=10", cancellationToken);
+                $"api/v1/customers/locations/thai?query={Uri.EscapeDataString(query)}&limit=10", cancellationToken);
             return results ?? new List<RegistryThaiLocation>();
         }
         catch
@@ -257,24 +257,24 @@ public partial class CustomerNew : ComponentBase
         if (addressIndex >= _customerData.Addresses.Count) return;
 
         var address = _customerData.Addresses[addressIndex];
-        
+
         // Update the selected location object for binding
         _selectedLocations[addressIndex] = location;
 
         if (location == null) return;
 
         var useThai = IsThai(address.District ?? "") || IsThai(address.City ?? "") || IsThai(address.StateProvince ?? "") || IsThai(address.AddressLine1);
-        
+
         if (!useThai && string.IsNullOrEmpty(address.District) && string.IsNullOrEmpty(address.City) && string.IsNullOrEmpty(address.StateProvince))
         {
             useThai = true;
         }
-        
+
         address.District = useThai ? location.SubDistrictTh : location.SubDistrictEn;
         address.City = useThai ? location.DistrictTh : location.DistrictEn;
         address.StateProvince = useThai ? location.ProvinceTh : location.ProvinceEn;
         address.PostalCode = location.PostalCode;
-        
+
         var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
         if (thailand != null)
         {
@@ -287,7 +287,7 @@ public partial class CustomerNew : ComponentBase
     {
         if (string.IsNullOrWhiteSpace(query)) return _allCountries;
 
-        return _allCountries.Where(c => 
+        return _allCountries.Where(c =>
             c.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
             c.Code.Contains(query, StringComparison.OrdinalIgnoreCase));
     }
@@ -315,12 +315,12 @@ public partial class CustomerNew : ComponentBase
         if (!isDefault || addressIndex >= _customerData.Addresses.Count) return;
 
         var address = _customerData.Addresses[addressIndex];
-        
+
         foreach (var addr in _customerData.Addresses.Where(a => a != address && a.Type == address.Type))
         {
             addr.IsDefault = false;
         }
-        
+
         address.IsDefault = true;
     }
 
@@ -328,7 +328,7 @@ public partial class CustomerNew : ComponentBase
     {
         var hasDefaultBilling = false;
         var hasDefaultShipping = false;
-        
+
         foreach (var addr in _customerData.Addresses)
         {
             if (addr.Type == "Billing")
@@ -347,20 +347,20 @@ public partial class CustomerNew : ComponentBase
     private void AddAddress()
     {
         var type = _customerData.Addresses.Count(a => a.Type == "Billing") >= 1 ? "Shipping" : "Billing";
-        
+
         var newAddress = new CreateAddressRequest
         {
             Type = type,
             IsDefault = !_customerData.Addresses.Any(a => a.Type == type)
         };
-        
+
         var thailand = _allCountries.FirstOrDefault(c => c.Code == "TH");
         if (thailand != null)
         {
             newAddress.CountryId = thailand.Id;
             _selectedCountries[_customerData.Addresses.Count] = thailand;
         }
-        
+
         _customerData.Addresses.Add(newAddress);
         UpdateAddressDefaults();
     }
@@ -373,11 +373,11 @@ public partial class CustomerNew : ComponentBase
     }
 
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
-    
+
     #endregion
 
     #region File Upload
-    
+
     private void OnNdaFilesSelected(IReadOnlyList<IBrowserFile> files)
     {
         _ndaFiles.Clear();
@@ -426,7 +426,7 @@ public partial class CustomerNew : ComponentBase
         try
         {
             using var content = new MultipartFormDataContent();
-            
+
             foreach (var file in files)
             {
                 var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
@@ -435,12 +435,12 @@ public partial class CustomerNew : ComponentBase
                 content.Add(fileContent, "files", file.Name);
             }
 
-            var response = await Http.PostAsync($"api/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}", content);
-            
+            var response = await Http.PostAsync($"api/v1/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}", content);
+
             if (response.IsSuccessStatusCode)
             {
                 var results = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
-                
+
                 foreach (var result in results ?? [])
                 {
                     var doc = new CreateDocumentRequest
@@ -454,7 +454,7 @@ public partial class CustomerNew : ComponentBase
                     uploadedList.Add(doc);
                     _customerData.Documents.Add(doc);
                 }
-                
+
                 Snackbar.Add($"Uploaded {results?.Count ?? 0} file(s)", Severity.Success);
                 files.Clear();
             }
@@ -484,26 +484,26 @@ public partial class CustomerNew : ComponentBase
         ".png" => "image/png",
         _ => "application/octet-stream"
     };
-    
+
     #endregion
 
     #region Form Validation & Submission
-    
+
     private async Task<string?> ValidateEmailAsync(string email)
     {
         if (string.IsNullOrWhiteSpace(email)) return "Email is required";
         if (!email.Contains("@") || !email.Contains(".")) return "Invalid email format";
-        
+
         try
         {
-            var exists = await Http.GetFromJsonAsync<bool>($"api/customers/check-email?email={Uri.EscapeDataString(email)}");
+            var exists = await Http.GetFromJsonAsync<bool>($"api/v1/customers/check-email?email={Uri.EscapeDataString(email)}");
             if (exists) return "A customer with this email already exists";
         }
         catch { }
-        
+
         return null;
     }
-    
+
     private bool IsFormValid()
     {
         // Basic customer validation
@@ -607,7 +607,7 @@ public partial class CustomerNew : ComponentBase
     {
         if (isNda) _uploadedNdaDocs.Remove(doc);
         else _uploadedCustomerDocs.Remove(doc);
-        
+
         _customerData.Documents.Remove(doc);
         StateHasChanged();
     }
@@ -629,7 +629,7 @@ public partial class CustomerNew : ComponentBase
         try
         {
             var response = await Http.GetFromJsonAsync<List<RegistryCompanyProfile>>(
-                $"api/customers/companies/search?query={Uri.EscapeDataString(value)}&limit={limit}", ct);
+                $"api/v1/customers/companies/search?query={Uri.EscapeDataString(value)}&limit={limit}", ct);
             return response ?? [];
         }
         catch

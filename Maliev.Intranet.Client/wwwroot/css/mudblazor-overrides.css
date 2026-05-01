@@ -1,0 +1,372 @@
+/* ================================================================
+   Maliev MudBlazor Compact-Density Overrides
+   Applies AFTER MudBlazor's own CSS. Targets only .mud-* classes.
+   Page-specific and component-specific rules live in scoped .razor.css.
+   All sizing values use --maliev-* tokens from design-tokens.css.
+   ================================================================ */
+
+/* ── INPUT FIELDS ─────────────────────────────────────────────────
+   MudTextField, MudNumericField, MudSelect, MudAutocomplete,
+   MudDatePicker
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-input.mud-input-text .mud-input-slot {
+    padding: 7px 9px;
+    font-size: var(--mud-typography-default-size);
+    min-height: unset;
+}
+
+.mud-input.mud-input-outlined {
+    border-radius: var(--maliev-radius-sm);
+}
+
+.mud-input.mud-input-outlined .mud-input-outlined-border {
+    border-radius: var(--maliev-radius-sm);
+}
+
+.mud-input-adornment {
+    padding: 4px;
+}
+
+.mud-input-adornment .mud-icon-root {
+    font-size: var(--maliev-icon-md);
+}
+
+/* !important required: MudBlazor 9 generates higher-specificity
+   selectors (.mud-input.mud-input-outlined .mud-input-label) that
+   otherwise win without it. */
+.mud-input-label {
+    font-size: var(--mud-typography-default-size) !important;
+}
+
+.mud-input-label-inputcontrol {
+    font-size: var(--mud-typography-default-size) !important;
+}
+
+.mud-input-label.mud-shrink {
+    font-size: var(--mud-typography-body2-size) !important;
+}
+
+.mud-input-slot::placeholder {
+    font-size: var(--mud-typography-default-size);
+    opacity: 0.6;
+}
+
+.mud-input-helper-text {
+    font-size: var(--mud-typography-caption-size);
+    margin-top: 2px;
+}
+
+.mud-input-control {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Dense outlined inputs with labels: strip MudBlazor 9's 8px top margin */
+.mud-input-control-margin-dense.mud-input-outlined-with-label {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Input typography catch-all */
+.mud-autocomplete .mud-input-control-input-control,
+.mud-input .mud-input-label,
+.mud-input-control .mud-input-label,
+.mud-input-slot::placeholder {
+    font-size: var(--mud-typography-default-size);
+}
+
+/* ── SELECT / AUTOCOMPLETE DROPDOWN ─────────────────────────────── */
+
+.mud-list-item {
+    padding: 5px 7px;
+    font-size: var(--mud-typography-default-size);
+    min-height: unset;
+}
+
+.mud-list-item .mud-list-item-text {
+    font-size: var(--mud-typography-default-size);
+}
+
+/* ── BUTTONS ──────────────────────────────────────────────────────
+   MudButton, MudIconButton
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-button-root {
+    padding: 5px 12px;
+    font-size: var(--mud-typography-button-size);
+    font-weight: 600;
+    border-radius: var(--maliev-radius-sm);
+    min-width: unset;
+    line-height: 1.4;
+    text-transform: none;
+}
+
+.mud-button-root.mud-button-size-small {
+    padding: 3px 8px;
+    font-size: var(--mud-typography-caption-size);
+}
+
+.mud-button-root.mud-button-size-large {
+    padding: 7px 16px;
+    font-size: var(--mud-typography-subtitle1-size);
+}
+
+.mud-icon-button-root {
+    padding: 5px;
+}
+
+.mud-icon-button-root.mud-icon-button-size-small {
+    padding: 3px;
+}
+
+.mud-icon-button-root .mud-icon-root {
+    font-size: var(--maliev-icon-lg);
+}
+
+.mud-icon-button-root.mud-icon-button-size-small .mud-icon-root {
+    font-size: var(--maliev-icon-md);
+}
+
+.mud-fab-root.mud-fab-size-small {
+    width: 32px;
+    height: 32px;
+}
+
+/* ── TABS ─────────────────────────────────────────────────────────
+   MudTabs
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-tab {
+    padding: 9px 12px;
+    font-size: var(--mud-typography-body2-size);
+    min-width: unset;
+    text-transform: none;
+}
+
+/* ── DATA GRID / TABLE ────────────────────────────────────────────
+   MudDataGrid, MudTable
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-table-root {
+    font-size: var(--mud-typography-body2-size);
+    border: 1px solid var(--mud-palette-lines-default);
+}
+
+.mud-table-head .mud-table-cell {
+    padding: 6px 8px;
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 600;
+}
+
+.mud-table-body .mud-table-cell {
+    padding: 4px 8px;
+    font-size: var(--mud-typography-body2-size);
+}
+
+.mud-table-foot .mud-table-cell {
+    padding: 4px 8px;
+    font-size: var(--mud-typography-caption-size);
+}
+
+.mud-table-row {
+    height: auto;
+}
+
+.mud-table-row .mud-table-cell {
+    line-height: 1.4;
+}
+
+.mud-table-dense .mud-table-body .mud-table-cell {
+    padding: 2px 8px;
+}
+
+.mud-table-pagination {
+    font-size: var(--mud-typography-body2-size);
+    padding: 4px 8px;
+}
+
+.mud-table-pagination .mud-table-pagination-actions {
+    gap: 2px;
+}
+
+.mud-table-sort-label {
+    font-size: var(--mud-typography-caption-size);
+}
+
+/* ── CARDS / PAPER ────────────────────────────────────────────────
+   MudCard, MudPaper
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-card {
+    border-radius: var(--maliev-radius-md);
+    box-shadow: var(--maliev-shadow-card);
+}
+
+.mud-card-content {
+    padding: 14px 16px;
+}
+
+.mud-card-header {
+    padding: 12px 16px 0 16px;
+}
+
+.mud-card-actions {
+    padding: 8px 16px 12px 16px;
+}
+
+.mud-paper {
+    border-radius: var(--maliev-radius-md);
+}
+
+/* ── ALERTS ───────────────────────────────────────────────────────
+   MudAlert
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-alert {
+    padding: 7px 10px;
+    border-radius: var(--maliev-radius-sm);
+}
+
+.mud-alert-message {
+    font-size: var(--mud-typography-caption-size);
+}
+
+.mud-alert-icon {
+    font-size: var(--maliev-icon-md);
+    padding: 0;
+    margin-right: 8px;
+}
+
+/* ── CHIPS ────────────────────────────────────────────────────────
+   MudChip
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-chip {
+    padding: 2px 7px;
+    font-size: var(--maliev-font-micro);
+    height: auto;
+    border-radius: var(--maliev-radius-sm);
+}
+
+.mud-chip .mud-chip-content {
+    padding: 0;
+}
+
+.mud-chip .mud-icon-root {
+    font-size: var(--maliev-icon-sm);
+}
+
+/* ── DIALOG ───────────────────────────────────────────────────────
+   MudDialog
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-dialog {
+    border-radius: var(--maliev-radius-md);
+}
+
+.mud-dialog .mud-dialog-title {
+    padding: 12px 16px;
+    font-size: var(--mud-typography-subtitle1-size);
+    font-weight: 600;
+}
+
+.mud-dialog .mud-dialog-content {
+    padding: 8px 16px;
+}
+
+.mud-dialog .mud-dialog-actions {
+    padding: 8px 16px 12px 16px;
+}
+
+/* ── BREADCRUMBS ──────────────────────────────────────────────────
+   MudBreadcrumbs
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-breadcrumbs {
+    padding: 0;
+}
+
+.mud-breadcrumb-item {
+    font-size: var(--mud-typography-body2-size);
+}
+
+.mud-breadcrumb-separator {
+    font-size: var(--mud-typography-caption-size);
+}
+
+/* ── MENU ─────────────────────────────────────────────────────────
+   MudMenu
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-menu-item {
+    padding: 5px 10px;
+    font-size: var(--mud-typography-body2-size);
+    min-height: unset;
+}
+
+/* ── SWITCH / CHECKBOX ────────────────────────────────────────────
+   MudSwitch, MudCheckBox
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-switch {
+    margin: 0;
+}
+
+.mud-checkbox .mud-typography,
+.mud-switch .mud-typography {
+    font-size: var(--mud-typography-body2-size);
+}
+
+/* ── DATE PICKER ──────────────────────────────────────────────────
+   MudDatePicker
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-picker .mud-picker-input-text {
+    font-size: var(--mud-typography-default-size);
+}
+
+/* ── SNACKBAR ─────────────────────────────────────────────────────
+   MudSnackbar
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-snackbar {
+    padding: 8px 12px;
+    font-size: var(--mud-typography-body2-size);
+    border-radius: var(--maliev-radius-sm);
+}
+
+/* ── BADGE ────────────────────────────────────────────────────────
+   MudBadge
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-badge-content {
+    font-size: var(--maliev-font-nano);
+}
+
+/* ── SKELETON ─────────────────────────────────────────────────────
+   MudSkeleton
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-skeleton {
+    border-radius: var(--maliev-radius-sm);
+}
+
+/* ── TOOLTIP ──────────────────────────────────────────────────────
+   MudTooltip
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-tooltip {
+    font-size: var(--mud-typography-caption-size);
+    padding: 4px 8px;
+    border-radius: var(--maliev-radius-sm);
+}
+
+/* ── NAV LINK (sidebar) ───────────────────────────────────────────
+   MudNavLink
+   ──────────────────────────────────────────────────────────────── */
+
+.mud-nav-link {
+    padding: 6px 12px;
+    font-size: var(--mud-typography-default-size);
+}

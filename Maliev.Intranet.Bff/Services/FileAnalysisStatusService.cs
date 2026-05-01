@@ -36,6 +36,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = FileAnalysisStatus.Processing,
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
+            NonManifoldReason = existing?.NonManifoldReason,
+            NonManifoldFaceCount = existing?.NonManifoldFaceCount,
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
@@ -49,7 +51,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     }
 
     /// <inheritdoc />
-    public Task SetDimensionsAsync(string uploadId, FileAnalysisDimensionsDto dimensions, bool isManifold, CancellationToken cancellationToken = default)
+    public Task SetDimensionsAsync(string uploadId, FileAnalysisDimensionsDto dimensions, bool isManifold, string? nonManifoldReason = null, int? nonManifoldFaceCount = null, CancellationToken cancellationToken = default)
     {
         var existing = Get(uploadId);
         var status = new FileAnalysisStatusDto
@@ -58,6 +60,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = existing?.Status ?? FileAnalysisStatus.Processing,
             Dimensions = dimensions,
             IsManifold = isManifold,
+            NonManifoldReason = nonManifoldReason,
+            NonManifoldFaceCount = nonManifoldFaceCount,
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
@@ -80,6 +84,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = existing?.Status ?? FileAnalysisStatus.Processing,
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
+            NonManifoldReason = existing?.NonManifoldReason,
+            NonManifoldFaceCount = existing?.NonManifoldFaceCount,
             ThumbnailUrl = thumbnailUrl ?? existing?.ThumbnailUrl,
             HiResThumbnailUrl = hiResThumbnailUrl ?? existing?.HiResThumbnailUrl,
             PreviewUrls = previewUrls,
@@ -102,6 +108,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = FileAnalysisStatus.Completed,
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
+            NonManifoldReason = existing?.NonManifoldReason,
+            NonManifoldFaceCount = existing?.NonManifoldFaceCount,
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
@@ -126,6 +134,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = FileAnalysisStatus.Completed,
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
+            NonManifoldReason = existing?.NonManifoldReason,
+            NonManifoldFaceCount = existing?.NonManifoldFaceCount,
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
@@ -148,6 +158,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = existing?.Status ?? FileAnalysisStatus.Completed,
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
+            NonManifoldReason = existing?.NonManifoldReason,
+            NonManifoldFaceCount = existing?.NonManifoldFaceCount,
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
@@ -170,6 +182,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = FileAnalysisStatus.Failed,
             Dimensions = existing?.Dimensions,
             IsManifold = existing?.IsManifold,
+            NonManifoldReason = existing?.NonManifoldReason,
+            NonManifoldFaceCount = existing?.NonManifoldFaceCount,
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
@@ -198,6 +212,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = existing.Status,
             Dimensions = existing.Dimensions,
             IsManifold = existing.IsManifold,
+            NonManifoldReason = existing.NonManifoldReason,
+            NonManifoldFaceCount = existing.NonManifoldFaceCount,
             ThumbnailUrl = existing.ThumbnailUrl,
             HiResThumbnailUrl = existing.HiResThumbnailUrl,
             PreviewUrls = existing.PreviewUrls,
@@ -271,6 +287,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             Status = existing.Status,
             Dimensions = existing.Dimensions,
             IsManifold = existing.IsManifold,
+            NonManifoldReason = existing.NonManifoldReason,
+            NonManifoldFaceCount = existing.NonManifoldFaceCount,
             ThumbnailUrl = existing.ThumbnailUrl,
             HiResThumbnailUrl = existing.HiResThumbnailUrl,
             PreviewUrls = existing.PreviewUrls,

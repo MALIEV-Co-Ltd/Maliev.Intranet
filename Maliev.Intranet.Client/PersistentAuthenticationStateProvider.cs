@@ -53,7 +53,7 @@ public class PersistentAuthenticationStateProvider : AuthenticationStateProvider
         // Otherwise, fall back to fetching from BFF API
         try
         {
-            var userContext = await _httpClient.GetFromJsonAsync<UserContextDto>("api/auth/user");
+            var userContext = await _httpClient.GetFromJsonAsync<UserContextDto>("api/v1/auth/user");
 
             if (userContext is not null)
             {

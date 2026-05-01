@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -11,15 +12,16 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 /// <param name="client">The career service client.</param>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class RecruitmentController(CareerServiceClient client) : ControllerBase
 {
     /// <summary>
     /// Retrieves active job postings.
     /// </summary>
     /// <returns>A list of job postings.</returns>
-    [HttpGet("jobs")]
     [RequirePermission(MalievPermissions.Career.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("jobs")]
     public async Task<ActionResult<List<JobPostingSummaryDto>>> GetJobs()
     {
         var result = await client.GetJobPostingsAsync();
@@ -30,8 +32,8 @@ public class RecruitmentController(CareerServiceClient client) : ControllerBase
     /// Retrieves recruitment pipeline statistics.
     /// </summary>
     /// <returns>Recruitment statistics.</returns>
-    [HttpGet("stats")]
     [RequirePermission(MalievPermissions.Career.Stats, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("stats")]
     public async Task<ActionResult<RecruitmentStatsDto>> GetStats()
     {
         var result = await client.GetRecruitmentStatsAsync();
@@ -41,8 +43,8 @@ public class RecruitmentController(CareerServiceClient client) : ControllerBase
     /// <summary>
     /// Creates a new job posting.
     /// </summary>
-    [HttpPost("jobs")]
     [RequirePermission(MalievPermissions.Career.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("jobs")]
     public async Task<IActionResult> CreateJob([FromBody] CreateJobPostingRequest request, CancellationToken ct)
     {
         var response = await client.CreateJobPostingAsync(request, ct);
@@ -52,8 +54,8 @@ public class RecruitmentController(CareerServiceClient client) : ControllerBase
     /// <summary>
     /// Updates an existing job posting.
     /// </summary>
-    [HttpPut("jobs/{id:guid}")]
     [RequirePermission(MalievPermissions.Career.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("jobs/{id:guid}")]
     public async Task<IActionResult> UpdateJob(Guid id, [FromBody] UpdateJobPostingRequest request, CancellationToken ct)
     {
         var response = await client.UpdateJobPostingAsync(id, request, ct);
@@ -63,8 +65,8 @@ public class RecruitmentController(CareerServiceClient client) : ControllerBase
     /// <summary>
     /// Creates a new candidate application.
     /// </summary>
-    [HttpPost("candidates")]
     [RequirePermission(MalievPermissions.Career.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("candidates")]
     public async Task<IActionResult> CreateCandidate([FromBody] CreateCandidateRequest request, CancellationToken ct)
     {
         var response = await client.CreateCandidateAsync(request, ct);
@@ -74,8 +76,8 @@ public class RecruitmentController(CareerServiceClient client) : ControllerBase
     /// <summary>
     /// Updates the status of a candidate application.
     /// </summary>
-    [HttpPatch("candidates/{id:guid}/status")]
     [RequirePermission(MalievPermissions.Career.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("candidates/{id:guid}/status")]
     public async Task<IActionResult> UpdateCandidateStatus(Guid id, [FromBody] UpdateCandidateStatusRequest request, CancellationToken ct)
     {
         var response = await client.UpdateCandidateStatusAsync(id, request, ct);

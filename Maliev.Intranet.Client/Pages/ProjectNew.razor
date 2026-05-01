@@ -18,23 +18,55 @@
         <ChildContent>
             <div class="pn-body">
                 @* ── Left: Parts List ─────────────────────────────────────── *@
-                <PartsListPanel
-                    Parts="@_parts"
-                    SelectedIndex="@_selectedPartIndex"
-                    Title="@_title"
-                    OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
-                    OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
-                    AutoSaving="@_autoSaving"
-                    LastSavedAt="@_lastSavedAt"
-                    HasCustomerSelected="@(_selectedCustomer != null)"
-                    OnDuplicate="DuplicateProject"
-                    OnSelectPart="@(i => { _selectedPartIndex = i; StateHasChanged(); })"
-                    OnAddPart="OpenFilePicker"
-                    OnRemovePart="RemovePart"
-                    OnDuplicatePart="DuplicateSinglePart" />
+                <div class="pn-desktop-parts">
+                    <PartsListPanel
+                        Parts="@_parts"
+                        SelectedIndex="@_selectedPartIndex"
+                        Title="@_title"
+                        OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
+                        OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
+                        AutoSaving="@_autoSaving"
+                        LastSavedAt="@_lastSavedAt"
+                        HasCustomerSelected="@(_selectedCustomer != null)"
+                        OnDuplicate="DuplicateProject"
+                        OnSelectPart="SelectPartFromPanel"
+                        OnAddPart="OpenFilePicker"
+                        OnRemovePart="RemovePart"
+                        OnDuplicatePart="DuplicateSinglePart" />
+                </div>
+
+                <MudDrawer @bind-Open="_partsDrawerOpen"
+                           Anchor="Anchor.Start"
+                           Variant="DrawerVariant.Temporary"
+                           Elevation="6"
+                           ClipMode="DrawerClipMode.Never"
+                           Class="pn-parts-drawer">
+                    <PartsListPanel
+                        Parts="@_parts"
+                        SelectedIndex="@_selectedPartIndex"
+                        Title="@_title"
+                        OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
+                        OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
+                        AutoSaving="@_autoSaving"
+                        LastSavedAt="@_lastSavedAt"
+                        HasCustomerSelected="@(_selectedCustomer != null)"
+                        OnDuplicate="DuplicateProject"
+                        OnSelectPart="SelectPartFromDrawer"
+                        OnAddPart="OpenFilePicker"
+                        OnRemovePart="RemovePart"
+                        OnDuplicatePart="DuplicateSinglePart" />
+                </MudDrawer>
 
                 @* ── Center: Viewer + Detail ─────────────────────────────── *@
                 <div class="pn-center">
+                    <div class="pn-mobile-toolbar">
+                        <button class="pn-parts-toggle" title="Open parts list" @onclick="@(() => _partsDrawerOpen = true)">
+                            <MudIcon Icon="@Icons.Material.Outlined.Menu" Size="Size.Small" />
+                            <span>Parts</span>
+                            <span class="pn-parts-count">@_parts.Count</span>
+                        </button>
+                    </div>
+
                     @if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)
                     {
                         <div class="pn-detail-row">

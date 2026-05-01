@@ -1,4 +1,6 @@
 using Asp.Versioning;
+using Maliev.Intranet.Shared;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.Intranet.Bff.Controllers;
@@ -8,8 +10,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// to the Blazor front-end.
 /// </summary>
 [ApiController]
-[ApiVersion("1")]
-[Route("api/config")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/config")]
 public class ClientConfigController : ControllerBase
 {
     private readonly IConfiguration _configuration;
@@ -26,6 +28,7 @@ public class ClientConfigController : ControllerBase
     /// <summary>
     /// Returns client configuration values.
     /// </summary>
+    [AllowAnonymous]
     [HttpGet("client")]
     public ActionResult<ClientConfigDto> GetClientConfig()
     {

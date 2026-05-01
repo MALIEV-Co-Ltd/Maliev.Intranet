@@ -79,8 +79,8 @@ public static class ThemeConfiguration
             ActionDisabledBackground = new MudColor("#e5e7eb"),
 
             // ── Surfaces (MudColor) ─────────────────────────────────────
-            Background = new MudColor("#f1f5f9"),
-            BackgroundGray = new MudColor("#f8fafc"),
+            Background = new MudColor("#eef2f7"),
+            BackgroundGray = new MudColor("#f5f7fa"),
             Surface = new MudColor("#ffffff"),
             DrawerBackground = new MudColor("#ffffff"),
             DrawerText = new MudColor("#1a1a1a"),
@@ -337,8 +337,8 @@ public static class ThemeConfiguration
             ActionDisabledBackground = new MudColor("#1e293b"),
 
             // ── Surfaces (MudColor) ─────────────────────────────────────
-            Background = new MudColor("#131620"),
-            BackgroundGray = new MudColor("#1e2130"),
+            Background = new MudColor("#0b0f18"),
+            BackgroundGray = new MudColor("#10151f"),
             Surface = new MudColor("#1e2130"),
             DrawerBackground = new MudColor("#1e2130"),
             DrawerText = new MudColor("#f1f5f9"),

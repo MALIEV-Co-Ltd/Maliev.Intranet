@@ -1,3 +1,5 @@
+using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -13,7 +15,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for managing user authentication and identity.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnvironment env, ILogger<AuthController> logger) : ControllerBase
 {
     /// <summary>
@@ -78,6 +81,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             new Claim(ClaimTypes.Name, jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value ?? authResult.User.Name ?? request.Username),
             new Claim("email", jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? authResult.User.Email ?? request.Username),
             new Claim("user_type", jwtToken.Claims.FirstOrDefault(c => c.Type == "user_type")?.Value ?? authResult.User.UserType),
+            new Claim("permissions", MalievPermissions.Auth.SessionsRead),
             new Claim("access_token", authResult.AccessToken)
         };
 
@@ -153,6 +157,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
     /// <summary>
     /// Retrieves the current user context.
     /// </summary>
+    [RequirePermission(MalievPermissions.Auth.SessionsRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("user")]
     public IActionResult GetUser()
     {
@@ -182,7 +187,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
     /// <summary>
     /// Diagnostic endpoint to debug user claims and tokens.
     /// </summary>
-    [Authorize]
+    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("debug")]
     public IActionResult DebugClaims()
     {

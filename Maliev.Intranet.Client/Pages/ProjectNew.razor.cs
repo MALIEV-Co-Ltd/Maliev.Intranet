@@ -29,7 +29,7 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Project-level state ───────────────────────────────────────────
     private Guid _tempProjectId = Guid.NewGuid();  // non-readonly; reassigned on Duplicate
     private string _title = $"Project {DateTime.Today:yyyy-MM-dd}";
-        private CustomerSummaryDto? _selectedCustomer;
+    private CustomerSummaryDto? _selectedCustomer;
     private List<LeadTimeOptionDto> _leadTimeOptions = [];
     private LeadTimeOptionDto? _selectedLeadTime;
     private List<ProcessDto> _processes = [];
@@ -45,6 +45,7 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Parts ─────────────────────────────────────────────────────────
     private readonly List<PartViewModel> _parts = [];
     private int _selectedPartIndex;
+    private bool _partsDrawerOpen;
 
     // ── Customer search ────────────────────────────────────────────────
     private CancellationTokenSource? _searchCts;
@@ -130,8 +131,8 @@ public partial class ProjectNew : IAsyncDisposable
 
         // ── Load reference data ────────────────────────────────────────
         var currenciesTask = CurrencyService.InitializeAsync();
-        var processesTask  = Http.GetFromJsonAsync<List<ProcessDto>>("api/catalog/processes");
-        var leadTimesTask  = Http.GetFromJsonAsync<List<LeadTimeOptionDto>>("api/pricing/lead-times");
+        var processesTask = Http.GetFromJsonAsync<List<ProcessDto>>("api/v1/catalog/processes");
+        var leadTimesTask = Http.GetFromJsonAsync<List<LeadTimeOptionDto>>("api/v1/pricing/lead-times");
 
         await Task.WhenAll(
             currenciesTask,
@@ -348,7 +349,7 @@ public partial class ProjectNew : IAsyncDisposable
         try
         {
             var result = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(
-                $"api/customers?query={Uri.EscapeDataString(value)}&page=1&pageSize=10",
+                $"api/v1/customers?query={Uri.EscapeDataString(value)}&page=1&pageSize=10",
                 _searchCts.Token);
             return result?.Data ?? [];
         }
@@ -434,7 +435,7 @@ public partial class ProjectNew : IAsyncDisposable
                 jsFiles.Add(new { bytes = ms.ToArray(), name = file.Name });
             }
 
-            var url = $"api/uploads/batch?projectId={_tempProjectId}&customerId={_selectedCustomerId}";
+            var url = $"api/v1/uploads/batch?projectId={_tempProjectId}&customerId={_selectedCustomerId}";
             var result = await JS.InvokeAsync<UploadResult>("window.uploadBatchWithProgress", url, jsFiles, callbackRef);
 
             if (result.Status != 200)
@@ -582,7 +583,7 @@ public partial class ProjectNew : IAsyncDisposable
         try
         {
             var statusResponse = await Http.GetAsync(
-                $"api/uploads/analysis-status?storagePath={Uri.EscapeDataString(storagePath)}");
+                $"api/v1/uploads/analysis-status?storagePath={Uri.EscapeDataString(storagePath)}");
 
             if (!statusResponse.IsSuccessStatusCode)
             {
@@ -695,7 +696,7 @@ public partial class ProjectNew : IAsyncDisposable
         try
         {
             var viewerResp = await Http.GetAsync(
-                $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(storagePath)}");
+                $"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(storagePath)}");
             if (viewerResp.IsSuccessStatusCode)
             {
                 var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
@@ -723,7 +724,7 @@ public partial class ProjectNew : IAsyncDisposable
             foreach (var (key, path) in part.OverlayPaths)
             {
                 var resp = await Http.GetAsync(
-                    $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(path)}");
+                    $"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(path)}");
                 if (resp.IsSuccessStatusCode)
                 {
                     var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
@@ -757,7 +758,7 @@ public partial class ProjectNew : IAsyncDisposable
         try
         {
             var viewerResp = await Http.GetAsync(
-                $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(storagePath)}");
+                $"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(storagePath)}");
             if (viewerResp.IsSuccessStatusCode)
             {
                 var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
@@ -770,7 +771,7 @@ public partial class ProjectNew : IAsyncDisposable
                     return;
                 }
             }
-            
+
             if (viewerResp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 Snackbar.Add("Session expired. Please refresh the page and log in again.", Severity.Error);
@@ -799,13 +800,13 @@ public partial class ProjectNew : IAsyncDisposable
         // Cascade delete all attachment files before removing the part
         foreach (var att in part.DrawingFiles.Concat(part.SupplementaryFiles))
         {
-            try { await Http.DeleteAsync($"api/uploads/attachments/{att.FileId}"); } catch { /* non-fatal */ }
+            try { await Http.DeleteAsync($"api/v1/uploads/attachments/{att.FileId}"); } catch { /* non-fatal */ }
         }
 
         // Delete from server if the project has been cloud-saved
         if (_serverProjectId.HasValue && !string.IsNullOrEmpty(part.StoragePath))
         {
-            try { await Http.DeleteAsync($"api/projects/{_serverProjectId}/parts/{part.FileId}"); } catch { /* non-fatal */ }
+            try { await Http.DeleteAsync($"api/v1/projects/{_serverProjectId}/parts/{part.FileId}"); } catch { /* non-fatal */ }
         }
 
         _parts.Remove(part);
@@ -826,6 +827,19 @@ public partial class ProjectNew : IAsyncDisposable
         StateHasChanged();
     }
 
+    private void SelectPartFromPanel(int index)
+    {
+        _selectedPartIndex = index;
+        StateHasChanged();
+    }
+
+    private void SelectPartFromDrawer(int index)
+    {
+        _selectedPartIndex = index;
+        _partsDrawerOpen = false;
+        StateHasChanged();
+    }
+
     // ── Task 12: Cascading dropdowns ──────────────────────────────────
 
     /// <inheritdoc />
@@ -841,13 +855,13 @@ public partial class ProjectNew : IAsyncDisposable
             {
                 var processCode = part.ProcessCode;
                 var materialsTask = Http.GetFromJsonAsync<List<CatalogMaterialDto>>(
-                    $"api/catalog/processes/{Uri.EscapeDataString(processCode)}/materials");
+                    $"api/v1/catalog/processes/{Uri.EscapeDataString(processCode)}/materials");
                 var finishesTask = Http.GetFromJsonAsync<List<CatalogSurfaceFinishDto>>(
-                    $"api/catalog/processes/{Uri.EscapeDataString(processCode)}/finishes");
+                    $"api/v1/catalog/processes/{Uri.EscapeDataString(processCode)}/finishes");
                 var tolerancesTask = Http.GetFromJsonAsync<List<CatalogToleranceDto>>(
-                    $"api/catalog/processes/{Uri.EscapeDataString(processCode)}/tolerances");
+                    $"api/v1/catalog/processes/{Uri.EscapeDataString(processCode)}/tolerances");
                 var configOptionsTask = Http.GetFromJsonAsync<List<ProcessConfigOptionDto>>(
-                    $"api/catalog/processes/{Uri.EscapeDataString(processCode)}/config-options");
+                    $"api/v1/catalog/processes/{Uri.EscapeDataString(processCode)}/config-options");
 
                 await Task.WhenAll(materialsTask, finishesTask, tolerancesTask, configOptionsTask);
 
@@ -1009,7 +1023,7 @@ public partial class ProjectNew : IAsyncDisposable
                     .FirstOrDefault(t => t.Code == part.ToleranceCode)?.AdditionalCostPercent,
             };
 
-            var response = await Http.PostAsJsonAsync("api/pricing/calculate", request, ct);
+            var response = await Http.PostAsJsonAsync("api/v1/pricing/calculate", request, ct);
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<PricingResultDto>(cancellationToken: ct);
@@ -1079,7 +1093,7 @@ public partial class ProjectNew : IAsyncDisposable
         {
             var processCode = Uri.EscapeDataString(part.ProcessCode ?? "");
             part.ProductionRouting = await Http.GetFromJsonAsync<ProductionRoutingDto>(
-                $"api/projects/{_tempProjectId}/parts/{partId}/routing?processType={processCode}");
+                $"api/v1/projects/{_tempProjectId}/parts/{partId}/routing?processType={processCode}");
             // Record which process this routing is for so we can detect staleness later
             if (part.ProcessCode == fetchedProcess)
                 _routingProcessByPart[part.FileId] = fetchedProcess!;
@@ -1128,7 +1142,7 @@ public partial class ProjectNew : IAsyncDisposable
                 TempProjectId = _tempProjectId,
                 ServerProjectId = _serverProjectId,
                 Title = _title,
-                                CustomerId = _selectedCustomer?.Id,
+                CustomerId = _selectedCustomer?.Id,
                 CustomerName = _selectedCustomer?.Name,
                 CustomerCompanyName = _selectedCustomer?.CompanyName,
                 CustomerEmail = _selectedCustomer?.Email,
@@ -1176,10 +1190,10 @@ public partial class ProjectNew : IAsyncDisposable
                     CustomerId = _selectedCustomerId!.Value,
                     CustomerName = _selectedCustomer?.Name ?? string.Empty,
                     Title = _title,
-                                        Currency = CurrencyService.Code,
+                    Currency = CurrencyService.Code,
                 };
 
-                var response = await Http.PostAsJsonAsync("api/projects", createRequest);
+                var response = await Http.PostAsJsonAsync("api/v1/projects", createRequest);
                 if (response.IsSuccessStatusCode)
                 {
                     var project = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
@@ -1202,7 +1216,7 @@ public partial class ProjectNew : IAsyncDisposable
                                     Finish = part.FinishCode,
                                     Tolerance = part.ToleranceCode,
                                 };
-                                var partResponse = await Http.PostAsJsonAsync($"api/projects/{_serverProjectId}/parts", addPartRequest);
+                                var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{_serverProjectId}/parts", addPartRequest);
                                 if (partResponse.IsSuccessStatusCode)
                                 {
                                     var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
@@ -1223,7 +1237,7 @@ public partial class ProjectNew : IAsyncDisposable
                             TempProjectId = _tempProjectId,
                             ServerProjectId = _serverProjectId,
                             Title = _title,
-                                                        CustomerId = _selectedCustomer?.Id,
+                            CustomerId = _selectedCustomer?.Id,
                             CustomerName = _selectedCustomer?.Name,
                             CustomerCompanyName = _selectedCustomer?.CompanyName,
                             CustomerEmail = _selectedCustomer?.Email,
@@ -1243,7 +1257,7 @@ public partial class ProjectNew : IAsyncDisposable
             }
             else
             {
-                                await Http.PutAsJsonAsync($"api/projects/{_serverProjectId}", new { Title = _title });
+                await Http.PutAsJsonAsync($"api/v1/projects/{_serverProjectId}", new { Title = _title });
 
                 foreach (var part in _parts.Where(p => p.IsFullyConfigured))
                 {
@@ -1262,7 +1276,7 @@ public partial class ProjectNew : IAsyncDisposable
                                 Finish = part.FinishCode,
                                 Tolerance = part.ToleranceCode,
                             };
-                            var partResponse = await Http.PostAsJsonAsync($"api/projects/{_serverProjectId}/parts", addPartRequest);
+                            var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{_serverProjectId}/parts", addPartRequest);
                             if (partResponse.IsSuccessStatusCode)
                             {
                                 var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
@@ -1284,7 +1298,7 @@ public partial class ProjectNew : IAsyncDisposable
                             Tolerance = part.ToleranceCode,
                         };
                         await Http.PutAsJsonAsync(
-                            $"api/projects/{_serverProjectId}/parts/{part.ServerPartId}",
+                            $"api/v1/projects/{_serverProjectId}/parts/{part.ServerPartId}",
                             partRequest);
                     }
                     catch
@@ -1385,7 +1399,7 @@ public partial class ProjectNew : IAsyncDisposable
     {
         try
         {
-            var response = await Http.GetAsync($"api/projects/{projectId}");
+            var response = await Http.GetAsync($"api/v1/projects/{projectId}");
             if (!response.IsSuccessStatusCode) return;
 
             var project = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
@@ -1466,13 +1480,13 @@ public partial class ProjectNew : IAsyncDisposable
         try
         {
             var materialsTask = Http.GetFromJsonAsync<List<CatalogMaterialDto>>(
-                $"api/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/materials");
+                $"api/v1/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/materials");
             var finishesTask = Http.GetFromJsonAsync<List<CatalogSurfaceFinishDto>>(
-                $"api/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/finishes");
+                $"api/v1/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/finishes");
             var tolerancesTask = Http.GetFromJsonAsync<List<CatalogToleranceDto>>(
-                $"api/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/tolerances");
+                $"api/v1/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/tolerances");
             var configOptionsTask = Http.GetFromJsonAsync<List<ProcessConfigOptionDto>>(
-                $"api/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/config-options");
+                $"api/v1/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/config-options");
 
             await Task.WhenAll(materialsTask, finishesTask, tolerancesTask, configOptionsTask);
 
@@ -1513,7 +1527,7 @@ public partial class ProjectNew : IAsyncDisposable
                 }).ToList()
             };
 
-            var response = await Http.PostAsJsonAsync("api/quotations/draft-pdf", pdfData);
+            var response = await Http.PostAsJsonAsync("api/v1/quotations/draft-pdf", pdfData);
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1551,7 +1565,7 @@ public partial class ProjectNew : IAsyncDisposable
             {
                 projectId = _serverProjectId.Value;
 
-                                var updateResponse = await Http.PutAsJsonAsync($"api/projects/{projectId}", new { Title = _title });
+                var updateResponse = await Http.PutAsJsonAsync($"api/v1/projects/{projectId}", new { Title = _title });
                 if (!updateResponse.IsSuccessStatusCode)
                 {
                     var errorContent = await updateResponse.Content.ReadAsStringAsync();
@@ -1574,7 +1588,7 @@ public partial class ProjectNew : IAsyncDisposable
 
                     try
                     {
-                        var partResponse = await Http.PostAsJsonAsync($"api/projects/{projectId}/parts", addPartRequest);
+                        var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addPartRequest);
                         if (partResponse.IsSuccessStatusCode)
                         {
                             var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
@@ -1592,10 +1606,10 @@ public partial class ProjectNew : IAsyncDisposable
                     CustomerId = _selectedCustomer!.Id,
                     CustomerName = _selectedCustomer.Name,
                     Title = _title,
-                                        Currency = CurrencyService.Code,
+                    Currency = CurrencyService.Code,
                 };
 
-                using var projectResponse = await Http.PostAsJsonAsync("api/projects", createRequest);
+                using var projectResponse = await Http.PostAsJsonAsync("api/v1/projects", createRequest);
                 if (!projectResponse.IsSuccessStatusCode)
                 {
                     var errorContent = await projectResponse.Content.ReadAsStringAsync();
@@ -1625,7 +1639,7 @@ public partial class ProjectNew : IAsyncDisposable
                         Tolerance = part.ToleranceCode,
                     };
 
-                    using var partResponse = await Http.PostAsJsonAsync($"api/projects/{projectId}/parts", addPartRequest);
+                    using var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addPartRequest);
                     if (partResponse.IsSuccessStatusCode)
                     {
                         var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
@@ -1639,7 +1653,7 @@ public partial class ProjectNew : IAsyncDisposable
                 }
             }
 
-            using var quoteResponse = await Http.PostAsync($"api/projects/{projectId}/generate-quotation", null);
+            using var quoteResponse = await Http.PostAsync($"api/v1/projects/{projectId}/generate-quotation", null);
             if (!quoteResponse.IsSuccessStatusCode)
             {
                 Snackbar.Add("Project created but quotation generation failed.", Severity.Warning);
@@ -1812,7 +1826,7 @@ public partial class ProjectNew : IAsyncDisposable
             return;
 
         var migrationResult = await Http.PostAsJsonAsync(
-            $"api/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
+            $"api/v1/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
             (object?)null);
 
         if (!migrationResult.IsSuccessStatusCode)
@@ -1830,7 +1844,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         var root = migrated.RootElement;
 
-        if (!root.TryGetProperty("errors", out var errorsElement) && 
+        if (!root.TryGetProperty("errors", out var errorsElement) &&
             !root.TryGetProperty("Errors", out errorsElement))
         {
             Snackbar.Add("Migration response is invalid: missing errors property.", Severity.Error);
@@ -1838,7 +1852,7 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         var totalMigrated = 0;
-        if (root.TryGetProperty("total_migrated", out var totalMigratedElement) || 
+        if (root.TryGetProperty("total_migrated", out var totalMigratedElement) ||
             root.TryGetProperty("TotalMigrated", out totalMigratedElement))
         {
             totalMigrated = totalMigratedElement.GetInt32();
@@ -1923,7 +1937,7 @@ public partial class ProjectNew : IAsyncDisposable
     {
         if (string.IsNullOrEmpty(part.GlbStoragePath)) return;
 
-        var resp = await Http.GetAsync($"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
+        var resp = await Http.GetAsync($"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
         if (!resp.IsSuccessStatusCode)
         {
             Snackbar.Add("Failed to load 3D viewer URL.", Severity.Error);

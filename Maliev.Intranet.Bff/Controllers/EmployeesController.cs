@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -11,7 +12,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 /// <param name="client">The employee service client.</param>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class EmployeesController(EmployeeServiceClient client) : ControllerBase
 {
     /// <summary>
@@ -79,7 +81,7 @@ public class EmployeesController(EmployeeServiceClient client) : ControllerBase
     /// <summary>
     /// Retrieves the current user's employee profile.
     /// </summary>
-    [Authorize]
+    [RequirePermission(MalievPermissions.Employee.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("me")]
     public async Task<ActionResult<EmployeeDetailDto>> GetMe(CancellationToken ct)
     {

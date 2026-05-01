@@ -1,5 +1,6 @@
 using Bunit;
 using Maliev.Intranet.Client.Components.Project;
+using Maliev.Intranet.Shared.Dtos;
 using Maliev.MessagingContracts.Contracts.Geometry;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
@@ -105,5 +106,243 @@ public class DfmChecksTabTests : BunitContext, IAsyncLifetime
         var cut = RenderTab(part);
 
         Assert.DoesNotContain("dfm-badge--ok", cut.Markup);
+    }
+
+    // Test 6: FILE_MISSING error code — shows message without "retry" prompt
+    [Fact]
+    public void DfmTab_FileMissing_ShowsMessageWithoutRetryPrompt()
+    {
+        var part = CleanFdmPart(timedOut: false);
+        part.AnalysisErrorCode = "FILE_MISSING";
+        part.DfmReport = null;
+
+        var cut = RenderTab(part);
+
+        Assert.Contains("File is no longer available", cut.Markup);
+        Assert.DoesNotContain("Select the process again to retry", cut.Markup);
+    }
+
+    // Test 7: Non-FILE_MISSING error code — shows "retry" prompt
+    [Fact]
+    public void DfmTab_NonFileMissingError_ShowsRetryPrompt()
+    {
+        var part = CleanFdmPart(timedOut: true);
+        part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+
+        var cut = RenderTab(part);
+
+        Assert.Contains("Select the process again to retry", cut.Markup);
+    }
+
+    // ── Pending state tests (new per-check state machine) ─────────────
+
+    // Test 8: When IsManifold=null and BodyCount=null, both intrinsic checks render as skeletons.
+    [Fact]
+    public void DfmChecksTab_IntrinsicChecksPendingWhenFlagsAreNull()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = null,
+            BodyCount = null,
+            DfmReport = null,
+            DfmAnalysisTimedOut = false,
+        };
+        var cut = RenderTab(part);
+
+        // Intrinsic checks show as skeletons (not expansion panels) when data is null.
+        Assert.Contains("dfm-check-row--skeleton", cut.Markup);
+        // Neither intrinsic check should show as a resolved panel (no green check icon).
+        Assert.DoesNotContain("dfm-expansion-panel--pass", cut.Markup);
+    }
+
+    // Test 9: When IsManifold=true and BodyCount=1, both intrinsic checks show as passed panels.
+    [Fact]
+    public void DfmChecksTab_IntrinsicChecksPassedWhenDataPresent()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = true,
+            BodyCount = 1,
+            DfmReport = null, // Process checks still pending
+            DfmAnalysisTimedOut = false,
+        };
+        var cut = RenderTab(part);
+
+        // Both intrinsic checks must be resolved as passed expansion panels.
+        Assert.Contains("dfm-expansion-panel--pass", cut.Markup);
+        // Process checks remain as skeletons.
+        Assert.Contains("dfm-check-row--skeleton", cut.Markup);
+        // Badge must NOT be ok (process checks still pending).
+        Assert.DoesNotContain("dfm-badge--ok", cut.Markup);
+    }
+
+    // Test 10: When IsManifold=true, BodyCount=1 with a clean FDM report — all checks pass, badge is ok.
+    [Fact]
+    public void DfmChecksTab_AllPassedBadgeOkWhenNoPendingAndNoFailed()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = true,
+            BodyCount = 1,
+            DfmAnalysisTimedOut = false,
+        };
+        var report = AllPassFdmReport();
+        part.FdmDfmReport = report;
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        Assert.Contains("dfm-badge--ok", cut.Markup);
+        Assert.DoesNotContain("dfm-check-row--skeleton", cut.Markup);
+    }
+
+    // Test 11: Multi-body file (BodyCount=14) must fail the "Single body" check.
+    [Fact]
+    public void DfmChecksTab_MultiBodyFailsSingleBodyCheck()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = true,
+            BodyCount = 14,
+            DfmAnalysisTimedOut = false,
+        };
+        var report = AllPassFdmReport();
+        part.FdmDfmReport = report;
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        // Single body check must be failed.
+        Assert.Contains("dfm-expansion-panel--fail", cut.Markup);
+        Assert.Contains("14 bodies found", cut.Markup);
+        // Badge must not be ok.
+        Assert.DoesNotContain("dfm-badge--ok", cut.Markup);
+    }
+
+    // Test 12: Pass-state detail for "Single body" uses the measured body count, not static text.
+    [Fact]
+    public void DfmChecksTab_PassDetailForSingleBodyUsesMeasuredCount()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = true,
+            BodyCount = 1,
+            DfmAnalysisTimedOut = false,
+        };
+        var report = AllPassFdmReport();
+        part.FdmDfmReport = report;
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        // Pass detail must contain the measured value "1 solid body", not just static text.
+        Assert.Contains("1 solid body", cut.Markup);
+        // Should NOT contain vague canned text that ignores data.
+        Assert.DoesNotContain("File contains a single solid body", cut.Markup);
+    }
+
+    // Test 13: "Mesh integrity" passes with watertight text; no "Pending" skeleton when IsManifold=true.
+    [Fact]
+    public void DfmChecksTab_MeshIntegrityPassDetailShowsWatertight()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = true,
+            BodyCount = 1,
+            DfmAnalysisTimedOut = false,
+        };
+        var report = AllPassFdmReport();
+        part.FdmDfmReport = report;
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        Assert.Contains("watertight", cut.Markup);
+    }
+
+    // Test 14: When IsManifold=false, "Mesh integrity" shows as failed regardless of DfmReport.
+    [Fact]
+    public void DfmChecksTab_NonManifoldMeshFailsMeshIntegrityCheck()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = false,
+            BodyCount = 1,
+            DfmAnalysisTimedOut = false,
+        };
+        var report = AllPassFdmReport();
+        part.FdmDfmReport = report;
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        Assert.Contains("dfm-expansion-panel--fail", cut.Markup);
+        Assert.Contains("Mesh has geometry issues", cut.Markup);
+    }
+
+    // Test 15: DfmReport DTO type (from two-phase HTTP path) with issues → shows failures, not phantom passes.
+    [Fact]
+    public void DfmChecksTab_DfmReportDtoType_ShowsFailuresNotPhantomPasses()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = true,
+            BodyCount = 1,
+            DfmAnalysisTimedOut = false,
+        };
+        // Simulate a DfmReport DTO from the two-phase HTTP path (not a typed FdmDfmReportPayload).
+        var report = new Maliev.Intranet.Shared.Dtos.DfmReport
+        {
+            ReportType = "FDM",
+            Issues =
+            [
+                new Maliev.Intranet.Shared.Dtos.DfmIssue { Category = "thin_wall", Severity = "warning", Title = "6 thin wall regions", Description = "Wall thickness below minimum", Value = 6, Threshold = 0.8 },
+                new Maliev.Intranet.Shared.Dtos.DfmIssue { Category = "overhang", Severity = "warning", Title = "5 overhang regions", Description = "Overhang exceeds angle limit", Value = 5, Threshold = 45 },
+            ],
+        };
+        part.FdmDfmReport = report;
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        // Must show failure panels, not just passes.
+        Assert.Contains("dfm-expansion-panel--fail", cut.Markup);
+        // Badge must NOT be ok — there are failures.
+        Assert.DoesNotContain("dfm-badge--ok", cut.Markup);
+        Assert.DoesNotContain("dfm-check-row--skeleton", cut.Markup);
+    }
+
+    // Test 16: DfmReport DTO type with no issues → all checks pass, badge is ok.
+    [Fact]
+    public void DfmChecksTab_DfmReportDtoType_AllPassWhenNoIssues()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "FDM",
+            IsManifold = true,
+            BodyCount = 1,
+            DfmAnalysisTimedOut = false,
+        };
+        var report = new Maliev.Intranet.Shared.Dtos.DfmReport
+        {
+            ReportType = "FDM",
+            Issues = [],
+        };
+        part.FdmDfmReport = report;
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        Assert.Contains("dfm-badge--ok", cut.Markup);
+        Assert.DoesNotContain("dfm-expansion-panel--fail", cut.Markup);
+        Assert.DoesNotContain("dfm-check-row--skeleton", cut.Markup);
     }
 }

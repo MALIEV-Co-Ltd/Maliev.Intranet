@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
@@ -10,13 +11,14 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for managing notification templates, delivery logs, and preferences.
 /// </summary>
 [ApiController]
-[ApiVersion("1")]
-[Route("api/notifications")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/notifications")]
 public class NotificationController(INotificationServiceClient notificationClient) : ControllerBase
 {
     /// <summary>
     /// Gets notification templates.
     /// </summary>
+    [RequirePermission(MalievPermissions.Notification.ReadTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("templates")]
     public async Task<ActionResult<PagedResponse<NotificationTemplateDto>>> GetTemplates([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? filter = null, CancellationToken ct = default)
     {
@@ -27,6 +29,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Gets a notification template by ID.
     /// </summary>
+    [RequirePermission(MalievPermissions.Notification.ReadTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("templates/{id:guid}")]
     public async Task<ActionResult<NotificationTemplateDto>> GetTemplate(Guid id, CancellationToken ct)
     {
@@ -38,6 +41,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Creates a notification template.
     /// </summary>
+    [RequirePermission(MalievPermissions.Notification.WriteTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("templates")]
     public async Task<ActionResult<NotificationTemplateDto>> CreateTemplate(CreateNotificationTemplateRequest request, CancellationToken ct)
     {
@@ -48,6 +52,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Updates a notification template.
     /// </summary>
+    [RequirePermission(MalievPermissions.Notification.WriteTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPut("templates/{id:guid}")]
     public async Task<ActionResult<NotificationTemplateDto>> UpdateTemplate(Guid id, UpdateNotificationTemplateRequest request, CancellationToken ct)
     {
@@ -58,6 +63,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Deletes a notification template.
     /// </summary>
+    [RequirePermission(MalievPermissions.Notification.WriteTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpDelete("templates/{id:guid}")]
     public async Task<IActionResult> DeleteTemplate(Guid id, CancellationToken ct)
     {
@@ -68,6 +74,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Gets delivery logs.
     /// </summary>
+    [RequirePermission(MalievPermissions.Notification.ReadTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("delivery-logs")]
     public async Task<ActionResult<PagedResponse<NotificationDeliveryLogDto>>> GetDeliveryLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? filter = null, CancellationToken ct = default)
     {
@@ -78,6 +85,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Gets user notification preferences.
     /// </summary>
+    [RequirePermission(MalievPermissions.Preference.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("preferences/{userId}")]
     public async Task<ActionResult<UserNotificationPreferenceDto>> GetPreferences(string userId, CancellationToken ct)
     {
@@ -89,6 +97,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Updates user notification preferences.
     /// </summary>
+    [RequirePermission(MalievPermissions.Preference.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPut("preferences/{userId}")]
     public async Task<ActionResult<UserNotificationPreferenceDto>> UpdatePreferences(string userId, UpdateNotificationPreferenceRequest request, CancellationToken ct)
     {

@@ -3,139 +3,144 @@
 @using Maliev.MessagingContracts.Contracts.Geometry
 @using MudBlazor
 
-@if (string.IsNullOrEmpty(Part.ProcessCode))
-{
-    <div class="dfm-empty-state">
-        <MudIcon Icon="@Icons.Material.Outlined.Science" Color="Color.Default" Size="Size.Large" />
-        <span>Select a manufacturing process to run DFM analysis</span>
-    </div>
-}
-else
-{
-    <div class="dfm-tab-root">
-        <div class="dfm-tab-container">
-        @* ── Header ── *@
-        <div class="dfm-header">
-            <div class="dfm-header-top">
-                <span class="dfm-title">Design for Manufacturability</span>
-                <div class="dfm-badge @(AnalysisFailed ? "dfm-badge--error" : AllPassed ? "dfm-badge--ok" : "dfm-badge--warn")">
+<div class="dfm-tab-root">
+    <div class="dfm-tab-container">
+    @* ── Header ── *@
+    <div class="dfm-header">
+        <div class="dfm-header-top">
+            <span class="dfm-title">Design for Manufacturability</span>
+            @if (!string.IsNullOrEmpty(Part.ProcessCode))
+            {
+                <div class="dfm-badge @(AnalysisFailed ? "dfm-badge--error" : AllPassed ? "dfm-badge--ok" : FailedCount > 0 ? "dfm-badge--warn" : "dfm-badge--warn")">
                     <MudIcon Icon="@(AnalysisFailed ? Icons.Material.Filled.Error : AllPassed ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Warning)"
                              Color="@(AnalysisFailed ? Color.Error : AllPassed ? Color.Success : Color.Warning)"
                              Size="Size.Small" Class="dfm-badge-icon" />
                     <span>@(AnalysisFailed ? "Analysis failed" : $"{PassedCount}/{TotalCount} checks passed")</span>
                 </div>
-            </div>
-            <div class="dfm-caption">Automated analysis against shop-floor tooling library. No sign-off required.</div>
-        </div>
-
-        @* ── Checks list ── *@
-        <div class="dfm-checks-list">
-            @if (Part.DfmReport == null && !AnalysisFailed && !string.IsNullOrEmpty(Part.ProcessCode))
-            {
-                @for (var i = 0; i < TotalCount; i++)
-                {
-                    <div class="dfm-check-row--skeleton">
-                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="20px" Height="20px" />
-                        <div style="flex:1;">
-                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="120px" />
-                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="200px" />
-                        </div>
-                    </div>
-                }
-            }
-            else if (AnalysisFailed)
-            {
-                <MudAlert Severity="Severity.Error" Class="ma-3">
-                    @DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) Select the process again to retry.
-                </MudAlert>
-            }
-            else
-            {
-                @* Failed checks — expandable *@
-                @if (FailedChecks.Any())
-                {
-                    <MudExpansionPanels MultiExpansion="true" Dense="true" Elevation="0" Class="dfm-expansions">
-                        @foreach (var check in FailedChecks)
-                        {
-                            var detail = GetCheckDetail(check);
-                            <MudExpansionPanel Class="dfm-expansion-panel dfm-expansion-panel--fail">
-                                <TitleContent>
-                                    <div class="dfm-panel-header">
-                                        <MudIcon Icon="@Icons.Material.Filled.Warning"
-                                                 Color="Color.Warning"
-                                                 Size="Size.Small"
-                                                 Style="flex-shrink:0;" />
-                                        <span class="dfm-panel-title">@check.Label</span>
-                                        <span class="dfm-panel-summary">@detail.FailSummary</span>
-                                    </div>
-                                </TitleContent>
-                                <ChildContent>
-                                    <div class="dfm-detail-body">
-                                        <div class="dfm-detail-section">
-                                            <div class="dfm-detail-section-label">Description</div>
-                                            <div class="dfm-detail-desc">@detail.Description</div>
-                                        </div>
-                                        @if (!string.IsNullOrEmpty(detail.MeasuredLabel))
-                                        {
-                                            <div class="dfm-detail-section">
-                                                <div class="dfm-detail-section-label">Why it failed</div>
-                                                <div class="dfm-measure-grid">
-                                                    <span class="dfm-measure-label">Detected</span>
-                                                    <span class="dfm-measure-value dfm-measure-value--fail">@detail.MeasuredLabel</span>
-                                                    @if (!string.IsNullOrEmpty(detail.RecommendedLabel))
-                                                    {
-                                                        <span class="dfm-measure-label">Recommended</span>
-                                                        <span class="dfm-measure-value">@detail.RecommendedLabel</span>
-                                                    }
-                                                </div>
-                                            </div>
-                                        }
-                                        @if (detail.Fixes.Count > 0)
-                                        {
-                                            <div class="dfm-detail-section">
-                                                <div class="dfm-detail-section-label">How to fix</div>
-                                                <ul class="dfm-fix-list">
-                                                    @foreach (var fix in detail.Fixes)
-                                                    {
-                                                        <li class="dfm-fix-item">
-                                                            <div class="dfm-fix-bullet"></div>
-                                                            <span>@fix</span>
-                                                        </li>
-                                                    }
-                                                </ul>
-                                            </div>
-                                        }
-                                    </div>
-                                </ChildContent>
-                            </MudExpansionPanel>
-                        }
-                    </MudExpansionPanels>
-                }
-
-                @* Passed checks — static rows, no expansion *@
-                @foreach (var check in PassedChecks)
-                {
-                    <div class="dfm-pass-row">
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
-                                 Color="Color.Success"
-                                 Size="Size.Small"
-                                 Style="flex-shrink:0;" />
-                        <div class="dfm-pass-text">
-                            <div class="dfm-pass-title">@check.Label</div>
-                            <div class="dfm-pass-desc">@check.PassDescription</div>
-                        </div>
-                    </div>
-                }
             }
         </div>
-        </div>
+        <div class="dfm-caption">Automated analysis against shop-floor tooling library. No sign-off required.</div>
     </div>
-}
+
+    @* ── Checks list ── *@
+    <div class="dfm-checks-list">
+        @if (AnalysisFailed)
+        {
+            <MudAlert Severity="Severity.Error" Class="ma-3">
+                @DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode)
+                @if (Part.AnalysisErrorCode != "FILE_MISSING")
+                {
+                    <span> Select the process again to retry.</span>
+                }
+            </MudAlert>
+        }
+        else
+        {
+        @* Pending checks render as skeleton rows above the expansion panels *@
+        @foreach (var check in Checks.Where(c => GetCheckState(c.Category) == DfmCheckState.Pending))
+        {
+            <div @key="@($"skeleton-{check.Category}")" class="dfm-check-row--skeleton">
+                <MudSkeleton SkeletonType="SkeletonType.Circle" Width="20px" Height="20px" />
+                <div style="flex:1;">
+                    <MudSkeleton SkeletonType="SkeletonType.Text" Width="120px" />
+                    <MudSkeleton SkeletonType="SkeletonType.Text" Width="200px" />
+                </div>
+            </div>
+        }
+        <MudExpansionPanels MultiExpansion="true" Dense="true" Elevation="0" Class="dfm-expansions">
+            @foreach (var check in Checks.Where(c => GetCheckState(c.Category) != DfmCheckState.Pending))
+            {
+                var isFailed = GetCheckState(check.Category) == DfmCheckState.Failed;
+                var detail = GetCheckDetail(check);
+                <MudExpansionPanel @key="@($"check-{check.Category}")"
+                                   Expanded="@isFailed"
+                                   Class="@($"dfm-expansion-panel {(isFailed ? "dfm-expansion-panel--fail" : "dfm-expansion-panel--pass")}")">
+                    <TitleContent>
+                        <div class="dfm-panel-header">
+                            @if (isFailed)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" Style="flex-shrink:0;margin-top:1px;" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" Style="flex-shrink:0;margin-top:1px;" />
+                            }
+                            <div class="dfm-panel-text">
+                                <span class="dfm-panel-title">@check.Label</span>
+                                <span class="dfm-panel-summary">@(isFailed ? detail.FailSummary : GetPassSummary(check))</span>
+                            </div>
+                        </div>
+                    </TitleContent>
+                    <ChildContent>
+                        @if (isFailed)
+                        {
+                            <div class="dfm-detail-body">
+                                <div class="dfm-detail-section">
+                                    <div class="dfm-detail-section-label">Description</div>
+                                    <div class="dfm-detail-desc">@detail.Description</div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(detail.MeasuredLabel))
+                                {
+                                    <div class="dfm-detail-section">
+                                        <div class="dfm-detail-section-label">Why it failed</div>
+                                        <div class="dfm-measure-grid">
+                                            <span class="dfm-measure-label">Detected</span>
+                                            <span class="dfm-measure-value dfm-measure-value--fail">@detail.MeasuredLabel</span>
+                                            @if (!string.IsNullOrEmpty(detail.RecommendedLabel))
+                                            {
+                                                <span class="dfm-measure-label">Recommended</span>
+                                                <span class="dfm-measure-value">@detail.RecommendedLabel</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                @if (detail.Fixes.Count > 0)
+                                {
+                                    <div class="dfm-detail-section">
+                                        <div class="dfm-detail-section-label">How to fix</div>
+                                        <ul class="dfm-fix-list">
+                                            @foreach (var fix in detail.Fixes)
+                                            {
+                                                <li class="dfm-fix-item">
+                                                    <div class="dfm-fix-bullet"></div>
+                                                    <span>@fix</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="dfm-pass-detail-body">
+                                <div class="dfm-detail-desc">@GetPassDetail(check)</div>
+                            </div>
+                        }
+                    </ChildContent>
+                </MudExpansionPanel>
+            }
+        </MudExpansionPanels>
+        }
+
+        @* No-process notice shown when no manufacturing process is selected *@
+        @if (string.IsNullOrEmpty(Part.ProcessCode))
+        {
+            <div class="dfm-process-notice">
+                <MudIcon Icon="@Icons.Material.Outlined.Science" Size="Size.Small" Color="Color.Default" />
+                <span>Select a manufacturing process to run process-specific checks (thin walls, overhangs, etc.)</span>
+            </div>
+        }
+    </div>
+    </div>
+</div>
 
 @code {
     [Parameter, EditorRequired] public PartViewModel Part { get; set; } = null!;
 
-    private record CheckDef(string Category, string Label, string PassDescription);
+    private enum DfmCheckState { Pending, Passed, Failed }
+
+    private record CheckDef(string Category, string Label);
 
     private record CheckDetail(
         string Description,
@@ -144,86 +149,161 @@ else
         string? RecommendedLabel,
         List<string> Fixes);
 
+    // Process-agnostic Phase 1 checks — always shown regardless of process selection.
+    private static readonly IReadOnlyList<CheckDef> IntrinsicChecks =
+    [
+        new("non_manifold", "Mesh integrity"),
+        new("multi_body",   "Single body"),
+    ];
+
     private static readonly IReadOnlyList<CheckDef> FdmChecks =
     [
-        new("thin_wall",    "Thin walls",            "All wall thicknesses are within printable limits"),
-        new("overhang",     "Overhangs / supports",   "No overhangs exceed the printable angle limit"),
-        new("small_feature","Small features",         "All fine details are within resolution limits"),
-        new("non_manifold", "Mesh integrity",         "Mesh is manifold (watertight) and printable"),
-        new("multi_body",   "Single body",            "File contains a single printable body"),
-        new("bridge",       "Bridge length",          "Bridge spans are within unsupported printing limits"),
+        new("thin_wall",    "Thin walls"),
+        new("overhang",     "Overhangs / supports"),
+        new("small_feature","Small features"),
+        new("bridge",       "Bridge length"),
     ];
 
     private static readonly IReadOnlyList<CheckDef> CncChecks =
     [
-        new("internal_radius","Internal radii",      "Inside corners are compatible with standard end mills"),
-        new("undercut",       "Undercuts",            "No undercut features requiring special tooling"),
-        new("drill_hole",     "Drill holes",          "Hole geometry is compatible with standard drill sizes"),
-        new("edm",            "EDM required",         "No complex features requiring EDM"),
-        new("grinding",       "Surface grinding",     "No tight-tolerance surfaces requiring grinding"),
-        new("non_manifold",   "Mesh integrity",       "Mesh is manifold and suitable for CNC"),
+        new("internal_radius","Internal radii"),
+        new("undercut",       "Undercuts"),
+        new("drill_hole",     "Drill holes"),
+        new("edm",            "EDM required"),
+        new("grinding",       "Surface grinding"),
     ];
 
     private static readonly IReadOnlyList<CheckDef> SlaChecks =
     [
-        new("thin_wall",     "Thin walls",            "All walls are thick enough for resin printing"),
-        new("escape_hole",   "Resin drainage",        "No enclosed cavities trapping resin"),
-        new("overhang",      "Suction risk",           "No large flat surfaces causing suction during peeling"),
-        new("hollow",        "Hollow regions",         "No hollow regions without drainage holes"),
-        new("non_manifold",  "Mesh integrity",         "Mesh is manifold (watertight) and printable"),
-        new("multi_body",    "Single body",            "File contains a single printable body"),
+        new("thin_wall",     "Thin walls"),
+        new("escape_hole",   "Resin drainage"),
+        new("overhang",      "Suction risk"),
+        new("hollow",        "Hollow regions"),
     ];
 
-    private IReadOnlyList<CheckDef> Checks => Part.ProcessCode?.ToUpperInvariant() switch
+    // Process-specific checks (intrinsic categories excluded — rendered separately above).
+    private IReadOnlyList<CheckDef> ProcessChecks => Part.ProcessCode?.ToUpperInvariant() switch
     {
         "CNC" or "CNC_MILL" or "CNC_TURN" => CncChecks,
         "SLA" or "SLA_DLP" or "DLP"       => SlaChecks,
         _                                  => FdmChecks,
     };
 
-    private HashSet<string> FailedCategories
+    // Combined set for header badge counts and unified rendering.
+    private IEnumerable<CheckDef> Checks =>
+        string.IsNullOrEmpty(Part.ProcessCode)
+            ? IntrinsicChecks
+            : IntrinsicChecks.Concat(ProcessChecks);
+
+    // ── Per-check state (tri-state: Pending / Passed / Failed) ────────
+
+    private DfmCheckState GetCheckState(string category) => category switch
     {
-        get
-        {
-            var cats = new HashSet<string>();
-            if (Part.IsManifold == false) cats.Add("non_manifold");
-            if (Part.BodyCount > 1) cats.Add("multi_body");
+        "non_manifold" => Part.IsManifold is null
+                            ? DfmCheckState.Pending
+                            : Part.IsManifold == false
+                                ? DfmCheckState.Failed
+                                : DfmCheckState.Passed,
+        "multi_body"   => Part.BodyCount is null
+                            ? DfmCheckState.Pending
+                            : Part.BodyCount > 1
+                                ? DfmCheckState.Failed
+                                : DfmCheckState.Passed,
+        _ => Part.DfmReport is null
+                ? DfmCheckState.Pending
+                : IsProcessCheckFailed(category)
+                    ? DfmCheckState.Failed
+                    : DfmCheckState.Passed,
+    };
 
-            switch (Part.DfmReport)
-            {
-                case FdmDfmReportPayload fdm:
-                    if (fdm.ThinWallCount > 0) cats.Add("thin_wall");
-                    if (fdm.OverhangFaceCount > 0 || fdm.SupportRequired) cats.Add("overhang");
-                    if (fdm.SmallDetailCount > 0) cats.Add("small_feature");
-                    break;
-                case SlaDfmReportPayload sla:
-                    if (sla.ThinWallCount > 0) cats.Add("thin_wall");
-                    if (sla.ResinTrappingRisk) cats.Add("escape_hole");
-                    if (sla.SuctionRisk) cats.Add("overhang");
-                    if (sla.HollowRegions?.Count > 0) cats.Add("hollow");
-                    break;
-                case CncDfmReportPayload cnc:
-                    if (cnc.SharpCornerCount > 0) cats.Add("internal_radius");
-                    if (cnc.HasUndercuts) cats.Add("undercut");
-                    if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0) cats.Add("drill_hole");
-                    if (cnc.RequiresEdm) cats.Add("edm");
-                    if (cnc.RequiresGrinding) cats.Add("grinding");
-                    break;
-            }
-            return cats;
-        }
-    }
+    private bool IsProcessCheckFailed(string category) => (category, Part.DfmReport) switch
+    {
+        ("thin_wall",       FdmDfmReportPayload fdm) => fdm.ThinWallCount > 0,
+        ("overhang",        FdmDfmReportPayload fdm) => fdm.OverhangFaceCount > 0 || fdm.SupportRequired,
+        ("small_feature",   FdmDfmReportPayload fdm) => fdm.SmallDetailCount > 0,
+        ("thin_wall",       SlaDfmReportPayload sla) => sla.ThinWallCount > 0,
+        ("escape_hole",     SlaDfmReportPayload sla) => sla.ResinTrappingRisk,
+        ("overhang",        SlaDfmReportPayload sla) => sla.SuctionRisk,
+        ("hollow",          SlaDfmReportPayload sla) => sla.HollowRegions?.Count > 0,
+        ("internal_radius", CncDfmReportPayload cnc) => cnc.SharpCornerCount > 0,
+        ("undercut",        CncDfmReportPayload cnc) => cnc.HasUndercuts,
+        ("drill_hole",      CncDfmReportPayload cnc) => cnc.HasDrillHoles && cnc.DrillHoleCount > 0,
+        ("edm",             CncDfmReportPayload cnc) => cnc.RequiresEdm,
+        ("grinding",        CncDfmReportPayload cnc) => cnc.RequiresGrinding,
+        // Fallback for DfmReport DTO (from HTTP on-demand analysis path).
+        // When the report comes through the two-phase DFM endpoint, it's a DfmReport DTO
+        // rather than a typed payload — match by issue category.
+        (_, DfmReport dto) => dto.Issues.Any(i => string.Equals(i.Category, category, StringComparison.OrdinalIgnoreCase)),
+        _ => false,
+    };
 
-    private IEnumerable<CheckDef> FailedChecks =>
-        Checks.Where(ch => FailedCategories.Contains(ch.Category));
+    // ── Header counts ─────────────────────────────────────────────────
 
-    private IEnumerable<CheckDef> PassedChecks =>
-        Checks.Where(ch => !FailedCategories.Contains(ch.Category));
+    private int TotalCount   => Checks.Count();
+    private int FailedCount  => Checks.Count(ch => GetCheckState(ch.Category) == DfmCheckState.Failed);
+    private int PendingCount => Checks.Count(ch => GetCheckState(ch.Category) == DfmCheckState.Pending);
+    private int PassedCount  => TotalCount - FailedCount - PendingCount;
+    private bool AnalysisFailed => Part.DfmAnalysisTimedOut || Part.AnalysisErrorCode == "FILE_MISSING";
+    private bool AllPassed => !AnalysisFailed && PendingCount == 0 && FailedCount == 0;
 
-    private int TotalCount => Checks.Count;
-    private int PassedCount => TotalCount - FailedCategories.Count(c => Checks.Any(ch => ch.Category == c));
-    private bool AnalysisFailed => Part.DfmAnalysisTimedOut;
-    private bool AllPassed => !AnalysisFailed && Part.DfmReport != null && PassedCount == TotalCount;
+    // ── Pass-state text (data-driven, replaces static PassDescription) ─
+
+    private string GetPassSummary(CheckDef check) => check.Category switch
+    {
+        "non_manifold"   => "Mesh is manifold (watertight)",
+        "multi_body"     => $"Single solid body",
+        "thin_wall"      => "Wall thicknesses within limits",
+        "overhang"       => Part.ProcessCode?.ToUpperInvariant() is "SLA" or "SLA_DLP" or "DLP"
+                                ? "No suction risk detected"
+                                : "No overhangs exceed printable angle",
+        "small_feature"  => "All details above resolution limit",
+        "bridge"         => "Bridge spans within unsupported limits",
+        "escape_hole"    => "No enclosed cavities",
+        "hollow"         => "No hollow regions detected",
+        "internal_radius"=> "All corners compatible with end mills",
+        "undercut"       => "No undercut features",
+        "drill_hole"     => "Hole geometry compatible with standard drills",
+        "edm"            => "No EDM-required features",
+        "grinding"       => "No grinding-required surfaces",
+        _                => "Check passed",
+    };
+
+    private string GetPassDetail(CheckDef check) => check.Category switch
+    {
+        "non_manifold" => "Mesh is watertight — no open boundary edges, non-manifold edges, or holes detected.",
+        "multi_body"   => $"File contains {Part.BodyCount ?? 1} solid body — single-body geometry confirmed.",
+        "thin_wall" when Part.DfmReport is FdmDfmReportPayload =>
+            "No thin walls detected. All wall thicknesses are ≥ 1.2 mm (FDM printable limit).",
+        "thin_wall" when Part.DfmReport is SlaDfmReportPayload =>
+            "No thin walls detected. All wall thicknesses are ≥ 0.5 mm (SLA resin printable limit).",
+        "overhang" when Part.DfmReport is FdmDfmReportPayload fdm =>
+            fdm.OverhangFaceCount == 0
+                ? "No overhanging faces detected. Part is self-supporting without support structures."
+                : $"{fdm.OverhangFaceCount} overhang region(s) detected, but all are within the ≤ 45° self-supporting limit.",
+        "overhang" when Part.DfmReport is SlaDfmReportPayload =>
+            "No large flat surfaces at risk of suction during SLA peeling.",
+        "small_feature" when Part.DfmReport is FdmDfmReportPayload fdm =>
+            fdm.SmallDetailCount == 0
+                ? "No features below the FDM resolution limit (≥ 0.4 mm) detected."
+                : $"All {fdm.SmallDetailCount} fine detail(s) are within printable resolution.",
+        "bridge"         => "All bridge spans are within the self-supporting limit (≤ 50 mm for FDM).",
+        "escape_hole"    => "No enclosed cavities detected — resin drainage is unobstructed.",
+        "hollow"         => "No hollow regions detected inside the part.",
+        "internal_radius" when Part.DfmReport is CncDfmReportPayload cnc =>
+            cnc.SharpCornerCount == 0
+                ? "All internal corners have adequate radius for standard end mill tooling."
+                : $"0 sharp corners detected — all corners are within tolerance.",
+        "undercut"       => "No undercut features detected. Part is accessible by standard 3-axis CNC tooling.",
+        "drill_hole" when Part.DfmReport is CncDfmReportPayload cnc =>
+            cnc.HasDrillHoles && cnc.DrillHoleCount > 0
+                ? $"{cnc.DrillHoleCount} drill hole(s) detected — all compatible with standard drill sizes."
+                : "No drill holes detected.",
+        "edm"            => "No features requiring EDM detected. All geometry is accessible by conventional cutting.",
+        "grinding"       => "No surfaces requiring grinding detected. Standard machined finish is sufficient.",
+        _                => GetPassSummary(check),
+    };
+
+    // ── Fail detail ───────────────────────────────────────────────────
 
     private CheckDetail GetCheckDetail(CheckDef check) => check.Category switch
     {
@@ -289,7 +369,7 @@ else
             "Bridge span may sag without support",
             "Long bridge span detected", "≤ 50 mm unsupported",
             ["Add a mid-span support column if the bridge is structural", "Orient the print so the bridge is minimized", "Accept support material under long bridges"]),
-        _ => new CheckDetail(check.PassDescription, "Issue detected", null, null, []),
+        _ => new CheckDetail(GetPassSummary(check), "Issue detected", null, null, []),
     };
 
     private string? BuildThinWallDetail_FailSummary() =>

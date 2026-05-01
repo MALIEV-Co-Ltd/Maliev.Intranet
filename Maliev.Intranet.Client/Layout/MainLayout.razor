@@ -1,13 +1,14 @@
 @inherits LayoutComponentBase
 @using System
 @using Microsoft.AspNetCore.SignalR.Client
-
 @using Maliev.Intranet.Client.Services
 @using Maliev.Intranet.Client.Helpers
 @using Maliev.Intranet.Client.Components
+
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LayoutService LayoutService
+@inject CurrencyService CurrencyService
 @inject ChatService ChatService
 @inject BreadcrumbService BreadcrumbService
 @inject CookieProvider CookieProvider
@@ -15,190 +16,46 @@
 @inject ILogger<MainLayout> Logger
 @implements IAsyncDisposable
 
-<MudThemeProvider @ref="@_mudThemeProvider"
-                  Theme="ThemeConfiguration.MalievTheme"
+<MudThemeProvider @ref="@_mudThemeProvider" Theme="ThemeConfiguration.MalievTheme"
                   IsDarkMode="LayoutService.IsDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<style>
-    html, body {
-        height: 100vh;
-        overflow: hidden;
-    }
 
-    .mud-layout {
-        height: 100%;
-    }
+<div class="app-shell">
+    @* ── Top Bar ── *@
+    <TopBar ChatDrawerOpen="@_chatDrawerOpen"
+            ChatDrawerOpenChanged="@(v => { _chatDrawerOpen = v; StateHasChanged(); })" OnToggleTheme="ToggleThemeAsync" />
 
-    .mud-main-content {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        padding-top: 0 !important;
-    }
-
-    .breadcrumb-header {
-        flex-shrink: 0;
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        background-color: var(--mud-palette-surface);
-        border-bottom: 1px solid var(--mud-palette-lines-default);
-        padding: 8px 16px;
-        min-height: 48px;
-        display: flex;
-        align-items: center;
-    }
-
-    .body-scroll-area {
-        flex: 1;
-        overflow: auto;
-        padding: 20px 24px;
-    }
-
-    .full-bleed-page {
-        margin: -20px -24px;
-        width: calc(100% + 48px);
-        height: calc(100% + 40px);
-        max-width: none;
-    }
-
-    /* Fix NavLink width issue caused by Tooltip wrapping */
-    .sidebar-drawer .mud-tooltip-root,
-    .sidebar-drawer .mud-tooltip-inline {
-        display: block !important;
-        width: 100%;
-    }
-</style>
-
-<MudLayout>
-    <!-- Sidebar -->
-    <MudDrawer @bind-Open="_drawerOpen"
-               Variant="DrawerVariant.Responsive"
-               Breakpoint="Breakpoint.Md"
-               Width="280px"
-               Elevation="0"
-               Class="border-r border-solid mud-border-lines-default sidebar-drawer">
-        <NavMenu ChatDrawerOpen="_chatDrawerOpen"
-                 ChatDrawerOpenChanged="@(v => { _chatDrawerOpen = v; StateHasChanged(); })"
-                 OnToggleTheme="ToggleThemeAsync"
-                 OnClearNotifications="ClearNotifications"
-                 HasUnreadNotifications="_hasUnreadNotifications"
-                 ThemeIcon="@GetThemeIcon()"
-                 ThemeIconStyle="@GetThemeIconStyle()"
-                 ThemeIconClass="@GetThemeIconClass()" />
-    </MudDrawer>
-
-    <!-- Chat Drawer (right side) -->
-    <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End"
-               ClipMode="DrawerClipMode.Never"
-               Elevation="3"
-               Variant="DrawerVariant.Temporary"
-               Width="400px">
+    @* ── Chat Drawer (right side) ── *@
+    <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End" ClipMode="DrawerClipMode.Never" Elevation="3"
+               Variant="DrawerVariant.Temporary" Width="400px">
         <ChatDrawer />
     </MudDrawer>
 
-    <MudMainContent>
-        <!-- Breadcrumb Header -->
-        <div class="breadcrumb-header">
-            @if (_breadcrumbs.Count > 1)
-            {
-                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" OnClick="HandleBack" Class="mr-2" />
-                <MudDivider Vertical="true" FlexItem="true" Class="mx-2 my-2" Style="height: 20px;" />
-            }
-            <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 ml-2" Separator=">">
-                <ItemTemplate Context="item">
-                    <MudLink Href="@item.Href"
-                             Typo="Typo.body2"
-                             Color="@(item.Disabled ? Color.Default : Color.Primary)"
-                             Style="@(item.Disabled ? "font-weight: 600; color: var(--mud-palette-text-primary);" : "color: var(--mud-palette-text-secondary);")"
-                             Underline="Underline.None">@item.Text</MudLink>
-                </ItemTemplate>
-            </MudBreadcrumbs>
-        </div>
-
-        <!-- Body scroll area -->
-        <div class="body-scroll-area">
-            @Body
-        </div>
-    </MudMainContent>
-</MudLayout>
+    @* ── Body ── *@
+    <div class="body-area">
+        @Body
+    </div>
+</div>
 
 @code {
     [CascadingParameter]
     private Task<AuthenticationState> AuthStateTask { get; set; } = null!;
 
-    private bool _drawerOpen = true;
     private bool _chatDrawerOpen = false;
-    private bool _hasUnreadNotifications = false;
     private HubConnection? _hubConnection;
     private MudThemeProvider _mudThemeProvider = null!;
-    private List<BreadcrumbItem> _breadcrumbs = new();
-
-    private void UpdateBreadcrumbs()
-    {
-        _breadcrumbs.Clear();
-        _breadcrumbs.Add(new BreadcrumbItem("Dashboard", href: "/"));
-
-        var uriWithoutQuery = Navigation.Uri.Split('?')[0];
-        var uri = Navigation.ToBaseRelativePath(uriWithoutQuery);
-        if (string.IsNullOrWhiteSpace(uri))
-        {
-            return;
-        }
-
-        var segments = uri.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var currentHref = "";
-        var lastSegment = segments.Length > 0 ? segments[^1] : "";
-
-        foreach (var segment in segments)
-        {
-            currentHref += $"/{segment}";
-
-            if (Guid.TryParse(segment, out _))
-            {
-                var entityLabel = BreadcrumbService.CurrentLabel ?? "Details";
-                _breadcrumbs.Add(new BreadcrumbItem(entityLabel, href: null, disabled: true));
-                continue;
-            }
-
-            var title = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(segment.Replace("-", " "));
-
-            if (segment.Equals("mfg", StringComparison.OrdinalIgnoreCase)) title = "Manufacturing";
-            else if (segment.Equals("hr", StringComparison.OrdinalIgnoreCase)) title = "HR";
-            else if (segment.Equals("iam", StringComparison.OrdinalIgnoreCase)) title = "IAM";
-            else if (segment.Equals("admin", StringComparison.OrdinalIgnoreCase)) title = "Operations";
-            else if (segment.Equals("sales", StringComparison.OrdinalIgnoreCase)) title = "Sales & CRM";
-            else if (segment.Equals("finance", StringComparison.OrdinalIgnoreCase)) title = "Finance";
-
-            var isLast = segment == lastSegment;
-            _breadcrumbs.Add(new BreadcrumbItem(title, href: isLast ? null : currentHref, disabled: isLast));
-        }
-    }
-
-    protected override void OnInitialized()
-    {
-        LayoutService.MajorUpdateOccurred += OnLayoutUpdate;
-        Navigation.LocationChanged += OnLocationChanged;
-        BreadcrumbService.OnChanged += OnBreadcrumbChanged;
-        UpdateBreadcrumbs();
-    }
-
-    private void OnBreadcrumbChanged()
-    {
-        UpdateBreadcrumbs();
-        InvokeAsync(StateHasChanged);
-    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await LayoutService.InitializeAsync();
+            await CurrencyService.InitializeAsync();
             await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemPreferenceChanged);
+            await SyncThemeAsync();
             StateHasChanged();
 
             var authState = await AuthStateTask;
@@ -213,7 +70,6 @@
 
                     _hubConnection.On<string>("ReceiveNotification", (message) =>
                     {
-                        _hasUnreadNotifications = true;
                         Snackbar.Add(message, Severity.Info, config =>
                         {
                             config.VisibleStateDuration = 10000;
@@ -236,41 +92,27 @@
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         ChatService.CurrentContext = Navigation.Uri;
-        BreadcrumbService.Clear();
-        UpdateBreadcrumbs();
         StateHasChanged();
     }
 
-    private Task OnSystemPreferenceChanged(bool isSystemDark)
+    private async Task OnSystemPreferenceChanged(bool isSystemDark)
     {
         LayoutService.UpdateSystemPreference(isSystemDark);
-        return InvokeAsync(StateHasChanged);
+        await SyncThemeAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task ToggleThemeAsync()
     {
         await LayoutService.ToggleModeAsync();
+        await SyncThemeAsync();
     }
 
-    private string GetThemeIcon() => LayoutService.CurrentMode switch
+    private async Task SyncThemeAsync()
     {
-        ThemeMode.Dark => Icons.Material.Filled.DarkMode,
-        ThemeMode.Light => Icons.Material.Filled.LightMode,
-        _ => Icons.Material.Filled.AutoMode
-    };
-
-    private string GetThemeIconStyle() => LayoutService.CurrentMode == ThemeMode.Light ? "color: #FFD700;" : "";
-
-    private string GetThemeIconClass() => LayoutService.CurrentMode == ThemeMode.System ? "auto-mode-icon" : "";
-
-    private void ClearNotifications()
-    {
-        _hasUnreadNotifications = false;
-    }
-
-    private async Task HandleBack()
-    {
-        await JSRuntime.InvokeVoidAsync("history.back");
+        var theme = LayoutService.IsDarkMode ? "dark" : "light";
+        await JSRuntime.InvokeVoidAsync("eval",
+            $"document.documentElement.setAttribute('data-maliev-theme','{theme}');");
     }
 
     private void OnLayoutUpdate(object? sender, EventArgs e)
@@ -280,9 +122,7 @@
 
     public async ValueTask DisposeAsync()
     {
-        LayoutService.MajorUpdateOccurred -= OnLayoutUpdate;
         Navigation.LocationChanged -= OnLocationChanged;
-        BreadcrumbService.OnChanged -= OnBreadcrumbChanged;
 
         if (_hubConnection is not null)
         {

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -12,7 +13,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for time-off operations, proxying to the Leave Service.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient employeeServiceClient) : ControllerBase
 {
     private async Task<Guid> GetEmployeeIdAsync(CancellationToken ct)

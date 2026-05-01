@@ -50,7 +50,7 @@
                           Counter="5000"
                           MaxLength="5000"
                           Class="note-text-field"
-                          Style="font-family: 'Roboto Mono', 'Noto Sans', 'Noto Sans Thai', monospace; font-size: 0.95rem; line-height: 1.6;" />
+                          />
         }
         else
         {
@@ -174,9 +174,7 @@
     private Guid? _previousNoteId;
 
     private string PaperClass => "note-editor-paper rounded overflow-hidden";
-    private string PaperStyle => LayoutService.IsDarkMode
-        ? "background-color: var(--mud-palette-surface);"
-        : "background-color: #ffffff;";
+    private string PaperStyle => "";
     private string ContentStyle => Compact
         ? "min-height: 180px;"
         : "min-height: 300px;";
@@ -281,7 +279,7 @@
         _noteActivityLoading = true;
         try
         {
-            var activity = await Http.GetFromJsonAsync<List<JsonElement>>($"api/customers/notes/{NoteId}/activity");
+            var activity = await Http.GetFromJsonAsync<List<JsonElement>>($"api/v1/customers/notes/{NoteId}/activity");
             _noteActivity = activity ?? [];
         }
         catch { _noteActivity = []; }
@@ -293,7 +291,7 @@
         if (string.IsNullOrWhiteSpace(_newNoteComment) || !NoteId.HasValue) return;
         try
         {
-            var response = await Http.PostAsJsonAsync($"api/customers/notes/{NoteId}/comments", new { commentText = _newNoteComment });
+            var response = await Http.PostAsJsonAsync($"api/v1/customers/notes/{NoteId}/comments", new { commentText = _newNoteComment });
             if (response.IsSuccessStatusCode)
             {
                 _newNoteComment = "";
@@ -331,34 +329,3 @@
 
     #endregion
 }
-
-<style>
-    .note-editor-toolbar {
-        background-color: var(--mud-palette-surface);
-        border-bottom: 1px solid var(--mud-palette-divider);
-        padding-inline-start: 8px;
-    }
-
-    .note-editor-content {
-        padding: 16px 20px;
-    }
-
-    .note-editor-content .note-text-field .mud-input-control-input-container { padding: 0 !important; }
-    .note-editor-content .note-text-field textarea {
-        padding: 0 !important;
-        border: none !important;
-        background: transparent !important;
-        font-family: 'Roboto Mono', 'Noto Sans', 'Noto Sans Thai', monospace;
-        font-size: 0.95rem;
-        line-height: 1.6;
-    }
-
-    .note-editor-content .note-content-preview .markdown-content {
-        font-size: 1rem;
-    }
-
-    .note-editor-paper .compact-timeline .mud-timeline-item {
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
-    }
-</style>

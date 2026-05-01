@@ -1,3 +1,5 @@
+using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
@@ -9,9 +11,9 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <summary>
 /// Controller for AI chat operations.
 /// </summary>
-[Authorize(AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class ChatController(
     ChatbotServiceClient chatbotClient,
     IChatContextResolver contextResolver,
@@ -21,6 +23,7 @@ public class ChatController(
     /// <summary>
     /// Initiates a new chat session.
     /// </summary>
+    [RequirePermission(MalievPermissions.Chat.SessionsCreate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("session")]
     public async Task<ActionResult<BffChatSessionResponse>> InitiateSession(
         [FromBody] BffChatSessionRequest request,
@@ -46,6 +49,7 @@ public class ChatController(
     /// <summary>
     /// Sends a message in an existing chat session.
     /// </summary>
+    [RequirePermission(MalievPermissions.Chat.SessionsCreate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("message")]
     public async Task<ActionResult<BffChatMessageResponse>> SendMessage(
         [FromBody] BffChatMessageRequest request,
@@ -96,6 +100,7 @@ public class ChatController(
     /// Sends a message with streaming thinking steps via SignalR.
     /// Returns the final response with thinking steps included.
     /// </summary>
+    [RequirePermission(MalievPermissions.Chat.SessionsCreate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("message/stream")]
     public async Task<ActionResult<BffChatMessageResponse>> SendMessageStream(
         [FromBody] BffChatMessageRequest request,
@@ -122,7 +127,7 @@ public class ChatController(
         {
             callbackBaseUrl = $"{Request.Scheme}://{Request.Host}";
         }
-        var callbackUrl = $"{callbackBaseUrl}/api/chat/callback/{request.SessionId}/thinking";
+        var callbackUrl = $"{callbackBaseUrl}/api/v1/chat/callback/{request.SessionId}/thinking";
 
         var result = await chatbotClient.SendMessageStreamAsync(
             request.SessionId,

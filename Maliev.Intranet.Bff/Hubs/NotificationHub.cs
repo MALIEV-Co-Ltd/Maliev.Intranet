@@ -56,6 +56,8 @@ public class NotificationHub : Hub
 /// <param name="ErrorCode">Error code from the analysis failure, or null on success.</param>
 /// <param name="BodyCount">Number of bodies in the CAD file (null if single-body or not computed).</param>
 /// <param name="Bodies">Per-body metadata for multi-body files (null if single-body or not computed).</param>
+/// <param name="NonManifoldReason">Human-readable explanation of why the mesh is non-manifold; null when manifold.</param>
+/// <param name="NonManifoldFaceCount">Approximate count of broken/non-manifold faces; null when manifold.</param>
 public record FileAnalysisCompletedPayload(
     string StoragePath,
     string? UploadId,
@@ -66,7 +68,9 @@ public record FileAnalysisCompletedPayload(
     bool Failed,
     string? ErrorCode,
     int? BodyCount = null,
-    IReadOnlyList<SignalRBodyInfo>? Bodies = null);
+    IReadOnlyList<SignalRBodyInfo>? Bodies = null,
+    string? NonManifoldReason = null,
+    int? NonManifoldFaceCount = null);
 
 /// <summary>
 /// Bounding-box dimensions from geometry analysis.
@@ -148,6 +152,8 @@ public record SignalRBBox(double X, double Y, double Z);
 /// Persisted in draft state so signed URLs can be re-generated after expiry.
 /// </param>
 /// <param name="BodyCount">Number of distinct bodies/shells detected; greater than 1 means multi-body.</param>
+/// <param name="NonManifoldReason">Human-readable mesh-integrity description; null when manifold.</param>
+/// <param name="NonManifoldFaceCount">Approximate count of broken/non-manifold faces; null when manifold.</param>
 public record DfmAnalysisReadyPayload(
     string StoragePath,
     Maliev.MessagingContracts.Contracts.Geometry.FdmDfmReportPayload? FdmReport,
@@ -155,7 +161,9 @@ public record DfmAnalysisReadyPayload(
     Maliev.MessagingContracts.Contracts.Geometry.CncDfmReportPayload? CncReport,
     IReadOnlyDictionary<string, string>? OverlayUrls = null,
     IReadOnlyDictionary<string, string>? OverlayPaths = null,
-    int? BodyCount = null);
+    int? BodyCount = null,
+    string? NonManifoldReason = null,
+    int? NonManifoldFaceCount = null);
 
 /// <summary>Payload pushed when a pricing calculation result is ready.</summary>
 /// <param name="StoragePath">GCS path of the original file (join key).</param>

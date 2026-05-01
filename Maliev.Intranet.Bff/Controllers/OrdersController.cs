@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -12,7 +13,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="client">The order service client.</param>
 [RequirePermission(MalievPermissions.Order.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class OrdersController(OrderServiceClient client) : ControllerBase
 {
     /// <summary>
@@ -50,8 +52,8 @@ public class OrdersController(OrderServiceClient client) : ControllerBase
     /// <param name="request">The update request.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>No content if successful.</returns>
-    [HttpPut("{id}")]
     [RequirePermission(MalievPermissions.Order.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, [FromBody] UpdateOrderRequest request, CancellationToken ct)
     {
         var response = await client.UpdateOrderAsync(id, request, ct);
@@ -61,8 +63,8 @@ public class OrdersController(OrderServiceClient client) : ControllerBase
     /// <summary>
     /// Updates the status of an order (e.g., from Kanban drag-and-drop).
     /// </summary>
-    [HttpPatch("{id}/status")]
     [RequirePermission(MalievPermissions.Order.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id}/status")]
     public async Task<IActionResult> UpdateStatus(string id, [FromBody] UpdateOrderStatusRequest request, CancellationToken ct)
     {
         var response = await client.UpdateStatusAsync(id, request, ct);

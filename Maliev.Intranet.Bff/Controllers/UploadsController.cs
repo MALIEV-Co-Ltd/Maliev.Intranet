@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Services;
@@ -15,7 +16,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="fileTypes">File type configuration from appsettings.</param>
 /// <param name="logger">Logger for diagnostic events.</param>
 [ApiController]
-[Route("api/uploads")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/uploads")]
 public class UploadsController(
     UploadServiceClient uploadClient,
     IFileAnalysisStatusService analysisStatusService,
@@ -43,8 +45,8 @@ public class UploadsController(
     /// <see cref="BffUploadResponse"/> containing <c>uploadId</c>, <c>fileName</c>,
     /// <c>fileSize</c>, and <c>storagePath</c> on success.
     /// </returns>
-    [HttpPost]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost]
     public async Task<ActionResult<BffUploadResponse>> UploadAsync(
         IFormFile file,
         [FromQuery] Guid projectId,
@@ -78,8 +80,8 @@ public class UploadsController(
     /// Each file is forwarded to the UploadService individually, but the authorization overhead
     /// is amortized across all files in the batch.
     /// </summary>
-    [HttpPost("batch")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("batch")]
     public async Task<ActionResult<List<BffUploadResponse>>> UploadBatchAsync(
         List<IFormFile> files,
         [FromQuery] Guid projectId,
@@ -123,8 +125,8 @@ public class UploadsController(
     /// <param name="storagePath">The GCS storage path (e.g., "projects/{guid}/filename.stp").</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The current analysis status, or 404 if not found.</returns>
-    [HttpGet("analysis-status")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("analysis-status")]
     public async Task<ActionResult<FileAnalysisStatusDto>> GetAnalysisStatusAsync(
         [FromQuery] string storagePath,
         CancellationToken ct)
@@ -141,8 +143,8 @@ public class UploadsController(
     /// <param name="storagePath">The GCS storage path of the original uploaded file.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>An object with a <c>url</c> property containing the signed GLB URL, or 404.</returns>
-    [HttpGet("viewer-url")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("viewer-url")]
     public async Task<ActionResult> GetViewerUrlAsync([FromQuery] string storagePath, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(storagePath))
@@ -177,8 +179,8 @@ public class UploadsController(
     /// <param name="storagePath">The GCS storage path of the preview image.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>An object with a <c>url</c> property containing the signed URL, or 404.</returns>
-    [HttpGet("preview-url")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("preview-url")]
     public async Task<ActionResult> GetPreviewUrlAsync([FromQuery] string storagePath, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(storagePath))
@@ -204,8 +206,8 @@ public class UploadsController(
     /// <param name="kind">The attachment kind: "Drawing" or "Supplementary".</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of attachment DTOs with FileId, StoragePath, Name, FileType, and FileSizeBytes.</returns>
-    [HttpPost("attachments")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("attachments")]
     public async Task<ActionResult<List<DraftProjectAttachmentDto>>> UploadAttachmentsAsync(
         List<IFormFile> files,
         [FromQuery] Guid projectId,
@@ -272,8 +274,8 @@ public class UploadsController(
     /// </summary>
     /// <param name="fileId">The attachment FileId.</param>
     /// <param name="ct">Cancellation token.</param>
-    [HttpDelete("attachments/{fileId:guid}")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpDelete("attachments/{fileId:guid}")]
     public async Task<IActionResult> DeleteAttachmentAsync(Guid fileId, CancellationToken ct)
     {
         try
@@ -294,8 +296,8 @@ public class UploadsController(
     /// <param name="fileId">The uploaded file GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>An object with a <c>url</c> property containing the signed URL, or 404.</returns>
-    [HttpGet("{fileId:guid}/download-url")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("{fileId:guid}/download-url")]
     public async Task<ActionResult> GetDownloadUrlAsync(Guid fileId, CancellationToken ct)
     {
         var signedUrl = await uploadClient.GetDownloadUrlAsync(fileId.ToString(), ct);
@@ -312,8 +314,8 @@ public class UploadsController(
     /// <param name="customerId">The target customer GUID.</param>
     /// <param name="dryRun">If true, only reports what would be migrated without making changes.</param>
     /// <param name="ct">Cancellation token.</param>
-    [HttpPost("migrate-project")]
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("migrate-project")]
     [ProducesResponseType(typeof(MigrateProjectResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -364,40 +366,40 @@ public class UploadsController(
         return extension?.ToLowerInvariant() switch
         {
             // 3D manufacturing
-            ".stl"  => "model/stl",
-            ".obj"  => "model/obj",
-            ".3mf"  => "model/3mf",
+            ".stl" => "model/stl",
+            ".obj" => "model/obj",
+            ".3mf" => "model/3mf",
             ".step" => "application/step",
-            ".stp"  => "application/step",
+            ".stp" => "application/step",
             ".stpz" => "application/step",
-            ".igs"  => "application/iges",
+            ".igs" => "application/iges",
             ".iges" => "application/iges",
             // 3D design
             ".blend" => "application/x-blender",
-            ".fbx"   => "application/x-fbx",
-            ".gltf"  => "model/gltf+json",
-            ".glb"   => "model/gltf-binary",
+            ".fbx" => "application/x-fbx",
+            ".gltf" => "model/gltf+json",
+            ".glb" => "model/gltf-binary",
             // Drawings
-            ".pdf"  => "application/pdf",
-            ".dxf"  => "application/dxf",
-            ".dwg"  => "image/vnd.dwg",
+            ".pdf" => "application/pdf",
+            ".dxf" => "application/dxf",
+            ".dwg" => "image/vnd.dwg",
             // Images
-            ".png"  => "image/png",
-            ".jpg"  => "image/jpeg",
+            ".png" => "image/png",
+            ".jpg" => "image/jpeg",
             ".jpeg" => "image/jpeg",
             ".tiff" => "image/tiff",
-            ".bmp"  => "image/bmp",
+            ".bmp" => "image/bmp",
             ".webp" => "image/webp",
             // Documents
-            ".doc"  => "application/msword",
+            ".doc" => "application/msword",
             ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".xls"  => "application/vnd.ms-excel",
+            ".xls" => "application/vnd.ms-excel",
             ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             // Archives
-            ".zip"  => "application/zip",
-            ".rar"  => "application/vnd.rar",
-            ".7z"   => "application/x-7z-compressed",
-            _       => "application/octet-stream"
+            ".zip" => "application/zip",
+            ".rar" => "application/vnd.rar",
+            ".7z" => "application/x-7z-compressed",
+            _ => "application/octet-stream"
         };
     }
 }

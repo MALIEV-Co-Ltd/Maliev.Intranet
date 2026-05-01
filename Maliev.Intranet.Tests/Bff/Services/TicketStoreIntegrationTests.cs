@@ -89,7 +89,7 @@ public class TicketStoreTestFactory : WebApplicationFactory<Program>
 
             services.AddHttpClient("IAMServiceBootstrap")
                 .ConfigurePrimaryHttpMessageHandler(() => new MockIAMServiceHandler());
-            
+
             // Override the generic client for IAM Service registered through AddIAMServiceClient
             services.AddHttpClient("IAMService")
                 .ConfigurePrimaryHttpMessageHandler(() => new MockIAMServiceHandler());
@@ -337,14 +337,14 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
     }
 
     /// <summary>
-    /// Verifies that the POST /api/auth/login endpoint sets the auth cookie.
+    /// Verifies that the POST /api/v1/auth/login endpoint sets the auth cookie.
     /// </summary>
     [Fact]
     public async Task Login_SetsAuthCookie()
     {
         var client = _factory.CreateClientWithCookies();
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new
         {
             username = "test@maliev.com",
             password = "password",
@@ -370,7 +370,7 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
         var client = _factory.CreateClientWithCookies();
 
         // Step 1: Login to establish session
-        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+        var loginResponse = await client.PostAsJsonAsync("/api/v1/auth/login", new
         {
             username = "test@maliev.com",
             password = "password",
@@ -379,7 +379,7 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
         // Step 2: First authenticated request — should NOT get 401
-        var response1 = await client.GetAsync("/api/auth/user");
+        var response1 = await client.GetAsync("/api/v1/auth/user");
         Assert.NotEqual(
             HttpStatusCode.Unauthorized,
             response1.StatusCode);
@@ -387,13 +387,13 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
         // Step 3: Second authenticated request — cookie must still be valid
         // This is the request that would fail with the destructive middleware:
         // The first request's response would delete the cookie, so the second request has no cookie.
-        var response2 = await client.GetAsync("/api/auth/user");
+        var response2 = await client.GetAsync("/api/v1/auth/user");
         Assert.NotEqual(
             HttpStatusCode.Unauthorized,
             response2.StatusCode);
 
         // Step 4: Third request for good measure
-        var response3 = await client.GetAsync("/api/auth/user");
+        var response3 = await client.GetAsync("/api/v1/auth/user");
         Assert.NotEqual(
             HttpStatusCode.Unauthorized,
             response3.StatusCode);
@@ -407,14 +407,14 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
     {
         var client = _factory.CreateClientWithCookies();
 
-        await client.PostAsJsonAsync("/api/auth/login", new { username = "test@maliev.com", password = "password", rememberMe = false });
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { username = "test@maliev.com", password = "password", rememberMe = false });
+        await client.PostAsJsonAsync("/api/v1/auth/login", new { username = "test@maliev.com", password = "password", rememberMe = false });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { username = "test@maliev.com", password = "password", rememberMe = false });
 
         var ticketStore = _factory.Services.GetRequiredService<DistributedCacheTicketStore>();
-        
+
         // Let's verify that the new session allows authenticated requests to succeed!
         // This is the true test of session validity.
-        var userResponse = await client.GetAsync("/api/auth/user");
+        var userResponse = await client.GetAsync("/api/v1/auth/user");
         Assert.Equal(HttpStatusCode.OK, userResponse.StatusCode);
     }
 
@@ -427,14 +427,14 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
     {
         var client = _factory.CreateClientWithCookies();
 
-        await client.PostAsJsonAsync("/api/auth/login", new
+        await client.PostAsJsonAsync("/api/v1/auth/login", new
         {
             username = "test@maliev.com",
             password = "password",
             rememberMe = false
         });
 
-        var meResponse = await client.GetAsync("/api/auth/user");
+        var meResponse = await client.GetAsync("/api/v1/auth/user");
 
         // The response should be OK (user context returned) or Forbidden (permissions issue)
         // but NEVER 401 Unauthorized — that would mean the session was destroyed
@@ -455,7 +455,7 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
         var client = _factory.CreateClientWithCookies();
 
         // Login
-        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+        var loginResponse = await client.PostAsJsonAsync("/api/v1/auth/login", new
         {
             username = "test@maliev.com",
             password = "password",
@@ -464,7 +464,7 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
         // Make a subsequent request and inspect the response headers
-        var response = await client.GetAsync("/api/auth/user");
+        var response = await client.GetAsync("/api/v1/auth/user");
 
         // If any Set-Cookie header contains an expired date or max-age=0 for our auth cookie,
         // it means the middleware is destructively deleting the cookie

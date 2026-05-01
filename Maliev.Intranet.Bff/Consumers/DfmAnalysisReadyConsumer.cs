@@ -65,11 +65,28 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
             return;
         }
 
+        // Merge: read existing cached reports and preserve non-null fields from prior events.
+        // Without merging, a SLS/MJF/SLA_DLP event (which sets only fdm/sla report) would
+        // overwrite all three fields with null, wiping data from the earlier FDM event.
+        var existing = await _analysisStatusService.GetStatusAsync(payload.StoragePath, context.CancellationToken);
+        object? existingFdm = null;
+        object? existingSla = null;
+        object? existingCnc = null;
+        if (existing?.DfmReport is JsonElement existingJe && existingJe.ValueKind == JsonValueKind.Object)
+        {
+            if (existingJe.TryGetProperty("FdmReport", out var fp) && fp.ValueKind != JsonValueKind.Null)
+                existingFdm = fp;
+            if (existingJe.TryGetProperty("SlaReport", out var sp) && sp.ValueKind != JsonValueKind.Null)
+                existingSla = sp;
+            if (existingJe.TryGetProperty("CncReport", out var cp) && cp.ValueKind != JsonValueKind.Null)
+                existingCnc = cp;
+        }
+
         var dfmReports = new
         {
-            FdmReport = (object?)payload.FdmReport,
-            SlaReport = (object?)payload.SlaReport,
-            CncReport = (object?)payload.CncReport,
+            FdmReport = payload.FdmReport != null ? (object?)payload.FdmReport : existingFdm,
+            SlaReport = payload.SlaReport != null ? (object?)payload.SlaReport : existingSla,
+            CncReport = payload.CncReport != null ? (object?)payload.CncReport : existingCnc,
         };
 
         await _analysisStatusService.SetDfmReportsAsync(
@@ -123,6 +140,8 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         }
 
         int? bodyCount = payload.BodyCount;
+        string? nonManifoldReason = payload.NonManifoldReason;
+        int? nonManifoldFaceCount = payload.NonManifoldFaceCount;
 
         await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
             "DfmAnalysisReady",
@@ -137,7 +156,9 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
                 OverlayPaths: rawOverlayPaths != null
                     ? new ReadOnlyDictionary<string, string>(rawOverlayPaths)
                     : null,
-                BodyCount: bodyCount),
+                BodyCount: bodyCount,
+                NonManifoldReason: nonManifoldReason,
+                NonManifoldFaceCount: nonManifoldFaceCount),
             context.CancellationToken);
     }
 

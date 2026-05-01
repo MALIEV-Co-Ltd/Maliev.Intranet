@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -13,7 +14,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="iamClient">The IAM service client.</param>
 [RequirePermission(MalievPermissions.System.DiagnosticsRead, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class DiagnosticsController(IAMServiceClient iamClient) : ControllerBase
 {
     /// <summary>

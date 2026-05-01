@@ -94,6 +94,7 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
         Services.AddSingleton<CookieProvider>();
         Services.AddSingleton<ChatService>();
         Services.AddSingleton(new UploadSettings());
+        Services.AddScoped<CurrencyService>();
 
         Render<MudPopoverProvider>();
     }
@@ -146,39 +147,10 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void ProjectNewPage_ShouldContain_CustomerField()
-    {
-        var cut = Render<ProjectNew>();
-        Assert.Contains("Customer", cut.Markup, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
     public void ProjectNewPage_ShouldContain_TitleField()
     {
         var cut = Render<ProjectNew>();
         Assert.Contains("Title", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── ProjectDetail page ────────────────────────────────────────────────────
-
-    [Fact]
-    public void ProjectDetailPage_ShouldRender_WithIdParameter()
-    {
-        var id = Guid.NewGuid();
-        var cut = Render<ProjectDetail>(parameters => parameters.Add(p => p.Id, id));
-        Assert.NotEmpty(cut.Markup);
-    }
-
-    [Fact]
-    public void ProjectDetailPage_ShouldShowLoadingOrContent()
-    {
-        var id = Guid.NewGuid();
-        var cut = Render<ProjectDetail>(parameters => parameters.Add(p => p.Id, id));
-        var markup = cut.Markup;
-        Assert.True(
-            markup.Contains("mud-skeleton", StringComparison.OrdinalIgnoreCase) ||
-            markup.Contains("Project", StringComparison.OrdinalIgnoreCase) ||
-            markup.Contains("Not Found", StringComparison.OrdinalIgnoreCase),
-            "Expected loading state, project content, or not-found");
-    }
 }

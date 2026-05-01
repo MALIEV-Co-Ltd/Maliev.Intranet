@@ -1,0 +1,37 @@
+.chat-input-container {
+    transition: box-shadow 0.2s;
+}
+
+.chat-input-container:focus-within {
+    box-shadow: 0 0 0 1px var(--mud-palette-primary) !important;
+}
+
+.action-icon {
+    color: var(--mud-palette-text-secondary);
+    border: 1px solid var(--maliev-border);
+    padding: 6px !important;
+}
+
+.send-button-square {
+    background-color: var(--mud-palette-text-primary) !important;
+    color: var(--mud-palette-surface) !important;
+    border-radius: var(--maliev-radius-sm) !important;
+    padding: 6px !important;
+}
+
+.send-button-square:hover {
+    opacity: 0.9;
+}
+
+.send-button-square:disabled {
+    background-color: var(--mud-palette-action-disabled-background) !important;
+}
+
+.scroll-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb {
+    background-color: var(--maliev-scroll);
+    border-radius: var(--maliev-radius-pill);
+}

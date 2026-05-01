@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -15,7 +16,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="invoiceClient">Typed Invoice service HTTP client.</param>
 [RequirePermission(MalievPermissions.Order.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/orders/{id:guid}/lifecycle")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/orders/{id:guid}/lifecycle")]
 public class OrderLifecycleController(
     OrderServiceClient orderClient,
     InvoiceServiceClient invoiceClient) : ControllerBase
@@ -146,9 +148,9 @@ public class OrderLifecycleController(
 
         return Ok(new OrderLifecycleDto
         {
-            OrderId      = id,
-            OrderNumber  = order.OrderNumber,
-            Stages       = stages,
+            OrderId = id,
+            OrderNumber = order.OrderNumber,
+            Stages = stages,
             CurrentStage = currentStage
         });
     }

@@ -1,3 +1,5 @@
+using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -13,9 +15,9 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="client">The IAM service client.</param>
 /// <param name="authorizationService">The authorization service for manual checks.</param>
 /// <param name="env">The host environment.</param>
-[Authorize] // Require authentication at minimum
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class IamController(
     IAMServiceClient client,
     IAuthorizationService authorizationService,
@@ -44,6 +46,7 @@ public class IamController(
     /// Retrieves all principals (users and service accounts) for the IAM console.
     /// </summary>
     /// <returns>A list of principals.</returns>
+    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("users")]
     public async Task<ActionResult<List<PrincipalSummaryDto>>> GetUsers()
     {
@@ -57,6 +60,7 @@ public class IamController(
     /// Retrieves all roles for the IAM console.
     /// </summary>
     /// <returns>A list of roles.</returns>
+    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("roles")]
     public async Task<ActionResult<List<RoleDto>>> GetRoles()
     {
@@ -69,6 +73,7 @@ public class IamController(
     /// Retrieves all permissions for the IAM console.
     /// </summary>
     /// <returns>A list of permissions.</returns>
+    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("permissions")]
     public async Task<ActionResult<List<PermissionDto>>> GetPermissions()
     {
@@ -82,6 +87,7 @@ public class IamController(
     /// </summary>
     /// <param name="principalId">The principal ID.</param>
     /// <returns>The list of role bindings.</returns>
+    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("users/{principalId}/roles")]
     public async Task<ActionResult<List<RoleBindingDto>>> GetUserRoles(Guid principalId)
     {
@@ -96,6 +102,7 @@ public class IamController(
     /// <param name="principalId">The principal ID.</param>
     /// <param name="request">The grant request.</param>
     /// <returns>Success status.</returns>
+    [RequirePermission(MalievPermissions.IAM.Manage, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("users/{principalId}/roles")]
     public async Task<IActionResult> GrantRole(Guid principalId, [FromBody] GrantRoleRequestDto request)
     {
@@ -110,6 +117,7 @@ public class IamController(
     /// <param name="principalId">The principal ID.</param>
     /// <param name="bindingId">The unique binding ID.</param>
     /// <returns>Success status.</returns>
+    [RequirePermission(MalievPermissions.IAM.Manage, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpDelete("users/{principalId}/roles/{bindingId}")]
     public async Task<IActionResult> RevokeRole(Guid principalId, Guid bindingId)
     {

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -12,7 +13,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 [RequirePermission(MalievPermissions.Dashboard.View, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class DashboardController(
     OrderServiceClient orderClient,
     QuotationServiceClient quotationClient,
@@ -146,9 +148,9 @@ public class DashboardController(
         // Fire all available sources in parallel (4 of 6 spec items).
         // Remaining 2 — "Projects needing pricing" and "Production jobs delayed" —
         // depend on ProjectServiceClient and JobServiceClient which are added in Phase 4.
-        var onHoldOrdersTask      = SafeCount(t => orderClient.GetOnHoldOrderCountAsync(t), ct);
-        var agingQuotesTask       = SafeCount(t => quotationClient.GetAgingQuotationCountAsync(7, t), ct);
-        var overdueInvoicesTask   = SafeCount(t => invoiceClient.GetOverdueInvoiceCountAsync(t), ct);
+        var onHoldOrdersTask = SafeCount(t => orderClient.GetOnHoldOrderCountAsync(t), ct);
+        var agingQuotesTask = SafeCount(t => quotationClient.GetAgingQuotationCountAsync(7, t), ct);
+        var overdueInvoicesTask = SafeCount(t => invoiceClient.GetOverdueInvoiceCountAsync(t), ct);
         var configuringProjectsTask = SafeCount(t => projectClient.GetConfiguringCountAsync(t), ct);
 
         var employeeId = await GetEmployeeIdAsync(ct);
@@ -160,21 +162,21 @@ public class DashboardController(
 
         var result = new DashboardActionItemsDto();
 
-        var onHoldOrders        = await onHoldOrdersTask;
-        var agingQuotes         = await agingQuotesTask;
-        var overdueInvoices     = await overdueInvoicesTask;
-        var pendingLeave        = await pendingLeaveTask;
+        var onHoldOrders = await onHoldOrdersTask;
+        var agingQuotes = await agingQuotesTask;
+        var overdueInvoices = await overdueInvoicesTask;
+        var pendingLeave = await pendingLeaveTask;
         var configuringProjects = await configuringProjectsTask;
 
         if (onHoldOrders > 0)
         {
             result.Categories.Add(new ActionItemCategoryDto
             {
-                Label      = $"{onHoldOrders} order{(onHoldOrders == 1 ? "" : "s")} on hold or delayed",
-                Icon       = "Icons.Material.Outlined.PauseCircle",
-                Count      = onHoldOrders,
+                Label = $"{onHoldOrders} order{(onHoldOrders == 1 ? "" : "s")} on hold or delayed",
+                Icon = "Icons.Material.Outlined.PauseCircle",
+                Count = onHoldOrders,
                 NavigateTo = "/sales/orders?status=OnHold,Delayed",
-                Severity   = "Error"
+                Severity = "Error"
             });
         }
 
@@ -182,11 +184,11 @@ public class DashboardController(
         {
             result.Categories.Add(new ActionItemCategoryDto
             {
-                Label      = $"{agingQuotes} quotation{(agingQuotes == 1 ? "" : "s")} awaiting response (>7 days)",
-                Icon       = "Icons.Material.Outlined.HourglassBottom",
-                Count      = agingQuotes,
+                Label = $"{agingQuotes} quotation{(agingQuotes == 1 ? "" : "s")} awaiting response (>7 days)",
+                Icon = "Icons.Material.Outlined.HourglassBottom",
+                Count = agingQuotes,
                 NavigateTo = "/sales/quotations?aging=true",
-                Severity   = "Warning"
+                Severity = "Warning"
             });
         }
 
@@ -194,11 +196,11 @@ public class DashboardController(
         {
             result.Categories.Add(new ActionItemCategoryDto
             {
-                Label      = $"{overdueInvoices} overdue invoice{(overdueInvoices == 1 ? "" : "s")}",
-                Icon       = "Icons.Material.Outlined.ReceiptLong",
-                Count      = overdueInvoices,
+                Label = $"{overdueInvoices} overdue invoice{(overdueInvoices == 1 ? "" : "s")}",
+                Icon = "Icons.Material.Outlined.ReceiptLong",
+                Count = overdueInvoices,
                 NavigateTo = "/finance/invoices?status=Overdue",
-                Severity   = "Error"
+                Severity = "Error"
             });
         }
 
@@ -206,11 +208,11 @@ public class DashboardController(
         {
             result.Categories.Add(new ActionItemCategoryDto
             {
-                Label       = $"{pendingLeave} leave request{(pendingLeave == 1 ? "" : "s")} pending your approval",
-                Icon        = "Icons.Material.Outlined.BeachAccess",
-                Count       = pendingLeave,
-                NavigateTo  = "/hr/leave?tab=approvals",
-                Severity    = "Info",
+                Label = $"{pendingLeave} leave request{(pendingLeave == 1 ? "" : "s")} pending your approval",
+                Icon = "Icons.Material.Outlined.BeachAccess",
+                Count = pendingLeave,
+                NavigateTo = "/hr/leave?tab=approvals",
+                Severity = "Info",
                 ManagerOnly = true
             });
         }
@@ -219,11 +221,11 @@ public class DashboardController(
         {
             result.Categories.Add(new ActionItemCategoryDto
             {
-                Label      = $"{configuringProjects} project{(configuringProjects == 1 ? "" : "s")} waiting for pricing",
-                Icon       = "Icons.Material.Outlined.FolderSpecial",
-                Count      = configuringProjects,
+                Label = $"{configuringProjects} project{(configuringProjects == 1 ? "" : "s")} waiting for pricing",
+                Icon = "Icons.Material.Outlined.FolderSpecial",
+                Count = configuringProjects,
                 NavigateTo = "/sales/projects?status=Configuring",
-                Severity   = "Warning"
+                Severity = "Warning"
             });
         }
 

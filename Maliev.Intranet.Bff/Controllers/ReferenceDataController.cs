@@ -1,7 +1,8 @@
+using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.Intranet.Bff.Controllers;
@@ -10,8 +11,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for reference data endpoints (countries, etc.).
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
-[Authorize]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class ReferenceDataController : ControllerBase
 {
     private readonly IReferenceDataService _referenceDataService;
@@ -39,6 +40,7 @@ public class ReferenceDataController : ControllerBase
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of countries.</returns>
+    [RequirePermission(MalievPermissions.Registry.LocationsRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("countries")]
     public async Task<ActionResult<List<CountryDto>>> GetCountries(CancellationToken cancellationToken)
     {
@@ -59,6 +61,7 @@ public class ReferenceDataController : ControllerBase
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of currencies.</returns>
+    [RequirePermission(MalievPermissions.Registry.LocationsRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("currencies")]
     public async Task<ActionResult<List<CurrencyDto>>> GetCurrencies(CancellationToken cancellationToken)
     {
@@ -79,6 +82,7 @@ public class ReferenceDataController : ControllerBase
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The primary currency.</returns>
+    [RequirePermission(MalievPermissions.Registry.LocationsRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("currencies/primary")]
     public async Task<ActionResult<CurrencyDto>> GetPrimaryCurrency(CancellationToken cancellationToken)
     {
@@ -106,6 +110,7 @@ public class ReferenceDataController : ControllerBase
     /// <param name="to">Target currency code (ISO 4217).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The exchange rate as a decimal.</returns>
+    [RequirePermission(MalievPermissions.Registry.LocationsRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("currencies/rate")]
     public async Task<ActionResult<ExchangeRateResponse>> GetExchangeRate(
         [FromQuery] string from,

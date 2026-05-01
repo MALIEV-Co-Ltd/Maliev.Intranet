@@ -40,12 +40,23 @@ public sealed record FileAnalysisStatusDto
 
     /// <summary>Gets or sets the UTC timestamp when the analysis was processed.</summary>
     public DateTimeOffset? ProcessedAt { get; init; }
-    
+
     /// <summary>
     /// Whether the mesh is manifold (watertight). False indicates potential geometry issues.
     /// Null if not yet determined.
     /// </summary>
     public bool? IsManifold { get; init; }
+
+    /// <summary>
+    /// Human-readable explanation of why the mesh is non-manifold (e.g. "5 open boundary edges").
+    /// Null when IsManifold is true or not yet determined.
+    /// </summary>
+    public string? NonManifoldReason { get; init; }
+
+    /// <summary>
+    /// Approximate number of broken/non-manifold faces. Null when IsManifold is true or not determined.
+    /// </summary>
+    public int? NonManifoldFaceCount { get; init; }
 
     /// <summary>
     /// Independent preview image generation status. File appears "Ready" when Status=Completed
@@ -109,15 +120,15 @@ public sealed record FileAnalysisDimensionsDto
 public sealed record FileAnalysisPreviewUrlsDto
 {
     /// <summary>Gets or sets the front view preview image URL (small WebP).</summary>
-    public string? FrontSmall  { get; init; }
+    public string? FrontSmall { get; init; }
     /// <summary>Gets or sets the back view preview image URL (small WebP).</summary>
-    public string? BackSmall   { get; init; }
+    public string? BackSmall { get; init; }
     /// <summary>Gets or sets the left view preview image URL (small WebP).</summary>
-    public string? LeftSmall   { get; init; }
+    public string? LeftSmall { get; init; }
     /// <summary>Gets or sets the right view preview image URL (small WebP).</summary>
-    public string? RightSmall  { get; init; }
+    public string? RightSmall { get; init; }
     /// <summary>Gets or sets the top view preview image URL (small WebP).</summary>
-    public string? TopSmall    { get; init; }
+    public string? TopSmall { get; init; }
     /// <summary>Gets or sets the bottom view preview image URL (small WebP).</summary>
     public string? BottomSmall { get; init; }
     /// <summary>Isometric thumbnail WebP URL (~256px small).</summary>

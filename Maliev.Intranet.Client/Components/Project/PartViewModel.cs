@@ -403,7 +403,7 @@ public class PartViewModel
         InsertCount = InsertCount,
         BagAndTag = BagAndTag,
         InspectionLevel = InspectionLevel,
-        Certificates = [..Certificates],
+        Certificates = [.. Certificates],
         // Persist pricing snapshot so the panel shows instantly on restore
         EstimatedUnitPrice = EstimatedUnitPrice,
         EstimatedTotalAmount = EstimatedTotalAmount,
@@ -462,7 +462,7 @@ public class PartViewModel
             InsertCount = s.InsertCount,
             BagAndTag = s.BagAndTag,
             InspectionLevel = s.InspectionLevel,
-            Certificates = [..s.Certificates],
+            Certificates = [.. s.Certificates],
             AwaitingPreview = false,
             StatusText = string.IsNullOrEmpty(s.ThumbnailSmallUrl) && string.IsNullOrEmpty(s.StoragePath)
                 ? "Processing..."

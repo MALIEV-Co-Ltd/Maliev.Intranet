@@ -48,22 +48,24 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
 
         var dimensions = payload.Metrics?.BoundingBox is { } bb
             ? new FileAnalysisDimensionsDto
-              {
-                  X         = bb.X,
-                  Y         = bb.Y,
-                  Z         = bb.Z,
-                  VolumeMm3 = payload.Metrics.VolumeCm3 * 1000,
-              }
+            {
+                X = bb.X,
+                Y = bb.Y,
+                Z = bb.Z,
+                VolumeMm3 = payload.Metrics.VolumeCm3 * 1000,
+            }
             : null;
 
         var isManifold = payload.Metrics?.IsManifold ?? true;
+        var nonManifoldReason = payload.Metrics?.NonManifoldReason;
+        var nonManifoldFaceCount = payload.Metrics?.NonManifoldFaceCount;
 
         await _analysisStatusService.SetProcessingAsync(payload.StoragePath, context.CancellationToken);
 
         if (dimensions != null)
         {
             await _analysisStatusService.SetDimensionsAsync(
-                payload.StoragePath, dimensions, isManifold, context.CancellationToken);
+                payload.StoragePath, dimensions, isManifold, nonManifoldReason, nonManifoldFaceCount, context.CancellationToken);
 
             _logger.LogInformation(
                 "FileMetricsReadyConsumer: stored dimensions for key={StoragePath}, manifold={IsManifold}",
@@ -97,7 +99,9 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
             Failed: false,
             ErrorCode: null,
             BodyCount: payload.BodyCount,
-            Bodies: bodies);
+            Bodies: bodies,
+            NonManifoldReason: nonManifoldReason,
+            NonManifoldFaceCount: nonManifoldFaceCount);
 
         await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
             "FileAnalysisCompleted",

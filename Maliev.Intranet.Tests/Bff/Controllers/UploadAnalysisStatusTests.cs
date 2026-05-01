@@ -11,7 +11,7 @@ using System.Net.Http;
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
 /// <summary>
-/// Tests for the /api/uploads/analysis-status endpoint.
+/// Tests for the /api/v1/uploads/analysis-status endpoint.
 /// Verifies that the endpoint correctly returns analysis status from
 /// IFileAnalysisStatusService.
 /// </summary>

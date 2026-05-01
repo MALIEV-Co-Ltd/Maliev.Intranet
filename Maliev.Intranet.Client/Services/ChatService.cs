@@ -209,7 +209,7 @@ public class ChatService : IAsyncDisposable
         {
             var language = System.Globalization.CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
             var request = new BffChatSessionRequest { Channel = "intranet", Language = language };
-            var response = await _httpClient.PostAsJsonAsync("api/chat/session", request);
+            var response = await _httpClient.PostAsJsonAsync("api/v1/chat/session", request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -256,8 +256,8 @@ public class ChatService : IAsyncDisposable
 
             // Use streaming endpoint when SignalR is connected
             var endpoint = IsSignalRConnected
-                ? "api/chat/message/stream"
-                : "api/chat/message";
+                ? "api/v1/chat/message/stream"
+                : "api/v1/chat/message";
 
             // Add a placeholder processing message for thinking steps
             if (IsSignalRConnected)

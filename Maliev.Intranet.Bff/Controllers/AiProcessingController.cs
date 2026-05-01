@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using System.Text.Json;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -15,9 +16,9 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="registryClient">The registry service client for Thai location resolution.</param>
 /// <param name="customerClient">The customer service client.</param>
 /// <param name="logger">The logger.</param>
-[Authorize(AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class AiProcessingController(
     ChatbotServiceClient chatbotClient,
     UploadServiceClient uploadClient,

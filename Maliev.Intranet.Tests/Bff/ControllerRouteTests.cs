@@ -13,37 +13,37 @@ public class ControllerRouteTests(BffTestWebApplicationFactory factory) : IClass
     private readonly BffTestWebApplicationFactory _factory = factory;
 
     [Theory(Skip = "Requires Docker/RabbitMQ for MassTransit bus initialization")]
-    [InlineData("/api/auth/user")]
-    [InlineData("/api/companies")]
-    [InlineData("/api/customers")]
-    [InlineData("/api/orders")]
-    [InlineData("/api/quotations")]
-    [InlineData("/api/invoices")]
-    [InlineData("/api/payments")]
-    [InlineData("/api/suppliers")]
-    [InlineData("/api/materials")]
-    [InlineData("/api/employees")]
-    [InlineData("/api/timeoff/balances")]
-    [InlineData("/api/receipts")]
-    [InlineData("/api/procurement")]
-    [InlineData("/api/deliverynotes")]
-    [InlineData("/api/accounting/journal-entries")]
-    [InlineData("/api/performance/reviews")]
-    [InlineData("/api/compliance/stats")]
-    [InlineData("/api/compensation/summary")]
-    [InlineData("/api/referencedata/countries")]
-    [InlineData("/api/notifications/templates")]
-    [InlineData("/api/dashboard")]
-    [InlineData("/api/preferences/UI")]
-    [InlineData("/api/diagnostics/me")]
-    [InlineData("/api/system-health")]
-    [InlineData("/api/models")]
-    [InlineData("/api/recruitment/jobs")]
-    [InlineData("/api/billing-notes")]
-    [InlineData("/api/credit-terms")]
-    [InlineData("/api/permissions/available")]
-    [InlineData("/api/onboarding")]
-    [InlineData("/api/equipments")]
+    [InlineData("/api/v1/auth/user")]
+    [InlineData("/api/v1/companies")]
+    [InlineData("/api/v1/customers")]
+    [InlineData("/api/v1/orders")]
+    [InlineData("/api/v1/quotations")]
+    [InlineData("/api/v1/invoices")]
+    [InlineData("/api/v1/payments")]
+    [InlineData("/api/v1/suppliers")]
+    [InlineData("/api/v1/materials")]
+    [InlineData("/api/v1/employees")]
+    [InlineData("/api/v1/timeoff/balances")]
+    [InlineData("/api/v1/receipts")]
+    [InlineData("/api/v1/procurement")]
+    [InlineData("/api/v1/deliverynotes")]
+    [InlineData("/api/v1/accounting/journal-entries")]
+    [InlineData("/api/v1/performance/reviews")]
+    [InlineData("/api/v1/compliance/stats")]
+    [InlineData("/api/v1/compensation/summary")]
+    [InlineData("/api/v1/referencedata/countries")]
+    [InlineData("/api/v1/notifications/templates")]
+    [InlineData("/api/v1/dashboard")]
+    [InlineData("/api/v1/preferences/UI")]
+    [InlineData("/api/v1/diagnostics/me")]
+    [InlineData("/api/v1/system-health")]
+    [InlineData("/api/v1/models")]
+    [InlineData("/api/v1/recruitment/jobs")]
+    [InlineData("/api/v1/billing-notes")]
+    [InlineData("/api/v1/credit-terms")]
+    [InlineData("/api/v1/permissions/available")]
+    [InlineData("/api/v1/onboarding")]
+    [InlineData("/api/v1/equipments")]
     public async Task Get_Endpoints_ReturnSuccessOrUnauthorized(string url)
     {
         // Arrange
@@ -85,13 +85,13 @@ public class ControllerRouteTests(BffTestWebApplicationFactory factory) : IClass
             }
         };
 
-        var response = await client.PostAsJsonAsync("/api/pricing/calculate", request);
+        var response = await client.PostAsJsonAsync("/api/v1/pricing/calculate", request);
 
         Assert.True(response.StatusCode == HttpStatusCode.OK ||
                     response.StatusCode == HttpStatusCode.Unauthorized ||
                     response.StatusCode == HttpStatusCode.Forbidden ||
                     response.StatusCode == HttpStatusCode.BadRequest,
-                    $"URL /api/pricing/calculate returned {response.StatusCode}");
+                    $"URL /api/v1/pricing/calculate returned {response.StatusCode}");
     }
 
     [Fact(Skip = "Requires Docker/RabbitMQ for MassTransit bus initialization")]
@@ -103,7 +103,7 @@ public class ControllerRouteTests(BffTestWebApplicationFactory factory) : IClass
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await client.GetAsync("/api/diagnostics/me");
+        var response = await client.GetAsync("/api/v1/diagnostics/me");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

@@ -8,9 +8,6 @@
 
 <PageTitle>Projects | Intranet Gateway</PageTitle>
 
-<style>
-    .status-tab-badge { font-size: var(--maliev-typography-micro-size); margin-left: 4px; }
-</style>
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4" Wrap="Wrap.Wrap">
     <div>
@@ -26,7 +23,7 @@
 </MudStack>
 
 @* Search bar *@
-<MudPaper Elevation="0" Class="pa-3 mb-3 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+<MudPaper Elevation="0" Class="pa-3 mb-3 rounded-lg pj-search-paper">
     <MudTextField @bind-Value="_search"
                   Placeholder="Search by project number, customer or title..."
                   Adornment="Adornment.Start"
@@ -160,7 +157,7 @@ else
         StateHasChanged();
         try
         {
-            var url = $"api/projects?page={_page}&pageSize=20";
+            var url = $"api/v1/projects?page={_page}&pageSize=20";
             if (!string.IsNullOrEmpty(ActiveStatus)) url += $"&status={Uri.EscapeDataString(ActiveStatus)}";
             if (!string.IsNullOrEmpty(_search))      url += $"&search={Uri.EscapeDataString(_search)}";
 

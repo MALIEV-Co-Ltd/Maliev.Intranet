@@ -133,7 +133,7 @@
                 var stream = file.OpenReadStream(UploadSettings.DrawingLimit);
                 content.Add(new StreamContent(stream), "files", file.Name);
 
-                var url = $"api/uploads/attachments?projectId={TempProjectId}&partId={Part.FileId}&kind=Drawing";
+                var url = $"api/v1/uploads/attachments?projectId={TempProjectId}&partId={Part.FileId}&kind=Drawing";
                 var resp = await Http.PostAsync(url, content);
                 if (resp.IsSuccessStatusCode)
                 {
@@ -173,7 +173,7 @@
 
         try
         {
-            var resp = await Http.GetAsync($"api/uploads/preview-url?storagePath={Uri.EscapeDataString(file.StoragePath)}");
+            var resp = await Http.GetAsync($"api/v1/uploads/preview-url?storagePath={Uri.EscapeDataString(file.StoragePath)}");
             if (resp.IsSuccessStatusCode)
             {
                 var doc = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
@@ -192,7 +192,7 @@
     {
         try
         {
-            var resp = await Http.DeleteAsync($"api/uploads/attachments/{file.FileId}");
+            var resp = await Http.DeleteAsync($"api/v1/uploads/attachments/{file.FileId}");
             if (resp.IsSuccessStatusCode)
             {
                 Part.DrawingFiles.Remove(file);

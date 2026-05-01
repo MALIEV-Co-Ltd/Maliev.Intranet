@@ -1,0 +1,35 @@
+.note-editor-paper {
+    background-color: var(--maliev-panel);
+}
+
+.note-editor-toolbar {
+    background-color: var(--mud-palette-surface);
+    border-bottom: 1px solid var(--maliev-border);
+    padding-inline-start: 8px;
+}
+
+.note-editor-content {
+    padding: 16px 20px;
+}
+
+.note-editor-content ::deep .note-text-field .mud-input-control-input-container {
+    padding: 0 !important;
+}
+
+.note-editor-content ::deep .note-text-field textarea {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    font-family: var(--maliev-font-mono);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.note-editor-content ::deep .note-content-preview .markdown-content {
+    font-size: 1rem;
+}
+
+.note-editor-paper ::deep .compact-timeline .mud-timeline-item {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}

@@ -74,6 +74,23 @@ public class UploadServiceClient
     }
 
     /// <summary>
+    /// Gets the current authoritative GCS storage path for a file by its upload ID.
+    /// Returns null if the file is not found in UploadService (404).
+    /// </summary>
+    public async Task<string?> GetStoragePathAsync(string uploadId, CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync($"/upload/v1/files/{uploadId}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+        if (!response.IsSuccessStatusCode)
+            return null;
+        var result = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
+        if (result.TryGetProperty("storagePath", out var pathProp))
+            return pathProp.GetString();
+        return null;
+    }
+
+    /// <summary>
     /// Gets a temporary signed download URL for a file using its GCS storage path.
     /// Used by background consumers where there is no HttpContext for user-identity forwarding.
     /// </summary>

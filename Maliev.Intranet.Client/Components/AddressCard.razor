@@ -283,44 +283,6 @@
     </MudGrid>
 </MudPaper>
 
-<style>
-    .address-card-paper {
-        border: 1px solid var(--mud-palette-divider);
-        border-radius: 8px;
-        padding: 1.5rem;
-        transition: all 0.2s;
-    }
-
-    .address-card-paper:hover {
-        box-shadow: var(--mud-elevation-4);
-    }
-
-    .address-card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid var(--mud-palette-divider);
-    }
-
-    .address-type-chip {
-        font-weight: 600;
-    }
-
-    .default-indicator {
-        opacity: 0.7;
-        margin-left: 0.5rem;
-    }
-
-    .btn-delete-address:hover {
-        background-color: rgba(var(--mud-palette-error-rgb), 0.1) !important;
-    }
-
-    .autocomplete-item {
-        padding: 0.5rem 0;
-    }
-</style>
 
 @code {
     [Parameter] public CreateAddressRequest Address { get; set; } = new();

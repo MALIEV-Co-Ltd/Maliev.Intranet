@@ -162,24 +162,6 @@
     </div>
 </div>
 
-<style>
-    .nav-sidebar {
-        background-color: var(--mud-palette-drawer-background);
-    }
-
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: var(--mud-palette-divider);
-        border-radius: 4px;
-    }
-
-    /* SVG Gradient for Auto Mode icon */
-    .auto-mode-icon svg path {
-        fill: url(#auto-mode-gradient) !important;
-    }
-</style>
 
 <!-- SVG Gradient for AutoMode icon -->
 <svg width="0" height="0" style="position: absolute;">
@@ -295,6 +277,6 @@
 
     private void HandleLogout()
     {
-        Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
+        Navigation.NavigateTo("/api/v1/auth/logout", forceLoad: true);
     }
 }

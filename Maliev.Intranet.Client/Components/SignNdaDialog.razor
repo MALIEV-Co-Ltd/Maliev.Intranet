@@ -100,7 +100,7 @@
             fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
             content.Add(fileContent, "file", file.Name);
 
-            var response = await Http.PostAsync("api/aiprocessing/extract-nda-dates", content);
+            var response = await Http.PostAsync("api/v1/aiprocessing/extract-nda-dates", content);
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<ExtractedNdaDatesResponse>();
@@ -145,7 +145,7 @@
             fileContent.Headers.ContentType = new MediaTypeHeaderValue(_file.ContentType);
             content.Add(fileContent, "files", _file.Name);
 
-            var uploadResponse = await Http.PostAsync($"api/aiprocessing/upload-documents?category=NDA", content);
+            var uploadResponse = await Http.PostAsync($"api/v1/aiprocessing/upload-documents?category=NDA", content);
             if (uploadResponse.IsSuccessStatusCode)
             {
                 var results = await uploadResponse.Content.ReadFromJsonAsync<List<BffUploadResponse>>();
@@ -165,7 +165,7 @@
                         }
                     };
 
-                    var linkResponse = await Http.PostAsJsonAsync($"api/aiprocessing/link-documents?ownerType=Customer&ownerId={CustomerId}", docs);
+                    var linkResponse = await Http.PostAsJsonAsync($"api/v1/aiprocessing/link-documents?ownerType=Customer&ownerId={CustomerId}", docs);
 
                     if (linkResponse.IsSuccessStatusCode)
                     {

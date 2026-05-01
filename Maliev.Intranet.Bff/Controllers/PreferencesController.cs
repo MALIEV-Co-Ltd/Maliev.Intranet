@@ -1,4 +1,6 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.Intranet.Shared;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -9,14 +11,15 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for managing user preferences.
 /// </summary>
 [ApiController]
-[ApiVersion("1")]
-[Route("api/preferences")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/preferences")]
 public class PreferencesController(EmployeeServiceClient employeeClient) : ControllerBase
 {
     /// <summary>
     /// Gets preferences for a scope. Returns a default empty preference if none exists,
     /// preventing 404 errors for new users who have never saved preferences.
     /// </summary>
+    [RequirePermission(MalievPermissions.Preference.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{scope}")]
     public async Task<ActionResult<UserPreferenceDto>> GetPreference(string scope, CancellationToken ct)
     {
@@ -35,6 +38,7 @@ public class PreferencesController(EmployeeServiceClient employeeClient) : Contr
     /// <summary>
     /// Updates preferences for a scope.
     /// </summary>
+    [RequirePermission(MalievPermissions.Preference.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPut("{scope}")]
     public async Task<ActionResult<UserPreferenceDto>> UpsertPreference(string scope, [FromBody] UpsertPreferenceRequest request, CancellationToken ct)
     {
@@ -45,6 +49,7 @@ public class PreferencesController(EmployeeServiceClient employeeClient) : Contr
     /// <summary>
     /// Deletes preferences for a scope.
     /// </summary>
+    [RequirePermission(MalievPermissions.Preference.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpDelete("{scope}")]
     public async Task<IActionResult> DeletePreference(string scope, CancellationToken ct)
     {

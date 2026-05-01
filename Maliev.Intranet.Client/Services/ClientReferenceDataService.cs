@@ -30,7 +30,7 @@ public class ClientReferenceDataService : IReferenceDataService
     {
         try
         {
-            var countries = await _httpClient.GetFromJsonAsync<List<CountryDto>>("api/ReferenceData/countries", cancellationToken);
+            var countries = await _httpClient.GetFromJsonAsync<List<CountryDto>>("api/v1/ReferenceData/countries", cancellationToken);
             return countries ?? new List<CountryDto>();
         }
         catch (Exception ex)
@@ -47,7 +47,7 @@ public class ClientReferenceDataService : IReferenceDataService
     {
         try
         {
-            var currencies = await _httpClient.GetFromJsonAsync<List<CurrencyDto>>("api/ReferenceData/currencies", cancellationToken);
+            var currencies = await _httpClient.GetFromJsonAsync<List<CurrencyDto>>("api/v1/ReferenceData/currencies", cancellationToken);
             return currencies ?? new List<CurrencyDto>();
         }
         catch (Exception ex)
@@ -64,7 +64,7 @@ public class ClientReferenceDataService : IReferenceDataService
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<CurrencyDto>("api/ReferenceData/currencies/primary", cancellationToken);
+            return await _httpClient.GetFromJsonAsync<CurrencyDto>("api/v1/ReferenceData/currencies/primary", cancellationToken);
         }
         catch (Exception ex)
         {
@@ -80,7 +80,7 @@ public class ClientReferenceDataService : IReferenceDataService
     {
         try
         {
-            var locations = await _httpClient.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/Customers/locations/thai?query={Uri.EscapeDataString(query)}&limit={limit}", cancellationToken);
+            var locations = await _httpClient.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/v1/Customers/locations/thai?query={Uri.EscapeDataString(query)}&limit={limit}", cancellationToken);
             return locations ?? new List<RegistryThaiLocation>();
         }
         catch (Exception ex)

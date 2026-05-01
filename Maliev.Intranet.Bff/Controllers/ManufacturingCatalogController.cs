@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -11,12 +12,13 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// to the Material Service.
 /// </summary>
 [ApiController]
-[Route("api/catalog")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/catalog")]
 public class ManufacturingCatalogController(MaterialServiceClient client) : ControllerBase
 {
     /// <summary>Returns all active manufacturing processes.</summary>
-    [HttpGet("processes")]
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("processes")]
     public async Task<ActionResult<List<ProcessDto>>> GetProcesses(CancellationToken ct)
     {
         var result = await client.GetProcessesAsync(ct);
@@ -24,8 +26,8 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     }
 
     /// <summary>Returns materials available for the specified process code.</summary>
-    [HttpGet("processes/{processCode}/materials")]
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("processes/{processCode}/materials")]
     public async Task<ActionResult<List<CatalogMaterialDto>>> GetMaterialsByProcess(string processCode, CancellationToken ct)
     {
         var result = await client.GetMaterialsByProcessAsync(processCode, ct);
@@ -33,8 +35,8 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     }
 
     /// <summary>Returns surface finishes available for the specified process code.</summary>
-    [HttpGet("processes/{processCode}/finishes")]
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("processes/{processCode}/finishes")]
     public async Task<ActionResult<List<CatalogSurfaceFinishDto>>> GetFinishesByProcess(string processCode, CancellationToken ct)
     {
         var result = await client.GetFinishesByProcessAsync(processCode, ct);
@@ -42,8 +44,8 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     }
 
     /// <summary>Returns tolerance classes available for the specified process code.</summary>
-    [HttpGet("processes/{processCode}/tolerances")]
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("processes/{processCode}/tolerances")]
     public async Task<ActionResult<List<CatalogToleranceDto>>> GetTolerancesByProcess(string processCode, CancellationToken ct)
     {
         var result = await client.GetTolerancesByProcessAsync(processCode, ct);
@@ -51,8 +53,8 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     }
 
     /// <summary>Returns dynamic configuration options for the specified process code.</summary>
-    [HttpGet("processes/{processCode}/config-options")]
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("processes/{processCode}/config-options")]
     public async Task<ActionResult<List<ProcessConfigOptionDto>>> GetConfigOptionsByProcess(string processCode, CancellationToken ct)
     {
         var result = await client.GetConfigOptionsByProcessAsync(processCode, ct);
@@ -60,8 +62,8 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     }
 
     /// <summary>Returns surface finishes compatible with a specific material.</summary>
-    [HttpGet("materials/{materialId:guid}/finishes")]
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("materials/{materialId:guid}/finishes")]
     public async Task<ActionResult<List<CatalogSurfaceFinishDto>>> GetFinishesByMaterial(Guid materialId, CancellationToken ct)
     {
         var result = await client.GetFinishesByMaterialAsync(materialId, ct);

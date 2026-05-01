@@ -11,33 +11,8 @@
 
 <PageTitle>Dashboard | Intranet Gateway</PageTitle>
 
-<style>
-    .widget-card {
-        cursor: pointer;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-        border: 1px solid var(--mud-palette-lines-default);
-    }
-    .widget-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--mud-elevation-4) !important;
-    }
-    .trend-up   { color: var(--mud-palette-success);  }
-    .trend-down { color: var(--mud-palette-error);    }
-    .quick-action-btn {
-        border: 1px solid var(--mud-palette-lines-default) !important;
-        transition: background 0.15s ease, transform 0.15s ease;
-    }
-    .quick-action-btn:hover { transform: translateY(-1px); }
-    .action-item-row {
-        transition: background 0.1s ease;
-        border-radius: 8px;
-        cursor: pointer;
-    }
-    .action-item-row:hover { background: var(--mud-palette-action-default-hover); }
-    /* Mini chart legend hidden */
-    .sparkline-chart .mud-chart-legend { display: none !important; }
-</style>
 
+<div class="home-root">
 @if (_loading)
 {
     <MudGrid>
@@ -60,7 +35,7 @@
 }
 else
 {
-    <MudGrid Spacing="3">
+    <MudGrid Spacing="4">
 
         @* ── WP-UIX-3.3: Improved Stat Widgets ──────────────────────────────── *@
         @if (_dashboard?.Widgets.Any() == true)
@@ -73,7 +48,7 @@ else
                         <MudText Typo="Typo.caption" Color="Color.Default" Style="text-transform: uppercase; letter-spacing: 0.05em;">@widget.Title</MudText>
                         <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.SpaceBetween" Class="mt-2">
                             <div>
-                                <MudText Typo="Typo.h4" Style="font-weight: 600; line-height: 1;">
+                                <MudText Typo="Typo.h4" Class="maliev-mono" Style="font-weight: 700; line-height: 1;">
                                     @if (widget.Type == "Stat")
                                     {
                                         // GetString() strips the surrounding JSON quotes that ToString() would preserve
@@ -124,7 +99,7 @@ else
 
         @* ── WP-UIX-3.4: Quick Action Buttons ──────────────────────────────── *@
         <MudItem xs="12">
-            <MudPaper Elevation="0" Class="pa-3 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+            <MudPaper Elevation="0" Class="pa-3 rounded-lg hm-panel-card">
                 <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
                     <MudText Typo="Typo.caption" Color="Color.Default" Class="align-self-center mr-2" Style="white-space: nowrap;">Quick actions:</MudText>
                     <MudButton Variant="Variant.Outlined"
@@ -167,7 +142,7 @@ else
         @if (_calculatorOpen)
         {
             <MudItem xs="12">
-                <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+                <MudPaper Elevation="0" Class="pa-4 rounded-lg hm-panel-card">
                     <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3" Wrap="Wrap.Wrap">
                         <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
                             <MudIcon Icon="@Icons.Material.Outlined.Calculate" Class="mr-1" Style="vertical-align: middle;" /> Quick Price Calculator
@@ -203,7 +178,7 @@ else
 
         @* ── WP-UIX-3.1: Action Items Panel ────────────────────────────────── *@
         <MudItem xs="12" md="4">
-            <MudPaper Elevation="0" Class="pa-4 rounded-lg h-100" Style="border: 1px solid var(--mud-palette-lines-default);">
+            <MudPaper Elevation="0" Class="pa-4 rounded-lg h-100 hm-panel-card">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
                     <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Action Items</MudText>
                     @if (_actionItemsLoading)
@@ -260,7 +235,7 @@ else
 
         @* ── Recent Orders (main table) ──────────────────────────────────── *@
         <MudItem xs="12" md="8">
-            <MudPaper Elevation="0" Class="rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+            <MudPaper Elevation="0" Class="rounded-lg hm-panel-card">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="px-4 pt-4 pb-2">
                     <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Recent Orders</MudText>
                     <MudTabs @bind-ActivePanelIndex="_activeOrderTab" Rounded="true" Color="Color.Transparent" SliderColor="Color.Primary" ApplyEffectsToContainer="true">
@@ -297,6 +272,7 @@ else
 
     </MudGrid>
 }
+</div>
 
 @code {
     private UserInfo? _userInfo;
@@ -349,7 +325,7 @@ else
             string widgetQuery = "";
             try
             {
-                var pref = await Http.GetFromJsonAsync<UserPreferenceDto>("api/preferences/dashboard");
+                var pref = await Http.GetFromJsonAsync<UserPreferenceDto>("api/v1/preferences/dashboard");
                 if (pref?.PreferenceData != null && pref.PreferenceData.TryGetValue("Widgets", out var widgetsObj) && widgetsObj is System.Text.Json.JsonElement widgetsElement)
                 {
                     var widgets = System.Text.Json.JsonSerializer.Deserialize<List<string>>(widgetsElement);
@@ -360,9 +336,9 @@ else
             catch { }
 
             // Parallel: widgets + orders + action items
-            var dashboardTask    = Http.GetFromJsonAsync<DashboardViewModel>($"api/dashboard{widgetQuery}");
-            var ordersTask       = Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/orders?pageSize=20&sortBy=createdAt&sortDesc=true");
-            var actionItemsTask  = Http.GetFromJsonAsync<DashboardActionItemsDto>("api/dashboard/action-items");
+            var dashboardTask    = Http.GetFromJsonAsync<DashboardViewModel>($"api/v1/dashboard{widgetQuery}");
+            var ordersTask       = Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/v1/orders?pageSize=20&sortBy=createdAt&sortDesc=true");
+            var actionItemsTask  = Http.GetFromJsonAsync<DashboardActionItemsDto>("api/v1/dashboard/action-items");
 
             await Task.WhenAll(dashboardTask, ordersTask, actionItemsTask);
 

@@ -3,9 +3,8 @@
 
 @if (Steps.Count > 0)
 {
-    <MudPaper Elevation="0" Class="rounded-lg mb-2 ml-12 thinking-chain" Style="border: 1px solid var(--mud-palette-divider); overflow: hidden;">
-        <div class="d-flex align-center pa-2 cursor-pointer" @onclick="ToggleExpanded"
-             style="background-color: var(--mud-palette-background-grey); user-select: none;">
+    <MudPaper Elevation="0" Class="rounded-lg mb-2 ml-12 thinking-chain">
+        <div class="d-flex align-center pa-2 cursor-pointer thinking-chain-header" @onclick="ToggleExpanded">
             <MudIcon Icon="@(IsExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
                      Size="Size.Small" Color="Color.Default" Class="mr-1" />
             <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" Color="Color.Default" Class="mr-2" />
@@ -52,19 +51,6 @@
     </MudPaper>
 }
 
-<style>
-    .thinking-chain {
-        transition: all 0.2s ease;
-    }
-
-    .cursor-pointer {
-        cursor: pointer;
-    }
-
-    .cursor-pointer:hover {
-        opacity: 0.85;
-    }
-</style>
 
 @code {
     [Parameter] public List<ThinkingStepDto> Steps { get; set; } = new();

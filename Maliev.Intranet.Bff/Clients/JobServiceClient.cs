@@ -44,10 +44,10 @@ public class JobServiceClient(HttpClient httpClient)
         CancellationToken ct = default)
     {
         var qs = $"/job/v1/jobs?page={page}";
-        if (!string.IsNullOrEmpty(status))      qs += $"&status={Uri.EscapeDataString(status)}";
-        if (machineId.HasValue)                 qs += $"&machineId={machineId.Value}";
+        if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
+        if (machineId.HasValue) qs += $"&machineId={machineId.Value}";
         if (!string.IsNullOrEmpty(processType)) qs += $"&processType={Uri.EscapeDataString(processType)}";
-        if (!string.IsNullOrEmpty(priority))    qs += $"&priority={Uri.EscapeDataString(priority)}";
+        if (!string.IsNullOrEmpty(priority)) qs += $"&priority={Uri.EscapeDataString(priority)}";
 
         return await httpClient.GetFromJsonAsync<PagedResponse<JobSummaryDto>>(qs, ct);
     }

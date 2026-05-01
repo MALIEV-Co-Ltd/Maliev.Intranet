@@ -99,7 +99,7 @@
     {
         try
         {
-            _history = await Http.GetFromJsonAsync<List<NDAAuditLogResponse>>($"api/customers/ndas/{NdaId}/history") ?? [];
+            _history = await Http.GetFromJsonAsync<List<NDAAuditLogResponse>>($"api/v1/customers/ndas/{NdaId}/history") ?? [];
         }
         catch
         {

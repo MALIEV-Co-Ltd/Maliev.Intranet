@@ -1,4 +1,7 @@
 @namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Client.Services
+@inject CurrencyService CurrencyService
+@implements IDisposable
 
 <div class="bpt-container">
     <div class="bpt-header" @onclick="@(() => _expanded = !_expanded)">
@@ -7,7 +10,14 @@
         <MudSpacer />
         @if (!_expanded && ActiveTier != null && SavingAmount > 0)
         {
-            <span class="bpt-saved-chip">Saved @CurrencySymbol @SavingAmount.ToString("N0")</span>
+            @if (CurrencyService.IsConverting)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Text" Width="60px" Height="14px" />
+            }
+            else
+            {
+                <span class="bpt-saved-chip">Saved @CurrencyService.Format(SavingAmount)</span>
+            }
         }
         <MudIcon Icon="@(_expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
                  Size="Size.Small" Color="Color.Secondary" Class="bpt-expand-icon" />
@@ -22,9 +32,16 @@
                                (i == Tiers.Count - 1 || CurrentQuantity < Tiers[i + 1].Quantity);
                 <div class="bpt-tier-row @(isActive ? "bpt-tier-row--active" : "")">
                     <MudText Typo="Typo.body2">@tier.Quantity+ units</MudText>
-                    <MudText Typo="Typo.body2" Style="@(isActive ? "font-weight:700;" : "")">
-                        @CurrencySymbol @tier.UnitPrice.ToString("N2")
-                    </MudText>
+                    @if (CurrencyService.IsConverting)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Text" Width="50px" Height="14px" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Style="@(isActive ? "font-weight:700;" : "")">
+                            @CurrencyService.Format(tier.UnitPrice)
+                        </MudText>
+                    }
                 </div>
             }
         </div>
@@ -84,10 +101,16 @@
     /// <summary>The current part quantity, used to highlight the active pricing tier.</summary>
     [Parameter] public int CurrentQuantity { get; set; } = 1;
 
-    /// <summary>The currency symbol used to format the savings display (e.g. "฿").</summary>
-    [Parameter] public string CurrencySymbol { get; set; } = "฿";
-
     private bool _expanded;
+
+    protected override void OnInitialized() =>
+        CurrencyService.Changed += OnCurrencyChanged;
+
+    public void Dispose() =>
+        CurrencyService.Changed -= OnCurrencyChanged;
+
+    private void OnCurrencyChanged(object? sender, EventArgs e) =>
+        InvokeAsync(StateHasChanged);
 
     private BulkTier? ActiveTier => Tiers
         .Where(t => CurrentQuantity >= t.Quantity)

@@ -172,7 +172,7 @@
                 await SetStep(Step.Customer, StepState.InProgress);
             }
 
-            var response = await Http.PostAsJsonAsync("api/customers/create-basic", Request);
+            var response = await Http.PostAsJsonAsync("api/v1/customers/create-basic", Request);
             if (!response.IsSuccessStatusCode)
             {
                 var error = await ReadError(response);
@@ -200,7 +200,7 @@
             if (Request.Addresses.Any())
             {
                 await SetStep(Step.Addresses, StepState.InProgress);
-                var addrResponse = await Http.PostAsJsonAsync($"api/customers/{_customerId}/addresses", Request.Addresses);
+                var addrResponse = await Http.PostAsJsonAsync($"api/v1/customers/{_customerId}/addresses", Request.Addresses);
                 if (!addrResponse.IsSuccessStatusCode)
                 {
                     var error = await ReadError(addrResponse);
@@ -213,7 +213,7 @@
             if (Request.Documents.Any())
             {
                 await SetStep(Step.Documents, StepState.InProgress);
-                var docResponse = await Http.PostAsJsonAsync($"api/aiprocessing/link-documents?ownerType=Customer&ownerId={_customerId}", Request.Documents);
+                var docResponse = await Http.PostAsJsonAsync($"api/v1/aiprocessing/link-documents?ownerType=Customer&ownerId={_customerId}", Request.Documents);
                 if (docResponse.IsSuccessStatusCode)
                 {
                     _createdDocuments = await docResponse.Content.ReadFromJsonAsync<List<DocumentResponse>>() ?? [];
@@ -230,7 +230,7 @@
             {
                 await SetStep(Step.Nda, StepState.InProgress);
                 var ndaRequest = new CreateNdaStepRequest { Nda = Request.Nda, Documents = _createdDocuments };
-                var ndaResponse = await Http.PostAsJsonAsync($"api/customers/{_customerId}/nda", ndaRequest);
+                var ndaResponse = await Http.PostAsJsonAsync($"api/v1/customers/{_customerId}/nda", ndaRequest);
                 if (!ndaResponse.IsSuccessStatusCode)
                 {
                     var error = await ReadError(ndaResponse);

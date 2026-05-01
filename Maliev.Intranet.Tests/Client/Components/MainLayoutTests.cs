@@ -51,6 +51,8 @@ public class MainLayoutTests : BunitContext, IAsyncLifetime
         Services.AddSingleton<CookieProvider>();
         Services.AddSingleton<ChatService>();
         Services.AddScoped<BreadcrumbService>();
+        Services.AddLogging();
+        Services.AddScoped<CurrencyService>();
 
         _authMock.Setup(x => x.GetAuthenticationStateAsync())
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")], "Test"))));
@@ -64,7 +66,7 @@ public class MainLayoutTests : BunitContext, IAsyncLifetime
     {
         var cut = Render<MainLayout>();
 
-        // Check for basic layout elements
-        Assert.Contains("mud-layout", cut.Markup);
+        // Top-bar shell layout
+        Assert.Contains("topbar-root", cut.Markup);
     }
 }

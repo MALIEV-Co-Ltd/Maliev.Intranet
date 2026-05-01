@@ -434,14 +434,14 @@
                                                     Icon="@Icons.Material.Filled.Gavel"
                                                     IconColor="@(_activeDocTabIndex == 0 ? Color.Primary : Color.Default)"
                                                     Class="@(_activeDocTabIndex == 0 ? "mud-selected-item" : "")"
-                                                    Style="border-radius: 8px; margin-bottom: 4px;">
+                                                    Style="border-radius: var(--maliev-radius-sm); margin-bottom: 4px;">
                                             NDA Agreement
                                         </MudNavLink>
                                         <MudNavLink OnClick="@(() => _activeDocTabIndex = 1)"
                                                     Icon="@Icons.Material.Filled.FolderOpen"
                                                     IconColor="@(_activeDocTabIndex == 1 ? Color.Primary : Color.Default)"
                                                     Class="@(_activeDocTabIndex == 1 ? "mud-selected-item" : "")"
-                                                    Style="border-radius: 8px; margin-bottom: 4px;">
+                                                    Style="border-radius: var(--maliev-radius-sm); margin-bottom: 4px;">
                                             Customer Documents
                                         </MudNavLink>
                                     </MudNavMenu>
@@ -806,11 +806,11 @@
                                                         <div class="flex-grow-1" style="overflow: hidden;">
                                                             @if (_selectedPreviewDoc.MimeType?.Contains("pdf") == true)
                                                             {
-                                                                <iframe src="@_previewUrl" style="width: 100%; height: 100%; border: none; border-radius: 8px;"></iframe>
+                                                                <iframe src="@_previewUrl" style="width: 100%; height: 100%; border: none; border-radius: var(--maliev-radius-sm);"></iframe>
                                                             }
                                                             else if (_selectedPreviewDoc.MimeType?.Contains("image") == true)
                                                             {
-                                                                <img src="@_previewUrl" alt="@_selectedPreviewDoc.FileName" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;" />
+                                                                <img src="@_previewUrl" alt="@_selectedPreviewDoc.FileName" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--maliev-radius-sm);" />
                                                             }
                                                             else
                                                             {
@@ -980,51 +980,4 @@
         </MudGrid>
     }
 </MudContainer>
-
-<style>
-    .activity-item-content .markdown-content p { margin-bottom: 0; font-weight: 500; font-size: 0.875rem; }
-    .activity-item-content .markdown-content ul { margin-top: 0.25rem; margin-bottom: 0; }
-    .activity-item-content .markdown-content li { font-size: 0.875rem; }
-    .note-preview-content { line-height: 1.6; color: var(--mud-palette-text-primary); }
-    .note-preview-content .markdown-content p { margin-bottom: 0.5rem; font-size: 0.875rem; }
-    .note-preview-content .markdown-content p:last-child { margin-bottom: 0; }
-    .note-content-preview .markdown-content { font-size: 1rem; }
-    .hover-primary:hover { color: var(--mud-palette-primary) !important; cursor: pointer; transition: color 0.2s; }
-    .mud-drop-zone { transition: all 0.3s ease; }
-    .mud-drop-zone-dragover { background-color: var(--mud-palette-primary-lighten) !important; border-color: var(--mud-palette-primary) !important; transform: scale(1.01); }
-    .hover-elevation-1:hover { box-shadow: var(--mud-elevation-2); transition: box-shadow 0.2s ease; }
-    .hover-elevation-2:hover { box-shadow: var(--mud-elevation-4); transform: translateY(-1px); }
-
-    .docs-vertical-nav .mud-nav-link { text-align: left !important; padding: 12px 16px !important; }
-    .docs-vertical-nav .mud-nav-link-text { text-align: left !important; width: 100%; }
-    .mud-selected-item { background-color: rgba(var(--mud-palette-primary-rgb), 0.12) !important; }
-
-    .file-upload-dropzone {
-        padding: 24px;
-        border-radius: 8px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        min-height: 100px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-    }
-    .file-upload-dropzone:hover {
-        transform: scale(1.01);
-        opacity: 0.9;
-    }
-    .file-upload-dropzone.drag-over {
-        transform: scale(1.02);
-        opacity: 1;
-        box-shadow: var(--mud-elevation-4);
-    }
-
-    /* Force equal size for address cards in grid */
-    .flex-wrap.gap-6 > div {
-        flex: 1 1 350px;
-        max-width: 500px;
-    }
-</style>
 

@@ -27,7 +27,7 @@ public class DownstreamFailureTests : IClassFixture<BffTestWebApplicationFactory
         mockClient.Setup(x => x.GetMyBalancesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Service Unavailable"));
 
-        
+
         var mockEmployeeClient = new Mock<EmployeeServiceClient>(new HttpClient { BaseAddress = new Uri("http://localhost") });
         mockEmployeeClient.Setup(x => x.GetByPrincipalIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new EmployeeDetailDto { Id = Guid.NewGuid() });
@@ -46,7 +46,7 @@ public class DownstreamFailureTests : IClassFixture<BffTestWebApplicationFactory
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await client.GetAsync("/api/timeoff/balances");
+        var response = await client.GetAsync("/api/v1/timeoff/balances");
 
         // Assert
         // We expect an error status code. 500 is preferred, but 404 from exception handler 
@@ -62,7 +62,7 @@ public class DownstreamFailureTests : IClassFixture<BffTestWebApplicationFactory
         mockClient.Setup(x => x.GetCompaniesAsync(null, 1, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Downstream error"));
 
-        
+
         var mockEmployeeClient = new Mock<EmployeeServiceClient>(new HttpClient { BaseAddress = new Uri("http://localhost") });
         mockEmployeeClient.Setup(x => x.GetByPrincipalIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new EmployeeDetailDto { Id = Guid.NewGuid() });
@@ -80,7 +80,7 @@ public class DownstreamFailureTests : IClassFixture<BffTestWebApplicationFactory
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await client.GetAsync("/api/companies");
+        var response = await client.GetAsync("/api/v1/companies");
 
         // Assert
         Assert.True((int)response.StatusCode >= 500, $"Expected 5xx status but got {response.StatusCode}");

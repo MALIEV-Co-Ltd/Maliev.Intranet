@@ -2,8 +2,8 @@
     width: 380px;
     min-width: 380px;
     height: 100%;
-    background: var(--mud-palette-surface);
-    border-left: 1px solid var(--mud-palette-lines-default);
+    background: var(--maliev-panel);
+    border-left: 1px solid var(--maliev-border);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
@@ -14,15 +14,15 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: var(--mud-palette-surface);
-    padding: 0 20px;
+    background: var(--maliev-panel);
+    padding: 0 4px;
     overflow-y: auto;
     min-height: 0;
 }
 
     .pcs-section {
         flex-shrink: 0;
-        background: var(--mud-palette-surface);
+        background: var(--maliev-panel);
     }
 
 .pcs-empty {
@@ -30,20 +30,20 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    background: var(--mud-palette-surface);
+    background: var(--maliev-panel);
 }
 
 /* ── Sticky footer for Production Routing ─────────────────────────── */
 .pcs-footer {
     flex-shrink: 0;
     padding: 0;
-    border-top: 1px solid var(--mud-palette-lines-default);
-    background: var(--mud-palette-surface);
+    border-top: 1px solid var(--maliev-border);
+    background: var(--maliev-panel);
 }
 
 /* ── Price card (Production Routing wrapper) ──────────────────────── */
 .pcs-price-card {
-    background: var(--mud-palette-background-grey);
+    background: var(--maliev-panel-3);
     padding: 12px;
 }
 
@@ -54,7 +54,7 @@
     justify-content: space-between;
     cursor: pointer;
     user-select: none;
-    background: var(--mud-palette-background-grey);
+    background: var(--maliev-panel-3);
     padding: 8px 12px;
     border-radius: var(--maliev-radius-sm);
 }
@@ -88,7 +88,7 @@
     align-items: center;
     font-size: 13px;
     margin-bottom: 8px;
-    color: var(--mud-palette-text-secondary);
+    color: var(--maliev-muted);
 }
 
 .pcs-routing-row:last-child {
@@ -120,11 +120,11 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    border: 1px solid var(--mud-palette-lines-default);
+    border: 1px solid var(--maliev-border);
     border-radius: var(--maliev-radius-md);
     cursor: pointer;
     transition: all 0.15s ease;
-    background: var(--mud-palette-surface);
+    background: var(--maliev-panel);
     font-size: 13px;
     font-weight: 500;
     flex: 1;
@@ -132,7 +132,7 @@
 }
 
 .pcs-check-btn:hover {
-    background: var(--mud-palette-background-grey);
+    background: var(--maliev-panel-3);
     border-color: var(--mud-palette-primary);
 }
 
@@ -145,7 +145,7 @@
 }
 
 .pcs-check-btn.checked {
-    background: var(--mud-palette-primary-lighten-5);
+    background: var(--maliev-accent-softer);
     border-color: var(--mud-palette-primary);
     color: var(--mud-palette-primary);
 }
@@ -160,7 +160,17 @@
         min-width: unset;
         height: auto;
         border-left: none;
-        border-top: 1px solid var(--mud-palette-lines-default);
+        border-top: 1px solid var(--maliev-border);
+    }
+
+    .pcs-scroll {
+        flex: 0 1 auto;
+        overflow: visible;
+        min-height: unset;
+    }
+
+    .pcs-footer {
+        position: static;
     }
 }
 
@@ -169,7 +179,7 @@
     width: 100%;
     min-width: unset;
     border-left: none;
-    border-top: 1px solid var(--mud-palette-lines-default);
+    border-top: 1px solid var(--maliev-border);
     height: auto;
 }
 

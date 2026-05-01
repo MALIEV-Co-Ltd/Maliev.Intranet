@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
@@ -10,13 +11,14 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Controller for managing 3D models.
 /// </summary>
 [ApiController]
-[ApiVersion("1")]
-[Route("api/models")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/models")]
 public class ModelsController(UploadServiceClient uploadClient) : ControllerBase
 {
     /// <summary>
     /// Lists 3D models.
     /// </summary>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<Model3DDto>>> GetModels([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? filter = null, CancellationToken ct = default)
     {
@@ -27,6 +29,7 @@ public class ModelsController(UploadServiceClient uploadClient) : ControllerBase
     /// <summary>
     /// Gets a model by ID.
     /// </summary>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<Model3DDto>> GetModel(Guid id, CancellationToken ct)
     {
@@ -38,6 +41,7 @@ public class ModelsController(UploadServiceClient uploadClient) : ControllerBase
     /// <summary>
     /// Uploads a 3D model.
     /// </summary>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("upload")]
     public async Task<ActionResult<BffUploadResponse>> UploadModel(IFormFile file, CancellationToken ct)
     {
@@ -56,6 +60,7 @@ public class ModelsController(UploadServiceClient uploadClient) : ControllerBase
     /// <summary>
     /// Gets a signed viewer URL (GLB).
     /// </summary>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}/viewer-url")]
     public async Task<ActionResult<string>> GetViewerUrl(Guid id, CancellationToken ct)
     {
@@ -81,6 +86,7 @@ public class ModelsController(UploadServiceClient uploadClient) : ControllerBase
     /// <summary>
     /// Gets a signed thumbnail URL.
     /// </summary>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}/thumbnail-url")]
     public async Task<ActionResult<string>> GetThumbnailUrl(Guid id, CancellationToken ct)
     {
@@ -98,6 +104,7 @@ public class ModelsController(UploadServiceClient uploadClient) : ControllerBase
     /// <summary>
     /// Deletes a model.
     /// </summary>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteModel(Guid id, CancellationToken ct)
     {

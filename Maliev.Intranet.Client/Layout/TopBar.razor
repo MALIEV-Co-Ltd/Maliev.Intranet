@@ -65,7 +65,7 @@
                          AdornmentColor="Color.Default">
             <ItemTemplate Context="c">
                 <div class="topbar-currency-item">
-                    <span class="fq-mono topbar-currency-code" style="font-weight:@(c.Code == CurrencyService.Code ? "700" : "400")">@c.Code @c.Symbol</span>
+                    <span class="maliev-mono topbar-currency-code" style="font-weight:@(c.Code == CurrencyService.Code ? "700" : "400")">@c.Code @c.Symbol</span>
                     <span class="topbar-currency-name">@c.Name</span>
                 </div>
             </ItemTemplate>
@@ -121,204 +121,6 @@
     </div>
 </header>
 
-<style>
-    .topbar-root {
-        height: 52px;
-        border-bottom: 1px solid var(--fq-border);
-        background: var(--fq-panel);
-        display: flex;
-        align-items: center;
-        padding: 0 14px;
-        gap: 12px;
-        flex-shrink: 0;
-        z-index: 1300;
-    }
-
-    .topbar-left {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
-    }
-
-    .topbar-logo-divider {
-        width: 1px;
-        height: 20px;
-        background: var(--fq-border);
-        margin: 0 4px;
-        flex-shrink: 0;
-    }
-
-    .topbar-nav {
-        display: flex;
-        align-items: center;
-        gap: 2px;
-    }
-
-    .topbar-nav .mud-nav-link {
-        padding: 6px 12px;
-        font-size: 13px;
-        font-weight: 500;
-        border-radius: 4px;
-        min-height: unset;
-        white-space: nowrap;
-        color: var(--fq-muted);
-        --mud-nav-link-padding: 0;
-    }
-
-    /* Remove the default icon-gutter left margin MudBlazor adds */
-    .topbar-nav .mud-nav-link-text {
-        margin-left: 0 !important;
-    }
-
-    .topbar-nav .mud-nav-link:hover {
-        background: var(--fq-panel-3);
-        color: var(--fq-ink);
-    }
-
-    .topbar-nav .mud-nav-link.active {
-        background: var(--fq-panel-3);
-        color: var(--fq-ink);
-        font-weight: 600;
-    }
-
-    /* Search */
-    .topbar-search { flex-shrink: 0; }
-
-    .topbar-search-wrap {
-        position: relative;
-        display: flex;
-        align-items: center;
-    }
-
-    .topbar-search-icon {
-        position: absolute;
-        left: 9px;
-        color: var(--fq-muted-2);
-        pointer-events: none;
-    }
-
-    .topbar-search-input {
-        width: 240px;
-        height: 32px;
-        padding: 0 10px 0 30px;
-        border: 1px solid var(--fq-border);
-        border-radius: 5px;
-        background: var(--fq-panel-2);
-        font-size: 13px;
-        font-family: inherit;
-        color: var(--fq-ink);
-        outline: none;
-    }
-
-    .topbar-search-input::placeholder { color: var(--fq-muted-2); }
-    .topbar-search-input:focus { border-color: var(--mud-palette-primary); }
-
-    /* Currency autocomplete */
-    .topbar-currency-autocomplete {
-        min-width: 120px;
-        width: auto;
-        font-size: 12px;
-        font-weight: 600;
-        font-family: 'JetBrains Mono', monospace;
-    }
-
-    /* Scoped z-index for currency popover only */
-    .topbar-currency-popover { min-width: 220px; z-index: 1400 !important; }
-    .topbar-currency-popover .mud-list-item-text { white-space: normal; line-height: 1.3; }
-
-    .topbar-currency-item { display: flex; flex-direction: column; gap: 1px; padding: 2px 0; }
-    .topbar-currency-code { font-size: 12px; }
-    .topbar-currency-name { font-size: 11px; color: var(--fq-muted); }
-
-    .topbar-currency-autocomplete .mud-input {
-        border: 1px solid var(--fq-border);
-        border-radius: 5px;
-        background: var(--fq-panel-2);
-        height: 32px;
-        font-size: 12px;
-        font-weight: 600;
-        padding: 0 4px 0 8px;
-    }
-
-    .topbar-currency-autocomplete .mud-input:hover {
-        background: var(--fq-panel-3);
-    }
-
-    .topbar-currency-autocomplete .mud-input-adornment {
-        margin-right: 0;
-    }
-
-    .topbar-right {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .topbar-divider {
-        width: 1px;
-        height: 20px;
-        background: var(--fq-border);
-        margin: 0 4px;
-    }
-
-    .topbar-profile {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 10px 4px 4px;
-        border-radius: 16px;
-        background: var(--fq-panel-3);
-        cursor: pointer;
-        transition: background 0.15s;
-    }
-
-    .topbar-profile:hover { background: var(--fq-panel-2); }
-
-    .topbar-avatar {
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--mud-palette-primary), oklch(0.58 0.17 300));
-        color: #fff;
-        display: grid;
-        place-items: center;
-        font-size: 11px;
-        font-weight: 600;
-        flex-shrink: 0;
-        overflow: hidden;
-    }
-
-    .topbar-avatar img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .topbar-profile-info {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.1;
-    }
-
-    .topbar-profile-name {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--fq-ink);
-    }
-
-    .topbar-profile-role {
-        font-size: 10px;
-        color: var(--fq-muted-2);
-    }
-
-    @@media (max-width: 960px) {
-        .topbar-nav { display: none; }
-        .topbar-search { display: none; }
-        .topbar-logo-divider { display: none; }
-        .topbar-profile-info { display: none; }
-    }
-</style>
 
 @code {
     [CascadingParameter] private Task<AuthenticationState> AuthStateTask { get; set; } = null!;
@@ -387,7 +189,12 @@
     private Task<IEnumerable<CurrencyDto>> SearchCurrenciesAsync(string? query, CancellationToken _)
     {
         var active = CurrencyService.Currencies.Where(c => c.IsActive).ToList();
-        if (string.IsNullOrWhiteSpace(query))
+        var currentDisplay = _selectedCurrency != null ? $"{_selectedCurrency.Code} {_selectedCurrency.Symbol}" : null;
+        // When the dropdown opens, MudAutocomplete sends the current display text as the query.
+        // Treat that as empty so the full prioritised list is shown rather than just the selected item.
+        var isShowAll = string.IsNullOrWhiteSpace(query) ||
+            (currentDisplay != null && string.Equals(query!.Trim(), currentDisplay.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (isShowAll)
         {
             var priority = PriorityCodes
                 .Select(code => active.FirstOrDefault(c => c.Code == code))
@@ -396,7 +203,7 @@
             var rest = active.Where(c => !PriorityCodes.Contains(c.Code));
             return Task.FromResult(priority.Concat(rest));
         }
-        var q = query.Trim();
+        var q = query!.Trim();
         var matches = active.Where(c =>
             c.Code.Contains(q, StringComparison.OrdinalIgnoreCase) ||
             c.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
@@ -424,7 +231,7 @@
 
     private async Task ToggleChat() => await ChatDrawerOpenChanged.InvokeAsync(!ChatDrawerOpen);
 
-    private void HandleLogout() => Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
+    private void HandleLogout() => Navigation.NavigateTo("/api/v1/auth/logout", forceLoad: true);
 
     private static string GetInitials(string? name)
     {

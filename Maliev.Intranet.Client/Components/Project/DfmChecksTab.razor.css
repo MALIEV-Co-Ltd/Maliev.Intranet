@@ -1,13 +1,14 @@
-.dfm-empty-state {
-    flex: 1;
+.dfm-process-notice {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 10px;
-    color: var(--fq-muted);
-    font-size: 13px;
-    background: var(--fq-bg);
+    gap: 8px;
+    margin-top: 10px;
+    padding: 12px 14px;
+    font-size: 11.5px;
+    color: var(--maliev-muted);
+    border: 1px dashed var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
 }
 
 .dfm-tab-root {
@@ -15,8 +16,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: var(--fq-bg);
-    align-items: center;
+    background: var(--maliev-bg);
 }
 
 .dfm-tab-container {
@@ -25,15 +25,13 @@
     flex-direction: column;
     min-height: 0;
     width: 100%;
-    max-width: 1100px;
-    padding: 0 16px;
     overflow: hidden;
 }
 
 .dfm-header {
     padding: 12px 14px 8px;
-    border-bottom: 1px solid var(--fq-border);
-    background: var(--fq-panel);
+    border-bottom: 1px solid var(--maliev-border);
+    background: var(--maliev-panel);
     flex-shrink: 0;
 }
 
@@ -48,7 +46,7 @@
 .dfm-title {
     font-size: 12px;
     font-weight: 700;
-    color: var(--fq-ink);
+    color: var(--maliev-ink);
 }
 
 .dfm-badge {
@@ -64,13 +62,13 @@
 }
 
 .dfm-badge--ok {
-    background: var(--fq-ok-bg);
-    color: var(--fq-ok);
+    background: var(--maliev-ok-bg);
+    color: var(--maliev-ok);
 }
 
 .dfm-badge--warn {
-    background: var(--fq-warn-bg);
-    color: var(--fq-warn);
+    background: var(--maliev-warn-bg);
+    color: var(--maliev-warn);
 }
 
 .dfm-badge--error {
@@ -86,7 +84,7 @@
 
 .dfm-caption {
     font-size: 10.5px;
-    color: var(--fq-muted);
+    color: var(--maliev-muted);
     line-height: 1.4;
 }
 
@@ -114,18 +112,23 @@
 /* ── Expansion panel header ── */
 .dfm-panel-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     width: 100%;
     min-width: 0;
 }
 
+.dfm-panel-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
 .dfm-panel-title {
     font-size: 12px;
     font-weight: 600;
-    color: var(--fq-ink);
-    flex: 1;
-    min-width: 0;
+    color: var(--maliev-ink);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -133,12 +136,12 @@
 
 .dfm-panel-summary {
     font-size: 10.5px;
-    color: var(--fq-muted);
-    flex-shrink: 0;
-    max-width: 160px;
+    color: var(--maliev-muted);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 /* ── Expansion panel body sections ── */
@@ -160,12 +163,12 @@
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: var(--fq-muted-2, var(--fq-muted));
+    color: var(--maliev-muted-2, var(--maliev-muted));
 }
 
 .dfm-detail-desc {
     font-size: 11.5px;
-    color: var(--fq-ink-2, var(--fq-ink));
+    color: var(--maliev-ink-2, var(--maliev-ink));
     line-height: 1.5;
 }
 
@@ -178,19 +181,19 @@
 }
 
 .dfm-measure-label {
-    color: var(--fq-muted);
+    color: var(--maliev-muted);
     font-size: 10.5px;
     padding-top: 1px;
 }
 
 .dfm-measure-value {
-    color: var(--fq-ink);
+    color: var(--maliev-ink);
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
 }
 
 .dfm-measure-value--fail {
-    color: var(--fq-warn);
+    color: var(--maliev-warn);
     font-weight: 600;
 }
 
@@ -209,7 +212,7 @@
     align-items: flex-start;
     gap: 6px;
     font-size: 11.5px;
-    color: var(--fq-ink-2, var(--fq-ink));
+    color: var(--maliev-ink-2, var(--maliev-ink));
     line-height: 1.5;
 }
 
@@ -222,30 +225,15 @@
     margin-top: 6px;
 }
 
-/* ── Pass row (collapsed, no expansion) ── */
-.dfm-pass-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    background: var(--fq-panel);
-    border: 1px solid var(--fq-border);
+/* ── Pass expansion panel body ── */
+.dfm-pass-detail-body {
+    padding: 4px 12px 10px;
 }
 
-.dfm-pass-text {
-    flex: 1;
-    min-width: 0;
+.dfm-expansion-panel--pass ::deep .mud-expand-panel {
+    border-color: var(--maliev-border-subtle) !important;
 }
 
-.dfm-pass-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--fq-ink);
-}
-
-.dfm-pass-desc {
-    font-size: 10.5px;
-    color: var(--fq-muted);
-    margin-top: 1px;
+.dfm-expansion-panel--pass ::deep .mud-expand-panel-header {
+    opacity: 0.85;
 }

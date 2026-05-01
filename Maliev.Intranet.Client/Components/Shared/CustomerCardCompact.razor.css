@@ -1,0 +1,65 @@
+.ccc-root {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--mud-palette-primary);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent);
+}
+
+.ccc-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--mud-palette-primary);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+}
+
+.ccc-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ccc-name {
+    font-size: var(--maliev-font-small);
+    font-weight: 600;
+    color: var(--maliev-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ccc-sub {
+    font-size: var(--maliev-font-micro);
+    color: var(--maliev-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 1px;
+}
+
+.ccc-clear {
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 50%;
+    background: var(--maliev-panel-3);
+    color: var(--maliev-muted);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    transition: background 0.1s, color 0.1s;
+}
+
+.ccc-clear:hover {
+    background: var(--maliev-danger-bg);
+    color: var(--maliev-danger);
+}

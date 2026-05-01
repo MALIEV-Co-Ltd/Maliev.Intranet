@@ -128,7 +128,7 @@
             }
 
             var customerPart = CustomerId.HasValue ? $"&customerId={CustomerId}" : "";
-            var url = $"api/uploads/attachments?projectId={ProjectId}{customerPart}&partId={PartId}&kind=Drawing";
+            var url = $"api/v1/uploads/attachments?projectId={ProjectId}{customerPart}&partId={PartId}&kind=Drawing";
             var response = await Http.PostAsync(url, content);
 
             if (response.IsSuccessStatusCode)
@@ -163,7 +163,7 @@
     {
         try
         {
-            var response = await Http.DeleteAsync($"api/uploads/attachments/{att.FileId}");
+            var response = await Http.DeleteAsync($"api/v1/uploads/attachments/{att.FileId}");
             if (response.IsSuccessStatusCode)
             {
                 Attachments.Remove(att);

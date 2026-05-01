@@ -66,7 +66,9 @@
                         <span class="qsb-lead-name">@lt.Name</span>
                         <span class="qsb-lead-mult">@(lt.PriceMultiplier < 1 ? $"-{Math.Round((1 - lt.PriceMultiplier) * 100)}%" : lt.PriceMultiplier > 1 ? $"+{Math.Round((lt.PriceMultiplier - 1) * 100)}%" : "base")</span>
                     </div>
-                    <div class="qsb-lead-days">@lt.MinDays business days</div>
+                    <div class="qsb-lead-days">
+                        @lt.MinDays <span class="qsb-bd-full">business days</span><span class="qsb-bd-short">days</span>
+                    </div>
                 </button>
             }
         </div>
@@ -198,13 +200,14 @@
 
     .qsb-lead-options {
         display: flex;
+        flex-wrap: wrap;
         gap: 6px;
         align-items: stretch;
     }
 
     .qsb-lead-btn {
         flex: 1;
-        min-width: 0;
+        min-width: 140px;
         padding: 6px 10px;
         border: 1px solid var(--maliev-border);
         background: transparent;
@@ -263,6 +266,10 @@
         color: var(--maliev-muted);
         font-family: 'JetBrains Mono', monospace;
         margin-top: 1px;
+    }
+
+    .qsb-bd-short {
+        display: none;
     }
 
     .qsb-lead-btn--active .qsb-lead-days {
@@ -335,7 +342,7 @@
         font-weight: 600;
     }
 
-    @@media (max-width: 960px) {
+    @@media (max-width: 1200px) {
         .qsb-root {
             height: auto;
             flex-wrap: wrap;
@@ -343,8 +350,54 @@
             gap: 10px;
         }
         .qsb-divider { display: none; }
+        .qsb-zone-customer {
+            max-width: none;
+            flex: 1 1 260px;
+        }
         .qsb-zone-lead { width: 100%; border-right: none; }
         .qsb-zone-total { width: 100%; }
+    }
+
+    @@media (max-width: 600px) {
+        .qsb-root {
+            flex-direction: column;
+            align-items: stretch;
+            padding: 10px;
+        }
+        .qsb-zone-customer,
+        .qsb-zone-lead,
+        .qsb-zone-total {
+            width: 100%;
+            max-width: none;
+            padding: 0;
+        }
+        .qsb-lead-options {
+            flex-direction: column;
+        }
+        .qsb-lead-btn {
+            width: 100%;
+            min-width: 0;
+        }
+        .qsb-bd-full {
+            display: none;
+        }
+        .qsb-bd-short {
+            display: inline;
+        }
+        .qsb-total-top,
+        .qsb-actions {
+            gap: 8px;
+        }
+        .qsb-total-top {
+            align-items: flex-start;
+        }
+        .qsb-actions {
+            flex-direction: column;
+        }
+        .qsb-btn-pdf,
+        .qsb-btn-checkout {
+            width: 100%;
+        }
     }
 </style>
 

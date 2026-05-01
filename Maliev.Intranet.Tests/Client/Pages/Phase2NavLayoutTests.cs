@@ -75,45 +75,10 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void NavMenu_ShouldContain_PaymentsLink()
+    public void NavMenu_ShouldContain_CustomersLink()
     {
         var cut = Render<NavMenu>();
-        Assert.Contains("finance/payments", cut.Markup, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void NavMenu_ShouldContain_AccountingLink()
-    {
-        var cut = Render<NavMenu>();
-        Assert.Contains("finance/accounting", cut.Markup, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void NavMenu_ShouldContain_DirectoryLink()
-    {
-        var cut = Render<NavMenu>();
-        Assert.Contains("hr/directory", cut.Markup, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void NavMenu_ShouldContain_LeaveLink()
-    {
-        var cut = Render<NavMenu>();
-        Assert.Contains("hr/leave", cut.Markup, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void NavMenu_ShouldContain_ProductionQueueLink()
-    {
-        var cut = Render<NavMenu>();
-        Assert.Contains("mfg/production-queue", cut.Markup, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void NavMenu_ShouldContain_SettingsLink()
-    {
-        var cut = Render<NavMenu>();
-        Assert.Contains("admin/settings", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sales/customers", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

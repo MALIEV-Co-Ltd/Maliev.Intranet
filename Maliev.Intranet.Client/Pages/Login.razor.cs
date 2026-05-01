@@ -34,8 +34,8 @@ public partial class Login : ComponentBase
     [Inject] public AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     /// <summary>Logger for this component.</summary>
     [Inject] public ILogger<Login> Logger { get; set; } = null!;
-    
-    
+
+
     /// <summary>The URL to redirect to after successful login.</summary>
     [Parameter]
     [SupplyParameterFromQuery]
@@ -63,7 +63,7 @@ public partial class Login : ComponentBase
     {
         ReturnUrl ??= "/";
         _isDarkMode = LayoutService.IsDarkMode;
-        
+
         try
         {
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -100,8 +100,8 @@ public partial class Login : ComponentBase
 
     private string GetThemeIcon() => LayoutService.CurrentMode switch
     {
-        ThemeMode.Dark => Icons.Material.Filled.LightMode,
-        ThemeMode.Light => Icons.Material.Filled.DarkMode,
+        ThemeMode.Dark => Icons.Material.Outlined.LightMode,
+        ThemeMode.Light => Icons.Material.Outlined.DarkMode,
         _ => Icons.Material.Filled.Brightness4
     };
 
@@ -136,11 +136,11 @@ public partial class Login : ComponentBase
                 return;
             }
 
-            var fullUsername = _usernameInput.Contains("@") 
-                ? _usernameInput 
+            var fullUsername = _usernameInput.Contains("@")
+                ? _usernameInput
                 : $"{_usernameInput}@maliev.com";
 
-            var response = await Http.PostAsJsonAsync("api/auth/login", new
+            var response = await Http.PostAsJsonAsync("api/v1/auth/login", new
             {
                 Username = fullUsername,
                 Password = _loginModel.Password,

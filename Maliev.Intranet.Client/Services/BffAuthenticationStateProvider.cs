@@ -26,7 +26,7 @@ public class BffAuthenticationStateProvider : AuthenticationStateProvider
     {
         try
         {
-            var userContext = await _httpClient.GetFromJsonAsync<UserContextDto>("api/auth/user");
+            var userContext = await _httpClient.GetFromJsonAsync<UserContextDto>("api/v1/auth/user");
 
             if (userContext != null)
             {

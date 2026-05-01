@@ -1,0 +1,8 @@
+.status-tab-badge {
+    font-size: var(--maliev-font-nano);
+    margin-left: 4px;
+}
+
+.pj-search-paper {
+    border: 1px solid var(--maliev-border);
+}

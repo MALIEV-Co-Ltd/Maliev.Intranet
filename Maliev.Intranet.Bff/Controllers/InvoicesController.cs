@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -13,7 +14,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="client">The invoice service client.</param>
 /// <param name="pdfClient">The PDF service client.</param>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pdfClient) : ControllerBase
 {
     /// <summary>

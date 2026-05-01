@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
@@ -12,7 +13,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="client">The IAM service client.</param>
 [RequirePermission(MalievPermissions.Iam.Manage, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class PermissionsController(IAMServiceClient client) : ControllerBase
 {
     /// <summary>

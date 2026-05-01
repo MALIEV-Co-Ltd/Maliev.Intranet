@@ -11,9 +11,9 @@ public static class BffHttpClientExtensions
     // AttemptTimeout (30 s) × (1 + MaxRetryAttempts 3) = 120 s < TotalRequestTimeout 180 s ✓
     private static void ConfigureStandardResilience(HttpStandardResilienceOptions options)
     {
-        options.AttemptTimeout.Timeout        = TimeSpan.FromSeconds(30);
-        options.TotalRequestTimeout.Timeout   = TimeSpan.FromSeconds(180);
-        options.Retry.MaxRetryAttempts        = 3;
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(180);
+        options.Retry.MaxRetryAttempts = 3;
         options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(300);
     }
 
@@ -111,9 +111,9 @@ public static class BffHttpClientExtensions
         .AddServiceDiscovery()
         .AddStandardResilienceHandler(options =>
         {
-            options.AttemptTimeout.Timeout          = perAttempt;
-            options.TotalRequestTimeout.Timeout     = totalTimeout;
-            options.Retry.MaxRetryAttempts          = 1;  // framework min is 1; expensive ops rarely benefit from retrying
+            options.AttemptTimeout.Timeout = perAttempt;
+            options.TotalRequestTimeout.Timeout = totalTimeout;
+            options.Retry.MaxRetryAttempts = 1;  // framework min is 1; expensive ops rarely benefit from retrying
             options.CircuitBreaker.SamplingDuration = samplingDuration;
         });
     }
