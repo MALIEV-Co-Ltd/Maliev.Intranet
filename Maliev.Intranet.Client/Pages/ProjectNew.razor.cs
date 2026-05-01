@@ -216,14 +216,14 @@ public partial class ProjectNew : IAsyncDisposable
                     part.VolumeMm3 = payload.Dimensions.VolumeMm3;
                 }
 
-                if (payload.NonManifoldReason != null || payload.Dimensions != null)
+                if (payload.NonManifoldReason != null || payload.Dimensions != null || payload.BodyCount.HasValue)
                 {
                     part.IsManifold = payload.NonManifoldReason == null;
                     part.NonManifoldReason = payload.NonManifoldReason;
                     part.NonManifoldFaceCount = payload.NonManifoldFaceCount;
                 }
 
-                if (payload.BodyCount.HasValue && payload.BodyCount.Value > 1)
+                if (payload.BodyCount.HasValue)
                 {
                     part.BodyCount = payload.BodyCount.Value;
                     if (payload.Bodies != null)
@@ -268,7 +268,7 @@ public partial class ProjectNew : IAsyncDisposable
                     part.GlbStoragePath ??= payload.StoragePath;
                     part.ViewerUrl ??= payload.GlbUrl;
 
-                    if (payload.BodyCount.HasValue && payload.BodyCount.Value > 1)
+                    if (payload.BodyCount.HasValue)
                     {
                         part.BodyCount = payload.BodyCount.Value;
                         if (payload.Bodies != null)
@@ -294,12 +294,30 @@ public partial class ProjectNew : IAsyncDisposable
 
             foreach (var part in parts)
             {
-                part.FdmDfmReport = payload.FdmReport;
-                part.SlaDfmReport = payload.SlaReport;
-                part.CncDfmReport = payload.CncReport;
-                part.OverlayUrls = payload.OverlayUrls;
-                part.OverlayPaths = payload.OverlayPaths;
-                part.BodyCount = payload.BodyCount;
+                // Only overwrite when the incoming event actually carries data.
+                // Per-process events (SLS, MJF, SLA_DLP, …) set only one of the three
+                // report fields and leave the other two null. Without this guard those
+                // null fields would wipe reports set by earlier process events.
+                if (payload.FdmReport != null) part.FdmDfmReport = payload.FdmReport;
+                if (payload.SlaReport != null) part.SlaDfmReport = payload.SlaReport;
+                if (payload.CncReport != null) part.CncDfmReport = payload.CncReport;
+                if (payload.OverlayUrls != null) part.OverlayUrls = payload.OverlayUrls;
+                if (payload.OverlayPaths != null) part.OverlayPaths = payload.OverlayPaths;
+                // Stamp body count unconditionally so single-body files also resolve Pending state.
+                if (payload.BodyCount.HasValue)
+                    part.BodyCount = payload.BodyCount.Value;
+                // Stamp mesh-integrity info from DFM event if not already set (cache-miss recovery path).
+                if (payload.NonManifoldReason != null && part.NonManifoldReason == null)
+                {
+                    part.IsManifold = false;
+                    part.NonManifoldReason = payload.NonManifoldReason;
+                    part.NonManifoldFaceCount = payload.NonManifoldFaceCount;
+                }
+                else if (payload.NonManifoldReason == null && payload.BodyCount.HasValue && part.IsManifold == null)
+                {
+                    // DFM event arrived with body count but no manifold issue — mark as manifold.
+                    part.IsManifold = true;
+                }
                 part.ResolveDfmReport();
             }
             StopStatusWatchdog(payload.StoragePath);
@@ -828,12 +846,15 @@ public partial class ProjectNew : IAsyncDisposable
                     $"api/catalog/processes/{Uri.EscapeDataString(processCode)}/finishes");
                 var tolerancesTask = Http.GetFromJsonAsync<List<CatalogToleranceDto>>(
                     $"api/catalog/processes/{Uri.EscapeDataString(processCode)}/tolerances");
+                var configOptionsTask = Http.GetFromJsonAsync<List<ProcessConfigOptionDto>>(
+                    $"api/catalog/processes/{Uri.EscapeDataString(processCode)}/config-options");
 
-                await Task.WhenAll(materialsTask, finishesTask, tolerancesTask);
+                await Task.WhenAll(materialsTask, finishesTask, tolerancesTask, configOptionsTask);
 
                 part.AvailableMaterials = materialsTask.Result ?? [];
                 part.AvailableFinishes = finishesTask.Result ?? [];
                 part.AvailableTolerances = tolerancesTask.Result ?? [];
+                part.AvailableProcessOptions = configOptionsTask.Result ?? [];
 
                 if (!part.MaterialId.HasValue)
                 {
@@ -880,6 +901,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.AvailableMaterials = [];
             part.AvailableFinishes = [];
             part.AvailableTolerances = [];
+            part.AvailableProcessOptions = [];
         }
 
         // Bug 4 fix: only re-resolve the DFM report when there are per-process reports to
@@ -975,10 +997,13 @@ public partial class ProjectNew : IAsyncDisposable
                 MaterialCode = part.MaterialCode ?? string.Empty,
                 ManufacturingProcessId = part.ProcessId ?? Guid.Empty,
                 ManufacturingProcessName = process?.Name ?? string.Empty,
+                ManufacturingProcessCode = part.ProcessCode,
                 Quantity = part.Quantity,
                 Geometry = geometry!,
                 StoragePath = part.StoragePath,
                 LeadTimeCode = _selectedLeadTime?.Code,
+                FinishId = part.FinishId,
+                ProcessOptionValues = part.ProcessOptionValues.Count > 0 ? part.ProcessOptionValues : null,
             };
 
             var response = await Http.PostAsJsonAsync("api/pricing/calculate", request, ct);
@@ -1443,12 +1468,15 @@ public partial class ProjectNew : IAsyncDisposable
                 $"api/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/finishes");
             var tolerancesTask = Http.GetFromJsonAsync<List<CatalogToleranceDto>>(
                 $"api/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/tolerances");
+            var configOptionsTask = Http.GetFromJsonAsync<List<ProcessConfigOptionDto>>(
+                $"api/catalog/processes/{Uri.EscapeDataString(part.ProcessCode)}/config-options");
 
-            await Task.WhenAll(materialsTask, finishesTask, tolerancesTask);
+            await Task.WhenAll(materialsTask, finishesTask, tolerancesTask, configOptionsTask);
 
             part.AvailableMaterials = materialsTask.Result ?? [];
             part.AvailableFinishes = finishesTask.Result ?? [];
             part.AvailableTolerances = tolerancesTask.Result ?? [];
+            part.AvailableProcessOptions = configOptionsTask.Result ?? [];
 
             if (part.MaterialId.HasValue)
                 await ComputePriceAsync(part, CancellationToken.None);

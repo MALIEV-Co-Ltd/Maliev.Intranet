@@ -215,6 +215,15 @@ public record PricingRequestDto
 
     /// <summary>The selected lead time code (e.g., "STANDARD", "EXPRESS", "RUSH").</summary>
     public string? LeadTimeCode { get; init; }
+
+    /// <summary>The selected surface finish identifier, used to apply finish surcharge to the price.</summary>
+    public Guid? FinishId { get; init; }
+
+    /// <summary>The manufacturing process code (e.g., "FDM", "CNC_MILL"), used for finish surcharge lookup.</summary>
+    public string? ManufacturingProcessCode { get; init; }
+
+    /// <summary>Dynamic process configuration option values keyed by ConfigKey (e.g. "anodize_color" → "BLACK"). Null when no options were set.</summary>
+    public Dictionary<string, string?>? ProcessOptionValues { get; init; }
 }
 
 /// <summary>

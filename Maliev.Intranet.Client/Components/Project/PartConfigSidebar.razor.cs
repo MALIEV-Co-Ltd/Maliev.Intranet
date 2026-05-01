@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.Intranet.Client.Components;
 using Maliev.Intranet.Client.Components.Shared;
 using Maliev.Intranet.Client.Services;
@@ -59,9 +60,15 @@ public partial class PartConfigSidebar : ComponentBase
     private readonly Dictionary<Guid, decimal> _lastSeenPricesByPart = new();
     private readonly Dictionary<Guid, List<BulkPricingTable.BulkTier>> _bulkTiersByPart = new();
     private int _lastQuantity;
+    // Finish id → absolute additional unit cost in THB.
+    private Dictionary<Guid, decimal> _finishPrices = new();
 
     // ── Two-phase DFM analysis state ─────────────────────────────────────
     private Dictionary<string, DfmAnalysisResponse> _dfmReports = new();
+    // Typed per-process report cache: keyed by ProcessCode so CNC_TURN and CNC_MILL stay separate.
+    private readonly Dictionary<string, object> _typedReportsByProcess = new();
+    // Cancellation token for the currently-running DFM analysis request.
+    private CancellationTokenSource? _dfmCts;
     /// <summary>Logger for two-phase DFM operations.</summary>
     [Inject] public ILogger<PartConfigSidebar> Logger { get; set; } = null!;
 
@@ -116,6 +123,7 @@ public partial class PartConfigSidebar : ComponentBase
                 _basePricesByPart[fileId] = currentPrice;
                 _lastSeenPricesByPart[fileId] = currentPrice;
                 await FetchBulkTiersAsync();
+                _ = RefreshFinishPricesAsync();
             }
             else if (_bulkTiers.Count > 0)
             {
@@ -186,29 +194,58 @@ public partial class PartConfigSidebar : ComponentBase
     {
         if (Part == null || p == null) return;
 
+        // Cancel any in-flight DFM request for the previous process.
+        var oldCts = _dfmCts;
+        _dfmCts = new CancellationTokenSource();
+        oldCts?.Cancel();
+        oldCts?.Dispose();
+
         Part.ProcessCode = p.Code;
         Part.ProcessId = p.Id;
 
-        // Check if we already have results for this process
+        // Reset stale analysis flags so prior errors don't bleed into the new process selection.
+        Part.DfmAnalysisTimedOut = false;
+        Part.AnalysisErrorCode = null;
+
+        // Check if we already have results for this process.
         if (_dfmReports.ContainsKey(p.Code))
         {
             Logger?.LogInformation("Using cached DFM results for process {ProcessCode}", p.Code);
+            // Restore the correct typed report slot from our per-process cache.
+            ApplyTypedReportFromCache(p.Code);
             Part.ResolveDfmReport();
             Part.AvailableMaterials = [];
             Part.AvailableFinishes = [];
             Part.AvailableTolerances = [];
+            Part.AvailableProcessOptions = [];
+            Part.ProcessOptionValues = new();
             await OnPartChanged.InvokeAsync(Part);
             return;
         }
 
-        // Clear options and immediately trigger material loading (don't wait for DFM).
+        // No cached result — clear DFM state and kick off a fresh analysis.
+        Part.DfmReport = null;
         Part.AvailableMaterials = [];
         Part.AvailableFinishes = [];
         Part.AvailableTolerances = [];
+        Part.AvailableProcessOptions = [];
+        Part.ProcessOptionValues = new();
         await OnPartChanged.InvokeAsync(Part);   // materials load NOW
 
         // DFM runs after materials are already loading. finally block fires OnPartChanged again with DFM state.
         await AnalyzeProcessForDfm(p);
+    }
+
+    private void ApplyTypedReportFromCache(string processCode)
+    {
+        if (!_typedReportsByProcess.TryGetValue(processCode, out var cached)) return;
+        var upper = processCode.ToUpperInvariant();
+        if (upper is "SLA" or "SLA_DLP" or "DLP")
+            Part!.SlaDfmReport = cached;
+        else if (upper is "CNC" or "CNC_MILL" or "CNC_TURN")
+            Part!.CncDfmReport = cached;
+        else
+            Part!.FdmDfmReport = cached;
     }
 
     private async Task OnMaterialChanged(CatalogMaterialDto? m)
@@ -217,6 +254,7 @@ public partial class PartConfigSidebar : ComponentBase
         Part.MaterialCode = m?.Code;
         Part.MaterialId = m?.Id;
         await OnPartChanged.InvokeAsync(Part);
+        _ = RefreshFinishPricesAsync();
     }
 
     private async Task OnFinishChanged(CatalogSurfaceFinishDto? f)
@@ -233,6 +271,61 @@ public partial class PartConfigSidebar : ComponentBase
         Part.ToleranceCode = t?.Code;
         Part.ToleranceId = t?.Id;
         await OnPartChanged.InvokeAsync(Part);
+        _ = RefreshFinishPricesAsync();
+    }
+
+    private async Task OnProcessOptionValueChanged(string key, string? value)
+    {
+        if (Part == null) return;
+        if (string.IsNullOrEmpty(value))
+            Part.ProcessOptionValues.Remove(key);
+        else
+            Part.ProcessOptionValues[key] = value;
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task RefreshFinishPricesAsync()
+    {
+        if (Part == null
+            || string.IsNullOrEmpty(Part.ProcessCode)
+            || !Part.MaterialId.HasValue
+            || !Part.ToleranceId.HasValue
+            || !Part.EstimatedUnitPrice.HasValue
+            || Part.AvailableFinishes.Count == 0)
+            return;
+
+        try
+        {
+            var request = new FinishPriceRequestDto
+            {
+                ProcessCode = Part.ProcessCode,
+                MaterialId = Part.MaterialId.Value,
+                ToleranceId = Part.ToleranceId.Value,
+                BaseUnitPrice = Part.EstimatedUnitPrice.Value,
+                FinishIds = Part.AvailableFinishes.Select(f => f.Id).ToList(),
+            };
+            var response = await Http.PostAsJsonAsync("api/pricing/finish-options", request);
+            if (response.IsSuccessStatusCode)
+            {
+                var items = await response.Content.ReadFromJsonAsync<List<FinishPriceItemDto>>();
+                if (items != null)
+                {
+                    _finishPrices = items.ToDictionary(i => i.FinishId, i => i.AdditionalUnitCost);
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch
+        {
+            // Non-fatal — finish prices will show as "incl."
+        }
+    }
+
+    private string FormatFinishPrice(CatalogSurfaceFinishDto fin)
+    {
+        if (_finishPrices.TryGetValue(fin.Id, out var cost) && cost > 0)
+            return $"+{CurrencyService.Format(cost)}";
+        return "incl.";
     }
 
     private async Task OnRoughnessChanged(string? v)
@@ -309,14 +402,10 @@ public partial class PartConfigSidebar : ComponentBase
 
     // ── Two-phase DFM analysis ─────────────────────────────────────────────
 
-    /// <summary>
-    /// Analyze the part for a specific manufacturing process using two-phase DFM API
-    /// </summary>
     private async Task AnalyzeProcessForDfm(ProcessDto process)
     {
         if (Part == null || Part.FileId == Guid.Empty)
         {
-            // No upload ID available, fall back to old behavior
             Logger?.LogWarning("No upload ID available for two-phase DFM analysis");
             if (Part != null)
             {
@@ -329,10 +418,10 @@ public partial class PartConfigSidebar : ComponentBase
             return;
         }
 
-        // From here on, Part is guaranteed non-null
         var part = Part!;
+        // Capture the token that was created for this invocation in OnProcessChanged.
+        var token = _dfmCts?.Token ?? CancellationToken.None;
 
-        // Note: AvailableMaterials/Finishes/Tolerances already cleared in OnProcessChanged before this method was awaited
         StateHasChanged();
 
         try
@@ -340,77 +429,130 @@ public partial class PartConfigSidebar : ComponentBase
             Logger?.LogInformation("Starting DFM analysis for upload {UploadId}, process {ProcessCode}",
                 part.FileId, process.Code);
 
-            // Call BFF endpoint to trigger process-specific DFM analysis
             var response = await Http.PostAsJsonAsync(
                 $"api/geometry/{part.FileId}/dfm/{process.Code}",
-                new GeometryAnalysisRequest { StoragePath = part.StoragePath }
+                new GeometryAnalysisRequest { StoragePath = part.StoragePath },
+                token
             );
+
+            // If cancelled mid-request (user already switched process), bail without touching part state.
+            token.ThrowIfCancellationRequested();
 
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<DfmAnalysisResponse>();
+                var result = await response.Content.ReadFromJsonAsync<DfmAnalysisResponse>(token);
 
                 if (result != null && result.Status == "analysis_complete")
                 {
-                    // Cache results locally so switching back to this process skips re-analysis.
-                    // The DFM overlay panel (populated via SignalR) shows the actual issues to the user.
                     _dfmReports[process.Code] = result;
 
                     Logger?.LogInformation("DFM analysis complete for {ProcessCode}: {IssueCount} issues found in {Time:F2}s",
                         process.Code, result.DfmReport.Issues.Count, result.DfmReport.AnalysisTimeSeconds);
+
+                    // Store typed report in the per-process cache (keeps CNC_TURN and CNC_MILL separate).
+                    _typedReportsByProcess[process.Code] = result.DfmReport;
+                    ApplyTypedReportFromCache(process.Code);
+
+                    // Stamp body count from DFM analysis if provided (fills in when
+                    // FileAnalyzedEvent was missed or arrived before this analysis).
+                    if (result.BodyCount.HasValue && !part.BodyCount.HasValue)
+                        part.BodyCount = result.BodyCount.Value;
+
+                    if (result.OverlayPaths.Count > 0)
+                    {
+                        part.OverlayPaths ??= new Dictionary<string, string>();
+                        foreach (var (key, path) in result.OverlayPaths)
+                            part.OverlayPaths[key] = path;
+
+                        part.OverlayUrls = await ResolveOverlayUrlsAsync(part.OverlayPaths);
+                    }
                 }
                 else if (result != null && result.Status == "timeout")
                 {
                     Logger?.LogWarning("DFM analysis timed out for upload {UploadId}, process {ProcessCode}",
                         part.FileId, process.Code);
-
                     part.DfmAnalysisTimedOut = true;
                     part.AnalysisErrorCode = "GEOMETRY_PHASE2_TIMEOUT";
                 }
                 else
                 {
                     Logger?.LogError("DFM analysis failed with status {Status}", result?.Status ?? "unknown");
-
                     part.DfmAnalysisTimedOut = true;
                     part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
                 }
             }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Gone)
+            {
+                Logger?.LogWarning("DFM analysis failed — file no longer in storage for upload {UploadId}", part.FileId);
+                part.DfmAnalysisTimedOut = false;
+                part.AnalysisErrorCode = "FILE_MISSING";
+                Snackbar.Add("File expired or missing — please re-upload to run analysis.", MudBlazor.Severity.Error);
+            }
             else
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
+                var errorContent = await response.Content.ReadAsStringAsync(token);
                 Logger?.LogError("DFM analysis HTTP request failed: {StatusCode} - {Error}",
                     response.StatusCode, errorContent);
-
                 part.DfmAnalysisTimedOut = true;
                 part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
             }
         }
         catch (OperationCanceledException)
         {
-            // The resilience pipeline (BffInternal AttemptTimeout) cancelled the request after retries,
-            // or the user navigated away. The analysis may still complete and arrive via SignalR.
-            Logger?.LogDebug("DFM analysis HTTP request cancelled for upload {UploadId}, process {ProcessCode} — result expected via SignalR",
-                part.FileId, process.Code);
+            // User switched process before this one completed — do not update part state.
+            Logger?.LogInformation("DFM analysis cancelled for process {ProcessCode} (user switched process)", process.Code);
+            return;
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "DFM analysis error for upload {UploadId}, process {ProcessCode}",
                 part.FileId, process.Code);
-
             part.DfmAnalysisTimedOut = true;
             part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
         }
         finally
         {
-            // Update part state
-            part.ResolveDfmReport();
-            part.AvailableMaterials = [];
-            part.AvailableFinishes = [];
-            part.AvailableTolerances = [];
-
-            StateHasChanged();
-            await OnPartChanged.InvokeAsync(part);
+            // Only update part state if this analysis is still for the current process.
+            // If the user already switched, ProcessCode has changed and we must not trample it.
+            if (part.ProcessCode == process.Code)
+            {
+                part.ResolveDfmReport();
+                part.AvailableMaterials = [];
+                part.AvailableFinishes = [];
+                part.AvailableTolerances = [];
+                StateHasChanged();
+                await OnPartChanged.InvokeAsync(part);
+            }
         }
+    }
+
+    /// <summary>
+    /// Signs raw GCS overlay paths into fresh signed URLs using the BFF viewer-url endpoint.
+    /// Returns a dictionary of signed URLs keyed by the same overlay keys.
+    /// </summary>
+    private async Task<Dictionary<string, string>> ResolveOverlayUrlsAsync(Dictionary<string, string> overlayPaths)
+    {
+        var signed = new Dictionary<string, string>(overlayPaths.Count);
+        foreach (var (key, path) in overlayPaths)
+        {
+            try
+            {
+                var resp = await Http.GetAsync(
+                    $"api/uploads/viewer-url?storagePath={Uri.EscapeDataString(path)}");
+                if (resp.IsSuccessStatusCode)
+                {
+                    var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
+                    var url = json?.RootElement.GetProperty("url").GetString();
+                    if (!string.IsNullOrEmpty(url))
+                        signed[key] = url;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogDebug(ex, "Failed to sign overlay URL for key {Key}", key);
+            }
+        }
+        return signed;
     }
 
 }

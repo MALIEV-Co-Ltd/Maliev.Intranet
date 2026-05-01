@@ -99,8 +99,7 @@
                                 <div class="pcs-fin-sub">@fin.Description</div>
                             }
                         </div>
-                        <div class="pcs-fin-price">@(fin.AdditionalCostPercent > 0 ?
-                                                    $"+{fin.AdditionalCostPercent.ToString("P0")}" : "incl.")</div>
+                        <div class="pcs-fin-price">@FormatFinishPrice(fin)</div>
                             @if (active)
                             {
                                 <div class="pcs-card-check">
@@ -136,6 +135,55 @@
                     }
                 </div>
             </section>
+
+            @* ── Process Options (anodize color, paint color, etc.) ─────────── *@
+            @{
+                var visibleOptions = Part!.AvailableProcessOptions.Where(opt =>
+                    opt.ConfigKey switch
+                    {
+                        "anodize_color" => Part.FinishCode == "ANODIZE_CLEAR" || Part.FinishCode == "ANODIZE_BLACK",
+                        "paint_color"   => Part.FinishCode == "PAINTED",
+                        _ => true,
+                    }).ToList();
+            }
+            @if (visibleOptions.Count > 0)
+            {
+                <section class="pcs-section">
+                    <div class="pcs-section-header">
+                        <span class="pcs-section-title">Options</span>
+                    </div>
+                    <div class="pcs-options-stack">
+                        @foreach (var opt in visibleOptions)
+                        {
+                            <div class="pcs-option-row">
+                                @if (opt.ConfigType == "dropdown")
+                                {
+                                    var currentValue = Part!.ProcessOptionValues.TryGetValue(opt.ConfigKey, out var v) ? v : opt.DefaultValue;
+                                    var options = string.IsNullOrEmpty(opt.OptionsJson)
+                                        ? Array.Empty<string>()
+                                        : System.Text.Json.JsonSerializer.Deserialize<string[]>(opt.OptionsJson) ?? Array.Empty<string>();
+                                    <MudSelect T="string" Label="@opt.Label" Value="@currentValue"
+                                               ValueChanged="@(val => OnProcessOptionValueChanged(opt.ConfigKey, val))"
+                                               Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" FullWidth="true">
+                                        @foreach (var o in options)
+                                        {
+                                            <MudSelectItem Value="@o">@o</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                                else
+                                {
+                                    var currentText = Part!.ProcessOptionValues.TryGetValue(opt.ConfigKey, out var tv) ? tv : opt.DefaultValue;
+                                    <MudTextField T="string" Label="@opt.Label" Value="@currentText"
+                                                  ValueChanged="@(val => OnProcessOptionValueChanged(opt.ConfigKey, val))"
+                                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                  HelperText="@opt.HelpText" FullWidth="true" />
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
 
             @* ── Quantity ─────────────────────────────────────────────────── *@
             <section class="pcs-section">
@@ -515,6 +563,17 @@
                 background: var(--mud-palette-primary);
                 color: #fff;
                 align-self: center;
+            }
+
+            /* ── Process Options ──────────────────────────────────────────────── */
+            .pcs-options-stack {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .pcs-option-row {
+                width: 100%;
             }
 
             /* ── Quantity ─────────────────────────────────────────────────────── */

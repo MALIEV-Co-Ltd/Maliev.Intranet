@@ -59,6 +59,12 @@ public class PartViewModel
     /// <summary>True when the user has acknowledged all DFM warnings.</summary>
     public bool DfmAcknowledged { get; set; }
 
+    /// <summary>Original file size in bytes from the browser File API.</summary>
+    public long? FileSizeBytes { get; set; }
+
+    /// <summary>When the file was uploaded (UTC). Used for relative-time display.</summary>
+    public DateTimeOffset? UploadedAt { get; set; }
+
     // ── Upload / preview (from polling) ───────────────────────────────
 
     /// <summary>True while the file is being uploaded.</summary>
@@ -108,6 +114,12 @@ public class PartViewModel
 
     /// <summary>Whether the part mesh is manifold (watertight), populated after file analysis.</summary>
     public bool? IsManifold { get; set; }
+
+    /// <summary>Human-readable explanation of why the mesh is non-manifold. Null when manifold or not yet determined.</summary>
+    public string? NonManifoldReason { get; set; }
+
+    /// <summary>Approximate count of broken/non-manifold faces. Null when manifold or not determined.</summary>
+    public int? NonManifoldFaceCount { get; set; }
 
     /// <summary>DFM analysis report embedded in FileAnalyzedEvent. Polymorphic — cast to FdmDfmReport, SlaDfmReport, or CncDfmReport as needed.</summary>
     public object? DfmReport { get; set; }
@@ -230,6 +242,12 @@ public class PartViewModel
 
     /// <summary>Tolerances available for the selected process, populated on process selection.</summary>
     public List<CatalogToleranceDto> AvailableTolerances { get; set; } = [];
+
+    /// <summary>Dynamic process configuration options for the selected process (e.g. anodize color, paint color). UI-only, not persisted.</summary>
+    public List<ProcessConfigOptionDto> AvailableProcessOptions { get; set; } = [];
+
+    /// <summary>User-entered values for dynamic process configuration options, keyed by ConfigKey. UI-only, not persisted.</summary>
+    public Dictionary<string, string?> ProcessOptionValues { get; set; } = new();
 
     /// <summary>True while catalog data is being loaded.</summary>
     public bool CatalogLoading { get; set; }
@@ -363,6 +381,8 @@ public class PartViewModel
         VolumeMm3 = VolumeMm3,
         Dimensions = Dimensions,
         IsManifold = IsManifold,
+        NonManifoldReason = NonManifoldReason,
+        NonManifoldFaceCount = NonManifoldFaceCount,
         ThumbnailSmallUrl = ThumbnailSmallUrl,
         ThumbnailLargeUrl = ThumbnailLargeUrl,
         ThumbnailSmallGcsPath = ThumbnailSmallGcsPath,
@@ -420,6 +440,8 @@ public class PartViewModel
             VolumeMm3 = s.VolumeMm3,
             Dimensions = s.Dimensions,
             IsManifold = s.IsManifold,
+            NonManifoldReason = s.NonManifoldReason,
+            NonManifoldFaceCount = s.NonManifoldFaceCount,
             ThumbnailSmallUrl = s.ThumbnailSmallUrl,
             ThumbnailLargeUrl = s.ThumbnailLargeUrl,
             ThumbnailSmallGcsPath = s.ThumbnailSmallGcsPath,
