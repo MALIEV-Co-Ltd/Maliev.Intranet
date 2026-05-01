@@ -21,6 +21,10 @@
     padding: 10px 10px 0;
     flex-shrink: 0;
 }
+.dat-dropzone-wrap ::deep .mud-chip,
+.dat-dropzone-wrap ::deep .mud-chipset {
+    display: none !important;
+}
 .dat-uploading {
     padding: 4px 10px;
     display: flex;
@@ -65,7 +69,8 @@
     white-space: nowrap;
 }
 .dat-row-meta {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto auto auto auto minmax(44px, 1fr);
     align-items: center;
     gap: 4px;
     font-size: 10.5px;
@@ -74,7 +79,11 @@
 .dat-row-ext { font-weight: 600; letter-spacing: 0.04em; }
 .dat-row-sep { opacity: 0.4; }
 .dat-row-size { font-family: 'JetBrains Mono', monospace; }
-.dat-row-date { }
+.dat-row-date {
+    justify-self: end;
+    text-align: right;
+    white-space: nowrap;
+}
 .dat-row-delete {
     flex-shrink: 0;
     width: 22px;

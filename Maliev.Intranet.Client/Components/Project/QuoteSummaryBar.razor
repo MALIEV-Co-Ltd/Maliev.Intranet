@@ -31,11 +31,7 @@
                              Placeholder="Search customer…"
                              Class="qsb-customer-search">
                 <ItemTemplate Context="item">
-                    <MudText Typo="Typo.body2">@item.Name</MudText>
-                    @if (!string.IsNullOrEmpty(item.CompanyName))
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@item.CompanyName</MudText>
-                    }
+                    <CustomerCardCompact Customer="@item" ShowClear="false" />
                 </ItemTemplate>
             </MudAutocomplete>
         }
@@ -50,12 +46,18 @@
             Lead Time
         </div>
         <div class="qsb-lead-options">
-            @if (LeadTimeOptions.Count == 0)
+            @if (LeadTimeOptions.Count == 0 && IsLeadTimeLoading)
             {
                 @for (var i = 0; i < 3; i++)
                 {
-                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="52px" Class="rounded" />
+                    <div class="qsb-lead-skeleton">
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="52px" Class="rounded" />
+                    </div>
                 }
+            }
+            else if (LeadTimeOptions.Count == 0)
+            {
+                <div class="qsb-lead-empty">@LeadTimeEmptyText</div>
             }
             @foreach (var lt in LeadTimeOptions)
             {
@@ -83,7 +85,7 @@
                 <div class="qsb-zone-label">Quote Total</div>
                 <div class="qsb-ships-by">
                     Ships by&nbsp;
-                    @if (LeadTimeOptions.Count == 0)
+                    @if (LeadTimeOptions.Count == 0 && IsLeadTimeLoading)
                     {
                         <MudSkeleton SkeletonType="SkeletonType.Text" Width="48px" Style="display:inline-block;" />
                     }
@@ -224,6 +226,11 @@
         font-family: inherit;
     }
 
+    .qsb-lead-skeleton {
+        flex: 1;
+        min-width: 140px;
+    }
+
     .qsb-lead-btn:hover {
         background: var(--maliev-panel-3);
     }
@@ -275,6 +282,15 @@
     .qsb-lead-btn--active .qsb-lead-days {
         color: var(--maliev-ink);
         font-weight: 600;
+    }
+
+    .qsb-lead-empty {
+        width: 100%;
+        min-height: 52px;
+        display: flex;
+        align-items: center;
+        color: var(--maliev-muted);
+        font-size: 12px;
     }
 
     /* ── Zone 2: Total + Actions ─────────────────────────────────────────── */
@@ -346,16 +362,24 @@
         .qsb-root {
             height: auto;
             flex-wrap: wrap;
-            padding: 10px 16px;
-            gap: 10px;
+            padding: 0;
+            gap: 0;
         }
-        .qsb-divider { display: none; }
         .qsb-zone-customer {
             max-width: none;
             flex: 1 1 260px;
+            padding: 10px 16px;
         }
-        .qsb-zone-lead { width: 100%; border-right: none; }
-        .qsb-zone-total { width: 100%; }
+        .qsb-zone-lead {
+            width: 100%;
+            border-top: 1px solid var(--maliev-border);
+            padding: 10px 16px;
+        }
+        .qsb-zone-total {
+            width: 100%;
+            border-top: 1px solid var(--maliev-border);
+            padding: 8px 16px 10px;
+        }
     }
 
     @@media (max-width: 600px) {
@@ -369,12 +393,22 @@
         .qsb-zone-total {
             width: 100%;
             max-width: none;
-            padding: 0;
+            padding: 10px 0;
+        }
+        .qsb-zone-customer {
+            padding: 0 0 10px;
+        }
+        .qsb-zone-lead {
+            padding: 10px 0;
         }
         .qsb-lead-options {
             flex-direction: column;
         }
         .qsb-lead-btn {
+            width: 100%;
+            min-width: 0;
+        }
+        .qsb-lead-skeleton {
             width: 100%;
             min-width: 0;
         }
@@ -416,6 +450,10 @@
     [Parameter] public EventCallback OnGeneratePdf { get; set; }
 
     private bool _generatingPdf;
+    private bool IsLeadTimeLoading => LeadTimeOptions.Count == 0 && Parts.Any(p => p.PricingLoading);
+    private string LeadTimeEmptyText => Parts.Count == 0
+        ? "Configure a part to calculate lead time."
+        : "Complete the part configuration to calculate lead time.";
 
     private async Task HandleGeneratePdfAsync()
     {
@@ -446,7 +484,24 @@
         if (SelectedLeadTime == null || SelectedLeadTime.MinDays <= 0)
             return "—";
         var days = SelectedLeadTime.MinDays;
-        var shipDate = DateTime.UtcNow.Date.AddDays(days);
+        var shipDate = AddBusinessDays(DateTime.UtcNow.Date, days);
         return shipDate.ToString("MMM d");
+    }
+
+    private static DateTime AddBusinessDays(DateTime date, int businessDays)
+    {
+        var result = date;
+        var remaining = businessDays;
+
+        while (remaining > 0)
+        {
+            result = result.AddDays(1);
+            if (result.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                continue;
+
+            remaining--;
+        }
+
+        return result;
     }
 }

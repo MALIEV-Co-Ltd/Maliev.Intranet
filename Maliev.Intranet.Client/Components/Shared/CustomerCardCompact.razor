@@ -14,18 +14,22 @@
             <div class="ccc-sub">@Customer.Email</div>
         }
     </div>
-    <button class="ccc-clear" title="Change customer" @onclick="@(() => OnClear.InvokeAsync())">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-    </button>
+    @if (ShowClear)
+    {
+        <button class="ccc-clear" title="Change customer" @onclick="@(() => OnClear.InvokeAsync())">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+        </button>
+    }
 </div>
 
 
 @code {
     [Parameter, EditorRequired] public CustomerSummaryDto Customer { get; set; } = null!;
     [Parameter] public EventCallback OnClear { get; set; }
+    [Parameter] public bool ShowClear { get; set; } = true;
 
     private static string GetInitials(string name)
     {

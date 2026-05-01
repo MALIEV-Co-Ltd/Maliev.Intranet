@@ -13,7 +13,7 @@
         <input type="text" value="@Title"
                @onchange="@(e => OnTitleChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty))" @onblur="@OnTitleCommit"
                class="plp-title-input" size="14" title="Project title" />
-        <button class="plp-duplicate-btn" title="Duplicate project" @onclick="@OnDuplicate">
+        <button class="plp-duplicate-btn" title="Duplicate project" disabled="@(!CanDuplicateProject)" @onclick="@OnDuplicate">
             <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" />
         </button>
     </div>
@@ -184,6 +184,16 @@
     .plp-duplicate-btn:hover {
         background: var(--maliev-panel-3);
         color: var(--maliev-ink);
+    }
+
+    .plp-duplicate-btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+    }
+
+    .plp-duplicate-btn:disabled:hover {
+        background: transparent;
+        color: var(--maliev-muted);
     }
 
     /* ── Upload Section ─────────────────────────────────────────────────── */
@@ -455,6 +465,9 @@
 
     /// <summary>True when a customer has been selected (i.e. saved, not just draft).</summary>
     [Parameter] public bool HasCustomerSelected { get; set; }
+
+    /// <summary>True when the project has content that can be duplicated.</summary>
+    [Parameter] public bool CanDuplicateProject { get; set; }
 
     /// <summary>Fired when the duplicate-project button is clicked.</summary>
     [Parameter] public EventCallback OnDuplicate { get; set; }

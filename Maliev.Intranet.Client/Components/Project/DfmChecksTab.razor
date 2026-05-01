@@ -173,6 +173,13 @@
         new("grinding",       "Surface grinding"),
     ];
 
+    private static readonly IReadOnlyList<CheckDef> CncTurningChecks =
+    [
+        new("not_turnable", "Turning suitability"),
+        new("ld_ratio",     "Length / diameter"),
+        new("groove",       "Grooves"),
+    ];
+
     private static readonly IReadOnlyList<CheckDef> SlaChecks =
     [
         new("thin_wall",     "Thin walls"),
@@ -184,7 +191,8 @@
     // Process-specific checks (intrinsic categories excluded — rendered separately above).
     private IReadOnlyList<CheckDef> ProcessChecks => Part.ProcessCode?.ToUpperInvariant() switch
     {
-        "CNC" or "CNC_MILL" or "CNC_TURN" => CncChecks,
+        "CNC_TURN" or "CNC_TURNING"        => CncTurningChecks,
+        "CNC" or "CNC_MILL" or "CNC_MILLING" => CncChecks,
         "SLA" or "SLA_DLP" or "DLP"       => SlaChecks,
         _                                  => FdmChecks,
     };
@@ -225,6 +233,8 @@
         ("escape_hole",     SlaDfmReportPayload sla) => sla.ResinTrappingRisk,
         ("overhang",        SlaDfmReportPayload sla) => sla.SuctionRisk,
         ("hollow",          SlaDfmReportPayload sla) => sla.HollowRegions?.Count > 0,
+        (_,                 CncDfmReportPayload cnc)
+            when cnc.Issues.Any(i => string.Equals(i.Category, category, StringComparison.OrdinalIgnoreCase)) => true,
         ("internal_radius", CncDfmReportPayload cnc) => cnc.SharpCornerCount > 0,
         ("undercut",        CncDfmReportPayload cnc) => cnc.HasUndercuts,
         ("drill_hole",      CncDfmReportPayload cnc) => cnc.HasDrillHoles && cnc.DrillHoleCount > 0,
@@ -300,6 +310,9 @@
                 : "No drill holes detected.",
         "edm"            => "No features requiring EDM detected. All geometry is accessible by conventional cutting.",
         "grinding"       => "No surfaces requiring grinding detected. Standard machined finish is sufficient.",
+        "not_turnable"   => "Part is rotationally symmetric enough for CNC turning.",
+        "ld_ratio"       => "Length-to-diameter ratio is within turning support limits.",
+        "groove"         => "Groove widths are compatible with standard turning tools.",
         _                => GetPassSummary(check),
     };
 
@@ -364,6 +377,27 @@
             "Grinding required for tight tolerances",
             "Ground surfaces required", "Ra ≤ 0.8 µm or IT6 tolerance",
             ["Specify tolerances only where functionally necessary", "Use H7/h6 fits rather than tighter unless required", "Accept grinding operation — add to drawing notes"]),
+        "not_turnable" => BuildCncIssueDetail(
+            check.Category,
+            "CNC turning requires geometry that is mostly a surface of revolution around the spindle axis. Non-axisymmetric geometry usually needs CNC milling instead.",
+            "Part not suitable for turning",
+            "Axial symmetry deviation exceeds limit",
+            "Symmetry deviation <= 0.15",
+            ["Select CNC milling for this part", "Redesign the part as a rotational profile if turning is required", "Split non-rotational features into a secondary milling operation"]),
+        "ld_ratio" => BuildCncIssueDetail(
+            check.Category,
+            "Long, slender turned parts can chatter or deflect unless supported with a steady rest or tailstock.",
+            "Length / diameter ratio exceeds limit",
+            "High length / diameter ratio",
+            "Length / diameter within limit",
+            ["Shorten the unsupported length where possible", "Increase the minimum diameter", "Specify tailstock or steady-rest support on the drawing"]),
+        "groove" => BuildCncIssueDetail(
+            check.Category,
+            "Grooves narrower than the available turning tool are difficult to machine reliably and may require special tooling.",
+            "Grooves too narrow for turning tool",
+            "Narrow groove width detected",
+            "Groove width >= minimum tool width",
+            ["Increase groove width", "Use a standard grooving insert size", "Call out any special grooving tool requirement on the drawing"]),
         "bridge" => new CheckDetail(
             "FDM can print short unsupported spans (bridges) up to ~50–80 mm depending on material and settings. Longer bridges sag during printing.",
             "Bridge span may sag without support",
@@ -414,5 +448,24 @@
             summary,
             summary, "≤ 45° self-supporting",
             ["Redesign overhangs to ≤ 45° where possible", "Split the part along the overhang and bond after printing", "Accept support material — it will be quoted and removed"]);
+    }
+
+    private CheckDetail BuildCncIssueDetail(
+        string category,
+        string defaultDescription,
+        string defaultFailSummary,
+        string defaultMeasuredLabel,
+        string defaultRecommendedLabel,
+        List<string> fixes)
+    {
+        var issue = (Part.DfmReport as CncDfmReportPayload)?.Issues.FirstOrDefault(i =>
+            string.Equals(i.Category, category, StringComparison.OrdinalIgnoreCase));
+
+        return new CheckDetail(
+            string.IsNullOrWhiteSpace(issue?.Description) ? defaultDescription : issue.Description,
+            string.IsNullOrWhiteSpace(issue?.Title) ? defaultFailSummary : issue.Title,
+            issue is null ? defaultMeasuredLabel : $"{defaultMeasuredLabel}: {issue.Value:0.###}",
+            issue is null ? defaultRecommendedLabel : $"{defaultRecommendedLabel}: {issue.Threshold:0.###}",
+            fixes);
     }
 }

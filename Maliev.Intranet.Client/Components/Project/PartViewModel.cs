@@ -59,6 +59,9 @@ public class PartViewModel
     /// <summary>True when the user has acknowledged all DFM warnings.</summary>
     public bool DfmAcknowledged { get; set; }
 
+    /// <summary>True after the transient all-clear DFM overlay has already been shown for the current process.</summary>
+    public bool DfmAllClearNotified { get; set; }
+
     /// <summary>Original file size in bytes from the browser File API.</summary>
     public long? FileSizeBytes { get; set; }
 
@@ -298,9 +301,20 @@ public class PartViewModel
 
     // ── Helpers ───────────────────────────────────────────────────────
 
-    /// <summary>True when the part has a file, a process, and a material selected with no outstanding errors.</summary>
+    /// <summary>True when tapped holes or inserts require a drawing with thread specifications.</summary>
+    public bool RequiresThreadSpecificationDrawing => HasThreadedHoles || HasInserts;
+
+    /// <summary>True when no thread drawing is required, or at least one drawing has been attached.</summary>
+    public bool HasRequiredThreadSpecificationDrawing =>
+        !RequiresThreadSpecificationDrawing || DrawingFiles.Count > 0;
+
+    /// <summary>True when the part has required file, process, material, and drawing information with no outstanding errors.</summary>
     public bool IsFullyConfigured =>
-        ProcessId.HasValue && MaterialId.HasValue && FileId != Guid.Empty && Error == null;
+        ProcessId.HasValue &&
+        MaterialId.HasValue &&
+        FileId != Guid.Empty &&
+        Error == null &&
+        HasRequiredThreadSpecificationDrawing;
 
     /// <summary>
     /// True when this part has DFM issues that should be surfaced to the user.
@@ -350,6 +364,7 @@ public class PartViewModel
                 (sla.HollowRegions?.Count ?? 0) > 0,
 
             CncDfmReportPayload cnc =>
+                cnc.Issues.Any() ||
                 cnc.SharpCornerCount > 0 ||
                 cnc.HasUndercuts ||
                 (cnc.HasDrillHoles && cnc.DrillHoleCount > 0) ||

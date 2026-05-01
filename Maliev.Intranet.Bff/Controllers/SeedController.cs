@@ -25,6 +25,7 @@ public class SeedController(
     /// Requires user to be logged in with appropriate permissions.
     /// </summary>
     [HttpPost("customers")]
+    [HttpPost("/api/seed/customers")]
     public async Task<IActionResult> SeedCustomers(CancellationToken ct)
     {
         logger.LogInformation("Starting customer data seeding...");

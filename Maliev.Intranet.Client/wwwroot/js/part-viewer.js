@@ -200,7 +200,7 @@ const CONFIG = {
         coneHeight: 0.18,
         coneTessellation: 8,
         labelFontSize: '11px',
-        viewportPosition: { x: 0.78, y: 0.76, width: 0.22, height: 0.24 },
+        viewportPosition: { x: 0.84, y: 0.76, width: 0.16, height: 0.24 },
     },
 
     /** Grid configuration */
@@ -271,7 +271,7 @@ const CONFIG = {
     GLB_RETRY_DELAYS: [2000, 5000, 10000, 20000],
 
     /** Gizmo hover detection region (top-right corner) */
-    GIZMO_HOVER_REGION: { xMin: 0.77, yMax: 0.25 },
+    GIZMO_HOVER_REGION: { xMin: 0.83, yMax: 0.25 },
 
     /** Auto-rotation speed interpolation factor (0.04 = smooth lerp) */
     AUTO_ROTATION_LERP_FACTOR: 0.04,
@@ -279,6 +279,32 @@ const CONFIG = {
     /** Minimum auto-rotation speed threshold (below this, rotation stops) */
     AUTO_ROTATION_MIN_THRESHOLD: 0.00001,
 };
+
+function isViewerDebugEnabled() {
+    try {
+        return globalThis.localStorage?.getItem('malievViewerDebug') === 'true';
+    } catch {
+        return false;
+    }
+}
+
+function debugLog(...args) {
+    if (isViewerDebugEnabled()) {
+        console.debug(...args);
+    }
+}
+
+function configureBabylonLogger() {
+    try {
+        if (globalThis.BABYLON?.Logger) {
+            BABYLON.Logger.LogLevels = BABYLON.Logger.WarningLogLevel | BABYLON.Logger.ErrorLogLevel;
+        }
+    } catch {
+        // Logger configuration is best-effort; viewer initialization should continue.
+    }
+}
+
+configureBabylonLogger();
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -887,10 +913,11 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
     // Debug logging: track when initialize is called
     const sanitizedUrl = fileUrl ? (fileUrl.includes('?') ? fileUrl.substring(0, fileUrl.indexOf('?')) + '?[SIGNED_URL]' : fileUrl) : '(none)';
     const prevGen = loadGenerations[canvasId] || 0;
-    console.log('[BabylonViewer] initialize START:', { canvasId, url: sanitizedUrl, fileExt, prevGen, timestamp: Date.now() });
+    debugLog('[BabylonViewer] initialize START:', { canvasId, url: sanitizedUrl, fileExt, prevGen, timestamp: Date.now() });
 
     try {
         await loadScript('./lib/babylonjs/babylon.js');
+        configureBabylonLogger();
         await loadScript('./lib/babylonjs/babylonjs.loaders.min.js');
         await loadScript('./lib/babylonjs/babylonjs.materials.min.js');
 
@@ -938,7 +965,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         mainCameras[canvasId] = camera;
 
         // Set initial projection mode based on parameter
-        console.log('[BabylonViewer] initialize: cameraProjection =', cameraProjection);
+        debugLog('[BabylonViewer] initialize: cameraProjection =', cameraProjection);
         if (cameraProjection === 'orthographic') {
             setCameraProjection(canvasId, 'orthographic');
         }
@@ -1178,7 +1205,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     });
                 });
                 perCanvasBodyMap[canvasId] = bodyMap;
-                console.log(`[BabylonViewer] Detected ${bodyMap.size} bodies in model`);
+                debugLog(`[BabylonViewer] Detected ${bodyMap.size} bodies in model`);
 
                 // ── Apply multi-body colored materials immediately ──
                 // Don't wait for SignalR — color the bodies right away on load
@@ -1212,7 +1239,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                         bodyData.index = idx;
                         bodyData.name = body.name;
 
-                        console.log(`[BylonViewer] Auto-colored body ${idx} (${body.name}) to RGB(${color.r},${color.g},${color.b})`);
+                        debugLog(`[BylonViewer] Auto-colored body ${idx} (${body.name}) to RGB(${color.r},${color.g},${color.b})`);
                     });
                 }
 
@@ -1764,8 +1791,11 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         },
         onResize(canvasWidth, canvasHeight) {
             // Keep gizmo axes undistorted: scale ortho bounds to match viewport aspect ratio.
-            // Viewport is (0.22 × 0.24) fractions of canvas; match orthoLeft/Right to that ratio.
-            const aspect = (canvasWidth * 0.22) / (canvasHeight * 0.24);
+            // Match the camera frustum to the configured gizmo viewport's actual pixel aspect.
+            const viewport = CONFIG.AXIS_GIZMO.viewportPosition;
+            const viewportWidth = Math.max(1, canvasWidth * viewport.width);
+            const viewportHeight = Math.max(1, canvasHeight * viewport.height);
+            const aspect = viewportWidth / viewportHeight;
             axesCam.orthoLeft   = -hw * aspect;
             axesCam.orthoRight  =  hw * aspect;
             axesCam.orthoTop    =  hw;
@@ -2337,11 +2367,12 @@ export function toggleBoundingBox(canvasId, enabled) {
         { text: `Z: ${(bb.max.z - bb.min.z).toFixed(1)} mm`, borderColor: '#3882f5' },
     ];
 
+    const labelHost = canvas.parentElement ?? document.body;
     const labelEntries = labelDefs.map(({ text, borderColor }) => {
         const div = document.createElement('div');
         div.textContent = text;
         div.style.cssText = `
-            position: fixed;
+            position: absolute;
             transform: translate(-50%, -50%);
             background: rgba(10, 10, 14, 0.82);
             color: #f0f0f0;
@@ -2355,7 +2386,7 @@ export function toggleBoundingBox(canvasId, enabled) {
             white-space: nowrap;
             z-index: 20;
         `;
-        document.body.appendChild(div);
+        labelHost.appendChild(div);
         // Use mutable Vector3 so each frame we can call .set() with the camera-facing anchor
         return { div, worldPos: new BABYLON.Vector3(midX, bb.min.y - gap, bb.min.z - gap) };
     });
@@ -2368,7 +2399,11 @@ export function toggleBoundingBox(canvasId, enabled) {
     if (cam) {
         const obs = scene.onAfterRenderObservable.add(() => {
             const cvs  = engine.getRenderingCanvas();
-            const rect = cvs ? cvs.getBoundingClientRect() : { left: 0, top: 0, width: 1, height: 1 };
+            const rect = cvs?.getBoundingClientRect();
+            if (!rect || rect.width <= 0 || rect.height <= 0) {
+                labelEntries.forEach(({ div }) => { div.style.display = 'none'; });
+                return;
+            }
             const rw = engine.getRenderWidth(), rh = engine.getRenderHeight();
             // Build view×projection from the main camera explicitly — scene.getTransformMatrix()
             // is unreliable when activeCameras has multiple entries (returns last-rendered camera).
@@ -2397,8 +2432,8 @@ export function toggleBoundingBox(canvasId, enabled) {
                     cam.viewport.toGlobal(rw, rh)
                 );
                 if (p.z >= 0 && p.z <= 1) {
-                    div.style.left    = (rect.left + (p.x / rw) * rect.width)  + 'px';
-                    div.style.top     = (rect.top  + (p.y / rh) * rect.height) + 'px';
+                    div.style.left    = ((p.x / rw) * rect.width)  + 'px';
+                    div.style.top     = ((p.y / rh) * rect.height) + 'px';
                     div.style.display = '';
                 } else {
                     div.style.display = 'none';
@@ -2495,7 +2530,7 @@ export function hideGrid(canvasId) {
 export function setCameraProjection(canvasId, mode) {
     const cam    = mainCameras[canvasId];
     const engine = engines[canvasId];
-    console.log('[BabylonViewer] setCameraProjection:', canvasId, mode, 'cam?', !!cam, 'engine?', !!engine);
+    debugLog('[BabylonViewer] setCameraProjection:', canvasId, mode, 'cam?', !!cam, 'engine?', !!engine);
     if (!cam || !engine) return;
 
     cameraProjection[canvasId] = mode;
@@ -3340,7 +3375,7 @@ export function setBodies(canvasId, bodies) {
         bodyData.index = idx;
         bodyData.name = body.name;
 
-        console.log(`[BabylonViewer] Set body ${idx} (${body.name}) to color RGB(${color.r},${color.g},${color.b})`);
+        debugLog(`[BabylonViewer] Set body ${idx} (${body.name}) to color RGB(${color.r},${color.g},${color.b})`);
     });
 }
 
@@ -3368,7 +3403,7 @@ export function selectBody(canvasId, bodyIndex) {
     // Check if clicking the same body that's already selected → deselect all
     const currentlySelected = selectedBodyIndices[canvasId];
     if (bodyIndex === currentlySelected) {
-        console.log(`[BabylonViewer] Deselecting body ${bodyIndex} (same body clicked)`);
+        debugLog(`[BabylonViewer] Deselecting body ${bodyIndex} (same body clicked)`);
         clearBodySelection(canvasId);
         selectedBodyIndices[canvasId] = null;
         return;
@@ -3412,7 +3447,7 @@ export function selectBody(canvasId, bodyIndex) {
         });
     });
 
-    console.log(`[BabylonViewer] Selected body ${bodyIndex}`);
+    debugLog(`[BabylonViewer] Selected body ${bodyIndex}`);
 }
 
 /**
@@ -3455,17 +3490,17 @@ export function enableBodyPicking(canvasId, dotNetRef) {
 
                 if (foundIdx !== null) {
                     dotNetRef?.invokeMethodAsync('NotifyBodyPicked', foundIdx);
-                    console.log(`[BabylonViewer] Picked body ${foundIdx}`);
+                    debugLog(`[BabylonViewer] Picked body ${foundIdx}`);
                 }
             } else {
                 // Clicked empty space - clear selection
                 dotNetRef?.invokeMethodAsync('NotifyBodyPicked', null);
-                console.log(`[BabylonViewer] Cleared body selection (clicked empty space)`);
+                debugLog(`[BabylonViewer] Cleared body selection (clicked empty space)`);
             }
         }
     });
 
-    console.log(`[BabylonViewer] Body picking enabled for canvas ${canvasId} (${bodyMap.size} bodies)`);
+    debugLog(`[BabylonViewer] Body picking enabled for canvas ${canvasId} (${bodyMap.size} bodies)`);
 }
 
 /**
@@ -3501,7 +3536,7 @@ export function clearBodySelection(canvasId) {
     // Reset selected body tracking
     selectedBodyIndices[canvasId] = null;
 
-    console.log(`[BabylonViewer] Body selection cleared for canvas ${canvasId}`);
+    debugLog(`[BabylonViewer] Body selection cleared for canvas ${canvasId}`);
 }
 
 /**
@@ -3524,7 +3559,7 @@ export function enableFlippedTriangleView(canvasId, enabled) {
     delete flippedTriangleMaterials[canvasId];
 
     if (!enabled) {
-        console.log(`[BabylonViewer] Flipped triangle view disabled for canvas ${canvasId}`);
+        debugLog(`[BabylonViewer] Flipped triangle view disabled for canvas ${canvasId}`);
         return;
     }
 
@@ -3569,7 +3604,7 @@ export function enableFlippedTriangleView(canvasId, enabled) {
         flippedTriangleMaterials[canvasId][mesh.uniqueId] = { material: sm, overlay };
     });
 
-    console.log(`[BabylonViewer] Flipped triangle view enabled for canvas ${canvasId}`);
+    debugLog(`[BabylonViewer] Flipped triangle view enabled for canvas ${canvasId}`);
 }
 
 /**
@@ -3853,7 +3888,7 @@ export function enableMeasureTool(canvasId, dotNetRef) {
     });
     state.labelObserver = labelUpdateObserver;
 
-    console.log(`[BabylonViewer] Measure tool enabled for canvas ${canvasId}`);
+    debugLog(`[BabylonViewer] Measure tool enabled for canvas ${canvasId}`);
 }
 
 /**
@@ -3889,7 +3924,7 @@ export function disableMeasureTool(canvasId) {
     if (canvas) canvas.style.cursor = 'default';
 
     delete measureStates[canvasId];
-    console.log(`[BabylonViewer] Measure tool disabled for canvas ${canvasId}`);
+    debugLog(`[BabylonViewer] Measure tool disabled for canvas ${canvasId}`);
 }
 
 /**
@@ -3992,7 +4027,7 @@ export function enableThicknessAnalysis(canvasId) {
                     state._lastDiagLog = Date.now();
                     const m = pickResult.pickedMesh;
                     const bb = m.getBoundingInfo().boundingBox;
-                    console.log('[Thickness DIAG]', {
+                    debugLog('[Thickness DIAG]', {
                         mesh: m.name,
                         faceId: pickResult.faceId,
                         pt: [+pickResult.pickedPoint.x.toFixed(1), +pickResult.pickedPoint.y.toFixed(1), +pickResult.pickedPoint.z.toFixed(1)],
@@ -4091,7 +4126,7 @@ export function enableThicknessAnalysis(canvasId) {
     });
     state.labelObserver = labelUpdateObserver;
 
-    console.log(`[BabylonViewer] Thickness analysis enabled for canvas ${canvasId}`);
+    debugLog(`[BabylonViewer] Thickness analysis enabled for canvas ${canvasId}`);
 }
 
 /**
@@ -4136,7 +4171,7 @@ export function disableThicknessAnalysis(canvasId) {
     }
 
     delete thicknessStates[canvasId];
-    console.log(`[BabylonViewer] Thickness analysis disabled for canvas ${canvasId}`);
+    debugLog(`[BabylonViewer] Thickness analysis disabled for canvas ${canvasId}`);
 }
 
 /**

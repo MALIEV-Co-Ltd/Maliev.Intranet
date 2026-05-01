@@ -8,9 +8,9 @@ using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using MudBlazor;
-using Microsoft.Extensions.Logging;
 
 namespace Maliev.Intranet.Client.Components.Project;
 
@@ -72,6 +72,91 @@ public partial class PartConfigSidebar : ComponentBase
     /// <summary>Logger for two-phase DFM operations.</summary>
     [Inject] public ILogger<PartConfigSidebar> Logger { get; set; } = null!;
 
+    private const string PaintColorHexKey = "paint_color_hex";
+    private const string PaintColorReferenceKey = "paint_color_reference";
+
+    private static readonly HashSet<string> HiddenCustomerOptionKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "layer_height",
+        "layerHeight",
+        "layer_mm",
+        "layerHeightMm",
+        "print_layer_height",
+        "printLayerHeight",
+        "infill",
+        "infill_percentage",
+        "infillPercentage",
+        "infill_percent",
+        "infillPercent",
+        "print_infill",
+        "printInfill",
+        "support_type",
+        "supportType",
+        "threaded_holes",
+        "threadedHoles",
+        "thread_holes",
+        "threadHoles",
+        "tapped_holes",
+        "tappedHoles",
+        "tap_holes",
+        "tapHoles",
+        "thread_inserts",
+        "threadInserts",
+        "threaded_inserts",
+        "threadedInserts",
+        "inserts",
+        "heat_set_inserts",
+        "heatSetInserts",
+    };
+
+    private static readonly IReadOnlyList<RoughnessOption> RoughnessOptions =
+    [
+        new("RA_3_2", "Ra 3.2 um", "Standard machined finish"),
+        new("RA_1_6", "Ra 1.6 um", "Fine visible faces"),
+        new("RA_0_8", "Ra 0.8 um", "Precision cosmetic or sliding surfaces"),
+        new("RA_0_4", "Ra 0.4 um", "Special polishing requirement"),
+    ];
+
+    private static readonly IReadOnlyList<InspectionOption> InspectionOptions =
+    [
+        new(InspectionLevel.Standard, "Standard", "Visual and basic dimensional check", Icons.Material.Outlined.FactCheck),
+        new(InspectionLevel.Dimensional, "Dimensional", "Measurement report for critical dimensions", Icons.Material.Outlined.Straighten),
+        new(InspectionLevel.FullCmm, "Full CMM", "Complete CMM inspection report", Icons.Material.Outlined.AssignmentTurnedIn),
+    ];
+
+    private static readonly IReadOnlyList<string> DefaultPlasticColors =
+    [
+        "Black",
+        "White",
+        "Natural",
+        "Gray",
+        "Blue",
+        "Red",
+        "Yellow",
+        "Green",
+    ];
+
+    private static readonly IReadOnlyList<string> DefaultAnodizeColors =
+    [
+        "Clear",
+        "Black",
+        "Red",
+        "Blue",
+        "Gold",
+        "Green",
+        "Purple",
+    ];
+
+    private static readonly IReadOnlyList<PaintColorOption> StandardPaintColors =
+    [
+        new("Black", "#111111", "RAL 9005"),
+        new("White", "#f7f7f2", "RAL 9010"),
+        new("Signal Red", "#c8333a", "RAL 3001"),
+        new("Traffic Blue", "#2f6fd6", "RAL 5017"),
+        new("Reseda Green", "#2f8f5b", "RAL 6011"),
+        new("Light Gray", "#9ba3af", "RAL 7035"),
+    ];
+
     // ── Computed properties ───────────────────────────────────────────────
 
     private ProcessDto? SelectedProcess =>
@@ -85,6 +170,23 @@ public partial class PartConfigSidebar : ComponentBase
 
     private CatalogToleranceDto? SelectedTolerance =>
         Part?.AvailableTolerances.FirstOrDefault(t => t.Id == Part.ToleranceId);
+
+    private IEnumerable<CatalogToleranceDto> VisibleTolerances =>
+        Part?.AvailableTolerances.Where(IsVisibleTolerance) ?? [];
+
+    private IEnumerable<ProcessConfigOptionDto> VisibleProcessOptions =>
+        (Part?.AvailableProcessOptions ?? [])
+            .Where(IsVisibleProcessOption)
+            .OrderBy(opt => opt.SortOrder);
+
+    private bool HasPaintSpecificColorOption =>
+        (Part?.AvailableProcessOptions ?? []).Any(IsPaintSpecificColorOption);
+
+    private bool IsFdmProcess =>
+        IsProcess("FDM") || IsProcess("FDM_3D_PRINTING");
+
+    private bool IsCncProcess =>
+        IsProcess("CNC") || IsProcess("CNC_MILL") || IsProcess("CNC_TURN");
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -101,6 +203,7 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part.HasThreadedHoles) features.Add("ThreadedHoles");
         if (Part.HasInserts) features.Add("Inserts");
         _selectedFeatures = features;
+        RemoveHiddenProcessOptionValues();
 
         var fileId = Part.FileId;
         if (fileId == Guid.Empty)
@@ -202,6 +305,7 @@ public partial class PartConfigSidebar : ComponentBase
 
         Part.ProcessCode = p.Code;
         Part.ProcessId = p.Id;
+        Part.DfmAllClearNotified = false;
 
         // Reset stale analysis flags so prior errors don't bleed into the new process selection.
         Part.DfmAnalysisTimedOut = false;
@@ -262,6 +366,7 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null) return;
         Part.FinishCode = f?.Code;
         Part.FinishId = f?.Id;
+        RemoveFinishSpecificOptionValues();
         await OnPartChanged.InvokeAsync(Part);
     }
 
@@ -282,6 +387,65 @@ public partial class PartConfigSidebar : ComponentBase
         else
             Part.ProcessOptionValues[key] = value;
         await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task OnProcessOptionBoolChanged(string key, bool value)
+    {
+        await OnProcessOptionValueChanged(key, value ? "true" : null);
+    }
+
+    private async Task OnPaintColorHexChanged(string catalogKey, string? value)
+    {
+        if (Part == null) return;
+
+        SetProcessOptionValue(PaintColorHexKey, value);
+        if (!Part.ProcessOptionValues.TryGetValue(PaintColorReferenceKey, out var reference)
+            || string.IsNullOrWhiteSpace(reference))
+        {
+            SetProcessOptionValue(catalogKey, value);
+        }
+
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task OnPaintColorReferenceChanged(string catalogKey, string? value)
+    {
+        if (Part == null) return;
+
+        SetProcessOptionValue(PaintColorReferenceKey, value);
+        SetProcessOptionValue(catalogKey, value);
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task OnStandardPaintColorChanged(string catalogKey, PaintColorOption paint)
+    {
+        if (Part == null) return;
+
+        SetProcessOptionValue(PaintColorHexKey, paint.Hex);
+        SetProcessOptionValue(PaintColorReferenceKey, paint.Reference);
+        SetProcessOptionValue(catalogKey, paint.Reference);
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task OnCustomPaintColorSelected(string catalogKey)
+    {
+        if (Part == null) return;
+
+        var currentHex = GetProcessOptionValue(PaintColorHexKey, "#111111");
+        SetProcessOptionValue(PaintColorHexKey, currentHex);
+        SetProcessOptionValue(PaintColorReferenceKey, GetProcessOptionValue(PaintColorReferenceKey, string.Empty));
+        SetProcessOptionValue(catalogKey, GetProcessOptionValue(PaintColorReferenceKey, currentHex));
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private void SetProcessOptionValue(string key, string? value)
+    {
+        if (Part == null) return;
+
+        if (string.IsNullOrWhiteSpace(value))
+            Part.ProcessOptionValues.Remove(key);
+        else
+            Part.ProcessOptionValues[key] = value;
     }
 
     private async Task RefreshFinishPricesAsync()
@@ -344,6 +508,32 @@ public partial class PartConfigSidebar : ComponentBase
         await OnPartChanged.InvokeAsync(Part);
     }
 
+    private async Task OnThreadedHolesChanged(bool value)
+    {
+        if (Part == null) return;
+        Part.HasThreadedHoles = value;
+        if (!value)
+        {
+            Part.ThreadedHoleSpec = null;
+            Part.ThreadedHoleCount = 0;
+        }
+
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task OnInsertsChanged(bool value)
+    {
+        if (Part == null) return;
+        Part.HasInserts = value;
+        if (!value)
+        {
+            Part.InsertType = InsertType.None;
+            Part.InsertCount = 0;
+        }
+
+        await OnPartChanged.InvokeAsync(Part);
+    }
+
     private async Task OnBagAndTagChanged(IReadOnlyCollection<string> selected)
     {
         if (Part == null) return;
@@ -380,6 +570,377 @@ public partial class PartConfigSidebar : ComponentBase
         Part.InspectionLevel = level;
         await OnPartChanged.InvokeAsync(Part);
     }
+
+    private bool IsProcess(string processCode) =>
+        string.Equals(Part?.ProcessCode, processCode, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsVisibleTolerance(CatalogToleranceDto tolerance)
+    {
+        if (!IsFdmProcess)
+            return true;
+
+        var combined = $"{tolerance.Code} {tolerance.Name} {tolerance.IsoStandard} {tolerance.Grade}";
+        return !combined.Contains("ISO 2768-c", StringComparison.OrdinalIgnoreCase)
+            && !combined.Contains("ISO 2768_C", StringComparison.OrdinalIgnoreCase)
+            && !combined.Contains("ISO2768_C", StringComparison.OrdinalIgnoreCase)
+            && !combined.Contains("ISO 2768-v", StringComparison.OrdinalIgnoreCase)
+            && !combined.Contains("ISO 2768_V", StringComparison.OrdinalIgnoreCase)
+            && !combined.Contains("ISO2768_V", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsVisibleProcessOption(ProcessConfigOptionDto option)
+    {
+        if (HiddenCustomerOptionKeys.Contains(option.ConfigKey))
+            return false;
+
+        if (IsHiddenCustomerOption(option))
+            return false;
+
+        if (IsAnodizeColorOption(option))
+            return IsAnodizeFinish();
+
+        if (IsPaintColorOption(option))
+            return IsPaintedFinish();
+
+        if (IsDedicatedPanelOption(option))
+            return false;
+
+        if (IsMaterialColorOption(option) || IsGenericColorOption(option))
+            return !IsPaintedFinish();
+
+        return true;
+    }
+
+    private static bool IsHiddenCustomerOption(ProcessConfigOptionDto option)
+    {
+        var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        return IsHiddenCustomerOptionText(normalized);
+    }
+
+    private static bool IsHiddenCustomerOptionText(string normalized) =>
+        normalized.Contains("layerheight", StringComparison.Ordinal)
+        || normalized.Contains("infill", StringComparison.Ordinal)
+        || normalized.Contains("supporttype", StringComparison.Ordinal)
+        || normalized.Contains("threadedhole", StringComparison.Ordinal)
+        || normalized.Contains("threadhole", StringComparison.Ordinal)
+        || normalized.Contains("tappedhole", StringComparison.Ordinal)
+        || normalized.Contains("taphole", StringComparison.Ordinal)
+        || normalized.Contains("threadinsert", StringComparison.Ordinal)
+        || normalized.Contains("threadedinsert", StringComparison.Ordinal)
+        || normalized.Contains("heatsetinsert", StringComparison.Ordinal);
+
+    private bool IsBooleanOption(ProcessConfigOptionDto option)
+    {
+        var key = option.ConfigKey;
+        var label = option.Label;
+        return option.ConfigType.Equals("boolean", StringComparison.OrdinalIgnoreCase)
+            || option.ConfigType.Equals("checkbox", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("deburr", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("tap", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("thread", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("insert", StringComparison.OrdinalIgnoreCase)
+            || label.Contains("deburr", StringComparison.OrdinalIgnoreCase)
+            || label.Contains("tap", StringComparison.OrdinalIgnoreCase)
+            || label.Contains("thread", StringComparison.OrdinalIgnoreCase)
+            || label.Contains("insert", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsCardChoiceOption(ProcessConfigOptionDto option) =>
+        option.ConfigType.Equals("dropdown", StringComparison.OrdinalIgnoreCase)
+        || option.ConfigType.Equals("select", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsColorChoiceOption(ProcessConfigOptionDto option)
+    {
+        var key = option.ConfigKey;
+        var label = option.Label;
+        return IsAnodizeColorOption(option)
+            || key.Contains("color", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("colour", StringComparison.OrdinalIgnoreCase)
+            || label.Contains("color", StringComparison.OrdinalIgnoreCase)
+            || label.Contains("colour", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsPaintColorOption(ProcessConfigOptionDto option) =>
+        IsPaintSpecificColorOption(option)
+        || (IsPaintedFinish() && !HasPaintSpecificColorOption && IsGenericColorOption(option));
+
+    private static bool IsPaintSpecificColorOption(ProcessConfigOptionDto option) =>
+        option.ConfigKey.Equals("paint_color", StringComparison.OrdinalIgnoreCase)
+        || option.ConfigKey.Equals("paint_colour", StringComparison.OrdinalIgnoreCase)
+        || option.Label.Contains("paint", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsDedicatedPanelOption(ProcessConfigOptionDto option)
+    {
+        var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        return normalized.Contains("surfaceroughness", StringComparison.Ordinal)
+            || normalized.Contains("roughness", StringComparison.Ordinal)
+            || normalized.Contains("inspectionlevel", StringComparison.Ordinal)
+            || normalized.Contains("inspection", StringComparison.Ordinal)
+            || normalized.Contains("qualityinspection", StringComparison.Ordinal);
+    }
+
+    private static bool IsGenericColorOption(ProcessConfigOptionDto option)
+    {
+        var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        return (normalized.Contains("color", StringComparison.Ordinal)
+                || normalized.Contains("colour", StringComparison.Ordinal))
+            && !normalized.Contains("paint", StringComparison.Ordinal)
+            && !normalized.Contains("anod", StringComparison.Ordinal);
+    }
+
+    private static bool IsMaterialColorOption(ProcessConfigOptionDto option)
+    {
+        var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        return IsMaterialColorOptionText(normalized);
+    }
+
+    private static bool IsMaterialColorOptionText(string normalized) =>
+        (normalized.Contains("materialcolor", StringComparison.Ordinal)
+            || normalized.Contains("materialcolour", StringComparison.Ordinal)
+            || normalized.Contains("plasticcolor", StringComparison.Ordinal)
+            || normalized.Contains("plasticcolour", StringComparison.Ordinal))
+        && !normalized.Contains("paint", StringComparison.Ordinal)
+        && !normalized.Contains("anod", StringComparison.Ordinal);
+
+    private static bool IsAnodizeColorOption(ProcessConfigOptionDto option) =>
+        option.ConfigKey.Equals("anodize_color", StringComparison.OrdinalIgnoreCase)
+        || option.ConfigKey.Equals("anodise_color", StringComparison.OrdinalIgnoreCase)
+        || option.Label.Contains("anodize", StringComparison.OrdinalIgnoreCase)
+        || option.Label.Contains("anodise", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeOptionText(string value)
+    {
+        var chars = value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray();
+        return new string(chars);
+    }
+
+    private bool IsPaintedFinish() =>
+        Part?.FinishCode?.Contains("paint", StringComparison.OrdinalIgnoreCase) == true;
+
+    private bool IsAnodizeFinish() =>
+        Part?.FinishCode?.Contains("anod", StringComparison.OrdinalIgnoreCase) == true;
+
+    private string GetToleranceRange(CatalogToleranceDto tolerance)
+    {
+        if (!string.IsNullOrWhiteSpace(tolerance.ToleranceRange))
+            return NormalizeToleranceRange(tolerance.ToleranceRange);
+
+        var code = tolerance.Code.ToUpperInvariant();
+        if (code.Contains("FDM") || IsFdmProcess)
+        {
+            if (code.Contains("FINE") || code.Contains("TIGHT"))
+                return "+-0.127 mm";
+            if (code.Contains("STANDARD") || code.Contains("STD"))
+                return "+-0.254 mm";
+            if (code.Contains("COMMERCIAL") || code.Contains("LOOSE"))
+                return "+-0.500 mm";
+        }
+
+        if (code.Contains("IT6")) return "IT6";
+        if (code.Contains("IT7")) return "IT7";
+        if (code.Contains("IT8")) return "IT8";
+        if (code.Contains("ISO2768_M") || code.Contains("ISO_2768_M")) return "ISO 2768-m";
+        if (code.Contains("ISO2768_F") || code.Contains("ISO_2768_F")) return "ISO 2768-f";
+
+        return tolerance.Grade;
+    }
+
+    private static string NormalizeToleranceRange(string value) =>
+        value.Replace("±", "+-", StringComparison.Ordinal)
+            .Replace("+/-", "+-", StringComparison.Ordinal)
+            .Replace("  ", " ", StringComparison.Ordinal)
+            .Trim();
+
+    private static IEnumerable<string> GetOptionChoices(ProcessConfigOptionDto option)
+    {
+        if (!string.IsNullOrWhiteSpace(option.OptionsJson))
+        {
+            var parsed = ParseOptionChoices(option.OptionsJson);
+            if (parsed.Count > 0)
+                return parsed;
+        }
+
+        if (IsAnodizeColorOption(option))
+            return DefaultAnodizeColors;
+
+        if (option.ConfigKey.Contains("color", StringComparison.OrdinalIgnoreCase)
+            || option.Label.Contains("color", StringComparison.OrdinalIgnoreCase))
+            return DefaultPlasticColors;
+
+        return [];
+    }
+
+    private static List<string> ParseOptionChoices(string optionsJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(optionsJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+                return [];
+
+            var values = new List<string>();
+            foreach (var item in document.RootElement.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    var value = item.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                        values.Add(value);
+                    continue;
+                }
+
+                if (item.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var propertyName in new[] { "label", "name", "value", "code" })
+                    {
+                        if (item.TryGetProperty(propertyName, out var property)
+                            && property.ValueKind == JsonValueKind.String)
+                        {
+                            var value = property.GetString();
+                            if (!string.IsNullOrWhiteSpace(value))
+                                values.Add(value);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        catch (JsonException)
+        {
+            return optionsJson.Split([',', ';', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+    }
+
+    private bool GetProcessOptionBool(string key) =>
+        Part?.ProcessOptionValues.TryGetValue(key, out var value) == true
+        && bool.TryParse(value, out var result)
+        && result;
+
+    private string GetProcessOptionValue(string key, string defaultValue) =>
+        Part?.ProcessOptionValues.TryGetValue(key, out var value) == true && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : defaultValue;
+
+    private static bool IsPaintColorSelected(PaintColorOption paint, string? paintHex, string? paintReference) =>
+        string.Equals(paintHex, paint.Hex, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(paintReference, paint.Reference, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(paintReference, paint.Name, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsCustomPaintColorSelected(string? paintHex, string? paintReference) =>
+        !string.IsNullOrWhiteSpace(paintHex)
+        && !StandardPaintColors.Any(paint => IsPaintColorSelected(paint, paintHex, paintReference));
+
+    private static string FormatOptionLabel(string value) =>
+        value.Replace("_", " ", StringComparison.Ordinal)
+            .Replace("-", " ", StringComparison.Ordinal)
+            .Trim();
+
+    private static string GetOptionIcon(string key)
+    {
+        if (key.Contains("anod", StringComparison.OrdinalIgnoreCase))
+            return Icons.Material.Outlined.AutoFixHigh;
+        if (key.Contains("rough", StringComparison.OrdinalIgnoreCase))
+            return Icons.Material.Outlined.Grain;
+        if (key.Contains("cert", StringComparison.OrdinalIgnoreCase))
+            return Icons.Material.Outlined.Verified;
+
+        return Icons.Material.Outlined.Tune;
+    }
+
+    private static string GetOptionColor(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "black" or "matte black" or "ral 9005" => "#111111",
+            "white" or "natural white" or "ral 9010" => "#f7f7f2",
+            "natural" => "#eee7d2",
+            "clear" or "transparent" => "linear-gradient(135deg, #f6fbff, #bcd7ef)",
+            "gray" or "grey" or "silver" => "#9ba3af",
+            "red" => "#c8333a",
+            "blue" => "#2f6fd6",
+            "green" => "#2f8f5b",
+            "yellow" => "#f1c232",
+            "orange" => "#e47c2f",
+            "gold" => "#d4a72c",
+            "purple" => "#7c4dff",
+            _ when normalized.Contains("black", StringComparison.Ordinal) => "#111111",
+            _ when normalized.Contains("white", StringComparison.Ordinal) => "#f7f7f2",
+            _ when normalized.Contains("blue", StringComparison.Ordinal) => "#2f6fd6",
+            _ when normalized.Contains("red", StringComparison.Ordinal) => "#c8333a",
+            _ when normalized.Contains("green", StringComparison.Ordinal) => "#2f8f5b",
+            _ when normalized.Contains("gold", StringComparison.Ordinal) => "#d4a72c",
+            _ => "linear-gradient(135deg, #d8dce4, #a8aeb8)",
+        };
+    }
+
+    private void RemoveHiddenProcessOptionValues()
+    {
+        if (Part == null || Part.ProcessOptionValues.Count == 0)
+            return;
+
+        foreach (var key in HiddenCustomerOptionKeys)
+            Part.ProcessOptionValues.Remove(key);
+
+        foreach (var key in Part.ProcessOptionValues.Keys.Where(IsHiddenCustomerOptionKey).ToList())
+            Part.ProcessOptionValues.Remove(key);
+
+        foreach (var key in Part.ProcessOptionValues.Keys.Where(IsDedicatedPanelOptionKey).ToList())
+            Part.ProcessOptionValues.Remove(key);
+
+        RemoveFinishSpecificOptionValues();
+    }
+
+    private void RemoveFinishSpecificOptionValues()
+    {
+        if (Part == null)
+            return;
+
+        if (!IsPaintedFinish())
+        {
+            Part.ProcessOptionValues.Remove("paint_color");
+            Part.ProcessOptionValues.Remove("paint_colour");
+            Part.ProcessOptionValues.Remove(PaintColorHexKey);
+            Part.ProcessOptionValues.Remove(PaintColorReferenceKey);
+        }
+        else
+        {
+            foreach (var key in Part.ProcessOptionValues.Keys.Where(IsMaterialColorOptionKey).ToList())
+                Part.ProcessOptionValues.Remove(key);
+        }
+
+        if (!IsAnodizeFinish())
+        {
+            Part.ProcessOptionValues.Remove("anodize_color");
+            Part.ProcessOptionValues.Remove("anodise_color");
+        }
+    }
+
+    private static bool IsHiddenCustomerOptionKey(string key) =>
+        IsHiddenCustomerOptionText(NormalizeOptionText(key));
+
+    private static bool IsMaterialColorOptionKey(string key) =>
+        IsMaterialColorOptionText(NormalizeOptionText(key));
+
+    private static bool IsDedicatedPanelOptionKey(string key)
+    {
+        var normalized = NormalizeOptionText(key);
+        return normalized.Contains("surfaceroughness", StringComparison.Ordinal)
+            || normalized.Contains("roughness", StringComparison.Ordinal)
+            || normalized.Contains("inspectionlevel", StringComparison.Ordinal)
+            || normalized.Contains("inspection", StringComparison.Ordinal)
+            || normalized.Contains("qualityinspection", StringComparison.Ordinal);
+    }
+
+    private sealed record RoughnessOption(string Code, string Name, string Description);
+
+    private sealed record InspectionOption(InspectionLevel Level, string Name, string Description, string Icon);
+
+    private sealed record PaintColorOption(string Name, string Hex, string Reference);
 
     private async Task OnDrawingsChanged(List<DraftProjectAttachmentDto> files)
     {

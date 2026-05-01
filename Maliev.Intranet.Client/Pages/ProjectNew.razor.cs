@@ -30,6 +30,7 @@ public partial class ProjectNew : IAsyncDisposable
     private Guid _tempProjectId = Guid.NewGuid();  // non-readonly; reassigned on Duplicate
     private string _title = $"Project {DateTime.Today:yyyy-MM-dd}";
     private CustomerSummaryDto? _selectedCustomer;
+    private List<LeadTimeOptionDto> _leadTimeCatalogOptions = [];
     private List<LeadTimeOptionDto> _leadTimeOptions = [];
     private LeadTimeOptionDto? _selectedLeadTime;
     private List<ProcessDto> _processes = [];
@@ -152,7 +153,7 @@ public partial class ProjectNew : IAsyncDisposable
             var result = await leadTimesTask;
             if (result is { Count: > 0 })
             {
-                _leadTimeOptions = result
+                _leadTimeCatalogOptions = result
                     .Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase))
                     .ToList();
             }
@@ -160,6 +161,7 @@ public partial class ProjectNew : IAsyncDisposable
         catch (Exception ex) { Snackbar.Add($"Failed to load lead times: {ex.Message}", Severity.Warning); }
 
         await RestoreDraftAsync();
+        RefreshLeadTimeOptionsFromPricing();
 
         // ── Server resume: if ?resume={id} or draft has ServerProjectId, hydrate from server ──
         var serverResumeId = Guid.TryParse(resumeParam, out var parsedResumeId) ? parsedResumeId : _serverProjectId;
@@ -814,6 +816,7 @@ public partial class ProjectNew : IAsyncDisposable
         if (_selectedPartIndex >= _parts.Count)
             _selectedPartIndex = Math.Max(0, _parts.Count - 1);
 
+        RefreshLeadTimeOptionsFromPricing();
         TriggerAutoSave();
     }
 
@@ -867,7 +870,7 @@ public partial class ProjectNew : IAsyncDisposable
 
                 part.AvailableMaterials = materialsTask.Result ?? [];
                 part.AvailableFinishes = finishesTask.Result ?? [];
-                part.AvailableTolerances = tolerancesTask.Result ?? [];
+                part.AvailableTolerances = FilterProcessTolerances(processCode, tolerancesTask.Result ?? []).ToList();
                 part.AvailableProcessOptions = configOptionsTask.Result ?? [];
 
                 if (!part.MaterialId.HasValue)
@@ -888,6 +891,13 @@ public partial class ProjectNew : IAsyncDisposable
                         part.FinishId = defaultFinish.Id;
                         part.FinishCode = defaultFinish.Code;
                     }
+                }
+
+                if (part.ToleranceId.HasValue
+                    && part.AvailableTolerances.All(t => t.Id != part.ToleranceId.Value))
+                {
+                    part.ToleranceId = null;
+                    part.ToleranceCode = null;
                 }
 
                 if (!part.ToleranceId.HasValue)
@@ -916,6 +926,8 @@ public partial class ProjectNew : IAsyncDisposable
             part.AvailableFinishes = [];
             part.AvailableTolerances = [];
             part.AvailableProcessOptions = [];
+            part.EstimatedLeadTimeDays = 0;
+            RefreshLeadTimeOptionsFromPricing();
         }
 
         // Bug 4 fix: only re-resolve the DFM report when there are per-process reports to
@@ -928,6 +940,57 @@ public partial class ProjectNew : IAsyncDisposable
 
         TriggerAutoSave();
         TriggerPricingAsync(part);
+    }
+
+    private void RefreshLeadTimeOptionsFromPricing()
+    {
+        var projectLeadTimeDays = _parts
+            .Where(p => p.EstimatedLeadTimeDays > 0 && !p.PricingLoading && !p.PricingFailed)
+            .Select(p => p.EstimatedLeadTimeDays)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        if (projectLeadTimeDays <= 0 || _leadTimeCatalogOptions.Count == 0)
+        {
+            _leadTimeOptions = [];
+            _selectedLeadTime = null;
+            return;
+        }
+
+        _leadTimeOptions = _leadTimeCatalogOptions
+            .Select(option => option with
+            {
+                MinDays = projectLeadTimeDays,
+                MaxDays = projectLeadTimeDays
+            })
+            .ToList();
+
+        if (_selectedLeadTime is not null)
+        {
+            _selectedLeadTime = _leadTimeOptions.FirstOrDefault(lt => lt.Code == _selectedLeadTime.Code);
+        }
+    }
+
+    private static IEnumerable<CatalogToleranceDto> FilterProcessTolerances(
+        string? processCode,
+        IEnumerable<CatalogToleranceDto> tolerances)
+    {
+        if (!string.Equals(processCode, "FDM", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(processCode, "FDM_3D_PRINTING", StringComparison.OrdinalIgnoreCase))
+        {
+            return tolerances;
+        }
+
+        return tolerances.Where(t =>
+        {
+            var combined = $"{t.Code} {t.Name} {t.IsoStandard} {t.Grade}";
+            return !combined.Contains("ISO 2768-c", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO 2768_C", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO2768_C", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO 2768-v", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO 2768_V", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO2768_V", StringComparison.OrdinalIgnoreCase);
+        });
     }
 
     // ── Task 13: Pricing ───────────────────────────────────────────────
@@ -979,6 +1042,8 @@ public partial class ProjectNew : IAsyncDisposable
             part.PricingLoading = false;
             part.EstimatedUnitPrice = null;
             part.EstimatedTotalAmount = null;
+            part.EstimatedLeadTimeDays = 0;
+            RefreshLeadTimeOptionsFromPricing();
             return;
         }
 
@@ -1002,6 +1067,7 @@ public partial class ProjectNew : IAsyncDisposable
                 : null;
 
             var process = _processes.FirstOrDefault(p => p.Id == part.ProcessId);
+            var processCode = part.ProcessCode ?? process?.Code ?? string.Empty;
 
             var request = new PricingRequestDto
             {
@@ -1010,8 +1076,8 @@ public partial class ProjectNew : IAsyncDisposable
                 MaterialId = part.MaterialId ?? Guid.Empty,
                 MaterialCode = part.MaterialCode ?? string.Empty,
                 ManufacturingProcessId = part.ProcessId ?? Guid.Empty,
-                ManufacturingProcessName = process?.Name ?? string.Empty,
-                ManufacturingProcessCode = part.ProcessCode,
+                ManufacturingProcessName = processCode,
+                ManufacturingProcessCode = processCode,
                 Quantity = part.Quantity,
                 Geometry = geometry!,
                 StoragePath = part.StoragePath,
@@ -1040,15 +1106,18 @@ public partial class ProjectNew : IAsyncDisposable
                 part.PricingFailed = true;
                 part.EstimatedUnitPrice = null;
                 part.EstimatedTotalAmount = null;
+                part.EstimatedLeadTimeDays = 0;
             }
         }
         catch (Exception)
         {
             part.PricingFailed = true;
+            part.EstimatedLeadTimeDays = 0;
         }
         finally
         {
             part.PricingLoading = false;
+            RefreshLeadTimeOptionsFromPricing();
             TriggerAutoSave();
             await InvokeAsync(StateHasChanged);
             await TriggerRoutingFetchAsync(part);
@@ -1492,7 +1561,7 @@ public partial class ProjectNew : IAsyncDisposable
 
             part.AvailableMaterials = materialsTask.Result ?? [];
             part.AvailableFinishes = finishesTask.Result ?? [];
-            part.AvailableTolerances = tolerancesTask.Result ?? [];
+            part.AvailableTolerances = FilterProcessTolerances(part.ProcessCode, tolerancesTask.Result ?? []).ToList();
             part.AvailableProcessOptions = configOptionsTask.Result ?? [];
 
             if (part.MaterialId.HasValue)
@@ -1684,6 +1753,9 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private void DuplicateProject()
     {
+        if (_parts.Count == 0)
+            return;
+
         _tempProjectId = Guid.NewGuid();
         _serverProjectId = null;
         _title = string.IsNullOrEmpty(_title) ? string.Empty : $"{_title} (Copy)";

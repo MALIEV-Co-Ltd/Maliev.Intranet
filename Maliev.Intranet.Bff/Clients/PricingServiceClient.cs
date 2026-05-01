@@ -59,7 +59,14 @@ public class PricingServiceClient(HttpClient httpClient) : IPricingServiceClient
 
         try
         {
-            var apiResponse = await httpClient.PostAsJsonAsync("/pricing/v1/calculate", request, cts.Token);
+            var downstreamRequest = request with
+            {
+                ManufacturingProcessName = string.IsNullOrWhiteSpace(request.ManufacturingProcessCode)
+                    ? request.ManufacturingProcessName
+                    : request.ManufacturingProcessCode
+            };
+
+            var apiResponse = await httpClient.PostAsJsonAsync("/pricing/v1/calculate", downstreamRequest, cts.Token);
             apiResponse.EnsureSuccessStatusCode();
 
             // Deserialize to the actual PricingService response first

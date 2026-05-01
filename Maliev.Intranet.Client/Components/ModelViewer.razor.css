@@ -1,4 +1,15 @@
 /* Viewer toolbar — responsive to light/dark mode via MudBlazor palette vars */
+.vp-toolbar-shell {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    z-index: 10;
+    max-width: calc(100% - 24px);
+    pointer-events: auto;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
 .model-viewer-container ::deep .vp-toolbar-paper {
     border-radius: 12px !important;
     background: color-mix(in srgb, var(--mud-palette-surface) 92%, transparent) !important;
@@ -70,8 +81,32 @@
 }
 
 @media (max-width: 768px) {
+    .vp-toolbar-shell {
+        right: 8px;
+        bottom: 8px;
+        left: 8px;
+        max-width: none;
+        overflow-x: auto;
+        overflow-y: hidden;
+        transform: none;
+        scrollbar-width: thin;
+    }
+
     .model-viewer-container ::deep .vp-toolbar-paper {
-        bottom: 16px !important;
+        width: max-content;
+        min-width: 100%;
+        padding: 3px !important;
+        gap: 2px;
         justify-content: flex-start !important;
+    }
+
+    .model-viewer-container ::deep .vp-cube-btn {
+        width: 30px;
+        height: 30px;
+        padding: 4px;
+    }
+
+    .model-viewer-container ::deep .vp-divider {
+        margin: 0 2px;
     }
 }

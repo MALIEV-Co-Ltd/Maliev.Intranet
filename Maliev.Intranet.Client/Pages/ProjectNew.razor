@@ -28,6 +28,7 @@
                         AutoSaving="@_autoSaving"
                         LastSavedAt="@_lastSavedAt"
                         HasCustomerSelected="@(_selectedCustomer != null)"
+                        CanDuplicateProject="@(_parts.Count > 0)"
                         OnDuplicate="DuplicateProject"
                         OnSelectPart="SelectPartFromPanel"
                         OnAddPart="OpenFilePicker"
@@ -40,7 +41,8 @@
                            Variant="DrawerVariant.Temporary"
                            Elevation="6"
                            ClipMode="DrawerClipMode.Never"
-                           Class="pn-parts-drawer">
+                           Class="pn-parts-drawer"
+                           Style="--mud-drawer-width: min(420px, 100vw); --mud-drawer-width-left: min(420px, 100vw);">
                     <PartsListPanel
                         Parts="@_parts"
                         SelectedIndex="@_selectedPartIndex"
@@ -50,6 +52,7 @@
                         AutoSaving="@_autoSaving"
                         LastSavedAt="@_lastSavedAt"
                         HasCustomerSelected="@(_selectedCustomer != null)"
+                        CanDuplicateProject="@(_parts.Count > 0)"
                         OnDuplicate="DuplicateProject"
                         OnSelectPart="SelectPartFromDrawer"
                         OnAddPart="OpenFilePicker"

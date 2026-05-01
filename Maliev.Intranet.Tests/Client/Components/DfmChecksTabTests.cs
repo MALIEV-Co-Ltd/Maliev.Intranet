@@ -47,6 +47,20 @@ public class DfmChecksTabTests : BunitContext, IAsyncLifetime
         SmallDetailCount: 0,
         Issues: []);
 
+    private static CncDfmReportPayload CncTurningReport(
+        IReadOnlyList<CncDfmReportPayloadIssuesItem> issues) => new(
+        ReportType: "CNC_TURN",
+        SharpCornerCount: 0,
+        SharpCornerRegions: [],
+        HasUndercuts: false,
+        UndercutRegions: [],
+        HasDrillHoles: false,
+        DrillHoleCount: 0,
+        RequiresEdm: false,
+        RequiresGrinding: false,
+        MinimumFeatureSizeMm: 0,
+        Issues: issues);
+
     // Test 1: When DfmAnalysisTimedOut=true → badge has "dfm-badge--error" class and shows "Analysis failed"
     [Fact]
     public void DfmTab_WhenTimedOut_BadgeShowsErrorClassAndFailedText()
@@ -344,5 +358,62 @@ public class DfmChecksTabTests : BunitContext, IAsyncLifetime
         Assert.Contains("dfm-badge--ok", cut.Markup);
         Assert.DoesNotContain("dfm-expansion-panel--fail", cut.Markup);
         Assert.DoesNotContain("dfm-check-row--skeleton", cut.Markup);
+    }
+
+    [Fact]
+    public void DfmChecksTab_CncTurningNotTurnableIssue_ShowsFailureInTab()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "CNC_TURN",
+            IsManifold = true,
+            BodyCount = 1,
+            DfmAnalysisTimedOut = false,
+        };
+        part.CncDfmReport = CncTurningReport(
+        [
+            new CncDfmReportPayloadIssuesItem(
+                Category: "not_turnable",
+                Severity: "error",
+                Title: "Part Not Suitable for Turning",
+                Description: "Symmetry deviation 1.000 exceeds turning threshold. Part likely requires milling.",
+                Value: 1.0,
+                Threshold: 0.15),
+        ]);
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        Assert.Contains("Turning suitability", cut.Markup);
+        Assert.Contains("Part Not Suitable for Turning", cut.Markup);
+        Assert.Contains("Symmetry deviation 1.000 exceeds turning threshold", cut.Markup);
+        Assert.Contains("dfm-expansion-panel--fail", cut.Markup);
+        Assert.Contains("4/5 checks passed", cut.Markup);
+        Assert.DoesNotContain("7/7 checks passed", cut.Markup);
+        Assert.DoesNotContain("dfm-badge--ok", cut.Markup);
+    }
+
+    [Fact]
+    public void PartViewModel_CncTypedIssues_MarkPartAsHavingDfmIssues()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "CNC_TURN",
+            IsManifold = true,
+            BodyCount = 1,
+        };
+        part.CncDfmReport = CncTurningReport(
+        [
+            new CncDfmReportPayloadIssuesItem(
+                Category: "not_turnable",
+                Severity: "error",
+                Title: "Part Not Suitable for Turning",
+                Description: "Symmetry deviation 1.000 exceeds turning threshold. Part likely requires milling.",
+                Value: 1.0,
+                Threshold: 0.15),
+        ]);
+        part.ResolveDfmReport();
+
+        Assert.True(part.HasProcessRelevantDfmIssues);
     }
 }

@@ -187,6 +187,9 @@ else if (IsVisible && DfmIssues.Count > 0)
     /// <summary>Invoked when the user clicks the eye icon on a DFM issue to toggle its overlay on the 3D model.</summary>
     [Parameter] public EventCallback<DfmIssue> OnToggleOverlay { get; set; }
 
+    /// <summary>Invoked after the transient all-clear message has been dismissed.</summary>
+    [Parameter] public EventCallback OnAllClearDismissed { get; set; }
+
     private bool _acknowledged;
     private bool _expanded;
     // Tracks the currently selected issue whose overlay is shown on the 3D model (single-select).
@@ -248,6 +251,7 @@ else if (IsVisible && DfmIssues.Count > 0)
             await InvokeAsync(StateHasChanged);
             await Task.Delay(500, token);
             _allClearShown = false;
+            await OnAllClearDismissed.InvokeAsync();
             await InvokeAsync(StateHasChanged);
         }
         catch (OperationCanceledException)

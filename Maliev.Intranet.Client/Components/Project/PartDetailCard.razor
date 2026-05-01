@@ -225,9 +225,10 @@
                              Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged && !string.IsNullOrEmpty(Part.ProcessCode))"
                              TimedOut="@Part.DfmAnalysisTimedOut"
                              ErrorMessage="@(Part.DfmAnalysisTimedOut ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
-                             AllClear="@(_dfmIssues.Count == 0 && Part.DfmReport != null && !Part.DfmAcknowledged && !string.IsNullOrEmpty(Part.ProcessCode))"
+                             AllClear="@ShouldShowAllClearOverlay()"
                              OnAcknowledged="@HandleDfmAcknowledged"
-                             OnToggleOverlay="@HandleToggleOverlay" />
+                             OnToggleOverlay="@HandleToggleOverlay"
+                             OnAllClearDismissed="@HandleAllClearDismissed" />
         </div>
 
     </div>
@@ -543,6 +544,19 @@
         return Task.CompletedTask;
     }
 
+    private bool ShouldShowAllClearOverlay() =>
+        _dfmIssues.Count == 0
+        && Part.DfmReport != null
+        && !Part.DfmAcknowledged
+        && !Part.DfmAllClearNotified
+        && !string.IsNullOrEmpty(Part.ProcessCode);
+
+    private Task HandleAllClearDismissed()
+    {
+        Part.DfmAllClearNotified = true;
+        return Task.CompletedTask;
+    }
+
     private async Task HandleViewerLoadFailed(string errorMessage)
     {
         _viewerLoadFailed = true;
@@ -709,16 +723,27 @@
                 break;
 
             case CncDfmReportPayload cnc:
-                if (cnc.SharpCornerCount > 0)
-                    issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)", "Sharp inside corners cannot be cut precisely with standard end mills", "internal_radius"));
-                if (cnc.HasUndercuts)
-                    issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected", "Undercut features require special machining strategies or EDM", "undercut"));
-                if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0)
-                    issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)", $"This model has {cnc.DrillHoleCount} drill hole(s) to machine", null));
-                if (cnc.RequiresEdm)
-                    issues.Add((Icons.Material.Filled.Build, "EDM required for complex features", "Complex internal geometry requires EDM (Electrical Discharge Machining)", null));
-                if (cnc.RequiresGrinding)
-                    issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces", "Flat surfaces require grinding for tight tolerance", null));
+                if (cnc.Issues.Count > 0)
+                {
+                    issues.AddRange(cnc.Issues.Select(issue =>
+                    {
+                        var (icon, category) = GetCncIssuePresentation(issue.Category);
+                        return (icon, issue.Title, issue.Description, category);
+                    }));
+                }
+                else
+                {
+                    if (cnc.SharpCornerCount > 0)
+                        issues.Add((Icons.Material.Filled.BugReport, $"{cnc.SharpCornerCount} sharp corner(s)", "Sharp inside corners cannot be cut precisely with standard end mills", "internal_radius"));
+                    if (cnc.HasUndercuts)
+                        issues.Add((Icons.Material.Filled.ContentCut, "Undercut features detected", "Undercut features require special machining strategies or EDM", "undercut"));
+                    if (cnc.HasDrillHoles && cnc.DrillHoleCount > 0)
+                        issues.Add((Icons.Material.Filled.Handyman, $"{cnc.DrillHoleCount} drill hole(s)", $"This model has {cnc.DrillHoleCount} drill hole(s) to machine", null));
+                    if (cnc.RequiresEdm)
+                        issues.Add((Icons.Material.Filled.Build, "EDM required for complex features", "Complex internal geometry requires EDM (Electrical Discharge Machining)", null));
+                    if (cnc.RequiresGrinding)
+                        issues.Add((Icons.Material.Filled.RotateRight, "Grinding required for flat surfaces", "Flat surfaces require grinding for tight tolerance", null));
+                }
                 break;
 
             // Fallback for DfmReport DTO (from HTTP on-demand analysis path).
@@ -746,6 +771,21 @@
 
         return issues;
     }
+
+    private static (string Icon, string? Category) GetCncIssuePresentation(string category) => category switch
+    {
+        "internal_radius" => (Icons.Material.Filled.BugReport, "internal_radius"),
+        "sharp_corner"   => (Icons.Material.Filled.BugReport, "internal_radius"),
+        "undercut"       => (Icons.Material.Filled.ContentCut, "undercut"),
+        "hole"           => (Icons.Material.Filled.RadioButtonUnchecked, "drill_hole"),
+        "drill_hole"     => (Icons.Material.Filled.Handyman, "drill_hole"),
+        "edm"            => (Icons.Material.Filled.Build, "edm"),
+        "grinding"       => (Icons.Material.Filled.RotateRight, "grinding"),
+        "not_turnable"   => (Icons.Material.Filled.SyncProblem, "not_turnable"),
+        "ld_ratio"       => (Icons.Material.Filled.Straighten, "ld_ratio"),
+        "groove"         => (Icons.Material.Filled.LinearScale, "groove"),
+        _                 => (Icons.Material.Filled.Warning, category.Length > 0 ? category : null),
+    };
 
     /// <summary>
     /// Initializes multi-body viewer functionality when bodies are available.
