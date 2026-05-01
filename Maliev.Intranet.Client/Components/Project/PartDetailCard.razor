@@ -107,42 +107,8 @@
     @* ── Tab: 3D Viewer + Body Selection ───────────────────────────────────────────────── *@
     @if (_activeTab == 0)
     {
+    <div class="pdc-viewer-wrap pdc-polkadot">
 
-    @* ── Body Selection Panel (multi-body files only) ──────────────────────────────────── *@
-    @if (Part.BodyCount > 1 && Part.Bodies.Count > 0)
-    {
-        <div class="pdc-body-panel">
-            <div class="pdc-body-header">
-                <MudText Typo="Typo.subtitle2" Class="fw-bold">Bodies (@Part.BodyCount)</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Click to select</MudText>
-            </div>
-            <div class="pdc-body-list">
-                @foreach (var body in Part.Bodies)
-                {
-                    <div class="pdc-body-item @(Part.SelectedBodyIndex == body.Index ? "pdc-body-item--selected" : "")"
-                         @onclick="@(() => SelectBodyAsync(body.Index))">
-                        <div class="pdc-body-color" style="background-color: @(body.ColorHex ?? "#888");"></div>
-                        <div class="pdc-body-info">
-                            <MudText Typo="Typo.body2" Class="pdc-body-name">@body.Name</MudText>
-                            @if (body.VolumeCm3.HasValue)
-                            {
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@body.VolumeCm3.Value:F2 cm³</MudText>
-                            }
-                        </div>
-                        @if (Part.SelectedBodyIndex == body.Index)
-                        {
-                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
-                                     Size="Size.Small"
-                                     Color="Color.Primary"
-                                     Class="pdc-body-check" />
-                        }
-                    </div>
-                }
-            </div>
-        </div>
-    }
-
-    <div class="pdc-viewer-wrap pdc-polkadot @(Part.BodyCount > 1 ? "pdc-viewer-wrap--with-bodies" : "")">
         @* Thumbnail area *@
         <div class="pdc-thumb-area">
 
@@ -211,8 +177,49 @@
 
             }
 
+            @* Body tree — floating overlay top-right, visible only for multi-body files *@
+            @if (Part.BodyCount > 1 && Part.Bodies.Count > 0)
+            {
+                <div class="pdc-body-tree @(_bodyTreeExpanded ? "pdc-body-tree--open" : "")">
+                    <button class="pdc-body-tree-header" @onclick="@(() => _bodyTreeExpanded = !_bodyTreeExpanded)">
+                        <span class="pdc-body-tree-icon">@((MarkupString)"<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='currentColor'><path d='M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z'/></svg>")</span>
+                        <span class="pdc-body-tree-title">Bodies (@Part.BodyCount)</span>
+                        <span class="pdc-body-tree-chevron @(_bodyTreeExpanded ? "pdc-body-tree-chevron--up" : "")">
+                            @((MarkupString)"<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='currentColor'><path d='M7 10l5 5 5-5z'/></svg>")
+                        </span>
+                    </button>
+                    @if (_bodyTreeExpanded)
+                    {
+                        <div class="pdc-body-tree-list">
+                            <button class="pdc-body-tree-row @(Part.SelectedBodyIndex is null ? "pdc-body-tree-row--active" : "")"
+                                    @onclick="ClearBodySelectionAsync">
+                                <span class="pdc-body-swatch pdc-body-swatch--all"></span>
+                                <span class="pdc-body-tree-name">All bodies</span>
+                                @if (Part.SelectedBodyIndex is null)
+                                {
+                                    <span class="pdc-body-tree-check">✓</span>
+                                }
+                            </button>
+                            @foreach (var body in Part.Bodies)
+                            {
+                                var b = body;
+                                <button class="pdc-body-tree-row @(Part.SelectedBodyIndex == b.Index ? "pdc-body-tree-row--active" : "")"
+                                        @onclick="@(() => SelectBodyAsync(b.Index))">
+                                    <span class="pdc-body-swatch" style="@GetBodySwatchStyle(b)"></span>
+                                    <span class="pdc-body-tree-name">@b.Name</span>
+                                    @if (Part.SelectedBodyIndex == b.Index)
+                                    {
+                                        <span class="pdc-body-tree-check">✓</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
             @* DFM overlay — positioned absolute over viewer area *@
-            <DfmOverlayPanel @ref="_dfmPanel"
+            <DfmOverlayPanel @ref="_dfmPanel" @key="@Part.FileId"
                              DfmIssues="@_dfmIssues"
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
                              Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged && !string.IsNullOrEmpty(Part.ProcessCode))"
@@ -301,6 +308,7 @@
     [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
 
     private int _activeTab = 0;
+    private bool _bodyTreeExpanded = false;
 
     protected override void OnInitialized() => CurrencyService.Changed += OnCurrencyChanged;
     public void Dispose() => CurrencyService.Changed -= OnCurrencyChanged;
@@ -312,6 +320,8 @@
         { AwaitingPreview: true } => "warn",
         { Error: not null } => "error",
         { DfmReport: not null } => "ok",
+        _ when (!string.IsNullOrEmpty(Part.ViewerUrl) || !string.IsNullOrEmpty(Part.ThumbnailLargeUrl))
+             && string.IsNullOrEmpty(Part.ProcessCode) => "warn",
         _ when !string.IsNullOrEmpty(Part.ViewerUrl) || !string.IsNullOrEmpty(Part.ThumbnailLargeUrl) => "ok",
         _ => "muted"
     };
@@ -322,6 +332,8 @@
         { AwaitingPreview: true } => "PROCESSING",
         { Error: not null } => "ERROR",
         { DfmReport: not null } => "ANALYZED",
+        _ when (!string.IsNullOrEmpty(Part.ViewerUrl) || !string.IsNullOrEmpty(Part.ThumbnailLargeUrl))
+             && string.IsNullOrEmpty(Part.ProcessCode) => "AWAITING PROCESS",
         _ when !string.IsNullOrEmpty(Part.ViewerUrl) || !string.IsNullOrEmpty(Part.ThumbnailLargeUrl) => "READY",
         _ => "PENDING"
     };
@@ -642,8 +654,12 @@
         {
             var supportKey = issue.OverlayKey + "_support";
             var supportUrl = Part.OverlayUrls?.GetValueOrDefault(supportKey);
-            if (supportUrl != null)
-                await _modelViewer.ToggleDfmOverlayAsync(supportKey, supportUrl, isActive);
+            // For hide, pass empty URL — the JS only needs the key to set isVisible=false.
+            // For show, we need the actual URL; skip if unavailable.
+            if (!isActive)
+                await _modelViewer.ToggleDfmOverlayAsync(supportKey, supportUrl ?? string.Empty, false);
+            else if (supportUrl != null)
+                await _modelViewer.ToggleDfmOverlayAsync(supportKey, supportUrl, true);
         }
 
         // Show/hide the grid floor when overhang overlay is toggled
@@ -732,6 +748,48 @@
     /// <summary>
     /// Initializes multi-body viewer functionality when bodies are available.
     /// </summary>
+    private static readonly string[] BodyPalette =
+    [
+        "#597fbb",
+        "#bf5959",
+        "#59bf59",
+        "#bfbf59",
+        "#bf59bf",
+        "#5959bf",
+        "#99734d",
+        "#737380",
+        "#bf8c4d",
+        "#bf598c",
+        "#59bfbf",
+        "#8cbf59",
+    ];
+
+    private PartViewModel.BodyInfo? SelectedBody =>
+        Part.SelectedBodyIndex is int bodyIndex
+            ? Part.Bodies.FirstOrDefault(body => body.Index == bodyIndex)
+            : null;
+
+    private string BodySelectorLabel => SelectedBody?.Name ?? $"{Part.BodyCount} bodies";
+
+    private string BodySelectorMeta =>
+        SelectedBody is { VolumeCm3: double volume }
+            ? FormatBodyVolume(volume)
+            : "All bodies";
+
+    private static string FormatBodyVolume(double? volumeCm3) =>
+        volumeCm3.HasValue ? $"{volumeCm3.Value:F2} cm³" : "Volume pending";
+
+    private static string GetBodySwatchStyle(PartViewModel.BodyInfo body)
+    {
+        var color = body.ColorHex;
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            color = BodyPalette[Math.Abs(body.Index) % BodyPalette.Length];
+        }
+
+        return $"background-color: {color};";
+    }
+
     private async Task InitializeMultiBodyViewerAsync()
     {
         if (_modelViewer == null || Part.Bodies.Count == 0)
@@ -772,6 +830,25 @@
         }
 
         // Notify parent of part state change
+        await OnPartChanged.InvokeAsync(Part);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Clears body selection and returns the viewer to the full assembly.
+    /// </summary>
+    private async Task ClearBodySelectionAsync()
+    {
+        if (Part.SelectedBodyIndex is null)
+            return;
+
+        Part.SelectedBodyIndex = null;
+
+        if (_modelViewer != null)
+        {
+            await _modelViewer.SelectBodyAsync(null);
+        }
+
         await OnPartChanged.InvokeAsync(Part);
         await InvokeAsync(StateHasChanged);
     }

@@ -120,80 +120,115 @@
     color: var(--maliev-muted);
 }
 
-/* ── Body Selection Panel ─────────────────────────────────────────────────────────── */
-.pdc-body-panel {
-    width: 280px;
-    background: var(--maliev-panel);
-    border-left: 1px solid var(--maliev-border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-.pdc-body-header {
-    padding: 16px;
-    border-bottom: 1px solid var(--maliev-border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.pdc-body-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.pdc-body-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    border: 2px solid transparent;
-}
-.pdc-body-item:hover {
-    background: var(--maliev-panel-3);
-}
-.pdc-body-item--selected {
-    background: var(--maliev-accent-soft) !important;
-    border-color: var(--mud-palette-primary) !important;
-}
-.pdc-body-color {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
+/* ── Body Selection ──────────────────────────────────────────────────────────────── */
+/* ── Body Tree Overlay ───────────────────────────────────────────────────── */
+.pdc-body-tree {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 8;
+    min-width: 180px;
+    max-width: min(260px, calc(100% - 24px));
     border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-md);
+    background: color-mix(in srgb, var(--maliev-panel) 92%, transparent);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--maliev-shadow-md);
+    overflow: hidden;
+}
+.pdc-body-tree-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    background: transparent;
+    color: var(--maliev-ink);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: left;
+}
+.pdc-body-tree-header:hover {
+    background: var(--maliev-accent-softer);
+}
+.pdc-body-tree-icon {
+    display: flex;
+    color: var(--maliev-muted);
     flex-shrink: 0;
 }
-.pdc-body-info {
+.pdc-body-tree-title {
     flex: 1;
     min-width: 0;
-}
-.pdc-body-name {
-    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.pdc-body-check {
+.pdc-body-tree-chevron {
+    display: flex;
+    color: var(--maliev-muted);
     flex-shrink: 0;
+    transition: transform 0.15s;
 }
-.pdc-viewer-wrap--with-bodies {
-    flex-direction: row;
+.pdc-body-tree-chevron--up {
+    transform: rotate(180deg);
 }
-@media (max-width: 900px) {
-    .pdc-body-panel {
-        width: 100%;
-        height: 200px;
-        border-left: none;
-        border-top: 1px solid var(--maliev-border);
-    }
-    .pdc-viewer-wrap--with-bodies {
-        flex-direction: column;
+.pdc-body-tree-list {
+    border-top: 1px solid var(--maliev-border-subtle);
+    max-height: min(260px, calc(100vh - 280px));
+    overflow-y: auto;
+}
+.pdc-body-tree-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    color: var(--maliev-ink);
+    cursor: pointer;
+    font-size: 12px;
+    text-align: left;
+    min-width: 0;
+}
+.pdc-body-tree-row:hover {
+    background: var(--maliev-accent-softer);
+}
+.pdc-body-tree-row--active {
+    background: var(--maliev-accent-soft);
+}
+.pdc-body-swatch {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border-radius: 3px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+}
+.pdc-body-swatch--all {
+    background: linear-gradient(135deg, #597fbb 0 25%, #bf5959 25% 50%,
+        #59bf59 50% 75%, #bfbf59 75%);
+}
+.pdc-body-tree-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pdc-body-tree-check {
+    flex-shrink: 0;
+    color: var(--mud-palette-primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+@media (max-width: 600px) {
+    .pdc-body-tree {
+        top: 8px;
+        right: 8px;
+        max-width: calc(50% - 12px);
     }
 }
 
@@ -390,4 +425,3 @@
 .pdc-footer-unit { font-size: 11px; color: var(--maliev-ink-2); }
 .pdc-footer-sep  { color: var(--maliev-muted-3); }
 .pdc-footer-total { font-size: 14px; font-weight: 700; color: var(--maliev-ink); }
-
