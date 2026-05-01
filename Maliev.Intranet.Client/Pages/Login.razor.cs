@@ -100,9 +100,9 @@ public partial class Login : ComponentBase
 
     private string GetThemeIcon() => LayoutService.CurrentMode switch
     {
-        ThemeMode.Dark => Icons.Material.Outlined.LightMode,
-        ThemeMode.Light => Icons.Material.Outlined.DarkMode,
-        _ => Icons.Material.Filled.Brightness4
+        ThemeMode.Dark => Icons.Material.Outlined.DarkMode,
+        ThemeMode.Light => Icons.Material.Outlined.LightMode,
+        _ => Icons.Material.Filled.AutoMode
     };
 
     private string GetThemeTooltip() => LayoutService.CurrentMode switch

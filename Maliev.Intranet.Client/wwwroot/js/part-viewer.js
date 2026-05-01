@@ -2611,10 +2611,16 @@ const overlayIntendedVisible = {};
 // If a key is absent the default red style is used.
 const OVERLAY_STYLES = {
     overhang_support: {
-        albedo:   () => new BABYLON.Color3(0.55, 0.78, 0.95), // cool blue-grey
-        alpha:    0.18,
-        emissive: () => new BABYLON.Color3(0.04, 0.10, 0.18),
-        zOffset:  0,
+        albedo:   () => new BABYLON.Color3(0.12, 0.55, 0.95), // support blue
+        alpha:    0.28,
+        emissive: () => new BABYLON.Color3(0.02, 0.08, 0.16),
+        zOffset:  -1,
+    },
+    support_required: {
+        albedo:   () => new BABYLON.Color3(0.12, 0.55, 0.95), // support blue
+        alpha:    0.28,
+        emissive: () => new BABYLON.Color3(0.02, 0.08, 0.16),
+        zOffset:  -1,
     },
 };
 
@@ -2699,6 +2705,10 @@ export async function toggleDfmOverlay(canvasId, partKey, overlayKey, glbUrl, vi
                     mat.alpha        = style.alpha;
                     mat.emissiveColor = style.emissive();
                     mat.zOffset      = style.zOffset;
+                    if (categorySuffix === 'overhang_support' || categorySuffix === 'support_required') {
+                        mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+                        mat.needDepthPrePass = true;
+                    }
                 } else {
                     mat.albedoColor  = new BABYLON.Color3(0.95, 0.10, 0.05); // red
                     mat.alpha        = 0.55;

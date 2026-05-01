@@ -64,9 +64,10 @@ public partial class PartConfigSidebar : ComponentBase
     private Dictionary<Guid, decimal> _finishPrices = new();
 
     // ── Two-phase DFM analysis state ─────────────────────────────────────
-    private Dictionary<string, DfmAnalysisResponse> _dfmReports = new();
+    private readonly Dictionary<string, DfmAnalysisResponse> _dfmReports = new(StringComparer.OrdinalIgnoreCase);
     // Typed per-process report cache: keyed by ProcessCode so CNC_TURN and CNC_MILL stay separate.
-    private readonly Dictionary<string, object> _typedReportsByProcess = new();
+    private readonly Dictionary<string, object> _typedReportsByProcess = new(StringComparer.OrdinalIgnoreCase);
+    private Guid? _dfmCacheFileId;
     // Cancellation token for the currently-running DFM analysis request.
     private CancellationTokenSource? _dfmCts;
     /// <summary>Logger for two-phase DFM operations.</summary>
@@ -196,8 +197,11 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null)
         {
             _bulkTiers = [];
+            ResetDfmAnalysisCache(null);
             return;
         }
+
+        ResetDfmAnalysisCache(Part.FileId);
 
         var features = new List<string>();
         if (Part.HasThreadedHoles) features.Add("ThreadedHoles");
@@ -432,9 +436,14 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null) return;
 
         var currentHex = GetProcessOptionValue(PaintColorHexKey, "#111111");
-        SetProcessOptionValue(PaintColorHexKey, currentHex);
-        SetProcessOptionValue(PaintColorReferenceKey, GetProcessOptionValue(PaintColorReferenceKey, string.Empty));
-        SetProcessOptionValue(catalogKey, GetProcessOptionValue(PaintColorReferenceKey, currentHex));
+        var currentReference = GetProcessOptionValue(PaintColorReferenceKey, string.Empty);
+        var isStandardPaint = StandardPaintColors.Any(paint => IsPaintColorSelected(paint, currentHex, currentReference));
+        var customHex = isStandardPaint ? "#000000" : currentHex;
+        var customReference = isStandardPaint ? string.Empty : currentReference;
+
+        SetProcessOptionValue(PaintColorHexKey, customHex);
+        SetProcessOptionValue(PaintColorReferenceKey, customReference);
+        SetProcessOptionValue(catalogKey, string.IsNullOrWhiteSpace(customReference) ? customHex : customReference);
         await OnPartChanged.InvokeAsync(Part);
     }
 
@@ -813,6 +822,19 @@ public partial class PartConfigSidebar : ComponentBase
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
+    }
+
+    private void ResetDfmAnalysisCache(Guid? fileId)
+    {
+        if (_dfmCacheFileId == fileId)
+            return;
+
+        _dfmCts?.Cancel();
+        _dfmCts?.Dispose();
+        _dfmCts = null;
+        _dfmReports.Clear();
+        _typedReportsByProcess.Clear();
+        _dfmCacheFileId = fileId;
     }
 
     private bool GetProcessOptionBool(string key) =>

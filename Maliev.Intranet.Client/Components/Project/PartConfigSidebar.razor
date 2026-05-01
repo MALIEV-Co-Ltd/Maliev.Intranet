@@ -84,6 +84,7 @@
         <section class="pcs-section">
             <div class="pcs-section-header">
                 <span class="pcs-section-title">Surface Finish</span>
+                <span class="pcs-section-count">@Part!.AvailableFinishes.Count options</span>
             </div>
             <div class="pcs-cards">
                 @foreach (var fin in Part!.AvailableFinishes)
@@ -115,6 +116,7 @@
             <section class="pcs-section">
                 <div class="pcs-section-header">
                     <span class="pcs-section-title">Tolerance</span>
+                    <span class="pcs-section-count">@VisibleTolerances.Count() options</span>
                 </div>
                 <div class="pcs-tol-grid">
                     @foreach (var tol in VisibleTolerances)
@@ -143,6 +145,7 @@
                 <section class="pcs-section">
                     <div class="pcs-section-header">
                         <span class="pcs-section-title">Surface Roughness</span>
+                        <span class="pcs-section-count">@RoughnessOptions.Count options</span>
                     </div>
                     <div class="pcs-cards">
                         @foreach (var roughness in RoughnessOptions)
@@ -173,32 +176,41 @@
             <section class="pcs-section">
                 <div class="pcs-section-header">
                     <span class="pcs-section-title">Part Features</span>
+                    <span class="pcs-section-count">2 options</span>
                 </div>
                 <div class="pcs-feature-toggle-grid">
-                    <div class="pcs-feature-option">
-                        <MudCheckBox T="bool"
-                                     Label="Tapped holes"
-                                     Value="@Part!.HasThreadedHoles"
-                                     ValueChanged="OnThreadedHolesChanged"
-                                     Color="Color.Primary"
-                                     Dense="true"
-                                     Class="pcs-feature-checkbox" />
-                        <div class="pcs-feature-help">
-                            Internal threads cut into the part. Requires a drawing with thread size, pitch, depth, tolerance, and locations.
+                    <button class="pcs-choice-card pcs-feature-card @(Part!.HasThreadedHoles ? "pcs-choice-card--active" : "")"
+                            @onclick="@(() => OnThreadedHolesChanged(!Part!.HasThreadedHoles))">
+                        <div class="pcs-choice-swatch">
+                            <MudIcon Icon="@Icons.Material.Outlined.Construction" Size="Size.Small" />
                         </div>
-                    </div>
-                    <div class="pcs-feature-option">
-                        <MudCheckBox T="bool"
-                                     Label="Thread inserts"
-                                     Value="@Part!.HasInserts"
-                                     ValueChanged="OnInsertsChanged"
-                                     Color="Color.Primary"
-                                     Dense="true"
-                                     Class="pcs-feature-checkbox" />
-                        <div class="pcs-feature-help">
-                            Installed threaded inserts such as Helicoil or heat-set inserts. Requires a drawing with insert type, thread spec, quantity, and locations.
+                        <div class="pcs-choice-info">
+                            <div class="pcs-choice-name">Tapped holes</div>
+                            <div class="pcs-choice-sub">Internal threads cut into the part.</div>
                         </div>
-                    </div>
+                        @if (Part!.HasThreadedHoles)
+                        {
+                            <div class="pcs-card-check">
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            </div>
+                        }
+                    </button>
+                    <button class="pcs-choice-card pcs-feature-card @(Part!.HasInserts ? "pcs-choice-card--active" : "")"
+                            @onclick="@(() => OnInsertsChanged(!Part!.HasInserts))">
+                        <div class="pcs-choice-swatch">
+                            <MudIcon Icon="@Icons.Material.Outlined.Hardware" Size="Size.Small" />
+                        </div>
+                        <div class="pcs-choice-info">
+                            <div class="pcs-choice-name">Thread inserts</div>
+                            <div class="pcs-choice-sub">Installed threaded hardware such as Helicoil or heat-set inserts.</div>
+                        </div>
+                        @if (Part!.HasInserts)
+                        {
+                            <div class="pcs-card-check">
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            </div>
+                        }
+                    </button>
                 </div>
                 @if (Part!.RequiresThreadSpecificationDrawing && !Part.HasRequiredThreadSpecificationDrawing)
                 {
@@ -220,6 +232,7 @@
                 <section class="pcs-section">
                     <div class="pcs-section-header">
                         <span class="pcs-section-title">Options</span>
+                        <span class="pcs-section-count">@visibleOptions.Count options</span>
                     </div>
                     <div class="pcs-options-stack">
                         @foreach (var opt in visibleOptions)
@@ -280,7 +293,7 @@
                                                        @onchange="@(e => OnPaintColorHexChanged(opt.ConfigKey, e.Value?.ToString()))" />
                                             </label>
                                             <MudTextField T="string"
-                                                          Label="Pantone / RAL color"
+                                                          Label="Custom color name/code"
                                                           Value="@paintReference"
                                                           ValueChanged="@(val => OnPaintColorReferenceChanged(opt.ConfigKey, val))"
                                                           Placeholder="RAL 9005, Pantone Black C..."
@@ -360,6 +373,7 @@
             <section class="pcs-section">
                 <div class="pcs-section-header">
                     <span class="pcs-section-title">Inspection</span>
+                    <span class="pcs-section-count">@InspectionOptions.Count options</span>
                 </div>
                 <div class="pcs-cards">
                     @foreach (var inspection in InspectionOptions)
@@ -803,28 +817,8 @@
 
             .pcs-feature-toggle-grid {
                 display: grid;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 6px;
-            }
-
-            .pcs-feature-option {
-                border: 1px solid var(--maliev-border);
-                border-radius: 5px;
-                background: var(--maliev-panel);
-                padding: 6px 10px 8px;
-                min-width: 0;
-            }
-
-            .pcs-feature-checkbox {
-                margin: 0;
-                padding: 0;
-            }
-
-            .pcs-feature-help {
-                color: var(--maliev-muted);
-                font-size: 10.5px;
-                line-height: 1.35;
-                margin-left: 30px;
+                grid-template-columns: 1fr;
+                gap: 4px;
             }
 
             .pcs-feature-warning {

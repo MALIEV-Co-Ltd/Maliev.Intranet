@@ -678,8 +678,8 @@
                 await _modelViewer.ToggleDfmOverlayAsync(fileId, supportKey, supportUrl, true);
         }
 
-        // Show/hide the grid floor when overhang overlay is toggled
-        if (issue.Category == "overhang")
+        // Show/hide the grid floor when support-related overlays are toggled.
+        if (issue.Category is "overhang" or "support_required")
         {
             if (isActive)
                 await _modelViewer.ShowGridAsync();
@@ -704,9 +704,7 @@
                 if (fdm.OverhangFaceCount > 0)
                     issues.Add((Icons.Material.Filled.Layers, $"{fdm.OverhangFaceCount} overhang region(s)", "Overhang regions exceeding the angle limit — support structures likely required", "overhang"));
                 else if (fdm.SupportRequired)
-                    // Only show the generic support notice when there are no overhang regions
-                    // to display (e.g. support driven purely by thin walls or bridges).
-                    issues.Add((Icons.Material.Filled.AddHome, "Support structures required", "This model requires support structures for printing", null));
+                    issues.Add((Icons.Material.Filled.AddHome, "Support structures required", "This model requires support structures for printing", "support_required"));
                 if (fdm.SmallDetailCount > 0)
                     issues.Add((Icons.Material.Filled.ZoomOutMap, $"{fdm.SmallDetailCount} small detail(s) may be lost", "Some fine details may not reproduce accurately", "small_feature"));
                 break;
