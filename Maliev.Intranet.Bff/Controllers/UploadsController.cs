@@ -339,6 +339,15 @@ public class UploadsController(
         {
             foreach (var file in result.MigratedFiles)
             {
+                var existingStatus = await analysisStatusService.GetStatusAsync(file.OldPath, ct);
+                if (string.IsNullOrWhiteSpace(existingStatus?.GlbStoragePath))
+                {
+                    logger.LogInformation(
+                        "GLB artifact for {OldPath} is not ready yet; late geometry events will resolve the migrated path by file id.",
+                        file.OldPath);
+                    continue;
+                }
+
                 var oldGlbPath = file.OldPath + "_viewer.glb";
                 var newGlbPath = file.NewPath + "_viewer.glb";
                 var glbCopied = await uploadClient.CopyFileAsync(oldGlbPath, newGlbPath, ct);

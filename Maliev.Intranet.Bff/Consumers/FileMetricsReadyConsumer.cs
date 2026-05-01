@@ -1,3 +1,4 @@
+using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared.Dtos;
@@ -15,6 +16,7 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
 {
     private readonly IHubContext<NotificationHub> _hub;
     private readonly IFileAnalysisStatusService _analysisStatusService;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<FileMetricsReadyConsumer> _logger;
 
     /// <summary>
@@ -23,10 +25,12 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
     public FileMetricsReadyConsumer(
         IHubContext<NotificationHub> hub,
         IFileAnalysisStatusService analysisStatusService,
+        IHttpClientFactory httpClientFactory,
         ILogger<FileMetricsReadyConsumer> logger)
     {
         _hub = hub;
         _analysisStatusService = analysisStatusService;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -46,6 +50,13 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
             "FileMetricsReadyConsumer: received event for file {FileId}, storagePath={StoragePath}",
             payload.FileId, payload.StoragePath);
 
+        var uploadClient = new UploadServiceClient("UploadServiceClient.Consumer", _httpClientFactory);
+        var storagePath = await ResolveCurrentStoragePathAsync(
+            uploadClient,
+            payload.FileId,
+            payload.StoragePath,
+            context.CancellationToken);
+
         var dimensions = payload.Metrics?.BoundingBox is { } bb
             ? new FileAnalysisDimensionsDto
             {
@@ -60,16 +71,16 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
         var nonManifoldReason = payload.Metrics?.NonManifoldReason;
         var nonManifoldFaceCount = payload.Metrics?.NonManifoldFaceCount;
 
-        await _analysisStatusService.SetProcessingAsync(payload.StoragePath, context.CancellationToken);
+        await _analysisStatusService.SetProcessingAsync(storagePath, context.CancellationToken);
 
         if (dimensions != null)
         {
             await _analysisStatusService.SetDimensionsAsync(
-                payload.StoragePath, dimensions, isManifold, nonManifoldReason, nonManifoldFaceCount, context.CancellationToken);
+                storagePath, dimensions, isManifold, nonManifoldReason, nonManifoldFaceCount, context.CancellationToken);
 
             _logger.LogInformation(
                 "FileMetricsReadyConsumer: stored dimensions for key={StoragePath}, manifold={IsManifold}",
-                payload.StoragePath, isManifold);
+                storagePath, isManifold);
         }
 
         // Convert body metadata to SignalR format
@@ -88,7 +99,7 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
         )).ToList();
 
         var signalRPayload = new FileAnalysisCompletedPayload(
-            StoragePath: payload.StoragePath,
+            StoragePath: storagePath,
             UploadId: payload.FileId,
             ThumbnailUrl: null,
             HiResThumbnailUrl: null,
@@ -103,13 +114,34 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
             NonManifoldReason: nonManifoldReason,
             NonManifoldFaceCount: nonManifoldFaceCount);
 
-        await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
+        await _hub.Clients.Group($"file:{storagePath}").SendAsync(
             "FileAnalysisCompleted",
             signalRPayload,
             context.CancellationToken);
 
         _logger.LogInformation(
             "FileMetricsReadyConsumer: pushed dimensions via SignalR for {StoragePath}",
-            payload.StoragePath);
+            storagePath);
+    }
+
+    private async Task<string> ResolveCurrentStoragePathAsync(
+        UploadServiceClient uploadClient,
+        string fileId,
+        string eventStoragePath,
+        CancellationToken cancellationToken)
+    {
+        var currentPath = await uploadClient.GetStoragePathAsync(fileId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(currentPath) ||
+            string.Equals(currentPath, eventStoragePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return eventStoragePath;
+        }
+
+        _logger.LogInformation(
+            "FileMetricsReadyConsumer: file {FileId} moved while analysis was in flight; using current storage path {CurrentPath} instead of event path {EventPath}.",
+            fileId,
+            currentPath,
+            eventStoragePath);
+        return currentPath;
     }
 }

@@ -65,10 +65,22 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
             return;
         }
 
+        var uploadClient = CreateUploadClient();
+        var storagePath = await ResolveCurrentStoragePathAsync(
+            uploadClient,
+            payload.FileId,
+            payload.StoragePath,
+            context.CancellationToken);
+
         // Merge: read existing cached reports and preserve non-null fields from prior events.
         // Without merging, a SLS/MJF/SLA_DLP event (which sets only fdm/sla report) would
         // overwrite all three fields with null, wiping data from the earlier FDM event.
-        var existing = await _analysisStatusService.GetStatusAsync(payload.StoragePath, context.CancellationToken);
+        var existing = await _analysisStatusService.GetStatusAsync(storagePath, context.CancellationToken);
+        if (existing == null)
+        {
+            await _analysisStatusService.SetProcessingAsync(storagePath, context.CancellationToken);
+        }
+
         object? existingFdm = null;
         object? existingSla = null;
         object? existingCnc = null;
@@ -90,11 +102,11 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         };
 
         await _analysisStatusService.SetDfmReportsAsync(
-            payload.StoragePath, dfmReports, context.CancellationToken);
+            storagePath, dfmReports, context.CancellationToken);
 
         _logger.LogInformation(
             "DfmAnalysisReadyConsumer: cached DFM reports for storagePath={StoragePath}",
-            payload.StoragePath);
+            storagePath);
 
         var fdmReport = DeserializeReport<FdmDfmReportPayload>(payload.FdmReport);
         var slaReport = DeserializeReport<SlaDfmReportPayload>(payload.SlaReport);
@@ -124,7 +136,7 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
             {
                 try
                 {
-                    var url = await CreateUploadClient().GetDownloadUrlByPathAsync(
+                    var url = await uploadClient.GetDownloadUrlByPathAsync(
                         kvp.Value, context.CancellationToken, expirationMinutes: 10080);
                     if (!string.IsNullOrEmpty(url))
                         signed[kvp.Key] = url;
@@ -143,10 +155,10 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         string? nonManifoldReason = payload.NonManifoldReason;
         int? nonManifoldFaceCount = payload.NonManifoldFaceCount;
 
-        await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
+        await _hub.Clients.Group($"file:{storagePath}").SendAsync(
             "DfmAnalysisReady",
             new DfmAnalysisReadyPayload(
-                StoragePath: payload.StoragePath,
+                StoragePath: storagePath,
                 FdmReport: fdmReport,
                 SlaReport: slaReport,
                 CncReport: cncReport,
@@ -160,6 +172,27 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
                 NonManifoldReason: nonManifoldReason,
                 NonManifoldFaceCount: nonManifoldFaceCount),
             context.CancellationToken);
+    }
+
+    private async Task<string> ResolveCurrentStoragePathAsync(
+        UploadServiceClient uploadClient,
+        string fileId,
+        string eventStoragePath,
+        CancellationToken cancellationToken)
+    {
+        var currentPath = await uploadClient.GetStoragePathAsync(fileId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(currentPath) ||
+            string.Equals(currentPath, eventStoragePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return eventStoragePath;
+        }
+
+        _logger.LogInformation(
+            "DfmAnalysisReadyConsumer: file {FileId} moved while analysis was in flight; using current storage path {CurrentPath} instead of event path {EventPath}.",
+            fileId,
+            currentPath,
+            eventStoragePath);
+        return currentPath;
     }
 
     private static T? DeserializeReport<T>(object? value) where T : class
