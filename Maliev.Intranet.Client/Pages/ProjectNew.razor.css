@@ -114,8 +114,8 @@
     }
     .pn-parts-drawer {
         display: block;
-        --mud-drawer-width: min(420px, 100vw);
-        --mud-drawer-width-left: min(420px, 100vw);
+        --mud-drawer-width: min(270px, 100vw);
+        --mud-drawer-width-left: min(270px, 100vw);
     }
     .pn-parts-drawer ::deep .mud-drawer {
         width: var(--mud-drawer-width, var(--mud-drawer-width-left)) !important;
@@ -126,12 +126,13 @@
         box-sizing: border-box;
     }
     .pn-parts-drawer ::deep .plp-root {
-        width: 100%;
+        width: min(270px, 100vw);
         min-width: 0;
+        max-width: 100vw;
         height: 100dvh;
         border-right: none;
         box-sizing: border-box;
-        flex: 1 1 auto;
+        flex: 0 0 min(270px, 100vw);
     }
     .pn-parts-drawer ::deep .plp-list {
         flex: 1 1 0;
@@ -161,13 +162,13 @@
 
 @media (max-width: 600px) {
     .pn-parts-drawer ::deep .mud-drawer {
-        --mud-drawer-width: 100vw;
-        --mud-drawer-width-left: 100vw;
-        width: 100vw !important;
+        --mud-drawer-width: min(270px, 100vw);
+        --mud-drawer-width-left: min(270px, 100vw);
+        width: var(--mud-drawer-width, var(--mud-drawer-width-left)) !important;
         max-width: 100vw;
     }
     .pn-parts-drawer ::deep .plp-root {
-        width: 100vw;
+        width: min(270px, 100vw);
     }
     .pn-mobile-toolbar {
         padding: 8px;
