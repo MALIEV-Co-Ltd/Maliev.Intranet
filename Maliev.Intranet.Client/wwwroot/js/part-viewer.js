@@ -783,6 +783,8 @@ function addRingToCenterCluster(clusters, entry, tolerance) {
             centerU: entry.ring.centerU,
             centerV: entry.ring.centerV,
             minRadius: entry.ring.radius,
+            minT: entry.ring.axisT,
+            maxT: entry.ring.axisT,
             totalQuality: entry.quality,
             ringCount: 1,
         });
@@ -793,6 +795,8 @@ function addRingToCenterCluster(clusters, entry, tolerance) {
     target.centerU = ((target.centerU * target.totalQuality) + (entry.ring.centerU * entry.quality)) / totalQuality;
     target.centerV = ((target.centerV * target.totalQuality) + (entry.ring.centerV * entry.quality)) / totalQuality;
     target.minRadius = Math.min(target.minRadius, entry.ring.radius);
+    target.minT = Math.min(target.minT, entry.ring.axisT);
+    target.maxT = Math.max(target.maxT, entry.ring.axisT);
     target.totalQuality = totalQuality;
     target.ringCount += 1;
 }
@@ -829,6 +833,7 @@ function selectTurningAxisCenterCluster(rings, diagonal) {
         centerV: selected.centerV,
         score: selected.totalQuality,
         ringCount: selected.ringCount,
+        axisSpan: Math.max(0, selected.maxT - selected.minT),
     };
 }
 
@@ -857,20 +862,32 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
     points.forEach(point => {
         const t = BABYLON.Vector3.Dot(point, normalizedDirection);
         const key = Math.round(t / bucketSize);
-        if (!buckets.has(key)) buckets.set(key, []);
-        buckets.get(key).push({
+        if (!buckets.has(key)) {
+            buckets.set(key, {
+                points: [],
+                tSum: 0,
+                count: 0,
+            });
+        }
+
+        const bucket = buckets.get(key);
+        bucket.points.push({
             x: BABYLON.Vector3.Dot(point, u),
             y: BABYLON.Vector3.Dot(point, v),
         });
+        bucket.tSum += t;
+        bucket.count += 1;
     });
 
     const rings = [];
-    for (const bucketPoints of buckets.values()) {
+    for (const bucket of buckets.values()) {
+        const bucketPoints = bucket.points;
         if (bucketPoints.length < TURNING_AXIS_RING_MIN_POINTS) continue;
 
         const uniquePoints = unique2DPoints(bucketPoints, uniqueTolerance);
         if (uniquePoints.length < TURNING_AXIS_RING_MIN_POINTS) continue;
 
+        const axisT = bucket.tSum / Math.max(1, bucket.count);
         const pointGroups = buildCirclePointGroups(uniquePoints, fallbackU, fallbackV, diagonal);
         pointGroups.forEach(group => {
             const sampledPoints = group.length > 220
@@ -882,7 +899,7 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
             const residualLimit = Math.max(0.22, fit.radius * 0.10);
             if (fit.coverage < TURNING_AXIS_MIN_RING_COVERAGE || fit.residual > residualLimit) return;
 
-            rings.push(fit);
+            rings.push({ ...fit, axisT });
         });
     }
 
@@ -891,6 +908,7 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
             direction: normalizedDirection,
             center: fallbackCenter,
             score: 0,
+            centerScore: 0,
             ringCount: 0,
         };
     }
@@ -901,10 +919,14 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
             direction: normalizedDirection,
             center: fallbackCenter,
             score: 0,
+            centerScore: 0,
             ringCount: 0,
         };
     }
 
+    const axialCoverage = Math.max(0, Math.min(1, selectedCluster.axisSpan / axisLength));
+    const ringSupport = Math.max(0, Math.min(1, selectedCluster.ringCount / 6));
+    const supportMultiplier = 0.50 + axialCoverage * 0.40 + ringSupport * 0.10;
     const axisMid = (minT + maxT) / 2;
     const center = u.scale(selectedCluster.centerU)
         .add(v.scale(selectedCluster.centerV))
@@ -913,8 +935,10 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
     return {
         direction: normalizedDirection,
         center,
-        score: selectedCluster.score,
+        score: selectedCluster.score * supportMultiplier,
+        centerScore: selectedCluster.score,
         ringCount: selectedCluster.ringCount,
+        axialCoverage,
     };
 }
 
@@ -935,24 +959,21 @@ function resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, bb, fallba
             return best;
         }
 
-        return {
-            direction: detectTurningAxisDirectionFromBounds(bb),
-            center: fallbackCenter,
-            score: 0,
-            ringCount: 0,
-        };
+        return null;
     }
 
     const direction = normalizeAxisVector(axisVector)
         || directionFromPrimaryAxis(primaryAxis)
         || detectTurningAxisDirectionFromBounds(bb);
     const evaluated = evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter);
+    const centerScore = evaluated.centerScore ?? evaluated.score;
     return {
         direction,
-        center: evaluated.score >= TURNING_AXIS_MIN_CENTER_SCORE && evaluated.ringCount > 0
+        center: centerScore >= TURNING_AXIS_MIN_CENTER_SCORE && evaluated.ringCount > 0
             ? evaluated.center
             : fallbackCenter,
         score: evaluated.score,
+        centerScore,
         ringCount: evaluated.ringCount,
     };
 }
@@ -1122,7 +1143,10 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     const fallbackCenter = toWorldPoint(centerData);
     const resolvedAxis = resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, bb, fallbackCenter);
     const direction = resolvedAxis?.direction;
-    if (!direction) return false;
+    if (!direction) {
+        clearTurningAxis(canvasId, false);
+        return false;
+    }
 
     clearTurningAxis(canvasId, false);
 
@@ -1145,18 +1169,10 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     const end = center.add(direction.scale(maxDot + padding));
     const length = BABYLON.Vector3.Distance(start, end);
 
-    const arrowLength = Math.max(length * 0.035, 5);
-    const arrowWidth = arrowLength * 0.45;
-    let perp = BABYLON.Vector3.Cross(direction, BABYLON.Axis.Z);
-    if (perp.length() < 1e-6) perp = BABYLON.Vector3.Cross(direction, BABYLON.Axis.Y);
-    perp.normalize();
-
     const overlay = createTurningAxisSvg();
     const axisLabel = createTurningAxisLabel('Axis of Turning');
-    const cwLabel = createTurningAxisLabel('CW');
     const labelPositions = [
         { div: axisLabel, worldPos: center.add(direction.scale(length * 0.10)) },
-        { div: cwLabel, worldPos: start.add(direction.scale(arrowLength * 2.2)).add(perp.scale(arrowWidth * 2.4)) },
     ];
 
     const state = {

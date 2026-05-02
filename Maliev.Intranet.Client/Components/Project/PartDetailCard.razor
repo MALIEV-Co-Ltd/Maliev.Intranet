@@ -569,15 +569,21 @@
         if (!IsCncTurningProcess(Part.ProcessCode))
             return null;
 
-        if (Part.CncDfmReport is CncDfmReportPayload cnc
-            && cnc.AxisVector.Count >= 3
-            && !string.IsNullOrWhiteSpace(cnc.PrimaryAxis))
+        if (Part.CncDfmReport is CncDfmReportPayload cnc)
         {
-            return new ModelViewer.TurningAxisViewModel(cnc.PrimaryAxis, cnc.AxisVector.Take(3).ToArray());
+            if (IsNotTurnableReport(cnc))
+                return null;
+
+            if (cnc.AxisVector.Count >= 3
+                && !string.IsNullOrWhiteSpace(cnc.PrimaryAxis))
+            {
+                return new ModelViewer.TurningAxisViewModel(cnc.PrimaryAxis, cnc.AxisVector.Take(3).ToArray());
+            }
         }
 
         if (Part.DfmReport is DfmReport dto
             && string.Equals(dto.ReportType, "CNC_TURN", StringComparison.OrdinalIgnoreCase)
+            && !IsNotTurnableReport(dto)
             && dto.AxisVector.Count >= 3
             && !string.IsNullOrWhiteSpace(dto.PrimaryAxis))
         {
@@ -585,6 +591,7 @@
         }
 
         if (Part.CncDfmReport is DfmReport cachedDto
+            && !IsNotTurnableReport(cachedDto)
             && cachedDto.AxisVector.Count >= 3
             && !string.IsNullOrWhiteSpace(cachedDto.PrimaryAxis))
         {
@@ -602,6 +609,23 @@
     {
         return new ModelViewer.TurningAxisViewModel("AUTO", [0.0, 0.0, 0.0]);
     }
+
+    private static bool IsNotTurnableReport(CncDfmReportPayload report) =>
+        !report.IsTurnable && HasNotTurnableIssue(report.Issues);
+
+    private static bool IsNotTurnableReport(DfmReport report) =>
+        report.IsTurnable == false || HasNotTurnableIssue(report.Issues);
+
+    private static bool HasNotTurnableIssue(IEnumerable<CncDfmReportPayloadIssuesItem> issues) =>
+        issues.Any(issue => IsNotTurnableIssue(issue.Category, issue.Title));
+
+    private static bool HasNotTurnableIssue(IEnumerable<Maliev.Intranet.Shared.Dtos.DfmIssue> issues) =>
+        issues.Any(issue => IsNotTurnableIssue(issue.Category, issue.Title));
+
+    private static bool IsNotTurnableIssue(string? category, string? title) =>
+        string.Equals(category, "not_turnable", StringComparison.OrdinalIgnoreCase)
+        || (!string.IsNullOrWhiteSpace(title)
+            && title.Contains("Not Suitable for Turning", StringComparison.OrdinalIgnoreCase));
 
     private async Task HandleViewerLoadFailed(string errorMessage)
     {
