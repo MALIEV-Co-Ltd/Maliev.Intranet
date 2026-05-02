@@ -69,6 +69,7 @@ public class ProjectQuotationPdfMapperTests
                     FinishCode = "AS_PRNTED",
                     ToleranceId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd"),
                     ToleranceCode = "FDM_STD",
+                    RoughnessCode = "RA_1_6",
                     HasThreadedHoles = true,
                     ThreadedHoleSpec = "M3",
                     ThreadedHoleCount = 4,
@@ -95,6 +96,7 @@ public class ProjectQuotationPdfMapperTests
                     ProcessOptionValues =
                     {
                         ["material_color"] = "Black",
+                        ["deburring"] = "true",
                     },
                 },
             ],
@@ -105,18 +107,77 @@ public class ProjectQuotationPdfMapperTests
         Assert.Equal(214, data.TotalAmount);
         Assert.Equal("Jane Buyer", data.ContactPerson);
         Assert.Equal("0105559999999", data.CustomerTaxId);
-        Assert.Equal("Head Office / สำนักงานใหญ่", data.CustomerBranch);
+        Assert.Equal("Head Office", data.CustomerBranch);
         Assert.Equal("+66 2 765 4321", data.CustomerPhone);
         Assert.Contains("88 Billing Road", data.BillingAddress);
         Assert.Contains("99 Shipping Road", data.ShippingAddress);
+        Assert.Equal("bracket.step", data.Items[0].PartName);
+        Assert.Equal("PLA", data.Items[0].MaterialName);
         Assert.Equal("3D Printing (FDM)", data.Items[0].ManufacturingProcess);
-        Assert.Contains("Finish: As-printed", data.Items[0].Notes);
-        Assert.Contains("Tolerance: FDM Standard +-0.3mm", data.Items[0].Notes);
-        Assert.Contains("Color: Black", data.Items[0].Notes);
+        Assert.Contains("As-printed", data.Items[0].DetailLines);
+        Assert.Contains("FDM Standard +-0.3mm", data.Items[0].DetailLines);
+        Assert.Contains("Ra 1.6 um", data.Items[0].DetailLines);
+        Assert.Contains("Black", data.Items[0].DetailLines);
         Assert.Contains("Tapped holes: 4 x M3", data.Items[0].Notes);
         Assert.Contains("Inserts: 2 x HeatSet", data.Items[0].Notes);
+        Assert.Contains("Deburring", data.Items[0].DetailLines);
         Assert.Contains("Inspection: Dimensional", data.Items[0].Notes);
         Assert.Contains("Drawing: bracket-drawing.pdf", data.Items[0].Notes);
+    }
+
+    /// <summary>
+    /// Verifies Thai company quotation data uses Thai branch and multiline address format.
+    /// </summary>
+    [Fact]
+    public void BuildDraftPdfData_WithThaiCompany_FormatsQuoteToAndAddresses()
+    {
+        var data = ProjectQuotationPdfMapper.BuildDraftPdfData(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            new CustomerSummaryDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "ณฐพล วนาศรีวิไล",
+                CompanyName = "บริษัท มาลีฟ จำกัด",
+                CompanyPhone = "028816002",
+            },
+            new CustomerDetailDto
+            {
+                Name = "ณฐพล วนาศรีวิไล",
+                CompanyName = "บริษัท มาลีฟ จำกัด",
+                CompanyPhone = "028816002",
+                CompanyBillingAddress = new AddressResponse
+                {
+                    Type = "Billing",
+                    AddressLine1 = "36/1 หมู่ 3",
+                    District = "คลองข่อย",
+                    City = "ปากเกร็ด",
+                    StateProvince = "นนทบุรี",
+                    PostalCode = "11120",
+                },
+                Addresses =
+                [
+                    new AddressResponse
+                    {
+                        Type = "Shipping",
+                        AddressLine1 = "36/2 หมู่ 4",
+                        District = "บางจาก",
+                        City = "ภาษีเจริญ",
+                        StateProvince = "กรุงเทพมหานคร",
+                        PostalCode = "10160",
+                    },
+                ],
+            },
+            "THB",
+            DateTime.SpecifyKind(new DateTime(2026, 5, 2), DateTimeKind.Utc),
+            "Standard: 5 - 8 business days after order confirmation",
+            [],
+            []);
+
+        Assert.Equal("สำนักงานใหญ่", data.CustomerBranch);
+        Assert.Equal("ณฐพล วนาศรีวิไล (028816002)", data.CustomerDisplayLines[0]);
+        Assert.Equal("บริษัท มาลีฟ จำกัด (สำนักงานใหญ่)", data.CustomerDisplayLines[1]);
+        Assert.Equal(["36/1 หมู่ 3", "ตำบลคลองข่อย", "อำเภอปากเกร็ด", "จังหวัดนนทบุรี 11120"], data.BillingAddressLines);
+        Assert.Equal(["36/2 หมู่ 4", "ตำบลบางจาก", "อำเภอภาษีเจริญ", "จังหวัดกรุงเทพมหานคร 10160"], data.ShippingAddressLines);
     }
 
     /// <summary>

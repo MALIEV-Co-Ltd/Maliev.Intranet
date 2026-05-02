@@ -32,18 +32,27 @@ public static class ProjectQuotationPdfMapper
             : "Corporate";
         var billingAddress = ResolveBillingAddress(customerDetail);
         var shippingAddress = ResolveShippingAddress(customerDetail);
+        var billingAddressLines = FormatAddressLines(billingAddress);
+        var shippingAddressLines = FormatAddressLines(shippingAddress);
+        var isThaiCustomer = ContainsThai(ResolveCustomerName(selectedCustomer, customerDetail))
+            || billingAddressLines.Any(ContainsThai);
+        var customerBranch = ResolveCustomerBranch(customerType, isThaiCustomer);
+        var customerPhone = ResolveCustomerPhone(selectedCustomer, customerDetail, customerType);
 
         return new QuotationPdfData
         {
             QuotationNumber = TruncateQuotationNumber($"DRAFT-{projectId:N}"),
             CustomerName = ResolveCustomerName(selectedCustomer, customerDetail),
             CustomerType = customerType,
-            CustomerBranch = ResolveCustomerBranch(customerType),
+            CustomerBranch = customerBranch,
             CustomerTaxId = customerDetail?.CompanyVatNumber ?? customerDetail?.CompanyRegistrationNumber,
-            CustomerPhone = ResolveCustomerPhone(selectedCustomer, customerDetail, customerType),
-            CustomerAddress = billingAddress,
-            BillingAddress = billingAddress,
-            ShippingAddress = shippingAddress,
+            CustomerPhone = customerPhone,
+            CustomerDisplayLines = BuildCustomerDisplayLines(selectedCustomer, customerDetail, customerType, customerBranch, customerPhone),
+            CustomerAddress = FormatAddressText(billingAddressLines),
+            BillingAddress = FormatAddressText(billingAddressLines),
+            BillingAddressLines = billingAddressLines,
+            ShippingAddress = FormatAddressText(shippingAddressLines),
+            ShippingAddressLines = shippingAddressLines,
             ContactPerson = customerDetail?.Name ?? selectedCustomer?.Name,
             QuotationDate = nowUtc,
             ValidityStart = nowUtc,
@@ -58,8 +67,10 @@ public static class ProjectQuotationPdfMapper
             Items = parts.Select((part, index) => new QuotationPdfItem
             {
                 Index = index + 1,
+                PartName = part.Name,
                 MaterialName = ResolveMaterialName(part),
                 ManufacturingProcess = ResolveProcessName(part, processes),
+                DetailLines = BuildLineItemDetailLines(part),
                 Quantity = part.Quantity,
                 QuantityUnit = "pcs",
                 UnitPrice = part.EstimatedUnitPrice ?? 0m,
@@ -74,16 +85,29 @@ public static class ProjectQuotationPdfMapper
     /// </summary>
     public static string? BuildLineItemNotes(PartViewModel part)
     {
+        var notes = BuildLineItemDetailLines(part);
+
+        return notes.Count == 0 ? null : string.Join(Environment.NewLine, notes);
+    }
+
+    /// <summary>
+    /// Builds human-readable line item detail rows for the quotation PDF.
+    /// </summary>
+    public static List<string> BuildLineItemDetailLines(PartViewModel part)
+    {
         var notes = new List<string>();
 
         if (ResolveFinishName(part) is { Length: > 0 } finishName)
-            notes.Add($"Finish: {finishName}");
+            notes.Add(finishName);
 
         if (ResolveToleranceName(part) is { Length: > 0 } toleranceName)
-            notes.Add($"Tolerance: {toleranceName}");
+            notes.Add(toleranceName);
+
+        if (ResolveRoughnessName(part) is { Length: > 0 } roughness)
+            notes.Add(roughness);
 
         if (ResolveColor(part) is { Length: > 0 } color)
-            notes.Add($"Color: {color}");
+            notes.Add(color);
 
         if (part.HasThreadedHoles)
         {
@@ -98,6 +122,9 @@ public static class ProjectQuotationPdfMapper
             notes.Add($"Inserts: {count} x {part.InsertType}");
         }
 
+        if (ResolveDeburring(part) is { Length: > 0 } deburring)
+            notes.Add(deburring);
+
         if (part.InspectionLevel != InspectionLevel.Standard)
             notes.Add($"Inspection: {part.InspectionLevel}");
 
@@ -107,7 +134,7 @@ public static class ProjectQuotationPdfMapper
         if (!string.IsNullOrWhiteSpace(part.PartNotes))
             notes.Add(part.PartNotes);
 
-        return notes.Count == 0 ? null : string.Join(" | ", notes);
+        return notes;
     }
 
     /// <summary>
@@ -138,8 +165,42 @@ public static class ProjectQuotationPdfMapper
         return customerDetail?.Name ?? selectedCustomer?.Name ?? "N/A";
     }
 
-    private static string? ResolveCustomerBranch(string customerType) =>
-        customerType == "Corporate" ? "Head Office / สำนักงานใหญ่" : null;
+    private static string? ResolveCustomerBranch(string customerType, bool isThaiCustomer)
+    {
+        if (customerType != "Corporate")
+            return null;
+
+        return isThaiCustomer ? "สำนักงานใหญ่" : "Head Office";
+    }
+
+    private static List<string> BuildCustomerDisplayLines(
+        CustomerSummaryDto? selectedCustomer,
+        CustomerDetailDto? customerDetail,
+        string customerType,
+        string? customerBranch,
+        string? customerPhone)
+    {
+        var lines = new List<string>();
+        var contactName = FirstNonEmpty(customerDetail?.Name, selectedCustomer?.Name);
+        var customerName = ResolveCustomerName(selectedCustomer, customerDetail);
+
+        if (customerType == "Corporate")
+        {
+            if (!string.IsNullOrWhiteSpace(contactName))
+                lines.Add(string.IsNullOrWhiteSpace(customerPhone) ? contactName : $"{contactName} ({customerPhone})");
+
+            var branch = string.IsNullOrWhiteSpace(customerBranch) ? string.Empty : $" ({customerBranch})";
+            lines.Add($"{customerName}{branch}");
+        }
+        else
+        {
+            lines.Add(customerName);
+            if (!string.IsNullOrWhiteSpace(customerPhone))
+                lines.Add(customerPhone);
+        }
+
+        return lines.Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
+    }
 
     private static string? ResolveCustomerPhone(CustomerSummaryDto? selectedCustomer, CustomerDetailDto? customerDetail, string customerType)
     {
@@ -171,8 +232,8 @@ public static class ProjectQuotationPdfMapper
             : null;
 
         return string.IsNullOrWhiteSpace(materialName)
-            ? part.Name
-            : $"{materialName} - {part.Name}";
+            ? part.MaterialCode ?? string.Empty
+            : materialName;
     }
 
     private static string ResolveProcessName(PartViewModel part, IReadOnlyList<ProcessDto> processes)
@@ -233,26 +294,67 @@ public static class ProjectQuotationPdfMapper
         return null;
     }
 
-    private static string? ResolveBillingAddress(CustomerDetailDto? customer)
+    private static string? ResolveRoughnessName(PartViewModel part)
     {
-        return FormatAddress(customer?.CompanyBillingAddress)
-            ?? FormatAddress(customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Billing")))
-            ?? FormatAddress(customer?.Addresses.FirstOrDefault(address => address.IsDefault));
+        if (string.IsNullOrWhiteSpace(part.RoughnessCode))
+            return null;
+
+        return part.RoughnessCode.ToUpperInvariant() switch
+        {
+            "RA_3_2" => "Ra 3.2 um",
+            "RA_1_6" => "Ra 1.6 um",
+            "RA_0_8" => "Ra 0.8 um",
+            "RA_0_4" => "Ra 0.4 um",
+            _ => part.RoughnessCode.Replace("_", " ", StringComparison.Ordinal),
+        };
     }
 
-    private static string? ResolveShippingAddress(CustomerDetailDto? customer)
+    private static string? ResolveDeburring(PartViewModel part)
     {
-        return FormatAddress(customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping") && address.IsDefault))
-            ?? FormatAddress(customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping")));
+        var value = part.ProcessOptionValues
+            .FirstOrDefault(pair => pair.Key.Contains("deburr", StringComparison.OrdinalIgnoreCase))
+            .Value;
+
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        return value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("included", StringComparison.OrdinalIgnoreCase)
+            ? "Deburring"
+            : $"Deburring: {value}";
+    }
+
+    private static AddressResponse? ResolveBillingAddress(CustomerDetailDto? customer)
+    {
+        return customer?.CompanyBillingAddress
+            ?? customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Billing"))
+            ?? customer?.Addresses.FirstOrDefault(address => address.IsDefault);
+    }
+
+    private static AddressResponse? ResolveShippingAddress(CustomerDetailDto? customer)
+    {
+        return customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping") && address.IsDefault)
+            ?? customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping"));
     }
 
     private static bool IsAddressType(AddressResponse address, string type) =>
         address.Type.Contains(type, StringComparison.OrdinalIgnoreCase);
 
-    private static string? FormatAddress(AddressResponse? address)
+    private static List<string> FormatAddressLines(AddressResponse? address)
     {
         if (address == null)
-            return null;
+            return [];
+
+        var isThai = ContainsThai(address.AddressLine1)
+            || ContainsThai(address.AddressLine2)
+            || ContainsThai(address.AddressLine3)
+            || ContainsThai(address.District)
+            || ContainsThai(address.City)
+            || ContainsThai(address.StateProvince);
+
+        if (isThai)
+            return FormatThaiAddressLines(address);
 
         var parts = new[]
         {
@@ -265,6 +367,54 @@ public static class ProjectQuotationPdfMapper
             address.PostalCode,
         }.Where(value => !string.IsNullOrWhiteSpace(value));
 
-        return string.Join(", ", parts);
+        return parts.ToList()!;
     }
+
+    private static List<string> FormatThaiAddressLines(AddressResponse address)
+    {
+        var lines = new List<string>();
+        AddIfPresent(lines, address.AddressLine1);
+        AddIfPresent(lines, address.AddressLine2);
+        AddIfPresent(lines, address.AddressLine3);
+        AddThaiAdministrativeLine(lines, address.District, "ตำบล");
+        AddThaiAdministrativeLine(lines, address.City, "อำเภอ");
+
+        var provinceLine = WithThaiPrefix(address.StateProvince, "จังหวัด");
+        if (!string.IsNullOrWhiteSpace(provinceLine) && !string.IsNullOrWhiteSpace(address.PostalCode))
+            lines.Add($"{provinceLine} {address.PostalCode}");
+        else
+        {
+            AddIfPresent(lines, provinceLine);
+            AddIfPresent(lines, address.PostalCode);
+        }
+
+        return lines;
+    }
+
+    private static string? FormatAddressText(IReadOnlyList<string> lines) =>
+        lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
+
+    private static void AddThaiAdministrativeLine(List<string> lines, string? value, string prefix)
+    {
+        var line = WithThaiPrefix(value, prefix);
+        AddIfPresent(lines, line);
+    }
+
+    private static string? WithThaiPrefix(string? value, string prefix)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value.Trim();
+        return trimmed.StartsWith(prefix, StringComparison.Ordinal) ? trimmed : $"{prefix}{trimmed}";
+    }
+
+    private static void AddIfPresent(List<string> lines, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            lines.Add(value.Trim());
+    }
+
+    private static bool ContainsThai(string? value) =>
+        value?.Any(ch => ch >= '\u0E00' && ch <= '\u0E7F') == true;
 }

@@ -56,14 +56,23 @@ public class QuotationPdfData
     /// <summary>The customer phone number shown on the quotation.</summary>
     public string? CustomerPhone { get; set; }
 
+    /// <summary>Preformatted customer identity lines shown in the QUOTE TO section.</summary>
+    public List<string> CustomerDisplayLines { get; set; } = [];
+
     /// <summary>The customer billing or registered address, if available.</summary>
     public string? CustomerAddress { get; set; }
 
     /// <summary>The customer billing address shown on the quotation.</summary>
     public string? BillingAddress { get; set; }
 
+    /// <summary>Preformatted billing address lines shown on the quotation.</summary>
+    public List<string> BillingAddressLines { get; set; } = [];
+
     /// <summary>The customer shipping address shown on the quotation.</summary>
     public string? ShippingAddress { get; set; }
+
+    /// <summary>Preformatted shipping address lines shown on the quotation.</summary>
+    public List<string> ShippingAddressLines { get; set; } = [];
 
     /// <summary>The customer's contact person, if available.</summary>
     public string? ContactPerson { get; set; }
@@ -122,8 +131,14 @@ public class QuotationPdfItem
     /// <summary>Material name, service name, or product identifier.</summary>
     public string MaterialName { get; set; } = "";
 
+    /// <summary>The part file name or customer-facing part name.</summary>
+    public string? PartName { get; set; }
+
     /// <summary>Manufacturing process such as FDM, SLA, or CNC.</summary>
     public string? ManufacturingProcess { get; set; }
+
+    /// <summary>Individual part information lines shown under the part name.</summary>
+    public List<string> DetailLines { get; set; } = [];
 
     /// <summary>The quantity of the item quoted.</summary>
     public decimal Quantity { get; set; }
