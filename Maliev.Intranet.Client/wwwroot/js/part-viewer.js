@@ -2612,15 +2612,15 @@ const overlayIntendedVisible = {};
 const OVERLAY_STYLES = {
     overhang_support: {
         albedo:   () => new BABYLON.Color3(0.12, 0.55, 0.95), // support blue
-        alpha:    0.28,
+        alpha:    0.34,
         emissive: () => new BABYLON.Color3(0.02, 0.08, 0.16),
-        zOffset:  -1,
+        zOffset:  -6,
     },
     support_required: {
         albedo:   () => new BABYLON.Color3(0.12, 0.55, 0.95), // support blue
-        alpha:    0.28,
+        alpha:    0.34,
         emissive: () => new BABYLON.Color3(0.02, 0.08, 0.16),
-        zOffset:  -1,
+        zOffset:  -6,
     },
 };
 
@@ -2707,7 +2707,7 @@ export async function toggleDfmOverlay(canvasId, partKey, overlayKey, glbUrl, vi
                     mat.zOffset      = style.zOffset;
                     if (categorySuffix === 'overhang_support' || categorySuffix === 'support_required') {
                         mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-                        mat.needDepthPrePass = true;
+                        mat.needDepthPrePass = false;
                     }
                 } else {
                     mat.albedoColor  = new BABYLON.Color3(0.95, 0.10, 0.05); // red
