@@ -566,7 +566,7 @@
 
     private ModelViewer.TurningAxisViewModel? BuildTurningAxis()
     {
-        if (!string.Equals(Part.ProcessCode, "CNC_TURN", StringComparison.OrdinalIgnoreCase))
+        if (!IsCncTurningProcess(Part.ProcessCode))
             return null;
 
         if (Part.CncDfmReport is CncDfmReportPayload cnc
@@ -584,7 +584,36 @@
             return new ModelViewer.TurningAxisViewModel(dto.PrimaryAxis, dto.AxisVector.Take(3).ToArray());
         }
 
-        return null;
+        if (Part.CncDfmReport is DfmReport cachedDto
+            && cachedDto.AxisVector.Count >= 3
+            && !string.IsNullOrWhiteSpace(cachedDto.PrimaryAxis))
+        {
+            return new ModelViewer.TurningAxisViewModel(cachedDto.PrimaryAxis, cachedDto.AxisVector.Take(3).ToArray());
+        }
+
+        return BuildProvisionalTurningAxis();
+    }
+
+    private static bool IsCncTurningProcess(string? processCode) =>
+        string.Equals(processCode, "CNC_TURN", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(processCode, "CNC_TURNING", StringComparison.OrdinalIgnoreCase);
+
+    private ModelViewer.TurningAxisViewModel? BuildProvisionalTurningAxis()
+    {
+        if (Part.Dimensions == null)
+            return null;
+
+        var dimensions = Part.Dimensions;
+        if (dimensions.X <= 0 || dimensions.Y <= 0 || dimensions.Z <= 0)
+            return null;
+
+        if (dimensions.X >= dimensions.Y && dimensions.X >= dimensions.Z)
+            return new ModelViewer.TurningAxisViewModel("X", [1.0, 0.0, 0.0]);
+
+        if (dimensions.Y >= dimensions.X && dimensions.Y >= dimensions.Z)
+            return new ModelViewer.TurningAxisViewModel("Y", [0.0, 1.0, 0.0]);
+
+        return new ModelViewer.TurningAxisViewModel("Z", [0.0, 0.0, 1.0]);
     }
 
     private async Task HandleViewerLoadFailed(string errorMessage)
