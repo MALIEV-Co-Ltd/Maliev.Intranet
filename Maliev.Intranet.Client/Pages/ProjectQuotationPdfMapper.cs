@@ -27,6 +27,9 @@ public static class ProjectQuotationPdfMapper
     {
         var subtotal = parts.Sum(part => part.EstimatedTotalAmount ?? 0m);
         var taxAmount = Math.Round(subtotal * ThailandVatRate, 2, MidpointRounding.AwayFromZero);
+        var customerType = string.IsNullOrWhiteSpace(selectedCustomer?.CompanyName) && string.IsNullOrWhiteSpace(customerDetail?.CompanyName)
+            ? "Individual"
+            : "Corporate";
         var billingAddress = ResolveBillingAddress(customerDetail);
         var shippingAddress = ResolveShippingAddress(customerDetail);
 
@@ -34,8 +37,10 @@ public static class ProjectQuotationPdfMapper
         {
             QuotationNumber = TruncateQuotationNumber($"DRAFT-{projectId:N}"),
             CustomerName = ResolveCustomerName(selectedCustomer, customerDetail),
-            CustomerType = string.IsNullOrWhiteSpace(selectedCustomer?.CompanyName) ? "Individual" : "Corporate",
+            CustomerType = customerType,
+            CustomerBranch = ResolveCustomerBranch(customerType),
             CustomerTaxId = customerDetail?.CompanyVatNumber ?? customerDetail?.CompanyRegistrationNumber,
+            CustomerPhone = ResolveCustomerPhone(selectedCustomer, customerDetail, customerType),
             CustomerAddress = billingAddress,
             BillingAddress = billingAddress,
             ShippingAddress = shippingAddress,
@@ -117,6 +122,32 @@ public static class ProjectQuotationPdfMapper
 
         return customerDetail?.Name ?? selectedCustomer?.Name ?? "N/A";
     }
+
+    private static string? ResolveCustomerBranch(string customerType) =>
+        customerType == "Corporate" ? "Head Office / สำนักงานใหญ่" : null;
+
+    private static string? ResolveCustomerPhone(CustomerSummaryDto? selectedCustomer, CustomerDetailDto? customerDetail, string customerType)
+    {
+        if (customerType == "Corporate")
+        {
+            return FirstNonEmpty(
+                customerDetail?.CompanyPhone,
+                selectedCustomer?.CompanyPhone,
+                customerDetail?.Mobile,
+                selectedCustomer?.Mobile,
+                customerDetail?.Landline,
+                selectedCustomer?.Landline);
+        }
+
+        return FirstNonEmpty(
+            customerDetail?.Mobile,
+            selectedCustomer?.Mobile,
+            customerDetail?.Landline,
+            selectedCustomer?.Landline);
+    }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private static string ResolveMaterialName(PartViewModel part)
     {

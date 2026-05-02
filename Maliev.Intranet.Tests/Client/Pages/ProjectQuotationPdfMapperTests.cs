@@ -23,11 +23,13 @@ public class ProjectQuotationPdfMapperTests
                 Id = Guid.NewGuid(),
                 Name = "Jane Buyer",
                 CompanyName = "Acme Thailand",
+                CompanyPhone = "+66 2 123 4567",
             },
             new CustomerDetailDto
             {
                 Name = "Jane Buyer",
                 CompanyName = "Acme Thailand",
+                CompanyPhone = "+66 2 765 4321",
                 CompanyVatNumber = "0105559999999",
                 CompanyBillingAddress = new AddressResponse
                 {
@@ -103,6 +105,8 @@ public class ProjectQuotationPdfMapperTests
         Assert.Equal(214, data.TotalAmount);
         Assert.Equal("Jane Buyer", data.ContactPerson);
         Assert.Equal("0105559999999", data.CustomerTaxId);
+        Assert.Equal("Head Office / สำนักงานใหญ่", data.CustomerBranch);
+        Assert.Equal("+66 2 765 4321", data.CustomerPhone);
         Assert.Contains("88 Billing Road", data.BillingAddress);
         Assert.Contains("99 Shipping Road", data.ShippingAddress);
         Assert.Equal("3D Printing (FDM)", data.Items[0].ManufacturingProcess);

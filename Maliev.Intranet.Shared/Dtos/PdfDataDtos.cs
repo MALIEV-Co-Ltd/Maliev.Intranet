@@ -53,6 +53,9 @@ public class QuotationPdfData
     /// <summary>The customer tax identifier, if available.</summary>
     public string? CustomerTaxId { get; set; }
 
+    /// <summary>The customer phone number shown on the quotation.</summary>
+    public string? CustomerPhone { get; set; }
+
     /// <summary>The customer billing or registered address, if available.</summary>
     public string? CustomerAddress { get; set; }
 
