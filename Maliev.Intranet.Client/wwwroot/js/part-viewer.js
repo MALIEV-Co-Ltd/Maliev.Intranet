@@ -418,9 +418,8 @@ const modelCenterOffsets    = {};   // canvasId → { cx, cy, zLift } (centering
 const bboxLines             = {};   // canvasId → BABYLON.LinesMesh
 const bboxLabels            = {};   // canvasId → [ { div, worldPos } ]
 const bboxObservers         = {};   // canvasId → scene render observable handle
-const turningAxisLayers     = {};   // canvasId → { meshes, labels, pointerObserver, renderObserver, hovered }
+const turningAxisLayers     = {};   // canvasId → { svg, labels, pointerObserver, renderObserver, hovered }
 const turningAxisRequests   = {};   // canvasId → latest requested turning-axis payload
-const TURNING_AXIS_RENDER_GROUP = 3;
 const TURNING_AXIS_HOVER_DISTANCE_PX = 14;
 const axisGizmoLayer        = {};   // canvasId → { dispose() }
 const axisLabelDivs         = {};   // canvasId → [ { div, localPos } ]
@@ -500,6 +499,24 @@ function normalizeAxisVector(axisVector) {
     return worldDirection.normalize();
 }
 
+function detectTurningAxisDirectionFromBounds(bb) {
+    const x = Math.abs(bb.max.x - bb.min.x);
+    const y = Math.abs(bb.max.y - bb.min.y);
+    const z = Math.abs(bb.max.z - bb.min.z);
+
+    if (x >= y && x >= z) return new BABYLON.Vector3(1, 0, 0);
+    if (y >= x && y >= z) return new BABYLON.Vector3(0, 1, 0);
+    return new BABYLON.Vector3(0, 0, 1);
+}
+
+function resolveTurningAxisDirection(primaryAxis, axisVector, bb) {
+    if (String(primaryAxis || '').toUpperCase() === 'AUTO') {
+        return detectTurningAxisDirectionFromBounds(bb);
+    }
+
+    return normalizeAxisVector(axisVector) || detectTurningAxisDirectionFromBounds(bb);
+}
+
 function createTurningAxisLabel(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -518,6 +535,56 @@ function createTurningAxisLabel(text) {
     div.style.display = 'none';
     document.body.appendChild(div);
     return div;
+}
+
+function createTurningAxisSvg() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const markerId = `turning-axis-arrow-${Math.random().toString(36).slice(2)}`;
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.position = 'fixed';
+    svg.style.left = '0';
+    svg.style.top = '0';
+    svg.style.width = '100vw';
+    svg.style.height = '100vh';
+    svg.style.overflow = 'visible';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '10010';
+
+    const defs = document.createElementNS(ns, 'defs');
+    const marker = document.createElementNS(ns, 'marker');
+    marker.setAttribute('id', markerId);
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '9');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '9');
+    marker.setAttribute('markerHeight', '9');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    marker.setAttribute('markerUnits', 'strokeWidth');
+
+    const arrowPath = document.createElementNS(ns, 'path');
+    arrowPath.setAttribute('d', 'M 0 0 L 10 5 L 0 10');
+    arrowPath.setAttribute('fill', 'none');
+    arrowPath.setAttribute('stroke', '#2563eb');
+    arrowPath.setAttribute('stroke-width', '1.7');
+    arrowPath.setAttribute('stroke-linecap', 'round');
+    arrowPath.setAttribute('stroke-linejoin', 'round');
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('stroke', '#2563eb');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('stroke-dasharray', '9 7');
+    line.setAttribute('marker-start', `url(#${markerId})`);
+    line.setAttribute('marker-end', `url(#${markerId})`);
+
+    svg.appendChild(defs);
+    svg.appendChild(line);
+    document.body.appendChild(svg);
+
+    return { svg, line };
 }
 
 function projectWorldPointToScreen(worldPos, canvasId) {
@@ -588,12 +655,22 @@ function isPointerNearTurningAxis(canvasId, state, pointerEvent) {
     ) <= TURNING_AXIS_HOVER_DISTANCE_PX;
 }
 
-function configureTurningAxisLine(mesh, color, alpha) {
-    mesh.color = color;
-    mesh.alpha = alpha;
-    mesh.isPickable = false;
-    mesh.alwaysSelectAsActiveMesh = true;
-    mesh.renderingGroupId = TURNING_AXIS_RENDER_GROUP;
+function updateTurningAxisSvg(canvasId, state) {
+    const start = projectWorldPointToScreen(state.start, canvasId);
+    const end = projectWorldPointToScreen(state.end, canvasId);
+
+    if (!start || !end) {
+        state.svg.style.display = 'none';
+        state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, false));
+        return;
+    }
+
+    state.svg.style.display = '';
+    state.line.setAttribute('x1', start.x.toString());
+    state.line.setAttribute('y1', start.y.toString());
+    state.line.setAttribute('x2', end.x.toString());
+    state.line.setAttribute('y2', end.y.toString());
+    state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, state.hovered));
 }
 
 function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
@@ -602,9 +679,7 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     const centerData = meshCenters[canvasId];
     if (!scene || !bb || !centerData) return false;
 
-    scene.setRenderingAutoClearDepthStencil(TURNING_AXIS_RENDER_GROUP, true, true, true);
-
-    const direction = normalizeAxisVector(axisVector);
+    const direction = resolveTurningAxisDirection(primaryAxis, axisVector, bb);
     if (!direction) return false;
 
     clearTurningAxis(canvasId, false);
@@ -636,20 +711,6 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     const start = center.add(direction.scale(minDot - padding));
     const end = center.add(direction.scale(maxDot + padding));
     const length = BABYLON.Vector3.Distance(start, end);
-    const segmentCount = Math.max(12, Math.ceil(length / Math.max(diagonal * 0.035, 5)));
-    const dashFraction = 0.58;
-    const blue = new BABYLON.Color3(0.15, 0.39, 0.92);
-    const meshes = [];
-
-    for (let i = 0; i < segmentCount; i += 1) {
-        const t0 = i / segmentCount;
-        const t1 = Math.min((i + dashFraction) / segmentCount, 1);
-        const a = BABYLON.Vector3.Lerp(start, end, t0);
-        const b = BABYLON.Vector3.Lerp(start, end, t1);
-        const dash = BABYLON.MeshBuilder.CreateLines(`__axis_turning_dash_${i}`, { points: [a, b], updatable: false }, scene);
-        configureTurningAxisLine(dash, blue, 0.92);
-        meshes.push(dash);
-    }
 
     const arrowLength = Math.max(length * 0.035, 5);
     const arrowWidth = arrowLength * 0.45;
@@ -657,18 +718,7 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     if (perp.length() < 1e-6) perp = BABYLON.Vector3.Cross(direction, BABYLON.Axis.Y);
     perp.normalize();
 
-    function addArrow(point, dir, suffix) {
-        const base = point.subtract(dir.scale(arrowLength));
-        const sideA = base.add(perp.scale(arrowWidth));
-        const sideB = base.subtract(perp.scale(arrowWidth));
-        const arrow = BABYLON.MeshBuilder.CreateLines(`__axis_turning_arrow_${suffix}`, { points: [sideA, point, sideB], updatable: false }, scene);
-        configureTurningAxisLine(arrow, blue, 0.95);
-        meshes.push(arrow);
-    }
-
-    addArrow(end, direction, 'positive');
-    addArrow(start, direction.scale(-1), 'negative');
-
+    const overlay = createTurningAxisSvg();
     const axisLabel = createTurningAxisLabel('Axis of Turning');
     const cwLabel = createTurningAxisLabel('CW');
     const labelPositions = [
@@ -677,7 +727,8 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     ];
 
     const state = {
-        meshes,
+        svg: overlay.svg,
+        line: overlay.line,
         labels: labelPositions,
         pointerObserver: null,
         renderObserver: null,
@@ -699,8 +750,9 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
         canvas.addEventListener('pointerleave', state.canvasLeaveHandler);
     }
     state.renderObserver = scene.onBeforeRenderObservable.add(() => {
-        state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, state.hovered));
+        updateTurningAxisSvg(canvasId, state);
     });
+    updateTurningAxisSvg(canvasId, state);
 
     turningAxisLayers[canvasId] = state;
     return true;
@@ -719,7 +771,7 @@ export function clearTurningAxis(canvasId, clearRequest = true) {
         if (state.pointerObserver && scene) scene.onPointerObservable.remove(state.pointerObserver);
         if (state.renderObserver && scene) scene.onBeforeRenderObservable.remove(state.renderObserver);
         if (state.canvasLeaveHandler && canvas) canvas.removeEventListener('pointerleave', state.canvasLeaveHandler);
-        state.meshes.forEach(mesh => { try { mesh.dispose(); } catch (_) {} });
+        if (state.svg) { try { state.svg.remove(); } catch (_) {} }
         state.labels.forEach(({ div }) => { try { div.remove(); } catch (_) {} });
         delete turningAxisLayers[canvasId];
     }

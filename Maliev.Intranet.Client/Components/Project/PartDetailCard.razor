@@ -600,20 +600,7 @@
 
     private ModelViewer.TurningAxisViewModel? BuildProvisionalTurningAxis()
     {
-        if (Part.Dimensions == null)
-            return null;
-
-        var dimensions = Part.Dimensions;
-        if (dimensions.X <= 0 || dimensions.Y <= 0 || dimensions.Z <= 0)
-            return null;
-
-        if (dimensions.X >= dimensions.Y && dimensions.X >= dimensions.Z)
-            return new ModelViewer.TurningAxisViewModel("X", [1.0, 0.0, 0.0]);
-
-        if (dimensions.Y >= dimensions.X && dimensions.Y >= dimensions.Z)
-            return new ModelViewer.TurningAxisViewModel("Y", [0.0, 1.0, 0.0]);
-
-        return new ModelViewer.TurningAxisViewModel("Z", [0.0, 0.0, 1.0]);
+        return new ModelViewer.TurningAxisViewModel("AUTO", [0.0, 0.0, 0.0]);
     }
 
     private async Task HandleViewerLoadFailed(string errorMessage)
