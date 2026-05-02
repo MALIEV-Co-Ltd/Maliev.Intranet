@@ -29,7 +29,7 @@ public class AiProcessingController(
     private readonly ILogger<AiProcessingController> _logger = logger;
 
     /// <summary>
-    /// Health check endpoint to verify chatbot service availability by initiating a session.
+    /// Health check endpoint to verify chatbot service availability without creating a session.
     /// </summary>
     [AllowAnonymous]
     [HttpGet("health")]
@@ -37,16 +37,12 @@ public class AiProcessingController(
     {
         try
         {
-            // Attempt to initiate a session with the chatbot service to verify LLM connectivity
-            var sessionResponse = await chatbotClient.InitiateSessionAsync("intranet", "en", cancellationToken);
-
-            if (sessionResponse?.SessionId != null)
+            if (await chatbotClient.CheckHealthAsync(cancellationToken))
             {
                 return Ok(new
                 {
                     status = "healthy",
                     service = "ai-processing",
-                    sessionId = sessionResponse.SessionId,
                     canInitiateSession = true
                 });
             }
@@ -56,7 +52,7 @@ public class AiProcessingController(
                 status = "unavailable",
                 service = "ai-processing",
                 canInitiateSession = false,
-                message = "Failed to initiate session with chatbot service"
+                message = "Chatbot service health check failed"
             });
         }
         catch (Exception ex)

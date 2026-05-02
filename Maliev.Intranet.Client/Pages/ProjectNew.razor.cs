@@ -62,9 +62,11 @@ public partial class ProjectNew : IAsyncDisposable
     // redundant re-fetches on non-process-change events (e.g. quantity, material, finish updates).
     private readonly Dictionary<Guid, string> _routingProcessByPart = new();
     private const int PricingDebounceMs = 300;
+    private const string ReferenceDataStateKey = "ProjectNew.ReferenceData";
 
     // ── Session ────────────────────────────────────────────────────────
     private Guid _sessionId;
+    private PersistingComponentStateSubscription? _referenceDataSubscription;
 
     /// <summary>
     /// When non-null, the project has been persisted to the ProjectService as a Draft.
@@ -85,6 +87,7 @@ public partial class ProjectNew : IAsyncDisposable
     [Inject] private UploadSettings UploadSettings { get; set; } = null!;
     [Inject] private CookieProvider CookieProvider { get; set; } = null!;
     [Inject] private ILogger<ProjectNew> Logger { get; set; } = null!;
+    [Inject] private PersistentComponentState ComponentState { get; set; } = null!;
 
     private bool CanSubmit =>
         !_saving &&
@@ -104,6 +107,7 @@ public partial class ProjectNew : IAsyncDisposable
         foreach (var cts in _statusPollCts.Values) { cts.Cancel(); cts.Dispose(); }
         _statusPollCts.Clear();
         _autoSaveDebounceTimer?.Dispose();
+        _referenceDataSubscription?.Dispose();
         if (_searchCts != null) { await _searchCts.CancelAsync(); _searchCts.Dispose(); }
         if (_hubConnection != null)
             await _hubConnection.DisposeAsync();
@@ -130,35 +134,49 @@ public partial class ProjectNew : IAsyncDisposable
             Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}{resumeFragment}", replace: true);
         }
 
+        _referenceDataSubscription ??= ComponentState.RegisterOnPersisting(PersistReferenceDataAsync);
+
         // ── Load reference data ────────────────────────────────────────
         var currenciesTask = CurrencyService.InitializeAsync();
-        var processesTask = Http.GetFromJsonAsync<List<ProcessDto>>("api/v1/catalog/processes");
-        var leadTimesTask = Http.GetFromJsonAsync<List<LeadTimeOptionDto>>("api/v1/pricing/lead-times");
-
-        await Task.WhenAll(
-            currenciesTask,
-            processesTask.ContinueWith(_ => { }),
-            leadTimesTask.ContinueWith(_ => { }));
-
-        try
+        if (ComponentState.TryTakeFromJson<ProjectNewReferenceDataState>(ReferenceDataStateKey, out var cachedReferenceData) &&
+            cachedReferenceData is { Processes.Count: > 0, LeadTimes.Count: > 0 })
         {
-            var result = await processesTask;
-            if (result is { Count: > 0 })
-                _processes = result.Where(p => p.Code is not "CNC").ToList();
+            await currenciesTask;
+            _processes = cachedReferenceData.Processes.Where(p => p.Code is not "CNC").ToList();
+            _leadTimeCatalogOptions = cachedReferenceData.LeadTimes
+                .Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase))
+                .ToList();
         }
-        catch (Exception ex) { Snackbar.Add($"Failed to load processes: {ex.Message}", Severity.Warning); }
-
-        try
+        else
         {
-            var result = await leadTimesTask;
-            if (result is { Count: > 0 })
+            var processesTask = Http.GetFromJsonAsync<List<ProcessDto>>("api/v1/catalog/processes");
+            var leadTimesTask = Http.GetFromJsonAsync<List<LeadTimeOptionDto>>("api/v1/pricing/lead-times");
+
+            await Task.WhenAll(
+                currenciesTask,
+                processesTask.ContinueWith(_ => { }),
+                leadTimesTask.ContinueWith(_ => { }));
+
+            try
             {
-                _leadTimeCatalogOptions = result
-                    .Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                var result = await processesTask;
+                if (result is { Count: > 0 })
+                    _processes = result.Where(p => p.Code is not "CNC").ToList();
             }
+            catch (Exception ex) { Snackbar.Add($"Failed to load processes: {ex.Message}", Severity.Warning); }
+
+            try
+            {
+                var result = await leadTimesTask;
+                if (result is { Count: > 0 })
+                {
+                    _leadTimeCatalogOptions = result
+                        .Where(lt => !lt.Code.Equals("RUSH", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
+            }
+            catch (Exception ex) { Snackbar.Add($"Failed to load lead times: {ex.Message}", Severity.Warning); }
         }
-        catch (Exception ex) { Snackbar.Add($"Failed to load lead times: {ex.Message}", Severity.Warning); }
 
         await RestoreDraftAsync();
         RefreshLeadTimeOptionsFromPricing();
@@ -333,6 +351,22 @@ public partial class ProjectNew : IAsyncDisposable
         foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
             await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
     }
+
+    private Task PersistReferenceDataAsync()
+    {
+        if (_processes.Count > 0 && _leadTimeCatalogOptions.Count > 0)
+        {
+            ComponentState.PersistAsJson(
+                ReferenceDataStateKey,
+                new ProjectNewReferenceDataState(_processes, _leadTimeCatalogOptions));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private sealed record ProjectNewReferenceDataState(
+        List<ProcessDto> Processes,
+        List<LeadTimeOptionDto> LeadTimes);
 
     // ── Task 4: Customer search ────────────────────────────────────────
 
