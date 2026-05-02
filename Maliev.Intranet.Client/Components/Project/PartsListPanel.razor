@@ -46,15 +46,15 @@
                 @* Row 1: thumb + info *@
                 <div class="plp-part-main">
                     <div class="plp-thumb">
-                        @if (part.QueuedUpload || part.AwaitingPreview)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true"
-                                                 Color="Color.Secondary" />
-                        }
-                        else if (part.Uploading)
+                        @if (part.Uploading)
                         {
                             <MudProgressCircular Size="Size.Small" Indeterminate="false" Value="@part.ProgressPercent"
                                                  Color="Color.Primary" />
+                        }
+                        else if (part.QueuedUpload || part.AwaitingPreview)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true"
+                                                 Color="Color.Secondary" />
                         }
                         else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
                         {

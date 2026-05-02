@@ -48,6 +48,31 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
         Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
     }
 
+    [Fact]
+    public void PartsListPanel_UploadingAndAwaitingPreview_ShowsLiveUploadProgress()
+    {
+        var parts = new List<PartViewModel>
+        {
+            new()
+            {
+                FileId = Guid.NewGuid(),
+                Name = "bracket.stl",
+                Uploading = true,
+                AwaitingPreview = true,
+                ProgressPercent = 44
+            }
+        };
+
+        var cut = Render<PartsListPanel>(parameters => parameters
+            .Add(p => p.Title, "Test quote")
+            .Add(p => p.Parts, parts));
+
+        var progress = cut.Find(".plp-thumb .mud-progress-circular");
+
+        Assert.Equal("44", progress.GetAttribute("aria-valuenow"));
+        Assert.DoesNotContain("mud-progress-circular-indeterminate", progress.ClassList);
+    }
+
     private static FileTypesSettings CreateFileTypesSettings() => new()
     {
         ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".stl", ".step", ".3mf", ".obj" },
