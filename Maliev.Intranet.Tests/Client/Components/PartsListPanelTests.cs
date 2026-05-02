@@ -49,6 +49,30 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void PartsListPanel_AwaitingPreviewWithUploadProgress_ShowsDeterminateProgress()
+    {
+        var parts = new List<PartViewModel>
+        {
+            new()
+            {
+                FileId = Guid.NewGuid(),
+                Name = "bracket.stl",
+                AwaitingPreview = true,
+                ProgressPercent = 100
+            }
+        };
+
+        var cut = Render<PartsListPanel>(parameters => parameters
+            .Add(p => p.Title, "Test quote")
+            .Add(p => p.Parts, parts));
+
+        var progress = cut.Find(".plp-thumb .mud-progress-circular");
+
+        Assert.Equal("100", progress.GetAttribute("aria-valuenow"));
+        Assert.DoesNotContain("mud-progress-circular-indeterminate", progress.ClassList);
+    }
+
+    [Fact]
     public void PartsListPanel_UploadingAndAwaitingPreview_ShowsLiveUploadProgress()
     {
         var parts = new List<PartViewModel>

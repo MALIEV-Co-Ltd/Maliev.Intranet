@@ -578,7 +578,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.FileId = Guid.TryParse(completedUpload.UploadId, out var fileId) ? fileId : Guid.NewGuid();
             part.QueuedUpload = false;
             part.Uploading = false;
-            part.ProgressPercent = 0;
+            part.ProgressPercent = 100;
             part.AwaitingPreview = true;
             part.StatusText = "Processing geometry...";
 
