@@ -420,6 +420,8 @@ const bboxLabels            = {};   // canvasId → [ { div, worldPos } ]
 const bboxObservers         = {};   // canvasId → scene render observable handle
 const turningAxisLayers     = {};   // canvasId → { meshes, labels, pointerObserver, renderObserver, hovered }
 const turningAxisRequests   = {};   // canvasId → latest requested turning-axis payload
+const TURNING_AXIS_RENDER_GROUP = 3;
+const TURNING_AXIS_HOVER_DISTANCE_PX = 14;
 const axisGizmoLayer        = {};   // canvasId → { dispose() }
 const axisLabelDivs         = {};   // canvasId → [ { div, localPos } ]
 const axisMouseHandlers     = {};   // canvasId → mousemove handler function
@@ -498,24 +500,6 @@ function normalizeAxisVector(axisVector) {
     return worldDirection.normalize();
 }
 
-function quaternionFromUnitVectors(from, to) {
-    const start = from.normalizeToNew();
-    const end = to.normalizeToNew();
-    const dot = BABYLON.Vector3.Dot(start, end);
-
-    if (dot < -0.999999) {
-        let axis = BABYLON.Vector3.Cross(BABYLON.Axis.X, start);
-        if (axis.length() < 1e-6) axis = BABYLON.Vector3.Cross(BABYLON.Axis.Y, start);
-        axis.normalize();
-        return BABYLON.Quaternion.RotationAxis(axis, Math.PI);
-    }
-
-    const cross = BABYLON.Vector3.Cross(start, end);
-    const q = new BABYLON.Quaternion(cross.x, cross.y, cross.z, 1 + dot);
-    q.normalize();
-    return q;
-}
-
 function createTurningAxisLabel(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -536,18 +520,13 @@ function createTurningAxisLabel(text) {
     return div;
 }
 
-function projectTurningAxisLabel(div, worldPos, canvasId, visible) {
-    if (!visible) {
-        div.style.display = 'none';
-        return;
-    }
-
+function projectWorldPointToScreen(worldPos, canvasId) {
     const cam = mainCameras[canvasId];
     const engine = engines[canvasId];
-    if (!cam || !engine) return;
+    if (!cam || !engine) return null;
 
     const canvas = engine.getRenderingCanvas();
-    if (!canvas) return;
+    if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
     const rw = engine.getRenderWidth();
@@ -560,13 +539,61 @@ function projectTurningAxisLabel(div, worldPos, canvasId, visible) {
         cam.viewport.toGlobal(rw, rh)
     );
 
-    if (projected.z >= 0 && projected.z <= 1) {
-        div.style.left = `${rect.left + (projected.x / rw) * rect.width}px`;
-        div.style.top = `${rect.top + (projected.y / rh) * rect.height}px`;
-        div.style.display = '';
-    } else {
+    if (projected.z < 0 || projected.z > 1) return null;
+    return {
+        x: rect.left + (projected.x / rw) * rect.width,
+        y: rect.top + (projected.y / rh) * rect.height,
+    };
+}
+
+function projectTurningAxisLabel(div, worldPos, canvasId, visible) {
+    if (!visible) {
         div.style.display = 'none';
+        return;
     }
+
+    const projected = projectWorldPointToScreen(worldPos, canvasId);
+    if (!projected) {
+        div.style.display = 'none';
+        return;
+    }
+
+    div.style.left = `${projected.x}px`;
+    div.style.top = `${projected.y}px`;
+    div.style.display = '';
+}
+
+function distancePointToSegmentPx(px, py, a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 <= 1e-6) return Math.hypot(px - a.x, py - a.y);
+
+    const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / len2));
+    const x = a.x + t * dx;
+    const y = a.y + t * dy;
+    return Math.hypot(px - x, py - y);
+}
+
+function isPointerNearTurningAxis(canvasId, state, pointerEvent) {
+    const start = projectWorldPointToScreen(state.start, canvasId);
+    const end = projectWorldPointToScreen(state.end, canvasId);
+    if (!start || !end) return false;
+
+    return distancePointToSegmentPx(
+        pointerEvent.clientX,
+        pointerEvent.clientY,
+        start,
+        end
+    ) <= TURNING_AXIS_HOVER_DISTANCE_PX;
+}
+
+function configureTurningAxisLine(mesh, color, alpha) {
+    mesh.color = color;
+    mesh.alpha = alpha;
+    mesh.isPickable = false;
+    mesh.alwaysSelectAsActiveMesh = true;
+    mesh.renderingGroupId = TURNING_AXIS_RENDER_GROUP;
 }
 
 function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
@@ -574,6 +601,8 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     const bb = sceneBoundingBoxes[canvasId];
     const centerData = meshCenters[canvasId];
     if (!scene || !bb || !centerData) return false;
+
+    scene.setRenderingAutoClearDepthStencil(TURNING_AXIS_RENDER_GROUP, true, true, true);
 
     const direction = normalizeAxisVector(axisVector);
     if (!direction) return false;
@@ -618,10 +647,7 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
         const a = BABYLON.Vector3.Lerp(start, end, t0);
         const b = BABYLON.Vector3.Lerp(start, end, t1);
         const dash = BABYLON.MeshBuilder.CreateLines(`__axis_turning_dash_${i}`, { points: [a, b], updatable: false }, scene);
-        dash.color = blue;
-        dash.alpha = 0.92;
-        dash.isPickable = false;
-        dash.renderingGroupId = 2;
+        configureTurningAxisLine(dash, blue, 0.92);
         meshes.push(dash);
     }
 
@@ -636,28 +662,12 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
         const sideA = base.add(perp.scale(arrowWidth));
         const sideB = base.subtract(perp.scale(arrowWidth));
         const arrow = BABYLON.MeshBuilder.CreateLines(`__axis_turning_arrow_${suffix}`, { points: [sideA, point, sideB], updatable: false }, scene);
-        arrow.color = blue;
-        arrow.alpha = 0.95;
-        arrow.isPickable = false;
-        arrow.renderingGroupId = 2;
+        configureTurningAxisLine(arrow, blue, 0.95);
         meshes.push(arrow);
     }
 
     addArrow(end, direction, 'positive');
     addArrow(start, direction.scale(-1), 'negative');
-
-    const hitDiameter = Math.max(diagonal * 0.025, 4);
-    const hit = BABYLON.MeshBuilder.CreateCylinder('__axis_turning_hit', {
-        height: length,
-        diameter: hitDiameter,
-        tessellation: 12,
-    }, scene);
-    hit.position = BABYLON.Vector3.Center(start, end);
-    hit.rotationQuaternion = quaternionFromUnitVectors(BABYLON.Axis.Y, direction);
-    hit.isPickable = true;
-    hit.visibility = 0;
-    hit.metadata = { turningAxis: true, primaryAxis };
-    meshes.push(hit);
 
     const axisLabel = createTurningAxisLabel('Axis of Turning');
     const cwLabel = createTurningAxisLabel('CW');
@@ -671,14 +681,23 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
         labels: labelPositions,
         pointerObserver: null,
         renderObserver: null,
+        canvasLeaveHandler: null,
         hovered: false,
+        start,
+        end,
     };
 
     state.pointerObserver = scene.onPointerObservable.add(pointerInfo => {
         if (pointerInfo.type !== BABYLON.PointerEventTypes.POINTERMOVE) return;
-        const pick = scene.pick(scene.pointerX, scene.pointerY, mesh => mesh?.metadata?.turningAxis === true);
-        state.hovered = !!pick?.hit;
+        state.hovered = pointerInfo.event
+            ? isPointerNearTurningAxis(canvasId, state, pointerInfo.event)
+            : false;
     });
+    const canvas = engines[canvasId]?.getRenderingCanvas();
+    if (canvas) {
+        state.canvasLeaveHandler = () => { state.hovered = false; };
+        canvas.addEventListener('pointerleave', state.canvasLeaveHandler);
+    }
     state.renderObserver = scene.onBeforeRenderObservable.add(() => {
         state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, state.hovered));
     });
@@ -696,8 +715,10 @@ export function clearTurningAxis(canvasId, clearRequest = true) {
     const state = turningAxisLayers[canvasId];
     if (state) {
         const scene = scenes[canvasId];
+        const canvas = engines[canvasId]?.getRenderingCanvas();
         if (state.pointerObserver && scene) scene.onPointerObservable.remove(state.pointerObserver);
         if (state.renderObserver && scene) scene.onBeforeRenderObservable.remove(state.renderObserver);
+        if (state.canvasLeaveHandler && canvas) canvas.removeEventListener('pointerleave', state.canvasLeaveHandler);
         state.meshes.forEach(mesh => { try { mesh.dispose(); } catch (_) {} });
         state.labels.forEach(({ div }) => { try { div.remove(); } catch (_) {} });
         delete turningAxisLayers[canvasId];
