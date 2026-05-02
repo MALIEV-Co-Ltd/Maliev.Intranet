@@ -956,7 +956,6 @@ function createTurningAxisLabel(text) {
 
 function createTurningAxisSvg() {
     const ns = 'http://www.w3.org/2000/svg';
-    const markerId = `turning-axis-arrow-${Math.random().toString(36).slice(2)}`;
     const svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('aria-hidden', 'true');
     svg.style.position = 'fixed';
@@ -968,36 +967,13 @@ function createTurningAxisSvg() {
     svg.style.pointerEvents = 'none';
     svg.style.zIndex = '10010';
 
-    const defs = document.createElementNS(ns, 'defs');
-    const marker = document.createElementNS(ns, 'marker');
-    marker.setAttribute('id', markerId);
-    marker.setAttribute('viewBox', '0 0 10 10');
-    marker.setAttribute('refX', '9');
-    marker.setAttribute('refY', '5');
-    marker.setAttribute('markerWidth', '9');
-    marker.setAttribute('markerHeight', '9');
-    marker.setAttribute('orient', 'auto-start-reverse');
-    marker.setAttribute('markerUnits', 'strokeWidth');
-
-    const arrowPath = document.createElementNS(ns, 'path');
-    arrowPath.setAttribute('d', 'M 0 0 L 10 5 L 0 10');
-    arrowPath.setAttribute('fill', 'none');
-    arrowPath.setAttribute('stroke', '#2563eb');
-    arrowPath.setAttribute('stroke-width', '1.7');
-    arrowPath.setAttribute('stroke-linecap', 'round');
-    arrowPath.setAttribute('stroke-linejoin', 'round');
-    marker.appendChild(arrowPath);
-    defs.appendChild(marker);
-
     const line = document.createElementNS(ns, 'line');
     line.setAttribute('stroke', '#2563eb');
     line.setAttribute('stroke-width', '2');
+    line.setAttribute('opacity', '0.45');
     line.setAttribute('stroke-linecap', 'round');
     line.setAttribute('stroke-dasharray', '9 7');
-    line.setAttribute('marker-start', `url(#${markerId})`);
-    line.setAttribute('marker-end', `url(#${markerId})`);
 
-    svg.appendChild(defs);
     svg.appendChild(line);
     document.body.appendChild(svg);
 

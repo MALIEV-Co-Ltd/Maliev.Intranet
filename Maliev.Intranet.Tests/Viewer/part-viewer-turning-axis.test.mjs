@@ -189,3 +189,11 @@ test('turning axis is only requested from GeometryService report data', () => {
 test('turning axis overlay does not render a CW label', () => {
     assert.equal(viewerSource().includes("createTurningAxisLabel('CW')"), false);
 });
+
+test('turning axis overlay is subtle and has no arrowheads', () => {
+    const source = viewerSource();
+
+    assert.equal(source.includes("line.setAttribute('marker-start'"), false);
+    assert.equal(source.includes("line.setAttribute('marker-end'"), false);
+    assert.equal(source.includes("line.setAttribute('opacity', '0.45')"), true);
+});
