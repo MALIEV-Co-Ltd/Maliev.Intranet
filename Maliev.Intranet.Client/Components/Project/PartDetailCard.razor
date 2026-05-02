@@ -121,6 +121,7 @@
                         <ModelViewer @ref="_modelViewer"
                                      ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
                                      KnownDimensions="@Part.Dimensions"
+                                     TurningAxis="@BuildTurningAxis()"
                                      OnLoadFailed="HandleViewerLoadFailed"
                                      OnBodyPicked="HandleBodyPickedAsync" />
                     }
@@ -561,6 +562,29 @@
     {
         Part.DfmAllClearNotified = true;
         return Task.CompletedTask;
+    }
+
+    private ModelViewer.TurningAxisViewModel? BuildTurningAxis()
+    {
+        if (!string.Equals(Part.ProcessCode, "CNC_TURN", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (Part.CncDfmReport is CncDfmReportPayload cnc
+            && cnc.AxisVector.Count >= 3
+            && !string.IsNullOrWhiteSpace(cnc.PrimaryAxis))
+        {
+            return new ModelViewer.TurningAxisViewModel(cnc.PrimaryAxis, cnc.AxisVector.Take(3).ToArray());
+        }
+
+        if (Part.DfmReport is DfmReport dto
+            && string.Equals(dto.ReportType, "CNC_TURN", StringComparison.OrdinalIgnoreCase)
+            && dto.AxisVector.Count >= 3
+            && !string.IsNullOrWhiteSpace(dto.PrimaryAxis))
+        {
+            return new ModelViewer.TurningAxisViewModel(dto.PrimaryAxis, dto.AxisVector.Take(3).ToArray());
+        }
+
+        return null;
     }
 
     private async Task HandleViewerLoadFailed(string errorMessage)

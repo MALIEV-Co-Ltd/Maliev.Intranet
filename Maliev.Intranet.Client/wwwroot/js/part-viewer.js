@@ -418,6 +418,8 @@ const modelCenterOffsets    = {};   // canvasId → { cx, cy, zLift } (centering
 const bboxLines             = {};   // canvasId → BABYLON.LinesMesh
 const bboxLabels            = {};   // canvasId → [ { div, worldPos } ]
 const bboxObservers         = {};   // canvasId → scene render observable handle
+const turningAxisLayers     = {};   // canvasId → { meshes, labels, pointerObserver, renderObserver, hovered }
+const turningAxisRequests   = {};   // canvasId → latest requested turning-axis payload
 const axisGizmoLayer        = {};   // canvasId → { dispose() }
 const axisLabelDivs         = {};   // canvasId → [ { div, localPos } ]
 const axisMouseHandlers     = {};   // canvasId → mousemove handler function
@@ -473,6 +475,235 @@ function computeSceneBounds(scene) {
     });
     if (!isFinite(minX)) return null;
     return { min: { x: minX, y: minY, z: minZ }, max: { x: maxX, y: maxY, z: maxZ } };
+}
+
+function toWorldPoint(point) {
+    return new BABYLON.Vector3(point.x, point.y, point.z);
+}
+
+function normalizeAxisVector(axisVector) {
+    if (!Array.isArray(axisVector) || axisVector.length < 3) return null;
+
+    const direction = new BABYLON.Vector3(
+        Number(axisVector[0]),
+        Number(axisVector[1]),
+        Number(axisVector[2])
+    );
+    if (!isFinite(direction.x) || !isFinite(direction.y) || !isFinite(direction.z) || direction.length() < 1e-6) {
+        return null;
+    }
+
+    const worldDirection = BABYLON.Vector3.TransformNormal(direction, BABYLON.Matrix.RotationX(Math.PI / 2));
+    if (worldDirection.length() < 1e-6) return null;
+    return worldDirection.normalize();
+}
+
+function quaternionFromUnitVectors(from, to) {
+    const start = from.normalizeToNew();
+    const end = to.normalizeToNew();
+    const dot = BABYLON.Vector3.Dot(start, end);
+
+    if (dot < -0.999999) {
+        let axis = BABYLON.Vector3.Cross(BABYLON.Axis.X, start);
+        if (axis.length() < 1e-6) axis = BABYLON.Vector3.Cross(BABYLON.Axis.Y, start);
+        axis.normalize();
+        return BABYLON.Quaternion.RotationAxis(axis, Math.PI);
+    }
+
+    const cross = BABYLON.Vector3.Cross(start, end);
+    const q = new BABYLON.Quaternion(cross.x, cross.y, cross.z, 1 + dot);
+    q.normalize();
+    return q;
+}
+
+function createTurningAxisLabel(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    div.style.position = 'fixed';
+    div.style.zIndex = '10020';
+    div.style.pointerEvents = 'none';
+    div.style.padding = '5px 9px';
+    div.style.border = '1px solid #2563eb';
+    div.style.borderRadius = '4px';
+    div.style.background = 'rgba(255, 255, 255, 0.96)';
+    div.style.color = '#2563eb';
+    div.style.font = '600 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    div.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.16)';
+    div.style.whiteSpace = 'nowrap';
+    div.style.transform = 'translate(-50%, -130%)';
+    div.style.display = 'none';
+    document.body.appendChild(div);
+    return div;
+}
+
+function projectTurningAxisLabel(div, worldPos, canvasId, visible) {
+    if (!visible) {
+        div.style.display = 'none';
+        return;
+    }
+
+    const cam = mainCameras[canvasId];
+    const engine = engines[canvasId];
+    if (!cam || !engine) return;
+
+    const canvas = engine.getRenderingCanvas();
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const rw = engine.getRenderWidth();
+    const rh = engine.getRenderHeight();
+    const viewProj = cam.getViewMatrix().multiply(cam.getProjectionMatrix());
+    const projected = BABYLON.Vector3.Project(
+        worldPos,
+        BABYLON.Matrix.Identity(),
+        viewProj,
+        cam.viewport.toGlobal(rw, rh)
+    );
+
+    if (projected.z >= 0 && projected.z <= 1) {
+        div.style.left = `${rect.left + (projected.x / rw) * rect.width}px`;
+        div.style.top = `${rect.top + (projected.y / rh) * rect.height}px`;
+        div.style.display = '';
+    } else {
+        div.style.display = 'none';
+    }
+}
+
+function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
+    const scene = scenes[canvasId];
+    const bb = sceneBoundingBoxes[canvasId];
+    const centerData = meshCenters[canvasId];
+    if (!scene || !bb || !centerData) return false;
+
+    const direction = normalizeAxisVector(axisVector);
+    if (!direction) return false;
+
+    clearTurningAxis(canvasId, false);
+
+    const center = toWorldPoint(centerData);
+    const min = toWorldPoint(bb.min);
+    const max = toWorldPoint(bb.max);
+    const corners = [
+        new BABYLON.Vector3(min.x, min.y, min.z),
+        new BABYLON.Vector3(min.x, min.y, max.z),
+        new BABYLON.Vector3(min.x, max.y, min.z),
+        new BABYLON.Vector3(min.x, max.y, max.z),
+        new BABYLON.Vector3(max.x, min.y, min.z),
+        new BABYLON.Vector3(max.x, min.y, max.z),
+        new BABYLON.Vector3(max.x, max.y, min.z),
+        new BABYLON.Vector3(max.x, max.y, max.z),
+    ];
+
+    let minDot = Infinity;
+    let maxDot = -Infinity;
+    corners.forEach(corner => {
+        const dot = BABYLON.Vector3.Dot(corner.subtract(center), direction);
+        minDot = Math.min(minDot, dot);
+        maxDot = Math.max(maxDot, dot);
+    });
+
+    const diagonal = max.subtract(min).length();
+    const padding = Math.max(diagonal * 0.08, 8);
+    const start = center.add(direction.scale(minDot - padding));
+    const end = center.add(direction.scale(maxDot + padding));
+    const length = BABYLON.Vector3.Distance(start, end);
+    const segmentCount = Math.max(12, Math.ceil(length / Math.max(diagonal * 0.035, 5)));
+    const dashFraction = 0.58;
+    const blue = new BABYLON.Color3(0.15, 0.39, 0.92);
+    const meshes = [];
+
+    for (let i = 0; i < segmentCount; i += 1) {
+        const t0 = i / segmentCount;
+        const t1 = Math.min((i + dashFraction) / segmentCount, 1);
+        const a = BABYLON.Vector3.Lerp(start, end, t0);
+        const b = BABYLON.Vector3.Lerp(start, end, t1);
+        const dash = BABYLON.MeshBuilder.CreateLines(`__axis_turning_dash_${i}`, { points: [a, b], updatable: false }, scene);
+        dash.color = blue;
+        dash.alpha = 0.92;
+        dash.isPickable = false;
+        dash.renderingGroupId = 2;
+        meshes.push(dash);
+    }
+
+    const arrowLength = Math.max(length * 0.035, 5);
+    const arrowWidth = arrowLength * 0.45;
+    let perp = BABYLON.Vector3.Cross(direction, BABYLON.Axis.Z);
+    if (perp.length() < 1e-6) perp = BABYLON.Vector3.Cross(direction, BABYLON.Axis.Y);
+    perp.normalize();
+
+    function addArrow(point, dir, suffix) {
+        const base = point.subtract(dir.scale(arrowLength));
+        const sideA = base.add(perp.scale(arrowWidth));
+        const sideB = base.subtract(perp.scale(arrowWidth));
+        const arrow = BABYLON.MeshBuilder.CreateLines(`__axis_turning_arrow_${suffix}`, { points: [sideA, point, sideB], updatable: false }, scene);
+        arrow.color = blue;
+        arrow.alpha = 0.95;
+        arrow.isPickable = false;
+        arrow.renderingGroupId = 2;
+        meshes.push(arrow);
+    }
+
+    addArrow(end, direction, 'positive');
+    addArrow(start, direction.scale(-1), 'negative');
+
+    const hitDiameter = Math.max(diagonal * 0.025, 4);
+    const hit = BABYLON.MeshBuilder.CreateCylinder('__axis_turning_hit', {
+        height: length,
+        diameter: hitDiameter,
+        tessellation: 12,
+    }, scene);
+    hit.position = BABYLON.Vector3.Center(start, end);
+    hit.rotationQuaternion = quaternionFromUnitVectors(BABYLON.Axis.Y, direction);
+    hit.isPickable = true;
+    hit.visibility = 0;
+    hit.metadata = { turningAxis: true, primaryAxis };
+    meshes.push(hit);
+
+    const axisLabel = createTurningAxisLabel('Axis of Turning');
+    const cwLabel = createTurningAxisLabel('CW');
+    const labelPositions = [
+        { div: axisLabel, worldPos: center.add(direction.scale(length * 0.10)) },
+        { div: cwLabel, worldPos: start.add(direction.scale(arrowLength * 2.2)).add(perp.scale(arrowWidth * 2.4)) },
+    ];
+
+    const state = {
+        meshes,
+        labels: labelPositions,
+        pointerObserver: null,
+        renderObserver: null,
+        hovered: false,
+    };
+
+    state.pointerObserver = scene.onPointerObservable.add(pointerInfo => {
+        if (pointerInfo.type !== BABYLON.PointerEventTypes.POINTERMOVE) return;
+        const pick = scene.pick(scene.pointerX, scene.pointerY, mesh => mesh?.metadata?.turningAxis === true);
+        state.hovered = !!pick?.hit;
+    });
+    state.renderObserver = scene.onBeforeRenderObservable.add(() => {
+        state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, state.hovered));
+    });
+
+    turningAxisLayers[canvasId] = state;
+    return true;
+}
+
+export function setTurningAxis(canvasId, primaryAxis, axisVector) {
+    turningAxisRequests[canvasId] = { primaryAxis, axisVector };
+    buildTurningAxisGeometry(canvasId, primaryAxis, axisVector);
+}
+
+export function clearTurningAxis(canvasId, clearRequest = true) {
+    const state = turningAxisLayers[canvasId];
+    if (state) {
+        const scene = scenes[canvasId];
+        if (state.pointerObserver && scene) scene.onPointerObservable.remove(state.pointerObserver);
+        if (state.renderObserver && scene) scene.onBeforeRenderObservable.remove(state.renderObserver);
+        state.meshes.forEach(mesh => { try { mesh.dispose(); } catch (_) {} });
+        state.labels.forEach(({ div }) => { try { div.remove(); } catch (_) {} });
+        delete turningAxisLayers[canvasId];
+    }
+
+    if (clearRequest) delete turningAxisRequests[canvasId];
 }
 
 /**
@@ -1137,6 +1368,10 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     y: (finalBb.min.y + finalBb.max.y) / 2,
                     z: (finalBb.min.z + finalBb.max.z) / 2,
                 };
+                if (turningAxisRequests[canvasId]) {
+                    const request = turningAxisRequests[canvasId];
+                    buildTurningAxisGeometry(canvasId, request.primaryAxis, request.axisVector);
+                }
 
                 // ── Permanent shadow-catcher ground plane ──
                 // Creates an always-on ground mesh to catch shadows from the model.
@@ -3201,6 +3436,7 @@ export function dispose(canvasId) {
     const engine = engines[canvasId];
     if (engine?._resizeHandler) window.removeEventListener('resize', engine._resizeHandler);
 
+    clearTurningAxis(canvasId);
     if (resizeObservers[canvasId]) { resizeObservers[canvasId].disconnect(); delete resizeObservers[canvasId]; }
     if (axisGizmoLayer[canvasId])  { try { axisGizmoLayer[canvasId].dispose(); } catch (_) {} delete axisGizmoLayer[canvasId]; }
     if (axisLabelDivs[canvasId])   { axisLabelDivs[canvasId].forEach(({ div }) => div.remove()); delete axisLabelDivs[canvasId]; }
@@ -4215,6 +4451,8 @@ window.babylonViewer = {
     setCameraProjection,
     toggleDfmOverlay,
     clearDfmOverlays,
+    setTurningAxis,
+    clearTurningAxis,
     setBodies,
     selectBody,
     clearBodySelection,

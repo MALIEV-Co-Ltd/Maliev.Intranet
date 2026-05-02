@@ -1,5 +1,6 @@
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.Intranet.Client.Services
+@using System.Globalization
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 @inject LayoutService LayoutService
@@ -221,9 +222,14 @@
     [Parameter] public EventCallback<string>       OnLoadFailed  { get; set; }
     /// <summary>Invoked when a body is clicked in the multi-body viewer.</summary>
     [Parameter] public EventCallback<int?>        OnBodyPicked   { get; set; }
+    /// <summary>Optional CNC turning axis overlay for the loaded model.</summary>
+    [Parameter] public TurningAxisViewModel?      TurningAxis    { get; set; }
 
     /// <summary>Body metadata for multi-body CAD files.</summary>
     public record BodyViewModel(int Index, string Name, double? VolumeCm3, string? ColorHex);
+
+    /// <summary>Detected CNC turning axis in model coordinates.</summary>
+    public record TurningAxisViewModel(string PrimaryAxis, IReadOnlyList<double> AxisVector);
 
     private string _canvasId    = $"babylon-canvas-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
@@ -234,6 +240,7 @@
     private bool   _edgesEnabled;
     private bool   _bboxEnabled;
     private string? _lastViewerUrl;
+    private string? _lastTurningAxisKey;
     private bool   _analysisMenuOpen;
     private string? _activeAnalysisTool;  // "flippedTriangles" | "measure" | "thickness" | null
     private string? _hoveredAnalysisTool;  // For hover effect in dropdown
@@ -427,6 +434,7 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         Logger.LogDebug("OnAfterRenderAsync: ViewerUrl='{ViewerUrl}', _lastViewerUrl='{LastViewerUrl}'", ViewerUrl, _lastViewerUrl);
+        var turningAxisKey = GetTurningAxisKey();
         if (!string.IsNullOrEmpty(ViewerUrl) && StripQueryString(ViewerUrl) != StripQueryString(_lastViewerUrl ?? ""))
         {
             string? previousUrl = _lastViewerUrl;
@@ -459,11 +467,51 @@
                     _dotNetRef,
                     _renderMode,
                     _cameraProjection);
+                await ApplyTurningAxisAsync();
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error initializing BabylonJS viewer");
             }
+        }
+        else if (_module != null && _lastTurningAxisKey != turningAxisKey)
+        {
+            await ApplyTurningAxisAsync();
+        }
+    }
+
+    private string GetTurningAxisKey()
+    {
+        if (TurningAxis is not { AxisVector.Count: >= 3 } axis)
+            return string.Empty;
+
+        var values = axis.AxisVector
+            .Take(3)
+            .Select(value => value.ToString("G17", CultureInfo.InvariantCulture));
+        return $"{axis.PrimaryAxis}:{string.Join(",", values)}";
+    }
+
+    private async Task ApplyTurningAxisAsync()
+    {
+        if (_module == null)
+            return;
+
+        try
+        {
+            if (TurningAxis is { AxisVector.Count: >= 3 } axis && !string.IsNullOrWhiteSpace(axis.PrimaryAxis))
+            {
+                await _module.InvokeVoidAsync("setTurningAxis", _canvasId, axis.PrimaryAxis, axis.AxisVector.Take(3).ToArray());
+            }
+            else
+            {
+                await _module.InvokeVoidAsync("clearTurningAxis", _canvasId);
+            }
+
+            _lastTurningAxisKey = GetTurningAxisKey();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] turning axis error: {ex.Message}");
         }
     }
 

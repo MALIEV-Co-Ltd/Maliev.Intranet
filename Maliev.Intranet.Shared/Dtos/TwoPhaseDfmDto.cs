@@ -201,6 +201,31 @@ public class DfmReport
     /// Estimated support volume in cubic centimeters (printing processes)
     /// </summary>
     public double? EstimatedSupportVolumeCm3 { get; set; }
+
+    /// <summary>
+    /// Whether the part is suitable for CNC turning.
+    /// </summary>
+    public bool? IsTurnable { get; set; }
+
+    /// <summary>
+    /// Detected primary axis of turning, when available.
+    /// </summary>
+    public string? PrimaryAxis { get; set; }
+
+    /// <summary>
+    /// Detected turning axis unit vector in model coordinates.
+    /// </summary>
+    public List<double> AxisVector { get; set; } = new();
+
+    /// <summary>
+    /// Length-to-diameter ratio for CNC turning analysis.
+    /// </summary>
+    public double? LengthDiameterRatio { get; set; }
+
+    /// <summary>
+    /// Radial symmetry deviation for CNC turning analysis.
+    /// </summary>
+    public double? SymmetryDeviation { get; set; }
 }
 
 /// <summary>
