@@ -28,7 +28,7 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
-    public void PartsListPanel_AwaitingPreviewWithoutThumbnail_ShowsSpinnerInsteadOfFallbackIcon()
+    public void PartsListPanel_AwaitingPreviewWithoutThumbnail_ShowsSkeletonInsteadOfSpinnerOrFallbackIcon()
     {
         var parts = new List<PartViewModel>
         {
@@ -44,7 +44,51 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
             .Add(p => p.Title, "Test quote")
             .Add(p => p.Parts, parts));
 
-        Assert.NotEmpty(cut.FindAll(".plp-thumb .mud-progress-circular"));
+        Assert.NotEmpty(cut.FindAll(".plp-thumb .mud-skeleton"));
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-progress-circular"));
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
+    }
+
+    [Fact]
+    public void PartsListPanel_QueuedUploadBeforeProgress_ShowsSkeletonInsteadOfSpinnerOrFallbackIcon()
+    {
+        var parts = new List<PartViewModel>
+        {
+            new()
+            {
+                Name = "bracket.stl",
+                QueuedUpload = true
+            }
+        };
+
+        var cut = Render<PartsListPanel>(parameters => parameters
+            .Add(p => p.Title, "Test quote")
+            .Add(p => p.Parts, parts));
+
+        Assert.NotEmpty(cut.FindAll(".plp-thumb .mud-skeleton"));
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-progress-circular"));
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
+    }
+
+    [Fact]
+    public void PartsListPanel_UploadingBeforeFirstProgress_ShowsSkeletonInsteadOfSpinnerOrFallbackIcon()
+    {
+        var parts = new List<PartViewModel>
+        {
+            new()
+            {
+                Name = "bracket.stl",
+                Uploading = true,
+                ProgressPercent = 0
+            }
+        };
+
+        var cut = Render<PartsListPanel>(parameters => parameters
+            .Add(p => p.Title, "Test quote")
+            .Add(p => p.Parts, parts));
+
+        Assert.NotEmpty(cut.FindAll(".plp-thumb .mud-skeleton"));
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-progress-circular"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
     }
 
