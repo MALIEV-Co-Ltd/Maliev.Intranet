@@ -92,6 +92,17 @@ public static class MalievPermissions
     }
 
     /// <summary>
+    /// Permissions for currency catalog and exchange-rate lookups.
+    /// </summary>
+    public static class Currency
+    {
+        /// <summary>Permission to view currency metadata.</summary>
+        public const string CurrenciesRead = "currency.currencies.read";
+        /// <summary>Permission to view exchange rates.</summary>
+        public const string RatesRead = "currency.rates.read";
+    }
+
+    /// <summary>
     /// Permissions for managing external supplier relationships.
     /// </summary>
     public static class Supplier

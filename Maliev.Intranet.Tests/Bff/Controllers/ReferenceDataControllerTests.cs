@@ -1,3 +1,5 @@
+using System.Reflection;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
@@ -47,5 +49,21 @@ public class ReferenceDataControllerTests
 
         var statusResult = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(500, statusResult.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(nameof(ReferenceDataController.GetCurrencies), MalievPermissions.Currency.CurrenciesRead)]
+    [InlineData(nameof(ReferenceDataController.GetPrimaryCurrency), MalievPermissions.Currency.CurrenciesRead)]
+    [InlineData(nameof(ReferenceDataController.GetExchangeRate), MalievPermissions.Currency.RatesRead)]
+    public void CurrencyEndpoints_RequireCurrencyPermissions(string actionName, string expectedPermission)
+    {
+        var method = typeof(ReferenceDataController)
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public)
+            .Single(method => method.Name == actionName);
+
+        var attribute = Assert.Single(method.GetCustomAttributes<RequirePermissionAttribute>());
+
+        Assert.Contains(expectedPermission, attribute.Policy, StringComparison.Ordinal);
+        Assert.Equal("Bearer,Cookies", attribute.AuthenticationSchemes);
     }
 }

@@ -70,26 +70,48 @@ try
     builder.Services.AddTransient<UserContextHandler>();
     builder.Services.AddTransient<Maliev.Intranet.Bff.Handlers.CookieForwardingHandler>();
 
+    var dataProtectionBuilder = builder.Services.AddDataProtection()
+        .SetApplicationName("MalievIntranet");
+
     var redisConnectionString = builder.Configuration.GetConnectionString("redis");
+    IConnectionMultiplexer? redis = null;
     if (!string.IsNullOrEmpty(redisConnectionString))
     {
-        var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+        redis = ConnectionMultiplexer.Connect(redisConnectionString);
         builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+    }
 
-        var dataProtectionBuilder = builder.Services.AddDataProtection()
-            .PersistKeysToStackExchangeRedis(redis, "Maliev:DataProtection:Keys")
-            .SetApplicationName("MalievIntranet");
+    if (builder.Environment.IsDevelopment())
+    {
+        var configuredKeysDirectory = builder.Configuration["DataProtection:KeysDirectory"];
+        var keysDirectory = string.IsNullOrWhiteSpace(configuredKeysDirectory)
+            ? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Maliev",
+                "IntranetBff",
+                "DataProtection-Keys")
+            : configuredKeysDirectory;
 
-        var certPath = builder.Configuration["DataProtection:CertificatePath"];
-        if (!string.IsNullOrEmpty(certPath))
-        {
-            var certPassword = builder.Configuration["DataProtection:CertificatePassword"];
-            var certData = File.ReadAllBytes(certPath);
-            var certificate = string.IsNullOrEmpty(certPassword)
-                ? X509Certificate2.CreateFromPemFile(certPath)
-                : X509Certificate2.CreateFromEncryptedPemFile(certPath, certPassword);
-            dataProtectionBuilder.ProtectKeysWithCertificate(certificate);
-        }
+        Directory.CreateDirectory(keysDirectory);
+        dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
+    }
+    else if (!string.IsNullOrEmpty(redisConnectionString))
+    {
+        dataProtectionBuilder.PersistKeysToStackExchangeRedis(redis!, "Maliev:DataProtection:Keys");
+    }
+
+    var certPath = builder.Configuration["DataProtection:CertificatePath"];
+    if (!string.IsNullOrEmpty(certPath))
+    {
+        var certPassword = builder.Configuration["DataProtection:CertificatePassword"];
+        var certificate = string.IsNullOrEmpty(certPassword)
+            ? X509Certificate2.CreateFromPemFile(certPath)
+            : X509Certificate2.CreateFromEncryptedPemFile(certPath, certPassword);
+        dataProtectionBuilder.ProtectKeysWithCertificate(certificate);
+    }
+    else if (builder.Environment.IsDevelopment() && OperatingSystem.IsWindows())
+    {
+        dataProtectionBuilder.ProtectKeysWithDpapi(protectToLocalMachine: true);
     }
 
     // Configure Authentication
