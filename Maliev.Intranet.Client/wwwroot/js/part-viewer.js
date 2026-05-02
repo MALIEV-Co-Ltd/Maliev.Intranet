@@ -425,6 +425,8 @@ const TURNING_AXIS_MAX_VERTEX_SAMPLES = 18000;
 const TURNING_AXIS_RING_MIN_POINTS = 10;
 const TURNING_AXIS_MIN_RING_COVERAGE = 0.42;
 const TURNING_AXIS_MIN_CENTER_SCORE = 12;
+const TURNING_AXIS_RELIABLE_RING_COVERAGE = 0.72;
+const TURNING_AXIS_RELIABLE_RING_RESIDUAL_RATIO = 0.04;
 const axisGizmoLayer        = {};   // canvasId → { dispose() }
 const axisLabelDivs         = {};   // canvasId → [ { div, localPos } ]
 const axisMouseHandlers     = {};   // canvasId → mousemove handler function
@@ -699,6 +701,137 @@ function fitCircle2D(points) {
     };
 }
 
+function splitRadialPointGroups(points, centerU, centerV, tolerance) {
+    const sorted = points
+        .map(point => ({
+            point,
+            radius: Math.hypot(point.x - centerU, point.y - centerV),
+        }))
+        .sort((a, b) => a.radius - b.radius);
+
+    const groups = [];
+    let current = [];
+    let previousRadius = null;
+
+    sorted.forEach(entry => {
+        if (previousRadius !== null
+            && entry.radius - previousRadius > tolerance
+            && current.length >= TURNING_AXIS_RING_MIN_POINTS) {
+            groups.push(current.map(item => item.point));
+            current = [];
+        }
+
+        current.push(entry);
+        previousRadius = entry.radius;
+    });
+
+    if (current.length >= TURNING_AXIS_RING_MIN_POINTS) {
+        groups.push(current.map(item => item.point));
+    }
+
+    return groups;
+}
+
+function buildCirclePointGroups(points, fallbackU, fallbackV, diagonal) {
+    const groups = [points];
+    const tolerance = Math.max(0.2, diagonal * 0.01);
+    splitRadialPointGroups(points, fallbackU, fallbackV, tolerance)
+        .forEach(group => groups.push(group));
+
+    const mean = points.reduce(
+        (acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }),
+        { x: 0, y: 0 });
+    mean.x /= points.length;
+    mean.y /= points.length;
+    splitRadialPointGroups(points, mean.x, mean.y, tolerance)
+        .forEach(group => groups.push(group));
+
+    return groups;
+}
+
+function getRingResidualRatio(ring) {
+    return ring.residual / Math.max(ring.radius, 1e-6);
+}
+
+function getRingQuality(ring) {
+    return Math.sqrt(ring.count)
+        * ring.coverage
+        / (1 + getRingResidualRatio(ring) * 12);
+}
+
+function isReliableTurningRing(ring) {
+    return ring.coverage >= TURNING_AXIS_RELIABLE_RING_COVERAGE
+        && getRingResidualRatio(ring) <= TURNING_AXIS_RELIABLE_RING_RESIDUAL_RATIO;
+}
+
+function addRingToCenterCluster(clusters, entry, tolerance) {
+    let target = null;
+    let bestDistance = Infinity;
+
+    clusters.forEach(cluster => {
+        const distance = Math.hypot(
+            cluster.centerU - entry.ring.centerU,
+            cluster.centerV - entry.ring.centerV);
+        if (distance <= tolerance && distance < bestDistance) {
+            target = cluster;
+            bestDistance = distance;
+        }
+    });
+
+    if (!target) {
+        clusters.push({
+            centerU: entry.ring.centerU,
+            centerV: entry.ring.centerV,
+            minRadius: entry.ring.radius,
+            totalQuality: entry.quality,
+            ringCount: 1,
+        });
+        return;
+    }
+
+    const totalQuality = target.totalQuality + entry.quality;
+    target.centerU = ((target.centerU * target.totalQuality) + (entry.ring.centerU * entry.quality)) / totalQuality;
+    target.centerV = ((target.centerV * target.totalQuality) + (entry.ring.centerV * entry.quality)) / totalQuality;
+    target.minRadius = Math.min(target.minRadius, entry.ring.radius);
+    target.totalQuality = totalQuality;
+    target.ringCount += 1;
+}
+
+function selectTurningAxisCenterCluster(rings, diagonal) {
+    const entries = rings
+        .map(ring => ({ ring, quality: getRingQuality(ring), reliable: isReliableTurningRing(ring) }))
+        .filter(entry => entry.quality > 0);
+    if (entries.length === 0) return null;
+
+    const reliableEntries = entries.filter(entry => entry.reliable);
+    const source = reliableEntries.length > 0 ? reliableEntries : entries;
+    const tolerance = Math.max(0.12, diagonal * 0.012);
+    const clusters = [];
+
+    source
+        .sort((a, b) => a.ring.radius - b.ring.radius)
+        .forEach(entry => addRingToCenterCluster(clusters, entry, tolerance));
+
+    if (clusters.length === 0) return null;
+
+    clusters.sort((a, b) => {
+        if (reliableEntries.length > 0) {
+            const radiusDelta = a.minRadius - b.minRadius;
+            if (Math.abs(radiusDelta) > 1e-6) return radiusDelta;
+        }
+
+        return b.totalQuality - a.totalQuality;
+    });
+
+    const selected = clusters[0];
+    return {
+        centerU: selected.centerU,
+        centerV: selected.centerV,
+        score: selected.totalQuality,
+        ringCount: selected.ringCount,
+    };
+}
+
 function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
     const normalizedDirection = direction.clone();
     normalizedDirection.normalize();
@@ -717,6 +850,8 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
     const bucketSize = Math.max(0.08, Math.min(1.25, axisLength * 0.015));
     const uniqueTolerance = Math.max(0.02, diagonal * 0.0004);
     const minRadius = Math.max(0.04, diagonal * 0.002);
+    const fallbackU = BABYLON.Vector3.Dot(fallbackCenter, u);
+    const fallbackV = BABYLON.Vector3.Dot(fallbackCenter, v);
     const buckets = new Map();
 
     points.forEach(point => {
@@ -736,18 +871,19 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
         const uniquePoints = unique2DPoints(bucketPoints, uniqueTolerance);
         if (uniquePoints.length < TURNING_AXIS_RING_MIN_POINTS) continue;
 
-        const sampledPoints = uniquePoints.length > 220
-            ? uniquePoints.filter((_, index) => index % Math.ceil(uniquePoints.length / 220) === 0)
-            : uniquePoints;
-        const fit = fitCircle2D(sampledPoints);
-        if (!fit || fit.radius < minRadius) continue;
+        const pointGroups = buildCirclePointGroups(uniquePoints, fallbackU, fallbackV, diagonal);
+        pointGroups.forEach(group => {
+            const sampledPoints = group.length > 220
+                ? group.filter((_, index) => index % Math.ceil(group.length / 220) === 0)
+                : group;
+            const fit = fitCircle2D(sampledPoints);
+            if (!fit || fit.radius < minRadius) return;
 
-        const residualLimit = Math.max(0.22, fit.radius * 0.10);
-        if (fit.coverage < TURNING_AXIS_MIN_RING_COVERAGE || fit.residual > residualLimit) continue;
+            const residualLimit = Math.max(0.22, fit.radius * 0.10);
+            if (fit.coverage < TURNING_AXIS_MIN_RING_COVERAGE || fit.residual > residualLimit) return;
 
-        const residualRatio = fit.residual / Math.max(fit.radius, 1e-6);
-        const weight = fit.count * fit.coverage / (1 + residualRatio * 8);
-        rings.push({ ...fit, weight });
+            rings.push(fit);
+        });
     }
 
     if (rings.length === 0) {
@@ -759,25 +895,26 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
         };
     }
 
-    const totalWeight = rings.reduce((sum, ring) => sum + ring.weight, 0);
-    const centerU = rings.reduce((sum, ring) => sum + ring.centerU * ring.weight, 0) / totalWeight;
-    const centerV = rings.reduce((sum, ring) => sum + ring.centerV * ring.weight, 0) / totalWeight;
-    const centerSpread = Math.sqrt(
-        rings.reduce((sum, ring) => {
-            const du = ring.centerU - centerU;
-            const dv = ring.centerV - centerV;
-            return sum + (du * du + dv * dv) * ring.weight;
-        }, 0) / totalWeight
-    );
-    const score = totalWeight / (1 + centerSpread / Math.max(diagonal * 0.02, 0.1));
+    const selectedCluster = selectTurningAxisCenterCluster(rings, diagonal);
+    if (!selectedCluster) {
+        return {
+            direction: normalizedDirection,
+            center: fallbackCenter,
+            score: 0,
+            ringCount: 0,
+        };
+    }
+
     const axisMid = (minT + maxT) / 2;
-    const center = u.scale(centerU).add(v.scale(centerV)).add(normalizedDirection.scale(axisMid));
+    const center = u.scale(selectedCluster.centerU)
+        .add(v.scale(selectedCluster.centerV))
+        .add(normalizedDirection.scale(axisMid));
 
     return {
         direction: normalizedDirection,
         center,
-        score,
-        ringCount: rings.length,
+        score: selectedCluster.score,
+        ringCount: selectedCluster.ringCount,
     };
 }
 
