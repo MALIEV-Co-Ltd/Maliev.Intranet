@@ -421,6 +421,10 @@ const bboxObservers         = {};   // canvasId → scene render observable hand
 const turningAxisLayers     = {};   // canvasId → { svg, labels, pointerObserver, renderObserver, hovered }
 const turningAxisRequests   = {};   // canvasId → latest requested turning-axis payload
 const TURNING_AXIS_HOVER_DISTANCE_PX = 14;
+const TURNING_AXIS_MAX_VERTEX_SAMPLES = 18000;
+const TURNING_AXIS_RING_MIN_POINTS = 10;
+const TURNING_AXIS_MIN_RING_COVERAGE = 0.42;
+const TURNING_AXIS_MIN_CENTER_SCORE = 12;
 const axisGizmoLayer        = {};   // canvasId → { dispose() }
 const axisLabelDivs         = {};   // canvasId → [ { div, localPos } ]
 const axisMouseHandlers     = {};   // canvasId → mousemove handler function
@@ -499,6 +503,14 @@ function normalizeAxisVector(axisVector) {
     return worldDirection.normalize();
 }
 
+function directionFromPrimaryAxis(primaryAxis) {
+    const axis = String(primaryAxis || '').toUpperCase();
+    if (axis === 'X') return new BABYLON.Vector3(1, 0, 0);
+    if (axis === 'Y') return BABYLON.Vector3.TransformNormal(new BABYLON.Vector3(0, 1, 0), BABYLON.Matrix.RotationX(Math.PI / 2)).normalize();
+    if (axis === 'Z') return BABYLON.Vector3.TransformNormal(new BABYLON.Vector3(0, 0, 1), BABYLON.Matrix.RotationX(Math.PI / 2)).normalize();
+    return null;
+}
+
 function detectTurningAxisDirectionFromBounds(bb) {
     const x = Math.abs(bb.max.x - bb.min.x);
     const y = Math.abs(bb.max.y - bb.min.y);
@@ -509,12 +521,303 @@ function detectTurningAxisDirectionFromBounds(bb) {
     return new BABYLON.Vector3(0, 0, 1);
 }
 
-function resolveTurningAxisDirection(primaryAxis, axisVector, bb) {
-    if (String(primaryAxis || '').toUpperCase() === 'AUTO') {
-        return detectTurningAxisDirectionFromBounds(bb);
+function getBoundingBoxCorners(bb) {
+    const min = toWorldPoint(bb.min);
+    const max = toWorldPoint(bb.max);
+    return [
+        new BABYLON.Vector3(min.x, min.y, min.z),
+        new BABYLON.Vector3(min.x, min.y, max.z),
+        new BABYLON.Vector3(min.x, max.y, min.z),
+        new BABYLON.Vector3(min.x, max.y, max.z),
+        new BABYLON.Vector3(max.x, min.y, min.z),
+        new BABYLON.Vector3(max.x, min.y, max.z),
+        new BABYLON.Vector3(max.x, max.y, min.z),
+        new BABYLON.Vector3(max.x, max.y, max.z),
+    ];
+}
+
+function isSystemMeshForTurningAxis(mesh, canvasId) {
+    if (!mesh || !mesh.name) return true;
+    if (mesh.name === '__grid__' || mesh.name === '__shadow_catcher__') return true;
+    if (mesh.name.startsWith('__axis') || mesh.name.startsWith('bbox_')) return true;
+    if (mesh.name.startsWith('__flipped_overlay__') || mesh.name.startsWith('measure_')) return true;
+
+    const directOverlayMap = overlayMeshes?.[canvasId];
+    if (directOverlayMap instanceof Map) {
+        for (const [, meshArr] of directOverlayMap) {
+            if (meshArr?.some(m => m.uniqueId === mesh.uniqueId)) return true;
+        }
     }
 
-    return normalizeAxisVector(axisVector) || detectTurningAxisDirectionFromBounds(bb);
+    const prefix = `${canvasId}::`;
+    for (const key of Object.keys(overlayMeshes ?? {})) {
+        if (!key.startsWith(prefix) || !(overlayMeshes[key] instanceof Map)) continue;
+        for (const [, meshArr] of overlayMeshes[key]) {
+            if (meshArr?.some(m => m.uniqueId === mesh.uniqueId)) return true;
+        }
+    }
+
+    return false;
+}
+
+function collectTurningAxisSamplePoints(scene, canvasId) {
+    const points = [];
+    const candidateMeshes = scene.meshes.filter(mesh =>
+        !isSystemMeshForTurningAxis(mesh, canvasId)
+        && mesh.getVerticesData
+        && mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind)
+        && mesh.getTotalVertices?.() > 0
+    );
+
+    const totalVertices = candidateMeshes.reduce((sum, mesh) => sum + (mesh.getTotalVertices?.() ?? 0), 0);
+    const globalStep = Math.max(1, Math.ceil(totalVertices / TURNING_AXIS_MAX_VERTEX_SAMPLES));
+
+    candidateMeshes.forEach(mesh => {
+        const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+        if (!positions) return;
+
+        mesh.computeWorldMatrix(true);
+        const matrix = mesh.getWorldMatrix();
+        for (let i = 0; i < positions.length; i += 3 * globalStep) {
+            points.push(BABYLON.Vector3.TransformCoordinates(
+                new BABYLON.Vector3(positions[i], positions[i + 1], positions[i + 2]),
+                matrix
+            ));
+        }
+    });
+
+    return points;
+}
+
+function buildAxisBasis(direction) {
+    let helper = Math.abs(BABYLON.Vector3.Dot(direction, BABYLON.Axis.Z)) < 0.9
+        ? BABYLON.Axis.Z
+        : BABYLON.Axis.Y;
+    let u = BABYLON.Vector3.Cross(direction, helper);
+    if (u.length() < 1e-6) {
+        helper = BABYLON.Axis.X;
+        u = BABYLON.Vector3.Cross(direction, helper);
+    }
+
+    u.normalize();
+    const v = BABYLON.Vector3.Cross(direction, u).normalize();
+    return { u, v };
+}
+
+function solve3x3(matrix, rhs) {
+    const a = matrix.map((row, index) => [...row, rhs[index]]);
+
+    for (let col = 0; col < 3; col += 1) {
+        let pivot = col;
+        for (let row = col + 1; row < 3; row += 1) {
+            if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) pivot = row;
+        }
+
+        if (Math.abs(a[pivot][col]) < 1e-9) return null;
+        if (pivot !== col) [a[col], a[pivot]] = [a[pivot], a[col]];
+
+        const divisor = a[col][col];
+        for (let j = col; j < 4; j += 1) a[col][j] /= divisor;
+
+        for (let row = 0; row < 3; row += 1) {
+            if (row === col) continue;
+            const factor = a[row][col];
+            for (let j = col; j < 4; j += 1) {
+                a[row][j] -= factor * a[col][j];
+            }
+        }
+    }
+
+    return [a[0][3], a[1][3], a[2][3]];
+}
+
+function unique2DPoints(points, tolerance) {
+    const unique = new Map();
+    points.forEach(point => {
+        const key = `${Math.round(point.x / tolerance)},${Math.round(point.y / tolerance)}`;
+        if (!unique.has(key)) unique.set(key, point);
+    });
+    return [...unique.values()];
+}
+
+function fitCircle2D(points) {
+    if (points.length < TURNING_AXIS_RING_MIN_POINTS) return null;
+
+    let sA = 0, sB = 0, sC = 0, sD = 0, sE = 0, sF = 0;
+    let rA = 0, rB = 0, rC = 0;
+    points.forEach(point => {
+        const a = 2 * point.x;
+        const b = 2 * point.y;
+        const c = 1;
+        const rhs = point.x * point.x + point.y * point.y;
+        sA += a * a;
+        sB += a * b;
+        sC += a * c;
+        sD += b * b;
+        sE += b * c;
+        sF += c * c;
+        rA += a * rhs;
+        rB += b * rhs;
+        rC += rhs;
+    });
+
+    const solved = solve3x3(
+        [[sA, sB, sC], [sB, sD, sE], [sC, sE, sF]],
+        [rA, rB, rC]
+    );
+    if (!solved) return null;
+
+    const [cx, cy, constant] = solved;
+    const radiusSquared = cx * cx + cy * cy + constant;
+    if (!isFinite(radiusSquared) || radiusSquared <= 1e-9) return null;
+
+    const radius = Math.sqrt(radiusSquared);
+    let residualSum = 0;
+    const angles = [];
+    points.forEach(point => {
+        const dist = Math.hypot(point.x - cx, point.y - cy);
+        residualSum += (dist - radius) * (dist - radius);
+        angles.push(Math.atan2(point.y - cy, point.x - cx));
+    });
+    angles.sort((a, b) => a - b);
+
+    let maxGap = 0;
+    for (let i = 1; i < angles.length; i += 1) {
+        maxGap = Math.max(maxGap, angles[i] - angles[i - 1]);
+    }
+    if (angles.length > 1) {
+        maxGap = Math.max(maxGap, (angles[0] + Math.PI * 2) - angles[angles.length - 1]);
+    }
+
+    return {
+        centerU: cx,
+        centerV: cy,
+        radius,
+        residual: Math.sqrt(residualSum / points.length),
+        coverage: Math.max(0, Math.min(1, (Math.PI * 2 - maxGap) / (Math.PI * 2))),
+        count: points.length,
+    };
+}
+
+function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
+    const normalizedDirection = direction.clone();
+    normalizedDirection.normalize();
+    const { u, v } = buildAxisBasis(normalizedDirection);
+    const corners = getBoundingBoxCorners(bb);
+    let minT = Infinity;
+    let maxT = -Infinity;
+    corners.forEach(corner => {
+        const t = BABYLON.Vector3.Dot(corner, normalizedDirection);
+        minT = Math.min(minT, t);
+        maxT = Math.max(maxT, t);
+    });
+
+    const axisLength = Math.max(maxT - minT, 1);
+    const diagonal = toWorldPoint(bb.max).subtract(toWorldPoint(bb.min)).length();
+    const bucketSize = Math.max(0.08, Math.min(1.25, axisLength * 0.015));
+    const uniqueTolerance = Math.max(0.02, diagonal * 0.0004);
+    const minRadius = Math.max(0.04, diagonal * 0.002);
+    const buckets = new Map();
+
+    points.forEach(point => {
+        const t = BABYLON.Vector3.Dot(point, normalizedDirection);
+        const key = Math.round(t / bucketSize);
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push({
+            x: BABYLON.Vector3.Dot(point, u),
+            y: BABYLON.Vector3.Dot(point, v),
+        });
+    });
+
+    const rings = [];
+    for (const bucketPoints of buckets.values()) {
+        if (bucketPoints.length < TURNING_AXIS_RING_MIN_POINTS) continue;
+
+        const uniquePoints = unique2DPoints(bucketPoints, uniqueTolerance);
+        if (uniquePoints.length < TURNING_AXIS_RING_MIN_POINTS) continue;
+
+        const sampledPoints = uniquePoints.length > 220
+            ? uniquePoints.filter((_, index) => index % Math.ceil(uniquePoints.length / 220) === 0)
+            : uniquePoints;
+        const fit = fitCircle2D(sampledPoints);
+        if (!fit || fit.radius < minRadius) continue;
+
+        const residualLimit = Math.max(0.22, fit.radius * 0.10);
+        if (fit.coverage < TURNING_AXIS_MIN_RING_COVERAGE || fit.residual > residualLimit) continue;
+
+        const residualRatio = fit.residual / Math.max(fit.radius, 1e-6);
+        const weight = fit.count * fit.coverage / (1 + residualRatio * 8);
+        rings.push({ ...fit, weight });
+    }
+
+    if (rings.length === 0) {
+        return {
+            direction: normalizedDirection,
+            center: fallbackCenter,
+            score: 0,
+            ringCount: 0,
+        };
+    }
+
+    const totalWeight = rings.reduce((sum, ring) => sum + ring.weight, 0);
+    const centerU = rings.reduce((sum, ring) => sum + ring.centerU * ring.weight, 0) / totalWeight;
+    const centerV = rings.reduce((sum, ring) => sum + ring.centerV * ring.weight, 0) / totalWeight;
+    const centerSpread = Math.sqrt(
+        rings.reduce((sum, ring) => {
+            const du = ring.centerU - centerU;
+            const dv = ring.centerV - centerV;
+            return sum + (du * du + dv * dv) * ring.weight;
+        }, 0) / totalWeight
+    );
+    const score = totalWeight / (1 + centerSpread / Math.max(diagonal * 0.02, 0.1));
+    const axisMid = (minT + maxT) / 2;
+    const center = u.scale(centerU).add(v.scale(centerV)).add(normalizedDirection.scale(axisMid));
+
+    return {
+        direction: normalizedDirection,
+        center,
+        score,
+        ringCount: rings.length,
+    };
+}
+
+function resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, bb, fallbackCenter) {
+    const points = collectTurningAxisSamplePoints(scene, canvasId);
+    const axis = String(primaryAxis || '').toUpperCase();
+
+    if (axis === 'AUTO') {
+        const candidates = [
+            new BABYLON.Vector3(1, 0, 0),
+            new BABYLON.Vector3(0, 1, 0),
+            new BABYLON.Vector3(0, 0, 1),
+        ].map(direction => evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter));
+        candidates.sort((a, b) => b.score - a.score);
+        const best = candidates[0];
+
+        if (best && best.score >= TURNING_AXIS_MIN_CENTER_SCORE && best.ringCount > 0) {
+            return best;
+        }
+
+        return {
+            direction: detectTurningAxisDirectionFromBounds(bb),
+            center: fallbackCenter,
+            score: 0,
+            ringCount: 0,
+        };
+    }
+
+    const direction = normalizeAxisVector(axisVector)
+        || directionFromPrimaryAxis(primaryAxis)
+        || detectTurningAxisDirectionFromBounds(bb);
+    const evaluated = evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter);
+    return {
+        direction,
+        center: evaluated.score >= TURNING_AXIS_MIN_CENTER_SCORE && evaluated.ringCount > 0
+            ? evaluated.center
+            : fallbackCenter,
+        score: evaluated.score,
+        ringCount: evaluated.ringCount,
+    };
 }
 
 function createTurningAxisLabel(text) {
@@ -679,24 +982,17 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     const centerData = meshCenters[canvasId];
     if (!scene || !bb || !centerData) return false;
 
-    const direction = resolveTurningAxisDirection(primaryAxis, axisVector, bb);
+    const fallbackCenter = toWorldPoint(centerData);
+    const resolvedAxis = resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, bb, fallbackCenter);
+    const direction = resolvedAxis?.direction;
     if (!direction) return false;
 
     clearTurningAxis(canvasId, false);
 
-    const center = toWorldPoint(centerData);
+    const center = resolvedAxis.center ?? fallbackCenter;
     const min = toWorldPoint(bb.min);
     const max = toWorldPoint(bb.max);
-    const corners = [
-        new BABYLON.Vector3(min.x, min.y, min.z),
-        new BABYLON.Vector3(min.x, min.y, max.z),
-        new BABYLON.Vector3(min.x, max.y, min.z),
-        new BABYLON.Vector3(min.x, max.y, max.z),
-        new BABYLON.Vector3(max.x, min.y, min.z),
-        new BABYLON.Vector3(max.x, min.y, max.z),
-        new BABYLON.Vector3(max.x, max.y, min.z),
-        new BABYLON.Vector3(max.x, max.y, max.z),
-    ];
+    const corners = getBoundingBoxCorners(bb);
 
     let minDot = Infinity;
     let maxDot = -Infinity;
