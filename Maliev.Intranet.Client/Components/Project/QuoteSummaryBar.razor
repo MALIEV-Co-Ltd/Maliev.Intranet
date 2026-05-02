@@ -69,7 +69,7 @@
                         <span class="qsb-lead-mult">@(lt.PriceMultiplier < 1 ? $"-{Math.Round((1 - lt.PriceMultiplier) * 100)}%" : lt.PriceMultiplier > 1 ? $"+{Math.Round((lt.PriceMultiplier - 1) * 100)}%" : "base")</span>
                     </div>
                     <div class="qsb-lead-days">
-                        @lt.MinDays <span class="qsb-bd-full">business days</span><span class="qsb-bd-short">days</span>
+                        @FormatLeadTimeDays(lt) <span class="qsb-bd-full">business days</span><span class="qsb-bd-short">days</span>
                     </div>
                 </button>
             }
@@ -484,10 +484,15 @@
     {
         if (SelectedLeadTime == null || SelectedLeadTime.MinDays <= 0)
             return "—";
-        var days = SelectedLeadTime.MinDays;
+        var days = Math.Max(SelectedLeadTime.MinDays, SelectedLeadTime.MaxDays);
         var shipDate = AddBusinessDays(DateTime.UtcNow.Date, days);
         return shipDate.ToString("MMM d");
     }
+
+    private static string FormatLeadTimeDays(LeadTimeOptionDto leadTime) =>
+        leadTime.MaxDays > leadTime.MinDays
+            ? $"{leadTime.MinDays} - {leadTime.MaxDays}"
+            : leadTime.MinDays.ToString();
 
     private static DateTime AddBusinessDays(DateTime date, int businessDays)
     {

@@ -161,16 +161,19 @@
                 }
 
                 @* Upload / processing progress overlay *@
-                @if (Part.Uploading || Part.AwaitingPreview)
+                @if (Part.QueuedUpload || Part.Uploading || Part.AwaitingPreview)
                 {
                     <div class="pdc-upload-progress">
-                        <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mb-2" />
+                        <MudProgressCircular Indeterminate="@(!Part.Uploading)"
+                                             Value="@Part.ProgressPercent"
+                                             Size="Size.Small"
+                                             Class="mb-2" />
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@Part.StatusText</MudText>
                     </div>
                 }
 
                 @* Fallback grey background — no preview *@
-                @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.AwaitingPreview && !Part.Uploading)
+                @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.QueuedUpload && !Part.AwaitingPreview && !Part.Uploading)
                 {
                     <MudIcon Icon="@FileTypes.GetIcon(Path.GetExtension(Part.Name))" Size="Size.Large" Color="Color.Default" />
                 }
@@ -317,6 +320,7 @@
 
     private string GetStatusClass() => Part switch
     {
+        { QueuedUpload: true } => "muted",
         { Uploading: true } => "muted",
         { AwaitingPreview: true } => "warn",
         { Error: not null } => "error",
@@ -329,6 +333,7 @@
 
     private string GetStatusLabel() => Part switch
     {
+        { QueuedUpload: true } => "QUEUED",
         { Uploading: true } => "UPLOADING",
         { AwaitingPreview: true } => "PROCESSING",
         { Error: not null } => "ERROR",
@@ -341,6 +346,7 @@
 
     private string GetUploadedLabel()
     {
+        if (Part.QueuedUpload) return "Queued...";
         if (Part.Uploading) return "Uploading…";
         if (Part.AwaitingPreview) return "Processing…";
         if (Part.UploadedAt.HasValue)

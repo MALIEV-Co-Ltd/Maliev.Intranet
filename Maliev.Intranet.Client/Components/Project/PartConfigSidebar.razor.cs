@@ -189,6 +189,9 @@ public partial class PartConfigSidebar : ComponentBase
     private bool IsCncProcess =>
         IsProcess("CNC") || IsProcess("CNC_MILL") || IsProcess("CNC_TURN");
 
+    private IReadOnlyList<CatalogToleranceDto> VisibleToleranceList =>
+        VisibleTolerances.OrderBy(t => t.SortOrder).ToList();
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     /// <inheritdoc />
@@ -372,6 +375,17 @@ public partial class PartConfigSidebar : ComponentBase
         Part.FinishId = f?.Id;
         RemoveFinishSpecificOptionValues();
         await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private bool IsSelectedFinishGroup(CatalogSurfaceFinishDto finish)
+    {
+        if (SelectedFinish == null)
+            return false;
+
+        return string.Equals(
+            GetSurfaceFinishDisplayKey(SelectedFinish),
+            GetSurfaceFinishDisplayKey(finish),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task OnToleranceChanged(CatalogToleranceDto? t)
@@ -630,13 +644,17 @@ public partial class PartConfigSidebar : ComponentBase
         normalized.Contains("layerheight", StringComparison.Ordinal)
         || normalized.Contains("infill", StringComparison.Ordinal)
         || normalized.Contains("supporttype", StringComparison.Ordinal)
+        || normalized.Contains("threadspec", StringComparison.Ordinal)
+        || normalized.Contains("threadspecification", StringComparison.Ordinal)
         || normalized.Contains("threadedhole", StringComparison.Ordinal)
         || normalized.Contains("threadhole", StringComparison.Ordinal)
         || normalized.Contains("tappedhole", StringComparison.Ordinal)
         || normalized.Contains("taphole", StringComparison.Ordinal)
         || normalized.Contains("threadinsert", StringComparison.Ordinal)
         || normalized.Contains("threadedinsert", StringComparison.Ordinal)
-        || normalized.Contains("heatsetinsert", StringComparison.Ordinal);
+        || normalized.Contains("heatsetinsert", StringComparison.Ordinal)
+        || normalized.Contains("groove", StringComparison.Ordinal)
+        || normalized.Contains("undercut", StringComparison.Ordinal);
 
     private bool IsBooleanOption(ProcessConfigOptionDto option)
     {
@@ -716,6 +734,39 @@ public partial class PartConfigSidebar : ComponentBase
         || option.ConfigKey.Equals("anodise_color", StringComparison.OrdinalIgnoreCase)
         || option.Label.Contains("anodize", StringComparison.OrdinalIgnoreCase)
         || option.Label.Contains("anodise", StringComparison.OrdinalIgnoreCase);
+
+    private static IReadOnlyList<CatalogSurfaceFinishDto> GetVisibleFinishes(IReadOnlyList<CatalogSurfaceFinishDto> finishes) =>
+        finishes
+            .OrderBy(f => f.SortOrder)
+            .GroupBy(GetSurfaceFinishDisplayKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+    private static string GetSurfaceFinishDisplayName(CatalogSurfaceFinishDto finish)
+    {
+        var key = GetSurfaceFinishDisplayKey(finish);
+        return key switch
+        {
+            "ANODIZE_TYPE_II" => "Anodized Type II",
+            "ANODIZE_TYPE_III" => "Anodized Type III",
+            _ => finish.Name,
+        };
+    }
+
+    private static string GetSurfaceFinishDisplayKey(CatalogSurfaceFinishDto finish)
+    {
+        var normalized = NormalizeOptionText($"{finish.Code} {finish.Name}");
+        if (normalized.Contains("anod", StringComparison.Ordinal))
+        {
+            if (normalized.Contains("typeiii", StringComparison.Ordinal)
+                || normalized.Contains("hard", StringComparison.Ordinal))
+                return "ANODIZE_TYPE_III";
+
+            return "ANODIZE_TYPE_II";
+        }
+
+        return finish.Code;
+    }
 
     private static string NormalizeOptionText(string value)
     {
@@ -873,6 +924,17 @@ public partial class PartConfigSidebar : ComponentBase
         return Icons.Material.Outlined.Tune;
     }
 
+    private static string GetBooleanOptionIcon(ProcessConfigOptionDto option)
+    {
+        var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        if (normalized.Contains("deburr", StringComparison.Ordinal))
+            return Icons.Material.Outlined.CleaningServices;
+        if (normalized.Contains("cert", StringComparison.Ordinal))
+            return Icons.Material.Outlined.Verified;
+
+        return Icons.Material.Outlined.CheckCircle;
+    }
+
     private static string GetOptionColor(string value)
     {
         var normalized = value.Trim().ToLowerInvariant();
@@ -981,6 +1043,24 @@ public partial class PartConfigSidebar : ComponentBase
         };
         DialogService.ShowAsync<ScheduleDialogContent>("Planning Schedule", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+    }
+
+    private void OpenToleranceInfoDialog()
+    {
+        var tolerances = VisibleToleranceList;
+        if (tolerances.Count == 0)
+            return;
+
+        var parameters = new DialogParameters<ToleranceInfoDialog>
+        {
+            { x => x.Tolerances, tolerances },
+            { x => x.GetRange, GetToleranceRange },
+        };
+
+        DialogService.ShowAsync<ToleranceInfoDialog>(
+            "Tolerance Information",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
     }
 
     // ── Two-phase DFM analysis ─────────────────────────────────────────────

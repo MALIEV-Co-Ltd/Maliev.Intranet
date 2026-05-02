@@ -133,11 +133,12 @@
     </ErrorBoundary>
 </div>
 
-<MudFileUpload T="IReadOnlyList<IBrowserFile>"
-               @ref="_fileUpload"
-               FilesChanged="HandleFileSelected"
-               Accept="@FileTypes.ThreeDAcceptString"
-               MaximumFileCount="20"
-               Hidden="true"
-               Style="display:none;" />
+<div id="@ProjectUploadContainerId" style="display:none;">
+    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                   @ref="_fileUpload"
+                   FilesChanged="HandleFileSelected"
+                   Accept="@FileTypes.ThreeDAcceptString"
+                   MaximumFileCount="20"
+                   Hidden="true" />
+</div>
 

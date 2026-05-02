@@ -135,17 +135,26 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
         var pdfData = new QuotationPdfData
         {
             QuotationNumber = quotation.QuotationNumber,
+            VersionNumber = quotation.CurrentVersionNumber,
             CustomerName = quotation.CustomerName,
+            CustomerType = "Corporate",
             QuotationDate = quotation.CreatedAt,
-            TotalAmount = (double)quotation.Total,
+            ValidityStart = quotation.ValidityPeriodStart,
+            ValidityEnd = quotation.ValidityPeriodEnd,
+            SubtotalBeforeDiscount = quotation.SubTotal,
+            Subtotal = quotation.SubTotal,
+            TaxAmount = quotation.Tax,
+            TotalAmount = quotation.Total,
             Currency = !string.IsNullOrEmpty(quotation.CurrencyCode) ? quotation.CurrencyCode : "THB",
+            DeliveryExpectations = quotation.DeliveryExpectations,
+            ChangeSummary = quotation.Versions?.OrderByDescending(version => version.VersionNumber).FirstOrDefault()?.ChangeSummary,
             Items = quotation.Versions?.FirstOrDefault()?.LineItems?.Select((item, index) => new QuotationPdfItem
             {
                 Index = index + 1,
-                Description = item.Description,
-                Quantity = (double)item.Quantity,
-                UnitPrice = (double)item.UnitPrice,
-                TotalPrice = (double)(item.Quantity * item.UnitPrice)
+                MaterialName = item.Description,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                LineTotal = item.Quantity * item.UnitPrice
             }).ToList() ?? []
         };
 

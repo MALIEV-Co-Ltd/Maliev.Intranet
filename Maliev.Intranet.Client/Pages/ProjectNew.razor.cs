@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -21,10 +22,10 @@ namespace Maliev.Intranet.Client.Pages;
 public partial class ProjectNew : IAsyncDisposable
 {
     /// <summary>
-    /// Holds a live DotNetObjectReference to a callback instance so JS Interop can
-    /// invoke OnUploadProgress and update the part's progress bar.
+    /// Holds live DotNetObjectReference instances so JS Interop can invoke
+    /// OnUploadProgress and update the matching part's progress bar.
     /// </summary>
-    private readonly Dictionary<Guid, DotNetObjectReference<UploadProgressCallback>> _uploadCallbacks = [];
+    private readonly ConcurrentDictionary<Guid, DotNetObjectReference<UploadProgressCallback>> _uploadCallbacks = [];
 
     // ── Project-level state ───────────────────────────────────────────
     private Guid _tempProjectId = Guid.NewGuid();  // non-readonly; reassigned on Duplicate
@@ -39,6 +40,7 @@ public partial class ProjectNew : IAsyncDisposable
     private DateTimeOffset? _lastSavedAt;
 
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
+    private const string ProjectUploadContainerId = "project-new-file-upload";
 
     // ── Validation ────────────────────────────────────────────────────
     private bool _titleHasError;
@@ -96,7 +98,7 @@ public partial class ProjectNew : IAsyncDisposable
         !_titleHasError &&
         _selectedLeadTime != null &&
         _parts.Count > 0 &&
-        !_parts.Any(p => p.Uploading || p.PricingLoading) &&
+        !_parts.Any(p => p.QueuedUpload || p.Uploading || p.PricingLoading) &&
         _parts.All(p => p.IsFullyConfigured && !p.PricingFailed) &&
         _parts.All(p => p.IsManifold != false || p.DfmAcknowledged);
 
@@ -106,8 +108,10 @@ public partial class ProjectNew : IAsyncDisposable
         foreach (var cts in _pricingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         foreach (var cts in _statusPollCts.Values) { cts.Cancel(); cts.Dispose(); }
         _statusPollCts.Clear();
-        _autoSaveDebounceTimer?.Dispose();
+        foreach (var callbackRef in _uploadCallbacks.Values) { callbackRef.Dispose(); }
+        _uploadCallbacks.Clear();
         _referenceDataSubscription?.Dispose();
+        _autoSaveDebounceTimer?.Dispose();
         if (_searchCts != null) { await _searchCts.CancelAsync(); _searchCts.Dispose(); }
         if (_hubConnection != null)
             await _hubConnection.DisposeAsync();
@@ -408,14 +412,16 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private async Task HandleFileSelected(IReadOnlyList<IBrowserFile> files)
     {
-        var validFiles = new List<(IBrowserFile File, PartViewModel Part)>();
+        var validFiles = new List<ProjectUploadItem>();
+        var fileIndex = 0;
 
         foreach (var file in files)
         {
             var ext = Path.GetExtension(file.Name);
-            if (!FileTypes.AllUploadExtensions.Contains(ext))
+            if (!FileTypes.ThreeDExtensions.Contains(ext))
             {
                 Snackbar.Add($"File type '{ext}' is not allowed.", Severity.Warning);
+                fileIndex++;
                 continue;
             }
 
@@ -426,98 +432,163 @@ public partial class ProjectNew : IAsyncDisposable
                     $"File '{file.Name}' ({sizeMB:F1} MB) exceeds the {UploadSettings.ThreeDModelLimit / (1024.0 * 1024.0):F0} MB limit.",
                     Severity.Error
                 );
+                fileIndex++;
                 continue;
             }
 
+            var clientUploadId = Guid.NewGuid().ToString("N");
             var part = new PartViewModel
             {
                 Name = file.Name,
-                Uploading = true,
-                AwaitingPreview = true,
-                StatusText = "Uploading...",
+                QueuedUpload = true,
+                Uploading = false,
+                AwaitingPreview = false,
+                StatusText = "Queued...",
                 FileSizeBytes = file.Size,
                 UploadedAt = DateTimeOffset.UtcNow,
+                ClientUploadId = clientUploadId,
             };
 
             _parts.Add(part);
             _selectedPartIndex = _parts.Count - 1;
-            validFiles.Add((file, part));
+            validFiles.Add(new ProjectUploadItem(file, part, fileIndex, clientUploadId));
+            fileIndex++;
         }
 
         if (validFiles.Count > 0)
-            _ = UploadBatchAndPollAsync(validFiles);
+        {
+            try
+            {
+                await CaptureBrowserFilesAsync(validFiles);
+            }
+            catch (JSException ex)
+            {
+                Logger.LogError(ex, "Failed to capture selected browser files for direct upload.");
+                foreach (var item in validFiles)
+                    await MarkUploadFailedAsync(item.Part, "Browser file capture failed.");
+                return;
+            }
+
+            _ = UploadFilesConcurrentlyAsync(validFiles);
+        }
     }
 
-    private async Task UploadBatchAndPollAsync(List<(IBrowserFile File, PartViewModel Part)> items)
+    private async Task CaptureBrowserFilesAsync(IReadOnlyList<ProjectUploadItem> items)
     {
-        var uploadId = Guid.NewGuid();
+        var mappings = items.Select(item => new
+        {
+            clientUploadId = item.ClientUploadId,
+            index = item.InputIndex
+        });
+
+        await JS.InvokeVoidAsync("window.projectNewUploads.captureFiles", ProjectUploadContainerId, mappings);
+    }
+
+    private async Task UploadFilesConcurrentlyAsync(IReadOnlyList<ProjectUploadItem> items)
+    {
+        var maxConcurrency = Math.Max(1, UploadSettings.MaxConcurrentUploads);
+        using var semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+
+        await Task.WhenAll(items.Select(item => UploadSingleProjectFileAsync(item, semaphore)));
+    }
+
+    private async Task UploadSingleProjectFileAsync(ProjectUploadItem item, SemaphoreSlim semaphore)
+    {
+        await semaphore.WaitAsync();
+
+        var part = item.Part;
+        var callbackId = Guid.NewGuid();
         DotNetObjectReference<UploadProgressCallback>? callbackRef = null;
 
         try
         {
-            // Use the first part as the progress reporter for aggregate progress
-            var progressPart = items[0].Part;
-            var callback = new UploadProgressCallback(progressPart, () => InvokeAsync(StateHasChanged));
+            part.QueuedUpload = false;
+            part.Uploading = true;
+            part.AwaitingPreview = false;
+            part.ProgressPercent = 0;
+            part.StatusText = "Uploading...";
+            part.Error = null;
+            await InvokeAsync(StateHasChanged);
+
+            var browserContentType = string.IsNullOrWhiteSpace(item.File.ContentType)
+                ? null
+                : item.File.ContentType;
+
+            var initiateRequest = new BffInitiateResumableUploadRequest
+            {
+                FileName = item.File.Name,
+                ContentType = browserContentType,
+                FileSize = item.File.Size,
+                ProjectId = _tempProjectId,
+                CustomerId = _selectedCustomerId
+            };
+
+            var initiateResponse = await Http.PostAsJsonAsync("api/v1/uploads/resumable", initiateRequest);
+            if (!initiateResponse.IsSuccessStatusCode)
+            {
+                await MarkUploadFailedAsync(part, $"Upload initiation failed ({(int)initiateResponse.StatusCode}).");
+                return;
+            }
+
+            var session = await initiateResponse.Content.ReadFromJsonAsync<BffResumableUploadSessionResponse>();
+            if (session == null || string.IsNullOrWhiteSpace(session.UploadId) || string.IsNullOrWhiteSpace(session.SessionUri))
+            {
+                await MarkUploadFailedAsync(part, "Upload initiation response was invalid.");
+                return;
+            }
+
+            var callback = new UploadProgressCallback(part, () => InvokeAsync(StateHasChanged));
             callbackRef = DotNetObjectReference.Create(callback);
-            _uploadCallbacks[uploadId] = callbackRef;
+            _uploadCallbacks[callbackId] = callbackRef;
 
-            // Read all file bytes
-            var jsFiles = new List<object>();
-            foreach (var (file, _) in items)
+            var uploadResult = await JS.InvokeAsync<UploadResult>(
+                "window.projectNewUploads.uploadFile",
+                item.ClientUploadId,
+                session.SessionUri,
+                $"api/v1/uploads/resumable/{Uri.EscapeDataString(session.UploadId)}",
+                browserContentType ?? "application/octet-stream",
+                item.File.Size,
+                callbackRef);
+
+            if (uploadResult == null || uploadResult.Status < 200 || uploadResult.Status >= 300)
             {
-                using var ms = new MemoryStream();
-                await using var rs = file.OpenReadStream(maxAllowedSize: UploadSettings.ThreeDModelLimit);
-                await rs.CopyToAsync(ms);
-                jsFiles.Add(new { bytes = ms.ToArray(), name = file.Name });
-            }
-
-            var url = $"api/v1/uploads/batch?projectId={_tempProjectId}&customerId={_selectedCustomerId}";
-            var result = await JS.InvokeAsync<UploadResult>("window.uploadBatchWithProgress", url, jsFiles, callbackRef);
-
-            if (result.Status != 200)
-            {
-                foreach (var (_, part) in items)
-                {
-                    part.Uploading = false;
-                    part.AwaitingPreview = false;
-                    part.Error = $"Upload failed ({result.Status})";
-                }
-                Snackbar.Add($"Batch upload failed ({result.Status}).", Severity.Error);
+                var status = uploadResult?.Status ?? 0;
+                await MarkUploadFailedAsync(part, $"Upload failed ({status}).");
                 return;
             }
 
-            var uploadResults = JsonSerializer.Deserialize<List<BffUploadResponse>>(result.Body);
-            if (uploadResults == null || uploadResults.Count == 0)
+            var completeResponse = await Http.PostAsJsonAsync(
+                $"api/v1/uploads/resumable/{Uri.EscapeDataString(session.UploadId)}/complete",
+                new { });
+
+            if (!completeResponse.IsSuccessStatusCode)
             {
-                foreach (var (_, part) in items)
-                {
-                    part.Uploading = false;
-                    part.AwaitingPreview = false;
-                    part.Error = "Upload response was empty.";
-                }
-                Snackbar.Add("Upload response was empty.", Severity.Error);
+                await MarkUploadFailedAsync(part, $"Upload completion failed ({(int)completeResponse.StatusCode}).");
                 return;
             }
 
-            // Map results back to parts by filename order
-            for (var i = 0; i < Math.Min(items.Count, uploadResults.Count); i++)
+            var completedUpload = await completeResponse.Content.ReadFromJsonAsync<BffUploadResponse>();
+            if (completedUpload == null || string.IsNullOrWhiteSpace(completedUpload.StoragePath))
             {
-                var part = items[i].Part;
-                var uploadResult = uploadResults[i];
-
-                part.StoragePath = uploadResult.StoragePath;
-                part.FileId = Guid.TryParse(uploadResult.UploadId, out var fid) ? fid : Guid.NewGuid();
-                part.Uploading = false;
-                part.ProgressPercent = 0;
-                part.StatusText = "Processing geometry...";
-
-                if (_hubConnection?.State == HubConnectionState.Connected)
-                    await _hubConnection.InvokeAsync("JoinFileGroup", uploadResult.StoragePath);
-
-                var pollCts = new CancellationTokenSource();
-                _statusPollCts[uploadResult.StoragePath!] = pollCts;
-                _ = Task.Run(() => StatusWatchdogLoopAsync(part, uploadResult.StoragePath!, pollCts.Token));
+                await MarkUploadFailedAsync(part, "Upload completion response was invalid.");
+                return;
             }
+
+            part.StoragePath = completedUpload.StoragePath;
+            part.FileId = Guid.TryParse(completedUpload.UploadId, out var fileId) ? fileId : Guid.NewGuid();
+            part.QueuedUpload = false;
+            part.Uploading = false;
+            part.ProgressPercent = 0;
+            part.AwaitingPreview = true;
+            part.StatusText = "Processing geometry...";
+
+            if (_hubConnection?.State == HubConnectionState.Connected)
+                await _hubConnection.InvokeAsync("JoinFileGroup", completedUpload.StoragePath);
+
+            var pollCts = new CancellationTokenSource();
+            _statusPollCts[completedUpload.StoragePath] = pollCts;
+            _ = Task.Run(() => StatusWatchdogLoopAsync(part, completedUpload.StoragePath, pollCts.Token));
+            await InvokeAsync(StateHasChanged);
         }
         catch (OperationCanceledException)
         {
@@ -525,25 +596,52 @@ public partial class ProjectNew : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            foreach (var (_, part) in items)
-            {
-                part.Uploading = false;
-                part.AwaitingPreview = false;
-                part.Error = $"Upload error: {ex.Message}";
-            }
-            Snackbar.Add($"Batch upload error: {ex.Message}", Severity.Error);
+            await MarkUploadFailedAsync(part, $"Upload error: {ex.Message}");
         }
         finally
         {
             if (callbackRef != null)
             {
-                _uploadCallbacks.Remove(uploadId);
+                _uploadCallbacks.TryRemove(callbackId, out _);
                 callbackRef.Dispose();
             }
+
+            try
+            {
+                await JS.InvokeVoidAsync("window.projectNewUploads.clearFile", item.ClientUploadId);
+            }
+            catch (JSDisconnectedException)
+            {
+                // Component disposal can race with background upload cleanup.
+            }
+            catch (JSException ex)
+            {
+                Logger.LogDebug(ex, "Failed to clear browser upload file reference.");
+            }
+
+            semaphore.Release();
         }
     }
 
     private sealed record UploadResult(int Status, string Body);
+
+    private sealed record ProjectUploadItem(
+        IBrowserFile File,
+        PartViewModel Part,
+        int InputIndex,
+        string ClientUploadId);
+
+    private async Task MarkUploadFailedAsync(PartViewModel part, string message)
+    {
+        part.QueuedUpload = false;
+        part.Uploading = false;
+        part.AwaitingPreview = false;
+        part.ProgressPercent = 0;
+        part.StatusText = "Upload failed";
+        part.Error = message;
+        Snackbar.Add($"{part.Name}: {message}", Severity.Error);
+        await InvokeAsync(StateHasChanged);
+    }
 
     // Maximum wall-clock time to wait for DFM analysis before declaring a client-side
     // timeout. Chosen to exceed the server's Phase 1 (300 s) + Phase 2 (360 s) hard
@@ -907,42 +1005,7 @@ public partial class ProjectNew : IAsyncDisposable
                 part.AvailableTolerances = FilterProcessTolerances(processCode, tolerancesTask.Result ?? []).ToList();
                 part.AvailableProcessOptions = configOptionsTask.Result ?? [];
 
-                if (!part.MaterialId.HasValue)
-                {
-                    var defaultMaterial = part.AvailableMaterials.OrderBy(m => m.SortOrder).FirstOrDefault();
-                    if (defaultMaterial != null)
-                    {
-                        part.MaterialId = defaultMaterial.Id;
-                        part.MaterialCode = defaultMaterial.Code;
-                    }
-                }
-
-                if (!part.FinishId.HasValue)
-                {
-                    var defaultFinish = part.AvailableFinishes.OrderBy(f => f.SortOrder).FirstOrDefault();
-                    if (defaultFinish != null)
-                    {
-                        part.FinishId = defaultFinish.Id;
-                        part.FinishCode = defaultFinish.Code;
-                    }
-                }
-
-                if (part.ToleranceId.HasValue
-                    && part.AvailableTolerances.All(t => t.Id != part.ToleranceId.Value))
-                {
-                    part.ToleranceId = null;
-                    part.ToleranceCode = null;
-                }
-
-                if (!part.ToleranceId.HasValue)
-                {
-                    var defaultTolerance = part.AvailableTolerances.OrderBy(t => t.SortOrder).FirstOrDefault();
-                    if (defaultTolerance != null)
-                    {
-                        part.ToleranceId = defaultTolerance.Id;
-                        part.ToleranceCode = defaultTolerance.Code;
-                    }
-                }
+                ApplyCatalogDefaults(part);
             }
             catch (Exception)
             {
@@ -994,8 +1057,8 @@ public partial class ProjectNew : IAsyncDisposable
         _leadTimeOptions = _leadTimeCatalogOptions
             .Select(option => option with
             {
-                MinDays = projectLeadTimeDays,
-                MaxDays = projectLeadTimeDays
+                MinDays = GetBufferedLeadTimeRange(option, projectLeadTimeDays).MinDays,
+                MaxDays = GetBufferedLeadTimeRange(option, projectLeadTimeDays).MaxDays
             })
             .ToList();
 
@@ -1003,6 +1066,107 @@ public partial class ProjectNew : IAsyncDisposable
         {
             _selectedLeadTime = _leadTimeOptions.FirstOrDefault(lt => lt.Code == _selectedLeadTime.Code);
         }
+        else
+        {
+            _selectedLeadTime = _leadTimeOptions.FirstOrDefault(lt => lt.IsDefault)
+                ?? _leadTimeOptions.FirstOrDefault(lt => lt.Code.Equals("STANDARD", StringComparison.OrdinalIgnoreCase))
+                ?? _leadTimeOptions.FirstOrDefault();
+        }
+    }
+
+    private static (int MinDays, int MaxDays) GetBufferedLeadTimeRange(
+        LeadTimeOptionDto option,
+        int standardLeadTimeDays)
+    {
+        var code = option.Code.ToUpperInvariant();
+        var minDays = standardLeadTimeDays;
+        var maxDays = standardLeadTimeDays + 3;
+
+        if (code.Contains("ECONOMY", StringComparison.Ordinal))
+        {
+            minDays = standardLeadTimeDays + 2;
+            maxDays = standardLeadTimeDays + 5;
+        }
+        else if (code.Contains("EXPRESS", StringComparison.Ordinal))
+        {
+            minDays = Math.Max(1, standardLeadTimeDays - 3);
+            maxDays = Math.Max(minDays + 2, standardLeadTimeDays - 1);
+        }
+
+        return (minDays, maxDays);
+    }
+
+    private static void ApplyCatalogDefaults(PartViewModel part)
+    {
+        if (!part.MaterialId.HasValue)
+        {
+            var defaultMaterial = part.AvailableMaterials.OrderBy(m => m.SortOrder).FirstOrDefault();
+            if (defaultMaterial != null)
+            {
+                part.MaterialId = defaultMaterial.Id;
+                part.MaterialCode = defaultMaterial.Code;
+            }
+        }
+
+        if (!part.FinishId.HasValue)
+        {
+            var defaultFinish = part.AvailableFinishes.OrderBy(f => f.SortOrder).FirstOrDefault();
+            if (defaultFinish != null)
+            {
+                part.FinishId = defaultFinish.Id;
+                part.FinishCode = defaultFinish.Code;
+            }
+        }
+
+        if (part.ToleranceId.HasValue
+            && part.AvailableTolerances.All(t => t.Id != part.ToleranceId.Value))
+        {
+            part.ToleranceId = null;
+            part.ToleranceCode = null;
+        }
+
+        if (!part.ToleranceId.HasValue)
+        {
+            var defaultTolerance = SelectDefaultTolerance(part.ProcessCode, part.AvailableTolerances);
+            if (defaultTolerance != null)
+            {
+                part.ToleranceId = defaultTolerance.Id;
+                part.ToleranceCode = defaultTolerance.Code;
+            }
+        }
+
+        if (IsCncProcessCode(part.ProcessCode) && string.IsNullOrWhiteSpace(part.RoughnessCode))
+            part.RoughnessCode = "RA_3_2";
+    }
+
+    private static CatalogToleranceDto? SelectDefaultTolerance(
+        string? processCode,
+        IEnumerable<CatalogToleranceDto> tolerances)
+    {
+        var ordered = tolerances.OrderBy(t => t.SortOrder).ToList();
+        if (IsCncProcessCode(processCode))
+        {
+            var medium = ordered.FirstOrDefault(IsIso2768MediumTolerance);
+            if (medium != null)
+                return medium;
+        }
+
+        return ordered.FirstOrDefault();
+    }
+
+    private static bool IsCncProcessCode(string? processCode) =>
+        string.Equals(processCode, "CNC", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(processCode, "CNC_MILL", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(processCode, "CNC_TURN", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsIso2768MediumTolerance(CatalogToleranceDto tolerance)
+    {
+        var combined = $"{tolerance.Code} {tolerance.Name} {tolerance.IsoStandard} {tolerance.Grade}";
+        return combined.Contains("ISO2768_M", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("ISO_2768_M", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("ISO 2768-m", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("ISO 2768 m", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tolerance.Grade, "m", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<CatalogToleranceDto> FilterProcessTolerances(
@@ -1617,16 +1781,26 @@ public partial class ProjectNew : IAsyncDisposable
             {
                 QuotationNumber = $"DRAFT-{_tempProjectId:N}"[..Math.Min(24, $"DRAFT-{_tempProjectId:N}".Length)],
                 CustomerName = _selectedCustomer?.CompanyName ?? _selectedCustomer?.Name ?? "N/A",
+                CustomerType = string.IsNullOrWhiteSpace(_selectedCustomer?.CompanyName) ? "Individual" : "Corporate",
                 QuotationDate = DateTime.UtcNow,
+                ValidityStart = DateTime.UtcNow,
+                ValidityEnd = DateTime.UtcNow.AddDays(30),
                 Currency = CurrencyService.Code ?? "THB",
-                TotalAmount = (double)_parts.Sum(p => p.EstimatedTotalAmount ?? 0),
+                SubtotalBeforeDiscount = _parts.Sum(p => p.EstimatedTotalAmount ?? 0),
+                Subtotal = _parts.Sum(p => p.EstimatedTotalAmount ?? 0),
+                TotalAmount = _parts.Sum(p => p.EstimatedTotalAmount ?? 0),
+                DeliveryExpectations = BuildDraftDeliveryExpectation(),
+                SpecialTerms = "Prices are indicative until project review is completed and all files are confirmed manufacturable.",
                 Items = _parts.Select((p, i) => new QuotationPdfItem
                 {
                     Index = i + 1,
-                    Description = p.Name,
+                    MaterialName = ResolveMaterialName(p),
+                    ManufacturingProcess = p.ProcessCode,
                     Quantity = p.Quantity,
-                    UnitPrice = (double)(p.EstimatedUnitPrice ?? 0),
-                    TotalPrice = (double)(p.EstimatedTotalAmount ?? 0),
+                    QuantityUnit = "pcs",
+                    UnitPrice = p.EstimatedUnitPrice ?? 0,
+                    LineTotal = p.EstimatedTotalAmount ?? 0,
+                    Notes = BuildDraftLineItemNotes(p),
                 }).ToList()
             };
 
@@ -1649,6 +1823,46 @@ public partial class ProjectNew : IAsyncDisposable
         {
             Snackbar.Add($"PDF generation error: {ex.Message}", MudBlazor.Severity.Error);
         }
+    }
+
+    private static string ResolveMaterialName(PartViewModel part)
+    {
+        var materialName = part.MaterialId.HasValue
+            ? part.AvailableMaterials.FirstOrDefault(material => material.Id == part.MaterialId.Value)?.Name
+            : null;
+
+        return string.IsNullOrWhiteSpace(materialName)
+            ? part.Name
+            : $"{materialName} - {part.Name}";
+    }
+
+    private string BuildDraftDeliveryExpectation()
+    {
+        var maxLeadTimeDays = _parts
+            .Where(part => part.EstimatedLeadTimeDays > 0)
+            .Select(part => part.EstimatedLeadTimeDays)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return maxLeadTimeDays > 0
+            ? $"{maxLeadTimeDays} business days after order confirmation"
+            : "To be confirmed after project review";
+    }
+
+    private static string? BuildDraftLineItemNotes(PartViewModel part)
+    {
+        var notes = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(part.FinishCode))
+            notes.Add($"Finish: {part.FinishCode}");
+
+        if (!string.IsNullOrWhiteSpace(part.ToleranceCode))
+            notes.Add($"Tolerance: {part.ToleranceCode}");
+
+        if (!string.IsNullOrWhiteSpace(part.PartNotes))
+            notes.Add(part.PartNotes);
+
+        return notes.Count == 0 ? null : string.Join(" | ", notes);
     }
 
     // ── Task 15: Create project + quotation ───────────────────────────

@@ -1,16 +1,19 @@
 using Bunit;
+using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using MudBlazor;
 using MudBlazor.Services;
 using System.Net;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -149,6 +152,168 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
         Assert.Contains(_sentRequests, r =>
             r.RequestUri?.AbsolutePath.Contains("lead-times") == true);
+    }
+
+    [Fact]
+    public async Task HandleFileSelectedAsync_WhenTwoValidFilesSelected_StartsBothUploads()
+    {
+        var releaseUploads = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initiateCount = 0;
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path == "/api/v1/uploads/resumable" && request.Method == HttpMethod.Post)
+            {
+                lock (_sentRequests) { _sentRequests.Add(request); }
+                Interlocked.Increment(ref initiateCount);
+                await releaseUploads.Task.WaitAsync(ct);
+                return CreateResumableSessionResponse();
+            }
+
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        try
+        {
+            await InvokeHandleFileSelectedAsync(cut, [
+                new TestBrowserFile("alpha.stl", 1024),
+                new TestBrowserFile("bravo.step", 2048)
+            ]);
+
+            cut.WaitForAssertion(() =>
+            {
+                var parts = GetParts(cut.Instance);
+                Assert.Equal(2, parts.Count);
+                Assert.Equal(2, parts.Count(p => p.Uploading));
+                Assert.DoesNotContain(parts, p => p.QueuedUpload);
+                Assert.Equal(2, Volatile.Read(ref initiateCount));
+            });
+        }
+        finally
+        {
+            releaseUploads.TrySetResult(null);
+        }
+    }
+
+    [Fact]
+    public async Task HandleFileSelectedAsync_WhenFiveFilesSelected_StartsThreeAndQueuesTwo()
+    {
+        var releaseUploads = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initiateCount = 0;
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path == "/api/v1/uploads/resumable" && request.Method == HttpMethod.Post)
+            {
+                lock (_sentRequests) { _sentRequests.Add(request); }
+                Interlocked.Increment(ref initiateCount);
+                await releaseUploads.Task.WaitAsync(ct);
+                return CreateResumableSessionResponse();
+            }
+
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        try
+        {
+            await InvokeHandleFileSelectedAsync(cut, [
+                new TestBrowserFile("one.stl", 1024),
+                new TestBrowserFile("two.stl", 1024),
+                new TestBrowserFile("three.stl", 1024),
+                new TestBrowserFile("four.stl", 1024),
+                new TestBrowserFile("five.stl", 1024)
+            ]);
+
+            cut.WaitForAssertion(() =>
+            {
+                var parts = GetParts(cut.Instance);
+                Assert.Equal(5, parts.Count);
+                Assert.Equal(3, parts.Count(p => p.Uploading));
+                Assert.Equal(2, parts.Count(p => p.QueuedUpload));
+                Assert.Equal(3, Volatile.Read(ref initiateCount));
+            });
+        }
+        finally
+        {
+            releaseUploads.TrySetResult(null);
+        }
+    }
+
+    [Fact]
+    public void UploadProgressCallback_WhenInvoked_UpdatesOnlyBoundPart()
+    {
+        var partA = new PartViewModel { Name = "alpha.stl" };
+        var partB = new PartViewModel { Name = "bravo.stl" };
+        var callbackType = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetNestedType("UploadProgressCallback", BindingFlags.NonPublic);
+        Assert.NotNull(callbackType);
+
+        var callback = Activator.CreateInstance(callbackType, [partB, (Action)(() => { })]);
+        Assert.NotNull(callback);
+
+        callbackType.GetMethod("OnUploadProgress")!.Invoke(callback, [62]);
+
+        Assert.Equal(0, partA.ProgressPercent);
+        Assert.Equal(62, partB.ProgressPercent);
+    }
+
+    [Fact]
+    public async Task HandleFileSelectedAsync_WhenOneUploadFails_ContinuesOtherUploads()
+    {
+        var releaseUploads = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initiateCount = 0;
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path == "/api/v1/uploads/resumable" && request.Method == HttpMethod.Post)
+            {
+                lock (_sentRequests) { _sentRequests.Add(request); }
+                Interlocked.Increment(ref initiateCount);
+
+                var body = await request.Content!.ReadAsStringAsync(ct);
+                using var json = JsonDocument.Parse(body);
+                var fileName = json.RootElement.GetProperty("fileName").GetString();
+                if (fileName == "bad.stl")
+                {
+                    return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+                }
+
+                await releaseUploads.Task.WaitAsync(ct);
+                return CreateResumableSessionResponse();
+            }
+
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        try
+        {
+            await InvokeHandleFileSelectedAsync(cut, [
+                new TestBrowserFile("bad.stl", 1024),
+                new TestBrowserFile("good-a.stl", 1024),
+                new TestBrowserFile("good-b.stl", 1024),
+                new TestBrowserFile("good-c.stl", 1024)
+            ]);
+
+            cut.WaitForAssertion(() =>
+            {
+                var parts = GetParts(cut.Instance);
+                Assert.Equal(4, parts.Count);
+                Assert.NotNull(parts.Single(p => p.Name == "bad.stl").Error);
+                Assert.Equal(3, parts.Count(p => p.Uploading));
+                Assert.DoesNotContain(parts.Where(p => p.Name != "bad.stl"), p => p.QueuedUpload);
+                Assert.Equal(4, Volatile.Read(ref initiateCount));
+            });
+        }
+        finally
+        {
+            releaseUploads.TrySetResult(null);
+        }
     }
 
     [Fact]
@@ -359,5 +524,159 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         };
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
         Assert.NotNull(cut.Instance);
+    }
+
+    [Fact]
+    public void ApplyCatalogDefaults_WhenCncTurningCatalogLoads_SelectsMediumToleranceAndRoughness()
+    {
+        var mediumTolerance = new CatalogToleranceDto(
+            Guid.NewGuid(),
+            "Medium ISO 2768-m",
+            "ISO2768_M",
+            "ISO 2768",
+            "m",
+            null,
+            0m,
+            20);
+        var fineTolerance = new CatalogToleranceDto(
+            Guid.NewGuid(),
+            "Fine ISO 2768-f",
+            "ISO2768_F",
+            "ISO 2768",
+            "f",
+            null,
+            10m,
+            10);
+        var part = new PartViewModel
+        {
+            ProcessCode = "CNC_TURN",
+            AvailableTolerances = [fineTolerance, mediumTolerance],
+        };
+
+        ApplyCatalogDefaults(part);
+
+        Assert.Equal(mediumTolerance.Id, part.ToleranceId);
+        Assert.Equal(mediumTolerance.Code, part.ToleranceCode);
+        Assert.Equal("RA_3_2", part.RoughnessCode);
+    }
+
+    [Fact]
+    public void RefreshLeadTimeOptionsFromPricing_WhenNoLeadTimeSelected_SelectsStandardWithBufferedRanges()
+    {
+        var page = new global::Maliev.Intranet.Client.Pages.ProjectNew();
+        SetPrivateField(page, "_leadTimeCatalogOptions", new List<LeadTimeOptionDto>
+        {
+            new("ECONOMY", "Economy", 0, 0, 0.9m, false),
+            new("STANDARD", "Standard", 0, 0, 1.0m, true),
+            new("EXPRESS", "Express", 0, 0, 1.3m, false),
+        });
+        GetParts(page).Add(new PartViewModel
+        {
+            EstimatedLeadTimeDays = 7,
+        });
+
+        InvokePrivateVoid(page, "RefreshLeadTimeOptionsFromPricing");
+
+        var options = GetPrivateField<List<LeadTimeOptionDto>>(page, "_leadTimeOptions");
+        var selected = GetPrivateField<LeadTimeOptionDto?>(page, "_selectedLeadTime");
+
+        Assert.Equal("STANDARD", selected?.Code);
+        Assert.Contains(options, option => option.Code == "ECONOMY" && option.MinDays == 9 && option.MaxDays == 12);
+        Assert.Contains(options, option => option.Code == "STANDARD" && option.MinDays == 7 && option.MaxDays == 10);
+        Assert.Contains(options, option => option.Code == "EXPRESS" && option.MinDays == 4 && option.MaxDays == 6);
+    }
+
+    private static async Task InvokeHandleFileSelectedAsync(
+        RenderedComponent<global::Maliev.Intranet.Client.Pages.ProjectNew> cut,
+        IReadOnlyList<IBrowserFile> files)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod("HandleFileSelected", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        var result = cut.InvokeAsync(() => (Task)method.Invoke(cut.Instance, [files])!);
+        await result;
+    }
+
+    private static List<PartViewModel> GetParts(global::Maliev.Intranet.Client.Pages.ProjectNew instance)
+    {
+        var field = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetField("_parts", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+
+        return Assert.IsType<List<PartViewModel>>(field.GetValue(instance));
+    }
+
+    private static void ApplyCatalogDefaults(PartViewModel part)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod("ApplyCatalogDefaults", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(null, [part]);
+    }
+
+    private static void InvokePrivateVoid(
+        global::Maliev.Intranet.Client.Pages.ProjectNew instance,
+        string methodName)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(instance, []);
+    }
+
+    private static void SetPrivateField<T>(
+        global::Maliev.Intranet.Client.Pages.ProjectNew instance,
+        string fieldName,
+        T value)
+    {
+        var field = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field.SetValue(instance, value);
+    }
+
+    private static T GetPrivateField<T>(
+        global::Maliev.Intranet.Client.Pages.ProjectNew instance,
+        string fieldName)
+    {
+        var field = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return Assert.IsType<T>(field.GetValue(instance));
+    }
+
+    private static HttpResponseMessage CreateResumableSessionResponse()
+    {
+        var session = new BffResumableUploadSessionResponse
+        {
+            UploadId = Guid.NewGuid().ToString("N"),
+            SessionUri = "https://storage.example/upload-session",
+            StoragePath = $"projects/{Guid.NewGuid()}/part.stl",
+            FileName = "part.stl",
+            FileSize = 1024,
+            ExpiresAt = DateTime.UtcNow.AddHours(1)
+        };
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(session), Encoding.UTF8, "application/json")
+        };
+    }
+
+    private sealed class TestBrowserFile(string name, long size, string contentType = "model/stl") : IBrowserFile
+    {
+        public string Name { get; } = name;
+
+        public DateTimeOffset LastModified { get; } = DateTimeOffset.UtcNow;
+
+        public long Size { get; } = size;
+
+        public string ContentType { get; } = contentType;
+
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("ProjectNew upload tests must not read browser file streams.");
+        }
     }
 }

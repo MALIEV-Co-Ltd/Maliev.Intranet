@@ -73,6 +73,12 @@ public class PartViewModel
     /// <summary>True while the file is being uploaded.</summary>
     public bool Uploading { get; set; }
 
+    /// <summary>True when the file is waiting for an upload concurrency slot.</summary>
+    public bool QueuedUpload { get; set; }
+
+    /// <summary>Client-side identifier that binds the UI part to a browser File object.</summary>
+    public string? ClientUploadId { get; set; }
+
     /// <summary>
     /// Upload progress percentage (0-100). Updated by JS Interop during HTTP upload.
     /// Resets to 0 when upload completes or fails.

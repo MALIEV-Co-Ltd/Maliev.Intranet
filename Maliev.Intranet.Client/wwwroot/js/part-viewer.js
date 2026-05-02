@@ -1739,14 +1739,21 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
 
     const labelDivs = labelDefs.map(({ name, color, pos }) => {
         const div = document.createElement('div');
+        div.className = 'axis-gizmo-label';
         div.textContent = name;
+        div.setAttribute('translate', 'no');
+        div.setAttribute('aria-label', `${name} axis`);
+        div.lang = 'zxx';
         div.style.cssText = `
             position: fixed;
             transform: translate(-50%, -50%);
             color: ${color};
             font-size: ${CONFIG.AXIS_GIZMO.labelFontSize};
             font-weight: 700;
-            font-family: monospace;
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, 'Courier New', monospace !important;
+            font-variant-ligatures: none;
+            font-feature-settings: "liga" 0, "clig" 0;
+            text-transform: none;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.18s ease;

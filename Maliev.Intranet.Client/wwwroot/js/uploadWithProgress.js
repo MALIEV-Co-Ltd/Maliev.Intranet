@@ -97,3 +97,82 @@ window.uploadBatchWithProgress = function (url, files, dotNetHelper) {
         xhr.send(formData);
     });
 };
+
+window.projectNewUploads = (function () {
+    const filesByClientId = new Map();
+
+    function findUploadInput(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return null;
+        return container.querySelector('input[type=file]');
+    }
+
+    function captureFiles(containerId, mappings) {
+        const input = findUploadInput(containerId);
+        if (!input || !input.files) return;
+
+        for (const mapping of mappings || []) {
+            const file = input.files[mapping.index];
+            if (file) {
+                filesByClientId.set(mapping.clientUploadId, file);
+            }
+        }
+    }
+
+    function sendXhr(url, file, contentType, includeCredentials, dotNetHelper) {
+        return new Promise(function (resolve, reject) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', url);
+            xhr.withCredentials = includeCredentials;
+            xhr.setRequestHeader('Content-Type', contentType || file.type || 'application/octet-stream');
+            xhr.setRequestHeader('Content-Range', `bytes 0-${file.size - 1}/${file.size}`);
+
+            xhr.upload.onprogress = function (e) {
+                if (e.lengthComputable && dotNetHelper) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    dotNetHelper.invokeMethodAsync('OnUploadProgress', pct);
+                }
+            };
+
+            xhr.onload = function () {
+                resolve({ status: xhr.status, body: xhr.responseText || '' });
+            };
+
+            xhr.onerror = function () {
+                reject({ status: xhr.status || 0, body: xhr.responseText || 'Network error during upload' });
+            };
+
+            xhr.send(file);
+        });
+    }
+
+    async function uploadFile(clientUploadId, sessionUri, fallbackUrl, contentType, fileSize, dotNetHelper) {
+        const file = filesByClientId.get(clientUploadId);
+        if (!file) {
+            return { status: 0, body: 'Selected browser file was not found.' };
+        }
+
+        const resolvedContentType = contentType || file.type || 'application/octet-stream';
+
+        try {
+            const directResult = await sendXhr(sessionUri, file, resolvedContentType, false, dotNetHelper);
+            if (directResult.status >= 200 && directResult.status < 300) {
+                return directResult;
+            }
+        } catch {
+            // Retry once through the BFF raw-stream proxy below.
+        }
+
+        return await sendXhr(fallbackUrl, file, resolvedContentType, true, dotNetHelper);
+    }
+
+    function clearFile(clientUploadId) {
+        filesByClientId.delete(clientUploadId);
+    }
+
+    return {
+        captureFiles,
+        uploadFile,
+        clearFile
+    };
+})();
