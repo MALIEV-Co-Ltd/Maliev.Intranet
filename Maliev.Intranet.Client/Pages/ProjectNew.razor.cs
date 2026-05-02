@@ -1777,32 +1777,17 @@ public partial class ProjectNew : IAsyncDisposable
     {
         try
         {
-            var pdfData = new QuotationPdfData
-            {
-                QuotationNumber = $"DRAFT-{_tempProjectId:N}"[..Math.Min(24, $"DRAFT-{_tempProjectId:N}".Length)],
-                CustomerName = _selectedCustomer?.CompanyName ?? _selectedCustomer?.Name ?? "N/A",
-                CustomerType = string.IsNullOrWhiteSpace(_selectedCustomer?.CompanyName) ? "Individual" : "Corporate",
-                QuotationDate = DateTime.UtcNow,
-                ValidityStart = DateTime.UtcNow,
-                ValidityEnd = DateTime.UtcNow.AddDays(30),
-                Currency = CurrencyService.Code ?? "THB",
-                SubtotalBeforeDiscount = _parts.Sum(p => p.EstimatedTotalAmount ?? 0),
-                Subtotal = _parts.Sum(p => p.EstimatedTotalAmount ?? 0),
-                TotalAmount = _parts.Sum(p => p.EstimatedTotalAmount ?? 0),
-                DeliveryExpectations = BuildDraftDeliveryExpectation(),
-                SpecialTerms = "Prices are indicative until project review is completed and all files are confirmed manufacturable.",
-                Items = _parts.Select((p, i) => new QuotationPdfItem
-                {
-                    Index = i + 1,
-                    MaterialName = ResolveMaterialName(p),
-                    ManufacturingProcess = p.ProcessCode,
-                    Quantity = p.Quantity,
-                    QuantityUnit = "pcs",
-                    UnitPrice = p.EstimatedUnitPrice ?? 0,
-                    LineTotal = p.EstimatedTotalAmount ?? 0,
-                    Notes = BuildDraftLineItemNotes(p),
-                }).ToList()
-            };
+            var customerDetail = await GetDraftPdfCustomerDetailAsync();
+            var nowUtc = DateTime.UtcNow;
+            var pdfData = ProjectQuotationPdfMapper.BuildDraftPdfData(
+                _tempProjectId,
+                _selectedCustomer,
+                customerDetail,
+                CurrencyService.Code,
+                nowUtc,
+                BuildDraftDeliveryExpectation(),
+                _parts,
+                _processes);
 
             var response = await Http.PostAsJsonAsync("api/v1/quotations/draft-pdf", pdfData);
             if (response.IsSuccessStatusCode)
@@ -1825,17 +1810,6 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
-    private static string ResolveMaterialName(PartViewModel part)
-    {
-        var materialName = part.MaterialId.HasValue
-            ? part.AvailableMaterials.FirstOrDefault(material => material.Id == part.MaterialId.Value)?.Name
-            : null;
-
-        return string.IsNullOrWhiteSpace(materialName)
-            ? part.Name
-            : $"{materialName} - {part.Name}";
-    }
-
     private string BuildDraftDeliveryExpectation()
     {
         var maxLeadTimeDays = _parts
@@ -1849,20 +1823,20 @@ public partial class ProjectNew : IAsyncDisposable
             : "To be confirmed after project review";
     }
 
-    private static string? BuildDraftLineItemNotes(PartViewModel part)
+    private async Task<CustomerDetailDto?> GetDraftPdfCustomerDetailAsync()
     {
-        var notes = new List<string>();
+        if (_selectedCustomer == null)
+            return null;
 
-        if (!string.IsNullOrWhiteSpace(part.FinishCode))
-            notes.Add($"Finish: {part.FinishCode}");
-
-        if (!string.IsNullOrWhiteSpace(part.ToleranceCode))
-            notes.Add($"Tolerance: {part.ToleranceCode}");
-
-        if (!string.IsNullOrWhiteSpace(part.PartNotes))
-            notes.Add(part.PartNotes);
-
-        return notes.Count == 0 ? null : string.Join(" | ", notes);
+        try
+        {
+            return await Http.GetFromJsonAsync<CustomerDetailDto>($"api/v1/customers/{_selectedCustomer.Id}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not load customer details for draft PDF {CustomerId}", _selectedCustomer.Id);
+            return null;
+        }
     }
 
     // ── Task 15: Create project + quotation ───────────────────────────

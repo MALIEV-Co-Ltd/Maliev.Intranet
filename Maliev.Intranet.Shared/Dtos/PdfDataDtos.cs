@@ -56,6 +56,12 @@ public class QuotationPdfData
     /// <summary>The customer billing or registered address, if available.</summary>
     public string? CustomerAddress { get; set; }
 
+    /// <summary>The customer billing address shown on the quotation.</summary>
+    public string? BillingAddress { get; set; }
+
+    /// <summary>The customer shipping address shown on the quotation.</summary>
+    public string? ShippingAddress { get; set; }
+
     /// <summary>The customer's contact person, if available.</summary>
     public string? ContactPerson { get; set; }
 
