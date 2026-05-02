@@ -118,4 +118,17 @@ public class ProjectQuotationPdfMapperTests
         Assert.Contains("Inspection: Dimensional", data.Items[0].Notes);
         Assert.Contains("Drawing: bracket-drawing.pdf", data.Items[0].Notes);
     }
+
+    /// <summary>
+    /// Verifies PDF lead time uses the same selected range shown on ProjectNew.
+    /// </summary>
+    [Fact]
+    public void BuildDeliveryExpectation_WithSelectedLeadTime_IncludesSelectedRange()
+    {
+        var leadTime = new LeadTimeOptionDto("STANDARD", "Standard", 5, 8, 1m, true);
+
+        var expectation = ProjectQuotationPdfMapper.BuildDeliveryExpectation(leadTime);
+
+        Assert.Equal("Standard: 5 - 8 business days after order confirmation", expectation);
+    }
 }

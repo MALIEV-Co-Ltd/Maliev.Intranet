@@ -110,6 +110,21 @@ public static class ProjectQuotationPdfMapper
         return notes.Count == 0 ? null : string.Join(" | ", notes);
     }
 
+    /// <summary>
+    /// Builds the PDF delivery expectation from the selected lead-time option shown on ProjectNew.
+    /// </summary>
+    public static string BuildDeliveryExpectation(LeadTimeOptionDto? selectedLeadTime)
+    {
+        if (selectedLeadTime is not { MinDays: > 0 })
+            return "To be confirmed after project review";
+
+        var days = selectedLeadTime.MaxDays > selectedLeadTime.MinDays
+            ? $"{selectedLeadTime.MinDays} - {selectedLeadTime.MaxDays}"
+            : selectedLeadTime.MinDays.ToString();
+
+        return $"{selectedLeadTime.Name}: {days} business days after order confirmation";
+    }
+
     private static string TruncateQuotationNumber(string value) => value[..Math.Min(24, value.Length)];
 
     private static string ResolveCustomerName(CustomerSummaryDto? selectedCustomer, CustomerDetailDto? customerDetail)

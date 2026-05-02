@@ -1785,7 +1785,7 @@ public partial class ProjectNew : IAsyncDisposable
                 customerDetail,
                 CurrencyService.Code,
                 nowUtc,
-                BuildDraftDeliveryExpectation(),
+                ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
                 _parts,
                 _processes);
 
@@ -1808,19 +1808,6 @@ public partial class ProjectNew : IAsyncDisposable
         {
             Snackbar.Add($"PDF generation error: {ex.Message}", MudBlazor.Severity.Error);
         }
-    }
-
-    private string BuildDraftDeliveryExpectation()
-    {
-        var maxLeadTimeDays = _parts
-            .Where(part => part.EstimatedLeadTimeDays > 0)
-            .Select(part => part.EstimatedLeadTimeDays)
-            .DefaultIfEmpty(0)
-            .Max();
-
-        return maxLeadTimeDays > 0
-            ? $"{maxLeadTimeDays} business days after order confirmation"
-            : "To be confirmed after project review";
     }
 
     private async Task<CustomerDetailDto?> GetDraftPdfCustomerDetailAsync()
