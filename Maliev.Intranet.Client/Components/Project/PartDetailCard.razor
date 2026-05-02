@@ -598,17 +598,12 @@
             return new ModelViewer.TurningAxisViewModel(cachedDto.PrimaryAxis, cachedDto.AxisVector.Take(3).ToArray());
         }
 
-        return BuildProvisionalTurningAxis();
+        return null;
     }
 
     private static bool IsCncTurningProcess(string? processCode) =>
         string.Equals(processCode, "CNC_TURN", StringComparison.OrdinalIgnoreCase)
         || string.Equals(processCode, "CNC_TURNING", StringComparison.OrdinalIgnoreCase);
-
-    private ModelViewer.TurningAxisViewModel? BuildProvisionalTurningAxis()
-    {
-        return new ModelViewer.TurningAxisViewModel("AUTO", [0.0, 0.0, 0.0]);
-    }
 
     private static bool IsNotTurnableReport(CncDfmReportPayload report) =>
         !report.IsTurnable && HasNotTurnableIssue(report.Issues);

@@ -96,6 +96,11 @@ function viewerSource() {
     return fs.readFileSync(viewerPath, 'utf8');
 }
 
+function partDetailCardSource() {
+    const partDetailCardPath = new URL('../../Maliev.Intranet.Client/Components/Project/PartDetailCard.razor', import.meta.url);
+    return fs.readFileSync(partDetailCardPath, 'utf8');
+}
+
 function addRing(positions, axisX, centerY, centerZ, radius, count) {
     for (let index = 0; index < count; index += 1) {
         const angle = (Math.PI * 2 * index) / count;
@@ -104,33 +109,6 @@ function addRing(positions, axisX, centerY, centerZ, radius, count) {
             centerY + Math.cos(angle) * radius,
             centerZ + Math.sin(angle) * radius);
     }
-}
-
-function addRingAboutZ(positions, axisZ, centerX, centerY, radius, count) {
-    for (let index = 0; index < count; index += 1) {
-        const angle = (Math.PI * 2 * index) / count;
-        positions.push(
-            centerX + Math.cos(angle) * radius,
-            centerY + Math.sin(angle) * radius,
-            axisZ);
-    }
-}
-
-function addBoxVertices(positions, min, max) {
-    [
-        [min.x, min.y, min.z],
-        [min.x, min.y, max.z],
-        [min.x, max.y, min.z],
-        [min.x, max.y, max.z],
-        [max.x, min.y, min.z],
-        [max.x, min.y, max.z],
-        [max.x, max.y, min.z],
-        [max.x, max.y, max.z],
-    ].forEach(point => {
-        for (let index = 0; index < 16; index += 1) {
-            positions.push(point[0], point[1], point[2]);
-        }
-    });
 }
 
 function buildScene(positions) {
@@ -165,7 +143,7 @@ test('turning axis resolver uses concentric bore instead of larger exterior ring
     context.fallbackCenter = new Vector3(0, 2, 0);
 
     const result = vm.runInContext(
-        "resolveTurningAxis(scene, 'viewer', 'AUTO', [0, 0, 0], bb, fallbackCenter)",
+        "resolveTurningAxis(scene, 'viewer', 'X', [1, 0, 0], bb, fallbackCenter)",
         context);
 
     assert.ok(Math.abs(result.direction.x) > 0.98);
@@ -199,51 +177,13 @@ test('explicit turning axis uses low-resolution bore center instead of bounding-
     assert.ok(Math.abs(result.center.z) < 0.2, `expected bore center z=0, got ${result.center.z}`);
 });
 
-test('turning axis resolver does not invent an AUTO axis for box geometry', () => {
-    const context = loadViewerContext();
-    const positions = [];
-    addBoxVertices(positions, { x: -10, y: -8, z: -6 }, { x: 10, y: 8, z: 6 });
+test('turning axis is only requested from GeometryService report data', () => {
+    const cardSource = partDetailCardSource();
+    const source = viewerSource();
 
-    context.scene = buildScene(positions);
-    context.bb = {
-        min: { x: -10, y: -8, z: -6 },
-        max: { x: 10, y: 8, z: 6 },
-    };
-    context.fallbackCenter = new Vector3(0, 0, 0);
-
-    const result = vm.runInContext(
-        "resolveTurningAxis(scene, 'viewer', 'AUTO', [0, 0, 0], bb, fallbackCenter)",
-        context);
-
-    assert.equal(result, null);
-});
-
-test('turning axis resolver prefers long axial ring support over a local circular feature', () => {
-    const context = loadViewerContext();
-    const positions = [];
-
-    for (let x = -80; x <= 80; x += 16) {
-        const radius = Math.abs(x) > 48 ? 3.2 : 4.1;
-        addRing(positions, x, 0, 0, radius, 64);
-    }
-
-    for (let z = -0.8; z <= 0.8; z += 0.16) {
-        addRingAboutZ(positions, z, 0, 0, 1.2, 64);
-    }
-
-    context.scene = buildScene(positions);
-    context.bb = {
-        min: { x: -80, y: -4.1, z: -4.1 },
-        max: { x: 80, y: 4.1, z: 4.1 },
-    };
-    context.fallbackCenter = new Vector3(0, 0, 0);
-
-    const result = vm.runInContext(
-        "resolveTurningAxis(scene, 'viewer', 'AUTO', [0, 0, 0], bb, fallbackCenter)",
-        context);
-
-    assert.ok(result, 'expected a detected turning axis');
-    assert.ok(Math.abs(result.direction.x) > 0.98, `expected X axis, got ${JSON.stringify(result.direction)}`);
+    assert.equal(cardSource.includes('BuildProvisionalTurningAxis'), false);
+    assert.equal(cardSource.includes('"AUTO"'), false);
+    assert.equal(source.includes("axis === 'AUTO'"), false);
 });
 
 test('turning axis overlay does not render a CW label', () => {
