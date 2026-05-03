@@ -38,11 +38,14 @@ public class AppWasmRenderModeTests
         var source = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
 
         Assert.Contains("--blazor-load-percentage", source);
-        Assert.Contains("wasm-loading-progress", source);
+        Assert.Contains("--wasm-logo-progress: var(--blazor-load-percentage, 0%)", source);
+        Assert.Contains("linear-gradient(90deg", source);
+        Assert.DoesNotContain("wasm-loading-progress", source, StringComparison.Ordinal);
         Assert.Contains("autostart=\"false\"", source);
         Assert.Contains("Blazor.start", source);
         Assert.Contains("loadBootResource", source);
         Assert.Contains("malievWasmLoader.markRuntimeReady", source);
+        Assert.DoesNotContain("conic-gradient", source, StringComparison.Ordinal);
         Assert.DoesNotContain("animation: maliev-logo-load", source, StringComparison.Ordinal);
         Assert.DoesNotContain("@@keyframes maliev-logo-load", source, StringComparison.Ordinal);
     }

@@ -21,15 +21,18 @@ public sealed class WasmLogoLoadingAnimationTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void WasmLogoLoadingAnimationCss_UsesLogoMaskAndConicFill()
+    public void WasmLogoLoadingAnimationCss_UsesLogoMaskAndProgressFill()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "WasmLogoLoadingAnimation.razor.css");
 
         Assert.Contains("url('/images/logo.svg')", source);
         Assert.Contains("--maliev-logo-loader-fill, #000000", source);
         Assert.Contains("--maliev-logo-loader-fill, #ffffff", source);
-        Assert.Contains("conic-gradient", source);
-        Assert.Contains("background-size: var(--blazor-load-percentage, 0%) 100%", source);
+        Assert.Contains("--logo-progress: var(--blazor-load-percentage, 0%)", source);
+        Assert.Contains("linear-gradient(90deg", source);
+        Assert.DoesNotContain("conic-gradient", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("background-size: var(--blazor-load-percentage, 0%) 100%", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".loader::after", source, StringComparison.Ordinal);
         Assert.DoesNotContain("@keyframes maliev-logo-load", source, StringComparison.Ordinal);
         Assert.DoesNotContain("animation:", source, StringComparison.Ordinal);
         Assert.DoesNotContain(":host-context", source, StringComparison.Ordinal);

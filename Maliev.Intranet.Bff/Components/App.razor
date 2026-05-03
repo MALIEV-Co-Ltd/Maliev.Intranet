@@ -47,10 +47,8 @@
             transition: opacity 180ms ease, visibility 180ms ease;
         }
 
-        html.maliev-wasm-runtime-ready .wasm-loading .maliev-logo-loader::after,
-        html.maliev-wasm-runtime-ready .wasm-loading-progress::after {
-            background-size: 100% 100%;
-            width: 100%;
+        html.maliev-wasm-runtime-ready .wasm-loading .maliev-logo-loader {
+            --wasm-logo-progress: 100%;
         }
 
         html.maliev-wasm-ready .wasm-loading {
@@ -71,40 +69,18 @@
 
         .wasm-loading .maliev-logo-loader {
             --logo-width: clamp(150px, 38vw, 236px);
+            --wasm-logo-progress: var(--blazor-load-percentage, 0%);
             width: var(--logo-width);
             aspect-ratio: 449.33078 / 103.18751;
             position: relative;
             color: transparent;
-            background: var(--wasm-logo-outline, color-mix(in oklch, #000000 24%, transparent));
+            background:
+                linear-gradient(
+                    90deg,
+                    var(--wasm-logo-fill, #000000) 0 var(--wasm-logo-progress),
+                    var(--wasm-logo-outline, color-mix(in oklch, #000000 24%, transparent)) var(--wasm-logo-progress) 100%);
             -webkit-mask: url('/images/logo.svg') center / contain no-repeat;
             mask: url('/images/logo.svg') center / contain no-repeat;
-        }
-
-        .wasm-loading .maliev-logo-loader::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: conic-gradient(var(--wasm-logo-fill, #000000) 0 0) 0 0 no-repeat;
-            background-size: var(--blazor-load-percentage, 0%) 100%;
-            transition: background-size 160ms ease-out;
-        }
-
-        .wasm-loading-progress {
-            width: min(280px, 54vw);
-            height: 3px;
-            overflow: hidden;
-            border-radius: 999px;
-            background: var(--wasm-logo-outline, color-mix(in oklch, #000000 24%, transparent));
-        }
-
-        .wasm-loading-progress::after {
-            content: "";
-            display: block;
-            width: var(--blazor-load-percentage, 0%);
-            height: 100%;
-            border-radius: inherit;
-            background: var(--wasm-logo-fill, #000000);
-            transition: width 160ms ease-out;
         }
 
         .wasm-loading-failure {
@@ -184,7 +160,6 @@
     <div id="wasm-loading" class="wasm-loading" aria-live="polite" aria-busy="true">
         <div class="wasm-loading-stage">
             <WasmLogoLoadingAnimation />
-            <div class="wasm-loading-progress" aria-hidden="true"></div>
             <div class="wasm-loading-failure" role="alert">Unable to start the employee intranet. Refresh the page or contact support.</div>
         </div>
     </div>
