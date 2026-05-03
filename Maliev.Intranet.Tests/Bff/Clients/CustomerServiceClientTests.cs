@@ -138,7 +138,8 @@ public class CustomerServiceClientTests
     public async Task GetCustomerByIdAsync_ShouldAggregateData()
     {
         var customerId = Guid.NewGuid();
-        var customer = new CustomerDetailDto { Id = customerId, FirstName = "John" };
+        var accountManagerId = Guid.NewGuid();
+        var customer = new CustomerDetailDto { Id = customerId, FirstName = "John", AccountManagerEmployeeId = accountManagerId };
 
         _httpMessageHandlerMock.Protected()
             .Setup<Task<HttpResponseMessage>>(
@@ -162,6 +163,77 @@ public class CustomerServiceClientTests
 
         Assert.NotNull(result);
         Assert.Equal("John", result.FirstName);
+        Assert.Equal(accountManagerId, result.AccountManagerEmployeeId);
+    }
+
+    [Fact]
+    public async Task UpdateCustomerFullAsync_ForwardsXminAndAccountManagerEmployeeId()
+    {
+        var customerId = Guid.NewGuid();
+        var accountManagerId = Guid.NewGuid();
+        var capturedPayload = string.Empty;
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(message =>
+                    message.Method == HttpMethod.Get &&
+                    message.RequestUri!.PathAndQuery == $"/customer/v1/customers/{customerId}"),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new CustomerDetailDto { Id = customerId, Xmin = 123 })
+            });
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(message =>
+                    message.Method == HttpMethod.Patch &&
+                    message.RequestUri!.PathAndQuery == $"/customer/v1/customers/{customerId}"),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(async (HttpRequestMessage message, CancellationToken _) =>
+            {
+                capturedPayload = await message.Content!.ReadAsStringAsync();
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new CustomerResponse { Id = customerId, AccountManagerEmployeeId = accountManagerId })
+                };
+            });
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(message =>
+                    message.Method == HttpMethod.Get &&
+                    message.RequestUri!.PathAndQuery.Contains("/customer/v1/addresses?ownerType=Customer", StringComparison.Ordinal)),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new List<AddressResponse>())
+            });
+
+        var result = await _client.UpdateCustomerFullAsync(customerId, new CustomerOnboardingRequest
+        {
+            Customer = new CreateCustomerRequest
+            {
+                FirstName = "Sarah",
+                LastName = "Chen",
+                Email = "sarah@example.com",
+                Segment = "Enterprise",
+                Tier = "Gold",
+                PreferredLanguage = "en",
+                Timezone = "Asia/Bangkok",
+                AccountManagerEmployeeId = accountManagerId
+            }
+        });
+
+        Assert.NotNull(result);
+        using var document = System.Text.Json.JsonDocument.Parse(capturedPayload);
+        var root = document.RootElement;
+        Assert.Equal(accountManagerId.ToString(), root.GetProperty("accountManagerEmployeeId").GetString());
+        Assert.False(root.GetProperty("clearAccountManager").GetBoolean());
+        Assert.Equal(123u, root.GetProperty("xmin").GetUInt32());
     }
 
     [Fact]

@@ -13,6 +13,7 @@ namespace Maliev.Intranet.Tests.Client.Pages;
 public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
 {
     private readonly Guid _customerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private readonly Guid _accountManagerId = Guid.Parse("55555555-5555-5555-5555-555555555555");
     private readonly List<string> _requestedPaths = [];
 
     public CustomerDetailPageTests()
@@ -46,6 +47,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Activity", cut.Markup);
         Assert.Contains("Contact information", cut.Markup);
         Assert.Contains("Account &amp; billing", cut.Markup);
+        Assert.Contains("Account manager", cut.Markup);
         Assert.Contains("Recent orders", cut.Markup);
         Assert.Contains("Snapshot", cut.Markup);
         Assert.Contains("Default addresses", cut.Markup);
@@ -56,6 +58,18 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Discard", cut.Markup);
         Assert.Contains("Save", cut.Markup);
         Assert.DoesNotContain("mlv-stat-tile", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CustomerDetail_LoadsEmployeesForAccountManagerSelector()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Mia Wong - Sales Manager", cut.Markup));
+
+        Assert.Contains(_requestedPaths, path => path.Equals("/api/v1/employees?page=1&pageSize=100", StringComparison.Ordinal));
+        var option = cut.Find($"option[value='{_accountManagerId}']");
+        Assert.Equal("Mia Wong - Sales Manager", option.TextContent);
     }
 
     [Fact]
@@ -178,6 +192,25 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
             });
         }
 
+        if (pathAndQuery.Equals("/api/v1/employees?page=1&pageSize=100", StringComparison.Ordinal))
+        {
+            return Json(new PagedResponse<EmployeeSummaryDto>
+            {
+                Data =
+                [
+                    new EmployeeSummaryDto
+                    {
+                        Id = _accountManagerId,
+                        Name = "Mia Wong",
+                        Email = "mia.wong@maliev.com",
+                        Title = "Sales Manager",
+                        Status = "Active"
+                    }
+                ],
+                Meta = new PaginationMeta { CurrentPage = 1, PageSize = 100, TotalCount = 1, TotalItems = 1, TotalPages = 1 }
+            });
+        }
+
         if (pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
         {
             return Json(new CustomerDetailDto
@@ -198,6 +231,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                 CompanyId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 CompanyName = "Axion Robotics",
                 CompanyVatNumber = "EIN 87-2341098",
+                AccountManagerEmployeeId = _accountManagerId,
                 CreatedByName = "Alex Kim",
                 Addresses =
                 [

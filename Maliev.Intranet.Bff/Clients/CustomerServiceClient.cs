@@ -375,7 +375,9 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             timezone = request.Customer.Timezone,
             communicationPreferences = request.Customer.CommunicationPreferences,
             companyId = request.Customer.CompanyId,
-            version = current.Version
+            accountManagerEmployeeId = request.Customer.AccountManagerEmployeeId,
+            clearAccountManager = request.Customer.AccountManagerEmployeeId is null,
+            xmin = current.Xmin
         };
 
         var response = await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", patchRequest, ct);
@@ -394,7 +396,7 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 {
                     var company = await companyResponse.Content.ReadFromJsonAsync<CompanySummaryDto>(ct);
                     if (company != null)
-                        await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", new { companyId = company.Id, version = updatedCustomer?.Version }, ct);
+                        await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", new { companyId = company.Id, xmin = updatedCustomer?.Xmin ?? current.Xmin }, ct);
                 }
             }
         }

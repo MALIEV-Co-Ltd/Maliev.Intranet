@@ -111,6 +111,10 @@ public class CustomerDetailDto
     public DateTime CreatedAt { get; set; }
     /// <summary>The unique identifier of the company the customer belongs to.</summary>
     public Guid? CompanyId { get; set; }
+    /// <summary>The EmployeeService employee ID assigned as this customer's account manager.</summary>
+    public Guid? AccountManagerEmployeeId { get; set; }
+    /// <summary>The resolved display name of this customer's account manager, when loaded by the Intranet.</summary>
+    public string? AccountManagerName { get; set; }
     /// <summary>The name of the company the customer belongs to.</summary>
     public string? CompanyName { get; set; }
     /// <summary>The general contact phone number of the customer's company.</summary>
@@ -621,6 +625,9 @@ public class CreateCustomerRequest
     /// <summary>The identifier of the company this customer belongs to, if applicable.</summary>
     public Guid? CompanyId { get; set; }
 
+    /// <summary>The EmployeeService employee ID assigned as this customer's account manager.</summary>
+    public Guid? AccountManagerEmployeeId { get; set; }
+
     /// <summary>Whether to automatically use the company's billing address for this customer.</summary>
     public bool UsesCompanyBillingAddress { get; set; } = true;
 
@@ -686,6 +693,15 @@ public class UpdateCustomerRequest
     [StringLength(50)]
     public string Timezone { get; set; } = "UTC";
 
+    /// <summary>The identifier of the company this customer belongs to, if applicable.</summary>
+    public Guid? CompanyId { get; set; }
+
+    /// <summary>The EmployeeService employee ID assigned as this customer's account manager.</summary>
+    public Guid? AccountManagerEmployeeId { get; set; }
+
+    /// <summary>Clears the current account manager assignment when true.</summary>
+    public bool ClearAccountManager { get; set; }
+
     /// <summary>Updated communication preference settings.</summary>
     public Dictionary<string, bool> CommunicationPreferences { get; set; } = new()
     {
@@ -740,6 +756,8 @@ public class CustomerResponse
     public string Timezone { get; set; } = string.Empty;
     /// <summary>The identifier of the associated company.</summary>
     public Guid? CompanyId { get; set; }
+    /// <summary>The EmployeeService employee ID assigned as this customer's account manager.</summary>
+    public Guid? AccountManagerEmployeeId { get; set; }
     /// <summary>Indicates if the customer record has been soft-deleted.</summary>
     public bool IsDeleted { get; set; }
     /// <summary>The date and time when the record was created.</summary>

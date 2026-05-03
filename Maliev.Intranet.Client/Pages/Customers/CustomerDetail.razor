@@ -84,11 +84,21 @@
                             </label>
                             <label class="customer-field">
                                 <span>Account manager</span>
-                                <input class="customer-input" readonly value="@AccountManager" />
+                                <select class="customer-input" @bind="AccountManagerSelectValue">
+                                    <option value="">Unassigned</option>
+                                    @if (_edit?.AccountManagerEmployeeId is Guid selectedManagerId && !_accountManagers.Any(employee => employee.Id == selectedManagerId))
+                                    {
+                                        <option value="@selectedManagerId">@AccountManager</option>
+                                    }
+                                    @foreach (var employee in _accountManagers)
+                                    {
+                                        <option value="@employee.Id">@FormatEmployeeOption(employee)</option>
+                                    }
+                                </select>
                             </label>
                             <label class="customer-field">
                                 <span>Payment terms</span>
-                                <select class="customer-input" @bind="_edit.PaymentTerms">
+                                <select class="customer-input" @bind="_edit!.PaymentTerms">
                                     <option>Due on receipt</option>
                                     <option>Net 15</option>
                                     <option>Net 30</option>
@@ -523,13 +533,14 @@
     private string _companyLookupQuery = string.Empty;
     private int _orderTotalCount;
     private readonly List<CountryDto> _countries = [];
+    private readonly List<EmployeeSummaryDto> _accountManagers = [];
     private readonly List<RegistryThaiLocation> _locationMatches = [];
     private readonly List<CompanySearchResultDto> _companyMatches = [];
     private readonly List<RegistryCompanyProfile> _registryCompanyMatches = [];
 
     private string CustomerType => HasCompany ? "Company" : "Individual";
     private bool HasCompany => _customer?.CompanyId is not null || !string.IsNullOrWhiteSpace(_customer?.CompanyName);
-    private string AccountManager => _customer?.CreatedByName ?? "Unassigned";
+    private string AccountManager => ResolveAccountManagerName(_edit?.AccountManagerEmployeeId ?? _customer?.AccountManagerEmployeeId);
     private string TaxId => _customer?.CompanyVatNumber ?? _customer?.CompanyRegistrationNumber ?? "-";
     private const string CreditLimit = "0";
     private string CustomerCode => _customer is null ? "-" : $"C-{_customer.Id.ToString("N")[..8].ToUpperInvariant()}";
@@ -538,6 +549,19 @@
     private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
     private string AddressModalTitle => _addressEdit?.Id is null ? "Add address" : "Edit address";
     private string CompanyConfirmLabel => _companyEdit?.ExistingCompanyId is Guid ? "Link company" : "Create and link";
+    private string AccountManagerSelectValue
+    {
+        get => _edit?.AccountManagerEmployeeId?.ToString() ?? string.Empty;
+        set
+        {
+            if (_edit is null)
+            {
+                return;
+            }
+
+            _edit.AccountManagerEmployeeId = Guid.TryParse(value, out var employeeId) ? employeeId : null;
+        }
+    }
 
     private AddressResponse? BillingAddress =>
         _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Billing") && address.IsDefault)
@@ -583,7 +607,7 @@
             }
 
             _edit = CustomerEditModel.FromCustomer(_customer);
-            await Task.WhenAll(LoadOrdersAsync(), LoadActivityAsync(), LoadCountriesAsync());
+            await Task.WhenAll(LoadOrdersAsync(), LoadActivityAsync(), LoadCountriesAsync(), LoadAccountManagersAsync());
         }
         catch (Exception ex)
         {
@@ -646,6 +670,23 @@
         _countries.AddRange(countries.OrderBy(country => country.Name));
     }
 
+    private async Task LoadAccountManagersAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<EmployeeSummaryDto>>("api/v1/employees?page=1&pageSize=100");
+            _accountManagers.Clear();
+            _accountManagers.AddRange((response?.Data ?? [])
+                .Where(employee => employee.Id != Guid.Empty)
+                .OrderByDescending(employee => string.Equals(employee.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(employee => employee.Name));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
     private Task DiscardChangesAsync(MouseEventArgs _)
     {
         if (_customer is not null)
@@ -687,6 +728,8 @@
                 timezone = _customer.Timezone,
                 communicationPreferences = _customer.CommunicationPreferences,
                 companyId = _edit.CompanyId,
+                accountManagerEmployeeId = _edit.AccountManagerEmployeeId,
+                clearAccountManager = _edit.AccountManagerEmployeeId is null,
                 xmin = _customer.Xmin
             };
 
@@ -1133,6 +1176,33 @@
 
     private static string FormatMoney(decimal value) => value.ToString("$#,0.##");
 
+    private string ResolveAccountManagerName(Guid? employeeId)
+    {
+        if (employeeId is null)
+        {
+            return "Unassigned";
+        }
+
+        var employee = _accountManagers.FirstOrDefault(item => item.Id == employeeId.Value);
+        if (employee is not null)
+        {
+            return FormatEmployeeOption(employee);
+        }
+
+        return _customer?.AccountManagerName ?? $"Employee {employeeId.Value.ToString("N")[..8].ToUpperInvariant()}";
+    }
+
+    private static string FormatEmployeeOption(EmployeeSummaryDto employee)
+    {
+        var name = string.IsNullOrWhiteSpace(employee.Name) ? employee.Email : employee.Name;
+        if (string.IsNullOrWhiteSpace(employee.Title))
+        {
+            return name;
+        }
+
+        return $"{name} - {employee.Title}";
+    }
+
     private static string FormatDate(DateTime value) => value == default ? "-" : value.ToString("MMM dd, yyyy");
 
     private static string FormatMonthYear(DateTime value) => value == default ? "-" : value.ToString("MMM yyyy");
@@ -1178,6 +1248,7 @@
         public string CustomerType { get; set; } = "Individual";
         public string Status { get; set; } = "Active";
         public string PaymentTerms { get; set; } = "Due on receipt";
+        public Guid? AccountManagerEmployeeId { get; set; }
 
         public static CustomerEditModel FromCustomer(CustomerDetailDto customer) => new()
         {
@@ -1188,7 +1259,8 @@
             Phone = customer.Mobile ?? customer.CompanyPhone ?? string.Empty,
             CustomerType = customer.CompanyId is not null || !string.IsNullOrWhiteSpace(customer.CompanyName) ? "Company" : "Individual",
             Status = string.IsNullOrWhiteSpace(customer.Status) ? "Active" : customer.Status,
-            PaymentTerms = "Due on receipt"
+            PaymentTerms = "Due on receipt",
+            AccountManagerEmployeeId = customer.AccountManagerEmployeeId
         };
     }
 
