@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -158,6 +159,8 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             }).ToList() ?? []
         };
 
+        ApplyQuotedByMetadata(pdfData);
+
         var pdfUrl = await pdfClient.GeneratePdfAsync(
             PdfDocumentType.Quotation,
             id.ToString(),
@@ -178,6 +181,7 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
     public async Task<ActionResult> GenerateDraftPdf([FromBody] QuotationPdfData pdfData, CancellationToken ct)
     {
         var referenceId = Guid.NewGuid().ToString();
+        ApplyQuotedByMetadata(pdfData);
         var pdfUrl = await pdfClient.GeneratePdfAsync(
             PdfDocumentType.Quotation,
             referenceId,
@@ -185,4 +189,25 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             ct: ct);
         return pdfUrl != null ? Ok(new { storageUrl = pdfUrl }) : BadRequest("Failed to generate PDF");
     }
+
+    private void ApplyQuotedByMetadata(QuotationPdfData pdfData)
+    {
+        pdfData.QuotedByName = FirstNonEmpty(
+            User.Identity?.Name,
+            User.FindFirst("name")?.Value,
+            User.FindFirst("preferred_username")?.Value,
+            User.FindFirst("email")?.Value,
+            User.FindFirst(ClaimTypes.Email)?.Value,
+            pdfData.QuotedByName);
+
+        pdfData.QuotedByEmail = FirstNonEmpty(
+            User.FindFirst("email")?.Value,
+            User.FindFirst(ClaimTypes.Email)?.Value,
+            pdfData.QuotedByEmail);
+
+        pdfData.QuotedAt = DateTime.UtcNow;
+    }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 }

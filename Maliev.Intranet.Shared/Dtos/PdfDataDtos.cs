@@ -122,6 +122,15 @@ public class QuotationPdfData
     /// <summary>Summary of changes for a revised quotation.</summary>
     public string? ChangeSummary { get; set; }
 
+    /// <summary>The employee name automatically recorded as the person who generated this quotation.</summary>
+    public string? QuotedByName { get; set; }
+
+    /// <summary>The employee email automatically recorded as the person who generated this quotation.</summary>
+    public string? QuotedByEmail { get; set; }
+
+    /// <summary>The UTC timestamp when this quotation PDF was generated or issued.</summary>
+    public DateTime? QuotedAt { get; set; }
+
     /// <summary>Discounts applied to the quotation.</summary>
     public List<QuotationPdfDiscount> Discounts { get; set; } = [];
 }
