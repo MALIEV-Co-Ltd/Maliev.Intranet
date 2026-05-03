@@ -12,6 +12,13 @@
 .global-search-icon {
     position: absolute;
     left: 9px;
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
     color: var(--maliev-muted-2);
     pointer-events: none;
 }
@@ -19,7 +26,15 @@
 .global-search-spinner {
     position: absolute;
     right: 8px;
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
     color: var(--maliev-muted-2);
+    pointer-events: none;
 }
 
 .global-search-input {

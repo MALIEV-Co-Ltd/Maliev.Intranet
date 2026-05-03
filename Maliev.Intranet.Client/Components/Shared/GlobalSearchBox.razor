@@ -4,7 +4,9 @@
 
 <div class="global-search @Class">
     <div class="global-search-input-wrap">
-        <MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" Class="global-search-icon" />
+        <span class="global-search-icon" aria-hidden="true">
+            <MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" />
+        </span>
         <input class="global-search-input"
                value="@_query"
                placeholder="@Placeholder"
@@ -15,7 +17,9 @@
                @onkeydown="HandleKeyDown" />
         @if (_loading)
         {
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="global-search-spinner" />
+            <span class="global-search-spinner" aria-hidden="true">
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            </span>
         }
     </div>
 
