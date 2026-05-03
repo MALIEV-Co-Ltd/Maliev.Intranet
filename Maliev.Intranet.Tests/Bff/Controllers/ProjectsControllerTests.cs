@@ -232,8 +232,8 @@ public class ProjectsControllerTests
     [Fact]
     public async Task GetPartPrice_WhenSuccessful_ShouldReturnBreakdown()
     {
-        var breakdown = new ProjectPriceBreakdownDto { TotalPerUnit = 250m };
-        var controller = new ProjectsController(CreateClient(breakdown), StubJobClient(), StubFacilityClient(), Logger);
+        var projectServicePart = new { effectiveUnitPrice = 250m };
+        var controller = new ProjectsController(CreateClient(projectServicePart), StubJobClient(), StubFacilityClient(), Logger);
 
         var result = await controller.GetPartPrice(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -273,7 +273,7 @@ public class ProjectsControllerTests
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);
 
-        var result = await controller.GenerateQuotation(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.GenerateQuotation(Guid.NewGuid(), new GenerateQuotationRequest(), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
     }
@@ -283,7 +283,7 @@ public class ProjectsControllerTests
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.UnprocessableEntity), StubJobClient(), StubFacilityClient(), Logger);
 
-        var result = await controller.GenerateQuotation(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.GenerateQuotation(Guid.NewGuid(), new GenerateQuotationRequest(), CancellationToken.None);
 
         var status = Assert.IsType<StatusCodeResult>(result);
         Assert.Equal(422, status.StatusCode);

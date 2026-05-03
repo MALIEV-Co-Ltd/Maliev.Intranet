@@ -172,8 +172,9 @@ public partial class ProjectNew : IAsyncDisposable
         RefreshLeadTimeOptionsFromPricing();
 
         // ── Server resume: if ?resume={id} or draft has ServerProjectId, hydrate from server ──
-        var serverResumeId = Guid.TryParse(resumeParam, out var parsedResumeId) ? parsedResumeId : _serverProjectId;
-        if (serverResumeId.HasValue && _selectedCustomer == null)
+        var hasExplicitResume = Guid.TryParse(resumeParam, out var parsedResumeId);
+        var serverResumeId = hasExplicitResume ? parsedResumeId : _serverProjectId;
+        if (serverResumeId.HasValue && (hasExplicitResume || _selectedCustomer == null))
         {
             await ResumeFromServerAsync(serverResumeId.Value);
         }
@@ -913,9 +914,9 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         // Delete from server if the project has been cloud-saved
-        if (_serverProjectId.HasValue && !string.IsNullOrEmpty(part.StoragePath))
+        if (_serverProjectId.HasValue && part.ServerPartId.HasValue)
         {
-            try { await Http.DeleteAsync($"api/v1/projects/{_serverProjectId}/parts/{part.FileId}"); } catch { /* non-fatal */ }
+            try { await Http.DeleteAsync($"api/v1/projects/{_serverProjectId}/parts/{part.ServerPartId.Value}"); } catch { /* non-fatal */ }
         }
 
         _parts.Remove(part);
@@ -1387,6 +1388,8 @@ public partial class ProjectNew : IAsyncDisposable
             FileName = part.Name,
             ProcessType = processCode,
             MaterialId = part.MaterialId,
+            MaterialName = ResolvePartMaterialName(part),
+            MaterialCode = ResolvePartMaterialCode(part),
             Quantity = part.Quantity,
             Finish = part.FinishCode,
             Color = ResolvePartColor(part),
@@ -1400,6 +1403,11 @@ public partial class ProjectNew : IAsyncDisposable
             InsertCount = part.InsertCount,
             BagAndTag = part.BagAndTag,
             InspectionLevel = part.InspectionLevel,
+            VolumeCm3 = part.VolumeMm3.HasValue ? (decimal)part.VolumeMm3.Value / 1_000m : null,
+            BoundingBoxX = part.Dimensions is null ? null : (decimal)part.Dimensions.X,
+            BoundingBoxY = part.Dimensions is null ? null : (decimal)part.Dimensions.Y,
+            BoundingBoxZ = part.Dimensions is null ? null : (decimal)part.Dimensions.Z,
+            IsManifold = part.IsManifold,
         };
     }
 
@@ -1415,6 +1423,8 @@ public partial class ProjectNew : IAsyncDisposable
         {
             ProcessType = processCode,
             MaterialId = part.MaterialId,
+            MaterialName = ResolvePartMaterialName(part),
+            MaterialCode = ResolvePartMaterialCode(part),
             Quantity = part.Quantity,
             Finish = part.FinishCode,
             Color = ResolvePartColor(part),
@@ -1432,6 +1442,28 @@ public partial class ProjectNew : IAsyncDisposable
             : null;
     }
 
+    private static string? ResolvePartMaterialName(PartViewModel part)
+    {
+        if (part.MaterialId.HasValue)
+        {
+            var material = part.AvailableMaterials.FirstOrDefault(item => item.Id == part.MaterialId.Value);
+            if (!string.IsNullOrWhiteSpace(material?.Name))
+                return material.Name;
+        }
+
+        return part.MaterialCode;
+    }
+
+    private static string? ResolvePartMaterialCode(PartViewModel part)
+    {
+        if (!string.IsNullOrWhiteSpace(part.MaterialCode))
+            return part.MaterialCode;
+
+        return part.MaterialId.HasValue
+            ? part.AvailableMaterials.FirstOrDefault(item => item.Id == part.MaterialId.Value)?.Code
+            : null;
+    }
+
     private static string? ResolvePartColor(PartViewModel part)
     {
         foreach (var key in new[] { "paint_color_reference", "paint_color", "paint_colour", "material_color", "material_colour", "plastic_color", "plastic_colour", "anodize_color", "anodise_color" })
@@ -1444,6 +1476,9 @@ public partial class ProjectNew : IAsyncDisposable
             ? hex
             : null;
     }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private async Task SaveDraftAsync()
     {
@@ -1717,6 +1752,7 @@ public partial class ProjectNew : IAsyncDisposable
             _serverProjectId = project.Id;
             _tempProjectId = project.Id;
             _title = project.Title;
+            _parts.Clear();
 
             if (!string.IsNullOrEmpty(project.Currency))
             {
@@ -1740,13 +1776,26 @@ public partial class ProjectNew : IAsyncDisposable
                         FileId = part.FileId,
                         ServerPartId = part.Id,
                         Name = part.FileName,
+                        StoragePath = part.FileReference,
                         ProcessCode = part.ProcessType,
                         MaterialId = part.MaterialId,
-                        MaterialCode = part.MaterialName,
+                        MaterialCode = part.MaterialCode,
                         Quantity = part.Quantity,
                         FinishCode = part.Finish,
                         ToleranceCode = part.Tolerance,
-                        EstimatedUnitPrice = part.ConfirmedPrice ?? part.EstimatedPrice,
+                        EstimatedUnitPrice = part.ConfirmedPrice ?? part.ConfirmedUnitPrice ?? part.EstimatedPrice ?? part.AiSuggestedPrice,
+                        EstimatedTotalAmount = (part.ConfirmedPrice ?? part.ConfirmedUnitPrice ?? part.EstimatedPrice ?? part.AiSuggestedPrice) * Math.Max(part.Quantity, 1),
+                        Dimensions = part.Dimensions is null
+                            ? null
+                            : new FileAnalysisDimensionsDto
+                            {
+                                X = part.Dimensions.X,
+                                Y = part.Dimensions.Y,
+                                Z = part.Dimensions.Z,
+                            },
+                        IsManifold = part.IsManifold,
+                        AwaitingPreview = false,
+                        StatusText = "Ready",
                     };
 
                     if (!string.IsNullOrEmpty(part.ProcessType))
@@ -1761,12 +1810,24 @@ public partial class ProjectNew : IAsyncDisposable
                         }
                     }
 
-                    if (!string.IsNullOrEmpty(part.ModelPreviewUrl))
+                    var thumbnailUrl = FirstNonEmpty(part.ModelPreviewUrl, part.ThumbnailUrl);
+                    if (!string.IsNullOrEmpty(thumbnailUrl))
                     {
-                        partVm.ThumbnailSmallUrl = part.ModelPreviewUrl;
+                        partVm.ThumbnailSmallUrl = thumbnailUrl;
                     }
 
                     _parts.Add(partVm);
+
+                    if (!string.IsNullOrEmpty(partVm.StoragePath))
+                    {
+                        var p = partVm;
+                        var path = partVm.StoragePath;
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(CatchUpDelayMs);
+                            await FetchCurrentStatusAsync(p, path);
+                        });
+                    }
                 }
             }
 
@@ -1811,6 +1872,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.AvailableFinishes = finishesTask.Result ?? [];
             part.AvailableTolerances = FilterProcessTolerances(part.ProcessCode, tolerancesTask.Result ?? []).ToList();
             part.AvailableProcessOptions = configOptionsTask.Result ?? [];
+            RestoreCatalogSelections(part);
 
             if (part.MaterialId.HasValue)
                 await ComputePriceAsync(part, CancellationToken.None);
@@ -1818,6 +1880,40 @@ public partial class ProjectNew : IAsyncDisposable
         catch
         {
             // Catalog reload failures are non-fatal
+        }
+    }
+
+    private static void RestoreCatalogSelections(PartViewModel part)
+    {
+        if (part.MaterialId.HasValue)
+        {
+            var material = part.AvailableMaterials.FirstOrDefault(item => item.Id == part.MaterialId.Value);
+            if (material is not null)
+                part.MaterialCode = material.Code;
+        }
+
+        if (!part.FinishId.HasValue && !string.IsNullOrWhiteSpace(part.FinishCode))
+        {
+            var finish = part.AvailableFinishes.FirstOrDefault(item =>
+                item.Code.Equals(part.FinishCode, StringComparison.OrdinalIgnoreCase)
+                || item.Name.Equals(part.FinishCode, StringComparison.OrdinalIgnoreCase));
+            if (finish is not null)
+            {
+                part.FinishId = finish.Id;
+                part.FinishCode = finish.Code;
+            }
+        }
+
+        if (!part.ToleranceId.HasValue && !string.IsNullOrWhiteSpace(part.ToleranceCode))
+        {
+            var tolerance = part.AvailableTolerances.FirstOrDefault(item =>
+                item.Code.Equals(part.ToleranceCode, StringComparison.OrdinalIgnoreCase)
+                || item.Name.Equals(part.ToleranceCode, StringComparison.OrdinalIgnoreCase));
+            if (tolerance is not null)
+            {
+                part.ToleranceId = tolerance.Id;
+                part.ToleranceCode = tolerance.Code;
+            }
         }
     }
 
@@ -1939,10 +2035,21 @@ public partial class ProjectNew : IAsyncDisposable
             if (!await ConfirmProjectPartPricesForQuoteAsync(projectId))
                 return;
 
-            using var quoteResponse = await Http.PostAsync($"api/v1/projects/{projectId}/generate-quotation", null);
+            using var quoteResponse = await Http.PostAsJsonAsync(
+                $"api/v1/projects/{projectId}/generate-quotation",
+                new GenerateQuotationRequest
+                {
+                    ValidityDays = 30,
+                    DeliveryExpectations = ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
+                });
             if (!quoteResponse.IsSuccessStatusCode)
             {
-                Snackbar.Add("Project created but quotation generation failed.", Severity.Warning);
+                var errorContent = await quoteResponse.Content.ReadAsStringAsync();
+                Snackbar.Add(
+                    string.IsNullOrWhiteSpace(errorContent)
+                        ? "Project created but quotation generation failed."
+                        : $"Project created but quotation generation failed. {errorContent}",
+                    Severity.Warning);
                 Navigation.NavigateTo($"/sales/projects/{projectId}");
                 return;
             }

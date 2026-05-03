@@ -226,14 +226,25 @@ public class ProjectsController(
     /// Only allowed when all parts have confirmed prices.
     /// </summary>
     /// <param name="id">The project GUID.</param>
+    /// <param name="request">Quotation validity and delivery expectations.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:guid}/generate-quotation")]
-    public async Task<IActionResult> GenerateQuotation(Guid id, CancellationToken ct)
+    public async Task<IActionResult> GenerateQuotation(
+        Guid id,
+        [FromBody] GenerateQuotationRequest? request,
+        CancellationToken ct)
     {
-        var response = await client.GenerateQuotationAsync(id, ct);
-        return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
+        var response = await client.GenerateQuotationAsync(id, request ?? new GenerateQuotationRequest(), ct);
+        if (response.IsSuccessStatusCode)
+            return NoContent();
+
+        var errorContent = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(errorContent))
+            return StatusCode((int)response.StatusCode);
+
+        return StatusCode((int)response.StatusCode, errorContent);
     }
 
     /// <summary>

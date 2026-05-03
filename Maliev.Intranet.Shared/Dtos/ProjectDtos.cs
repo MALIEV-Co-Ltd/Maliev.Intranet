@@ -137,6 +137,9 @@ public class ProjectPartDto
     /// <summary>Gets or sets the reference to the uploaded 3D file.</summary>
     public Guid FileId { get; set; }
 
+    /// <summary>Gets or sets the GCS storage path for the uploaded file.</summary>
+    public string? FileReference { get; set; }
+
     /// <summary>Gets or sets the original uploaded filename (e.g. bracket_v2.stl).</summary>
     public string FileName { get; set; } = string.Empty;
 
@@ -148,6 +151,9 @@ public class ProjectPartDto
 
     /// <summary>Gets or sets the material display name.</summary>
     public string? MaterialName { get; set; }
+
+    /// <summary>Gets or sets the material SKU/code used for pricing and quotation handoff.</summary>
+    public string? MaterialCode { get; set; }
 
     /// <summary>Gets or sets the ordered quantity.</summary>
     public int Quantity { get; set; } = 1;
@@ -167,6 +173,12 @@ public class ProjectPartDto
     /// <summary>Gets or sets the employee-confirmed price per unit.</summary>
     public decimal? ConfirmedPrice { get; set; }
 
+    /// <summary>Gets or sets the AI-suggested unit price returned by ProjectService.</summary>
+    public decimal? AiSuggestedPrice { get; set; }
+
+    /// <summary>Gets or sets the employee-confirmed unit price returned by ProjectService.</summary>
+    public decimal? ConfirmedUnitPrice { get; set; }
+
     /// <summary>Gets or sets the reason the employee overrode the AI price, if applicable.</summary>
     public string? OverrideReason { get; set; }
 
@@ -179,8 +191,14 @@ public class ProjectPartDto
     /// <summary>Gets or sets the signed URL for 3D model preview from UploadService.</summary>
     public string? ModelPreviewUrl { get; set; }
 
+    /// <summary>Gets or sets the thumbnail URL returned by ProjectService.</summary>
+    public string? ThumbnailUrl { get; set; }
+
     /// <summary>Gets or sets bounding box dimensions (X × Y × Z in mm).</summary>
     public ModelDimensionsDto? Dimensions { get; set; }
+
+    /// <summary>Gets or sets whether the analyzed mesh is manifold.</summary>
+    public bool? IsManifold { get; set; }
 
     /// <summary>Gets or sets the production job ID once the order is placed.</summary>
     public Guid? JobId { get; set; }
@@ -301,6 +319,12 @@ public class AddProjectPartRequest
     /// <summary>Gets or sets the material ID.</summary>
     public Guid? MaterialId { get; set; }
 
+    /// <summary>Gets or sets the denormalized material display name.</summary>
+    public string? MaterialName { get; set; }
+
+    /// <summary>Gets or sets the material SKU/code used for pricing and quotation handoff.</summary>
+    public string? MaterialCode { get; set; }
+
     /// <summary>Gets or sets the ordered quantity.</summary>
     public int Quantity { get; set; } = 1;
 
@@ -339,6 +363,27 @@ public class AddProjectPartRequest
 
     /// <summary>Inspection level for quality control.</summary>
     public InspectionLevel InspectionLevel { get; set; } = InspectionLevel.Standard;
+
+    /// <summary>Volume in cubic centimeters, when geometry analysis is available.</summary>
+    public decimal? VolumeCm3 { get; set; }
+
+    /// <summary>Support volume in cubic centimeters, when geometry analysis is available.</summary>
+    public decimal? SupportVolumeCm3 { get; set; }
+
+    /// <summary>Surface area in square centimeters, when geometry analysis is available.</summary>
+    public decimal? SurfaceAreaCm2 { get; set; }
+
+    /// <summary>Bounding box X dimension in millimeters.</summary>
+    public decimal? BoundingBoxX { get; set; }
+
+    /// <summary>Bounding box Y dimension in millimeters.</summary>
+    public decimal? BoundingBoxY { get; set; }
+
+    /// <summary>Bounding box Z dimension in millimeters.</summary>
+    public decimal? BoundingBoxZ { get; set; }
+
+    /// <summary>Whether the analyzed mesh is manifold.</summary>
+    public bool? IsManifold { get; set; }
 }
 
 /// <summary>
@@ -352,6 +397,12 @@ public class UpdateProjectPartRequest
     /// <summary>Gets or sets the updated material ID.</summary>
     public Guid? MaterialId { get; set; }
 
+    /// <summary>Gets or sets the updated denormalized material display name.</summary>
+    public string? MaterialName { get; set; }
+
+    /// <summary>Gets or sets the updated material SKU/code.</summary>
+    public string? MaterialCode { get; set; }
+
     /// <summary>Gets or sets the updated quantity.</summary>
     public int Quantity { get; set; } = 1;
 
@@ -363,6 +414,20 @@ public class UpdateProjectPartRequest
 
     /// <summary>Gets or sets the updated tolerance.</summary>
     public string? Tolerance { get; set; }
+}
+
+/// <summary>
+/// Request to generate a quotation from confirmed project parts.
+/// </summary>
+public class GenerateQuotationRequest
+{
+    /// <summary>Gets or sets the number of days the quotation remains valid.</summary>
+    [Range(1, 365)]
+    public int ValidityDays { get; set; } = 30;
+
+    /// <summary>Gets or sets delivery expectations or lead-time notes shown on the quotation.</summary>
+    [MaxLength(1000)]
+    public string? DeliveryExpectations { get; set; }
 }
 
 /// <summary>

@@ -118,8 +118,7 @@
 
     private bool HasQuotation => _project?.QuotationId is not null;
 
-    private bool CanAcceptQuote => HasQuotation &&
-        string.Equals(_project?.Status, "Quoted", StringComparison.OrdinalIgnoreCase);
+    private bool CanAcceptQuote => HasQuotation && IsAcceptableQuoteStatus(_project?.Status);
 
     private decimal PartsSubtotal => _project?.Parts.Sum(part => GetPartLineTotal(part)) ?? 0m;
 
@@ -546,7 +545,16 @@
 
     private string FormatMoney(decimal value) => CurrencyFormatter.Format(value, ProjectCurrency, 2);
 
-    private static decimal GetPartUnitPrice(ProjectPartDto part) => part.ConfirmedPrice ?? part.EstimatedPrice ?? 0m;
+    private static bool IsAcceptableQuoteStatus(string? status) =>
+        NormalizeStatus(status) is "quoted" or "quotationgenerated" or "quotationsent";
+
+    private static string NormalizeStatus(string? status) =>
+        string.IsNullOrWhiteSpace(status)
+            ? string.Empty
+            : status.Replace(" ", string.Empty, StringComparison.Ordinal).Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+
+    private static decimal GetPartUnitPrice(ProjectPartDto part) =>
+        part.ConfirmedPrice ?? part.ConfirmedUnitPrice ?? part.EstimatedPrice ?? part.AiSuggestedPrice ?? 0m;
 
     private static decimal GetPartLineTotal(ProjectPartDto part) => GetPartUnitPrice(part) * Math.Max(part.Quantity, 0);
 

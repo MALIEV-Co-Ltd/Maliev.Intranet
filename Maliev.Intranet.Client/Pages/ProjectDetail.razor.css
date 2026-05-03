@@ -116,9 +116,11 @@
 }
 
 .project-record-shell ::deep .project-parts-table {
+    min-width: 860px;
     width: 100%;
     border-collapse: collapse;
     font-size: var(--maliev-font-base);
+    table-layout: fixed;
 }
 
 .project-record-shell ::deep .project-parts-table th,
@@ -127,6 +129,37 @@
     border-bottom: 1px solid var(--maliev-border-subtle);
     text-align: left;
     vertical-align: middle;
+}
+
+.project-record-shell ::deep .project-parts-table th:nth-child(1),
+.project-record-shell ::deep .project-parts-table td:nth-child(1) {
+    width: 22%;
+}
+
+.project-record-shell ::deep .project-parts-table th:nth-child(2),
+.project-record-shell ::deep .project-parts-table td:nth-child(2),
+.project-record-shell ::deep .project-parts-table th:nth-child(3),
+.project-record-shell ::deep .project-parts-table td:nth-child(3),
+.project-record-shell ::deep .project-parts-table th:nth-child(4),
+.project-record-shell ::deep .project-parts-table td:nth-child(4) {
+    width: 14%;
+}
+
+.project-record-shell ::deep .project-parts-table th:nth-child(5),
+.project-record-shell ::deep .project-parts-table td:nth-child(5) {
+    width: 7%;
+}
+
+.project-record-shell ::deep .project-parts-table th:nth-child(6),
+.project-record-shell ::deep .project-parts-table td:nth-child(6),
+.project-record-shell ::deep .project-parts-table th:nth-child(7),
+.project-record-shell ::deep .project-parts-table td:nth-child(7) {
+    width: 10%;
+}
+
+.project-record-shell ::deep .project-parts-table th:nth-child(8),
+.project-record-shell ::deep .project-parts-table td:nth-child(8) {
+    width: 9%;
 }
 
 .project-record-shell ::deep .project-parts-table th {

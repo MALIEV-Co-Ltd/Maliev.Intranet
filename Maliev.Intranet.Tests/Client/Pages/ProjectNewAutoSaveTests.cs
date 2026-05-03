@@ -534,6 +534,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var projectId = Guid.NewGuid();
         var partId = Guid.NewGuid();
         decimal? confirmedPrice = null;
+        string? quotationBody = null;
 
         _httpHandler.HandlerFunc = async (request, ct) =>
         {
@@ -555,7 +556,10 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             }
 
             if (path == $"/api/v1/projects/{projectId}/generate-quotation" && request.Method == HttpMethod.Post)
+            {
+                quotationBody = await request.Content!.ReadAsStringAsync(ct);
                 return new HttpResponseMessage(HttpStatusCode.NoContent);
+            }
 
             return await DefaultHandler(request, ct);
         };
@@ -600,6 +604,12 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.True(confirmIndex >= 0, $"The quote flow must persist the calculated part price before generating the quotation. Requests: {string.Join(", ", paths)}");
         Assert.True(quoteIndex > confirmIndex, $"The quotation endpoint must run after part prices are confirmed. Requests: {string.Join(", ", paths)}");
         Assert.Equal(1250m, confirmedPrice);
+        Assert.NotNull(quotationBody);
+        using (var json = JsonDocument.Parse(quotationBody))
+        {
+            Assert.Equal(30, json.RootElement.GetProperty("validityDays").GetInt32());
+            Assert.Contains("Standard", json.RootElement.GetProperty("deliveryExpectations").GetString(), StringComparison.Ordinal);
+        }
         Assert.EndsWith($"/sales/projects/{projectId}", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
     }
 
