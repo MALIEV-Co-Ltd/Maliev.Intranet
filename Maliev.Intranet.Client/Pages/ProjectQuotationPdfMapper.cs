@@ -47,6 +47,7 @@ public static class ProjectQuotationPdfMapper
             || billingAddressLines.Any(ContainsThai);
         var customerBranch = ResolveCustomerBranch(customerType, isThaiCustomer);
         var customerPhone = ResolveCustomerPhone(selectedCustomer, customerDetail, customerType);
+        var customerEmail = ResolveCustomerEmail(selectedCustomer, customerDetail, customerType);
 
         return new QuotationPdfData
         {
@@ -56,7 +57,7 @@ public static class ProjectQuotationPdfMapper
             CustomerBranch = customerBranch,
             CustomerTaxId = customerDetail?.CompanyVatNumber ?? customerDetail?.CompanyRegistrationNumber,
             CustomerPhone = customerPhone,
-            CustomerDisplayLines = BuildCustomerDisplayLines(selectedCustomer, customerDetail, customerType, customerBranch, customerPhone),
+            CustomerDisplayLines = BuildCustomerDisplayLines(selectedCustomer, customerDetail, customerType, customerBranch, customerPhone, customerEmail),
             CustomerAddress = FormatAddressText(billingAddressLines),
             BillingAddress = FormatAddressText(billingAddressLines),
             BillingAddressLines = billingAddressLines,
@@ -127,9 +128,14 @@ public static class ProjectQuotationPdfMapper
 
         if (part.HasThreadedHoles)
         {
-            var specification = string.IsNullOrWhiteSpace(part.ThreadedHoleSpec) ? "specified thread" : part.ThreadedHoleSpec;
-            var count = part.ThreadedHoleCount > 0 ? part.ThreadedHoleCount.ToString("N0") : "TBD";
-            notes.Add($"Tapped holes: {count} x {specification}");
+            if (part.ThreadedHoleCount > 0 && !string.IsNullOrWhiteSpace(part.ThreadedHoleSpec))
+            {
+                notes.Add($"Tapped holes: {part.ThreadedHoleCount:N0} x {part.ThreadedHoleSpec}");
+            }
+            else
+            {
+                notes.Add(part.DrawingFiles.Count > 0 ? "Tapped holes: Yes (see attached drawings)" : "Tapped holes: Yes");
+            }
         }
 
         if (part.HasInserts && part.InsertType != InsertType.None)
@@ -196,7 +202,8 @@ public static class ProjectQuotationPdfMapper
         CustomerDetailDto? customerDetail,
         string customerType,
         string? customerBranch,
-        string? customerPhone)
+        string? customerPhone,
+        string? customerEmail)
     {
         var lines = new List<string>();
         var contactName = FirstNonEmpty(customerDetail?.Name, selectedCustomer?.Name);
@@ -214,12 +221,17 @@ public static class ProjectQuotationPdfMapper
                     : $"{contactName} ({customerPhone})";
                 lines.Add($"Attn: {contactLine}");
             }
+
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+                lines.Add($"Email: {customerEmail}");
         }
         else
         {
             lines.Add(customerName);
             if (!string.IsNullOrWhiteSpace(customerPhone))
                 lines.Add(customerPhone);
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+                lines.Add($"Email: {customerEmail}");
         }
 
         return lines.Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
@@ -243,6 +255,22 @@ public static class ProjectQuotationPdfMapper
             selectedCustomer?.Mobile,
             customerDetail?.Landline,
             selectedCustomer?.Landline);
+    }
+
+    private static string? ResolveCustomerEmail(CustomerSummaryDto? selectedCustomer, CustomerDetailDto? customerDetail, string customerType)
+    {
+        if (customerType == "Corporate")
+        {
+            return FirstNonEmpty(
+                customerDetail?.CompanyContactEmail,
+                customerDetail?.Email,
+                selectedCustomer?.Email);
+        }
+
+        return FirstNonEmpty(
+            customerDetail?.Email,
+            selectedCustomer?.Email,
+            customerDetail?.CompanyContactEmail);
     }
 
     private static string? FirstNonEmpty(params string?[] values) =>
@@ -302,6 +330,9 @@ public static class ProjectQuotationPdfMapper
             return $"{tolerance.Name} {NormalizeToleranceRange(tolerance.ToleranceRange)}";
 
         var name = StripToleranceRange(tolerance.Name);
+        if (!string.IsNullOrWhiteSpace(name) && HasIsoReference(name))
+            return name;
+
         if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(tolerance.IsoStandard)
             && !name.Contains(tolerance.IsoStandard, StringComparison.OrdinalIgnoreCase)
             && !name.Contains(tolerance.IsoStandard.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.OrdinalIgnoreCase))
@@ -412,6 +443,12 @@ public static class ProjectQuotationPdfMapper
 
     private static string NormalizeIsoStandard(string value) =>
         value.Replace(" ", string.Empty, StringComparison.Ordinal).Trim();
+
+    private static bool HasIsoReference(string value)
+    {
+        var normalized = value.Replace(" ", string.Empty, StringComparison.Ordinal);
+        return normalized.Contains("ISO2768", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool IsFdmProcess(PartViewModel part) =>
         part.ProcessCode?.Contains("FDM", StringComparison.OrdinalIgnoreCase) == true;

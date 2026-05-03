@@ -23,13 +23,16 @@ public class ProjectQuotationPdfMapperTests
                 Id = Guid.NewGuid(),
                 Name = "Jane Buyer",
                 CompanyName = "Acme Thailand",
+                Email = "summary.buyer@example.com",
                 CompanyPhone = "+66 2 123 4567",
             },
             new CustomerDetailDto
             {
                 Name = "Jane Buyer",
+                Email = "jane.buyer@example.com",
                 CompanyName = "Acme Thailand",
                 CompanyPhone = "+66 2 765 4321",
+                CompanyContactEmail = "sales@acme.example",
                 CompanyVatNumber = "0105559999999",
                 CompanyBillingAddress = new AddressResponse
                 {
@@ -110,6 +113,7 @@ public class ProjectQuotationPdfMapperTests
         Assert.Equal("0105559999999", data.CustomerTaxId);
         Assert.Equal("Head Office", data.CustomerBranch);
         Assert.Equal("+66 2 765 4321", data.CustomerPhone);
+        Assert.Contains("Email: sales@acme.example", data.CustomerDisplayLines);
         Assert.Contains("88 Billing Road", data.BillingAddress);
         Assert.Contains("99 Shipping Road", data.ShippingAddress);
         Assert.Equal("bracket.step", data.Items[0].PartName);
@@ -142,6 +146,51 @@ public class ProjectQuotationPdfMapperTests
         var lines = ProjectQuotationPdfMapper.BuildLineItemDetailLines(part);
 
         Assert.Contains("Inspection: Standard", lines);
+    }
+
+    /// <summary>
+    /// Verifies tapped-hole placeholders are not shown when details are left to attached drawings.
+    /// </summary>
+    [Fact]
+    public void BuildLineItemDetailLines_WithUnspecifiedTappedHoles_UsesDrawingReference()
+    {
+        var part = new PartViewModel
+        {
+            Name = "bracket.step",
+            HasThreadedHoles = true,
+            DrawingFiles =
+            [
+                new DraftProjectAttachmentDto { Name = "bracket-drawing.pdf" },
+            ],
+        };
+
+        var lines = ProjectQuotationPdfMapper.BuildLineItemDetailLines(part);
+
+        Assert.Contains("Tapped holes: Yes (see attached drawings)", lines);
+        Assert.DoesNotContain("Tapped holes: TBD x specified thread", lines);
+    }
+
+    /// <summary>
+    /// Verifies ISO tolerance names are not duplicated with secondary ISO labels.
+    /// </summary>
+    [Fact]
+    public void BuildLineItemDetailLines_WithIsoToleranceName_DoesNotDuplicateIsoStandard()
+    {
+        var toleranceId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            ToleranceId = toleranceId,
+            ToleranceCode = "ISO2768_M",
+            AvailableTolerances =
+            [
+                new CatalogToleranceDto(toleranceId, "Medium (ISO 2768-m)", "ISO2768_M", "ISO2768-1", "", "", 0, 1),
+            ],
+        };
+
+        var lines = ProjectQuotationPdfMapper.BuildLineItemDetailLines(part);
+
+        Assert.Contains("Tolerance: Medium (ISO 2768-m)", lines);
+        Assert.DoesNotContain(lines, line => line.Contains("ISO2768-1", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
