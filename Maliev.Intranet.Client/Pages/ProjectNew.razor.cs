@@ -343,7 +343,8 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private async Task<IEnumerable<CustomerSummaryDto>> SearchCustomersAsync(string value, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+        var query = value?.Trim() ?? string.Empty;
+        if (query.Length == 1)
             return [];
 
         // Cancel any in-flight search request so debounced keystrokes don't
@@ -354,8 +355,12 @@ public partial class ProjectNew : IAsyncDisposable
 
         try
         {
+            var url = string.IsNullOrWhiteSpace(query)
+                ? "api/v1/customers?page=1&pageSize=10"
+                : $"api/v1/customers?query={Uri.EscapeDataString(query)}&page=1&pageSize=10";
+
             var result = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(
-                $"api/v1/customers?query={Uri.EscapeDataString(value)}&page=1&pageSize=10",
+                url,
                 _searchCts.Token);
             return result?.Data ?? [];
         }

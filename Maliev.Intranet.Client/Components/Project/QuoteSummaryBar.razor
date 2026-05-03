@@ -8,33 +8,10 @@
 <div class="qsb-root">
     @* ── Zone 0: Customer ─────────────────────────────────────────────────── *@
     <div class="qsb-zone-customer">
-        <div class="qsb-zone-label">Customer</div>
-        @if (SelectedCustomer != null)
-        {
-            <CustomerCardCompact Customer="@SelectedCustomer"
-                                 OnClear="@(() => OnCustomerSelected.InvokeAsync(null))" />
-        }
-        else
-        {
-            <MudAutocomplete T="CustomerSummaryDto"
-                             Value="@SelectedCustomer"
-                             ValueChanged="@OnCustomerSelected"
-                             ToStringFunc="@(c => c?.Name ?? "")"
-                             SearchFunc="@SearchCustomers"
-                             Variant="Variant.Outlined"
-                             Margin="Margin.Dense"
-                             Dense="true"
-                             Clearable="false"
-                             ShowProgressIndicator="true"
-                             DebounceInterval="300"
-                             CoerceText="true"
-                             Placeholder="Search customer…"
-                             Class="qsb-customer-search">
-                <ItemTemplate Context="item">
-                    <CustomerCardCompact Customer="@item" ShowClear="false" />
-                </ItemTemplate>
-            </MudAutocomplete>
-        }
+        <div class="qsb-zone-label">Bill To</div>
+        <CustomerPicker SelectedCustomer="@SelectedCustomer"
+                        SearchCustomers="@SearchCustomers"
+                        OnCustomerSelected="@OnCustomerSelected" />
     </div>
 
     <div class="qsb-divider" />
@@ -156,7 +133,7 @@
         background: var(--maliev-panel);
         border-top: 1px solid var(--maliev-border);
         flex-shrink: 0;
-        overflow: hidden;
+        overflow: visible;
     }
 
     .qsb-divider {
@@ -180,6 +157,8 @@
 
     /* ── Zone 0: Customer ─────────────────────────────────────────────────── */
     .qsb-zone-customer {
+        position: relative;
+        z-index: 5;
         flex: 1 1 220px;
         max-width: 270px;
         padding: 10px 16px;
@@ -188,7 +167,6 @@
         justify-content: center;
         flex-shrink: 0;
     }
-    .qsb-customer-search { width: 100%; }
 
     /* ── Zone 1: Lead Time ────────────────────────────────────────────────── */
     .qsb-zone-lead {

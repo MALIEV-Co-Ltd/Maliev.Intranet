@@ -1,0 +1,244 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Shared
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@implements IDisposable
+
+<div class="customer-picker">
+    @if (SelectedCustomer != null)
+    {
+        <CustomerCardCompact Customer="@SelectedCustomer"
+                             OnClear="@ClearSelectionAsync" />
+    }
+    else
+    {
+        <button type="button"
+                class="customer-picker-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="@_open"
+                @onclick="TogglePickerAsync">
+            <MudIcon Icon="@Icons.Material.Outlined.PersonSearch" Size="Size.Small" />
+            <span>Select customer...</span>
+        </button>
+
+        @if (_open)
+        {
+            <button type="button"
+                    class="customer-picker-scrim"
+                    aria-label="Close customer picker"
+                    @onclick="ClosePicker"></button>
+
+            <div class="customer-picker-popover" role="dialog" aria-label="Select customer" @onclick:stopPropagation="true">
+                <div class="customer-picker-search">
+                    <MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" />
+                    <input @ref="_searchInput"
+                           class="customer-picker-search-input"
+                           value="@_query"
+                           placeholder="Search customers..."
+                           autocomplete="off"
+                           @oninput="HandleSearchInputAsync"
+                           @onkeydown="HandleSearchKeyDown" />
+                </div>
+
+                @if (_isLoading)
+                {
+                    <div class="customer-picker-progress" aria-hidden="true"></div>
+                }
+
+                <div class="customer-picker-list" role="listbox" aria-label="Customer results">
+                    @if (!string.IsNullOrWhiteSpace(_errorText))
+                    {
+                        <div class="customer-picker-state">@_errorText</div>
+                    }
+                    else if (!_isLoading && _customers.Count == 0)
+                    {
+                        <div class="customer-picker-state">No customers found</div>
+                    }
+                    else
+                    {
+                        @foreach (var customer in _customers)
+                        {
+                            var tier = GetTierText(customer);
+                            <button type="button"
+                                    class="customer-picker-option"
+                                    role="option"
+                                    @onclick="@(() => SelectCustomerAsync(customer))">
+                                <span class="@GetAvatarClass(customer)">@GetInitials(customer.Name)</span>
+                                <span class="customer-picker-copy">
+                                    <span class="customer-picker-name">@customer.Name</span>
+                                    @if (!string.IsNullOrWhiteSpace(customer.CompanyName))
+                                    {
+                                        <span class="customer-picker-company">@customer.CompanyName</span>
+                                    }
+                                </span>
+                                @if (!string.IsNullOrWhiteSpace(tier))
+                                {
+                                    <span class="@GetTierClass(tier)">@tier</span>
+                                }
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public CustomerSummaryDto? SelectedCustomer { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IEnumerable<CustomerSummaryDto>>>? SearchCustomers { get; set; }
+    [Parameter] public EventCallback<CustomerSummaryDto?> OnCustomerSelected { get; set; }
+
+    private readonly List<CustomerSummaryDto> _customers = [];
+    private ElementReference _searchInput;
+    private string _query = string.Empty;
+    private string? _errorText;
+    private bool _disposed;
+    private bool _focusSearch;
+    private bool _isLoading;
+    private bool _open;
+    private int _loadVersion;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusSearch)
+            return;
+
+        _focusSearch = false;
+        await _searchInput.FocusAsync();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _loadVersion++;
+    }
+
+    private async Task TogglePickerAsync()
+    {
+        if (_open)
+        {
+            ClosePicker();
+            return;
+        }
+
+        _open = true;
+        _focusSearch = true;
+        _query = string.Empty;
+        await LoadCustomersAsync();
+    }
+
+    private void ClosePicker()
+    {
+        _open = false;
+        _query = string.Empty;
+        _errorText = null;
+    }
+
+    private async Task ClearSelectionAsync() => await OnCustomerSelected.InvokeAsync(null);
+
+    private async Task HandleSearchInputAsync(ChangeEventArgs args)
+    {
+        _query = args.Value?.ToString() ?? string.Empty;
+        await LoadCustomersAsync();
+    }
+
+    private void HandleSearchKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+            ClosePicker();
+    }
+
+    private async Task LoadCustomersAsync()
+    {
+        var version = ++_loadVersion;
+        _isLoading = true;
+        _errorText = null;
+
+        try
+        {
+            var search = SearchCustomers;
+            var results = search == null
+                ? []
+                : await search(_query.Trim(), CancellationToken.None);
+
+            if (_disposed || version != _loadVersion)
+                return;
+
+            _customers.Clear();
+            _customers.AddRange(results.Take(8));
+        }
+        catch (Exception) when (!_disposed && version == _loadVersion)
+        {
+            _customers.Clear();
+            _errorText = "Unable to load customers";
+        }
+        finally
+        {
+            if (!_disposed && version == _loadVersion)
+                _isLoading = false;
+        }
+    }
+
+    private async Task SelectCustomerAsync(CustomerSummaryDto customer)
+    {
+        _open = false;
+        _query = string.Empty;
+        _errorText = null;
+        _customers.Clear();
+        await OnCustomerSelected.InvokeAsync(customer);
+    }
+
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "?";
+
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+            : name.Length >= 2
+                ? $"{name[0]}{name[1]}".ToUpperInvariant()
+                : name[0].ToString().ToUpperInvariant();
+    }
+
+    private static string GetTierText(CustomerSummaryDto customer) =>
+        !string.IsNullOrWhiteSpace(customer.Tier)
+            ? customer.Tier
+            : customer.Status;
+
+    private static string GetAvatarClass(CustomerSummaryDto customer) =>
+        $"customer-picker-avatar customer-picker-avatar--{GetStableTone(customer.Name)}";
+
+    private static int GetStableTone(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return 0;
+
+        var hash = 0;
+        foreach (var character in value)
+            hash = ((hash * 31) + character) & 0x7fffffff;
+
+        return hash % 4;
+    }
+
+    private static string GetTierClass(string tier)
+    {
+        var key = NormalizeClassKey(tier);
+        return string.IsNullOrWhiteSpace(key)
+            ? "customer-picker-tier"
+            : $"customer-picker-tier customer-picker-tier--{key}";
+    }
+
+    private static string NormalizeClassKey(string value)
+    {
+        var chars = value
+            .Trim()
+            .ToLowerInvariant()
+            .Select(character => char.IsLetterOrDigit(character) ? character : '-')
+            .ToArray();
+
+        return new string(chars).Trim('-');
+    }
+}

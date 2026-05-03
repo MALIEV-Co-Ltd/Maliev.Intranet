@@ -1,0 +1,270 @@
+.customer-picker {
+    position: relative;
+    width: 100%;
+}
+
+.customer-picker-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    height: 32px;
+    padding: 0 11px;
+    border: 1px dashed color-mix(in oklch, var(--maliev-border) 82%, var(--maliev-muted));
+    border-radius: 6px;
+    background: var(--maliev-panel);
+    color: var(--maliev-muted);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.customer-picker-trigger:hover,
+.customer-picker-trigger:focus-visible {
+    border-color: var(--mud-palette-primary);
+    background: color-mix(in oklch, var(--mud-palette-primary) 6%, var(--maliev-panel));
+    color: var(--maliev-ink);
+    outline: none;
+}
+
+.customer-picker-trigger ::deep .mud-icon-root {
+    width: 15px;
+    height: 15px;
+    color: currentColor;
+}
+
+.customer-picker-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: default;
+}
+
+.customer-picker-popover {
+    position: absolute;
+    left: -4px;
+    bottom: calc(100% + 8px);
+    z-index: 101;
+    width: min(270px, calc(100vw - 24px));
+    max-height: 280px;
+    overflow: hidden;
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
+    background: var(--maliev-panel);
+    box-shadow: 0 16px 38px color-mix(in oklch, black 18%, transparent);
+}
+
+.customer-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 6px;
+    height: 34px;
+    padding: 0 8px;
+    border: 1px solid var(--maliev-border);
+    border-radius: 6px;
+    background: var(--maliev-panel-2);
+}
+
+.customer-picker-search ::deep .mud-icon-root {
+    width: 14px;
+    height: 14px;
+    color: var(--maliev-muted);
+}
+
+.customer-picker-search-input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--maliev-ink);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+.customer-picker-search-input::placeholder {
+    color: var(--maliev-muted);
+}
+
+.customer-picker-progress {
+    height: 2px;
+    background:
+        linear-gradient(
+            90deg,
+            transparent 0%,
+            var(--mud-palette-primary) 45%,
+            transparent 100%);
+    background-size: 180% 100%;
+    animation: customer-picker-progress 0.9s linear infinite;
+}
+
+.customer-picker-list {
+    max-height: 226px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.customer-picker-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.customer-picker-list::-webkit-scrollbar-thumb {
+    border: 2px solid var(--maliev-panel);
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--maliev-muted) 42%, transparent);
+}
+
+.customer-picker-option {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 45px;
+    padding: 5px 8px;
+    border: 0;
+    border-bottom: 1px solid color-mix(in oklch, var(--maliev-border) 72%, transparent);
+    background: transparent;
+    color: var(--maliev-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.customer-picker-option:last-child {
+    border-bottom: 0;
+}
+
+.customer-picker-option:hover,
+.customer-picker-option:focus-visible {
+    background: var(--maliev-panel-3);
+    outline: none;
+}
+
+.customer-picker-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.customer-picker-avatar--0 {
+    background: #5267d8;
+}
+
+.customer-picker-avatar--1 {
+    background: #6f5fd7;
+}
+
+.customer-picker-avatar--2 {
+    background: #2f7bce;
+}
+
+.customer-picker-avatar--3 {
+    background: #7d62c8;
+}
+
+.customer-picker-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.customer-picker-name,
+.customer-picker-company {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.customer-picker-name {
+    color: var(--maliev-ink);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.customer-picker-company {
+    color: var(--maliev-muted);
+    font-size: 10.5px;
+    line-height: 1.1;
+}
+
+.customer-picker-tier {
+    justify-self: end;
+    max-width: 76px;
+    overflow: hidden;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--mud-palette-primary) 10%, transparent);
+    color: var(--mud-palette-primary);
+    font-size: 9.5px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.customer-picker-tier--active {
+    background: color-mix(in oklch, #22a06b 13%, transparent);
+    color: #17834f;
+}
+
+.customer-picker-tier--inactive {
+    background: color-mix(in oklch, #64748b 14%, transparent);
+    color: #526173;
+}
+
+.customer-picker-tier--vip,
+.customer-picker-tier--platinum {
+    background: color-mix(in oklch, #8b5cf6 14%, transparent);
+    color: #7a3ff0;
+}
+
+.customer-picker-tier--gold {
+    background: color-mix(in oklch, #c88a04 15%, transparent);
+    color: #946200;
+}
+
+.customer-picker-tier--bronze {
+    background: color-mix(in oklch, #a16207 14%, transparent);
+    color: #8a4c05;
+}
+
+.customer-picker-state {
+    padding: 16px 10px 18px;
+    color: var(--maliev-muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+@keyframes customer-picker-progress {
+    from {
+        background-position: 100% 0;
+    }
+
+    to {
+        background-position: -100% 0;
+    }
+}
+
+@media (max-width: 600px) {
+    .customer-picker-popover {
+        left: 0;
+        width: min(100%, calc(100vw - 20px));
+    }
+}
