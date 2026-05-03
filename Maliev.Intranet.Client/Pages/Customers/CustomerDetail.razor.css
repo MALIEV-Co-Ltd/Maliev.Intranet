@@ -160,6 +160,14 @@
     border-bottom: 0;
 }
 
+.customer-table-subtext {
+    margin-top: 3px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    font-weight: 500;
+    line-height: 1.35;
+}
+
 .customer-orders-table a,
 .customer-inline-link {
     color: var(--maliev-info);

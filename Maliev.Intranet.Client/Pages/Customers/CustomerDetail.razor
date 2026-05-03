@@ -17,6 +17,7 @@
     <nav class="customer-record-tabs" aria-label="Customer sections">
         <button type="button" data-tab="overview" class="@TabClass(CustomerDetailTab.Overview)" aria-current="@TabCurrent(CustomerDetailTab.Overview)" @onclick="@(() => SelectTab(CustomerDetailTab.Overview))">Overview</button>
         <button type="button" data-tab="addresses" class="@TabClass(CustomerDetailTab.Addresses)" aria-current="@TabCurrent(CustomerDetailTab.Addresses)" @onclick="@(() => SelectTab(CustomerDetailTab.Addresses))">Addresses (@(_customer?.Addresses.Count ?? 0))</button>
+        <button type="button" data-tab="projects" class="@TabClass(CustomerDetailTab.Projects)" aria-current="@TabCurrent(CustomerDetailTab.Projects)" @onclick="@(() => SelectTab(CustomerDetailTab.Projects))">Projects (@ProjectCount.ToString("N0"))</button>
         <button type="button" data-tab="orders" class="@TabClass(CustomerDetailTab.Orders)" aria-current="@TabCurrent(CustomerDetailTab.Orders)" @onclick="@(() => SelectTab(CustomerDetailTab.Orders))">Orders</button>
         <button type="button" data-tab="notes" class="@TabClass(CustomerDetailTab.Notes)" aria-current="@TabCurrent(CustomerDetailTab.Notes)" @onclick="@(() => SelectTab(CustomerDetailTab.Notes))">Notes (@(_customer?.Notes.Count ?? 0))</button>
         <button type="button" data-tab="activity" class="@TabClass(CustomerDetailTab.Activity)" aria-current="@TabCurrent(CustomerDetailTab.Activity)" @onclick="@(() => SelectTab(CustomerDetailTab.Activity))">Activity</button>
@@ -117,13 +118,50 @@
                     </section>
 
                     <section class="customer-panel">
+                        <SectionTitle Text="Recent projects" />
+                        @if (_projects.Count > 0)
+                        {
+                            <table class="customer-orders-table">
+                                <thead>
+                                    <tr>
+                                        <th>Project</th>
+                                        <th>Created</th>
+                                        <th>Parts</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var project in _projects.Take(6))
+                                    {
+                                        <tr>
+                                            <td>
+                                                <a href="@($"/sales/projects/{project.Id}")">@project.ProjectNumber</a>
+                                                <div class="customer-table-subtext">@project.Title</div>
+                                            </td>
+                                            <td>@FormatDate(project.CreatedAt)</td>
+                                            <td>@project.PartsCount.ToString("N0")</td>
+                                            <td class="mlv-mono">@FormatMoney(project.TotalPrice)</td>
+                                            <td><StatusBadge Status="@project.Status" /></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="customer-muted-box">No active projects yet.</div>
+                        }
+                    </section>
+
+                    <section class="customer-panel">
                         <SectionTitle Text="Recent orders" />
                         @if (_orders.Count > 0)
                         {
                             <table class="customer-orders-table">
                                 <thead>
                                     <tr>
-                                        <th>Quote #</th>
+                                        <th>Order #</th>
                                         <th>Date</th>
                                         <th>Parts</th>
                                         <th>Total</th>
@@ -274,6 +312,45 @@
                 }
             </section>
         }
+        else if (_activeTab == CustomerDetailTab.Projects)
+        {
+            <section class="customer-panel customer-tab-panel customer-projects-panel" data-section="projects">
+                <SectionTitle Text="@($"All projects ({ProjectCount:N0})")" />
+                @if (_projects.Count > 0)
+                {
+                    <table class="customer-orders-table">
+                        <thead>
+                            <tr>
+                                <th>Project</th>
+                                <th>Created</th>
+                                <th>Parts</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var project in _projects)
+                            {
+                                <tr>
+                                    <td>
+                                        <a href="@($"/sales/projects/{project.Id}")">@project.ProjectNumber</a>
+                                        <div class="customer-table-subtext">@project.Title</div>
+                                    </td>
+                                    <td>@FormatDate(project.CreatedAt)</td>
+                                    <td>@project.PartsCount.ToString("N0")</td>
+                                    <td class="mlv-mono">@FormatMoney(project.TotalPrice)</td>
+                                    <td><StatusBadge Status="@project.Status" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="customer-muted-box">No projects recorded for this customer.</div>
+                }
+            </section>
+        }
         else if (_activeTab == CustomerDetailTab.Orders)
         {
             <section class="customer-panel customer-tab-panel customer-orders-panel" data-section="orders">
@@ -283,7 +360,7 @@
                     <table class="customer-orders-table">
                         <thead>
                             <tr>
-                                <th>Quote #</th>
+                                <th>Order #</th>
                                 <th>Date</th>
                                 <th>Parts</th>
                                 <th>Total</th>
@@ -520,6 +597,7 @@
 
     private CustomerDetailDto? _customer;
     private CustomerEditModel? _edit;
+    private readonly List<ProjectSummaryDto> _projects = [];
     private readonly List<OrderSummaryDto> _orders = [];
     private readonly List<CustomerActivityResponse> _activity = [];
     private CustomerDetailTab _activeTab = CustomerDetailTab.Overview;
@@ -531,6 +609,7 @@
     private string _newNoteText = string.Empty;
     private string _addressLookupQuery = string.Empty;
     private string _companyLookupQuery = string.Empty;
+    private int _projectTotalCount;
     private int _orderTotalCount;
     private readonly List<CountryDto> _countries = [];
     private readonly List<EmployeeSummaryDto> _accountManagers = [];
@@ -544,6 +623,7 @@
     private string TaxId => _customer?.CompanyVatNumber ?? _customer?.CompanyRegistrationNumber ?? "-";
     private const string CreditLimit = "0";
     private string CustomerCode => _customer is null ? "-" : $"C-{_customer.Id.ToString("N")[..8].ToUpperInvariant()}";
+    private int ProjectCount => _projectTotalCount > 0 ? _projectTotalCount : _projects.Count;
     private int LifetimeOrderCount => _orderTotalCount > 0 ? _orderTotalCount : Math.Max(_orders.Count, _customer?.ActiveOrdersCount ?? 0);
     private decimal AverageOrderValue => LifetimeOrderCount > 0 && _customer is not null ? _customer.TotalSpent / LifetimeOrderCount : 0m;
     private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
@@ -607,7 +687,7 @@
             }
 
             _edit = CustomerEditModel.FromCustomer(_customer);
-            await Task.WhenAll(LoadOrdersAsync(), LoadActivityAsync(), LoadCountriesAsync(), LoadAccountManagersAsync());
+            await Task.WhenAll(LoadProjectsAsync(), LoadOrdersAsync(), LoadActivityAsync(), LoadCountriesAsync(), LoadAccountManagersAsync());
         }
         catch (Exception ex)
         {
@@ -618,6 +698,23 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>($"api/v1/projects?customerId={Id}&page=1&pageSize=20");
+            _projects.Clear();
+            _projects.AddRange(response?.Data.OrderByDescending(project => project.CreatedAt).ToList() ?? []);
+            _projectTotalCount = response?.Meta.TotalItems > 0
+                ? response.Meta.TotalItems
+                : response?.Meta.TotalCount ?? _projects.Count;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
         }
     }
 
@@ -1233,6 +1330,7 @@
     {
         Overview,
         Addresses,
+        Projects,
         Orders,
         Notes,
         Activity

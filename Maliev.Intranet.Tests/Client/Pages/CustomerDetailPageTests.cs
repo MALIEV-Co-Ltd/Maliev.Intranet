@@ -1,6 +1,7 @@
 using Bunit;
 using Maliev.Intranet.Client.Pages.Customers;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
@@ -42,12 +43,14 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("customer-record-tabs", cut.Markup);
         Assert.Contains("Overview", cut.Markup);
         Assert.Contains("Addresses (2)", cut.Markup);
+        Assert.Contains("Projects (1)", cut.Markup);
         Assert.Contains("Orders", cut.Markup);
         Assert.Contains("Notes (1)", cut.Markup);
         Assert.Contains("Activity", cut.Markup);
         Assert.Contains("Contact information", cut.Markup);
         Assert.Contains("Account &amp; billing", cut.Markup);
         Assert.Contains("Account manager", cut.Markup);
+        Assert.Contains("Recent projects", cut.Markup);
         Assert.Contains("Recent orders", cut.Markup);
         Assert.Contains("Snapshot", cut.Markup);
         Assert.Contains("Default addresses", cut.Markup);
@@ -70,6 +73,26 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains(_requestedPaths, path => path.Equals("/api/v1/employees?page=1&pageSize=100", StringComparison.Ordinal));
         var option = cut.Find($"option[value='{_accountManagerId}']");
         Assert.Equal("Mia Wong - Sales Manager", option.TextContent);
+    }
+
+    [Fact]
+    public void CustomerDetail_LoadsProjectsSeparatelyFromOrders()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("PRJ-2026-014", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("Robot arm bracket batch", cut.Markup));
+
+        Assert.Contains(_requestedPaths, path => path.Equals($"/api/v1/projects?customerId={_customerId}&page=1&pageSize=20", StringComparison.Ordinal));
+
+        cut.Find("button[data-tab='projects']").Click();
+
+        Assert.Contains("All projects (1)", cut.Markup);
+        Assert.Contains("customer-projects-panel", cut.Markup);
+        Assert.Contains("PRJ-2026-014", cut.Markup);
+        Assert.Contains("Robot arm bracket batch", cut.Markup);
+        Assert.Contains("4", cut.Markup);
+        Assert.Contains("$9,800", cut.Markup);
     }
 
     [Fact]
@@ -97,10 +120,17 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("customer-address-card", cut.Markup);
         Assert.DoesNotContain("Contact information", cut.Markup, StringComparison.Ordinal);
 
+        cut.Find("button[data-tab='projects']").Click();
+        Assert.Contains("All projects (1)", cut.Markup);
+        Assert.Contains("customer-projects-panel", cut.Markup);
+        Assert.Contains("PRJ-2026-014", cut.Markup);
+
         cut.Find("button[data-tab='orders']").Click();
         Assert.Contains("All orders (1)", cut.Markup);
         Assert.Contains("customer-orders-panel", cut.Markup);
         Assert.Contains("Q-2026-098", cut.Markup);
+        Assert.Contains("Order #", cut.Markup);
+        Assert.DoesNotContain("Quote #", cut.Markup, StringComparison.Ordinal);
 
         cut.Find("button[data-tab='notes']").Click();
         Assert.Contains("Add internal note", cut.Markup);
@@ -156,6 +186,29 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                     }
                 ],
                 Meta = new PaginationMeta { CurrentPage = 1, PageSize = 8, TotalCount = 1, TotalItems = 1, TotalPages = 1 }
+            });
+        }
+
+        if (pathAndQuery.StartsWith("/api/v1/projects", StringComparison.Ordinal))
+        {
+            return Json(new PagedResponse<ProjectSummaryDto>
+            {
+                Data =
+                [
+                    new ProjectSummaryDto
+                    {
+                        Id = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                        ProjectNumber = "PRJ-2026-014",
+                        CustomerId = _customerId,
+                        CustomerName = "Sarah Chen",
+                        Title = "Robot arm bracket batch",
+                        Status = "Configuring",
+                        PartsCount = 4,
+                        TotalPrice = 9800m,
+                        CreatedAt = new DateTime(2026, 4, 25, 0, 0, 0, DateTimeKind.Utc)
+                    }
+                ],
+                Meta = new PaginationMeta { CurrentPage = 1, PageSize = 20, TotalCount = 1, TotalItems = 1, TotalPages = 1 }
             });
         }
 
