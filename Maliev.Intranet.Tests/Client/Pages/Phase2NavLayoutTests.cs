@@ -4,6 +4,7 @@ using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Tests.Testing;
 using MudBlazor;
 using MudBlazor.Services;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Authorization;
@@ -74,6 +75,39 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     {
         var cut = Render<TopBar>();
         Assert.Contains("sales/projects/new", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TopBar_ShouldPrioritizeQuoteBeforeDashboard()
+    {
+        var cut = Render<TopBar>();
+        var navText = cut.Find("nav.topbar-nav").TextContent;
+
+        var quoteIndex = navText.IndexOf("Quote", StringComparison.Ordinal);
+        var dashboardIndex = navText.IndexOf("Dashboard", StringComparison.Ordinal);
+
+        Assert.True(quoteIndex >= 0);
+        Assert.True(dashboardIndex >= 0);
+        Assert.True(quoteIndex < dashboardIndex, $"Expected Quote before Dashboard in top navigation. Actual: {navText}");
+    }
+
+    [Fact]
+    public void TopBar_ShouldStyleQuoteAsPrimaryNavigationAction()
+    {
+        var cut = Render<TopBar>();
+        Assert.Contains("topbar-nav-quote", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TopBar_LogoClick_NavigatesToDashboard()
+    {
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/customers");
+
+        var cut = Render<TopBar>();
+        cut.Find("button.topbar-logo-button").Click();
+
+        Assert.EndsWith("/", navigation.Uri);
     }
 
     [Fact]

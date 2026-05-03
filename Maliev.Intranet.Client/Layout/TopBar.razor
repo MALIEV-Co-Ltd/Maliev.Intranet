@@ -11,8 +11,13 @@
 <header class="topbar-root">
     @* ── Left: Logo ── *@
     <div class="topbar-left">
-        <MudImage Src="@LogoUrl" Alt="Maliev" Height="22" Style="cursor: pointer;"
-                  @onclick="@(() => Navigation.NavigateTo("/"))" />
+        <button type="button"
+                class="topbar-logo-button"
+                title="Dashboard"
+                aria-label="Go to dashboard"
+                @onclick="@(() => Navigation.NavigateTo("/"))">
+            <MudImage Src="@LogoUrl" Alt="MALIEV" Height="22" />
+        </button>
     </div>
 
     @* ── Divider ── *@
@@ -22,7 +27,7 @@
     <nav class="topbar-nav">
         @foreach (var item in _navItems)
         {
-            <MudNavLink Href="@item.Href" Match="@item.Match">@item.Label</MudNavLink>
+            <MudNavLink Href="@item.Href" Match="@item.Match" Class="@item.Class">@item.Label</MudNavLink>
         }
     </nav>
 
@@ -129,12 +134,12 @@
 
     private string _searchString = "";
 
-    private record NavItem(string Label, string Href, NavLinkMatch Match = NavLinkMatch.Prefix);
+    private record NavItem(string Label, string Href, NavLinkMatch Match = NavLinkMatch.Prefix, string? Class = null);
 
     private readonly List<NavItem> _navItems =
     [
+        new("Quote", "sales/projects/new", NavLinkMatch.Prefix, "topbar-nav-quote"),
         new("Dashboard", "", NavLinkMatch.All),
-        new("Quote", "sales/projects/new", NavLinkMatch.Prefix),
         new("Customers", "customers"),
         new("Accounting", "accounting"),
         new("Purchasing", "purchasing"),
