@@ -90,6 +90,20 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void AccountingPage_ExposesFinanceWorkstreamsAndServerPagination()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Accounting", "InvoiceList.razor");
+
+        Assert.Contains("Journal Entries", source, StringComparison.Ordinal);
+        Assert.Contains("Income Entry", source, StringComparison.Ordinal);
+        Assert.Contains("Expense Entry", source, StringComparison.Ordinal);
+        Assert.Contains("Payroll Journals", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/invoices?page={_invoicePage}&pageSize={_pageSize}", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/accounting/journal-entries?page={_journalPage}&pageSize={_pageSize}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("page=1&pageSize=50", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_CurrencySelectorTrigger_RemainsCompact()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
