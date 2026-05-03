@@ -41,7 +41,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Creates a notification template.
     /// </summary>
-    [RequirePermission(MalievPermissions.Notification.WriteTemplate, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Notification.CreateTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("templates")]
     public async Task<ActionResult<NotificationTemplateDto>> CreateTemplate(CreateNotificationTemplateRequest request, CancellationToken ct)
     {
@@ -52,7 +52,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Updates a notification template.
     /// </summary>
-    [RequirePermission(MalievPermissions.Notification.WriteTemplate, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Notification.UpdateTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPut("templates/{id:guid}")]
     public async Task<ActionResult<NotificationTemplateDto>> UpdateTemplate(Guid id, UpdateNotificationTemplateRequest request, CancellationToken ct)
     {
@@ -63,7 +63,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Deletes a notification template.
     /// </summary>
-    [RequirePermission(MalievPermissions.Notification.WriteTemplate, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Notification.DeleteTemplate, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpDelete("templates/{id:guid}")]
     public async Task<IActionResult> DeleteTemplate(Guid id, CancellationToken ct)
     {
@@ -74,7 +74,7 @@ public class NotificationController(INotificationServiceClient notificationClien
     /// <summary>
     /// Gets delivery logs.
     /// </summary>
-    [RequirePermission(MalievPermissions.Notification.ReadTemplate, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Notification.ReadLogs, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("delivery-logs")]
     public async Task<ActionResult<PagedResponse<NotificationDeliveryLogDto>>> GetDeliveryLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? filter = null, CancellationToken ct = default)
     {

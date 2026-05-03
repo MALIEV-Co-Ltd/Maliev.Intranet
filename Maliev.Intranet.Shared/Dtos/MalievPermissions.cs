@@ -472,9 +472,9 @@ public static class MalievPermissions
     public static class Preference
     {
         /// <summary>Permission to read system or user settings.</summary>
-        public const string Read = "preference.preferences.read";
+        public const string Read = "notification.preferences.read";
         /// <summary>Permission to update configuration and preference values.</summary>
-        public const string Write = "preference.preferences.write";
+        public const string Write = "notification.preferences.update";
     }
 
     /// <summary>
@@ -484,8 +484,16 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view email and message templates.</summary>
         public const string ReadTemplate = "notification.templates.read";
-        /// <summary>Permission to define or update notification templates.</summary>
-        public const string WriteTemplate = "notification.templates.write";
+        /// <summary>Permission to create notification templates.</summary>
+        public const string CreateTemplate = "notification.templates.create";
+        /// <summary>Permission to update notification templates.</summary>
+        public const string UpdateTemplate = "notification.templates.update";
+        /// <summary>Permission to delete notification templates.</summary>
+        public const string DeleteTemplate = "notification.templates.delete";
+        /// <summary>Permission to manage notification templates.</summary>
+        public const string WriteTemplate = "notification.templates.manage";
+        /// <summary>Permission to view notification delivery logs.</summary>
+        public const string ReadLogs = "notification.logs.read";
     }
 
     /// <summary>
