@@ -58,7 +58,7 @@ internal static class SeedCustomerDataFactory
             .Select((name, index) => new SeedCompanyDefinition(
                 Key: $"company-{index + 1:00}",
                 Name: name,
-                VatNumber: $"TH-SEED-{index + 1:0000000000}",
+                VatNumber: $"TH-{9000000000000 + index}",
                 RegistrationNumber: $"SEED-COMPANY-{index + 1:000}",
                 ContactPhone: $"+662100{index:0000}",
                 Segment: Segments[index % Segments.Length],
