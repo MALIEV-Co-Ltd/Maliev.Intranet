@@ -1,0 +1,27 @@
+<div class="mlv-avatar @Class" title="@Name">@Initials</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private string Initials
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Name))
+            {
+                return "M";
+            }
+
+            var parts = Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                return $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant();
+            }
+
+            return parts[0].Length > 1
+                ? $"{parts[0][0]}{parts[0][1]}".ToUpperInvariant()
+                : parts[0][0].ToString().ToUpperInvariant();
+        }
+    }
+}

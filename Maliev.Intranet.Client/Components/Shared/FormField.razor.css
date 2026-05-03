@@ -1,0 +1,31 @@
+.mlv-form-field {
+    display: grid;
+    gap: 6px;
+}
+
+.mlv-form-field span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-micro);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.mlv-form-field ::deep input,
+.mlv-form-field ::deep select,
+.mlv-form-field ::deep textarea {
+    width: 100%;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+    color: var(--maliev-ink);
+    font: inherit;
+}
+
+.mlv-form-field ::deep textarea {
+    min-height: 84px;
+    padding-top: 8px;
+    resize: vertical;
+}

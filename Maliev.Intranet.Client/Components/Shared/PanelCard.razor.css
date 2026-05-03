@@ -1,0 +1,7 @@
+.mlv-panel-card {
+    padding: 16px 20px;
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-sm);
+}

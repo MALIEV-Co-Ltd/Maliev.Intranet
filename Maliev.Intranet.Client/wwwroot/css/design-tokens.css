@@ -5,6 +5,8 @@
 
 /* ── Light mode (default) ─────────────────────────────────────── */
 :root {
+    --maliev-accent-hue: 250;
+    --maliev-accent:        oklch(0.58 0.17 var(--maliev-accent-hue));
 
     /* Surfaces & ink */
     --maliev-bg:            oklch(0.965 0.004 240);
@@ -19,9 +21,9 @@
     --maliev-border:        #e4e7ee;
     --maliev-border-subtle: #eef0f4;
 
-    /* Accent tints (derive from MudBlazor primary so they follow theme) */
-    --maliev-accent-soft:   color-mix(in oklch, var(--mud-palette-primary) 10%, transparent);
-    --maliev-accent-softer: color-mix(in oklch, var(--mud-palette-primary)  6%, transparent);
+    /* Accent tints */
+    --maliev-accent-soft:   oklch(0.58 0.17 var(--maliev-accent-hue) / 0.12);
+    --maliev-accent-softer: oklch(0.58 0.17 var(--maliev-accent-hue) / 0.07);
 
     /* Status colours */
     --maliev-ok:          #10a36a;

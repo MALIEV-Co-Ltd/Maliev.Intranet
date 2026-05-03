@@ -51,7 +51,7 @@
                             <MudProgressCircular Size="Size.Small" Indeterminate="false" Value="@part.ProgressPercent"
                                                  Color="Color.Primary" />
                         }
-                        else if (part.QueuedUpload || part.AwaitingPreview)
+                        else if (part.Uploading || part.QueuedUpload || part.AwaitingPreview)
                         {
                             <MudSkeleton SkeletonType="SkeletonType.Rectangle"
                                          Width="100%"

@@ -565,7 +565,6 @@ try
     builder.Services.AddProblemDetails();
     builder.Services.AddControllersWithViews();
     builder.Services.AddRazorComponents()
-        .AddInteractiveServerComponents()
         .AddInteractiveWebAssemblyComponents();
 
     var app = builder.Build();
@@ -616,7 +615,6 @@ try
     // Do NOT add .RequireAuthorization() here - it conflicts with AuthorizeRouteView
     // Authorization is handled by AuthorizeRouteView in Routes.razor + [AllowAnonymous] on Login page
     app.MapRazorComponents<Maliev.Intranet.Bff.Components.App>()
-        .AddInteractiveServerRenderMode()
         .AddInteractiveWebAssemblyRenderMode()
         .AddAdditionalAssemblies(typeof(Maliev.Intranet.Client._Imports).Assembly);
 

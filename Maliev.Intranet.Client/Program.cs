@@ -9,8 +9,7 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 builder.Services.AddAuthorizationCore();
 
-// Use PersistentAuthenticationStateProvider: reads claims persisted during SSR (fast path),
-// falls back to GET /api/v1/auth/user only when persisted state is unavailable.
+// Resolve authenticated employee state from the BFF cookie after the WASM shell starts.
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<CurrencyService>();

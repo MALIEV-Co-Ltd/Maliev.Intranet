@@ -1,0 +1,56 @@
+.mlv-status-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 2px 8px;
+    border-radius: var(--maliev-radius-pill);
+    background: var(--maliev-panel-3);
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.status-active,
+.status-paid,
+.status-received,
+.status-completed,
+.status-delivered,
+.status-online {
+    background: var(--maliev-ok-bg);
+    color: var(--maliev-ok);
+}
+
+.status-warning,
+.status-sent,
+.status-in-transit,
+.status-pending,
+.status-processing,
+.status-outstanding,
+.status-undermaintenance {
+    background: var(--maliev-warn-bg);
+    color: var(--maliev-warn-fg);
+}
+
+.status-overdue,
+.status-cancelled,
+.status-blocked,
+.status-error,
+.status-failed,
+.status-admin {
+    background: var(--maliev-danger-bg);
+    color: var(--maliev-danger);
+}
+
+.status-vip,
+.status-api {
+    background: oklch(0.58 0.17 300 / 0.12);
+    color: oklch(0.58 0.17 300);
+}
+
+.status-engineer,
+.status-open,
+.status-info {
+    background: var(--maliev-accent-soft);
+    color: var(--maliev-accent);
+}

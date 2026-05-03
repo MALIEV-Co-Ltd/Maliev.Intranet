@@ -1,0 +1,33 @@
+@inject NavigationManager Navigation
+
+<header class="mlv-page-header @Class">
+    <button class="mlv-back-button" type="button" @onclick="GoBack">
+        <MudIcon Icon="@Icons.Material.Outlined.ArrowBack" Size="Size.Small" />
+        <span>@BackLabel</span>
+    </button>
+    <div class="mlv-page-divider"></div>
+    <div class="mlv-page-copy">
+        <h1>@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <p>@Subtitle</p>
+        }
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="mlv-page-actions">
+            @ChildContent
+        </div>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string BackLabel { get; set; } = "Back";
+    [Parameter] public string BackHref { get; set; } = "/";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private void GoBack() => Navigation.NavigateTo(BackHref);
+}

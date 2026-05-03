@@ -1,9 +1,5 @@
-@inject PersistentComponentState ApplicationState
-@inject IHttpContextAccessor HttpContextAccessor
-@inject ILogger<App> Logger
 @using Maliev.Intranet.Client
-@using Maliev.Intranet.Client.Services
-@implements IDisposable
+@using Microsoft.AspNetCore.Components.Web
 
 <!DOCTYPE html>
 <html lang="en">
@@ -15,19 +11,93 @@
     
     <!-- Critical CSS: Apply background immediately to prevent flash -->
     <style>
-        :root[data-theme="dark"] {
+        :root[data-maliev-theme="dark"] {
             color-scheme: dark;
         }
-        :root[data-theme="dark"] body {
+        :root[data-maliev-theme="dark"] body {
             background-color: #0d1117 !important;
             color: #c9d1d9 !important;
         }
-        :root[data-theme="light"] {
+        :root[data-maliev-theme="light"] {
             color-scheme: light;
         }
-        :root[data-theme="light"] body {
+        :root[data-maliev-theme="light"] body {
             background-color: #ffffff !important;
             color: #24292f !important;
+        }
+
+        .wasm-loading {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: grid;
+            place-items: center;
+            background: var(--maliev-bg, #f5f7fa);
+            color: var(--maliev-ink, #1a2030);
+            transition: opacity 180ms ease, visibility 180ms ease;
+        }
+
+        html.maliev-wasm-ready .wasm-loading {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .wasm-loading-card {
+            width: min(360px, calc(100vw - 40px));
+            padding: 24px;
+            border: 1px solid var(--maliev-border, #e4e7ee);
+            border-radius: 8px;
+            background: var(--maliev-panel, #fff);
+            box-shadow: var(--maliev-shadow-lg, 0 12px 40px rgba(10,20,40,0.15));
+        }
+
+        .wasm-loading-mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 7px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 14px;
+            background: var(--maliev-accent, #2563eb);
+            color: #fff;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .wasm-loading-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .wasm-loading-subtitle {
+            margin: 6px 0 16px;
+            color: var(--maliev-muted, #677088);
+            font-size: 12px;
+        }
+
+        .wasm-loading-bar {
+            height: 3px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: var(--maliev-panel-3, #eef1f6);
+        }
+
+        .wasm-loading-bar::before {
+            content: "";
+            display: block;
+            width: 40%;
+            height: 100%;
+            border-radius: inherit;
+            background: var(--maliev-accent, #2563eb);
+            animation: maliev-load 1.1s ease-in-out infinite;
+        }
+
+        @@keyframes maliev-load {
+            0% { transform: translateX(-110%); }
+            100% { transform: translateX(260%); }
         }
     </style>
 
@@ -70,7 +140,12 @@
                 }
 
                 // Apply theme SYNCHRONOUSLY (blocks rendering)
-                document.documentElement.setAttribute('data-theme', effectiveTheme);
+                document.documentElement.setAttribute('data-maliev-theme', effectiveTheme);
+
+                try {
+                    const accent = localStorage.getItem('maliev_accent_hue') || getCookie('maliev_accent_hue') || '250';
+                    document.documentElement.style.setProperty('--maliev-accent-hue', accent);
+                } catch (e) { /* ignore unavailable storage */ }
                 
                 // Set a short-lived hint cookie for the server to avoid flicker on refresh
                 document.cookie = `maliev_system_dark=${systemDark}; path=/; max-age=31536000; SameSite=Lax`;
@@ -86,14 +161,23 @@
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <link href="css/design-tokens.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
+    <link href="css/module-pages.css" rel="stylesheet" />
     <link href="css/mudblazor-overrides.css" rel="stylesheet" />
     <link href="css/utilities.css" rel="stylesheet" />
     <link href="Maliev.Intranet.Client.styles.css" rel="stylesheet" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="WasmRenderMode" />
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <div id="wasm-loading" class="wasm-loading" aria-live="polite" aria-busy="true">
+        <div class="wasm-loading-card">
+            <div class="wasm-loading-mark">M</div>
+            <p class="wasm-loading-title">Loading workspace</p>
+            <p class="wasm-loading-subtitle">Starting the employee intranet locally.</p>
+            <div class="wasm-loading-bar"></div>
+        </div>
+    </div>
+    <Routes @rendermode="WasmRenderMode" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="js/note-editor.js"></script>
@@ -104,30 +188,6 @@
 </html>
 
 @code {
-    [Inject] private CookieProvider CookieProvider { get; set; } = null!;
-
-    private PersistingComponentStateSubscription? _subscription;
-
-    protected override void OnInitialized()
-    {
-        var httpContext = HttpContextAccessor.HttpContext;
-        if (httpContext != null)
-        {
-            var cookieHeader = httpContext.Request.Headers["Cookie"].ToString();
-            if (!string.IsNullOrEmpty(cookieHeader))
-            {
-                CookieProvider.CookieHeader = cookieHeader;
-                _subscription = ApplicationState.RegisterOnPersisting(() =>
-                {
-                    ApplicationState.PersistAsJson(CookieProvider.StateKey, cookieHeader);
-                    return Task.CompletedTask;
-                }, RenderMode.InteractiveServer);
-            }
-        }
-    }
-
-    public void Dispose()
-    {
-        _subscription?.Dispose();
-    }
+    private static readonly IComponentRenderMode WasmRenderMode =
+        new InteractiveWebAssemblyRenderMode(prerender: false);
 }

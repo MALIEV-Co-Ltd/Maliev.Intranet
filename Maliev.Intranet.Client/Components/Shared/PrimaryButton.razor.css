@@ -1,0 +1,25 @@
+.mlv-button {
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 12px;
+    border-radius: var(--maliev-radius-sm);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.mlv-button.primary {
+    border: 1px solid var(--maliev-accent);
+    background: var(--maliev-accent);
+    color: #fff;
+}
+
+.mlv-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}

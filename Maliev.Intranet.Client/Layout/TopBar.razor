@@ -20,11 +20,9 @@
 
     @* ── Center: Navigation ── *@
     <nav class="topbar-nav">
-        <MudNavLink Href="" Match="NavLinkMatch.All">Dashboard</MudNavLink>
-        <MudNavLink Href="sales/projects" Match="NavLinkMatch.Prefix">Projects</MudNavLink>
         @foreach (var item in _navItems)
         {
-            <MudNavLink Href="@item.Href" Match="NavLinkMatch.Prefix">@item.Label</MudNavLink>
+            <MudNavLink Href="@item.Href" Match="@item.Match">@item.Label</MudNavLink>
         }
     </nav>
 
@@ -33,7 +31,7 @@
         <div class="topbar-search-wrap">
             <svg class="topbar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input class="topbar-search-input"
-                   placeholder="Search parts, quotes…"
+                   placeholder="Search customers, invoices, POs..."
                    value="@_searchString"
                    @oninput="@(e => _searchString = e.Value?.ToString() ?? "")"
                    @onkeydown="@OnSearchKeyDown" />
@@ -78,6 +76,38 @@
                            OnClick="@OnToggleTheme"
                            Color="Color.Default" />
         </MudTooltip>
+
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" LockScroll="true">
+            <ActivatorContent>
+                <MudTooltip Text="Display tweaks" Placement="Placement.Bottom">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Palette"
+                                   Size="Size.Medium"
+                                   Color="Color.Default" />
+                </MudTooltip>
+            </ActivatorContent>
+            <ChildContent>
+                <div class="topbar-tweaks">
+                    <div class="topbar-tweaks-title">Accent color</div>
+                    <input class="topbar-accent-slider"
+                           type="range"
+                           min="0"
+                           max="360"
+                           value="@LayoutService.AccentHue"
+                           @oninput="OnAccentHueInput" />
+                    <div class="topbar-accent-presets">
+                        @foreach (var preset in _accentPresets)
+                        {
+                            <button type="button"
+                                    class="topbar-accent-preset @(LayoutService.AccentHue == preset.Hue ? "active" : "")"
+                                    title="@preset.Label"
+                                    style="@($"--preset-hue:{preset.Hue}")"
+                                    @onclick="@(() => SetAccentHueAsync(preset.Hue))">
+                            </button>
+                        }
+                    </div>
+                </div>
+            </ChildContent>
+        </MudMenu>
 
         @* AI Assistant *@
         <MudTooltip Text="AI Assistant" Placement="Placement.Bottom">
@@ -131,11 +161,27 @@
 
     private string _searchString = "";
 
-    private record NavItem(string Label, string Href);
+    private record NavItem(string Label, string Href, NavLinkMatch Match = NavLinkMatch.Prefix);
+    private record AccentPreset(string Label, int Hue);
 
     private readonly List<NavItem> _navItems =
     [
-        new("Customers", "sales/customers"),
+        new("Dashboard", "", NavLinkMatch.All),
+        new("Quote", "sales/projects/new", NavLinkMatch.Prefix),
+        new("Customers", "customers"),
+        new("Accounting", "accounting"),
+        new("Purchasing", "purchasing"),
+        new("Admin", "admin"),
+        new("IAM", "iam"),
+    ];
+
+    private readonly List<AccentPreset> _accentPresets =
+    [
+        new("Blue", 250),
+        new("Azure", 220),
+        new("Teal", 160),
+        new("Indigo", 270),
+        new("Orange", 35),
     ];
 
     private string LogoUrl => LayoutService.IsDarkMode
@@ -221,7 +267,7 @@
     private void ExecuteSearch()
     {
         if (!string.IsNullOrWhiteSpace(_searchString))
-            Navigation.NavigateTo($"/sales/customers?search={Uri.EscapeDataString(_searchString)}");
+            Navigation.NavigateTo($"/customers?search={Uri.EscapeDataString(_searchString)}");
     }
 
     private void OnSearchKeyDown(KeyboardEventArgs e)
@@ -230,6 +276,16 @@
     }
 
     private async Task ToggleChat() => await ChatDrawerOpenChanged.InvokeAsync(!ChatDrawerOpen);
+
+    private async Task OnAccentHueInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var hue))
+        {
+            await SetAccentHueAsync(hue);
+        }
+    }
+
+    private Task SetAccentHueAsync(int hue) => LayoutService.SetAccentHueAsync(hue);
 
     private void HandleLogout() => Navigation.NavigateTo("/api/v1/auth/logout", forceLoad: true);
 
