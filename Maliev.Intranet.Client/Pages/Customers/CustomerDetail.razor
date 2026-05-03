@@ -1,88 +1,211 @@
 @page "/customers/{Id:guid}"
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
-<PageTitle>Customer Detail | MALIEV Intranet</PageTitle>
+<PageTitle>@((_customer?.Name ?? "Customer") + " | MALIEV Intranet")</PageTitle>
 
-<div class="mlv-module-shell">
-    <PageHeader Title="@(_customer?.Name ?? "Customer")" Subtitle="@(_customer?.CompanyName ?? _customer?.Email)" BackHref="/customers">
+<div class="mlv-module-shell customer-record-shell">
+    <PageHeader Title="@(_customer?.Name ?? "Customer")" Subtitle="@(_customer?.CompanyName ?? _customer?.Email)" BackLabel="Customers" BackHref="/customers">
         @if (_customer is not null)
         {
-            <StatusBadge Status="@_customer.Status" />
+            <SecondaryButton Icon="@Icons.Material.Outlined.Email" OnClick="EmailCustomerAsync">Email</SecondaryButton>
+            <SecondaryButton Icon="@Icons.Material.Outlined.LockReset" OnClick="PasswordResetAsync">Password reset</SecondaryButton>
+            <SecondaryButton Icon="@Icons.Material.Outlined.PersonOutline" OnClick="ImpersonateAsync">Impersonate</SecondaryButton>
+            <SecondaryButton OnClick="DiscardChangesAsync" Disabled="@_saving">Discard</SecondaryButton>
+            <PrimaryButton Icon="@Icons.Material.Outlined.Check" OnClick="SaveCustomerAsync" Disabled="@_saving">Save</PrimaryButton>
         }
     </PageHeader>
 
-    <PageBody>
+    <nav class="customer-record-tabs" aria-label="Customer sections">
+        <a class="active" href="#overview">Overview</a>
+        <a href="#addresses">Addresses (@(_customer?.Addresses.Count ?? 0))</a>
+        <a href="#orders">Orders</a>
+        <a href="#notes">Notes (@(_customer?.Notes.Count ?? 0))</a>
+        <a href="#activity">Activity</a>
+    </nav>
+
+    <PageBody Class="customer-record-body">
         @if (_loading)
         {
             <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
         }
-        else if (_customer is null)
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+        else if (_customer is null || _edit is null)
         {
             <div class="mlv-empty">Customer was not found.</div>
         }
         else
         {
-            <StatBar Class="mb-4">
-                <StatTile Label="Total spent" Value="@_customer.TotalSpent.ToString("N2")" />
-                <StatTile Label="Active orders" Value="@_customer.ActiveOrdersCount.ToString("N0")" />
-                <StatTile Label="Open quotes" Value="@_customer.OpenQuotationsCount.ToString("N0")" />
-                <StatTile Label="Tier" Value="@_customer.Tier" />
-            </StatBar>
+            <div id="overview" class="customer-record-grid">
+                <div class="customer-record-main">
+                    <section class="customer-panel">
+                        <SectionTitle Text="Contact information" />
+                        <div class="customer-form-grid">
+                            <label class="customer-field">
+                                <span>Full name</span>
+                                <input class="customer-input" @bind="_edit.FullName" />
+                            </label>
+                            <label class="customer-field">
+                                <span>Company</span>
+                                <input class="customer-input" readonly value="@_edit.Company" />
+                            </label>
+                            <label class="customer-field">
+                                <span>Email</span>
+                                <input class="customer-input" type="email" @bind="_edit.Email" />
+                            </label>
+                            <label class="customer-field">
+                                <span>Phone</span>
+                                <input class="customer-input" @bind="_edit.Phone" />
+                            </label>
+                        </div>
+                    </section>
 
-            <div class="mlv-grid">
-                <PanelCard Title="Profile" Class="mlv-span-5">
-                    <div class="mlv-list">
-                        <div class="mlv-list-row"><span>Email</span><strong>@_customer.Email</strong></div>
-                        <div class="mlv-list-row"><span>Mobile</span><strong>@(_customer.Mobile ?? "-")</strong></div>
-                        <div class="mlv-list-row"><span>Company</span><strong>@(_customer.CompanyName ?? "Private")</strong></div>
-                        <div class="mlv-list-row"><span>Segment</span><strong>@_customer.Segment</strong></div>
-                        <div class="mlv-list-row"><span>NDA</span><StatusBadge Status="@(_customer.Nda?.Status ?? "None")" /></div>
-                    </div>
-                </PanelCard>
+                    <section class="customer-panel">
+                        <SectionTitle Text="Account &amp; billing" />
+                        <div class="customer-form-grid">
+                            <label class="customer-field">
+                                <span>Customer type</span>
+                                <select class="customer-input" @bind="_edit.CustomerType">
+                                    <option>Company</option>
+                                    <option>Individual</option>
+                                </select>
+                            </label>
+                            <label class="customer-field">
+                                <span>Status</span>
+                                <select class="customer-input" @bind="_edit.Status">
+                                    <option>Active</option>
+                                    <option>Lead</option>
+                                    <option>Inactive</option>
+                                </select>
+                            </label>
+                            <label class="customer-field">
+                                <span>Account manager</span>
+                                <input class="customer-input" readonly value="@AccountManager" />
+                            </label>
+                            <label class="customer-field">
+                                <span>Payment terms</span>
+                                <select class="customer-input" @bind="_edit.PaymentTerms">
+                                    <option>Due on receipt</option>
+                                    <option>Net 15</option>
+                                    <option>Net 30</option>
+                                    <option>Net 45</option>
+                                </select>
+                            </label>
+                            <label class="customer-field">
+                                <span>Tax ID</span>
+                                <input class="customer-input" readonly value="@TaxId" />
+                            </label>
+                            <label class="customer-field">
+                                <span>Credit limit (USD)</span>
+                                <input class="customer-input" readonly value="@CreditLimit" />
+                            </label>
+                        </div>
+                    </section>
 
-                <PanelCard Title="Addresses" Class="mlv-span-7">
-                    @if (_customer.Addresses.Count > 0)
-                    {
-                        <div class="mlv-list">
-                            @foreach (var address in _customer.Addresses)
+                    <section id="orders" class="customer-panel">
+                        <SectionTitle Text="Recent orders" />
+                        @if (_orders.Count > 0)
+                        {
+                            <table class="customer-orders-table">
+                                <thead>
+                                    <tr>
+                                        <th>Quote #</th>
+                                        <th>Date</th>
+                                        <th>Parts</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var order in _orders.Take(6))
+                                    {
+                                        <tr>
+                                            <td><a href="@($"/orders/{order.Id}")">@order.OrderNumber</a></td>
+                                            <td>@FormatDate(order.CreatedAt)</td>
+                                            <td>-</td>
+                                            <td class="mlv-mono">@FormatMoney(ResolveOrderTotal(order))</td>
+                                            <td><StatusBadge Status="@order.Status" /></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="customer-muted-box">No recent orders yet.</div>
+                        }
+                    </section>
+                </div>
+
+                <aside class="customer-record-sidebar">
+                    <section class="customer-panel">
+                        <SectionTitle Text="Snapshot" />
+                        <dl class="customer-snapshot">
+                            <div><dt>Type</dt><dd><StatusBadge Text="@CustomerType" Status="@CustomerType" /></dd></div>
+                            <div><dt>Customer ID</dt><dd>@CustomerCode</dd></div>
+                            <div><dt>Joined</dt><dd>@FormatMonthYear(_customer.CreatedAt)</dd></div>
+                            <div><dt>Last order</dt><dd>@LastOrderText</dd></div>
+                            <div><dt>Lifetime orders</dt><dd>@LifetimeOrderCount.ToString("N0")</dd></div>
+                            <div><dt>Lifetime revenue</dt><dd>@FormatMoney(_customer.TotalSpent)</dd></div>
+                            <div><dt>Avg order</dt><dd>@FormatMoney(AverageOrderValue)</dd></div>
+                        </dl>
+                    </section>
+
+                    <section id="addresses" class="customer-panel">
+                        <SectionTitle Text="Default addresses" />
+                        <div class="customer-address-stack">
+                            @if (BillingAddress is not null)
                             {
-                                <div class="mlv-list-row">
-                                    <div>
-                                        <div class="mlv-row-main">@address.Type @(address.IsDefault ? "(default)" : "")</div>
-                                        <div class="mlv-row-sub">@address.AddressLine1, @address.City @address.PostalCode</div>
-                                    </div>
-                                    <StatusBadge Status="@address.Type" />
+                                <div>
+                                    <div class="customer-address-label">Bill to</div>
+                                    <strong>@AddressName(BillingAddress, "Billing")</strong>
+                                    <p>@FormatAddress(BillingAddress)</p>
                                 </div>
                             }
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="mlv-empty">No addresses recorded.</div>
-                    }
-                </PanelCard>
-
-                <PanelCard Title="Internal notes" Class="mlv-span-12">
-                    @if (_customer.Notes.Count > 0)
-                    {
-                        <div class="mlv-list">
-                            @foreach (var note in _customer.Notes.OrderByDescending(n => n.CreatedAt).Take(6))
+                            @if (ShippingAddress is not null)
                             {
-                                <div class="mlv-list-row">
-                                    <div>
-                                        <div class="mlv-row-main">@note.NoteText</div>
-                                        <div class="mlv-row-sub">@note.CreatedByName - @note.CreatedAt.ToString("dd MMM yyyy")</div>
-                                    </div>
+                                <div>
+                                    <div class="customer-address-label ship">Ship to</div>
+                                    <strong>@AddressName(ShippingAddress, "Shipping")</strong>
+                                    <p>@FormatAddress(ShippingAddress)</p>
                                 </div>
                             }
+                            @if (BillingAddress is null && ShippingAddress is null)
+                            {
+                                <div class="customer-muted-box compact">No default addresses recorded.</div>
+                            }
                         </div>
-                    }
-                    else
-                    {
-                        <div class="mlv-empty">No internal notes yet.</div>
-                    }
-                </PanelCard>
+                        <a class="customer-inline-link" href="#addresses">Manage all addresses -></a>
+                    </section>
+
+                    <section id="activity" class="customer-panel">
+                        <SectionTitle Text="Recent activity" />
+                        @if (RecentActivity.Count > 0)
+                        {
+                            <div class="customer-activity-list">
+                                @foreach (var activity in RecentActivity)
+                                {
+                                    <div class="customer-activity-item">
+                                        <MudIcon Icon="@ActivityIcon(activity.Action)" Size="Size.Small" />
+                                        <div>
+                                            <strong>@activity.Description</strong>
+                                            <span>@(activity.ActorName ?? "System") - @FormatDateTime(activity.Timestamp)</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="customer-muted-box compact">No activity recorded.</div>
+                        }
+                        <a class="customer-inline-link" href="#activity">View all activity -></a>
+                    </section>
+                </aside>
             </div>
         }
     </PageBody>
@@ -92,22 +215,278 @@
     [Parameter] public Guid Id { get; set; }
 
     private CustomerDetailDto? _customer;
+    private CustomerEditModel? _edit;
+    private readonly List<OrderSummaryDto> _orders = [];
+    private readonly List<CustomerActivityResponse> _activity = [];
     private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+    private int _orderTotalCount;
+
+    private string CustomerType => HasCompany ? "Company" : "Individual";
+    private bool HasCompany => _customer?.CompanyId is not null || !string.IsNullOrWhiteSpace(_customer?.CompanyName);
+    private string AccountManager => _customer?.CreatedByName ?? "Unassigned";
+    private string TaxId => _customer?.CompanyVatNumber ?? _customer?.CompanyRegistrationNumber ?? "-";
+    private const string CreditLimit = "0";
+    private string CustomerCode => _customer is null ? "-" : $"C-{_customer.Id.ToString("N")[..8].ToUpperInvariant()}";
+    private int LifetimeOrderCount => _orderTotalCount > 0 ? _orderTotalCount : Math.Max(_orders.Count, _customer?.ActiveOrdersCount ?? 0);
+    private decimal AverageOrderValue => LifetimeOrderCount > 0 && _customer is not null ? _customer.TotalSpent / LifetimeOrderCount : 0m;
+    private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
+
+    private AddressResponse? BillingAddress =>
+        _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Billing") && address.IsDefault)
+        ?? _customer?.CompanyBillingAddress
+        ?? _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Billing"));
+
+    private AddressResponse? ShippingAddress =>
+        _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping") && address.IsDefault)
+        ?? _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping"));
+
+    private IReadOnlyList<CustomerActivityResponse> RecentActivity =>
+        _activity.Count > 0
+            ? _activity.Take(5).ToList()
+            : (_customer?.Notes.OrderByDescending(note => note.CreatedAt)
+                .Take(5)
+                .Select(note => new CustomerActivityResponse
+                {
+                    Action = "Note",
+                    Description = note.NoteText,
+                    ActorName = note.CreatedByName,
+                    Timestamp = note.CreatedAt
+                })
+                .ToList() ?? []);
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
         try
         {
             _customer = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/v1/customers/{Id}");
+            if (_customer is null)
+            {
+                _error = "Customer was not found.";
+                return;
+            }
+
+            _edit = CustomerEditModel.FromCustomer(_customer);
+            await Task.WhenAll(LoadOrdersAsync(), LoadActivityAsync());
         }
         catch (Exception ex)
         {
-            Snackbar.Add("Customer could not be loaded.", Severity.Warning);
+            _error = "Customer could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
             Console.WriteLine(ex.Message);
         }
         finally
         {
             _loading = false;
         }
+    }
+
+    private async Task LoadOrdersAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>($"api/v1/orders?customerId={Id}&page=1");
+            _orders.Clear();
+            _orders.AddRange(response?.Data.OrderByDescending(order => order.CreatedAt).Take(6) ?? []);
+            _orderTotalCount = response?.Meta.TotalItems > 0
+                ? response.Meta.TotalItems
+                : response?.Meta.TotalCount ?? _orders.Count;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task LoadActivityAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/v1/customers/{Id}/history?page=1&pageSize=8");
+            _activity.Clear();
+            _activity.AddRange(response?.Data.OrderByDescending(activity => activity.Timestamp).Take(8) ?? []);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private Task EmailCustomerAsync(MouseEventArgs _)
+    {
+        if (!string.IsNullOrWhiteSpace(_customer?.Email))
+        {
+            Navigation.NavigateTo($"mailto:{_customer.Email}");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task PasswordResetAsync(MouseEventArgs _)
+    {
+        Snackbar.Add("Password reset workflow is not connected yet.", Severity.Info);
+        return Task.CompletedTask;
+    }
+
+    private Task ImpersonateAsync(MouseEventArgs _)
+    {
+        Snackbar.Add("Impersonation workflow is not connected yet.", Severity.Info);
+        return Task.CompletedTask;
+    }
+
+    private Task DiscardChangesAsync(MouseEventArgs _)
+    {
+        if (_customer is not null)
+        {
+            _edit = CustomerEditModel.FromCustomer(_customer);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveCustomerAsync(MouseEventArgs _)
+    {
+        if (_customer is null || _edit is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var (firstName, lastName) = SplitName(_edit.FullName);
+            var request = new
+            {
+                firstName,
+                lastName,
+                email = _edit.Email,
+                mobile = _edit.Phone,
+                status = _edit.Status,
+                extension = _customer.Extension,
+                landline = _customer.Landline,
+                segment = _customer.Segment,
+                tier = _customer.Tier,
+                preferredLanguage = _customer.PreferredLanguage,
+                timezone = _customer.Timezone,
+                communicationPreferences = _customer.CommunicationPreferences,
+                companyId = _customer.CompanyId,
+                version = _customer.Version
+            };
+
+            var response = await Http.PatchAsJsonAsync($"api/v1/customers/{Id}", request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Customer saved.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add("Customer could not be saved.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Customer could not be saved.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static (string FirstName, string LastName) SplitName(string fullName)
+    {
+        var parts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length switch
+        {
+            0 => (string.Empty, string.Empty),
+            1 => (parts[0], string.Empty),
+            _ => (parts[0], parts[1])
+        };
+    }
+
+    private static bool IsAddressType(AddressResponse address, string type) =>
+        string.Equals(address.Type, type, StringComparison.OrdinalIgnoreCase);
+
+    private static string AddressName(AddressResponse address, string fallback) =>
+        string.IsNullOrWhiteSpace(address.RecipientName) ? fallback : address.RecipientName;
+
+    private static string FormatAddress(AddressResponse address)
+    {
+        var parts = new[]
+        {
+            address.AddressLine1,
+            address.AddressLine2,
+            address.AddressLine3,
+            address.District,
+            address.City,
+            address.StateProvince,
+            address.PostalCode
+        }.Where(part => !string.IsNullOrWhiteSpace(part));
+
+        return string.Join(", ", parts);
+    }
+
+    private static decimal ResolveOrderTotal(OrderSummaryDto order) =>
+        order.TotalAmount > 0 ? order.TotalAmount : order.Total;
+
+    private static string FormatMoney(decimal value) => value.ToString("$#,0.##");
+
+    private static string FormatDate(DateTime value) => value == default ? "-" : value.ToString("MMM dd, yyyy");
+
+    private static string FormatMonthYear(DateTime value) => value == default ? "-" : value.ToString("MMM yyyy");
+
+    private static string FormatDateTime(DateTime value) => value == default ? "-" : value.ToString("MMM dd, yyyy HH:mm");
+
+    private static string ActivityIcon(string action)
+    {
+        if (action.Contains("order", StringComparison.OrdinalIgnoreCase) || action.Contains("paid", StringComparison.OrdinalIgnoreCase))
+        {
+            return Icons.Material.Outlined.AttachMoney;
+        }
+
+        if (action.Contains("note", StringComparison.OrdinalIgnoreCase))
+        {
+            return Icons.Material.Outlined.Edit;
+        }
+
+        if (action.Contains("email", StringComparison.OrdinalIgnoreCase))
+        {
+            return Icons.Material.Outlined.AlternateEmail;
+        }
+
+        return Icons.Material.Outlined.Update;
+    }
+
+    private sealed class CustomerEditModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Company { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string CustomerType { get; set; } = "Individual";
+        public string Status { get; set; } = "Active";
+        public string PaymentTerms { get; set; } = "Due on receipt";
+
+        public static CustomerEditModel FromCustomer(CustomerDetailDto customer) => new()
+        {
+            FullName = customer.Name,
+            Company = customer.CompanyName ?? "Private",
+            Email = customer.Email,
+            Phone = customer.Mobile ?? customer.CompanyPhone ?? string.Empty,
+            CustomerType = customer.CompanyId is not null || !string.IsNullOrWhiteSpace(customer.CompanyName) ? "Company" : "Individual",
+            Status = string.IsNullOrWhiteSpace(customer.Status) ? "Active" : customer.Status,
+            PaymentTerms = "Due on receipt"
+        };
     }
 }
