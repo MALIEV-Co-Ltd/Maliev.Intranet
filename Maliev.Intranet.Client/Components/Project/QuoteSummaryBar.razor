@@ -57,36 +57,39 @@
 
     @* ── Zone 2: Adjustments ──────────────────────────────────────────────── *@
     <div class="qsb-zone-adjustments">
-        <div class="qsb-zone-label">
-            <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
-            Quote Details
+        <div class="qsb-adjustment-row">
+            <div class="qsb-zone-label qsb-adjustment-label">
+                <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
+                Quote Details
+            </div>
+            <div class="qsb-adjustment-fields">
+                <MudNumericField T="decimal"
+                                 Label="Shipping"
+                                 Value="@ShippingCost"
+                                 ValueChanged="OnShippingCostChanged"
+                                 Min="0m"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 HideSpinButtons="true" />
+                <MudNumericField T="decimal"
+                                 Label="Discount"
+                                 Value="@ManualDiscountAmount"
+                                 ValueChanged="OnManualDiscountAmountChanged"
+                                 Min="0m"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 HideSpinButtons="true" />
+                <MudTextField T="string"
+                              Label="Terms"
+                              Value="@QuotationTerms"
+                              ValueChanged="OnQuotationTermsChanged"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="2"
+                              FullWidth="true"
+                              Class="qsb-terms-field" />
+            </div>
         </div>
-        <div class="qsb-adjustment-grid">
-            <MudNumericField T="decimal"
-                             Label="Shipping"
-                             Value="@ShippingCost"
-                             ValueChanged="OnShippingCostChanged"
-                             Min="0m"
-                             Variant="Variant.Outlined"
-                             Margin="Margin.Dense"
-                             HideSpinButtons="true" />
-            <MudNumericField T="decimal"
-                             Label="Discount"
-                             Value="@ManualDiscountAmount"
-                             ValueChanged="OnManualDiscountAmountChanged"
-                             Min="0m"
-                             Variant="Variant.Outlined"
-                             Margin="Margin.Dense"
-                             HideSpinButtons="true" />
-        </div>
-        <MudTextField T="string"
-                      Label="Terms"
-                      Value="@QuotationTerms"
-                      ValueChanged="OnQuotationTermsChanged"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Lines="1"
-                      FullWidth="true" />
     </div>
 
     <div class="qsb-divider" />
@@ -309,19 +312,33 @@
 
     /* ── Zone 2: Adjustments ─────────────────────────────────────────────── */
     .qsb-zone-adjustments {
-        width: 270px;
-        padding: 8px 12px 10px;
-        display: flex;
-        flex-direction: column;
+        flex: 0 1 430px;
+        min-width: 360px;
+        padding: 8px 12px;
+        display: grid;
+        align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        gap: 4px;
     }
 
-    .qsb-adjustment-grid {
+    .qsb-adjustment-row {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        width: 100%;
+    }
+
+    .qsb-adjustment-label {
+        margin-bottom: 0;
+        line-height: 1.2;
+    }
+
+    .qsb-adjustment-fields {
+        display: grid;
+        grid-template-columns: minmax(84px, 0.55fr) minmax(84px, 0.55fr) minmax(150px, 1.4fr);
         gap: 6px;
+        align-items: stretch;
     }
 
     .qsb-zone-adjustments ::deep .mud-input-control {
@@ -331,6 +348,12 @@
 
     .qsb-zone-adjustments ::deep .mud-input-slot {
         font-size: 12px;
+    }
+
+    .qsb-zone-adjustments ::deep textarea {
+        min-height: 34px !important;
+        line-height: 1.25;
+        resize: none;
     }
 
     /* ── Zone 3: Total + Actions ─────────────────────────────────────────── */
@@ -398,7 +421,7 @@
         font-weight: 600;
     }
 
-    @@media (max-width: 1200px) {
+    @@media (max-width: 1400px) {
         .qsb-root {
             height: auto;
             flex-wrap: wrap;
@@ -407,24 +430,49 @@
         }
         .qsb-zone-customer {
             max-width: none;
-            flex: 1 1 260px;
+            flex: 0 1 280px;
             padding: 10px 16px;
         }
         .qsb-zone-lead {
-            width: 100%;
-            border-top: 1px solid var(--maliev-border);
+            flex: 1 1 420px;
+            min-width: 420px;
             padding: 10px 16px;
         }
         .qsb-zone-adjustments {
-            width: 50%;
-            min-width: 260px;
+            order: 4;
+            flex: 1 0 100%;
+            min-width: 0;
             border-top: 1px solid var(--maliev-border);
+            padding: 8px 16px;
+        }
+        .qsb-adjustment-fields {
+            grid-template-columns: minmax(120px, 0.35fr) minmax(120px, 0.35fr) minmax(320px, 1fr);
+        }
+        .qsb-zone-total {
+            width: 330px;
             padding: 8px 16px 10px;
+        }
+    }
+
+    @@media (max-width: 900px) {
+        .qsb-zone-customer {
+            flex: 1 1 260px;
+        }
+        .qsb-zone-lead {
+            order: 3;
+            flex: 1 0 100%;
+            min-width: 0;
+            border-top: 1px solid var(--maliev-border);
         }
         .qsb-zone-total {
             flex: 1 1 320px;
-            border-top: 1px solid var(--maliev-border);
-            padding: 8px 16px 10px;
+            width: auto;
+        }
+        .qsb-zone-adjustments {
+            order: 4;
+        }
+        .qsb-adjustment-fields {
+            grid-template-columns: minmax(110px, 0.4fr) minmax(110px, 0.4fr) minmax(260px, 1fr);
         }
     }
 
@@ -449,6 +497,13 @@
         .qsb-zone-lead {
             padding: 10px 0;
         }
+        .qsb-adjustment-row {
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+        .qsb-adjustment-label {
+            margin-bottom: 0;
+        }
         .qsb-lead-options {
             flex-direction: column;
         }
@@ -456,8 +511,11 @@
             width: 100%;
             min-width: 0;
         }
-        .qsb-adjustment-grid {
+        .qsb-adjustment-fields {
             grid-template-columns: 1fr;
+        }
+        .qsb-zone-adjustments ::deep textarea {
+            min-height: 58px !important;
         }
         .qsb-lead-skeleton {
             width: 100%;
