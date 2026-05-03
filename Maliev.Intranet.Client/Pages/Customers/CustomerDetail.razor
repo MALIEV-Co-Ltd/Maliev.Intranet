@@ -9,20 +9,20 @@
     <PageHeader Title="@(_customer?.Name ?? "Customer")" Subtitle="@(_customer?.CompanyName ?? _customer?.Email)" BackLabel="Customers" BackHref="/customers">
         @if (_customer is not null)
         {
-            <SecondaryButton Icon="@Icons.Material.Outlined.Email" OnClick="EmailCustomerAsync">Email</SecondaryButton>
-            <SecondaryButton Icon="@Icons.Material.Outlined.LockReset" OnClick="PasswordResetAsync">Password reset</SecondaryButton>
-            <SecondaryButton Icon="@Icons.Material.Outlined.PersonOutline" OnClick="ImpersonateAsync">Impersonate</SecondaryButton>
+            <SecondaryButton Class="customer-action-email" Icon="@Icons.Material.Outlined.Email" OnClick="OpenEmailAsync">Email</SecondaryButton>
+            <SecondaryButton Class="customer-action-password" Icon="@Icons.Material.Outlined.LockReset" OnClick="OpenPasswordResetAsync">Password reset</SecondaryButton>
+            <SecondaryButton Class="customer-action-impersonate" Icon="@Icons.Material.Outlined.PersonOutline" OnClick="ImpersonateAsync">Impersonate</SecondaryButton>
             <SecondaryButton OnClick="DiscardChangesAsync" Disabled="@_saving">Discard</SecondaryButton>
             <PrimaryButton Icon="@Icons.Material.Outlined.Check" OnClick="SaveCustomerAsync" Disabled="@_saving">Save</PrimaryButton>
         }
     </PageHeader>
 
     <nav class="customer-record-tabs" aria-label="Customer sections">
-        <a class="active" href="#overview">Overview</a>
-        <a href="#addresses">Addresses (@(_customer?.Addresses.Count ?? 0))</a>
-        <a href="#orders">Orders</a>
-        <a href="#notes">Notes (@(_customer?.Notes.Count ?? 0))</a>
-        <a href="#activity">Activity</a>
+        <button type="button" data-tab="overview" class="@TabClass(CustomerDetailTab.Overview)" aria-current="@TabCurrent(CustomerDetailTab.Overview)" @onclick="@(() => SelectTab(CustomerDetailTab.Overview))">Overview</button>
+        <button type="button" data-tab="addresses" class="@TabClass(CustomerDetailTab.Addresses)" aria-current="@TabCurrent(CustomerDetailTab.Addresses)" @onclick="@(() => SelectTab(CustomerDetailTab.Addresses))">Addresses (@(_customer?.Addresses.Count ?? 0))</button>
+        <button type="button" data-tab="orders" class="@TabClass(CustomerDetailTab.Orders)" aria-current="@TabCurrent(CustomerDetailTab.Orders)" @onclick="@(() => SelectTab(CustomerDetailTab.Orders))">Orders</button>
+        <button type="button" data-tab="notes" class="@TabClass(CustomerDetailTab.Notes)" aria-current="@TabCurrent(CustomerDetailTab.Notes)" @onclick="@(() => SelectTab(CustomerDetailTab.Notes))">Notes (@(_customer?.Notes.Count ?? 0))</button>
+        <button type="button" data-tab="activity" class="@TabClass(CustomerDetailTab.Activity)" aria-current="@TabCurrent(CustomerDetailTab.Activity)" @onclick="@(() => SelectTab(CustomerDetailTab.Activity))">Activity</button>
     </nav>
 
     <PageBody Class="customer-record-body">
@@ -38,9 +38,9 @@
         {
             <div class="mlv-empty">Customer was not found.</div>
         }
-        else
+        else if (_activeTab == CustomerDetailTab.Overview)
         {
-            <div id="overview" class="customer-record-grid">
+            <div class="customer-record-grid">
                 <div class="customer-record-main">
                     <section class="customer-panel">
                         <SectionTitle Text="Contact information" />
@@ -106,7 +106,7 @@
                         </div>
                     </section>
 
-                    <section id="orders" class="customer-panel">
+                    <section class="customer-panel">
                         <SectionTitle Text="Recent orders" />
                         @if (_orders.Count > 0)
                         {
@@ -155,7 +155,7 @@
                         </dl>
                     </section>
 
-                    <section id="addresses" class="customer-panel">
+                    <section class="customer-panel">
                         <SectionTitle Text="Default addresses" />
                         <div class="customer-address-stack">
                             @if (BillingAddress is not null)
@@ -179,10 +179,10 @@
                                 <div class="customer-muted-box compact">No default addresses recorded.</div>
                             }
                         </div>
-                        <a class="customer-inline-link" href="#addresses">Manage all addresses -></a>
+                        <button type="button" class="customer-inline-link" @onclick="@(() => SelectTab(CustomerDetailTab.Addresses))">Manage all addresses -></button>
                     </section>
 
-                    <section id="activity" class="customer-panel">
+                    <section class="customer-panel">
                         <SectionTitle Text="Recent activity" />
                         @if (RecentActivity.Count > 0)
                         {
@@ -203,13 +203,251 @@
                         {
                             <div class="customer-muted-box compact">No activity recorded.</div>
                         }
-                        <a class="customer-inline-link" href="#activity">View all activity -></a>
+                        <button type="button" class="customer-inline-link" @onclick="@(() => SelectTab(CustomerDetailTab.Activity))">View all activity -></button>
                     </section>
                 </aside>
             </div>
         }
+        else if (_activeTab == CustomerDetailTab.Addresses)
+        {
+            <section class="customer-panel customer-tab-panel" data-section="addresses">
+                <div class="customer-section-head">
+                    <SectionTitle Text="Address book" />
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Add" OnClick="OpenAddAddressAsync">Add address</PrimaryButton>
+                </div>
+
+                @if (_customer.Addresses.Count > 0)
+                {
+                    <div class="customer-address-book-grid">
+                        @foreach (var address in _customer.Addresses.OrderByDescending(address => address.IsDefault).ThenBy(address => address.Type).ThenBy(address => AddressName(address, address.Type)))
+                        {
+                            <article class="customer-address-card">
+                                <div class="customer-address-card-head">
+                                    <div>
+                                        <strong>@AddressName(address, address.Type)</strong>
+                                        <StatusBadge Text="@address.Type" Status="@address.Type" />
+                                    </div>
+                                    <div class="customer-icon-actions">
+                                        <button type="button" class="customer-icon-button customer-address-edit" title="Edit address" aria-label="Edit address" @onclick="@(() => OpenEditAddress(address))">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" />
+                                        </button>
+                                        <button type="button" class="customer-icon-button danger" title="Delete address" aria-label="Delete address" @onclick="DeleteAddressUnavailableAsync">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="customer-address-lines">
+                                    @foreach (var line in FormatAddressLines(address))
+                                    {
+                                        <span>@line</span>
+                                    }
+                                </div>
+
+                                <div class="customer-address-card-footer">
+                                    @if (address.IsDefault)
+                                    {
+                                        <span class="customer-default-chip">Default @address.Type.ToLowerInvariant()</span>
+                                    }
+                                    else
+                                    {
+                                        <SecondaryButton Class="compact" OnClick="@(args => SetDefaultAddressAsync(address))">Set default @address.Type.ToLowerInvariant()</SecondaryButton>
+                                    }
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="customer-muted-box">No addresses recorded.</div>
+                }
+            </section>
+        }
+        else if (_activeTab == CustomerDetailTab.Orders)
+        {
+            <section class="customer-panel customer-tab-panel customer-orders-panel" data-section="orders">
+                <SectionTitle Text="@($"All orders ({LifetimeOrderCount:N0})")" />
+                @if (_orders.Count > 0)
+                {
+                    <table class="customer-orders-table">
+                        <thead>
+                            <tr>
+                                <th>Quote #</th>
+                                <th>Date</th>
+                                <th>Parts</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var order in _orders)
+                            {
+                                <tr>
+                                    <td><a href="@($"/orders/{order.Id}")">@order.OrderNumber</a></td>
+                                    <td>@FormatDate(order.CreatedAt)</td>
+                                    <td>-</td>
+                                    <td class="mlv-mono">@FormatMoney(ResolveOrderTotal(order))</td>
+                                    <td><StatusBadge Status="@order.Status" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="customer-muted-box">No orders recorded for this customer.</div>
+                }
+            </section>
+        }
+        else if (_activeTab == CustomerDetailTab.Notes)
+        {
+            <div class="customer-notes-layout" data-section="notes">
+                <section class="customer-panel customer-note-composer">
+                    <SectionTitle Text="Add internal note" />
+                    <textarea class="customer-textarea" rows="4" placeholder="Write a note visible only to your team..." @bind="_newNoteText"></textarea>
+                    <div class="customer-panel-actions">
+                        <PrimaryButton OnClick="PostNoteAsync" Disabled="@string.IsNullOrWhiteSpace(_newNoteText)">Post note</PrimaryButton>
+                    </div>
+                </section>
+
+                @if (_customer.Notes.Count > 0)
+                {
+                    <div class="customer-note-list">
+                        @foreach (var note in _customer.Notes.OrderByDescending(note => note.CreatedAt))
+                        {
+                            <article class="customer-note-card">
+                                <Avatar Name="@(note.CreatedByName ?? note.CreatedByEmail ?? "MALIEV")" />
+                                <div>
+                                    <div class="customer-note-meta">
+                                        <strong>@(note.CreatedByName ?? "System")</strong>
+                                        <span>@FormatDate(note.CreatedAt)</span>
+                                    </div>
+                                    <p>@note.NoteText</p>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="customer-muted-box">No internal notes yet.</div>
+                }
+            </div>
+        }
+        else if (_activeTab == CustomerDetailTab.Activity)
+        {
+            <section class="customer-panel customer-tab-panel customer-activity-panel" data-section="activity">
+                <SectionTitle Text="Audit trail" />
+                @if (ActivityFeed.Count > 0)
+                {
+                    <div class="customer-audit-list">
+                        @foreach (var activity in ActivityFeed)
+                        {
+                            <div class="customer-activity-item">
+                                <MudIcon Icon="@ActivityIcon(activity.Action)" Size="Size.Small" />
+                                <div>
+                                    <strong>@activity.Description</strong>
+                                    <span>@(activity.ActorName ?? "System") - @FormatDateTime(activity.Timestamp)</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="customer-muted-box">No activity recorded.</div>
+                }
+            </section>
+        }
     </PageBody>
 </div>
+
+<ConfirmModal Open="_passwordResetOpen"
+              Title="Send password reset?"
+              ConfirmLabel="Send reset link"
+              OnCancel="ClosePasswordResetAsync"
+              OnConfirm="ConfirmPasswordResetAsync">
+    <p class="customer-modal-copy">A password reset link will be emailed to @(_customer?.Email). The link expires in 24 hours.</p>
+</ConfirmModal>
+
+<ConfirmModal Open="_emailModalOpen"
+              Title="Send email"
+              ConfirmLabel="Send email"
+              Class="customer-modal-wide"
+              OnCancel="CloseEmailModalAsync"
+              OnConfirm="SendEmailAsync">
+    <div class="customer-email-modal">
+        <div class="customer-email-recipient">To: <span>@_customer?.Email</span></div>
+        <div class="customer-email-template-row" aria-label="Email templates">
+            <button type="button" @onclick="@(() => ApplyEmailTemplate(EmailTemplate.InvoiceReminder))">Invoice reminder</button>
+            <button type="button" @onclick="@(() => ApplyEmailTemplate(EmailTemplate.QuoteFollowUp))">Quote follow-up</button>
+            <button type="button" @onclick="@(() => ApplyEmailTemplate(EmailTemplate.Blank))">Blank</button>
+        </div>
+        <label class="customer-field">
+            <span>Subject</span>
+            <input class="customer-input" placeholder="Enter subject..." @bind="_emailSubject" />
+        </label>
+        <label class="customer-field">
+            <span>Message</span>
+            <textarea class="customer-textarea" rows="8" @bind="_emailMessage"></textarea>
+        </label>
+    </div>
+</ConfirmModal>
+
+<ConfirmModal Open="@(_addressEdit is not null)"
+              Title="@AddressModalTitle"
+              ConfirmLabel="Save"
+              Class="customer-modal-wide"
+              OnCancel="CloseAddressModalAsync"
+              OnConfirm="SaveAddressAsync">
+    @if (_addressEdit is not null)
+    {
+        <div class="customer-address-form">
+            <div class="customer-form-grid">
+                <label class="customer-field">
+                    <span>Label</span>
+                    <input class="customer-input" @bind="_addressEdit.Label" />
+                </label>
+                <label class="customer-field">
+                    <span>Type</span>
+                    <select class="customer-input" @bind="_addressEdit.Type">
+                        <option>Billing</option>
+                        <option>Shipping</option>
+                        <option>Office</option>
+                    </select>
+                </label>
+                <label class="customer-field customer-span-2">
+                    <span>Street</span>
+                    <input class="customer-input" @bind="_addressEdit.AddressLine1" />
+                </label>
+                <label class="customer-field customer-span-2">
+                    <span>Street 2</span>
+                    <input class="customer-input" @bind="_addressEdit.AddressLine2" />
+                </label>
+                <label class="customer-field">
+                    <span>City</span>
+                    <input class="customer-input" @bind="_addressEdit.City" />
+                </label>
+                <label class="customer-field">
+                    <span>State / province</span>
+                    <input class="customer-input" @bind="_addressEdit.StateProvince" />
+                </label>
+                <label class="customer-field">
+                    <span>Postal</span>
+                    <input class="customer-input" @bind="_addressEdit.PostalCode" />
+                </label>
+                <label class="customer-field">
+                    <span>Default</span>
+                    <select class="customer-input" @bind="_addressEdit.IsDefault">
+                        <option value="true">Default address</option>
+                        <option value="false">Not default</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+    }
+</ConfirmModal>
 
 @code {
     [Parameter] public Guid Id { get; set; }
@@ -218,9 +456,16 @@
     private CustomerEditModel? _edit;
     private readonly List<OrderSummaryDto> _orders = [];
     private readonly List<CustomerActivityResponse> _activity = [];
+    private CustomerDetailTab _activeTab = CustomerDetailTab.Overview;
+    private AddressEditModel? _addressEdit;
     private bool _loading = true;
     private bool _saving;
+    private bool _passwordResetOpen;
+    private bool _emailModalOpen;
     private string? _error;
+    private string _newNoteText = string.Empty;
+    private string _emailSubject = string.Empty;
+    private string _emailMessage = string.Empty;
     private int _orderTotalCount;
 
     private string CustomerType => HasCompany ? "Company" : "Individual";
@@ -232,6 +477,7 @@
     private int LifetimeOrderCount => _orderTotalCount > 0 ? _orderTotalCount : Math.Max(_orders.Count, _customer?.ActiveOrdersCount ?? 0);
     private decimal AverageOrderValue => LifetimeOrderCount > 0 && _customer is not null ? _customer.TotalSpent / LifetimeOrderCount : 0m;
     private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
+    private string AddressModalTitle => _addressEdit?.Id is null ? "Add address" : "Edit address";
 
     private AddressResponse? BillingAddress =>
         _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Billing") && address.IsDefault)
@@ -242,11 +488,10 @@
         _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping") && address.IsDefault)
         ?? _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping"));
 
-    private IReadOnlyList<CustomerActivityResponse> RecentActivity =>
+    private IReadOnlyList<CustomerActivityResponse> ActivityFeed =>
         _activity.Count > 0
-            ? _activity.Take(5).ToList()
+            ? _activity
             : (_customer?.Notes.OrderByDescending(note => note.CreatedAt)
-                .Take(5)
                 .Select(note => new CustomerActivityResponse
                 {
                     Action = "Note",
@@ -255,6 +500,8 @@
                     Timestamp = note.CreatedAt
                 })
                 .ToList() ?? []);
+
+    private IReadOnlyList<CustomerActivityResponse> RecentActivity => ActivityFeed.Take(5).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -294,9 +541,9 @@
     {
         try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>($"api/v1/orders?customerId={Id}&page=1");
+            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>($"api/v1/orders?customerId={Id}&page=1&pageSize=20");
             _orders.Clear();
-            _orders.AddRange(response?.Data.OrderByDescending(order => order.CreatedAt).Take(6) ?? []);
+            _orders.AddRange(response?.Data.OrderByDescending(order => order.CreatedAt).ToList() ?? []);
             _orderTotalCount = response?.Meta.TotalItems > 0
                 ? response.Meta.TotalItems
                 : response?.Meta.TotalCount ?? _orders.Count;
@@ -311,9 +558,9 @@
     {
         try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/v1/customers/{Id}/history?page=1&pageSize=8");
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/v1/customers/{Id}/history?page=1&pageSize=20");
             _activity.Clear();
-            _activity.AddRange(response?.Data.OrderByDescending(activity => activity.Timestamp).Take(8) ?? []);
+            _activity.AddRange(response?.Data.OrderByDescending(activity => activity.Timestamp).ToList() ?? []);
         }
         catch (Exception ex)
         {
@@ -321,18 +568,47 @@
         }
     }
 
-    private Task EmailCustomerAsync(MouseEventArgs _)
-    {
-        if (!string.IsNullOrWhiteSpace(_customer?.Email))
-        {
-            Navigation.NavigateTo($"mailto:{_customer.Email}");
-        }
+    private void SelectTab(CustomerDetailTab tab) => _activeTab = tab;
 
+    private string TabClass(CustomerDetailTab tab) => tab == _activeTab ? "active" : string.Empty;
+
+    private string? TabCurrent(CustomerDetailTab tab) => tab == _activeTab ? "page" : null;
+
+    private Task OpenEmailAsync(MouseEventArgs _)
+    {
+        ApplyEmailTemplate(EmailTemplate.Blank);
+        _emailModalOpen = true;
         return Task.CompletedTask;
     }
 
-    private Task PasswordResetAsync(MouseEventArgs _)
+    private Task CloseEmailModalAsync()
     {
+        _emailModalOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private Task SendEmailAsync()
+    {
+        _emailModalOpen = false;
+        Snackbar.Add("Email workflow is not connected yet.", Severity.Info);
+        return Task.CompletedTask;
+    }
+
+    private Task OpenPasswordResetAsync(MouseEventArgs _)
+    {
+        _passwordResetOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private Task ClosePasswordResetAsync()
+    {
+        _passwordResetOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private Task ConfirmPasswordResetAsync()
+    {
+        _passwordResetOpen = false;
         Snackbar.Add("Password reset workflow is not connected yet.", Severity.Info);
         return Task.CompletedTask;
     }
@@ -404,6 +680,206 @@
         }
     }
 
+    private Task OpenAddAddressAsync(MouseEventArgs _)
+    {
+        _addressEdit = AddressEditModel.Create(_customer?.Addresses.FirstOrDefault()?.CountryId ?? Guid.Empty);
+        return Task.CompletedTask;
+    }
+
+    private void OpenEditAddress(AddressResponse address)
+    {
+        _addressEdit = AddressEditModel.FromAddress(address);
+    }
+
+    private Task CloseAddressModalAsync()
+    {
+        _addressEdit = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAddressAsync()
+    {
+        if (_customer is null || _addressEdit is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_addressEdit.AddressLine1) ||
+            string.IsNullOrWhiteSpace(_addressEdit.City) ||
+            string.IsNullOrWhiteSpace(_addressEdit.PostalCode))
+        {
+            Snackbar.Add("Address needs street, city, and postal code.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            HttpResponseMessage response;
+            if (_addressEdit.Id is Guid addressId)
+            {
+                response = await Http.PatchAsJsonAsync($"api/v1/customers/addresses/{addressId}", new UpdateAddressRequest
+                {
+                    Type = _addressEdit.Type,
+                    IsDefault = _addressEdit.IsDefault,
+                    AddressLine1 = _addressEdit.AddressLine1,
+                    AddressLine2 = _addressEdit.AddressLine2,
+                    City = _addressEdit.City,
+                    StateProvince = _addressEdit.StateProvince,
+                    PostalCode = _addressEdit.PostalCode,
+                    CountryId = _addressEdit.CountryId == Guid.Empty ? null : _addressEdit.CountryId,
+                    RecipientName = _addressEdit.Label,
+                    Version = _addressEdit.Version
+                });
+            }
+            else
+            {
+                if (_addressEdit.CountryId == Guid.Empty)
+                {
+                    Snackbar.Add("Select a country before adding a new address.", Severity.Warning);
+                    return;
+                }
+
+                response = await Http.PostAsJsonAsync($"api/v1/customers/{Id}/addresses", new List<CreateAddressRequest>
+                {
+                    new()
+                    {
+                        Type = _addressEdit.Type,
+                        IsDefault = _addressEdit.IsDefault,
+                        AddressLine1 = _addressEdit.AddressLine1,
+                        AddressLine2 = _addressEdit.AddressLine2,
+                        City = _addressEdit.City,
+                        StateProvince = _addressEdit.StateProvince,
+                        PostalCode = _addressEdit.PostalCode,
+                        CountryId = _addressEdit.CountryId,
+                        RecipientName = _addressEdit.Label
+                    }
+                });
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Address saved.", Severity.Success);
+                _addressEdit = null;
+                await LoadAsync();
+                _activeTab = CustomerDetailTab.Addresses;
+            }
+            else
+            {
+                Snackbar.Add("Address could not be saved.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Address could not be saved.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task SetDefaultAddressAsync(AddressResponse address)
+    {
+        try
+        {
+            var response = await Http.PatchAsJsonAsync($"api/v1/customers/addresses/{address.Id}", new UpdateAddressRequest
+            {
+                Type = address.Type,
+                IsDefault = true,
+                AddressLine1 = address.AddressLine1,
+                AddressLine2 = address.AddressLine2,
+                AddressLine3 = address.AddressLine3,
+                District = address.District,
+                City = address.City,
+                StateProvince = address.StateProvince,
+                PostalCode = address.PostalCode,
+                CountryId = address.CountryId,
+                RecipientName = address.RecipientName,
+                RecipientPhone = address.RecipientPhone,
+                Version = address.Version
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Default address updated.", Severity.Success);
+                await LoadAsync();
+                _activeTab = CustomerDetailTab.Addresses;
+            }
+            else
+            {
+                Snackbar.Add("Default address could not be updated.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Default address could not be updated.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private Task DeleteAddressUnavailableAsync()
+    {
+        Snackbar.Add("Address deletion is not connected yet.", Severity.Info);
+        return Task.CompletedTask;
+    }
+
+    private async Task PostNoteAsync(MouseEventArgs _)
+    {
+        if (_customer is null || string.IsNullOrWhiteSpace(_newNoteText))
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/customers/{Id}/notes", new CreateInternalNoteRequest
+            {
+                OwnerType = "Customer",
+                OwnerId = Id,
+                NoteText = _newNoteText.Trim()
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                _newNoteText = string.Empty;
+                Snackbar.Add("Note posted.", Severity.Success);
+                await LoadAsync();
+                _activeTab = CustomerDetailTab.Notes;
+            }
+            else
+            {
+                Snackbar.Add("Note could not be posted.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Note could not be posted.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void ApplyEmailTemplate(EmailTemplate template)
+    {
+        var firstName = _customer?.FirstName;
+        if (string.IsNullOrWhiteSpace(firstName))
+        {
+            firstName = SplitName(_customer?.Name ?? string.Empty).FirstName;
+        }
+
+        if (template == EmailTemplate.InvoiceReminder)
+        {
+            _emailSubject = "Invoice reminder";
+            _emailMessage = $"Hi {firstName},\n\nThis is a reminder that an invoice is ready for review.\n\nBest,\nMALIEV Support";
+        }
+        else if (template == EmailTemplate.QuoteFollowUp)
+        {
+            _emailSubject = "Quote follow-up";
+            _emailMessage = $"Hi {firstName},\n\nI'm following up on the quote we sent over. Let us know if you need any changes.\n\nBest,\nMALIEV Support";
+        }
+        else
+        {
+            _emailSubject = string.Empty;
+            _emailMessage = $"Hi {firstName},\n\n\nBest,\nMALIEV Support";
+        }
+    }
+
     private static (string FirstName, string LastName) SplitName(string fullName)
     {
         var parts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -421,21 +897,20 @@
     private static string AddressName(AddressResponse address, string fallback) =>
         string.IsNullOrWhiteSpace(address.RecipientName) ? fallback : address.RecipientName;
 
-    private static string FormatAddress(AddressResponse address)
+    private static IReadOnlyList<string> FormatAddressLines(AddressResponse address)
     {
-        var parts = new[]
-        {
-            address.AddressLine1,
-            address.AddressLine2,
-            address.AddressLine3,
-            address.District,
-            address.City,
-            address.StateProvince,
-            address.PostalCode
-        }.Where(part => !string.IsNullOrWhiteSpace(part));
+        var street = string.Join(", ", new[] { address.AddressLine1, address.AddressLine2, address.AddressLine3 }
+            .Where(part => !string.IsNullOrWhiteSpace(part)));
+        var locality = string.Join(", ", new[] { address.City, address.StateProvince, address.PostalCode }
+            .Where(part => !string.IsNullOrWhiteSpace(part)));
 
-        return string.Join(", ", parts);
+        return new[] { street, locality }
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .ToList();
     }
+
+    private static string FormatAddress(AddressResponse address) =>
+        string.Join(", ", FormatAddressLines(address));
 
     private static decimal ResolveOrderTotal(OrderSummaryDto order) =>
         order.TotalAmount > 0 ? order.TotalAmount : order.Total;
@@ -460,12 +935,28 @@
             return Icons.Material.Outlined.Edit;
         }
 
-        if (action.Contains("email", StringComparison.OrdinalIgnoreCase))
+        if (action.Contains("email", StringComparison.OrdinalIgnoreCase) || action.Contains("invoice", StringComparison.OrdinalIgnoreCase))
         {
             return Icons.Material.Outlined.AlternateEmail;
         }
 
         return Icons.Material.Outlined.Update;
+    }
+
+    private enum CustomerDetailTab
+    {
+        Overview,
+        Addresses,
+        Orders,
+        Notes,
+        Activity
+    }
+
+    private enum EmailTemplate
+    {
+        InvoiceReminder,
+        QuoteFollowUp,
+        Blank
     }
 
     private sealed class CustomerEditModel
@@ -487,6 +978,42 @@
             CustomerType = customer.CompanyId is not null || !string.IsNullOrWhiteSpace(customer.CompanyName) ? "Company" : "Individual",
             Status = string.IsNullOrWhiteSpace(customer.Status) ? "Active" : customer.Status,
             PaymentTerms = "Due on receipt"
+        };
+    }
+
+    private sealed class AddressEditModel
+    {
+        public Guid? Id { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public string Type { get; set; } = "Billing";
+        public bool IsDefault { get; set; }
+        public string AddressLine1 { get; set; } = string.Empty;
+        public string? AddressLine2 { get; set; }
+        public string City { get; set; } = string.Empty;
+        public string StateProvince { get; set; } = string.Empty;
+        public string PostalCode { get; set; } = string.Empty;
+        public Guid CountryId { get; set; }
+        public byte[] Version { get; set; } = [];
+
+        public static AddressEditModel Create(Guid countryId) => new()
+        {
+            CountryId = countryId,
+            IsDefault = true
+        };
+
+        public static AddressEditModel FromAddress(AddressResponse address) => new()
+        {
+            Id = address.Id,
+            Label = AddressName(address, address.Type),
+            Type = string.IsNullOrWhiteSpace(address.Type) ? "Billing" : address.Type,
+            IsDefault = address.IsDefault,
+            AddressLine1 = address.AddressLine1,
+            AddressLine2 = address.AddressLine2,
+            City = address.City,
+            StateProvince = address.StateProvince,
+            PostalCode = address.PostalCode,
+            CountryId = address.CountryId,
+            Version = address.Version
         };
     }
 }

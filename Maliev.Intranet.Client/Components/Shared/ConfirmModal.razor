@@ -1,7 +1,7 @@
 @if (Open)
 {
     <div class="mlv-modal-backdrop" @onclick="CancelAsync">
-        <div class="mlv-modal" @onclick:stopPropagation="true">
+        <div class="mlv-modal @Class" @onclick:stopPropagation="true">
             <div class="mlv-modal-header">
                 <h2>@Title</h2>
                 <button type="button" @onclick="CancelAsync" aria-label="Close">
@@ -24,6 +24,7 @@
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
     [Parameter] public string ConfirmLabel { get; set; } = "Confirm";
     [Parameter] public bool Danger { get; set; }
+    [Parameter] public string? Class { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback OnConfirm { get; set; }

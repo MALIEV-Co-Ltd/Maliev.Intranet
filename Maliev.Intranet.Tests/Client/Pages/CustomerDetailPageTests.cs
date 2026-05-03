@@ -69,6 +69,61 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains(_requestedPaths, path => path.Contains($"/api/v1/customers/{_customerId}/history", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void CustomerDetail_TabsRenderConsistentDetailSections()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+
+        cut.Find("button[data-tab='addresses']").Click();
+        Assert.Contains("Address book", cut.Markup);
+        Assert.Contains("customer-address-book-grid", cut.Markup);
+        Assert.Contains("customer-address-card", cut.Markup);
+        Assert.DoesNotContain("Contact information", cut.Markup, StringComparison.Ordinal);
+
+        cut.Find("button[data-tab='orders']").Click();
+        Assert.Contains("All orders (1)", cut.Markup);
+        Assert.Contains("customer-orders-panel", cut.Markup);
+        Assert.Contains("Q-2026-098", cut.Markup);
+
+        cut.Find("button[data-tab='notes']").Click();
+        Assert.Contains("Add internal note", cut.Markup);
+        Assert.Contains("customer-notes-layout", cut.Markup);
+        Assert.Contains("Added internal note", cut.Markup);
+
+        cut.Find("button[data-tab='activity']").Click();
+        Assert.Contains("Audit trail", cut.Markup);
+        Assert.Contains("customer-audit-list", cut.Markup);
+        Assert.Contains("Order Q-2026-098 paid", cut.Markup);
+    }
+
+    [Fact]
+    public void CustomerDetail_ActionsUseRecordStyleModals()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+
+        cut.Find("button.customer-action-email").Click();
+        Assert.Contains("Send email", cut.Markup);
+        Assert.Contains("customer-modal-wide", cut.Markup);
+        Assert.Contains("Invoice reminder", cut.Markup);
+        Assert.Contains("Quote follow-up", cut.Markup);
+
+        cut.Find("button[aria-label='Close']").Click();
+        cut.Find("button.customer-action-password").Click();
+        Assert.Contains("Send password reset?", cut.Markup);
+        Assert.Contains("A password reset link will be emailed to sarah@axion.io.", cut.Markup);
+
+        cut.Find("button[aria-label='Close']").Click();
+        cut.Find("button[data-tab='addresses']").Click();
+        cut.Find("button.customer-address-edit").Click();
+        Assert.Contains("Edit address", cut.Markup);
+        Assert.Contains("customer-address-form", cut.Markup);
+        Assert.Contains("HQ - Billing", cut.Markup);
+    }
+
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
     {
         var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
