@@ -123,8 +123,12 @@
                     <FormField Label="Date"><InputDate class="mlv-form-input" @bind-Value="_incomeForm.Date" /></FormField>
                     <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_incomeForm.Description" /></FormField>
                     <FormField Label="Reference"><InputText class="mlv-form-input" @bind-Value="_incomeForm.Reference" /></FormField>
-                    <FormField Label="Debit account ID"><input class="mlv-form-input" @bind="_incomeDebitAccountId" /></FormField>
-                    <FormField Label="Credit account ID"><input class="mlv-form-input" @bind="_incomeCreditAccountId" /></FormField>
+                    <FormField Label="Debit account">
+                        <select class="mlv-form-input" @bind="_incomeDebitAccountId">@AccountOptions()</select>
+                    </FormField>
+                    <FormField Label="Credit account">
+                        <select class="mlv-form-input" @bind="_incomeCreditAccountId">@AccountOptions()</select>
+                    </FormField>
                     <FormField Label="Amount"><InputNumber class="mlv-form-input" @bind-Value="_incomeForm.Amount" /></FormField>
                 </FormGrid>
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
@@ -139,8 +143,12 @@
                     <FormField Label="Date"><InputDate class="mlv-form-input" @bind-Value="_expenseForm.Date" /></FormField>
                     <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_expenseForm.Description" /></FormField>
                     <FormField Label="Reference"><InputText class="mlv-form-input" @bind-Value="_expenseForm.Reference" /></FormField>
-                    <FormField Label="Debit account ID"><input class="mlv-form-input" @bind="_expenseDebitAccountId" /></FormField>
-                    <FormField Label="Credit account ID"><input class="mlv-form-input" @bind="_expenseCreditAccountId" /></FormField>
+                    <FormField Label="Debit account">
+                        <select class="mlv-form-input" @bind="_expenseDebitAccountId">@AccountOptions()</select>
+                    </FormField>
+                    <FormField Label="Credit account">
+                        <select class="mlv-form-input" @bind="_expenseCreditAccountId">@AccountOptions()</select>
+                    </FormField>
                     <FormField Label="Amount"><InputNumber class="mlv-form-input" @bind-Value="_expenseForm.Amount" /></FormField>
                 </FormGrid>
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
@@ -155,8 +163,12 @@
                     <FormField Label="Date"><InputDate class="mlv-form-input" @bind-Value="_payrollForm.Date" /></FormField>
                     <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_payrollForm.Description" /></FormField>
                     <FormField Label="Reference"><InputText class="mlv-form-input" @bind-Value="_payrollForm.Reference" /></FormField>
-                    <FormField Label="Debit account ID"><input class="mlv-form-input" @bind="_payrollDebitAccountId" /></FormField>
-                    <FormField Label="Credit account ID"><input class="mlv-form-input" @bind="_payrollCreditAccountId" /></FormField>
+                    <FormField Label="Debit account">
+                        <select class="mlv-form-input" @bind="_payrollDebitAccountId">@AccountOptions()</select>
+                    </FormField>
+                    <FormField Label="Credit account">
+                        <select class="mlv-form-input" @bind="_payrollCreditAccountId">@AccountOptions()</select>
+                    </FormField>
                     <FormField Label="Amount"><InputNumber class="mlv-form-input" @bind-Value="_payrollForm.Amount" /></FormField>
                 </FormGrid>
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
@@ -266,6 +278,7 @@
     private List<InvoiceSummaryDto> _invoices = [];
     private List<JournalEntryDto> _journalEntries = [];
     private List<AccountingPeriodDto> _periods = [];
+    private List<ChartOfAccountDto> _accounts = [];
     private PaymentStatsDto? _paymentStats;
     private FinancialReportDto? _report;
     private ReconciliationResultDto? _reconciliation;
@@ -321,7 +334,8 @@
         _loading = true;
         try
         {
-            await Task.WhenAll(LoadInvoicesAsync(), LoadJournalEntriesAsync(), LoadPeriodsAsync(), LoadPaymentStatsAsync());
+            await Task.WhenAll(LoadInvoicesAsync(), LoadJournalEntriesAsync(), LoadPeriodsAsync(), LoadPaymentStatsAsync(), LoadAccountsAsync());
+            ApplyAccountDefaults();
         }
         catch (Exception ex)
         {
@@ -360,6 +374,12 @@
     private async Task LoadPaymentStatsAsync()
     {
         _paymentStats = await Http.GetFromJsonAsync<PaymentStatsDto>("api/v1/payments/stats");
+    }
+
+    private async Task LoadAccountsAsync()
+    {
+        var accounts = await Http.GetFromJsonAsync<List<ChartOfAccountDto>>("api/v1/accounting/accounts-tree") ?? [];
+        _accounts = FlattenAccounts(accounts).Where(account => account.IsActive).ToList();
     }
 
     private async Task CreateCurrentQuickEntryAsync(MouseEventArgs _)
@@ -466,6 +486,55 @@
         form.CreditAccountId = creditId;
         return true;
     }
+
+    private void ApplyAccountDefaults()
+    {
+        _incomeDebitAccountId = DefaultAccount("Asset") ?? _incomeDebitAccountId;
+        _incomeCreditAccountId = DefaultAccount("Revenue", "Income") ?? _incomeCreditAccountId;
+        _expenseDebitAccountId = DefaultAccount("Expense") ?? _expenseDebitAccountId;
+        _expenseCreditAccountId = DefaultAccount("Asset", "Liability") ?? _expenseCreditAccountId;
+        _payrollDebitAccountId = DefaultAccount("Expense") ?? _payrollDebitAccountId;
+        _payrollCreditAccountId = DefaultAccount("Liability") ?? _payrollCreditAccountId;
+    }
+
+    private string? DefaultAccount(params string[] typeHints)
+    {
+        return _accounts.FirstOrDefault(account =>
+            typeHints.Any(hint =>
+                account.Type.Contains(hint, StringComparison.OrdinalIgnoreCase) ||
+                (account.Category?.Contains(hint, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                account.Name.Contains(hint, StringComparison.OrdinalIgnoreCase)))?.Id.ToString();
+    }
+
+    private static IEnumerable<ChartOfAccountDto> FlattenAccounts(IEnumerable<ChartOfAccountDto> accounts)
+    {
+        foreach (var account in accounts)
+        {
+            yield return account;
+
+            foreach (var child in FlattenAccounts(account.Children))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    private RenderFragment AccountOptions() => builder =>
+    {
+        var sequence = 0;
+        builder.OpenElement(sequence++, "option");
+        builder.AddAttribute(sequence++, "value", string.Empty);
+        builder.AddContent(sequence++, "Select account");
+        builder.CloseElement();
+
+        foreach (var account in _accounts)
+        {
+            builder.OpenElement(sequence++, "option");
+            builder.AddAttribute(sequence++, "value", account.Id.ToString());
+            builder.AddContent(sequence++, $"{account.AccountNumber} - {account.Name}");
+            builder.CloseElement();
+        }
+    };
 
     private sealed class QuickJournalForm
     {
