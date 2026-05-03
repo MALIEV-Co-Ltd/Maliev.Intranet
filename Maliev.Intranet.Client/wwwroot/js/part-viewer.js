@@ -1597,8 +1597,7 @@ function applyPreset(cam, presetName, smooth = false, canvasId = null) {
 export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef, renderMode = "solid", cameraProjection = "perspective") {
     // Debug logging: track when initialize is called
     const sanitizedUrl = fileUrl ? (fileUrl.includes('?') ? fileUrl.substring(0, fileUrl.indexOf('?')) + '?[SIGNED_URL]' : fileUrl) : '(none)';
-    const prevGen = loadGenerations[canvasId] || 0;
-    debugLog('[BabylonViewer] initialize START:', { canvasId, url: sanitizedUrl, fileExt, prevGen, timestamp: Date.now() });
+    debugLog('[BabylonViewer] initialize START:', { canvasId, url: sanitizedUrl, fileExt, prevGen: loadGenerations[canvasId] || 0, timestamp: Date.now() });
 
     try {
         await loadScript('./lib/babylonjs/babylon.js');
@@ -1617,7 +1616,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
         // Generation counter: any stale retry or async callback from a previous initialize()
         // call will see a mismatched generation and bail out, preventing duplicate mesh appends.
-        loadGenerations[canvasId] = prevGen + 1;
+        loadGenerations[canvasId] = (loadGenerations[canvasId] || 0) + 1;
         const currentGen = loadGenerations[canvasId];
 
         darkModes[canvasId]        = !!isDark;
@@ -1627,7 +1626,12 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         meshCenters[canvasId]      = null;
         edgesEnabled[canvasId]     = false;
 
-        const engine = new BABYLON.Engine(canvas, true, { premultipliedAlpha: false, alpha: true, reverseDepthBuffer: true });
+        const engine = new BABYLON.Engine(canvas, true, {
+            premultipliedAlpha: false,
+            alpha: true,
+            reverseDepthBuffer: true,
+            disableUniformBuffers: true,
+        });
         const scene  = new BABYLON.Scene(engine);
         engine.resize();
 
@@ -2067,6 +2071,10 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         _loadAttempt(0);
 
         engine.runRenderLoop(() => {
+            if (loadGenerations[canvasId] !== currentGen || engines[canvasId] !== engine || scenes[canvasId] !== scene) {
+                return;
+            }
+
             // Smooth speed interpolation (lerp toward target)
             const curr   = autoSpeedCurrent[canvasId] ?? 0;
             const target = autoSpeedTarget[canvasId]  ?? 0;
@@ -3887,8 +3895,11 @@ export function zoomToFit(canvasId, smooth = true) {
 // ── dispose ───────────────────────────────────────────────────────────────────
 
 export function dispose(canvasId) {
+    loadGenerations[canvasId] = (loadGenerations[canvasId] || 0) + 1;
+
     const engine = engines[canvasId];
     if (engine?._resizeHandler) window.removeEventListener('resize', engine._resizeHandler);
+    try { engine?.stopRenderLoop(); } catch (_) {}
 
     clearTurningAxis(canvasId);
     if (resizeObservers[canvasId]) { resizeObservers[canvasId].disconnect(); delete resizeObservers[canvasId]; }
@@ -3977,9 +3988,6 @@ export function dispose(canvasId) {
         });
         delete perCanvasBodyMap[canvasId];
     }
-
-    // Invalidate any pending load attempts for this canvas
-    delete loadGenerations[canvasId];
 
     // Clean up shadow generator
     if (shadowGenerators[canvasId]) {

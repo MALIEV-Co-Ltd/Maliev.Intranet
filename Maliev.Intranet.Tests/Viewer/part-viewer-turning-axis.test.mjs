@@ -197,3 +197,23 @@ test('turning axis overlay is subtle and has no arrowheads', () => {
     assert.equal(source.includes("line.setAttribute('marker-end'"), false);
     assert.equal(source.includes("line.setAttribute('opacity', '0.45')"), true);
 });
+
+test('viewer disposal invalidates stale render work before releasing Babylon resources', () => {
+    const source = viewerSource();
+
+    assert.match(source, /loadGenerations\[canvasId\] = \(loadGenerations\[canvasId\] \|\| 0\) \+ 1;\s+const engine = engines\[canvasId\];/);
+    assert.match(source, /engine\?\.stopRenderLoop\(\)/);
+    assert.equal(source.includes('delete loadGenerations[canvasId]'), false);
+});
+
+test('render loop ignores stale engines from previous part loads', () => {
+    const source = viewerSource();
+
+    assert.match(source, /engine\.runRenderLoop\(\(\) => \{\s+if \(loadGenerations\[canvasId\] !== currentGen \|\| engines\[canvasId\] !== engine \|\| scenes\[canvasId\] !== scene\)/);
+});
+
+test('viewer avoids WebGL uniform-buffer reuse across Babylon engine swaps', () => {
+    const source = viewerSource();
+
+    assert.match(source, /disableUniformBuffers:\s*true/);
+});
