@@ -6,181 +6,246 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
-<PageTitle>Projects | Intranet Gateway</PageTitle>
+<PageTitle>Projects | MALIEV Intranet</PageTitle>
 
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Projects" Subtitle="Project intake, part configuration, quotation readiness, and production handoff.">
+        <PrimaryButton Icon="@Icons.Material.Outlined.Add" Href="/sales/projects/new">New Project</PrimaryButton>
+    </ModuleHeader>
 
-<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4" Wrap="Wrap.Wrap">
-    <div>
-        <MudText Typo="Typo.h5" Style="font-weight: 700;">Projects</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Default">Manage 3D printing & manufacturing projects</MudText>
-    </div>
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               StartIcon="@Icons.Material.Outlined.Add"
-               OnClick="@(() => Navigation.NavigateTo("/sales/projects/new"))">
-        New Project
-    </MudButton>
-</MudStack>
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Matching projects" Value="@_meta.TotalItems.ToString("N0")" />
+            <StatTile Label="Page count" Value="@_projects.Count.ToString("N0")" />
+            <StatTile Label="Page value" Value="@CurrencyFormatter.Format(_projects.Sum(p => p.TotalPrice), "THB", 2)" />
+            <StatTile Label="View" Value="@(ActiveStatus ?? "All")" />
+        </StatBar>
 
-@* Search bar *@
-<MudPaper Elevation="0" Class="pa-3 mb-3 rounded-lg pj-search-paper">
-    <MudTextField @bind-Value="_search"
-                  Placeholder="Search by project number, customer or title..."
-                  Adornment="Adornment.Start"
-                  AdornmentIcon="@Icons.Material.Outlined.Search"
-                  Immediate="true"
-                  DebounceInterval="400"
-                  OnDebounceIntervalElapsed="@(() => { _page = 1; _ = LoadProjectsAsync(); })"
-                  Variant="Variant.Outlined"
-                  Margin="Margin.Dense"
-                  Class="mb-0" />
-</MudPaper>
+        <div class="mlv-toolbar">
+            <div class="mlv-toolbar-left">
+                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search projects..." OnEnter="SearchAsync" />
+                <div class="mlv-segmented">
+                    @foreach (var tab in _statusTabs)
+                    {
+                        <button type="button" class="@(string.Equals(ActiveStatusLabel, tab.Label, StringComparison.OrdinalIgnoreCase) ? "active" : "")" @onclick="@(() => SetStatusAsync(tab.Value))">@tab.Label</button>
+                    }
+                </div>
+            </div>
+            <div class="mlv-toolbar-right">
+                <SecondaryButton Icon="@Icons.Material.Outlined.Search" OnClick="@SearchClickedAsync">Search</SecondaryButton>
+                <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+            </div>
+        </div>
 
-@* Status tabs *@
-<MudTabs ActivePanelIndex="_activeTab"
-         ActivePanelIndexChanged="OnTabChanged"
-         Rounded="true"
-         SliderColor="Color.Primary"
-         ApplyEffectsToContainer="true"
-         TabPanelsClass="pt-3">
-    @foreach (var tab in _statusTabs)
-    {
-        <MudTabPanel Text="@tab" />
-    }
-</MudTabs>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
 
-@if (_loading)
-{
-    @for (int i = 0; i < 5; i++)
-    {
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="52px" Class="mb-2 rounded" />
-    }
-}
-else
-{
-    <MudDataGrid T="ProjectSummaryDto"
-                 Items="@_projects"
-                 Hover="true"
-                 Striped="false"
-                 Bordered="false"
-                 Dense="true"
-                 Elevation="0"
-                 Breakpoint="Breakpoint.Sm"
-                 RowClick="@((DataGridRowClickEventArgs<ProjectSummaryDto> args) => Navigation.NavigateTo($"/sales/projects/{args.Item.Id}"))"
-                 Style="cursor: pointer;">
-        <Columns>
-            <PropertyColumn Property="x => x.ProjectNumber" Title="Project #" />
-            <PropertyColumn Property="x => x.CustomerName" Title="Customer" />
-            <PropertyColumn Property="x => x.Title" Title="Title" />
-            <TemplateColumn Title="Parts">
-                <CellTemplate>
-                    <MudText Typo="Typo.body2">@context.Item.PartsCount part@(context.Item.PartsCount == 1 ? "" : "s")</MudText>
-                </CellTemplate>
-            </TemplateColumn>
-            <TemplateColumn Title="Total Price">
-                <CellTemplate>
-                    <MudText Typo="Typo.body2">
-                        @(context.Item.TotalPrice > 0 ? CurrencyFormatter.Format(context.Item.TotalPrice, "THB", 2) : "—")
-                    </MudText>
-                </CellTemplate>
-            </TemplateColumn>
-            <TemplateColumn Title="Status">
-                <CellTemplate>
-                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
-                        @context.Item.Status
-                    </MudChip>
-                </CellTemplate>
-            </TemplateColumn>
-            <TemplateColumn Title="Created">
-                <CellTemplate>
-                    <MudText Typo="Typo.body2" Color="Color.Default">@context.Item.CreatedAt.ToString("dd MMM yyyy")</MudText>
-                </CellTemplate>
-            </TemplateColumn>
-        </Columns>
-        <NoRecordsContent>
-            <MudStack AlignItems="AlignItems.Center" Class="pa-8">
-                <MudIcon Icon="@Icons.Material.Outlined.FolderOff" Style="font-size: 48px;" Color="Color.Default" />
-                <MudText Typo="Typo.body2" Color="Color.Default" Class="mt-2">No projects found</MudText>
-                <MudButton Variant="Variant.Outlined" Class="mt-3"
-                           OnClick="@(() => Navigation.NavigateTo("/sales/projects/new"))">
-                    Create First Project
-                </MudButton>
-            </MudStack>
-        </NoRecordsContent>
-    </MudDataGrid>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
 
-    @* Pagination *@
-    @if (_meta.TotalPages > 1)
-    {
-        <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
-            <MudPagination Color="Color.Primary"
-                           Count="@_meta.TotalPages"
-                           Selected="@_page"
-                           SelectedChanged="OnPageChanged"
-                           BoundaryCount="1"
-                           MiddleCount="3" />
-        </MudStack>
-    }
-}
+        <PanelCard>
+            @if (_projects.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Parts</th>
+                            <th>Total</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var project in _projects)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/sales/projects/{project.Id}"))">
+                                <td>
+                                    <div class="mlv-row-main mlv-mono">@project.ProjectNumber</div>
+                                    <div class="mlv-row-sub">@Display(project.Title)</div>
+                                </td>
+                                <td>@Display(project.CustomerName)</td>
+                                <td><StatusBadge Status="@project.Status" /></td>
+                                <td>@project.PartsCount.ToString("N0")</td>
+                                <td class="mlv-mono">@(project.TotalPrice > 0 ? CurrencyFormatter.Format(project.TotalPrice, "THB", 2) : "-")</td>
+                                <td>@project.CreatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">
+                    No projects match this view.
+                    <div class="mt-3">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.Add" Href="/sales/projects/new">Create Project</PrimaryButton>
+                    </div>
+                </div>
+            }
+        </PanelCard>
+
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
+    </PageBody>
+</div>
 
 @code {
-    private string[] _statusTabs = ["All", "Draft", "Configuring", "Quoted", "In Production", "Completed"];
-    private int _activeTab = 0;
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public int? QueryPageSize { get; set; }
+
+    private readonly (string Label, string? Value)[] _statusTabs =
+    [
+        ("All", null),
+        ("Draft", "Draft"),
+        ("Configuring", "Configuring"),
+        ("Quoted", "Quoted"),
+        ("In Production", "In Production"),
+        ("Completed", "Completed")
+    ];
+
+    private string? _status;
     private string? _search;
     private bool _loading = true;
+    private string? _error;
     private int _page = 1;
-    private List<ProjectSummaryDto> _projects = new();
+    private int _pageSize = 20;
+    private List<ProjectSummaryDto> _projects = [];
     private PaginationMeta _meta = new();
 
-    /// <summary>Loads projects on first render.</summary>
-    protected override async Task OnInitializedAsync() => await LoadProjectsAsync();
+    private string? ActiveStatus => string.IsNullOrWhiteSpace(_status) ? null : _status;
+    private string ActiveStatusLabel => _statusTabs.FirstOrDefault(t => string.Equals(t.Value, ActiveStatus, StringComparison.OrdinalIgnoreCase)).Label ?? "All";
 
-    private async Task OnTabChanged(int index)
+    protected override async Task OnParametersSetAsync()
     {
-        if (index == _activeTab) return;
-        _activeTab = index;
-        _page = 1;
+        _status = NormalizeStatus(Status);
+        _search = Search;
+        _page = Math.Max(1, QueryPage ?? 1);
+        _pageSize = NormalizePageSize(QueryPageSize ?? 20);
         await LoadProjectsAsync();
     }
+
+    private async Task SetStatusAsync(string? status)
+    {
+        _status = status;
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private Task OnSearchChanged(string? value)
+    {
+        _search = value;
+        return Task.CompletedTask;
+    }
+
+    private async Task SearchAsync()
+    {
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task SearchClickedAsync(MouseEventArgs _) => await SearchAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadProjectsAsync();
 
     private async Task OnPageChanged(int page)
     {
         _page = page;
-        await LoadProjectsAsync();
+        await NavigateAndLoadAsync();
     }
 
-    private string? ActiveStatus => _activeTab == 0 ? null : _statusTabs[_activeTab];
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = NormalizePageSize(pageSize);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task NavigateAndLoadAsync()
+    {
+        Navigation.NavigateTo(BuildPageUri(), replace: true);
+        await LoadProjectsAsync();
+    }
 
     private async Task LoadProjectsAsync(CancellationToken ct = default)
     {
         _loading = true;
-        StateHasChanged();
+        _error = null;
         try
         {
-            var url = $"api/v1/projects?page={_page}&pageSize=20";
-            if (!string.IsNullOrEmpty(ActiveStatus)) url += $"&status={Uri.EscapeDataString(ActiveStatus)}";
-            if (!string.IsNullOrEmpty(_search))      url += $"&search={Uri.EscapeDataString(_search)}";
-
-            var result = await Http.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>(url, ct);
-            _projects = result?.Data.ToList() ?? new();
-            _meta     = result?.Meta ?? new();
+            var result = await Http.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>(BuildApiUrl(), ct);
+            _projects = result?.Data.ToList() ?? [];
+            _meta = result?.Meta ?? new();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load projects: {ex.Message}", Severity.Error);
+            _error = "Projects could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
         }
-        finally { _loading = false; }
+        finally
+        {
+            _loading = false;
+        }
     }
 
-    private static Color GetStatusColor(string status) => status switch
+    private string BuildApiUrl()
     {
-        "Draft"         => Color.Default,
-        "Configuring"   => Color.Warning,
-        "Priced"        => Color.Info,
-        "Quoted"        => Color.Primary,
-        "In Production" => Color.Default,
-        "Completed"     => Color.Success,
-        "Cancelled"     => Color.Error,
-        _               => Color.Default
+        var query = new List<string>
+        {
+            $"page={_page}",
+            $"pageSize={_pageSize}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(ActiveStatus))
+        {
+            query.Add($"status={Uri.EscapeDataString(ActiveStatus)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_search))
+        {
+            query.Add($"search={Uri.EscapeDataString(_search)}");
+        }
+
+        return $"api/v1/projects?{string.Join("&", query)}";
+    }
+
+    private string BuildPageUri()
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(ActiveStatus)) query.Add($"status={Uri.EscapeDataString(ActiveStatus)}");
+        if (!string.IsNullOrWhiteSpace(_search)) query.Add($"search={Uri.EscapeDataString(_search)}");
+        if (_page > 1) query.Add($"page={_page}");
+        if (_pageSize != 20) query.Add($"pageSize={_pageSize}");
+        return query.Count == 0 ? "/sales/projects" : $"/sales/projects?{string.Join("&", query)}";
+    }
+
+    private string? NormalizeStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return null;
+        var match = _statusTabs.FirstOrDefault(t => string.Equals(t.Value, status, StringComparison.OrdinalIgnoreCase));
+        return match.Value;
+    }
+
+    private static int NormalizePageSize(int pageSize) => pageSize switch
+    {
+        <= 10 => 10,
+        <= 20 => 20,
+        _ => 50
     };
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 }

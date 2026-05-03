@@ -154,10 +154,20 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// Retrieves a paged list of customers, optionally filtered by a search query.
     /// Sorted by creation date descending (newest first).
     /// </summary>
-    public virtual async Task<PagedResponse<CustomerSummaryDto>?> GetCustomersAsync(string? query = null, int page = 1, CancellationToken ct = default)
+    public virtual async Task<PagedResponse<CustomerSummaryDto>?> GetCustomersAsync(
+        string? query = null,
+        string? segment = null,
+        string? tier = null,
+        bool includeDeleted = false,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken ct = default)
     {
-        var url = $"/customer/v1/customers?page={page}&sortBy=createdAt&sortDirection=desc";
+        var url = $"/customer/v1/customers?page={page}&pageSize={pageSize}&sortBy=createdAt&sortDirection=desc";
         if (!string.IsNullOrEmpty(query)) url += $"&query={Uri.EscapeDataString(query)}";
+        if (!string.IsNullOrEmpty(segment)) url += $"&segment={Uri.EscapeDataString(segment)}";
+        if (!string.IsNullOrEmpty(tier)) url += $"&tier={Uri.EscapeDataString(tier)}";
+        if (includeDeleted) url += "&includeDeleted=true";
 
         var response = await httpClient.GetFromJsonAsync<CustomerServicePaginatedResponse<CustomerSummaryDto>>(url, ct);
         if (response == null) return new PagedResponse<CustomerSummaryDto>();

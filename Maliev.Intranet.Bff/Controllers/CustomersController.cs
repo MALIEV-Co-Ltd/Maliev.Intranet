@@ -29,9 +29,16 @@ public class CustomersController(
     /// <summary>Gets all customers</summary>
     [RequirePermission(MalievPermissions.Customer.List)]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get(string? query = null, int page = 1, CancellationToken ct = default)
+    public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get(
+        [FromQuery] string? query = null,
+        [FromQuery] string? segment = null,
+        [FromQuery] string? tier = null,
+        [FromQuery] bool includeDeleted = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
     {
-        var result = await client.GetCustomersAsync(query, page, ct);
+        var result = await client.GetCustomersAsync(query, segment, tier, includeDeleted, page, pageSize, ct);
         return Ok(result);
     }
 

@@ -40,6 +40,40 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void TopBar_UsesLogoForDashboardAndProfileMenuHasSignOut()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
+
+        Assert.DoesNotContain("new(\"Dashboard\"", source, StringComparison.Ordinal);
+        Assert.Contains("Navigation.NavigateTo(\"/\")", source, StringComparison.Ordinal);
+        Assert.Contains("My Profile", source, StringComparison.Ordinal);
+        Assert.Contains("Preferences", source, StringComparison.Ordinal);
+        Assert.Contains("Sign out", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProjectsPage_UsesSharedShellAndQueryBackedPagination()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Projects.razor");
+
+        Assert.Contains("ModuleHeader Title=\"Projects\"", source, StringComparison.Ordinal);
+        Assert.Contains("[SupplyParameterFromQuery(Name = \"status\")]", source, StringComparison.Ordinal);
+        Assert.Contains("PaginationFooter", source, StringComparison.Ordinal);
+        Assert.Contains("pageSize={_pageSize}", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CustomerList_UsesServerPaginationInsteadOfFixedFirstPage()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");
+
+        Assert.Contains("PaginationFooter", source, StringComparison.Ordinal);
+        Assert.Contains("pageSize={_pageSize}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("page=1&pageSize=50", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("FilteredCustomers", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_CurrencySelectorTrigger_RemainsCompact()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");

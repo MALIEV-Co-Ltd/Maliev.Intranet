@@ -16,15 +16,16 @@
     <PageBody>
         <div class="mlv-toolbar">
             <div class="mlv-toolbar-left">
-                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search customers..." OnEnter="LoadAsync" />
+                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search customers..." OnEnter="SearchAsync" />
                 <div class="mlv-segmented">
                     @foreach (var filter in _filters)
                     {
-                        <button type="button" class="@(_filter == filter.Value ? "active" : "")" @onclick="@(() => SetFilter(filter.Value))">@filter.Label</button>
+                        <button type="button" class="@(_filter == filter.Key ? "active" : "")" @onclick="@(() => SetFilterAsync(filter.Key))">@filter.Label</button>
                     }
                 </div>
             </div>
             <div class="mlv-toolbar-right">
+                <SecondaryButton Icon="@Icons.Material.Outlined.Search" OnClick="@SearchClickedAsync">Search</SecondaryButton>
                 <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
             </div>
         </div>
@@ -40,7 +41,7 @@
         }
 
         <PanelCard>
-            @if (FilteredCustomers.Count > 0)
+            @if (_customers.Count > 0)
             {
                 <table class="mlv-table">
                     <thead>
@@ -54,7 +55,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var customer in FilteredCustomers)
+                        @foreach (var customer in _customers)
                         {
                             <tr @onclick="@(() => Navigation.NavigateTo($"/customers/{customer.Id}"))">
                                 <td>
@@ -81,49 +82,65 @@
                 <div class="mlv-empty">No customers match this view.</div>
             }
         </PanelCard>
+
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
     </PageBody>
 </div>
 
 @code {
     [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "filter")] public string? Filter { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public int? QueryPageSize { get; set; }
 
-    private readonly (string Label, string Value)[] _filters =
+    private sealed record CustomerFilter(string Key, string Label, string? Segment = null, string? Tier = null, bool IncludeDeleted = false);
+
+    private readonly CustomerFilter[] _filters =
     [
-        ("All", "all"),
-        ("Company", "company"),
-        ("Private", "private"),
-        ("VIP", "vip"),
-        ("Inactive", "inactive")
+        new("all", "All"),
+        new("enterprise", "Enterprise", Segment: "Enterprise"),
+        new("vip", "VIP", Tier: "VIP"),
+        new("deleted", "Deleted", IncludeDeleted: true)
     ];
 
     private List<CustomerSummaryDto> _customers = [];
+    private PaginationMeta _meta = new();
     private bool _loading = true;
     private string _filter = "all";
     private string? _search;
     private string? _error;
+    private int _page = 1;
+    private int _pageSize = 20;
+    private bool _realtimeStarted;
 
-    private List<CustomerSummaryDto> FilteredCustomers => _filter switch
-    {
-        "company" => _customers.Where(c => c.CompanyId.HasValue).ToList(),
-        "private" => _customers.Where(c => !c.CompanyId.HasValue).ToList(),
-        "vip" => _customers.Where(c => string.Equals(c.Tier, "VIP", StringComparison.OrdinalIgnoreCase) || string.Equals(c.Segment, "VIP", StringComparison.OrdinalIgnoreCase)).ToList(),
-        "inactive" => _customers.Where(c => !string.Equals(c.Status, "Active", StringComparison.OrdinalIgnoreCase)).ToList(),
-        _ => _customers
-    };
+    private CustomerFilter ActiveFilter => _filters.FirstOrDefault(f => f.Key == _filter) ?? _filters[0];
 
     protected override async Task OnInitializedAsync()
     {
-        _search = Search;
         CustomerRealtime.OnCustomerChanged += OnCustomerChangedAsync;
         try
         {
             await CustomerRealtime.StartAsync();
+            _realtimeStarted = true;
         }
         catch (Exception ex)
         {
             Snackbar.Add("Realtime customer updates are unavailable.", Severity.Warning);
             Console.WriteLine(ex.Message);
         }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _search = Search;
+        _filter = _filters.Any(f => f.Key == Filter) ? Filter! : "all";
+        _page = Math.Max(1, QueryPage ?? 1);
+        _pageSize = NormalizePageSize(QueryPageSize ?? 20);
         await LoadAsync();
     }
 
@@ -133,19 +150,47 @@
         StateHasChanged();
     });
 
-    private async Task OnSearchChanged(string? value)
+    private Task OnSearchChanged(string? value)
     {
         _search = value;
-        await LoadAsync();
+        return Task.CompletedTask;
     }
 
-    private async Task SetFilter(string filter)
+    private async Task SearchAsync()
+    {
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task SearchClickedAsync(MouseEventArgs _) => await SearchAsync();
+
+    private async Task SetFilterAsync(string filter)
     {
         _filter = filter;
-        await Task.CompletedTask;
+        _page = 1;
+        await NavigateAndLoadAsync();
     }
 
     private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = NormalizePageSize(pageSize);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task NavigateAndLoadAsync()
+    {
+        Navigation.NavigateTo(BuildPageUri(), replace: true);
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
@@ -153,14 +198,11 @@
         _error = null;
         try
         {
-            var url = $"api/v1/customers?page=1&pageSize=50";
-            if (!string.IsNullOrWhiteSpace(_search))
-            {
-                url += $"&query={Uri.EscapeDataString(_search)}";
-            }
-
-            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(url);
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(BuildApiUrl());
             _customers = response?.Data.ToList() ?? [];
+            _meta = response?.Meta ?? new();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
         }
         catch (Exception ex)
         {
@@ -174,9 +216,46 @@
         }
     }
 
+    private string BuildApiUrl()
+    {
+        var filter = ActiveFilter;
+        var query = new List<string>
+        {
+            $"page={_page}",
+            $"pageSize={_pageSize}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(_search)) query.Add($"query={Uri.EscapeDataString(_search)}");
+        if (!string.IsNullOrWhiteSpace(filter.Segment)) query.Add($"segment={Uri.EscapeDataString(filter.Segment)}");
+        if (!string.IsNullOrWhiteSpace(filter.Tier)) query.Add($"tier={Uri.EscapeDataString(filter.Tier)}");
+        if (filter.IncludeDeleted) query.Add("includeDeleted=true");
+
+        return $"api/v1/customers?{string.Join("&", query)}";
+    }
+
+    private string BuildPageUri()
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_search)) query.Add($"search={Uri.EscapeDataString(_search)}");
+        if (_filter != "all") query.Add($"filter={Uri.EscapeDataString(_filter)}");
+        if (_page > 1) query.Add($"page={_page}");
+        if (_pageSize != 20) query.Add($"pageSize={_pageSize}");
+        return query.Count == 0 ? "/customers" : $"/customers?{string.Join("&", query)}";
+    }
+
+    private static int NormalizePageSize(int pageSize) => pageSize switch
+    {
+        <= 10 => 10,
+        <= 20 => 20,
+        _ => 50
+    };
+
     public async ValueTask DisposeAsync()
     {
         CustomerRealtime.OnCustomerChanged -= OnCustomerChangedAsync;
-        await CustomerRealtime.DisposeAsync();
+        if (_realtimeStarted)
+        {
+            await CustomerRealtime.DisposeAsync();
+        }
     }
 }

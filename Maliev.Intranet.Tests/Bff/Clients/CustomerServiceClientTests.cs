@@ -193,6 +193,37 @@ public class CustomerServiceClientTests
     }
 
     [Fact]
+    public async Task GetCustomersAsync_ForwardsPaginationAndSupportedFilters()
+    {
+        var response = new
+        {
+            items = new List<CustomerSummaryDto> { new() { Name = "Test" } },
+            totalCount = 1,
+            page = 2,
+            pageSize = 10,
+            totalPages = 4
+        };
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m =>
+                    m.RequestUri!.PathAndQuery == "/customer/v1/customers?page=2&pageSize=10&sortBy=createdAt&sortDirection=desc&query=acme&segment=Enterprise&tier=VIP&includeDeleted=true"),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(response)
+            });
+
+        var result = await _client.GetCustomersAsync("acme", "Enterprise", "VIP", includeDeleted: true, page: 2, pageSize: 10);
+
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Meta.CurrentPage);
+        Assert.Equal(10, result.Meta.PageSize);
+        Assert.Equal(4, result.Meta.TotalPages);
+    }
+
+    [Fact]
     public async Task UpdateAddressAsync_ShouldReturnTrue()
     {
         _httpMessageHandlerMock.Protected()
