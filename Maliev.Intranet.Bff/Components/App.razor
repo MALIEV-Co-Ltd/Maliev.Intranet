@@ -50,20 +50,17 @@
             border-radius: 8px;
             background: var(--maliev-panel, #fff);
             box-shadow: var(--maliev-shadow-lg, 0 12px 40px rgba(10,20,40,0.15));
+            display: grid;
+            justify-items: center;
+            text-align: center;
         }
 
-        .wasm-loading-mark {
-            width: 34px;
-            height: 34px;
-            border-radius: 7px;
+        .wasm-loading-animation {
             display: grid;
             place-items: center;
+            min-height: 82px;
+            padding-top: 48px;
             margin-bottom: 14px;
-            background: var(--maliev-accent, #2563eb);
-            color: #fff;
-            font-family: 'JetBrains Mono', ui-monospace, monospace;
-            font-size: 14px;
-            font-weight: 700;
         }
 
         .wasm-loading-title {
@@ -73,31 +70,9 @@
         }
 
         .wasm-loading-subtitle {
-            margin: 6px 0 16px;
+            margin: 6px 0 0;
             color: var(--maliev-muted, #677088);
             font-size: 12px;
-        }
-
-        .wasm-loading-bar {
-            height: 3px;
-            overflow: hidden;
-            border-radius: 999px;
-            background: var(--maliev-panel-3, #eef1f6);
-        }
-
-        .wasm-loading-bar::before {
-            content: "";
-            display: block;
-            width: 40%;
-            height: 100%;
-            border-radius: inherit;
-            background: var(--maliev-accent, #2563eb);
-            animation: maliev-load 1.1s ease-in-out infinite;
-        }
-
-        @@keyframes maliev-load {
-            0% { transform: translateX(-110%); }
-            100% { transform: translateX(260%); }
         }
     </style>
 
@@ -166,10 +141,11 @@
 <body>
     <div id="wasm-loading" class="wasm-loading" aria-live="polite" aria-busy="true">
         <div class="wasm-loading-card">
-            <div class="wasm-loading-mark">M</div>
+            <div class="wasm-loading-animation">
+                <WasmLoadingAnimation />
+            </div>
             <p class="wasm-loading-title">Loading workspace</p>
             <p class="wasm-loading-subtitle">Starting the employee intranet locally.</p>
-            <div class="wasm-loading-bar"></div>
         </div>
     </div>
     <Routes @rendermode="WasmRenderMode" />

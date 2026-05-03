@@ -20,8 +20,10 @@ public class AppWasmRenderModeTests
 
         Assert.Contains("id=\"wasm-loading\"", source);
         Assert.Contains("Loading workspace", source);
+        Assert.Contains("<WasmLoadingAnimation", source);
         Assert.Contains("data-maliev-theme", source);
         Assert.Contains("maliev_theme", source);
+        Assert.DoesNotContain("wasm-loading-bar", source, StringComparison.Ordinal);
         Assert.DoesNotContain("maliev_accent_hue", source, StringComparison.Ordinal);
     }
 
