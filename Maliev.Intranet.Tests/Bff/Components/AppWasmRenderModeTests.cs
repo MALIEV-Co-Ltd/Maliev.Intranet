@@ -19,10 +19,16 @@ public class AppWasmRenderModeTests
         var source = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
 
         Assert.Contains("id=\"wasm-loading\"", source);
-        Assert.Contains("Loading workspace", source);
         Assert.Contains("<WasmLogoLoadingAnimation", source);
         Assert.Contains("data-maliev-theme", source);
         Assert.Contains("maliev_theme", source);
+        Assert.Contains("--maliev-logo-loader-fill: #000000", source);
+        Assert.Contains("--maliev-logo-loader-fill: #ffffff", source);
+        Assert.DoesNotContain("Loading workspace", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Starting the employee intranet locally.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("wasm-loading-card", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("wasm-loading-title", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("wasm-loading-subtitle", source, StringComparison.Ordinal);
         Assert.DoesNotContain("wasm-loading-bar", source, StringComparison.Ordinal);
         Assert.DoesNotContain("maliev_accent_hue", source, StringComparison.Ordinal);
     }

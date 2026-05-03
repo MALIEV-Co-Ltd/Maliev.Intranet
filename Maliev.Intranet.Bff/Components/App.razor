@@ -13,6 +13,11 @@
     <style>
         :root[data-maliev-theme="dark"] {
             color-scheme: dark;
+            --wasm-loader-bg: #0d1117;
+            --maliev-logo-loader-outline: color-mix(in oklch, #ffffff 24%, transparent);
+            --maliev-logo-loader-fill: #ffffff;
+            --wasm-logo-outline: var(--maliev-logo-loader-outline);
+            --wasm-logo-fill: var(--maliev-logo-loader-fill);
         }
         :root[data-maliev-theme="dark"] body {
             background-color: #0d1117 !important;
@@ -20,6 +25,11 @@
         }
         :root[data-maliev-theme="light"] {
             color-scheme: light;
+            --wasm-loader-bg: #ffffff;
+            --maliev-logo-loader-outline: color-mix(in oklch, #000000 24%, transparent);
+            --maliev-logo-loader-fill: #000000;
+            --wasm-logo-outline: var(--maliev-logo-loader-outline);
+            --wasm-logo-fill: var(--maliev-logo-loader-fill);
         }
         :root[data-maliev-theme="light"] body {
             background-color: #ffffff !important;
@@ -32,8 +42,8 @@
             z-index: 9999;
             display: grid;
             place-items: center;
-            background: var(--maliev-bg, #f5f7fa);
-            color: var(--maliev-ink, #1a2030);
+            background: var(--wasm-loader-bg, #ffffff);
+            color: var(--wasm-logo-fill, #000000);
             transition: opacity 180ms ease, visibility 180ms ease;
         }
 
@@ -43,36 +53,36 @@
             pointer-events: none;
         }
 
-        .wasm-loading-card {
-            width: min(360px, calc(100vw - 40px));
-            padding: 24px;
-            border: 1px solid var(--maliev-border, #e4e7ee);
-            border-radius: 8px;
-            background: var(--maliev-panel, #fff);
-            box-shadow: var(--maliev-shadow-lg, 0 12px 40px rgba(10,20,40,0.15));
-            display: grid;
-            justify-items: center;
-            text-align: center;
+        .wasm-loading .maliev-logo-loader {
+            --logo-width: clamp(150px, 38vw, 236px);
+            width: var(--logo-width);
+            aspect-ratio: 449.33078 / 103.18751;
+            position: relative;
+            color: transparent;
+            background: var(--wasm-logo-outline, color-mix(in oklch, #000000 24%, transparent));
+            -webkit-mask: url('/images/logo.svg') center / contain no-repeat;
+            mask: url('/images/logo.svg') center / contain no-repeat;
         }
 
-        .wasm-loading-animation {
-            display: grid;
-            place-items: center;
-            min-height: 68px;
-            padding: 8px 0 2px;
-            margin-bottom: 12px;
+        .wasm-loading .maliev-logo-loader::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: conic-gradient(var(--wasm-logo-fill, #000000) 0 0) 0 / 0% 100% no-repeat;
+            animation: maliev-logo-load 1s linear infinite;
         }
 
-        .wasm-loading-title {
-            margin: 0;
-            font-size: 16px;
-            font-weight: 700;
+        @@keyframes maliev-logo-load {
+            to {
+                background-size: 120% 100%;
+            }
         }
 
-        .wasm-loading-subtitle {
-            margin: 6px 0 0;
-            color: var(--maliev-muted, #677088);
-            font-size: 12px;
+        @@media (prefers-reduced-motion: reduce) {
+            .wasm-loading .maliev-logo-loader::after {
+                animation: none;
+                background-size: 120% 100%;
+            }
         }
     </style>
 
@@ -140,13 +150,7 @@
 
 <body>
     <div id="wasm-loading" class="wasm-loading" aria-live="polite" aria-busy="true">
-        <div class="wasm-loading-card">
-            <div class="wasm-loading-animation">
-                <WasmLogoLoadingAnimation />
-            </div>
-            <p class="wasm-loading-title">Loading workspace</p>
-            <p class="wasm-loading-subtitle">Starting the employee intranet locally.</p>
-        </div>
+        <WasmLogoLoadingAnimation />
     </div>
     <Routes @rendermode="WasmRenderMode" />
     <script src="_framework/blazor.web.js"></script>

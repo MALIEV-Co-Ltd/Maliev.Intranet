@@ -1,7 +1,7 @@
 .loader {
     --logo-width: clamp(150px, 38vw, 236px);
-    --logo-outline: color-mix(in oklch, var(--maliev-ink, #1a2030) 26%, transparent);
-    --logo-fill: var(--maliev-ink, #1a2030);
+    --logo-outline: var(--maliev-logo-loader-outline, color-mix(in oklch, #000000 24%, transparent));
+    --logo-fill: var(--maliev-logo-loader-fill, #000000);
     width: var(--logo-width);
     aspect-ratio: 449.33078 / 103.18751;
     position: relative;
@@ -19,9 +19,11 @@
     animation: maliev-logo-load 1s linear infinite;
 }
 
-:host-context([data-maliev-theme="dark"]) .loader {
-    --logo-outline: color-mix(in oklch, #ffffff 26%, transparent);
-    --logo-fill: #f8fafc;
+@media (prefers-color-scheme: dark) {
+    .loader {
+        --logo-outline: var(--maliev-logo-loader-outline, color-mix(in oklch, #ffffff 24%, transparent));
+        --logo-fill: var(--maliev-logo-loader-fill, #ffffff);
+    }
 }
 
 @keyframes maliev-logo-load {
