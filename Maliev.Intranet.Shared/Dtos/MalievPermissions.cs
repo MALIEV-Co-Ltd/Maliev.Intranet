@@ -14,6 +14,83 @@ public static class MalievPermissions
         public const string Manage = "iam.principals.manage";
         /// <summary>Permission to read IAM information.</summary>
         public const string Read = "iam.principals.read";
+
+        /// <summary>
+        /// Permissions for IAM principals.
+        /// </summary>
+        public static class Principals
+        {
+            /// <summary>Permission to create a principal.</summary>
+            public const string Create = "iam.principals.create";
+            /// <summary>Permission to read a principal.</summary>
+            public const string Read = "iam.principals.read";
+            /// <summary>Permission to update a principal.</summary>
+            public const string Update = "iam.principals.update";
+            /// <summary>Permission to delete a principal.</summary>
+            public const string Delete = "iam.principals.delete";
+            /// <summary>Permission to list principals.</summary>
+            public const string List = "iam.principals.list";
+        }
+
+        /// <summary>
+        /// Permissions for IAM roles.
+        /// </summary>
+        public static class Roles
+        {
+            /// <summary>Permission to create a role.</summary>
+            public const string Create = "iam.roles.create";
+            /// <summary>Permission to read a role.</summary>
+            public const string Read = "iam.roles.read";
+            /// <summary>Permission to update a role.</summary>
+            public const string Update = "iam.roles.update";
+            /// <summary>Permission to delete a role.</summary>
+            public const string Delete = "iam.roles.delete";
+            /// <summary>Permission to list roles.</summary>
+            public const string List = "iam.roles.list";
+        }
+
+        /// <summary>
+        /// Permissions for IAM permission catalog entries.
+        /// </summary>
+        public static class Permissions
+        {
+            /// <summary>Permission to create a permission.</summary>
+            public const string Create = "iam.permissions.create";
+            /// <summary>Permission to read a permission.</summary>
+            public const string Read = "iam.permissions.read";
+            /// <summary>Permission to update a permission.</summary>
+            public const string Update = "iam.permissions.update";
+            /// <summary>Permission to delete a permission.</summary>
+            public const string Delete = "iam.permissions.delete";
+            /// <summary>Permission to list permissions.</summary>
+            public const string List = "iam.permissions.list";
+        }
+
+        /// <summary>
+        /// Permissions for IAM role bindings.
+        /// </summary>
+        public static class Bindings
+        {
+            /// <summary>Permission to create a role binding.</summary>
+            public const string Create = "iam.bindings.create";
+            /// <summary>Permission to read a role binding.</summary>
+            public const string Read = "iam.bindings.read";
+            /// <summary>Permission to delete a role binding.</summary>
+            public const string Delete = "iam.bindings.delete";
+            /// <summary>Permission to list role bindings.</summary>
+            public const string List = "iam.bindings.list";
+        }
+
+        /// <summary>
+        /// Permissions for IAM audit records.
+        /// </summary>
+        public static class Audit
+        {
+            /// <summary>Permission to read audit records.</summary>
+            public const string Read = "iam.audit.read";
+            /// <summary>Permission to list audit records.</summary>
+            public const string List = "iam.audit.list";
+        }
     }
 
     /// <summary>
@@ -25,6 +102,26 @@ public static class MalievPermissions
         public const string Manage = "iam.principals.manage";
         /// <summary>Permission to read IAM information.</summary>
         public const string Read = "iam.principals.read";
+        /// <summary>Permission to create IAM principals.</summary>
+        public const string PrincipalsCreate = IAM.Principals.Create;
+        /// <summary>Permission to read IAM principals.</summary>
+        public const string PrincipalsRead = IAM.Principals.Read;
+        /// <summary>Permission to update IAM principals.</summary>
+        public const string PrincipalsUpdate = IAM.Principals.Update;
+        /// <summary>Permission to delete IAM principals.</summary>
+        public const string PrincipalsDelete = IAM.Principals.Delete;
+        /// <summary>Permission to list IAM principals.</summary>
+        public const string PrincipalsList = IAM.Principals.List;
+        /// <summary>Permission to list IAM roles.</summary>
+        public const string RolesList = IAM.Roles.List;
+        /// <summary>Permission to list IAM permissions.</summary>
+        public const string PermissionsList = IAM.Permissions.List;
+        /// <summary>Permission to create IAM role bindings.</summary>
+        public const string BindingsCreate = IAM.Bindings.Create;
+        /// <summary>Permission to list IAM role bindings.</summary>
+        public const string BindingsList = IAM.Bindings.List;
+        /// <summary>Permission to delete IAM role bindings.</summary>
+        public const string BindingsDelete = IAM.Bindings.Delete;
     }
 
     /// <summary>

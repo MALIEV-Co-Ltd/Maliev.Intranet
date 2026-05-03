@@ -122,6 +122,7 @@ try
     {
         client.BaseAddress = new Uri("http://IAMService");
     })
+    .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
     .AddServiceDiscovery();
 
     // Named client for IAM bootstrap (no UserContextHandler - token attached manually)

@@ -1,29 +1,37 @@
 @page "/iam/users/new"
+@using Maliev.Intranet.Shared
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
-<PageTitle>Invite IAM User | MALIEV Intranet</PageTitle>
+<PageTitle>Create IAM User | MALIEV Intranet</PageTitle>
 
 <div class="mlv-module-shell">
-    <PageHeader Title="Invite User" Subtitle="Queue an employee IAM invite." BackHref="/iam" />
+    <PageHeader Title="Create IAM User" Subtitle="Create an IAM principal and assign an initial role." BackHref="/iam" />
     <PageBody>
         @if (!string.IsNullOrWhiteSpace(_error))
         {
             <div class="mlv-error">@_error</div>
         }
 
-        <PanelCard Title="Invite">
+        <PanelCard Title="User access">
             <EditForm Model="@_request" OnValidSubmit="SaveAsync">
                 <DataAnnotationsValidator />
                 <FormGrid>
                     <FormField Label="Name"><InputText class="mlv-form-input" @bind-Value="_request.DisplayName" /></FormField>
                     <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_request.Email" /></FormField>
-                    <FormField Label="Role"><InputText class="mlv-form-input" @bind-Value="_request.RoleId" /></FormField>
+                    <FormField Label="Role">
+                        <InputSelect class="mlv-form-input" @bind-Value="_request.RoleId" disabled="@(_rolesLoading || _roles.Count == 0)">
+                            @foreach (var role in _roles)
+                            {
+                                <option value="@role.RoleId">@role.Name (@role.RoleId)</option>
+                            }
+                        </InputSelect>
+                    </FormField>
                 </FormGrid>
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
                     <SecondaryButton Href="/iam">Cancel</SecondaryButton>
-                    <PrimaryButton Type="submit" Disabled="@_saving">Send Invite</PrimaryButton>
+                    <PrimaryButton Type="submit" Disabled="@(_saving || _rolesLoading)">Create User</PrimaryButton>
                 </div>
             </EditForm>
         </PanelCard>
@@ -31,9 +39,31 @@
 </div>
 
 @code {
-    private InviteUserRequest _request = new() { RoleId = "engineer" };
+    private InviteUserRequest _request = new();
+    private List<RoleDto> _roles = [];
+    private bool _rolesLoading = true;
     private bool _saving;
     private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/v1/iam/roles") ?? [];
+            _request.RoleId = _roles.FirstOrDefault(role => role.RoleId == "roles.platform.viewer")?.RoleId
+                ?? _roles.FirstOrDefault()?.RoleId
+                ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _error = "IAM roles could not be loaded.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _rolesLoading = false;
+        }
+    }
 
     private async Task SaveAsync()
     {
@@ -44,17 +74,20 @@
             var response = await Http.PostAsJsonAsync("api/v1/iam/users/invite", _request);
             if (response.IsSuccessStatusCode)
             {
-                Snackbar.Add("Invite queued.", Severity.Success);
+                Snackbar.Add("IAM user created.", Severity.Success);
                 Navigation.NavigateTo("/iam");
             }
             else
             {
-                _error = "Invite could not be queued.";
+                var details = await response.Content.ReadAsStringAsync();
+                _error = string.IsNullOrWhiteSpace(details)
+                    ? "IAM user could not be created."
+                    : $"IAM user could not be created. {details}";
             }
         }
         catch (Exception ex)
         {
-            _error = "Invite could not be queued.";
+            _error = "IAM user could not be created.";
             Console.WriteLine(ex.Message);
         }
         finally

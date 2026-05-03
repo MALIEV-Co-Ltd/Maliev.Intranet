@@ -51,7 +51,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Default addresses", cut.Markup);
         Assert.Contains("Recent activity", cut.Markup);
         Assert.Contains("Password reset", cut.Markup);
-        Assert.Contains("Impersonate", cut.Markup);
+        Assert.DoesNotContain("Impersonate", cut.Markup);
         Assert.Contains("Discard", cut.Markup);
         Assert.Contains("Save", cut.Markup);
         Assert.DoesNotContain("mlv-stat-tile", cut.Markup, StringComparison.Ordinal);

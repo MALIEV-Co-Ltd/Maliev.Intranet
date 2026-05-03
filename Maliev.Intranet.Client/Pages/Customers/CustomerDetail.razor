@@ -11,7 +11,6 @@
         {
             <SecondaryButton Class="customer-action-email" Icon="@Icons.Material.Outlined.Email" OnClick="OpenEmailAsync">Email</SecondaryButton>
             <SecondaryButton Class="customer-action-password" Icon="@Icons.Material.Outlined.LockReset" OnClick="OpenPasswordResetAsync">Password reset</SecondaryButton>
-            <SecondaryButton Class="customer-action-impersonate" Icon="@Icons.Material.Outlined.PersonOutline" OnClick="ImpersonateAsync">Impersonate</SecondaryButton>
             <SecondaryButton OnClick="DiscardChangesAsync" Disabled="@_saving">Discard</SecondaryButton>
             <PrimaryButton Icon="@Icons.Material.Outlined.Check" OnClick="SaveCustomerAsync" Disabled="@_saving">Save</PrimaryButton>
         }
@@ -610,12 +609,6 @@
     {
         _passwordResetOpen = false;
         Snackbar.Add("Password reset workflow is not connected yet.", Severity.Info);
-        return Task.CompletedTask;
-    }
-
-    private Task ImpersonateAsync(MouseEventArgs _)
-    {
-        Snackbar.Add("Impersonation workflow is not connected yet.", Severity.Info);
         return Task.CompletedTask;
     }
 

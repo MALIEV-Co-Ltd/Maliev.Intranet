@@ -5,7 +5,7 @@
 <PageTitle>Admin | MALIEV Intranet</PageTitle>
 
 <div class="mlv-module-shell">
-    <ModuleHeader Title="Admin" Subtitle="Business settings, notifications, and platform operations." />
+    <ModuleHeader Title="Admin" Subtitle="Platform operations and notification configuration." />
 
     <PageBody>
         @if (_loading)
@@ -22,17 +22,9 @@
             </div>
         </div>
 
-        @if (_tab == "Company")
+        @if (_tab == "Operations")
         {
             <div class="mlv-grid">
-                <PanelCard Title="Business profile" Class="mlv-span-6">
-                    <FormGrid>
-                        <FormField Label="Company name"><input class="mlv-form-input" value="MALIEV Precision Manufacturing" readonly /></FormField>
-                        <FormField Label="Industry"><input class="mlv-form-input" value="CNC and additive manufacturing" readonly /></FormField>
-                        <FormField Label="Website"><input class="mlv-form-input" value="https://maliev.com" readonly /></FormField>
-                        <FormField Label="Support email"><input class="mlv-form-input" value="ops@maliev.com" readonly /></FormField>
-                    </FormGrid>
-                </PanelCard>
                 <PanelCard Title="Operations" Class="mlv-span-6">
                     <div class="mlv-list">
                         <div class="mlv-list-row">
@@ -69,7 +61,7 @@
                     }
                     else
                     {
-                        <div class="mlv-empty">Health data is not available.</div>
+                        <div class="mlv-empty">@_healthError</div>
                     }
                 </PanelCard>
             </div>
@@ -96,7 +88,7 @@
                 }
                 else
                 {
-                    <div class="mlv-empty">No notification templates found.</div>
+                    <div class="mlv-empty">@_notificationError</div>
                 }
             </PanelCard>
         }
@@ -104,31 +96,63 @@
 </div>
 
 @code {
-    private readonly string[] _tabs = ["Company", "Notifications"];
+    private readonly string[] _tabs = ["Operations", "Notifications"];
 
-    private string _tab = "Company";
+    private string _tab = "Operations";
     private List<NotificationTemplateDto> _templates = [];
     private SystemHealthDto? _health;
     private bool _loading = true;
+    private string _healthError = "Health data is not available.";
+    private string _notificationError = "No notification templates are registered.";
 
     protected override async Task OnInitializedAsync()
     {
+        _loading = true;
         try
         {
-            var templatesTask = Http.GetFromJsonAsync<PagedResponse<NotificationTemplateDto>>("api/v1/notifications/templates?page=1&pageSize=50");
-            var healthTask = Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
-            await Task.WhenAll(templatesTask, healthTask);
-            _templates = (await templatesTask)?.Data.ToList() ?? [];
-            _health = await healthTask;
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add("Admin data could not be loaded.", Severity.Warning);
-            Console.WriteLine(ex.Message);
+            await LoadHealthAsync();
         }
         finally
         {
-            _loading = false;
+            try
+            {
+                await LoadNotificationTemplatesAsync();
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private async Task LoadHealthAsync()
+    {
+        try
+        {
+            _health = await Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
+        }
+        catch (Exception ex)
+        {
+            _health = null;
+            _healthError = "Health data could not be loaded.";
+            Snackbar.Add(_healthError, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task LoadNotificationTemplatesAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<NotificationTemplateDto>>("api/v1/notifications/templates?page=1&pageSize=50");
+            _templates = response?.Data.ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            _templates = [];
+            _notificationError = "Notification templates could not be loaded.";
+            Snackbar.Add(_notificationError, Severity.Warning);
+            Console.WriteLine(ex.Message);
         }
     }
 }

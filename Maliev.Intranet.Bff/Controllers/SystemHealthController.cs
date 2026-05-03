@@ -38,7 +38,7 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         new("PdfService", "Platform", "pdf", false),
         new("GeometryService", "Manufacturing", "geometry", true),
         new("PricingService", "Manufacturing", "pricing", true),
-        new("PredictionService", "Manufacturing", "prediction", false),
+        new("PredictionService", "Manufacturing", "predictionservice", false),
         new("CurrencyService", "Reference", "currency", false),
         new("CountryService", "Reference", "country", false),
         new("RegistryService", "Reference", "registry", false),
@@ -155,6 +155,6 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         string RoutePrefix,
         bool IsCritical)
     {
-        public string HealthPath { get; } = $"/{RoutePrefix}/liveness";
+        public string HealthPath { get; } = $"/{RoutePrefix}/aspire-liveness";
     }
 }

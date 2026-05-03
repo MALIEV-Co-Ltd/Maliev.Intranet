@@ -24,20 +24,25 @@ public class IamController(
     IAuthorizationService authorizationService,
     IWebHostEnvironment env) : ControllerBase
 {
-    private async Task<bool> IsAuthorizedAsync()
+    private async Task<bool> IsAuthorizedAsync(params string[] permissions)
     {
-        // 1. Check if user has explicit permission (Standard Path)
-        // Use standard policy name format expected by the platform's PermissionAuthorizationPolicyProvider
         const string permissionPrefix = "Permission:";
-        var authResult = await authorizationService.AuthorizeAsync(User, $"{permissionPrefix}{MalievPermissions.Iam.Manage}");
-        if (authResult.Succeeded) return true;
+        foreach (var permission in permissions)
+        {
+            var authResult = await authorizationService.AuthorizeAsync(User, $"{permissionPrefix}{permission}");
+            if (authResult.Succeeded)
+            {
+                return true;
+            }
+        }
 
-        // 2. Bootstrap logic (Development Only)
-        // Calls promote directly — the IAM endpoint has its own guard (humanUsers.Count <= 1)
         if (env.IsDevelopment())
         {
             var promoted = await client.PromoteCallerToAdminAsync();
-            if (promoted) return true;
+            if (promoted)
+            {
+                return true;
+            }
         }
 
         return false;
@@ -47,14 +52,14 @@ public class IamController(
     /// Retrieves all principals (users and service accounts) for the IAM console.
     /// </summary>
     /// <returns>A list of principals.</returns>
-    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Principals.List, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("users")]
     public async Task<ActionResult<PagedResponse<PrincipalSummaryDto>>> GetUsers(
         [FromQuery] string? search = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Principals.List)) return Forbid();
 
         var principals = await client.GetPrincipalsAsync();
         if (!string.IsNullOrWhiteSpace(search))
@@ -94,11 +99,11 @@ public class IamController(
     /// Retrieves all roles for the IAM console.
     /// </summary>
     /// <returns>A list of roles.</returns>
-    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Roles.List, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("roles")]
     public async Task<ActionResult<List<RoleDto>>> GetRoles()
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Roles.List)) return Forbid();
         var roles = await client.GetRolesAsync();
         return Ok(roles);
     }
@@ -107,11 +112,11 @@ public class IamController(
     /// Retrieves all permissions for the IAM console.
     /// </summary>
     /// <returns>A list of permissions.</returns>
-    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Permissions.List, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("permissions")]
     public async Task<ActionResult<List<PermissionDto>>> GetPermissions()
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Permissions.List)) return Forbid();
         var permissions = await client.GetPermissionsAsync();
         return Ok(permissions);
     }
@@ -121,11 +126,11 @@ public class IamController(
     /// </summary>
     /// <param name="principalId">The principal ID.</param>
     /// <returns>The list of role bindings.</returns>
-    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Bindings.List, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("users/{principalId}/roles")]
     public async Task<ActionResult<List<RoleBindingDto>>> GetUserRoles(Guid principalId)
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Bindings.List)) return Forbid();
         var roles = await client.GetPrincipalRolesAsync(principalId);
         return Ok(roles);
     }
@@ -136,11 +141,11 @@ public class IamController(
     /// <param name="principalId">The principal ID.</param>
     /// <param name="request">The grant request.</param>
     /// <returns>Success status.</returns>
-    [RequirePermission(MalievPermissions.IAM.Manage, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Bindings.Create, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("users/{principalId}/roles")]
     public async Task<IActionResult> GrantRole(Guid principalId, [FromBody] GrantRoleRequestDto request)
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Bindings.Create)) return Forbid();
         var success = await client.GrantRoleAsync(principalId, request);
         return success ? Ok() : BadRequest("Failed to grant role.");
     }
@@ -151,11 +156,11 @@ public class IamController(
     /// <param name="principalId">The principal ID.</param>
     /// <param name="bindingId">The unique binding ID.</param>
     /// <returns>Success status.</returns>
-    [RequirePermission(MalievPermissions.IAM.Manage, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Bindings.Delete, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpDelete("users/{principalId}/roles/{bindingId}")]
     public async Task<IActionResult> RevokeRole(Guid principalId, Guid bindingId)
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Bindings.Delete)) return Forbid();
         var success = await client.RevokeRoleAsync(principalId, bindingId);
         return success ? Ok() : BadRequest("Failed to revoke role.");
     }
@@ -165,11 +170,11 @@ public class IamController(
     /// </summary>
     /// <param name="request">The invite request.</param>
     /// <returns>An accepted response containing the queued invite data.</returns>
-    [RequirePermission(MalievPermissions.IAM.Manage, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Principals.Create, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("users/invite")]
     public async Task<IActionResult> InviteUser([FromBody] InviteUserRequest request)
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Principals.Create)) return Forbid();
         var principal = await client.CreatePrincipalAsync(request.Email, request.DisplayName);
         if (principal is null)
         {
@@ -194,11 +199,11 @@ public class IamController(
     /// <param name="principalId">The principal identifier.</param>
     /// <param name="request">The patch request.</param>
     /// <returns>An accepted response containing the requested state.</returns>
-    [RequirePermission(MalievPermissions.IAM.Manage, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Principals.Update, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPatch("users/{principalId:guid}")]
     public async Task<IActionResult> PatchUser(Guid principalId, [FromBody] PatchUserRequest request)
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Principals.Update)) return Forbid();
         return Accepted(new { PrincipalId = principalId, request.DisplayName, request.IsEnabled, Status = "Queued" });
     }
 
@@ -207,11 +212,11 @@ public class IamController(
     /// </summary>
     /// <param name="principalId">The principal identifier.</param>
     /// <returns>A stable activity response shape.</returns>
-    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Audit.List, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("users/{principalId:guid}/activity")]
     public async Task<IActionResult> GetUserActivity(Guid principalId)
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Audit.List, MalievPermissions.IAM.Principals.Read)) return Forbid();
         return Ok(Array.Empty<object>());
     }
 
@@ -220,11 +225,11 @@ public class IamController(
     /// </summary>
     /// <param name="roleId">The role identifier.</param>
     /// <returns>A role-to-permission matrix derived from IAM role data.</returns>
-    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.IAM.Roles.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("roles/{roleId}/permissions-matrix")]
     public async Task<IActionResult> GetRolePermissionsMatrix(string roleId)
     {
-        if (!await IsAuthorizedAsync()) return Forbid();
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Roles.Read, MalievPermissions.IAM.Roles.List)) return Forbid();
         var roles = await client.GetRolesAsync();
         var role = roles.FirstOrDefault(r => string.Equals(r.RoleId, roleId, StringComparison.OrdinalIgnoreCase));
         if (role is null) return NotFound();
