@@ -1,0 +1,38 @@
+.loader {
+    --logo-width: clamp(150px, 38vw, 236px);
+    --logo-outline: color-mix(in oklch, var(--maliev-ink, #1a2030) 26%, transparent);
+    --logo-fill: var(--maliev-ink, #1a2030);
+    width: var(--logo-width);
+    aspect-ratio: 449.33078 / 103.18751;
+    position: relative;
+    color: transparent;
+    background: var(--logo-outline);
+    -webkit-mask: url('/images/logo.svg') center / contain no-repeat;
+    mask: url('/images/logo.svg') center / contain no-repeat;
+}
+
+.loader::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: conic-gradient(var(--logo-fill) 0 0) 0 / 0% 100% no-repeat;
+    animation: maliev-logo-load 1s linear infinite;
+}
+
+:host-context([data-maliev-theme="dark"]) .loader {
+    --logo-outline: color-mix(in oklch, #ffffff 26%, transparent);
+    --logo-fill: #f8fafc;
+}
+
+@keyframes maliev-logo-load {
+    to {
+        background-size: 120% 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loader::after {
+        animation: none;
+        background-size: 120% 100%;
+    }
+}

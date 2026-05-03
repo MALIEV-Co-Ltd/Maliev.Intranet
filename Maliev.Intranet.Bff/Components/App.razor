@@ -58,9 +58,9 @@
         .wasm-loading-animation {
             display: grid;
             place-items: center;
-            min-height: 82px;
-            padding-top: 48px;
-            margin-bottom: 14px;
+            min-height: 68px;
+            padding: 8px 0 2px;
+            margin-bottom: 12px;
         }
 
         .wasm-loading-title {
@@ -142,7 +142,7 @@
     <div id="wasm-loading" class="wasm-loading" aria-live="polite" aria-busy="true">
         <div class="wasm-loading-card">
             <div class="wasm-loading-animation">
-                <WasmLoadingAnimation />
+                <WasmLogoLoadingAnimation />
             </div>
             <p class="wasm-loading-title">Loading workspace</p>
             <p class="wasm-loading-subtitle">Starting the employee intranet locally.</p>
