@@ -58,6 +58,83 @@ public class CustomerServiceClientTests
     }
 
     [Fact]
+    public async Task CreateAddressesAsync_WithBillingOnlyAndNoExistingShipping_CreatesDefaultShippingAddress()
+    {
+        var customerId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        var postedAddressPayloads = new List<string>();
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m =>
+                    m.Method == HttpMethod.Get &&
+                    m.RequestUri!.PathAndQuery.Contains($"/addresses?ownerType=Customer&ownerId={customerId}")),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new List<AddressResponse>())
+            });
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m =>
+                    m.Method == HttpMethod.Post &&
+                    m.RequestUri!.PathAndQuery.Contains("/addresses")),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(async (HttpRequestMessage message, CancellationToken _) =>
+            {
+                postedAddressPayloads.Add(await message.Content!.ReadAsStringAsync());
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new AddressResponse { Id = Guid.NewGuid() })
+                };
+            });
+
+        var result = await _client.CreateAddressesAsync(customerId,
+        [
+            new CreateAddressRequest
+            {
+                Type = "Billing",
+                IsDefault = true,
+                AddressLine1 = "36/1 Moo 3",
+                AddressLine2 = "Unit A",
+                AddressLine3 = "Building B",
+                District = "Khlong Khoi",
+                City = "Pak Kret",
+                StateProvince = "Nonthaburi",
+                PostalCode = "11120",
+                CountryId = countryId,
+                RecipientName = "Natthaphon",
+                RecipientPhone = "028816002"
+            }
+        ]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(2, postedAddressPayloads.Count);
+
+        using var billingPayload = System.Text.Json.JsonDocument.Parse(postedAddressPayloads[0]);
+        using var shippingPayload = System.Text.Json.JsonDocument.Parse(postedAddressPayloads[1]);
+        var billingRoot = billingPayload.RootElement;
+        var shippingRoot = shippingPayload.RootElement;
+
+        Assert.Equal("Billing", billingRoot.GetProperty("type").GetString());
+        Assert.Equal("Shipping", shippingRoot.GetProperty("type").GetString());
+        Assert.True(shippingRoot.GetProperty("isDefault").GetBoolean());
+        Assert.Equal(billingRoot.GetProperty("addressLine1").GetString(), shippingRoot.GetProperty("addressLine1").GetString());
+        Assert.Equal(billingRoot.GetProperty("addressLine2").GetString(), shippingRoot.GetProperty("addressLine2").GetString());
+        Assert.Equal(billingRoot.GetProperty("addressLine3").GetString(), shippingRoot.GetProperty("addressLine3").GetString());
+        Assert.Equal(billingRoot.GetProperty("district").GetString(), shippingRoot.GetProperty("district").GetString());
+        Assert.Equal(billingRoot.GetProperty("city").GetString(), shippingRoot.GetProperty("city").GetString());
+        Assert.Equal(billingRoot.GetProperty("stateProvince").GetString(), shippingRoot.GetProperty("stateProvince").GetString());
+        Assert.Equal(billingRoot.GetProperty("postalCode").GetString(), shippingRoot.GetProperty("postalCode").GetString());
+        Assert.Equal(billingRoot.GetProperty("countryId").GetString(), shippingRoot.GetProperty("countryId").GetString());
+        Assert.Equal(billingRoot.GetProperty("recipientName").GetString(), shippingRoot.GetProperty("recipientName").GetString());
+        Assert.Equal(billingRoot.GetProperty("recipientPhone").GetString(), shippingRoot.GetProperty("recipientPhone").GetString());
+    }
+
+    [Fact]
     public async Task GetCustomerByIdAsync_ShouldAggregateData()
     {
         var customerId = Guid.NewGuid();

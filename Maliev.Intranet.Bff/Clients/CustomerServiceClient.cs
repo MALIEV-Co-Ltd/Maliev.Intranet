@@ -54,8 +54,9 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// </summary>
     public virtual async Task<List<AddressResponse>> CreateAddressesAsync(Guid customerId, List<CreateAddressRequest> addresses, CancellationToken ct = default)
     {
+        var addressesToCreate = await EnsureDefaultShippingAddressAsync(customerId, addresses, ct);
         var results = new List<AddressResponse>();
-        foreach (var address in addresses)
+        foreach (var address in addressesToCreate)
         {
             var response = await httpClient.PostAsJsonAsync("/customer/v1/addresses", new
             {
@@ -83,6 +84,71 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         }
         return results;
     }
+
+    private async Task<IReadOnlyList<CreateAddressRequest>> EnsureDefaultShippingAddressAsync(
+        Guid customerId,
+        IReadOnlyList<CreateAddressRequest> addresses,
+        CancellationToken ct)
+    {
+        if (addresses.Count == 0 || addresses.Any(IsShippingAddress))
+            return addresses;
+
+        var billingAddress = addresses.FirstOrDefault(IsBillingAddress);
+        if (billingAddress is null || !HasRequiredAddressFields(billingAddress))
+            return addresses;
+
+        try
+        {
+            var existingAddresses = await httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Customer&ownerId={customerId}", ct) ?? [];
+            if (existingAddresses.Any(IsShippingAddress))
+                return addresses;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not check existing shipping address for customer {CustomerId}; applying billing address fallback.", customerId);
+        }
+
+        var normalizedAddresses = addresses.ToList();
+        normalizedAddresses.Add(CloneAsShippingAddress(billingAddress));
+        return normalizedAddresses;
+    }
+
+    private static CreateAddressRequest CloneAsShippingAddress(CreateAddressRequest billingAddress)
+    {
+        return new CreateAddressRequest
+        {
+            Type = "Shipping",
+            IsDefault = true,
+            AddressLine1 = billingAddress.AddressLine1,
+            AddressLine2 = billingAddress.AddressLine2,
+            AddressLine3 = billingAddress.AddressLine3,
+            District = billingAddress.District,
+            City = billingAddress.City,
+            StateProvince = billingAddress.StateProvince,
+            PostalCode = billingAddress.PostalCode,
+            CountryId = billingAddress.CountryId,
+            RecipientName = billingAddress.RecipientName,
+            RecipientPhone = billingAddress.RecipientPhone
+        };
+    }
+
+    private static bool HasRequiredAddressFields(CreateAddressRequest address)
+    {
+        return !string.IsNullOrWhiteSpace(address.AddressLine1)
+            && !string.IsNullOrWhiteSpace(address.City)
+            && !string.IsNullOrWhiteSpace(address.StateProvince)
+            && !string.IsNullOrWhiteSpace(address.PostalCode)
+            && address.CountryId != Guid.Empty;
+    }
+
+    private static bool IsBillingAddress(CreateAddressRequest address) =>
+        string.Equals(address.Type, "Billing", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsShippingAddress(CreateAddressRequest address) =>
+        string.Equals(address.Type, "Shipping", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsShippingAddress(AddressResponse address) =>
+        string.Equals(address.Type, "Shipping", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Retrieves a paged list of customers, optionally filtered by a search query.
