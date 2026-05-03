@@ -40,7 +40,7 @@ public static class ProjectQuotationPdfMapper
             ? "Individual"
             : "Corporate";
         var billingAddress = ResolveBillingAddress(customerDetail);
-        var shippingAddress = ResolveShippingAddress(customerDetail);
+        var shippingAddress = ResolveShippingAddress(customerDetail) ?? billingAddress;
         var billingAddressLines = FormatAddressLines(billingAddress);
         var shippingAddressLines = FormatAddressLines(shippingAddress);
         var isThaiCustomer = ContainsThai(ResolveCustomerName(selectedCustomer, customerDetail))

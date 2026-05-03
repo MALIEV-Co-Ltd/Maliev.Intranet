@@ -200,6 +200,44 @@ public class ProjectQuotationPdfMapperTests
     }
 
     /// <summary>
+    /// Verifies quotation PDFs default missing shipping address details from billing address details.
+    /// </summary>
+    [Fact]
+    public void BuildDraftPdfData_WithBillingOnly_DefaultsShippingAddressToBillingAddress()
+    {
+        var data = ProjectQuotationPdfMapper.BuildDraftPdfData(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            new CustomerSummaryDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "Jane Buyer",
+                CompanyName = "Acme Thailand",
+            },
+            new CustomerDetailDto
+            {
+                Name = "Jane Buyer",
+                CompanyName = "Acme Thailand",
+                CompanyBillingAddress = new AddressResponse
+                {
+                    Type = "Billing",
+                    AddressLine1 = "88 Billing Road",
+                    District = "Khlong Toei",
+                    City = "Khlong Toei",
+                    StateProvince = "Bangkok",
+                    PostalCode = "10110",
+                },
+            },
+            "THB",
+            DateTime.SpecifyKind(new DateTime(2026, 5, 2), DateTimeKind.Utc),
+            "Standard: 5 - 8 business days after order confirmation",
+            [],
+            []);
+
+        Assert.Equal(data.BillingAddress, data.ShippingAddress);
+        Assert.Equal(data.BillingAddressLines, data.ShippingAddressLines);
+    }
+
+    /// <summary>
     /// Verifies selected display currency, shipping, manual discount, and user-entered terms are mapped to the PDF payload.
     /// </summary>
     [Fact]
