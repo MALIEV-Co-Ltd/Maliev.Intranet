@@ -151,7 +151,8 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
                 line.AccountId,
                 debitAmount = line.Debit,
                 creditAmount = line.Credit,
-                line.Description
+                line.Description,
+                line.Reference
             }).ToList()
         };
 
@@ -474,6 +475,8 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
 
         public string? Description { get; set; }
 
+        public string? Reference { get; set; }
+
         public JournalEntryLineDto ToDto() => new()
         {
             Id = Id,
@@ -483,7 +486,8 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
             AccountName = AccountName,
             Debit = DebitAmount,
             Credit = CreditAmount,
-            Description = Description ?? string.Empty
+            Description = Description ?? string.Empty,
+            Reference = Reference
         };
     }
 }

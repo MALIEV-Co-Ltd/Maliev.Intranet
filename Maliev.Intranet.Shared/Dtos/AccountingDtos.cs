@@ -196,6 +196,11 @@ public sealed record JournalEntryLineDto
     /// A description for this specific line item.
     /// </summary>
     public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// An optional source document, slip, or external reference for this line.
+    /// </summary>
+    public string? Reference { get; set; }
 }
 
 /// <summary>

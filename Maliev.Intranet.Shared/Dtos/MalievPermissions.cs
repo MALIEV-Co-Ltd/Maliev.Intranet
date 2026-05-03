@@ -350,8 +350,16 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view chart of accounts and balances.</summary>
         public const string Read = "accounting.accounts.read";
-        /// <summary>Permission to manage accounts and financial configurations.</summary>
-        public const string Write = "accounting.accounts.write";
+        /// <summary>Permission to update accounts and financial configurations.</summary>
+        public const string Write = "accounting.accounts.update";
+        /// <summary>Permission to open accounting periods.</summary>
+        public const string PeriodsOpen = "accounting.periods.open";
+        /// <summary>Permission to close accounting periods.</summary>
+        public const string PeriodsClose = "accounting.periods.close";
+        /// <summary>Permission to reopen accounting periods.</summary>
+        public const string PeriodsReopen = "accounting.periods.reopen";
+        /// <summary>Permission to run reconciliation.</summary>
+        public const string ReconciliationRun = "accounting.reconciliation.run";
 
         /// <summary>
         /// Permissions for journal entry management.
@@ -359,9 +367,13 @@ public static class MalievPermissions
         public static class Journal
         {
             /// <summary>Permission to view accounting journal entries.</summary>
-            public const string Read = "accounting.journals.read";
-            /// <summary>Permission to post or adjust journal entries.</summary>
-            public const string Write = "accounting.journals.write";
+            public const string Read = "accounting.journal-entries.read";
+            /// <summary>Permission to create journal entries.</summary>
+            public const string Create = "accounting.journal-entries.create";
+            /// <summary>Permission to update journal entries.</summary>
+            public const string Write = "accounting.journal-entries.update";
+            /// <summary>Permission to post journal entries.</summary>
+            public const string Post = "accounting.journal-entries.post";
         }
     }
 

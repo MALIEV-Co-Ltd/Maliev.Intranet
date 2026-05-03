@@ -99,7 +99,8 @@ public class AccountingServiceClientTests
         {
             Date = new DateTime(2026, 05, 10, 0, 0, 0, DateTimeKind.Utc),
             Description = "Income",
-            Lines = [new JournalEntryLineDto { AccountId = accountId, Debit = 250m }]
+            Reference = "receipt-42",
+            Lines = [new JournalEntryLineDto { AccountId = accountId, Debit = 250m, Reference = "receipt-42" }]
         });
 
         Assert.NotNull(capturedRequest);
@@ -110,8 +111,10 @@ public class AccountingServiceClientTests
         using var document = JsonDocument.Parse(payload);
         var root = document.RootElement;
         Assert.True(root.TryGetProperty("entryDate", out _));
+        Assert.Equal("receipt-42", root.GetProperty("reference").GetString());
         Assert.Equal(accountId, root.GetProperty("lines")[0].GetProperty("accountId").GetGuid());
         Assert.Equal(250m, root.GetProperty("lines")[0].GetProperty("debitAmount").GetDecimal());
+        Assert.Equal("receipt-42", root.GetProperty("lines")[0].GetProperty("reference").GetString());
     }
 
     [Theory]

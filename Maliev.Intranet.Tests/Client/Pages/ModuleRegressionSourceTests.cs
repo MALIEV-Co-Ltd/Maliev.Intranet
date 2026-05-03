@@ -109,8 +109,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Income Entry", source, StringComparison.Ordinal);
         Assert.Contains("Expense Entry", source, StringComparison.Ordinal);
         Assert.Contains("Payroll Journals", source, StringComparison.Ordinal);
+        Assert.Contains("InputFile", source, StringComparison.Ordinal);
+        Assert.Contains("Payroll journals are produced by CompensationService payroll runs", source, StringComparison.Ordinal);
         Assert.Contains("api/v1/invoices?page={_invoicePage}&pageSize={_pageSize}", source, StringComparison.Ordinal);
         Assert.Contains("api/v1/accounting/journal-entries?page={_journalPage}&pageSize={_pageSize}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreatePayrollAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enter valid debit and credit account IDs", source, StringComparison.Ordinal);
         Assert.DoesNotContain("page=1&pageSize=50", source, StringComparison.Ordinal);
     }
 

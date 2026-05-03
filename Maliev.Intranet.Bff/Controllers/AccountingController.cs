@@ -13,8 +13,10 @@ namespace Maliev.Intranet.Bff.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class AccountingController(IAccountingServiceClient client) : ControllerBase
+public class AccountingController(IAccountingServiceClient client, UploadServiceClient? uploadClient = null) : ControllerBase
 {
+    private const long MaxAccountingAttachmentBytes = 25 * 1024 * 1024;
+
     /// <summary>
     /// Retrieves the chart of accounts tree.
     /// </summary>
@@ -31,7 +33,7 @@ public class AccountingController(IAccountingServiceClient client) : ControllerB
     /// <summary>
     /// Retrieves a paged list of journal entries.
     /// </summary>
-    [RequirePermission(MalievPermissions.Accounting.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Accounting.Journal.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("journal-entries")]
     public async Task<ActionResult<PagedResponse<JournalEntryDto>>> GetJournalEntries(
         [FromQuery] int page = 1,
@@ -49,7 +51,7 @@ public class AccountingController(IAccountingServiceClient client) : ControllerB
     /// <summary>
     /// Creates a new journal entry.
     /// </summary>
-    [RequirePermission(MalievPermissions.Accounting.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Accounting.Journal.Create, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("journal-entries")]
     public async Task<ActionResult<JournalEntryDto>> CreateJournalEntry([FromBody] CreateJournalEntryRequest request, CancellationToken ct)
     {
@@ -60,7 +62,7 @@ public class AccountingController(IAccountingServiceClient client) : ControllerB
     /// <summary>
     /// Posts a draft journal entry.
     /// </summary>
-    [RequirePermission(MalievPermissions.Accounting.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Accounting.Journal.Post, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("journal-entries/{id:guid}/post")]
     public async Task<ActionResult<JournalEntryDto>> PostJournalEntry(Guid id, CancellationToken ct)
     {
@@ -93,7 +95,7 @@ public class AccountingController(IAccountingServiceClient client) : ControllerB
     /// <summary>
     /// Opens or creates the accounting period containing the specified date.
     /// </summary>
-    [RequirePermission(MalievPermissions.Accounting.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Accounting.PeriodsOpen, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("periods/open")]
     public async Task<IActionResult> OpenPeriod([FromQuery] DateTime date, CancellationToken ct)
     {
@@ -103,7 +105,7 @@ public class AccountingController(IAccountingServiceClient client) : ControllerB
     /// <summary>
     /// Closes an accounting period.
     /// </summary>
-    [RequirePermission(MalievPermissions.Accounting.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Accounting.PeriodsClose, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("periods/{id:guid}/close")]
     public async Task<IActionResult> ClosePeriod(Guid id, CancellationToken ct)
     {
@@ -113,7 +115,7 @@ public class AccountingController(IAccountingServiceClient client) : ControllerB
     /// <summary>
     /// Reopens an accounting period.
     /// </summary>
-    [RequirePermission(MalievPermissions.Accounting.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Accounting.PeriodsReopen, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("periods/{id:guid}/reopen")]
     public async Task<IActionResult> ReopenPeriod(Guid id, CancellationToken ct)
     {
@@ -123,7 +125,7 @@ public class AccountingController(IAccountingServiceClient client) : ControllerB
     /// <summary>
     /// Runs accounting reconciliation for a source system and period.
     /// </summary>
-    [RequirePermission(MalievPermissions.Accounting.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Accounting.ReconciliationRun, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("reconciliation/run")]
     public async Task<ActionResult<ReconciliationResultDto>> RunReconciliation(
         [FromQuery] string sourceSystem,
@@ -132,5 +134,51 @@ public class AccountingController(IAccountingServiceClient client) : ControllerB
     {
         var result = await client.RunReconciliationAsync(sourceSystem, periodId, ct);
         return result is not null ? Ok(result) : BadRequest();
+    }
+
+    /// <summary>
+    /// Uploads an accounting document, such as transfer slip or receipt evidence, to UploadService.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Accounting.Journal.Create, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("documents")]
+    public async Task<ActionResult<BffUploadResponse>> UploadDocument(
+        IFormFile file,
+        [FromQuery] string category = "JournalEvidence",
+        CancellationToken ct = default)
+    {
+        if (uploadClient is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "UploadServiceClient is not configured.");
+        }
+
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file uploaded.");
+        }
+
+        if (file.Length > MaxAccountingAttachmentBytes)
+        {
+            return BadRequest($"File exceeds the {MaxAccountingAttachmentBytes / 1024 / 1024} MB limit.");
+        }
+
+        var safeFileName = Path.GetFileName(file.FileName);
+        if (string.IsNullOrWhiteSpace(safeFileName))
+        {
+            return BadRequest("File name is required.");
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+            ? "application/octet-stream"
+            : file.ContentType;
+        var safeCategory = string.IsNullOrWhiteSpace(category) ? "JournalEvidence" : category.Trim();
+        var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+        var storagePath = $"accounting/{safeCategory}/{DateTime.UtcNow:yyyyMMdd}/{uniquePrefix}_{safeFileName}";
+
+        using var stream = file.OpenReadStream();
+        var upload = await uploadClient.UploadFileAsync(safeFileName, stream, contentType, storagePath, true, ct);
+
+        return upload is not null
+            ? Ok(upload)
+            : StatusCode(StatusCodes.Status502BadGateway, "Upload failed.");
     }
 }

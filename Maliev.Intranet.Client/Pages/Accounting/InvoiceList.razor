@@ -1,5 +1,6 @@
 @page "/accounting"
 @page "/finance/invoices"
+@using System.Net.Http.Headers
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
@@ -10,7 +11,10 @@
 
 <div class="mlv-module-shell">
     <ModuleHeader Title="Accounting" Subtitle="Invoices, journal entries, reporting, periods, reconciliation, and payroll journal impact.">
-        <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@CreateCurrentQuickEntryAsync">Post Entry</PrimaryButton>
+        @if (IsQuickEntryTab)
+        {
+            <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@CreateCurrentQuickEntryAsync">Post Entry</PrimaryButton>
+        }
     </ModuleHeader>
 
     <PageBody>
@@ -120,16 +124,23 @@
         {
             <PanelCard Title="Income entry">
                 <FormGrid>
-                    <FormField Label="Date"><InputDate class="mlv-form-input" @bind-Value="_incomeForm.Date" /></FormField>
-                    <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_incomeForm.Description" /></FormField>
-                    <FormField Label="Reference"><InputText class="mlv-form-input" @bind-Value="_incomeForm.Reference" /></FormField>
+                    <FormField Label="Date"><input type="date" class="mlv-form-input" @bind="_incomeForm.Date" @bind:format="yyyy-MM-dd" /></FormField>
+                    <FormField Label="Description"><input class="mlv-form-input" @bind="_incomeForm.Description" /></FormField>
+                    <FormField Label="Reference"><input class="mlv-form-input" @bind="_incomeForm.Reference" /></FormField>
                     <FormField Label="Debit account">
                         <select class="mlv-form-input" @bind="_incomeDebitAccountId">@AccountOptions()</select>
                     </FormField>
                     <FormField Label="Credit account">
                         <select class="mlv-form-input" @bind="_incomeCreditAccountId">@AccountOptions()</select>
                     </FormField>
-                    <FormField Label="Amount"><InputNumber class="mlv-form-input" @bind-Value="_incomeForm.Amount" /></FormField>
+                    <FormField Label="Amount"><input type="number" step="0.01" class="mlv-form-input" @bind="_incomeForm.Amount" /></FormField>
+                    <FormField Label="Transfer slip or receipt">
+                        <InputFile class="mlv-form-input" OnChange="@(args => OnDocumentSelected(args, _incomeForm))" />
+                        @if (_incomeForm.Document is not null)
+                        {
+                            <div class="mlv-form-hint">@_incomeForm.Document.Name</div>
+                        }
+                    </FormField>
                 </FormGrid>
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
                     <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@(_ => CreateIncomeAsync())">Create income journal</PrimaryButton>
@@ -140,16 +151,23 @@
         {
             <PanelCard Title="Expense entry">
                 <FormGrid>
-                    <FormField Label="Date"><InputDate class="mlv-form-input" @bind-Value="_expenseForm.Date" /></FormField>
-                    <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_expenseForm.Description" /></FormField>
-                    <FormField Label="Reference"><InputText class="mlv-form-input" @bind-Value="_expenseForm.Reference" /></FormField>
+                    <FormField Label="Date"><input type="date" class="mlv-form-input" @bind="_expenseForm.Date" @bind:format="yyyy-MM-dd" /></FormField>
+                    <FormField Label="Description"><input class="mlv-form-input" @bind="_expenseForm.Description" /></FormField>
+                    <FormField Label="Reference"><input class="mlv-form-input" @bind="_expenseForm.Reference" /></FormField>
                     <FormField Label="Debit account">
                         <select class="mlv-form-input" @bind="_expenseDebitAccountId">@AccountOptions()</select>
                     </FormField>
                     <FormField Label="Credit account">
                         <select class="mlv-form-input" @bind="_expenseCreditAccountId">@AccountOptions()</select>
                     </FormField>
-                    <FormField Label="Amount"><InputNumber class="mlv-form-input" @bind-Value="_expenseForm.Amount" /></FormField>
+                    <FormField Label="Amount"><input type="number" step="0.01" class="mlv-form-input" @bind="_expenseForm.Amount" /></FormField>
+                    <FormField Label="Receipt or supplier document">
+                        <InputFile class="mlv-form-input" OnChange="@(args => OnDocumentSelected(args, _expenseForm))" />
+                        @if (_expenseForm.Document is not null)
+                        {
+                            <div class="mlv-form-hint">@_expenseForm.Document.Name</div>
+                        }
+                    </FormField>
                 </FormGrid>
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
                     <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@(_ => CreateExpenseAsync())">Create expense journal</PrimaryButton>
@@ -159,21 +177,41 @@
         else if (_tab == "Payroll Journals")
         {
             <PanelCard Title="Payroll journal impact">
-                <FormGrid>
-                    <FormField Label="Date"><InputDate class="mlv-form-input" @bind-Value="_payrollForm.Date" /></FormField>
-                    <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_payrollForm.Description" /></FormField>
-                    <FormField Label="Reference"><InputText class="mlv-form-input" @bind-Value="_payrollForm.Reference" /></FormField>
-                    <FormField Label="Debit account">
-                        <select class="mlv-form-input" @bind="_payrollDebitAccountId">@AccountOptions()</select>
-                    </FormField>
-                    <FormField Label="Credit account">
-                        <select class="mlv-form-input" @bind="_payrollCreditAccountId">@AccountOptions()</select>
-                    </FormField>
-                    <FormField Label="Amount"><InputNumber class="mlv-form-input" @bind-Value="_payrollForm.Amount" /></FormField>
-                </FormGrid>
-                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
-                    <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@(_ => CreatePayrollAsync())">Create payroll journal</PrimaryButton>
-                </div>
+                @{
+                    var payrollEntries = PayrollJournalEntries().ToList();
+                }
+                @if (payrollEntries.Count > 0)
+                {
+                    <table class="mlv-table">
+                        <thead>
+                            <tr>
+                                <th>Entry</th>
+                                <th>Status</th>
+                                <th>Description</th>
+                                <th>Debit</th>
+                                <th>Credit</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in payrollEntries)
+                            {
+                                <tr>
+                                    <td class="mlv-mono">@entry.EntryNumber</td>
+                                    <td><StatusBadge Status="@entry.Status" /></td>
+                                    <td>@Display(entry.Description)</td>
+                                    <td class="mlv-mono">@entry.TotalDebit.ToString("N2")</td>
+                                    <td class="mlv-mono">@entry.TotalCredit.ToString("N2")</td>
+                                    <td>@entry.Date.ToString("dd MMM yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty">Payroll journals are produced by CompensationService payroll runs. No payroll journal impact is present in the loaded journal page.</div>
+                }
             </PanelCard>
         }
         else if (_tab == "Reports")
@@ -191,11 +229,11 @@
                         </label>
                         <label class="mlv-filter-field">
                             <span>Start</span>
-                            <InputDate class="mlv-form-input" @bind-Value="_reportStart" />
+                            <input type="date" class="mlv-form-input" @bind="_reportStart" @bind:format="yyyy-MM-dd" />
                         </label>
                         <label class="mlv-filter-field">
                             <span>End</span>
-                            <InputDate class="mlv-form-input" @bind-Value="_reportEnd" />
+                            <input type="date" class="mlv-form-input" @bind="_reportEnd" @bind:format="yyyy-MM-dd" />
                         </label>
                     </div>
                     <PrimaryButton Icon="@Icons.Material.Outlined.Assessment" OnClick="@LoadReportAsync">Run Report</PrimaryButton>
@@ -230,7 +268,7 @@
                     <div class="mlv-toolbar-left">
                         <label class="mlv-filter-field">
                             <span>Open date</span>
-                            <InputDate class="mlv-form-input" @bind-Value="_periodOpenDate" />
+                            <input type="date" class="mlv-form-input" @bind="_periodOpenDate" @bind:format="yyyy-MM-dd" />
                         </label>
                         <label class="mlv-filter-field">
                             <span>Source system</span>
@@ -273,6 +311,8 @@
 </div>
 
 @code {
+    private const long MaxAccountingDocumentBytes = 25 * 1024 * 1024;
+
     private readonly string[] _tabs = ["Invoices", "Journal Entries", "Income Entry", "Expense Entry", "Reports", "Periods", "Payroll Journals"];
     private string _tab = "Invoices";
     private List<InvoiceSummaryDto> _invoices = [];
@@ -295,13 +335,12 @@
     private string _reconciliationSource = "Sales";
     private QuickJournalForm _incomeForm = new() { Description = "Income receipt", Amount = 0 };
     private QuickJournalForm _expenseForm = new() { Description = "Expense payment", Amount = 0 };
-    private QuickJournalForm _payrollForm = new() { Description = "Payroll journal", Amount = 0 };
     private string _incomeDebitAccountId = string.Empty;
     private string _incomeCreditAccountId = string.Empty;
     private string _expenseDebitAccountId = string.Empty;
     private string _expenseCreditAccountId = string.Empty;
-    private string _payrollDebitAccountId = string.Empty;
-    private string _payrollCreditAccountId = string.Empty;
+
+    private bool IsQuickEntryTab => _tab is "Income Entry" or "Expense Entry";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -386,7 +425,6 @@
     {
         if (_tab == "Income Entry") await CreateIncomeAsync();
         else if (_tab == "Expense Entry") await CreateExpenseAsync();
-        else if (_tab == "Payroll Journals") await CreatePayrollAsync();
     }
 
     private async Task CreateIncomeAsync()
@@ -405,14 +443,6 @@
         }
     }
 
-    private async Task CreatePayrollAsync()
-    {
-        if (PrepareAccounts(_payrollForm, _payrollDebitAccountId, _payrollCreditAccountId))
-        {
-            await CreateJournalAsync(_payrollForm, "Payroll journal created.");
-        }
-    }
-
     private async Task CreateJournalAsync(QuickJournalForm form, string successMessage)
     {
         if (form.Amount <= 0 || form.DebitAccountId == Guid.Empty || form.CreditAccountId == Guid.Empty)
@@ -421,15 +451,22 @@
             return;
         }
 
+        var documentReference = await UploadJournalEvidenceAsync(form);
+        if (form.Document is not null && string.IsNullOrWhiteSpace(documentReference))
+        {
+            return;
+        }
+
+        var reference = CombineReference(form.Reference, documentReference);
         var request = new CreateJournalEntryRequest
         {
             Date = form.Date,
             Description = form.Description,
-            Reference = form.Reference,
+            Reference = reference,
             Lines =
             [
-                new JournalEntryLineDto { AccountId = form.DebitAccountId, Debit = form.Amount, Description = form.Description },
-                new JournalEntryLineDto { AccountId = form.CreditAccountId, Credit = form.Amount, Description = form.Description }
+                new JournalEntryLineDto { AccountId = form.DebitAccountId, Debit = form.Amount, Description = form.Description, Reference = reference },
+                new JournalEntryLineDto { AccountId = form.CreditAccountId, Credit = form.Amount, Description = form.Description, Reference = reference }
             ]
         };
 
@@ -437,9 +474,58 @@
         Snackbar.Add(response.IsSuccessStatusCode ? successMessage : "Journal entry could not be created.", response.IsSuccessStatusCode ? Severity.Success : Severity.Warning);
         if (response.IsSuccessStatusCode)
         {
+            form.Reference = string.Empty;
+            form.Document = null;
             _journalPage = 1;
             await LoadJournalEntriesAsync();
         }
+    }
+
+    private async Task<string?> UploadJournalEvidenceAsync(QuickJournalForm form)
+    {
+        if (form.Document is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            await using var stream = form.Document.OpenReadStream(MaxAccountingDocumentBytes);
+            using var content = new MultipartFormDataContent();
+            using var fileContent = new StreamContent(stream);
+            if (!string.IsNullOrWhiteSpace(form.Document.ContentType))
+            {
+                fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse(form.Document.ContentType);
+            }
+
+            content.Add(fileContent, "file", form.Document.Name);
+            var category = _tab == "Income Entry" ? "IncomeEvidence" : "ExpenseEvidence";
+            using var response = await Http.PostAsync($"api/v1/accounting/documents?category={Uri.EscapeDataString(category)}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Document could not be uploaded.", Severity.Warning);
+                return null;
+            }
+
+            var upload = await response.Content.ReadFromJsonAsync<BffUploadResponse>();
+            return string.IsNullOrWhiteSpace(upload?.UploadId) ? upload?.StoragePath : $"doc:{upload.UploadId}";
+        }
+        catch (IOException)
+        {
+            Snackbar.Add($"Document exceeds the {MaxAccountingDocumentBytes / 1024 / 1024} MB limit.", Severity.Warning);
+            return null;
+        }
+    }
+
+    private static string? CombineReference(string? reference, string? documentReference)
+    {
+        var combined = string.Join(
+            " | ",
+            new[] { reference?.Trim(), documentReference?.Trim() }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+        return string.IsNullOrWhiteSpace(combined)
+            ? null
+            : combined.Length <= 100 ? combined : combined[..100];
     }
 
     private async Task PostJournalEntryAsync(Guid id)
@@ -478,7 +564,7 @@
     {
         if (!Guid.TryParse(debitAccountId, out var debitId) || !Guid.TryParse(creditAccountId, out var creditId))
         {
-            Snackbar.Add("Enter valid debit and credit account IDs.", Severity.Warning);
+            Snackbar.Add("Select valid debit and credit accounts.", Severity.Warning);
             return false;
         }
 
@@ -493,9 +579,14 @@
         _incomeCreditAccountId = DefaultAccount("Revenue", "Income") ?? _incomeCreditAccountId;
         _expenseDebitAccountId = DefaultAccount("Expense") ?? _expenseDebitAccountId;
         _expenseCreditAccountId = DefaultAccount("Asset", "Liability") ?? _expenseCreditAccountId;
-        _payrollDebitAccountId = DefaultAccount("Expense") ?? _payrollDebitAccountId;
-        _payrollCreditAccountId = DefaultAccount("Liability") ?? _payrollCreditAccountId;
     }
+
+    private IEnumerable<JournalEntryDto> PayrollJournalEntries() =>
+        _journalEntries.Where(entry =>
+            (entry.Description?.Contains("payroll", StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (entry.Reference?.Contains("payroll", StringComparison.OrdinalIgnoreCase) ?? false) ||
+            entry.Lines.Any(line => line.Description.Contains("payroll", StringComparison.OrdinalIgnoreCase) ||
+                                    (line.Reference?.Contains("payroll", StringComparison.OrdinalIgnoreCase) ?? false)));
 
     private string? DefaultAccount(params string[] typeHints)
     {
@@ -549,5 +640,10 @@
         public Guid CreditAccountId { get; set; }
 
         public decimal Amount { get; set; }
+
+        public IBrowserFile? Document { get; set; }
     }
+
+    private static void OnDocumentSelected(InputFileChangeEventArgs args, QuickJournalForm form) =>
+        form.Document = args.FileCount > 0 ? args.File : null;
 }
