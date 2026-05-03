@@ -463,10 +463,10 @@ public static class ProjectQuotationPdfMapper
                 .Replace("-", " ", StringComparison.Ordinal)
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries))
             .ToLowerInvariant() switch
-            {
-                var text when string.IsNullOrWhiteSpace(text) => value,
-                var text => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(text),
-            };
+        {
+            var text when string.IsNullOrWhiteSpace(text) => value,
+            var text => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(text),
+        };
 
     private static string? ResolveDeburring(PartViewModel part)
     {
