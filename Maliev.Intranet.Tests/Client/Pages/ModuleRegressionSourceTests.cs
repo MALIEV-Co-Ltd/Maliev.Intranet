@@ -22,6 +22,17 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void AdminPage_DoesNotExposeTenantOrMachinesTab()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "AdminPage.razor");
+
+        Assert.DoesNotContain("Tenant profile", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"Machines\"", source, StringComparison.Ordinal);
+        Assert.Contains("/admin/system-health", source, StringComparison.Ordinal);
+        Assert.Contains("/mfg/equipment", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ClientLoginRoute_IsNotUsedForEmployeeLogin()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor");
@@ -117,6 +128,22 @@ public class ModuleRegressionSourceTests
         Assert.Contains("/maintenance", detail, StringComparison.Ordinal);
         Assert.Contains("/loans", detail, StringComparison.Ordinal);
         Assert.Contains("/attachments", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SystemHealthPage_RendersAllServiceHealthFields()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "SystemHealth.razor");
+        var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "SystemHealthController.cs");
+
+        Assert.Contains("@page \"/admin/system-health\"", page, StringComparison.Ordinal);
+        Assert.Contains("DomainGroup", page, StringComparison.Ordinal);
+        Assert.Contains("HealthPath", page, StringComparison.Ordinal);
+        Assert.Contains("ErrorBody", page, StringComparison.Ordinal);
+        Assert.Contains("FacilityService", controller, StringComparison.Ordinal);
+        Assert.Contains("InventoryService", controller, StringComparison.Ordinal);
+        Assert.Contains("DeliveryService", controller, StringComparison.Ordinal);
+        Assert.Contains("ChatbotService", controller, StringComparison.Ordinal);
     }
 
     [Fact]

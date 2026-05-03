@@ -115,6 +115,26 @@ public class ServiceHealthStatus
     public string ServiceName { get; set; } = string.Empty;
 
     /// <summary>
+    /// The domain group this service belongs to.
+    /// </summary>
+    public string DomainGroup { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The service route prefix used for HTTP endpoints.
+    /// </summary>
+    public string RoutePrefix { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The health endpoint path used for liveness checks.
+    /// </summary>
+    public string HealthPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Indicates whether the service is critical for core business operations.
+    /// </summary>
+    public bool IsCritical { get; set; }
+
+    /// <summary>
     /// The current status of the service (e.g., Healthy, Unhealthy, Unknown).
     /// </summary>
     public string Status { get; set; } = "Unknown";
@@ -143,6 +163,11 @@ public class ServiceHealthStatus
     /// An optional error message if the health check failed.
     /// </summary>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// The response body returned by the health endpoint when the check fails.
+    /// </summary>
+    public string? ErrorBody { get; set; }
 }
 
 /// <summary>

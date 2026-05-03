@@ -5,7 +5,7 @@
 <PageTitle>Admin | MALIEV Intranet</PageTitle>
 
 <div class="mlv-module-shell">
-    <ModuleHeader Title="Admin" Subtitle="Company settings, machines, and notifications." />
+    <ModuleHeader Title="Admin" Subtitle="Business settings, notifications, and platform operations." />
 
     <PageBody>
         @if (_loading)
@@ -25,7 +25,7 @@
         @if (_tab == "Company")
         {
             <div class="mlv-grid">
-                <PanelCard Title="Tenant profile" Class="mlv-span-6">
+                <PanelCard Title="Business profile" Class="mlv-span-6">
                     <FormGrid>
                         <FormField Label="Company name"><input class="mlv-form-input" value="MALIEV Precision Manufacturing" readonly /></FormField>
                         <FormField Label="Industry"><input class="mlv-form-input" value="CNC and additive manufacturing" readonly /></FormField>
@@ -33,16 +33,34 @@
                         <FormField Label="Support email"><input class="mlv-form-input" value="ops@maliev.com" readonly /></FormField>
                     </FormGrid>
                 </PanelCard>
-                <PanelCard Title="System health" Class="mlv-span-6">
+                <PanelCard Title="Operations" Class="mlv-span-6">
+                    <div class="mlv-list">
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">System health checks</div>
+                                <div class="mlv-row-sub">All HTTP service liveness checks and response diagnostics.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.MonitorHeart" Href="/admin/system-health">Open</SecondaryButton>
+                        </div>
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">Equipment management</div>
+                                <div class="mlv-row-sub">Moved to Manufacturing Equipment and backed by FacilityService.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.PrecisionManufacturing" Href="/mfg/equipment">Open</SecondaryButton>
+                        </div>
+                    </div>
+                </PanelCard>
+                <PanelCard Title="Health snapshot" Class="mlv-span-12">
                     @if (_health?.Services.Count > 0)
                     {
                         <div class="mlv-list">
-                            @foreach (var service in _health.Services.Take(8))
+                            @foreach (var service in _health.Services.Where(s => s.IsCritical).Take(12))
                             {
                                 <div class="mlv-list-row">
                                     <div>
                                         <div class="mlv-row-main">@service.ServiceName</div>
-                                        <div class="mlv-row-sub">@service.ResponseTimeMs.ToString("N0") ms</div>
+                                        <div class="mlv-row-sub">@service.DomainGroup · @service.ResponseTimeMs.ToString("N0") ms</div>
                                     </div>
                                     <StatusBadge Status="@service.Status" />
                                 </div>
@@ -55,33 +73,6 @@
                     }
                 </PanelCard>
             </div>
-        }
-        else if (_tab == "Machines")
-        {
-            <PanelCard>
-                @if (_equipment.Count > 0)
-                {
-                    <table class="mlv-table">
-                        <thead><tr><th>Asset</th><th>Name</th><th>Category</th><th>Status</th><th>Updated</th></tr></thead>
-                        <tbody>
-                            @foreach (var item in _equipment)
-                            {
-                                <tr>
-                                    <td class="mlv-mono">@item.AssetCode</td>
-                                    <td>@item.Name</td>
-                                    <td>@item.Category</td>
-                                    <td><StatusBadge Status="@item.Status" /></td>
-                                    <td>@item.UpdatedAt.ToString("dd MMM yyyy")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
-                else
-                {
-                    <div class="mlv-empty">No machines found.</div>
-                }
-            </PanelCard>
         }
         else if (_tab == "Notifications")
         {
@@ -113,10 +104,9 @@
 </div>
 
 @code {
-    private readonly string[] _tabs = ["Company", "Machines", "Notifications"];
+    private readonly string[] _tabs = ["Company", "Notifications"];
 
     private string _tab = "Company";
-    private List<EquipmentSummaryDto> _equipment = [];
     private List<NotificationTemplateDto> _templates = [];
     private SystemHealthDto? _health;
     private bool _loading = true;
@@ -125,11 +115,9 @@
     {
         try
         {
-            var equipmentTask = Http.GetFromJsonAsync<PagedResponse<EquipmentSummaryDto>>("api/v1/equipments?page=1&pageSize=50");
             var templatesTask = Http.GetFromJsonAsync<PagedResponse<NotificationTemplateDto>>("api/v1/notifications/templates?page=1&pageSize=50");
             var healthTask = Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
-            await Task.WhenAll(equipmentTask, templatesTask, healthTask);
-            _equipment = (await equipmentTask)?.Data.ToList() ?? [];
+            await Task.WhenAll(templatesTask, healthTask);
             _templates = (await templatesTask)?.Data.ToList() ?? [];
             _health = await healthTask;
         }
