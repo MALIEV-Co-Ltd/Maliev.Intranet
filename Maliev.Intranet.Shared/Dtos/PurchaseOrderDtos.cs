@@ -245,3 +245,27 @@ public sealed record CancelPurchaseOrderRequest
     [Required]
     public string Reason { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Metadata for a file uploaded to storage and linked to a purchase order.
+/// </summary>
+public sealed record RegisterPurchaseOrderFileRequest
+{
+    /// <summary>The original file name.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>The storage object name or path returned by UploadService.</summary>
+    public string ObjectName { get; set; } = string.Empty;
+
+    /// <summary>The file size in bytes.</summary>
+    public long FileSize { get; set; }
+
+    /// <summary>The uploaded file content type.</summary>
+    public string ContentType { get; set; } = string.Empty;
+
+    /// <summary>The document classification, such as Reference, Invoice, or CustomerPO.</summary>
+    public string DocumentType { get; set; } = "Reference";
+
+    /// <summary>Optional file description.</summary>
+    public string? Description { get; set; }
+}

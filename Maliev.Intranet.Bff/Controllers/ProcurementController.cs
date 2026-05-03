@@ -13,8 +13,10 @@ namespace Maliev.Intranet.Bff.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class ProcurementController(IPurchaseOrderServiceClient client) : ControllerBase
+public class ProcurementController(IPurchaseOrderServiceClient client, UploadServiceClient? uploadClient = null) : ControllerBase
 {
+    private const long MaxPurchaseOrderAttachmentBytes = 25 * 1024 * 1024;
+
     /// <summary>
     /// Retrieves a paged list of purchase orders.
     /// </summary>
@@ -65,7 +67,7 @@ public class ProcurementController(IPurchaseOrderServiceClient client) : Control
     /// <summary>
     /// Creates a new purchase order.
     /// </summary>
-    [RequirePermission(MalievPermissions.PurchaseOrder.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.PurchaseOrder.Create, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost]
     public async Task<ActionResult<PurchaseOrderDto>> Create([FromBody] CreatePurchaseOrderRequest request, CancellationToken ct)
     {
@@ -78,7 +80,7 @@ public class ProcurementController(IPurchaseOrderServiceClient client) : Control
     /// <summary>
     /// Approves a purchase order.
     /// </summary>
-    [RequirePermission(MalievPermissions.PurchaseOrder.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.PurchaseOrder.Approve, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:int}/approve")]
     public async Task<ActionResult<PurchaseOrderDto>> Approve(int id, CancellationToken ct)
     {
@@ -89,7 +91,7 @@ public class ProcurementController(IPurchaseOrderServiceClient client) : Control
     /// <summary>
     /// Sends a purchase order to the supplier.
     /// </summary>
-    [RequirePermission(MalievPermissions.PurchaseOrder.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.PurchaseOrder.Send, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:int}/send-to-supplier")]
     public async Task<ActionResult<PurchaseOrderDto>> SendToSupplier(int id, CancellationToken ct)
     {
@@ -100,7 +102,7 @@ public class ProcurementController(IPurchaseOrderServiceClient client) : Control
     /// <summary>
     /// Marks purchase order goods as received.
     /// </summary>
-    [RequirePermission(MalievPermissions.PurchaseOrder.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.PurchaseOrder.Receive, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:int}/receive")]
     public async Task<ActionResult<PurchaseOrderDto>> Receive(
         int id,
@@ -114,12 +116,73 @@ public class ProcurementController(IPurchaseOrderServiceClient client) : Control
     /// <summary>
     /// Cancels a purchase order.
     /// </summary>
-    [RequirePermission(MalievPermissions.PurchaseOrder.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.PurchaseOrder.Cancel, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:int}/cancel")]
     public async Task<IActionResult> Cancel(int id, [FromBody] CancelPurchaseOrderRequest request, CancellationToken ct)
     {
         var result = await client.CancelPurchaseOrderAsync(id, request, ct);
         return result ? NoContent() : BadRequest();
+    }
+
+    /// <summary>
+    /// Uploads and links a file to a purchase order.
+    /// </summary>
+    [RequirePermission(MalievPermissions.PurchaseOrder.FileUpload, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:int}/files")]
+    public async Task<ActionResult<PurchaseOrderFileDto>> UploadFile(
+        int id,
+        IFormFile file,
+        [FromQuery] string documentType = "Reference",
+        [FromQuery] string? description = null,
+        CancellationToken ct = default)
+    {
+        if (uploadClient is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "UploadServiceClient is not configured.");
+        }
+
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file uploaded.");
+        }
+
+        if (file.Length > MaxPurchaseOrderAttachmentBytes)
+        {
+            return BadRequest($"File exceeds the {MaxPurchaseOrderAttachmentBytes / 1024 / 1024} MB limit.");
+        }
+
+        var safeFileName = Path.GetFileName(file.FileName);
+        if (string.IsNullOrWhiteSpace(safeFileName))
+        {
+            return BadRequest("File name is required.");
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+            ? "application/octet-stream"
+            : file.ContentType;
+        var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+        var storagePath = $"purchase-orders/{id}/{uniquePrefix}_{safeFileName}";
+
+        using var stream = file.OpenReadStream();
+        var upload = await uploadClient.UploadFileAsync(safeFileName, stream, contentType, storagePath, true, ct);
+        if (upload is null)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, "Upload failed.");
+        }
+
+        var result = await client.RegisterFileAsync(id, new RegisterPurchaseOrderFileRequest
+        {
+            FileName = safeFileName,
+            ObjectName = upload.StoragePath ?? upload.FileReference ?? storagePath,
+            FileSize = upload.FileSize,
+            ContentType = contentType,
+            DocumentType = documentType,
+            Description = description
+        }, ct);
+
+        return result is not null
+            ? Ok(result)
+            : StatusCode(StatusCodes.Status502BadGateway, "Purchase order file could not be linked.");
     }
 
     /// <summary>

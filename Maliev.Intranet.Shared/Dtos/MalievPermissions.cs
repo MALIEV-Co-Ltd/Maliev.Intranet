@@ -394,8 +394,20 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view purchase order details.</summary>
         public const string Read = "purchase-order.orders.read";
-        /// <summary>Permission to create and manage purchase orders with suppliers.</summary>
-        public const string Write = "purchase-order.orders.write";
+        /// <summary>Permission to update purchase orders.</summary>
+        public const string Write = "purchase-order.orders.update";
+        /// <summary>Permission to create purchase orders.</summary>
+        public const string Create = "purchase-order.orders.create";
+        /// <summary>Permission to approve purchase orders.</summary>
+        public const string Approve = "purchase-order.orders.approve";
+        /// <summary>Permission to send purchase orders to suppliers.</summary>
+        public const string Send = "purchase-order.orders.send";
+        /// <summary>Permission to receive purchase order items.</summary>
+        public const string Receive = "purchase-order.orders.receive";
+        /// <summary>Permission to cancel purchase orders.</summary>
+        public const string Cancel = "purchase-order.orders.cancel";
+        /// <summary>Permission to upload files to purchase orders.</summary>
+        public const string FileUpload = "purchase-order.files.upload";
     }
 
     /// <summary>

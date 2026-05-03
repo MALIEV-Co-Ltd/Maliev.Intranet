@@ -62,6 +62,11 @@ public interface IPurchaseOrderServiceClient
     /// Exports a purchase order in the requested format.
     /// </summary>
     Task<HttpResponseMessage> ExportPurchaseOrderAsync(int id, string format = "pdf", CancellationToken ct = default);
+
+    /// <summary>
+    /// Registers an uploaded file against a purchase order.
+    /// </summary>
+    Task<PurchaseOrderFileDto?> RegisterFileAsync(int id, RegisterPurchaseOrderFileRequest request, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -172,6 +177,34 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
     {
         var safeFormat = string.IsNullOrWhiteSpace(format) ? "pdf" : format;
         return httpClient.GetAsync($"/purchase-order/v1/purchase-orders/{id}/export?format={Uri.EscapeDataString(safeFormat)}", ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<PurchaseOrderFileDto?> RegisterFileAsync(int id, RegisterPurchaseOrderFileRequest request, CancellationToken ct = default)
+    {
+        var downstreamRequest = new DownstreamRegisterPurchaseOrderFileRequest
+        {
+            FileName = request.FileName,
+            ObjectName = request.ObjectName,
+            FileSize = request.FileSize,
+            ContentType = request.ContentType,
+            DocumentType = MapDocumentType(request.DocumentType),
+            Description = request.Description
+        };
+
+        using var response = await httpClient.PostAsJsonAsync(
+            $"/purchase-order/v1/purchase-orders/{id}/files",
+            downstreamRequest,
+            JsonOptions,
+            ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var file = await response.Content.ReadFromJsonAsync<DownstreamPurchaseOrderFileResponse>(JsonOptions, ct);
+        return file?.ToDto();
     }
 
     private static string BuildSearchPath(
@@ -493,6 +526,41 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
 
     private sealed record DownstreamCancelPurchaseOrderRequest(
         [property: JsonPropertyName("reason")] string Reason);
+
+    private sealed class DownstreamRegisterPurchaseOrderFileRequest
+    {
+        [JsonPropertyName("fileName")]
+        public string FileName { get; set; } = string.Empty;
+
+        [JsonPropertyName("objectName")]
+        public string ObjectName { get; set; } = string.Empty;
+
+        [JsonPropertyName("fileSize")]
+        public long FileSize { get; set; }
+
+        [JsonPropertyName("contentType")]
+        public string ContentType { get; set; } = string.Empty;
+
+        [JsonPropertyName("documentType")]
+        public int DocumentType { get; set; }
+
+        [JsonPropertyName("description")]
+        public string? Description { get; set; }
+    }
+
+    private static int MapDocumentType(string? documentType)
+    {
+        return documentType?.Trim().ToLowerInvariant() switch
+        {
+            "customerpo" or "customer po" => 0,
+            "internalapproval" or "internal approval" => 1,
+            "invoice" => 2,
+            "reference" => 3,
+            "generatedpdf" or "generated pdf" => 4,
+            "other" => 5,
+            _ => 3
+        };
+    }
 
     private static string FormatDocumentType(JsonElement documentType)
     {

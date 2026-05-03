@@ -237,6 +237,57 @@ public class PurchaseOrderServiceClientTests
         Assert.Equal(expectedPath, capturedRequest.RequestUri!.PathAndQuery);
     }
 
+    [Fact]
+    public async Task RegisterFileAsync_TargetsPurchaseOrderFilesEndpoint()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        string? payload = null;
+        var client = MakeClient(async request =>
+        {
+            capturedRequest = request;
+            payload = await request.Content!.ReadAsStringAsync();
+            return JsonContent.Create(new
+            {
+                id = 9,
+                purchaseOrderId = 1001,
+                fileName = "supplier-quote.pdf",
+                objectName = "purchase-orders/1001/supplier-quote.pdf",
+                fileSize = 2048,
+                contentType = "application/pdf",
+                documentType = 3,
+                uploadedAt = DateTime.UtcNow,
+                uploadedBy = "user123",
+                description = "Supplier quote"
+            });
+        });
+
+        var result = await client.RegisterFileAsync(1001, new RegisterPurchaseOrderFileRequest
+        {
+            FileName = "supplier-quote.pdf",
+            ObjectName = "purchase-orders/1001/supplier-quote.pdf",
+            FileSize = 2048,
+            ContentType = "application/pdf",
+            DocumentType = "Reference",
+            Description = "Supplier quote"
+        });
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Post, capturedRequest.Method);
+        Assert.Equal("/purchase-order/v1/purchase-orders/1001/files", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.NotNull(payload);
+        using var document = JsonDocument.Parse(payload);
+        var root = document.RootElement;
+        Assert.Equal("supplier-quote.pdf", root.GetProperty("fileName").GetString());
+        Assert.Equal("purchase-orders/1001/supplier-quote.pdf", root.GetProperty("objectName").GetString());
+        Assert.Equal(2048, root.GetProperty("fileSize").GetInt64());
+        Assert.Equal("application/pdf", root.GetProperty("contentType").GetString());
+        Assert.Equal(3, root.GetProperty("documentType").GetInt32());
+        Assert.Equal("Supplier quote", root.GetProperty("description").GetString());
+        Assert.NotNull(result);
+        Assert.Equal(9, result.Id);
+        Assert.Equal("Reference", result.DocumentType);
+    }
+
     private static PurchaseOrderServiceClient MakeClient(Func<HttpRequestMessage, HttpContent> contentFactory)
     {
         var handler = new MockHttpMessageHandler((request, _) =>

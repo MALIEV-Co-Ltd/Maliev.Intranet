@@ -1,5 +1,6 @@
 @page "/purchasing/{Id:int}"
 @page "/mfg/procurement/{Id:int}"
+@using System.Net.Http.Headers
 @using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 @inject ISnackbar Snackbar
@@ -119,6 +120,28 @@
             </PanelCard>
 
             <PanelCard Title="Files" Class="mt-4">
+                <div class="mlv-toolbar mb-3">
+                    <div class="mlv-toolbar-left">
+                        <InputFile class="mlv-form-input" OnChange="OnFileSelected" />
+                        <select class="mlv-form-input" @bind="_fileDocumentType">
+                            <option value="Reference">Reference</option>
+                            <option value="CustomerPO">Customer PO</option>
+                            <option value="InternalApproval">Internal approval</option>
+                            <option value="Invoice">Invoice</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <input class="mlv-form-input" placeholder="Description" @bind="_fileDescription" />
+                    </div>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.AttachFile" Disabled="@(_selectedFile is null || _fileUploading)" OnClick="@UploadFileAsync">Attach document</PrimaryButton>
+                </div>
+                @if (_selectedFile is not null)
+                {
+                    <div class="mlv-row-sub mb-3">@_selectedFile.Name (@FormatBytes(_selectedFile.Size))</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_fileError))
+                {
+                    <div class="mlv-error mb-3">@_fileError</div>
+                }
                 @if (_order.Files.Count > 0)
                 {
                     <table class="mlv-table">
@@ -152,7 +175,13 @@
     private bool _loading = true;
     private bool _busy;
     private bool _showCancel;
+    private bool _fileUploading;
+    private IBrowserFile? _selectedFile;
+    private string _fileDocumentType = "Reference";
+    private string? _fileDescription;
+    private string? _fileError;
     private string _cancelReason = string.Empty;
+    private const long MaxPurchaseOrderDocumentBytes = 25 * 1024 * 1024;
 
     private bool CanApprove => HasStatus("Pending");
     private bool CanSend => HasStatus("Approved");
@@ -231,6 +260,76 @@
         finally
         {
             _busy = false;
+        }
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs args)
+    {
+        _fileError = null;
+        _selectedFile = args.File;
+        if (_selectedFile.Size > MaxPurchaseOrderDocumentBytes)
+        {
+            _fileError = $"File exceeds the {MaxPurchaseOrderDocumentBytes / 1024 / 1024} MB limit.";
+            _selectedFile = null;
+        }
+    }
+
+    private async Task UploadFileAsync(MouseEventArgs _)
+    {
+        if (_selectedFile is null)
+        {
+            Snackbar.Add("Select a document to attach.", Severity.Warning);
+            return;
+        }
+
+        _fileUploading = true;
+        _fileError = null;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            await using var stream = _selectedFile.OpenReadStream(MaxPurchaseOrderDocumentBytes);
+            using var fileContent = new StreamContent(stream);
+            if (!string.IsNullOrWhiteSpace(_selectedFile.ContentType))
+            {
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(_selectedFile.ContentType);
+            }
+
+            content.Add(fileContent, "file", _selectedFile.Name);
+            var url = $"api/v1/procurement/{Id}/files?documentType={Uri.EscapeDataString(_fileDocumentType)}";
+            if (!string.IsNullOrWhiteSpace(_fileDescription))
+            {
+                url += $"&description={Uri.EscapeDataString(_fileDescription)}";
+            }
+
+            using var response = await Http.PostAsync(url, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _fileError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(_fileError))
+                {
+                    _fileError = "Document could not be attached.";
+                }
+                return;
+            }
+
+            var file = await response.Content.ReadFromJsonAsync<PurchaseOrderFileDto>();
+            if (file is not null && _order is not null)
+            {
+                _order.Files.Add(file);
+            }
+
+            _selectedFile = null;
+            _fileDescription = null;
+            Snackbar.Add("Document attached.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _fileError = "Document could not be attached.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _fileUploading = false;
         }
     }
 
