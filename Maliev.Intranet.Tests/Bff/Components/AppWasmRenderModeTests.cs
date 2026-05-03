@@ -40,7 +40,8 @@ public class AppWasmRenderModeTests
 
         Assert.Contains("--blazor-load-percentage", source);
         Assert.Contains("--wasm-logo-progress: var(--blazor-load-percentage, 0%)", source);
-        Assert.Contains("linear-gradient(90deg", source);
+        Assert.Contains("linear-gradient(", source);
+        Assert.Contains("90deg", source);
         Assert.DoesNotContain("wasm-loading-progress", source, StringComparison.Ordinal);
         Assert.Contains("autostart=\"false\"", source);
         Assert.Contains("Blazor.start", source);

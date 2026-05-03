@@ -806,6 +806,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             Quantity = 2,
             EstimatedUnitPrice = 1250m,
             EstimatedTotalAmount = 2500m,
+            IsManifold = true,
         });
 
         Assert.True(GetPrivateProperty<bool>(cut.Instance, "CanSubmit"));

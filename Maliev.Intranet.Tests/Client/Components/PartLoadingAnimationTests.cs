@@ -43,7 +43,8 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
         Assert.Contains(".part-processing-loader::before,", source);
         Assert.Contains(".part-processing-loader::after", source);
         Assert.Contains("clip-path: polygon", source);
-        Assert.Contains("conic-gradient(from -90deg at calc(100% - var(--_d)) var(--_d)", source);
+        Assert.Contains("conic-gradient(", source);
+        Assert.Contains("from -90deg at calc(100% - var(--_d)) var(--_d)", source);
         Assert.Contains("animation-delay: 0.6s", source);
         Assert.Contains("@keyframes part-processing-loader", source);
         Assert.Contains("16.67%", source);

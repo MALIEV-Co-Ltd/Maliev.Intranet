@@ -106,7 +106,7 @@ public class OrderServiceClient(HttpClient httpClient)
         {
             return new PagedResponse<OrderSummaryDto>
             {
-                Data = Items.Select(item => item.ToSummaryDto()).ToList(),
+                Data = Items?.Select(item => item.ToSummaryDto()).ToList() ?? [],
                 Meta = new PaginationMeta
                 {
                     CurrentPage = Page,

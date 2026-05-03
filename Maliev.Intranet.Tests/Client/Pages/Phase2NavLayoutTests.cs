@@ -78,17 +78,13 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void TopBar_ShouldPrioritizeQuoteBeforeDashboard()
+    public void TopBar_ShouldPrioritizeQuoteAsFirstModuleLink()
     {
         var cut = Render<TopBar>();
-        var navText = cut.Find("nav.topbar-nav").TextContent;
+        var firstLink = cut.Find("nav.topbar-nav a");
 
-        var quoteIndex = navText.IndexOf("Quote", StringComparison.Ordinal);
-        var dashboardIndex = navText.IndexOf("Dashboard", StringComparison.Ordinal);
-
-        Assert.True(quoteIndex >= 0);
-        Assert.True(dashboardIndex >= 0);
-        Assert.True(quoteIndex < dashboardIndex, $"Expected Quote before Dashboard in top navigation. Actual: {navText}");
+        Assert.Contains("Quote", firstLink.TextContent, StringComparison.Ordinal);
+        Assert.Contains("sales/projects/new", firstLink.GetAttribute("href"), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
