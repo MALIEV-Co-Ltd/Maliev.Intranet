@@ -127,12 +127,16 @@
                 {
                     <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
                 }
-                Generate Quote
+                Quote
                 <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
             </MudButton>
         </div>
         @if (_detailsOpen)
         {
+            <button type="button"
+                    class="qsb-details-click-away"
+                    aria-label="Close quote details"
+                    @onclick="CloseDetails"></button>
             <div class="qsb-details-popover">
                 <div class="qsb-details-header">
                     <div class="qsb-zone-label qsb-details-title">
@@ -149,6 +153,7 @@
                                      Value="@ShippingCost"
                                      ValueChanged="OnShippingCostChanged"
                                      Min="0m"
+                                     Immediate="true"
                                      Variant="Variant.Outlined"
                                      Margin="Margin.Dense"
                                      HideSpinButtons="true" />
@@ -157,6 +162,7 @@
                                      Value="@ManualDiscountAmount"
                                      ValueChanged="OnManualDiscountAmountChanged"
                                      Min="0m"
+                                     Immediate="true"
                                      Variant="Variant.Outlined"
                                      Margin="Margin.Dense"
                                      HideSpinButtons="true" />
@@ -403,6 +409,16 @@
         font-weight: 600;
     }
 
+    .qsb-details-click-away {
+        position: fixed;
+        inset: 0;
+        z-index: 19;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        cursor: default;
+    }
+
     .qsb-details-popover {
         position: absolute;
         right: 16px;
@@ -625,6 +641,8 @@
     private void OnCurrencyChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
 
     private void ToggleDetails() => _detailsOpen = !_detailsOpen;
+
+    private void CloseDetails() => _detailsOpen = false;
 
     private async Task OnShippingCostChanged(decimal value) =>
         await ShippingCostChanged.InvokeAsync(Math.Max(0m, value));

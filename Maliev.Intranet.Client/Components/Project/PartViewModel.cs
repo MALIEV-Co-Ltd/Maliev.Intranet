@@ -26,6 +26,12 @@ public class PartViewModel
     /// <summary>The storage path of the uploaded file.</summary>
     public string? StoragePath { get; set; }
 
+    /// <summary>
+    /// Previous source storage paths for this part. These remain valid SignalR aliases while
+    /// GeometryService finishes work that started before the file moved into customer storage.
+    /// </summary>
+    public List<string> StoragePathAliases { get; set; } = [];
+
     /// <summary>The manufacturing process code (e.g. "FDM", "CNC").</summary>
     public string? ProcessCode { get; set; }
 
@@ -322,6 +328,46 @@ public class PartViewModel
         Error == null &&
         HasRequiredThreadSpecificationDrawing;
 
+    /// <summary>Adds a previous storage path as a SignalR/event matching alias.</summary>
+    /// <param name="storagePath">The previous storage path.</param>
+    public void AddStoragePathAlias(string? storagePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return;
+
+        if (string.Equals(storagePath, StoragePath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (StoragePathAliases.Any(alias => string.Equals(alias, storagePath, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        StoragePathAliases.Add(storagePath);
+    }
+
+    /// <summary>Returns true when a SignalR event storage path belongs to this part.</summary>
+    /// <param name="storagePath">The event storage path.</param>
+    public bool MatchesSourceStoragePath(string? storagePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return false;
+
+        return string.Equals(StoragePath, storagePath, StringComparison.OrdinalIgnoreCase)
+            || StoragePathAliases.Any(alias => string.Equals(alias, storagePath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Returns the current and previous source paths that should receive SignalR events.</summary>
+    public IEnumerable<string> GetSignalRStoragePaths()
+    {
+        if (!string.IsNullOrWhiteSpace(StoragePath))
+            yield return StoragePath;
+
+        foreach (var alias in StoragePathAliases.Where(alias => !string.IsNullOrWhiteSpace(alias)))
+        {
+            if (!string.Equals(alias, StoragePath, StringComparison.OrdinalIgnoreCase))
+                yield return alias;
+        }
+    }
+
     /// <summary>
     /// True when this part has DFM issues that should be surfaced to the user.
     /// Mirrors the logic from PartDetailCard.BuildDfmIssues to ensure consistency
@@ -387,6 +433,7 @@ public class PartViewModel
         FileId = FileId,
         ServerPartId = ServerPartId,
         StoragePath = StoragePath ?? string.Empty,
+        StoragePathAliases = [.. StoragePathAliases],
         Name = Name,
         Quantity = Quantity,
         ProcessCode = ProcessCode,
@@ -449,6 +496,7 @@ public class PartViewModel
             FileId = s.FileId,
             ServerPartId = s.ServerPartId,
             StoragePath = s.StoragePath,
+            StoragePathAliases = [.. s.StoragePathAliases],
             Name = s.Name,
             Quantity = s.Quantity,
             ProcessCode = s.ProcessCode,

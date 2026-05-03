@@ -1629,7 +1629,6 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         const engine = new BABYLON.Engine(canvas, true, {
             premultipliedAlpha: false,
             alpha: true,
-            reverseDepthBuffer: true,
             disableUniformBuffers: true,
         });
         const scene  = new BABYLON.Scene(engine);
@@ -3443,7 +3442,14 @@ export function clearDfmOverlays(canvasId, partKey) {
     const slot = partKey ? `${canvasId}::${partKey}` : canvasId;
     const map = overlayMeshes[slot];
     if (map) {
-        map.forEach(meshes => meshes.forEach(m => m.dispose()));
+        map.forEach(meshes => meshes.forEach(m => {
+            if (!m || (typeof m.isDisposed === 'function' && m.isDisposed())) return;
+            try {
+                m.dispose();
+            } catch (error) {
+                debugLog('clearDfmOverlays dispose skipped', error);
+            }
+        }));
         map.clear();
         delete overlayMeshes[slot];
     }

@@ -80,6 +80,12 @@ public sealed class DraftPartState
     /// <summary>The storage path of the uploaded file.</summary>
     public string StoragePath { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Previous source storage paths that may still receive late GeometryService events after
+    /// the file has moved from temporary project storage into customer storage.
+    /// </summary>
+    public List<string> StoragePathAliases { get; set; } = [];
+
     /// <summary>The original file name.</summary>
     public string Name { get; set; } = string.Empty;
 

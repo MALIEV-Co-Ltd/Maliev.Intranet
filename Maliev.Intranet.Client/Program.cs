@@ -3,9 +3,15 @@ using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
+
+builder.Logging.SetMinimumLevel(LogLevel.Warning);
+builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.AspNetCore.Components.WebAssembly", LogLevel.Warning);
+builder.Logging.AddFilter("Maliev.Intranet.Client.Components.Project.PartConfigSidebar", LogLevel.Warning);
 
 builder.Services.AddAuthorizationCore();
 

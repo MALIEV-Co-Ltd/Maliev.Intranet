@@ -59,7 +59,8 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Upload catch-up / watchdog ─────────────────────────────────────
     private const int CatchUpDelayMs = 5000;   // first fetch after SignalR group join
     private const int StatusPollIntervalMs = 30_000; // subsequent interval
-    private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new();
+    private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _storageMigrationSemaphore = new(1, 1);
 
     // ── Pricing debounce ───────────────────────────────────────────────
     private readonly Dictionary<Guid, CancellationTokenSource> _pricingTokens = new();
@@ -115,6 +116,7 @@ public partial class ProjectNew : IAsyncDisposable
         if (_searchCts != null) { await _searchCts.CancelAsync(); _searchCts.Dispose(); }
         if (_hubConnection != null)
             await _hubConnection.DisposeAsync();
+        _storageMigrationSemaphore.Dispose();
     }
 
     // ── Task 4: Initialize ─────────────────────────────────────────────
@@ -188,12 +190,12 @@ public partial class ProjectNew : IAsyncDisposable
         _hubConnection.Reconnected += async _ =>
         {
             foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
-                await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
+                await JoinPartFileGroupsAsync(part);
         };
 
         _hubConnection.On<SignalRFileAnalysisPayload>("FileAnalysisCompleted", async payload =>
         {
-            var parts = _parts.Where(p => p.StoragePath == payload.StoragePath).ToList();
+            var parts = FindPartsByStoragePath(payload.StoragePath);
             if (parts.Count == 0) return;
 
             if (payload.Failed)
@@ -205,7 +207,7 @@ public partial class ProjectNew : IAsyncDisposable
                     p.DfmAnalysisTimedOut = true;
                     p.StatusText = DfmStatusMessages.GetStatusText(payload.ErrorCode);
                 }
-                StopStatusWatchdog(payload.StoragePath);
+                StopStatusWatchdogs(parts);
                 TriggerAutoSave();
                 await InvokeAsync(StateHasChanged);
                 return;
@@ -269,7 +271,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         _hubConnection.On<SignalRGlbReadyPayload>("GlbReady", async payload =>
         {
-            var parts = _parts.Where(p => p.StoragePath == payload.StoragePath).ToList();
+            var parts = FindPartsByStoragePath(payload.StoragePath);
             if (parts.Count == 0) return;
 
             if (!payload.Failed)
@@ -301,7 +303,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         _hubConnection.On<SignalRDfmAnalysisPayload>("DfmAnalysisReady", async payload =>
         {
-            var parts = _parts.Where(p => p.StoragePath == payload.StoragePath).ToList();
+            var parts = FindPartsByStoragePath(payload.StoragePath);
             if (parts.Count == 0) return;
 
             foreach (var part in parts)
@@ -332,7 +334,7 @@ public partial class ProjectNew : IAsyncDisposable
                 }
                 part.ResolveDfmReport();
             }
-            StopStatusWatchdog(payload.StoragePath);
+            StopStatusWatchdogs(parts);
 
             await InvokeAsync(StateHasChanged);
         });
@@ -340,7 +342,7 @@ public partial class ProjectNew : IAsyncDisposable
         await _hubConnection.StartAsync();
 
         foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
-            await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
+            await JoinPartFileGroupsAsync(part);
     }
 
     // ── Task 4: Customer search ────────────────────────────────────────
@@ -558,12 +560,15 @@ public partial class ProjectNew : IAsyncDisposable
             part.AwaitingPreview = true;
             part.StatusText = "Processing geometry...";
 
-            if (_hubConnection?.State == HubConnectionState.Connected)
-                await _hubConnection.InvokeAsync("JoinFileGroup", completedUpload.StoragePath);
+            await JoinPartFileGroupsAsync(part);
+            StartStatusWatchdog(part, completedUpload.StoragePath);
 
-            var pollCts = new CancellationTokenSource();
-            _statusPollCts[completedUpload.StoragePath] = pollCts;
-            _ = Task.Run(() => StatusWatchdogLoopAsync(part, completedUpload.StoragePath, pollCts.Token));
+            if (_selectedCustomerId.HasValue &&
+                completedUpload.StoragePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase))
+            {
+                await MigrateTempProjectFilesAsync();
+            }
+
             await InvokeAsync(StateHasChanged);
         }
         catch (OperationCanceledException)
@@ -681,6 +686,74 @@ public partial class ProjectNew : IAsyncDisposable
             _statusPollCts.Remove(storagePath);
             cts.Cancel();
             cts.Dispose();
+        }
+    }
+
+    private void StartStatusWatchdog(PartViewModel part, string? storagePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return;
+
+        if (_statusPollCts.ContainsKey(storagePath))
+            return;
+
+        var pollCts = new CancellationTokenSource();
+        _statusPollCts[storagePath] = pollCts;
+        _ = Task.Run(() => StatusWatchdogLoopAsync(part, storagePath, pollCts.Token));
+    }
+
+    private void StopStatusWatchdogs(PartViewModel part)
+    {
+        foreach (var storagePath in part.GetSignalRStoragePaths())
+            StopStatusWatchdog(storagePath);
+    }
+
+    private void StopStatusWatchdogs(IEnumerable<PartViewModel> parts)
+    {
+        foreach (var part in parts)
+            StopStatusWatchdogs(part);
+    }
+
+    private List<PartViewModel> FindPartsByStoragePath(string? storagePath) =>
+        string.IsNullOrWhiteSpace(storagePath)
+            ? []
+            : _parts.Where(part => part.MatchesSourceStoragePath(storagePath)).ToList();
+
+    private async Task JoinPartFileGroupsAsync(PartViewModel part)
+    {
+        var hubConnection = _hubConnection;
+        if (hubConnection?.State != HubConnectionState.Connected)
+            return;
+
+        foreach (var storagePath in part.GetSignalRStoragePaths().Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await hubConnection.InvokeAsync("JoinFileGroup", storagePath);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to join file SignalR group for {StoragePath}", storagePath);
+            }
+        }
+    }
+
+    private async Task LeavePartFileGroupsAsync(PartViewModel part)
+    {
+        var hubConnection = _hubConnection;
+        if (hubConnection?.State != HubConnectionState.Connected)
+            return;
+
+        foreach (var storagePath in part.GetSignalRStoragePaths().Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await hubConnection.InvokeAsync("LeaveFileGroup", storagePath);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "Failed to leave file SignalR group for {StoragePath}", storagePath);
+            }
         }
     }
 
@@ -858,7 +931,9 @@ public partial class ProjectNew : IAsyncDisposable
     /// </summary>
     private async Task RequestFreshViewerUrlAsync(string storagePath)
     {
-        var part = _parts.FirstOrDefault(p => p.GlbStoragePath == storagePath || p.StoragePath == storagePath);
+        var part = _parts.FirstOrDefault(p =>
+            p.MatchesSourceStoragePath(storagePath)
+            || string.Equals(p.GlbStoragePath, storagePath, StringComparison.OrdinalIgnoreCase));
         if (part == null)
         {
             Snackbar.Add("Part not found for URL refresh.", Severity.Warning);
@@ -902,10 +977,8 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private async Task RemovePart(PartViewModel part)
     {
-        if (!string.IsNullOrEmpty(part.StoragePath) && _hubConnection?.State == HubConnectionState.Connected)
-            await _hubConnection.InvokeAsync("LeaveFileGroup", part.StoragePath);
-
-        StopStatusWatchdog(part.StoragePath);
+        await LeavePartFileGroupsAsync(part);
+        StopStatusWatchdogs(part);
 
         // Cascade delete all attachment files before removing the part
         foreach (var att in part.DrawingFiles.Concat(part.SupplementaryFiles))
@@ -1721,8 +1794,12 @@ public partial class ProjectNew : IAsyncDisposable
                 // restores DFM results from BFF cache, and repopulates GlbStoragePath.
                 if (!string.IsNullOrEmpty(partVm.StoragePath))
                 {
-                    var p = partVm; var path = partVm.StoragePath!;
-                    _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(p, path); });
+                    var p = partVm;
+                    foreach (var path in partVm.GetSignalRStoragePaths())
+                    {
+                        var statusPath = path;
+                        _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(p, statusPath); });
+                    }
                 }
 
                 _parts.Add(partVm);
@@ -1821,12 +1898,15 @@ public partial class ProjectNew : IAsyncDisposable
                     if (!string.IsNullOrEmpty(partVm.StoragePath))
                     {
                         var p = partVm;
-                        var path = partVm.StoragePath;
-                        _ = Task.Run(async () =>
+                        foreach (var path in partVm.GetSignalRStoragePaths())
                         {
-                            await Task.Delay(CatchUpDelayMs);
-                            await FetchCurrentStatusAsync(p, path);
-                        });
+                            var statusPath = path;
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(CatchUpDelayMs);
+                                await FetchCurrentStatusAsync(p, statusPath);
+                            });
+                        }
                     }
                 }
             }
@@ -2213,6 +2293,7 @@ public partial class ProjectNew : IAsyncDisposable
             Name = sourcePart.Name,
             FileId = sourcePart.FileId,
             StoragePath = sourcePart.StoragePath,
+            StoragePathAliases = [.. sourcePart.StoragePathAliases],
             FileSizeBytes = sourcePart.FileSizeBytes,
             UploadedAt = sourcePart.UploadedAt,
 
@@ -2261,11 +2342,7 @@ public partial class ProjectNew : IAsyncDisposable
         _selectedPartIndex = index + 1;
 
         // Join the file group so late-arriving events reach this clone too.
-        if (!string.IsNullOrEmpty(cloned.StoragePath) && _hubConnection is not null)
-        {
-            try { await _hubConnection.InvokeAsync("JoinFileGroup", cloned.StoragePath); }
-            catch (Exception ex) { Logger.LogWarning(ex, "Duplicate: JoinFileGroup failed"); }
-        }
+        await JoinPartFileGroupsAsync(cloned);
 
         await TriggerRoutingFetchAsync(cloned);
 
@@ -2305,115 +2382,119 @@ public partial class ProjectNew : IAsyncDisposable
         if (previousCustomerId.HasValue || !_selectedCustomerId.HasValue)
             return;
 
-        var partsInTemp = _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath) && p.StoragePath.StartsWith("projects/")).ToList();
-        if (partsInTemp.Count == 0)
+        await MigrateTempProjectFilesAsync();
+    }
+
+    private async Task MigrateTempProjectFilesAsync()
+    {
+        if (!_selectedCustomerId.HasValue)
             return;
 
-        var migrationResult = await Http.PostAsJsonAsync(
-            $"api/v1/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
-            (object?)null);
-
-        if (!migrationResult.IsSuccessStatusCode)
+        await _storageMigrationSemaphore.WaitAsync();
+        try
         {
-            Snackbar.Add("Failed to migrate files to customer storage. Please try again.", Severity.Error);
-            return;
-        }
-
-        var migrated = await migrationResult.Content.ReadFromJsonAsync<JsonDocument>();
-        if (migrated == null)
-        {
-            Snackbar.Add("Migration failed.", Severity.Error);
-            return;
-        }
-
-        var root = migrated.RootElement;
-
-        if (!root.TryGetProperty("errors", out var errorsElement) &&
-            !root.TryGetProperty("Errors", out errorsElement))
-        {
-            Snackbar.Add("Migration response is invalid: missing errors property.", Severity.Error);
-            return;
-        }
-
-        var totalMigrated = 0;
-        if (root.TryGetProperty("total_migrated", out var totalMigratedElement) ||
-            root.TryGetProperty("TotalMigrated", out totalMigratedElement))
-        {
-            totalMigrated = totalMigratedElement.GetInt32();
-        }
-
-        if (!root.TryGetProperty("migrated_files", out var migratedFilesElement) &&
-            !root.TryGetProperty("MigratedFiles", out migratedFilesElement) &&
-            !root.TryGetProperty("migratedFiles", out migratedFilesElement))
-        {
-            Snackbar.Add("Migration response is invalid: missing migrated_files property.", Severity.Error);
-            return;
-        }
-
-        var successfullyMigratedParts = new List<PartViewModel>();
-
-        foreach (var entry in migratedFilesElement.EnumerateArray())
-        {
-            if (!entry.TryGetProperty("file_id", out var fileIdElement) &&
-                !entry.TryGetProperty("FileId", out fileIdElement))
-                continue;
-            if (!entry.TryGetProperty("new_path", out var newPathElement) &&
-                !entry.TryGetProperty("NewPath", out newPathElement))
-                continue;
-            if (!entry.TryGetProperty("old_path", out var oldPathElement) &&
-                !entry.TryGetProperty("OldPath", out oldPathElement))
-                continue;
-
-            var fileId = fileIdElement.GetString();
-            var newBasePath = newPathElement.GetString();
-            var oldBasePath = oldPathElement.GetString();
-
-            if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(newBasePath) || string.IsNullOrEmpty(oldBasePath))
-                continue;
-
-            var part = _parts.FirstOrDefault(p => p.FileId.ToString() == fileId);
-            if (part == null) continue;
-
-            part.StoragePath = newBasePath;
-
-            if (!string.IsNullOrEmpty(part.GlbStoragePath))
-            {
-                var oldGlbViewerPath = oldBasePath + "_viewer.glb";
-                if (part.GlbStoragePath.StartsWith(oldGlbViewerPath))
-                    part.GlbStoragePath = newBasePath + "_viewer.glb";
-                else if (part.GlbStoragePath.StartsWith(oldBasePath))
-                    part.GlbStoragePath = newBasePath;
-            }
-
-            if (!string.IsNullOrEmpty(part.ThumbnailSmallGcsPath) && part.ThumbnailSmallGcsPath.StartsWith(oldBasePath))
-                part.ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath.Replace(oldBasePath, newBasePath);
-
-            if (!string.IsNullOrEmpty(part.ThumbnailLargeGcsPath) && part.ThumbnailLargeGcsPath.StartsWith(oldBasePath))
-                part.ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath.Replace(oldBasePath, newBasePath);
-
-            part.GlbSignedUrl = null;
-            successfullyMigratedParts.Add(part);
-        }
-
-        await InvokeAsync(StateHasChanged);
-
-        foreach (var part in successfullyMigratedParts.Where(p => p.ProcessId.HasValue && p.MaterialId.HasValue))
-            TriggerPricingAsync(part);
-
-        if (errorsElement.GetArrayLength() > 0)
-        {
-            var errorMessages = errorsElement.EnumerateArray()
-                .Select(e => e.GetString() ?? string.Empty)
-                .Where(e => !string.IsNullOrEmpty(e))
+            var partsInTemp = _parts
+                .Where(p => !string.IsNullOrEmpty(p.StoragePath) &&
+                            p.StoragePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase))
                 .ToList();
+            if (partsInTemp.Count == 0)
+                return;
 
-            var summary = $"Migration completed with {errorsElement.GetArrayLength()} error(s). {successfullyMigratedParts.Count} file(s) migrated successfully.";
-            if (errorMessages.Count > 0 && errorMessages.Count <= 3)
+            var migrationResult = await Http.PostAsJsonAsync(
+                $"api/v1/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
+                (object?)null);
+
+            if (!migrationResult.IsSuccessStatusCode)
             {
-                summary += " Errors: " + string.Join("; ", errorMessages);
+                Snackbar.Add("Failed to migrate files to customer storage. Please try again.", Severity.Error);
+                return;
             }
 
-            Snackbar.Add(summary, Severity.Warning);
+            var migrated = await migrationResult.Content.ReadFromJsonAsync<JsonDocument>();
+            if (migrated == null)
+            {
+                Snackbar.Add("Migration failed.", Severity.Error);
+                return;
+            }
+
+            var root = migrated.RootElement;
+
+            if (!root.TryGetProperty("errors", out var errorsElement) &&
+                !root.TryGetProperty("Errors", out errorsElement))
+            {
+                Snackbar.Add("Migration response is invalid: missing errors property.", Severity.Error);
+                return;
+            }
+
+            if (!root.TryGetProperty("migrated_files", out var migratedFilesElement) &&
+                !root.TryGetProperty("MigratedFiles", out migratedFilesElement) &&
+                !root.TryGetProperty("migratedFiles", out migratedFilesElement))
+            {
+                Snackbar.Add("Migration response is invalid: missing migrated_files property.", Severity.Error);
+                return;
+            }
+
+            var successfullyMigratedParts = new List<PartViewModel>();
+
+            foreach (var entry in migratedFilesElement.EnumerateArray())
+            {
+                if (!entry.TryGetProperty("file_id", out var fileIdElement) &&
+                    !entry.TryGetProperty("FileId", out fileIdElement))
+                    continue;
+                if (!entry.TryGetProperty("new_path", out var newPathElement) &&
+                    !entry.TryGetProperty("NewPath", out newPathElement))
+                    continue;
+                if (!entry.TryGetProperty("old_path", out var oldPathElement) &&
+                    !entry.TryGetProperty("OldPath", out oldPathElement))
+                    continue;
+
+                var fileId = fileIdElement.GetString();
+                var newBasePath = newPathElement.GetString();
+                var oldBasePath = oldPathElement.GetString();
+
+                if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(newBasePath) || string.IsNullOrEmpty(oldBasePath))
+                    continue;
+
+                var part = _parts.FirstOrDefault(p => p.FileId.ToString() == fileId);
+                if (part == null) continue;
+
+                part.AddStoragePathAlias(oldBasePath);
+                part.StoragePath = newBasePath;
+
+                await JoinPartFileGroupsAsync(part);
+                StartStatusWatchdog(part, oldBasePath);
+                StartStatusWatchdog(part, newBasePath);
+                successfullyMigratedParts.Add(part);
+            }
+
+            if (successfullyMigratedParts.Count > 0)
+            {
+                TriggerAutoSave();
+                await InvokeAsync(StateHasChanged);
+
+                foreach (var part in successfullyMigratedParts.Where(p => p.ProcessId.HasValue && p.MaterialId.HasValue))
+                    TriggerPricingAsync(part);
+            }
+
+            if (errorsElement.GetArrayLength() > 0)
+            {
+                var errorMessages = errorsElement.EnumerateArray()
+                    .Select(e => e.GetString() ?? string.Empty)
+                    .Where(e => !string.IsNullOrEmpty(e))
+                    .ToList();
+
+                var summary = $"Migration completed with {errorsElement.GetArrayLength()} error(s). {successfullyMigratedParts.Count} file(s) migrated successfully.";
+                if (errorMessages.Count > 0 && errorMessages.Count <= 3)
+                {
+                    summary += " Errors: " + string.Join("; ", errorMessages);
+                }
+
+                Snackbar.Add(summary, Severity.Warning);
+            }
+        }
+        finally
+        {
+            _storageMigrationSemaphore.Release();
         }
     }
 

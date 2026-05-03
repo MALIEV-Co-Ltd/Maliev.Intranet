@@ -53,7 +53,7 @@ public partial class PartConfigSidebar : ComponentBase
     /// <summary>Controls the layout mode of the sidebar. Sidebar renders the full-width panel; Inline renders a compact version for use inside cards.</summary>
     [Parameter] public PartConfigSidebarDisplayMode DisplayMode { get; set; } = PartConfigSidebarDisplayMode.Sidebar;
 
-    private bool _routingExpanded = true;
+    private bool _routingExpanded;
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
     private IReadOnlyCollection<string> _selectedFeatures = [];
     private readonly Dictionary<Guid, decimal> _basePricesByPart = new();
