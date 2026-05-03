@@ -59,6 +59,11 @@ public class DfmChecksTabTests : BunitContext, IAsyncLifetime
         RequiresEdm: false,
         RequiresGrinding: false,
         MinimumFeatureSizeMm: 0,
+        IsTurnable: issues.Count == 0,
+        PrimaryAxis: "Z",
+        AxisVector: [0, 0, 1],
+        LengthDiameterRatio: 1,
+        SymmetryDeviation: issues.Count == 0 ? 0 : 1,
         Issues: issues);
 
     // Test 1: When DfmAnalysisTimedOut=true → badge has "dfm-badge--error" class and shows "Analysis failed"

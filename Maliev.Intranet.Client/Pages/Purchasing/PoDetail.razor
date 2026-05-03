@@ -1,0 +1,75 @@
+@page "/purchasing/{Id:guid}"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Purchase Order | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@(_order?.PoNumber ?? "Purchase Order")" Subtitle="@_order?.SupplierName" BackHref="/purchasing">
+        @if (_order is not null)
+        {
+            <StatusBadge Status="@_order.Status" />
+        }
+    </PageHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_order is null)
+        {
+            <div class="mlv-empty">Purchase order was not found.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Total" Value="@_order.TotalAmount.ToString("N2")" />
+                <StatTile Label="Items" Value="@_order.ItemsCount.ToString("N0")" />
+                <StatTile Label="Issued" Value="@_order.Date.ToString("dd MMM")" />
+                <StatTile Label="Expected" Value="@(_order.ExpectedDelivery?.ToString("dd MMM") ?? "-")" />
+            </StatBar>
+            <PanelCard Title="Line items">
+                @if (_order.Items.Count > 0)
+                {
+                    <table class="mlv-table">
+                        <thead><tr><th>Material</th><th>Quantity</th><th>Unit price</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in _order.Items)
+                            {
+                                <tr><td class="mlv-mono">@item.MaterialId</td><td>@item.Quantity</td><td>@item.UnitPrice.ToString("N2")</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty">No line items.</div>
+                }
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PurchaseOrderDto? _order;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _order = await Http.GetFromJsonAsync<PurchaseOrderDto>($"api/v1/procurement/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Purchase order could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

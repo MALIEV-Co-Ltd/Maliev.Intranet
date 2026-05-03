@@ -1,0 +1,130 @@
+@page "/iam"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>IAM | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="IAM" Subtitle="Users, roles, and permission coverage.">
+        <PrimaryButton Icon="@Icons.Material.Outlined.PersonAdd" Href="/iam/users/new">Invite User</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <div class="mlv-toolbar">
+            <div class="mlv-segmented">
+                @foreach (var tab in _tabs)
+                {
+                    <button type="button" class="@(_tab == tab ? "active" : "")" @onclick="@(() => _tab = tab)">@tab</button>
+                }
+            </div>
+        </div>
+
+        @if (_tab == "Users")
+        {
+            <PanelCard>
+                @if (_users.Count > 0)
+                {
+                    <table class="mlv-table">
+                        <thead><tr><th>User</th><th>Type</th><th>Status</th><th>Created</th></tr></thead>
+                        <tbody>
+                            @foreach (var user in _users)
+                            {
+                                <tr @onclick="@(() => Navigation.NavigateTo($"/iam/users/{user.PrincipalId}"))">
+                                    <td>
+                                        <div class="mlv-row-title">
+                                            <Avatar Name="@user.DisplayName" />
+                                            <div>
+                                                <div class="mlv-row-main">@user.DisplayName</div>
+                                                <div class="mlv-row-sub">@user.Email</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>@user.Type</td>
+                                    <td><StatusBadge Status="@(user.IsActive && user.IsEnabled ? "Active" : "Inactive")" /></td>
+                                    <td>@user.CreatedAt.ToString("dd MMM yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty">No IAM users found.</div>
+                }
+            </PanelCard>
+        }
+        else if (_tab == "Roles")
+        {
+            <PanelCard>
+                <div class="mlv-list">
+                    @foreach (var role in _roles)
+                    {
+                        <div class="mlv-list-row" @onclick="@(() => Navigation.NavigateTo($"/iam/roles/{Uri.EscapeDataString(role.RoleId)}"))">
+                            <div>
+                                <div class="mlv-row-main">@role.Name</div>
+                                <div class="mlv-row-sub">@role.Description</div>
+                            </div>
+                            <StatusBadge Status="@role.RoleId" Text="@($"{role.PermissionIds.Count} permissions")" />
+                        </div>
+                    }
+                </div>
+            </PanelCard>
+        }
+        else
+        {
+            <PanelCard>
+                <table class="mlv-table">
+                    <thead><tr><th>Permission</th><th>Category</th><th>Description</th></tr></thead>
+                    <tbody>
+                        @foreach (var permission in _permissions)
+                        {
+                            <tr>
+                                <td class="mlv-mono">@permission.PermissionId</td>
+                                <td>@permission.Category</td>
+                                <td>@permission.Description</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    private readonly string[] _tabs = ["Users", "Roles", "Permissions"];
+    private string _tab = "Users";
+    private List<PrincipalSummaryDto> _users = [];
+    private List<RoleDto> _roles = [];
+    private List<PermissionDto> _permissions = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var usersTask = Http.GetFromJsonAsync<List<PrincipalSummaryDto>>("api/v1/iam/users");
+            var rolesTask = Http.GetFromJsonAsync<List<RoleDto>>("api/v1/iam/roles");
+            var permissionsTask = Http.GetFromJsonAsync<List<PermissionDto>>("api/v1/iam/permissions");
+            await Task.WhenAll(usersTask, rolesTask, permissionsTask);
+            _users = await usersTask ?? [];
+            _roles = await rolesTask ?? [];
+            _permissions = await permissionsTask ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("IAM data could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

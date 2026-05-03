@@ -10,9 +10,12 @@ public class NavigationTests(BffTestWebApplicationFactory factory) : IClassFixtu
 
     [Theory(Skip = "Requires Docker/RabbitMQ — host startup hangs due to service discovery and IAM token provider")]
     [InlineData("/")]
-    [InlineData("/sales/customers")]
-    [InlineData("/sales/projects")]
     [InlineData("/sales/projects/new")]
+    [InlineData("/customers")]
+    [InlineData("/accounting")]
+    [InlineData("/purchasing")]
+    [InlineData("/admin")]
+    [InlineData("/iam")]
     public async Task FrontendRoutes_ReturnBlazorShell(string url)
     {
         // Arrange
@@ -28,7 +31,8 @@ public class NavigationTests(BffTestWebApplicationFactory factory) : IClassFixtu
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
 
-        // The shell should contain blazor boot script
+        // The server-owned shell should contain the WASM boot path and static loading screen.
         Assert.Contains("_framework/blazor.web.js", content);
+        Assert.Contains("wasm-loading", content);
     }
 }

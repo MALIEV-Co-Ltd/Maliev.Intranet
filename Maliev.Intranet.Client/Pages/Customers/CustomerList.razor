@@ -1,0 +1,157 @@
+@page "/customers"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Customers | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Customers" Subtitle="Customer accounts, company contacts, NDA status, and balances.">
+        <PrimaryButton Icon="@Icons.Material.Outlined.PersonAdd" Href="/customers/new">New Customer</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        <div class="mlv-toolbar">
+            <div class="mlv-toolbar-left">
+                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search customers..." OnEnter="LoadAsync" />
+                <div class="mlv-segmented">
+                    @foreach (var filter in _filters)
+                    {
+                        <button type="button" class="@(_filter == filter.Value ? "active" : "")" @onclick="@(() => SetFilter(filter.Value))">@filter.Label</button>
+                    }
+                </div>
+            </div>
+            <div class="mlv-toolbar-right">
+                <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <PanelCard>
+            @if (FilteredCustomers.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Company</th>
+                            <th>Status</th>
+                            <th>NDA</th>
+                            <th>Balance</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var customer in FilteredCustomers)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/customers/{customer.Id}"))">
+                                <td>
+                                    <div class="mlv-row-title">
+                                        <Avatar Name="@customer.Name" />
+                                        <div>
+                                            <div class="mlv-row-main">@customer.Name</div>
+                                            <div class="mlv-row-sub">@customer.Email</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>@(customer.CompanyName ?? "Private")</td>
+                                <td><StatusBadge Status="@customer.Status" /></td>
+                                <td><StatusBadge Status="@(customer.NdaStatus ?? "None")" /></td>
+                                <td class="mlv-mono">@customer.OutstandingBalance.ToString("N2")</td>
+                                <td>@customer.CreatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">No customers match this view.</div>
+            }
+        </PanelCard>
+    </PageBody>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+
+    private readonly (string Label, string Value)[] _filters =
+    [
+        ("All", "all"),
+        ("Company", "company"),
+        ("Private", "private"),
+        ("VIP", "vip"),
+        ("Inactive", "inactive")
+    ];
+
+    private List<CustomerSummaryDto> _customers = [];
+    private bool _loading = true;
+    private string _filter = "all";
+    private string? _search;
+    private string? _error;
+
+    private List<CustomerSummaryDto> FilteredCustomers => _filter switch
+    {
+        "company" => _customers.Where(c => c.CompanyId.HasValue).ToList(),
+        "private" => _customers.Where(c => !c.CompanyId.HasValue).ToList(),
+        "vip" => _customers.Where(c => string.Equals(c.Tier, "VIP", StringComparison.OrdinalIgnoreCase) || string.Equals(c.Segment, "VIP", StringComparison.OrdinalIgnoreCase)).ToList(),
+        "inactive" => _customers.Where(c => !string.Equals(c.Status, "Active", StringComparison.OrdinalIgnoreCase)).ToList(),
+        _ => _customers
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _search = Search;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchChanged(string? value)
+    {
+        _search = value;
+        await LoadAsync();
+    }
+
+    private async Task SetFilter(string filter)
+    {
+        _filter = filter;
+        await Task.CompletedTask;
+    }
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var url = $"api/v1/customers?page=1&pageSize=50";
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                url += $"&query={Uri.EscapeDataString(_search)}";
+            }
+
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(url);
+            _customers = response?.Data.ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            _error = "Customer data could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

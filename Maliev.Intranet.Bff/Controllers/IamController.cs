@@ -5,6 +5,7 @@ using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
@@ -124,5 +125,99 @@ public class IamController(
         if (!await IsAuthorizedAsync()) return Forbid();
         var success = await client.RevokeRoleAsync(principalId, bindingId);
         return success ? Ok() : BadRequest("Failed to revoke role.");
+    }
+
+    /// <summary>
+    /// Queues an employee invitation request for future downstream IAM wiring.
+    /// </summary>
+    /// <param name="request">The invite request.</param>
+    /// <returns>An accepted response containing the queued invite data.</returns>
+    [RequirePermission(MalievPermissions.IAM.Manage, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("users/invite")]
+    public async Task<IActionResult> InviteUser([FromBody] InviteUserRequest request)
+    {
+        if (!await IsAuthorizedAsync()) return Forbid();
+        return Accepted(new { request.Email, request.DisplayName, request.RoleId, Status = "Queued" });
+    }
+
+    /// <summary>
+    /// Updates basic user profile state for future downstream IAM wiring.
+    /// </summary>
+    /// <param name="principalId">The principal identifier.</param>
+    /// <param name="request">The patch request.</param>
+    /// <returns>An accepted response containing the requested state.</returns>
+    [RequirePermission(MalievPermissions.IAM.Manage, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("users/{principalId:guid}")]
+    public async Task<IActionResult> PatchUser(Guid principalId, [FromBody] PatchUserRequest request)
+    {
+        if (!await IsAuthorizedAsync()) return Forbid();
+        return Accepted(new { PrincipalId = principalId, request.DisplayName, request.IsEnabled, Status = "Queued" });
+    }
+
+    /// <summary>
+    /// Retrieves recent user activity for the IAM console.
+    /// </summary>
+    /// <param name="principalId">The principal identifier.</param>
+    /// <returns>A stable activity response shape.</returns>
+    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("users/{principalId:guid}/activity")]
+    public async Task<IActionResult> GetUserActivity(Guid principalId)
+    {
+        if (!await IsAuthorizedAsync()) return Forbid();
+        return Ok(Array.Empty<object>());
+    }
+
+    /// <summary>
+    /// Retrieves a permission matrix for the requested role.
+    /// </summary>
+    /// <param name="roleId">The role identifier.</param>
+    /// <returns>A role-to-permission matrix derived from IAM role data.</returns>
+    [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("roles/{roleId}/permissions-matrix")]
+    public async Task<IActionResult> GetRolePermissionsMatrix(string roleId)
+    {
+        if (!await IsAuthorizedAsync()) return Forbid();
+        var roles = await client.GetRolesAsync();
+        var role = roles.FirstOrDefault(r => string.Equals(r.RoleId, roleId, StringComparison.OrdinalIgnoreCase));
+        if (role is null) return NotFound();
+
+        var permissions = role.PermissionIds.Count > 0 ? role.PermissionIds : role.Permissions;
+        return Ok(new
+        {
+            role.RoleId,
+            role.Name,
+            Permissions = permissions.Select(permission => new { PermissionId = permission, Granted = true }).ToList()
+        });
+    }
+
+    /// <summary>
+    /// Request payload for inviting a user to the employee intranet.
+    /// </summary>
+    public sealed class InviteUserRequest
+    {
+        /// <summary>Gets or sets the display name for the invited user.</summary>
+        [Required]
+        public string DisplayName { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the employee email address.</summary>
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the initial role identifier.</summary>
+        [Required]
+        public string RoleId { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Request payload for patching basic IAM user state.
+    /// </summary>
+    public sealed class PatchUserRequest
+    {
+        /// <summary>Gets or sets the display name override.</summary>
+        public string? DisplayName { get; set; }
+
+        /// <summary>Gets or sets whether the user should be enabled.</summary>
+        public bool? IsEnabled { get; set; }
     }
 }

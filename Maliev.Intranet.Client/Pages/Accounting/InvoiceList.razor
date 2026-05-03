@@ -1,0 +1,113 @@
+@page "/accounting"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Accounting | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Accounting" Subtitle="Invoices, payments, receipts, and financial work queues.">
+        <PrimaryButton Icon="@Icons.Material.Outlined.ReceiptLong" Href="/accounting/new">New Invoice</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <StatBar Class="mb-4">
+            <StatTile Label="Invoice total" Value="@_invoices.Sum(i => i.Total).ToString("N2")" />
+            <StatTile Label="Outstanding" Value="@_invoices.Sum(i => i.Balance).ToString("N2")" Trend="@(_invoices.Sum(i => i.Balance) <= 0)" />
+            <StatTile Label="Overdue" Value="@_invoices.Count(i => i.DueDate.Date < DateTime.Today && !string.Equals(i.Status, "Paid", StringComparison.OrdinalIgnoreCase)).ToString("N0")" />
+            <StatTile Label="Payments today" Value="@(_paymentStats?.TodayTotal.ToString("N2") ?? "-")" />
+        </StatBar>
+
+        <div class="mlv-toolbar">
+            <div class="mlv-segmented">
+                @foreach (var tab in _tabs)
+                {
+                    <button type="button" class="@(_tab == tab ? "active" : "")" @onclick="@(() => _tab = tab)">@tab</button>
+                }
+            </div>
+            <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+        </div>
+
+        @if (_tab == "Invoices")
+        {
+            <PanelCard>
+                @if (_invoices.Count > 0)
+                {
+                    <table class="mlv-table">
+                        <thead>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th>Total</th>
+                                <th>Balance</th>
+                                <th>Due</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var invoice in _invoices)
+                            {
+                                <tr @onclick="@(() => Navigation.NavigateTo($"/accounting/{invoice.Id}"))">
+                                    <td class="mlv-mono">@invoice.InvoiceNumber</td>
+                                    <td>@invoice.CustomerName</td>
+                                    <td><StatusBadge Status="@invoice.Status" /></td>
+                                    <td class="mlv-mono">@invoice.Total.ToString("N2")</td>
+                                    <td class="mlv-mono">@invoice.Balance.ToString("N2")</td>
+                                    <td>@invoice.DueDate.ToString("dd MMM yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty">No invoices found.</div>
+                }
+            </PanelCard>
+        }
+        else
+        {
+            <PanelCard Title="@_tab">
+                <div class="mlv-empty">@_tab will appear here when the accounting service exposes this workstream.</div>
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    private readonly string[] _tabs = ["Invoices", "Expenses", "Payroll"];
+    private string _tab = "Invoices";
+    private List<InvoiceSummaryDto> _invoices = [];
+    private PaymentStatsDto? _paymentStats;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var invoicesTask = Http.GetFromJsonAsync<PagedResponse<InvoiceSummaryDto>>("api/v1/invoices?page=1&pageSize=50");
+            var statsTask = Http.GetFromJsonAsync<PaymentStatsDto>("api/v1/payments/stats");
+            await Task.WhenAll(invoicesTask, statsTask);
+            _invoices = (await invoicesTask)?.Data.ToList() ?? [];
+            _paymentStats = await statsTask;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Accounting data could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

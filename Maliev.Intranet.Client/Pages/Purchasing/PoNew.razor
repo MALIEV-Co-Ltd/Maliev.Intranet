@@ -1,0 +1,80 @@
+@page "/purchasing/new"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>New Purchase Order | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="New Purchase Order" Subtitle="Create a draft procurement request." BackHref="/purchasing" />
+    <PageBody>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <PanelCard Title="PO details">
+            <EditForm Model="@_request" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <FormGrid>
+                    <FormField Label="Supplier ID"><InputText class="mlv-form-input" @bind-Value="_supplierId" /></FormField>
+                    <FormField Label="Date"><InputDate class="mlv-form-input" @bind-Value="_request.Date" /></FormField>
+                    <FormField Label="Material ID"><InputText class="mlv-form-input" @bind-Value="_materialId" /></FormField>
+                    <FormField Label="Quantity"><InputNumber class="mlv-form-input" @bind-Value="_line.Quantity" /></FormField>
+                    <FormField Label="Unit price"><InputNumber class="mlv-form-input" @bind-Value="_line.UnitPrice" /></FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                    <SecondaryButton Href="/purchasing">Cancel</SecondaryButton>
+                    <PrimaryButton Type="submit" Disabled="@_saving">Create PO</PrimaryButton>
+                </div>
+            </EditForm>
+        </PanelCard>
+    </PageBody>
+</div>
+
+@code {
+    private CreatePurchaseOrderRequest _request = new() { Date = DateTime.Today };
+    private PurchaseOrderLineItemDto _line = new() { Quantity = 1, UnitPrice = 0 };
+    private string _supplierId = string.Empty;
+    private string _materialId = string.Empty;
+    private bool _saving;
+    private string? _error;
+
+    private async Task SaveAsync()
+    {
+        if (!Guid.TryParse(_supplierId, out var supplierId) || !Guid.TryParse(_materialId, out var materialId))
+        {
+            _error = "Enter valid supplier and material IDs.";
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        _request.SupplierId = supplierId;
+        _line.MaterialId = materialId;
+        _request.Items = [_line];
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/procurement", _request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Purchase order created.", Severity.Success);
+                Navigation.NavigateTo("/purchasing");
+            }
+            else
+            {
+                _error = "Purchase order could not be created.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Purchase order could not be created.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

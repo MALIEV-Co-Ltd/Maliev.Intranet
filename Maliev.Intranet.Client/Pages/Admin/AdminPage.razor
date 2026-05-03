@@ -1,0 +1,169 @@
+@page "/admin"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Admin | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Admin" Subtitle="Company settings, machines, notifications, and integrations." />
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <div class="mlv-toolbar">
+            <div class="mlv-segmented">
+                @foreach (var tab in _tabs)
+                {
+                    <button type="button" class="@(_tab == tab ? "active" : "")" @onclick="@(() => _tab = tab)">@tab</button>
+                }
+            </div>
+        </div>
+
+        @if (_tab == "Company")
+        {
+            <div class="mlv-grid">
+                <PanelCard Title="Tenant profile" Class="mlv-span-6">
+                    <FormGrid>
+                        <FormField Label="Company name"><input class="mlv-form-input" value="MALIEV Precision Manufacturing" readonly /></FormField>
+                        <FormField Label="Industry"><input class="mlv-form-input" value="CNC and additive manufacturing" readonly /></FormField>
+                        <FormField Label="Website"><input class="mlv-form-input" value="https://maliev.com" readonly /></FormField>
+                        <FormField Label="Support email"><input class="mlv-form-input" value="ops@maliev.com" readonly /></FormField>
+                    </FormGrid>
+                </PanelCard>
+                <PanelCard Title="System health" Class="mlv-span-6">
+                    @if (_health?.Services.Count > 0)
+                    {
+                        <div class="mlv-list">
+                            @foreach (var service in _health.Services.Take(8))
+                            {
+                                <div class="mlv-list-row">
+                                    <div>
+                                        <div class="mlv-row-main">@service.ServiceName</div>
+                                        <div class="mlv-row-sub">@service.ResponseTimeMs.ToString("N0") ms</div>
+                                    </div>
+                                    <StatusBadge Status="@service.Status" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">Health data is not available.</div>
+                    }
+                </PanelCard>
+            </div>
+        }
+        else if (_tab == "Machines")
+        {
+            <PanelCard>
+                @if (_equipment.Count > 0)
+                {
+                    <table class="mlv-table">
+                        <thead><tr><th>Asset</th><th>Name</th><th>Category</th><th>Status</th><th>Updated</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in _equipment)
+                            {
+                                <tr>
+                                    <td class="mlv-mono">@item.AssetCode</td>
+                                    <td>@item.Name</td>
+                                    <td>@item.Category</td>
+                                    <td><StatusBadge Status="@item.Status" /></td>
+                                    <td>@item.UpdatedAt.ToString("dd MMM yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty">No machines found.</div>
+                }
+            </PanelCard>
+        }
+        else if (_tab == "Notifications")
+        {
+            <PanelCard>
+                @if (_templates.Count > 0)
+                {
+                    <table class="mlv-table">
+                        <thead><tr><th>Template</th><th>Key</th><th>Channel</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var template in _templates)
+                            {
+                                <tr>
+                                    <td>@template.Name</td>
+                                    <td class="mlv-mono">@template.TemplateKey</td>
+                                    <td>@template.ChannelType</td>
+                                    <td><StatusBadge Status="@(template.IsActive ? "Active" : "Inactive")" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty">No notification templates found.</div>
+                }
+            </PanelCard>
+        }
+        else
+        {
+            <PanelCard Title="Integrations">
+                <div class="mlv-list">
+                    @foreach (var integration in _integrations)
+                    {
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">@integration.Name</div>
+                                <div class="mlv-row-sub">@integration.Description</div>
+                            </div>
+                            <StatusBadge Status="@integration.Status" />
+                        </div>
+                    }
+                </div>
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    private readonly string[] _tabs = ["Company", "Machines", "Notifications", "Integrations"];
+    private readonly (string Name, string Description, string Status)[] _integrations =
+    [
+        ("QuickBooks", "Accounting sync", "Pending"),
+        ("Slack", "Team notifications", "Pending"),
+        ("Stripe", "Payment intake", "Pending")
+    ];
+
+    private string _tab = "Company";
+    private List<EquipmentSummaryDto> _equipment = [];
+    private List<NotificationTemplateDto> _templates = [];
+    private SystemHealthDto? _health;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var equipmentTask = Http.GetFromJsonAsync<PagedResponse<EquipmentSummaryDto>>("api/v1/equipments?page=1&pageSize=50");
+            var templatesTask = Http.GetFromJsonAsync<PagedResponse<NotificationTemplateDto>>("api/v1/notifications/templates?page=1&pageSize=50");
+            var healthTask = Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
+            await Task.WhenAll(equipmentTask, templatesTask, healthTask);
+            _equipment = (await equipmentTask)?.Data.ToList() ?? [];
+            _templates = (await templatesTask)?.Data.ToList() ?? [];
+            _health = await healthTask;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Admin data could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

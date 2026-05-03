@@ -1,0 +1,86 @@
+@page "/accounting/new"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>New Invoice | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="New Invoice" Subtitle="Create a draft invoice against an existing customer." BackHref="/accounting" />
+    <PageBody>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <PanelCard Title="Invoice details">
+            <EditForm Model="@_request" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <FormGrid>
+                    <FormField Label="Customer ID"><InputText class="mlv-form-input" @bind-Value="_customerId" /></FormField>
+                    <FormField Label="Currency"><InputText class="mlv-form-input" @bind-Value="_request.Currency" /></FormField>
+                    <FormField Label="Issue date"><InputDate class="mlv-form-input" @bind-Value="_request.IssueDate" /></FormField>
+                    <FormField Label="Due date"><InputDate class="mlv-form-input" @bind-Value="_request.DueDate" /></FormField>
+                    <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_line.Description" /></FormField>
+                    <FormField Label="Amount"><InputNumber class="mlv-form-input" @bind-Value="_line.UnitPrice" /></FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                    <SecondaryButton Href="/accounting">Cancel</SecondaryButton>
+                    <PrimaryButton Type="submit" Disabled="@_saving">Create Invoice</PrimaryButton>
+                </div>
+            </EditForm>
+        </PanelCard>
+    </PageBody>
+</div>
+
+@code {
+    private CreateInvoiceRequest _request = new()
+    {
+        IssueDate = DateTime.Today,
+        DueDate = DateTime.Today.AddDays(30),
+        PaymentTermsDays = 30,
+        Currency = "THB"
+    };
+
+    private InvoiceItemDto _line = new() { Description = "Manufacturing services", Quantity = 1, UnitPrice = 0 };
+    private string _customerId = string.Empty;
+    private bool _saving;
+    private string? _error;
+
+    private async Task SaveAsync()
+    {
+        if (!Guid.TryParse(_customerId, out var customerId))
+        {
+            _error = "Enter a valid customer ID.";
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        _request.CustomerId = customerId;
+        _request.Items = [_line];
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/invoices", _request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Invoice created.", Severity.Success);
+                Navigation.NavigateTo("/accounting");
+            }
+            else
+            {
+                _error = "Invoice could not be created.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Invoice could not be created.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

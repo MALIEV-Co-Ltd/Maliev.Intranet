@@ -1,0 +1,113 @@
+@page "/customers/{Id:guid}"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Customer Detail | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@(_customer?.Name ?? "Customer")" Subtitle="@(_customer?.CompanyName ?? _customer?.Email)" BackHref="/customers">
+        @if (_customer is not null)
+        {
+            <StatusBadge Status="@_customer.Status" />
+        }
+    </PageHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_customer is null)
+        {
+            <div class="mlv-empty">Customer was not found.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Total spent" Value="@_customer.TotalSpent.ToString("N2")" />
+                <StatTile Label="Active orders" Value="@_customer.ActiveOrdersCount.ToString("N0")" />
+                <StatTile Label="Open quotes" Value="@_customer.OpenQuotationsCount.ToString("N0")" />
+                <StatTile Label="Tier" Value="@_customer.Tier" />
+            </StatBar>
+
+            <div class="mlv-grid">
+                <PanelCard Title="Profile" Class="mlv-span-5">
+                    <div class="mlv-list">
+                        <div class="mlv-list-row"><span>Email</span><strong>@_customer.Email</strong></div>
+                        <div class="mlv-list-row"><span>Mobile</span><strong>@(_customer.Mobile ?? "-")</strong></div>
+                        <div class="mlv-list-row"><span>Company</span><strong>@(_customer.CompanyName ?? "Private")</strong></div>
+                        <div class="mlv-list-row"><span>Segment</span><strong>@_customer.Segment</strong></div>
+                        <div class="mlv-list-row"><span>NDA</span><StatusBadge Status="@(_customer.Nda?.Status ?? "None")" /></div>
+                    </div>
+                </PanelCard>
+
+                <PanelCard Title="Addresses" Class="mlv-span-7">
+                    @if (_customer.Addresses.Count > 0)
+                    {
+                        <div class="mlv-list">
+                            @foreach (var address in _customer.Addresses)
+                            {
+                                <div class="mlv-list-row">
+                                    <div>
+                                        <div class="mlv-row-main">@address.Type @(address.IsDefault ? "(default)" : "")</div>
+                                        <div class="mlv-row-sub">@address.AddressLine1, @address.City @address.PostalCode</div>
+                                    </div>
+                                    <StatusBadge Status="@address.Type" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">No addresses recorded.</div>
+                    }
+                </PanelCard>
+
+                <PanelCard Title="Internal notes" Class="mlv-span-12">
+                    @if (_customer.Notes.Count > 0)
+                    {
+                        <div class="mlv-list">
+                            @foreach (var note in _customer.Notes.OrderByDescending(n => n.CreatedAt).Take(6))
+                            {
+                                <div class="mlv-list-row">
+                                    <div>
+                                        <div class="mlv-row-main">@note.NoteText</div>
+                                        <div class="mlv-row-sub">@note.CreatedByName - @note.CreatedAt.ToString("dd MMM yyyy")</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">No internal notes yet.</div>
+                    }
+                </PanelCard>
+            </div>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private CustomerDetailDto? _customer;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _customer = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/v1/customers/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Customer could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

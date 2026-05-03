@@ -1,0 +1,62 @@
+@page "/iam/roles/{Id}"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>IAM Role | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@(_role?.Name ?? Id)" Subtitle="@_role?.Description" BackHref="/iam" />
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_role is null)
+        {
+            <div class="mlv-empty">Role was not found.</div>
+        }
+        else
+        {
+            <PanelCard Title="Permissions">
+                <table class="mlv-table">
+                    <thead><tr><th>Permission</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var permission in _permissions)
+                        {
+                            <tr>
+                                <td class="mlv-mono">@permission</td>
+                                <td><StatusBadge Status="Active" Text="Granted" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+    private RoleDto? _role;
+    private List<string> _permissions = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/v1/iam/roles") ?? [];
+            _role = roles.FirstOrDefault(r => string.Equals(r.RoleId, Id, StringComparison.OrdinalIgnoreCase));
+            _permissions = _role?.PermissionIds.Count > 0 ? _role.PermissionIds : _role?.Permissions ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Role could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

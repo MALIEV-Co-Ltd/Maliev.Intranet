@@ -1,0 +1,86 @@
+@page "/iam/users/{Id:guid}"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>IAM User | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@(_user?.DisplayName ?? "IAM User")" Subtitle="@_user?.Email" BackHref="/iam">
+        @if (_user is not null)
+        {
+            <StatusBadge Status="@(_user.IsActive && _user.IsEnabled ? "Active" : "Inactive")" />
+        }
+    </PageHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_user is null)
+        {
+            <div class="mlv-empty">User was not found.</div>
+        }
+        else
+        {
+            <div class="mlv-grid">
+                <PanelCard Title="Profile" Class="mlv-span-5">
+                    <div class="mlv-list">
+                        <div class="mlv-list-row"><span>Principal</span><strong class="mlv-mono">@_user.PrincipalId</strong></div>
+                        <div class="mlv-list-row"><span>Type</span><strong>@_user.Type</strong></div>
+                        <div class="mlv-list-row"><span>Identifier</span><strong>@_user.Identifier</strong></div>
+                    </div>
+                </PanelCard>
+                <PanelCard Title="Roles" Class="mlv-span-7">
+                    @if (_roles.Count > 0)
+                    {
+                        <div class="mlv-list">
+                            @foreach (var role in _roles)
+                            {
+                                <div class="mlv-list-row">
+                                    <div>
+                                        <div class="mlv-row-main">@role.RoleName</div>
+                                        <div class="mlv-row-sub">@role.ResourcePath</div>
+                                    </div>
+                                    <StatusBadge Status="@role.RoleId" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">No role bindings.</div>
+                    }
+                </PanelCard>
+            </div>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PrincipalSummaryDto? _user;
+    private List<RoleBindingDto> _roles = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var usersTask = Http.GetFromJsonAsync<List<PrincipalSummaryDto>>("api/v1/iam/users");
+            var rolesTask = Http.GetFromJsonAsync<List<RoleBindingDto>>($"api/v1/iam/users/{Id}/roles");
+            await Task.WhenAll(usersTask, rolesTask);
+            _user = (await usersTask)?.FirstOrDefault(u => u.PrincipalId == Id || u.Id == Id);
+            _roles = await rolesTask ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("IAM user could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

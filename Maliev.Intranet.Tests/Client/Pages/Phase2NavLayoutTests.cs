@@ -15,7 +15,7 @@ namespace Maliev.Intranet.Tests.Client.Pages;
 
 /// <summary>
 /// Tests for Phase 2: Navigation &amp; Layout Overhaul.
-/// Verifies the NavMenu renders new consolidated routes and breadcrumbs work.
+/// Verifies the top navigation renders the flat employee modules and breadcrumbs work.
 /// </summary>
 public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
 {
@@ -49,6 +49,8 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
         Services.AddSingleton<LayoutService>(layoutService);
         Services.AddSingleton<ChatService>();
         Services.AddScoped<BreadcrumbService>();
+        Services.AddLogging();
+        Services.AddScoped<CurrencyService>();
 
         _authMock.Setup(x => x.GetAuthenticationStateAsync())
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(
@@ -61,24 +63,29 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
-    public void NavMenu_ShouldRender_WithoutException()
+    public void TopBar_ShouldRender_WithoutException()
     {
-        var cut = Render<NavMenu>();
+        var cut = Render<TopBar>();
         Assert.NotEmpty(cut.Markup);
     }
 
     [Fact]
-    public void NavMenu_ShouldContain_ProjectsLink()
+    public void TopBar_ShouldContain_QuoteLink()
     {
-        var cut = Render<NavMenu>();
-        Assert.Contains("sales/projects", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        var cut = Render<TopBar>();
+        Assert.Contains("sales/projects/new", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void NavMenu_ShouldContain_CustomersLink()
+    public void TopBar_ShouldContain_FlatModuleLinks()
     {
-        var cut = Render<NavMenu>();
-        Assert.Contains("sales/customers", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        var cut = Render<TopBar>();
+        Assert.Contains("href=\"customers\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("href=\"accounting\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("href=\"purchasing\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("href=\"admin\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("href=\"iam\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sales/customers", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

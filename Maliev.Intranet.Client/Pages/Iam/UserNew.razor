@@ -1,0 +1,72 @@
+@page "/iam/users/new"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Invite IAM User | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="Invite User" Subtitle="Queue an employee IAM invite." BackHref="/iam" />
+    <PageBody>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <PanelCard Title="Invite">
+            <EditForm Model="@_request" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <FormGrid>
+                    <FormField Label="Name"><InputText class="mlv-form-input" @bind-Value="_request.DisplayName" /></FormField>
+                    <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_request.Email" /></FormField>
+                    <FormField Label="Role"><InputText class="mlv-form-input" @bind-Value="_request.RoleId" /></FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                    <SecondaryButton Href="/iam">Cancel</SecondaryButton>
+                    <PrimaryButton Type="submit" Disabled="@_saving">Send Invite</PrimaryButton>
+                </div>
+            </EditForm>
+        </PanelCard>
+    </PageBody>
+</div>
+
+@code {
+    private InviteUserRequest _request = new() { RoleId = "engineer" };
+    private bool _saving;
+    private string? _error;
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/iam/users/invite", _request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Invite queued.", Severity.Success);
+                Navigation.NavigateTo("/iam");
+            }
+            else
+            {
+                _error = "Invite could not be queued.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Invite could not be queued.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class InviteUserRequest
+    {
+        public string DisplayName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string RoleId { get; set; } = string.Empty;
+    }
+}

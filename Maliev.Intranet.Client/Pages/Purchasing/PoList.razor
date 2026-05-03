@@ -1,0 +1,84 @@
+@page "/purchasing"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Purchasing | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Purchasing" Subtitle="Purchase orders, suppliers, and inbound procurement.">
+        <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">New PO</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <StatBar Class="mb-4">
+            <StatTile Label="Open POs" Value="@_orders.Count(o => !string.Equals(o.Status, "Received", StringComparison.OrdinalIgnoreCase)).ToString("N0")" />
+            <StatTile Label="Spend" Value="@_orders.Sum(o => o.TotalAmount).ToString("N2")" />
+            <StatTile Label="In transit" Value="@_orders.Count(o => string.Equals(o.Status, "InTransit", StringComparison.OrdinalIgnoreCase) || string.Equals(o.Status, "Sent", StringComparison.OrdinalIgnoreCase)).ToString("N0")" />
+            <StatTile Label="Suppliers" Value="@_orders.Select(o => o.SupplierId).Distinct().Count().ToString("N0")" />
+        </StatBar>
+
+        <PanelCard>
+            @if (_orders.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>PO</th>
+                            <th>Supplier</th>
+                            <th>Status</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Expected</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in _orders)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/purchasing/{order.Id}"))">
+                                <td class="mlv-mono">@order.PoNumber</td>
+                                <td>@order.SupplierName</td>
+                                <td><StatusBadge Status="@order.Status" /></td>
+                                <td>@order.ItemsCount</td>
+                                <td class="mlv-mono">@order.TotalAmount.ToString("N2")</td>
+                                <td>@(order.ExpectedDelivery?.ToString("dd MMM yyyy") ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">No purchase orders found.</div>
+            }
+        </PanelCard>
+    </PageBody>
+</div>
+
+@code {
+    private List<PurchaseOrderDto> _orders = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<PurchaseOrderDto>>("api/v1/procurement?page=1&pageSize=50");
+            _orders = response?.Data.ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Purchase orders could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
