@@ -100,6 +100,7 @@ public partial class ProjectNew : IAsyncDisposable
         _parts.Count > 0 &&
         !_parts.Any(p => p.QueuedUpload || p.Uploading || p.PricingLoading) &&
         _parts.All(p => p.IsFullyConfigured && !p.PricingFailed) &&
+        _parts.All(p => ResolvePartUnitPriceForConfirmation(p).GetValueOrDefault() > 0m) &&
         _parts.All(p => p.IsManifold != false || p.DfmAcknowledged);
 
     /// <inheritdoc />
@@ -1903,25 +1904,6 @@ public partial class ProjectNew : IAsyncDisposable
                     Snackbar.Add($"Failed to update project: {errorContent}", Severity.Error);
                     return;
                 }
-
-                foreach (var part in _parts.Where(p => p.IsFullyConfigured && !string.IsNullOrEmpty(p.StoragePath) && !p.ServerPartId.HasValue))
-                {
-                    var addPartRequest = BuildAddProjectPartRequest(part);
-                    if (addPartRequest == null)
-                        continue;
-
-                    try
-                    {
-                        var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addPartRequest);
-                        if (partResponse.IsSuccessStatusCode)
-                        {
-                            var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
-                            if (createdPart != null)
-                                part.ServerPartId = createdPart.Id;
-                        }
-                    }
-                    catch { /* parts may already exist from auto-save; non-fatal */ }
-                }
             }
             else
             {
@@ -1949,26 +1931,13 @@ public partial class ProjectNew : IAsyncDisposable
                 }
 
                 projectId = project.Id;
-
-                foreach (var part in _parts.Where(p => p.IsFullyConfigured))
-                {
-                    var addPartRequest = BuildAddProjectPartRequest(part);
-                    if (addPartRequest == null)
-                        continue;
-
-                    using var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addPartRequest);
-                    if (partResponse.IsSuccessStatusCode)
-                    {
-                        var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
-                        if (createdPart != null)
-                            part.ServerPartId = createdPart.Id;
-                    }
-                    else
-                    {
-                        Snackbar.Add($"Failed to add part '{part.Name}'.", Severity.Warning);
-                    }
-                }
             }
+
+            if (!await SyncProjectPartsForQuoteAsync(projectId))
+                return;
+
+            if (!await ConfirmProjectPartPricesForQuoteAsync(projectId))
+                return;
 
             using var quoteResponse = await Http.PostAsync($"api/v1/projects/{projectId}/generate-quotation", null);
             if (!quoteResponse.IsSuccessStatusCode)
@@ -1994,6 +1963,94 @@ public partial class ProjectNew : IAsyncDisposable
         {
             _saving = false;
         }
+    }
+
+    private async Task<bool> SyncProjectPartsForQuoteAsync(Guid projectId)
+    {
+        foreach (var part in _parts.Where(p => p.IsFullyConfigured))
+        {
+            if (part.ServerPartId.HasValue)
+            {
+                var updateRequest = BuildUpdateProjectPartRequest(part);
+                if (updateRequest == null)
+                    return false;
+
+                using var updateResponse = await Http.PutAsJsonAsync(
+                    $"api/v1/projects/{projectId}/parts/{part.ServerPartId.Value}",
+                    updateRequest);
+
+                if (!updateResponse.IsSuccessStatusCode)
+                {
+                    Snackbar.Add($"Failed to update part '{part.Name}'.", Severity.Warning);
+                    return false;
+                }
+
+                continue;
+            }
+
+            var addRequest = BuildAddProjectPartRequest(part);
+            if (addRequest == null)
+                return false;
+
+            using var addResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addRequest);
+            if (!addResponse.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Failed to add part '{part.Name}'.", Severity.Warning);
+                return false;
+            }
+
+            var createdPart = await addResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
+            if (createdPart == null)
+            {
+                Snackbar.Add($"Project part '{part.Name}' was saved but returned no part ID.", Severity.Warning);
+                return false;
+            }
+
+            part.ServerPartId = createdPart.Id;
+        }
+
+        return true;
+    }
+
+    private async Task<bool> ConfirmProjectPartPricesForQuoteAsync(Guid projectId)
+    {
+        foreach (var part in _parts.Where(p => p.IsFullyConfigured))
+        {
+            if (!part.ServerPartId.HasValue)
+            {
+                Snackbar.Add($"Part '{part.Name}' has not been saved to the project yet.", Severity.Warning);
+                return false;
+            }
+
+            var unitPrice = ResolvePartUnitPriceForConfirmation(part);
+            if (!unitPrice.HasValue || unitPrice.Value <= 0m)
+            {
+                Snackbar.Add($"Part '{part.Name}' has no calculated price yet.", Severity.Warning);
+                return false;
+            }
+
+            using var response = await Http.PostAsJsonAsync(
+                $"api/v1/projects/{projectId}/parts/{part.ServerPartId.Value}/confirm-price",
+                new ConfirmPartPriceRequest { ConfirmedPrice = unitPrice.Value });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Failed to confirm price for '{part.Name}'.", Severity.Warning);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static decimal? ResolvePartUnitPriceForConfirmation(PartViewModel part)
+    {
+        if (part.EstimatedUnitPrice.HasValue)
+            return part.EstimatedUnitPrice.Value;
+
+        return part.Quantity > 0 && part.EstimatedTotalAmount.HasValue
+            ? part.EstimatedTotalAmount.Value / part.Quantity
+            : null;
     }
 
     // ── Task 15: Duplicate project ─────────────────────────────────────

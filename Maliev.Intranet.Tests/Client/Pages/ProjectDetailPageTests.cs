@@ -81,6 +81,18 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         });
     }
 
+    [Fact]
+    public void ProjectDetailCss_TargetsRenderFragmentContentThroughDeepSelectors()
+    {
+        var cssPath = FindProjectDetailCssPath();
+        var css = File.ReadAllText(cssPath);
+
+        Assert.Contains("::deep .project-record-body", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-field-grid", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-metric-row", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
+    }
+
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
     {
         var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
@@ -172,4 +184,24 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         {
             Content = JsonContent.Create(body)
         });
+
+    private static string FindProjectDetailCssPath()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(
+                directory.FullName,
+                "Maliev.Intranet.Client",
+                "Pages",
+                "ProjectDetail.razor.css");
+
+            if (File.Exists(candidate))
+                return candidate;
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException("Could not locate ProjectDetail.razor.css from the test output directory.");
+    }
 }

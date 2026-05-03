@@ -529,6 +529,81 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateProjectAndQuoteAsync_WhenPartsHavePrices_ConfirmsPartPricesBeforeGeneratingQuotation()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        decimal? confirmedPrice = null;
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            if (path == $"/api/v1/projects/{projectId}" && request.Method == HttpMethod.Put)
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+
+            if (path == $"/api/v1/projects/{projectId}/parts/{partId}" && request.Method == HttpMethod.Put)
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+
+            if (path == $"/api/v1/projects/{projectId}/parts/{partId}/confirm-price" && request.Method == HttpMethod.Post)
+            {
+                var body = await request.Content!.ReadAsStringAsync(ct);
+                using var json = JsonDocument.Parse(body);
+                confirmedPrice = json.RootElement.GetProperty("confirmedPrice").GetDecimal();
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+            }
+
+            if (path == $"/api/v1/projects/{projectId}/generate-quotation" && request.Method == HttpMethod.Post)
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        cut.WaitForAssertion(() =>
+            Assert.Contains(_sentRequests, request => request.RequestUri?.AbsolutePath == "/api/v1/pricing/lead-times"));
+        ClearRequests();
+
+        var materialId = Guid.NewGuid();
+        SetPrivateField(cut.Instance, "_serverProjectId", (Guid?)projectId);
+        SetPrivateField(cut.Instance, "_title", "Priced generated quote");
+        SetPrivateField(cut.Instance, "_selectedCustomer", new CustomerSummaryDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "Wanasrivwilai Engineering",
+            Email = "quote@example.test",
+        });
+        SetPrivateField(cut.Instance, "_selectedLeadTime", new LeadTimeOptionDto("STANDARD", "Standard", 7, 10, 1m, true));
+        GetParts(cut.Instance).Add(new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            ServerPartId = partId,
+            Name = "priced-part.stl",
+            StoragePath = "projects/priced-part.stl",
+            ProcessId = Guid.NewGuid(),
+            ProcessCode = "CNC_MILL",
+            MaterialId = materialId,
+            MaterialCode = "AL6061",
+            Quantity = 2,
+            EstimatedUnitPrice = 1250m,
+            EstimatedTotalAmount = 2500m,
+        });
+
+        Assert.True(GetPrivateProperty<bool>(cut.Instance, "CanSubmit"));
+        await InvokePrivateTaskAsync(cut, "CreateProjectAndQuoteAsync");
+
+        var paths = _sentRequests.Select(request => request.RequestUri?.AbsolutePath ?? string.Empty).ToList();
+        var confirmIndex = paths.FindIndex(path => path == $"/api/v1/projects/{projectId}/parts/{partId}/confirm-price");
+        var quoteIndex = paths.FindIndex(path => path == $"/api/v1/projects/{projectId}/generate-quotation");
+
+        Assert.True(confirmIndex >= 0, $"The quote flow must persist the calculated part price before generating the quotation. Requests: {string.Join(", ", paths)}");
+        Assert.True(quoteIndex > confirmIndex, $"The quotation endpoint must run after part prices are confirmed. Requests: {string.Join(", ", paths)}");
+        Assert.Equal(1250m, confirmedPrice);
+        Assert.EndsWith($"/sales/projects/{projectId}", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SaveDraftToServerAsync_FirstSave_PostsToProjectsEndpoint()
     {
         var createRequestId = Guid.NewGuid();
@@ -650,6 +725,18 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         await result;
     }
 
+    private static async Task InvokePrivateTaskAsync(
+        RenderedComponent<global::Maliev.Intranet.Client.Pages.ProjectNew> cut,
+        string methodName)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        var result = cut.InvokeAsync(() => (Task)method.Invoke(cut.Instance, [])!);
+        await result;
+    }
+
     private static List<PartViewModel> GetParts(global::Maliev.Intranet.Client.Pages.ProjectNew instance)
     {
         var field = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
@@ -696,6 +783,16 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         return Assert.IsType<T>(field.GetValue(instance));
+    }
+
+    private static T GetPrivateProperty<T>(
+        global::Maliev.Intranet.Client.Pages.ProjectNew instance,
+        string propertyName)
+    {
+        var property = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(property);
+        return Assert.IsType<T>(property.GetValue(instance));
     }
 
     private static HttpResponseMessage CreateResumableSessionResponse()
