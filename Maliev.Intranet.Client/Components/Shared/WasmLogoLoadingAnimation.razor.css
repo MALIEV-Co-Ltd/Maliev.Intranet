@@ -15,8 +15,9 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: conic-gradient(var(--logo-fill) 0 0) 0 / 0% 100% no-repeat;
-    animation: maliev-logo-load 1s linear infinite;
+    background: conic-gradient(var(--logo-fill) 0 0) 0 0 no-repeat;
+    background-size: var(--blazor-load-percentage, 0%) 100%;
+    transition: background-size 160ms ease-out;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -26,15 +27,8 @@
     }
 }
 
-@keyframes maliev-logo-load {
-    to {
-        background-size: 120% 100%;
-    }
-}
-
 @media (prefers-reduced-motion: reduce) {
     .loader::after {
-        animation: none;
-        background-size: 120% 100%;
+        transition: none;
     }
 }

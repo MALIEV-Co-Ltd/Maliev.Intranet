@@ -56,7 +56,6 @@
             await CurrencyService.InitializeAsync();
             await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemPreferenceChanged);
             await SyncThemeAsync();
-            await MarkWasmReadyAsync();
             StateHasChanged();
 
             var authState = await AuthStateTask;
@@ -114,12 +113,6 @@
         var theme = LayoutService.IsDarkMode ? "dark" : "light";
         await JSRuntime.InvokeVoidAsync("eval",
             $"document.documentElement.setAttribute('data-maliev-theme','{theme}');");
-    }
-
-    private async Task MarkWasmReadyAsync()
-    {
-        await JSRuntime.InvokeVoidAsync("eval",
-            "document.documentElement.classList.add('maliev-wasm-ready');");
     }
 
     private void OnLayoutUpdate(object? sender, EventArgs e)

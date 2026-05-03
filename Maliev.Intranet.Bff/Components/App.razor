@@ -47,10 +47,26 @@
             transition: opacity 180ms ease, visibility 180ms ease;
         }
 
+        html.maliev-wasm-runtime-ready .wasm-loading .maliev-logo-loader::after,
+        html.maliev-wasm-runtime-ready .wasm-loading-progress::after {
+            background-size: 100% 100%;
+            width: 100%;
+        }
+
         html.maliev-wasm-ready .wasm-loading {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
+        }
+
+        html.maliev-wasm-failed .wasm-loading-failure {
+            display: block;
+        }
+
+        .wasm-loading-stage {
+            display: grid;
+            justify-items: center;
+            gap: 22px;
         }
 
         .wasm-loading .maliev-logo-loader {
@@ -68,21 +84,37 @@
             content: "";
             position: absolute;
             inset: 0;
-            background: conic-gradient(var(--wasm-logo-fill, #000000) 0 0) 0 / 0% 100% no-repeat;
-            animation: maliev-logo-load 1s linear infinite;
+            background: conic-gradient(var(--wasm-logo-fill, #000000) 0 0) 0 0 no-repeat;
+            background-size: var(--blazor-load-percentage, 0%) 100%;
+            transition: background-size 160ms ease-out;
         }
 
-        @@keyframes maliev-logo-load {
-            to {
-                background-size: 120% 100%;
-            }
+        .wasm-loading-progress {
+            width: min(280px, 54vw);
+            height: 3px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: var(--wasm-logo-outline, color-mix(in oklch, #000000 24%, transparent));
         }
 
-        @@media (prefers-reduced-motion: reduce) {
-            .wasm-loading .maliev-logo-loader::after {
-                animation: none;
-                background-size: 120% 100%;
-            }
+        .wasm-loading-progress::after {
+            content: "";
+            display: block;
+            width: var(--blazor-load-percentage, 0%);
+            height: 100%;
+            border-radius: inherit;
+            background: var(--wasm-logo-fill, #000000);
+            transition: width 160ms ease-out;
+        }
+
+        .wasm-loading-failure {
+            display: none;
+            max-width: 320px;
+            color: var(--wasm-logo-fill, #000000);
+            font-size: 13px;
+            line-height: 1.45;
+            opacity: 0.72;
+            text-align: center;
         }
     </style>
 
@@ -150,10 +182,100 @@
 
 <body>
     <div id="wasm-loading" class="wasm-loading" aria-live="polite" aria-busy="true">
-        <WasmLogoLoadingAnimation />
+        <div class="wasm-loading-stage">
+            <WasmLogoLoadingAnimation />
+            <div class="wasm-loading-progress" aria-hidden="true"></div>
+            <div class="wasm-loading-failure" role="alert">Unable to start the employee intranet. Refresh the page or contact support.</div>
+        </div>
     </div>
     <Routes @rendermode="WasmRenderMode" />
-    <script src="_framework/blazor.web.js"></script>
+    <script>
+        window.malievWasmLoader = (function () {
+            const root = document.documentElement;
+            const seenResources = new Set();
+            let loadedResources = 0;
+            let totalResources = 0;
+
+            function clamp(value) {
+                return Math.max(0, Math.min(100, value));
+            }
+
+            function setProgress(value) {
+                const progress = clamp(Number.isFinite(value) ? value : 0);
+                root.style.setProperty('--blazor-load-percentage', `${progress}%`);
+                root.style.setProperty('--blazor-load-percentage-text', `"${Math.floor(progress)}%"`);
+            }
+
+            function markRuntimeReady() {
+                setProgress(100);
+                root.classList.add('maliev-wasm-runtime-ready');
+            }
+
+            function markReady() {
+                markRuntimeReady();
+                window.setTimeout(function () {
+                    root.classList.add('maliev-wasm-ready');
+                }, 180);
+            }
+
+            function markFailed(error) {
+                console.error('MALIEV WASM startup failed', error);
+                root.classList.add('maliev-wasm-failed');
+            }
+
+            function updateResourceProgress() {
+                const divisor = Math.max(totalResources, loadedResources, 1);
+                setProgress((loadedResources / divisor) * 100);
+            }
+
+            function loadBootResource(type, name, defaultUri, integrity) {
+                if (type === 'dotnetjs') {
+                    return null;
+                }
+
+                const key = `${type}:${name}:${defaultUri}`;
+                if (!seenResources.has(key)) {
+                    seenResources.add(key);
+                    totalResources += 1;
+                    updateResourceProgress();
+                }
+
+                const requestInit = integrity ? { integrity } : undefined;
+                return fetch(defaultUri, requestInit).then(
+                    function (response) {
+                        loadedResources += 1;
+                        updateResourceProgress();
+                        return response;
+                    },
+                    function (error) {
+                        markFailed(error);
+                        throw error;
+                    });
+            }
+
+            setProgress(0);
+
+            return {
+                loadBootResource,
+                markRuntimeReady,
+                markReady,
+                markFailed,
+                setProgress
+            };
+        })();
+    </script>
+    <script src="_framework/blazor.web.js" autostart="false"></script>
+    <script>
+        Blazor.start({
+            webAssembly: {
+                loadBootResource: window.malievWasmLoader.loadBootResource
+            }
+        }).then(function () {
+            window.malievWasmLoader.markRuntimeReady();
+        }).catch(function (error) {
+            window.malievWasmLoader.markFailed(error);
+        });
+    </script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="js/note-editor.js"></script>
     <script src="js/chat.js"></script>

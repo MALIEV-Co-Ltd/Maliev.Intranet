@@ -29,8 +29,33 @@ public class AppWasmRenderModeTests
         Assert.DoesNotContain("wasm-loading-card", source, StringComparison.Ordinal);
         Assert.DoesNotContain("wasm-loading-title", source, StringComparison.Ordinal);
         Assert.DoesNotContain("wasm-loading-subtitle", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("wasm-loading-bar", source, StringComparison.Ordinal);
         Assert.DoesNotContain("maliev_accent_hue", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AppRoot_UsesActualWasmProgressAndManualBlazorStart()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
+
+        Assert.Contains("--blazor-load-percentage", source);
+        Assert.Contains("wasm-loading-progress", source);
+        Assert.Contains("autostart=\"false\"", source);
+        Assert.Contains("Blazor.start", source);
+        Assert.Contains("loadBootResource", source);
+        Assert.Contains("malievWasmLoader.markRuntimeReady", source);
+        Assert.DoesNotContain("animation: maliev-logo-load", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("@@keyframes maliev-logo-load", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ClientRoutes_MarksStaticWasmLoaderReadyAfterFirstRender()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Routes.razor");
+
+        Assert.Contains("@inject IJSRuntime", source);
+        Assert.Contains("OnAfterRenderAsync", source);
+        Assert.Contains("malievWasmLoader.markReady", source);
+        Assert.Contains("maliev-wasm-ready", source);
     }
 
     [Fact]
