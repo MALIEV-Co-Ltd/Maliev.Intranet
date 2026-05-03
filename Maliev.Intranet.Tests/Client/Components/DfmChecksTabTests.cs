@@ -66,6 +66,25 @@ public class DfmChecksTabTests : BunitContext, IAsyncLifetime
         SymmetryDeviation: issues.Count == 0 ? 0 : 1,
         Issues: issues);
 
+    private static CncDfmReportPayload CncMillingReport(
+        IReadOnlyList<CncDfmReportPayloadIssuesItem> issues) => new(
+        ReportType: "CNC_MILL",
+        SharpCornerCount: 0,
+        SharpCornerRegions: [],
+        HasUndercuts: false,
+        UndercutRegions: [],
+        HasDrillHoles: false,
+        DrillHoleCount: 0,
+        RequiresEdm: false,
+        RequiresGrinding: false,
+        MinimumFeatureSizeMm: 1,
+        IsTurnable: true,
+        PrimaryAxis: string.Empty,
+        AxisVector: [],
+        LengthDiameterRatio: 0,
+        SymmetryDeviation: 0,
+        Issues: issues);
+
     // Test 1: When DfmAnalysisTimedOut=true → badge has "dfm-badge--error" class and shows "Analysis failed"
     [Fact]
     public void DfmTab_WhenTimedOut_BadgeShowsErrorClassAndFailedText()
@@ -420,5 +439,45 @@ public class DfmChecksTabTests : BunitContext, IAsyncLifetime
         part.ResolveDfmReport();
 
         Assert.True(part.HasProcessRelevantDfmIssues);
+    }
+
+    [Fact]
+    public void DfmChecksTab_CncMillingCavityAndSharpCornerIssues_ShowFailuresInTab()
+    {
+        var part = new PartViewModel
+        {
+            ProcessCode = "CNC_MILL",
+            IsManifold = true,
+            BodyCount = 1,
+            DfmAnalysisTimedOut = false,
+        };
+        part.CncDfmReport = CncMillingReport(
+        [
+            new CncDfmReportPayloadIssuesItem(
+                Category: "cavity_depth",
+                Severity: "warning",
+                Title: "Deep Cavities (13)",
+                Description: "13 cavity/cavities exceed the 4.0:1 depth/width limit. Worst: 15.4:1.",
+                Value: 13,
+                Threshold: 4.0),
+            new CncDfmReportPayloadIssuesItem(
+                Category: "sharp_corner",
+                Severity: "warning",
+                Title: "Sharp Internal Corners (29)",
+                Description: "29 sharp corner(s) may require EDM or are inaccessible to standard endmills.",
+                Value: 29,
+                Threshold: 1.0),
+        ]);
+        part.ResolveDfmReport();
+
+        var cut = RenderTab(part);
+
+        Assert.Contains("Deep cavities", cut.Markup);
+        Assert.Contains("Deep Cavities (13)", cut.Markup);
+        Assert.Contains("Sharp Internal Corners (29)", cut.Markup);
+        Assert.Contains("dfm-expansion-panel--fail", cut.Markup);
+        Assert.Contains("6/8 checks passed", cut.Markup);
+        Assert.DoesNotContain("7/7 checks passed", cut.Markup);
+        Assert.DoesNotContain("dfm-badge--ok", cut.Markup);
     }
 }
