@@ -1,0 +1,177 @@
+@page "/hr/profile"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>My Profile | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="My Profile" Subtitle="Employee profile, preferences, and work details.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        @if (_profile is null && !_loading)
+        {
+            <div class="mlv-empty">Your employee profile could not be found.</div>
+        }
+        else if (_profile is not null)
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Status" Value="@Display(_profile.Status)" />
+                <StatTile Label="Department" Value="@Display(_profile.Department)" />
+                <StatTile Label="Role" Value="@Display(_profile.Title)" />
+                <StatTile Label="Manager" Value="@Display(_profile.ManagerName)" />
+            </StatBar>
+
+            <div class="mlv-grid">
+                <div class="mlv-span-7">
+                    <PanelCard Title="Employee details">
+                        <table class="mlv-table profile-table">
+                            <tbody>
+                                <tr><th>Name</th><td>@_profile.Name</td></tr>
+                                <tr><th>Email</th><td>@_profile.Email</td></tr>
+                                <tr><th>Phone</th><td>@Display(_profile.Phone)</td></tr>
+                                <tr><th>Location</th><td>@Display(_profile.WorkLocation)</td></tr>
+                                <tr><th>Employee type</th><td>@Display(_profile.EmployeeType)</td></tr>
+                                <tr><th>Hire date</th><td>@(_profile.HireDate?.ToString("dd MMM yyyy") ?? "-")</td></tr>
+                            </tbody>
+                        </table>
+                    </PanelCard>
+                </div>
+                <div class="mlv-span-5">
+                    <PanelCard Title="Preferences">
+                        <div class="mlv-list">
+                            <div class="mlv-list-row">
+                                <div>
+                                    <div class="mlv-row-main">Profile scope</div>
+                                    <div class="mlv-row-sub">Stored in EmployeeService preferences</div>
+                                </div>
+                                <StatusBadge Status="@(_preferences is null ? "Missing" : "Ready")" />
+                            </div>
+                            <div class="mlv-list-row">
+                                <div>
+                                    <div class="mlv-row-main">Preference keys</div>
+                                    <div class="mlv-row-sub">@((_preferences?.PreferenceData.Count ?? 0).ToString("N0")) configured</div>
+                                </div>
+                                <SecondaryButton Icon="@Icons.Material.Outlined.Tune" OnClick="@LoadPreferencesAsync">Reload</SecondaryButton>
+                            </div>
+                        </div>
+                    </PanelCard>
+                </div>
+                <div class="mlv-span-12">
+                    <PanelCard Title="Teams and documents">
+                        <div class="mlv-grid">
+                            <div class="mlv-span-6">
+                                @if (_profile.Teams.Count == 0)
+                                {
+                                    <div class="mlv-empty">No team assignments.</div>
+                                }
+                                else
+                                {
+                                    <div class="mlv-list">
+                                        @foreach (var team in _profile.Teams)
+                                        {
+                                            <div class="mlv-list-row">
+                                                <div>
+                                                    <div class="mlv-row-main">@team.Name</div>
+                                                    <div class="mlv-row-sub">@team.Role</div>
+                                                </div>
+                                                @if (team.IsLead)
+                                                {
+                                                    <StatusBadge Status="Lead" />
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                            <div class="mlv-span-6">
+                                @if (_profile.Documents.Count == 0)
+                                {
+                                    <div class="mlv-empty">No employee documents.</div>
+                                }
+                                else
+                                {
+                                    <div class="mlv-list">
+                                        @foreach (var doc in _profile.Documents)
+                                        {
+                                            <div class="mlv-list-row">
+                                                <div>
+                                                    <div class="mlv-row-main">@doc.FileName</div>
+                                                    <div class="mlv-row-sub">@doc.DocumentType</div>
+                                                </div>
+                                                <span>@doc.UploadedAt.ToString("dd MMM yyyy")</span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </PanelCard>
+                </div>
+            </div>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
+
+    private EmployeeDetailDto? _profile;
+    private UserPreferenceDto? _preferences;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var profileTask = Http.GetFromJsonAsync<EmployeeDetailDto>("api/v1/employees/me");
+            var preferencesTask = Http.GetFromJsonAsync<UserPreferenceDto>("api/v1/preferences/intranet-profile");
+            await Task.WhenAll(profileTask, preferencesTask);
+            _profile = await profileTask;
+            _preferences = await preferencesTask;
+        }
+        catch (Exception ex)
+        {
+            _error = "Profile data could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadPreferencesAsync(MouseEventArgs _)
+    {
+        try
+        {
+            _preferences = await Http.GetFromJsonAsync<UserPreferenceDto>("api/v1/preferences/intranet-profile");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Preferences could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+}

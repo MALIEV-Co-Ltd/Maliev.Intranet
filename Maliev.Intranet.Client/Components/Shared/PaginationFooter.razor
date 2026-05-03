@@ -1,0 +1,68 @@
+<div class="mlv-pagination-footer @Class">
+    <div class="mlv-pagination-summary">
+        @SummaryText
+    </div>
+    <div class="mlv-pagination-controls">
+        <label>
+            <span>Rows</span>
+            <select value="@PageSize" @onchange="OnPageSizeChanged" class="mlv-page-size-select">
+                @foreach (var option in PageSizeOptions)
+                {
+                    <option value="@option">@option</option>
+                }
+            </select>
+        </label>
+        <MudPagination Color="Color.Primary"
+                       Count="@EffectiveTotalPages"
+                       Selected="@CurrentPage"
+                       SelectedChanged="OnSelectedChanged"
+                       BoundaryCount="1"
+                       MiddleCount="3"
+                       Disabled="@Disabled" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public PaginationMeta Meta { get; set; } = new();
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public IReadOnlyList<int> PageSizeOptions { get; set; } = [10, 20, 50];
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+    [Parameter] public EventCallback<int> PageSizeChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private int EffectiveTotalPages => Math.Max(1, Meta.TotalPages);
+
+    private string SummaryText
+    {
+        get
+        {
+            var total = Meta.TotalItems > 0 ? Meta.TotalItems : Meta.TotalCount;
+            if (total <= 0)
+            {
+                return "No records";
+            }
+
+            var start = ((Math.Max(1, CurrentPage) - 1) * Math.Max(1, PageSize)) + 1;
+            var end = Math.Min(start + Math.Max(1, PageSize) - 1, total);
+            return $"{start:N0}-{end:N0} of {total:N0}";
+        }
+    }
+
+    private async Task OnSelectedChanged(int page)
+    {
+        if (page != CurrentPage)
+        {
+            await PageChanged.InvokeAsync(page);
+        }
+    }
+
+    private async Task OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var nextPageSize) && nextPageSize != PageSize)
+        {
+            await PageSizeChanged.InvokeAsync(nextPageSize);
+        }
+    }
+}

@@ -116,7 +116,10 @@
                         </div>
                     </ActivatorContent>
                     <ChildContent>
-                        <MudMenuItem OnClick="@HandleLogout">Logout</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.AccountCircle" Href="/hr/profile">My Profile</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Tune" Href="/hr/profile?tab=preferences">Preferences</MudMenuItem>
+                        <MudDivider />
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Logout" OnClick="@HandleLogout">Sign out</MudMenuItem>
                     </ChildContent>
                 </MudMenu>
             </Authorized>
@@ -139,7 +142,6 @@
     private readonly List<NavItem> _navItems =
     [
         new("Quote", "sales/projects/new", NavLinkMatch.Prefix, "topbar-nav-quote"),
-        new("Dashboard", "", NavLinkMatch.All),
         new("Customers", "customers"),
         new("Accounting", "accounting"),
         new("Purchasing", "purchasing"),
