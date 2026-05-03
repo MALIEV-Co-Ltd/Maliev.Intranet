@@ -1,7 +1,9 @@
 @page "/accounting/new"
+@using System.Net.Http.Headers
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@implements IDisposable
 
 <PageTitle>New Invoice | MALIEV Intranet</PageTitle>
 
@@ -17,16 +19,57 @@
             <EditForm Model="@_request" OnValidSubmit="SaveAsync">
                 <DataAnnotationsValidator />
                 <FormGrid>
-                    <FormField Label="Customer ID"><InputText class="mlv-form-input" @bind-Value="_customerId" /></FormField>
-                    <FormField Label="Currency"><InputText class="mlv-form-input" @bind-Value="_request.Currency" /></FormField>
+                    <FormField Label="Customer">
+                        <CustomerPicker SelectedCustomer="@_selectedCustomer"
+                                        SearchCustomers="@SearchCustomersAsync"
+                                        OnCustomerSelected="@OnCustomerSelectedAsync"
+                                        OpenBelow="true" />
+                    </FormField>
+                    <FormField Label="Currency">
+                        <select class="mlv-form-input" @bind="_request.Currency" disabled="@(_currencies.Count == 0)">
+                            @foreach (var currency in _currencies)
+                            {
+                                <option value="@currency.Code">@currency.Code - @currency.Name</option>
+                            }
+                        </select>
+                    </FormField>
+                    <FormField Label="Customer PO number"><InputText class="mlv-form-input" @bind-Value="_request.PoNumber" /></FormField>
+                    <FormField Label="Customer PO document">
+                        <InputFile class="mlv-form-input" OnChange="OnPoDocumentSelected" />
+                        @if (_poDocument is not null)
+                        {
+                            <div class="mlv-form-help">@_poDocument.Name (@FormatFileSize(_poDocument.Size))</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_poDocumentError))
+                        {
+                            <div class="mlv-form-help text-danger">@_poDocumentError</div>
+                        }
+                    </FormField>
                     <FormField Label="Issue date"><InputDate class="mlv-form-input" @bind-Value="_request.IssueDate" /></FormField>
                     <FormField Label="Due date"><InputDate class="mlv-form-input" @bind-Value="_request.DueDate" /></FormField>
                     <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_line.Description" /></FormField>
-                    <FormField Label="Amount"><InputNumber class="mlv-form-input" @bind-Value="_line.UnitPrice" /></FormField>
+                    <FormField Label="Quantity"><InputNumber class="mlv-form-input" @bind-Value="_line.Quantity" /></FormField>
+                    <FormField Label="Unit price"><InputNumber class="mlv-form-input" @bind-Value="_line.UnitPrice" /></FormField>
+                    <FormField Label="Tax rate"><InputNumber class="mlv-form-input" @bind-Value="_line.TaxRate" /></FormField>
                 </FormGrid>
+
+                @if (_customerLoading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-3" />
+                }
+                else if (_customerDetail is not null)
+                {
+                    <div class="mlv-list mt-4">
+                        <div class="mlv-list-row"><span>Billing name</span><strong>@Display(_request.CustomerName)</strong></div>
+                        <div class="mlv-list-row"><span>Tax ID</span><strong>@Display(_request.CustomerTaxId)</strong></div>
+                        <div class="mlv-list-row"><span>Billing address</span><strong>@Display(_request.BillingAddress)</strong></div>
+                        <div class="mlv-list-row"><span>Shipping address</span><strong>@Display(_request.ShippingAddress)</strong></div>
+                    </div>
+                }
+
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
                     <SecondaryButton Href="/accounting">Cancel</SecondaryButton>
-                    <PrimaryButton Type="submit" Disabled="@_saving">Create Invoice</PrimaryButton>
+                    <PrimaryButton Type="submit" Disabled="@(_saving || _customerLoading)">Create Invoice</PrimaryButton>
                 </div>
             </EditForm>
         </PanelCard>
@@ -34,7 +77,9 @@
 </div>
 
 @code {
-    private CreateInvoiceRequest _request = new()
+    private const long MaxInvoiceDocumentBytes = 25 * 1024 * 1024;
+
+    private readonly CreateInvoiceRequest _request = new()
     {
         IssueDate = DateTime.Today,
         DueDate = DateTime.Today.AddDays(30),
@@ -42,36 +87,186 @@
         Currency = "THB"
     };
 
-    private InvoiceItemDto _line = new() { Description = "Manufacturing services", Quantity = 1, UnitPrice = 0 };
-    private string _customerId = string.Empty;
+    private readonly InvoiceItemDto _line = new() { Description = "Manufacturing services", Quantity = 1, UnitPrice = 0, TaxRate = 7.00m };
+    private readonly List<CurrencyDto> _currencies = [];
+    private CustomerSummaryDto? _selectedCustomer;
+    private CustomerDetailDto? _customerDetail;
+    private CancellationTokenSource? _searchCts;
+    private IBrowserFile? _poDocument;
+    private string? _poDocumentError;
+    private bool _customerLoading;
     private bool _saving;
     private string? _error;
 
-    private async Task SaveAsync()
+    protected override async Task OnInitializedAsync()
     {
-        if (!Guid.TryParse(_customerId, out var customerId))
+        await LoadCurrenciesAsync();
+    }
+
+    public void Dispose()
+    {
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+    }
+
+    private async Task LoadCurrenciesAsync()
+    {
+        try
         {
-            _error = "Enter a valid customer ID.";
+            var currencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/v1/referenceData/currencies");
+            _currencies.Clear();
+            _currencies.AddRange((currencies ?? []).Where(c => c.IsActive).OrderByDescending(c => c.IsPrimary).ThenBy(c => c.Code));
+
+            var defaultCurrency = _currencies.FirstOrDefault(c => c.IsPrimary)
+                ?? _currencies.FirstOrDefault(c => string.Equals(c.Code, "THB", StringComparison.OrdinalIgnoreCase))
+                ?? _currencies.FirstOrDefault();
+            if (defaultCurrency is not null)
+            {
+                _request.Currency = defaultCurrency.Code;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Currencies could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task<IEnumerable<CustomerSummaryDto>> SearchCustomersAsync(string value, CancellationToken ct)
+    {
+        var query = value?.Trim() ?? string.Empty;
+        if (query.Length == 1)
+            return [];
+
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+        try
+        {
+            var url = string.IsNullOrWhiteSpace(query)
+                ? "api/v1/customers?page=1&pageSize=10"
+                : $"api/v1/customers?query={Uri.EscapeDataString(query)}&page=1&pageSize=10";
+
+            var result = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(url, _searchCts.Token);
+            return result?.Data ?? [];
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return [];
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Failed to search customers.", Severity.Warning);
+            return [];
+        }
+    }
+
+    private async Task OnCustomerSelectedAsync(CustomerSummaryDto? customer)
+    {
+        _selectedCustomer = customer;
+        _customerDetail = null;
+        _error = null;
+
+        if (customer is null)
+        {
+            _request.CustomerId = Guid.Empty;
+            _request.CustomerName = string.Empty;
+            _request.CustomerTaxId = string.Empty;
+            _request.BillingAddress = string.Empty;
+            _request.ShippingAddress = null;
             return;
         }
 
+        _customerLoading = true;
+        try
+        {
+            _customerDetail = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/v1/customers/{customer.Id}");
+            if (_customerDetail is not null)
+            {
+                ApplyCustomer(_customerDetail);
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Customer billing data could not be loaded.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _customerLoading = false;
+        }
+    }
+
+    private void ApplyCustomer(CustomerDetailDto customer)
+    {
+        var hasCompany = customer.CompanyId.HasValue || !string.IsNullOrWhiteSpace(customer.CompanyName);
+        var billingAddress = customer.CompanyBillingAddress
+            ?? customer.Addresses.FirstOrDefault(a => string.Equals(a.Type, "Billing", StringComparison.OrdinalIgnoreCase) && a.IsDefault)
+            ?? customer.Addresses.FirstOrDefault(a => string.Equals(a.Type, "Billing", StringComparison.OrdinalIgnoreCase))
+            ?? customer.Addresses.FirstOrDefault(a => a.IsDefault)
+            ?? customer.Addresses.FirstOrDefault();
+        var shippingAddress = customer.Addresses.FirstOrDefault(a => string.Equals(a.Type, "Shipping", StringComparison.OrdinalIgnoreCase) && a.IsDefault)
+            ?? customer.Addresses.FirstOrDefault(a => string.Equals(a.Type, "Shipping", StringComparison.OrdinalIgnoreCase));
+
+        _request.CustomerId = customer.Id;
+        _request.BillingIdentityType = hasCompany ? BillingIdentityType.Corporate : BillingIdentityType.Personal;
+        _request.CustomerName = hasCompany ? customer.CompanyName ?? customer.Name : customer.Name;
+        _request.CustomerTaxId = FirstNonEmpty(customer.CompanyVatNumber, customer.CompanyRegistrationNumber);
+        _request.BillingAddress = FormatAddress(billingAddress);
+        _request.ShippingAddress = FormatAddress(shippingAddress);
+    }
+
+    private void OnPoDocumentSelected(InputFileChangeEventArgs args)
+    {
+        _poDocumentError = null;
+        _poDocument = args.File;
+
+        if (_poDocument.Size > MaxInvoiceDocumentBytes)
+        {
+            _poDocumentError = $"File exceeds the {MaxInvoiceDocumentBytes / 1024 / 1024} MB limit.";
+            _poDocument = null;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!ValidateInvoice())
+            return;
+
         _saving = true;
         _error = null;
-        _request.CustomerId = customerId;
-        _request.Items = [_line];
+        _request.PaymentTermsDays = Math.Max(1, (_request.DueDate.Date - _request.IssueDate.Date).Days);
+        _request.Currency = _request.Currency.Trim().ToUpperInvariant();
+        _request.Items = [new InvoiceItemDto
+        {
+            Description = _line.Description.Trim(),
+            Quantity = _line.Quantity,
+            UnitPrice = _line.UnitPrice,
+            TaxRate = _line.TaxRate
+        }];
 
         try
         {
             var response = await Http.PostAsJsonAsync("api/v1/invoices", _request);
-            if (response.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                Snackbar.Add("Invoice created.", Severity.Success);
-                Navigation.NavigateTo("/accounting");
+                _error = await ReadFailureAsync(response, "Invoice could not be created.");
+                return;
             }
-            else
+
+            var invoice = await response.Content.ReadFromJsonAsync<InvoiceSummaryDto>();
+            if (invoice is not null && _poDocument is not null)
             {
-                _error = "Invoice could not be created.";
+                var uploaded = await UploadPoDocumentAsync(invoice.Id);
+                if (!uploaded)
+                {
+                    Snackbar.Add("Invoice created, but the PO document could not be attached.", Severity.Warning);
+                }
             }
+
+            Snackbar.Add("Invoice created.", Severity.Success);
+            Navigation.NavigateTo(invoice is not null ? $"/accounting/{invoice.Id}" : "/accounting");
         }
         catch (Exception ex)
         {
@@ -82,5 +277,113 @@
         {
             _saving = false;
         }
+    }
+
+    private bool ValidateInvoice()
+    {
+        if (_selectedCustomer is null || _request.CustomerId == Guid.Empty)
+        {
+            _error = "Select a customer before creating an invoice.";
+            return false;
+        }
+
+        if (_customerDetail is null)
+        {
+            _error = "Customer billing data is not loaded yet.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_request.CustomerName))
+        {
+            _error = "The selected customer does not have a billing name.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_request.CustomerTaxId))
+        {
+            _error = "The selected customer needs a linked company tax ID or registration number before an invoice can be created.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_request.BillingAddress))
+        {
+            _error = "The selected customer needs a billing address before an invoice can be created.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_request.Currency))
+        {
+            _error = "Select a currency.";
+            return false;
+        }
+
+        if (_request.DueDate.Date <= _request.IssueDate.Date)
+        {
+            _error = "Due date must be after the issue date.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_line.Description) || _line.Quantity <= 0 || _line.UnitPrice <= 0)
+        {
+            _error = "Enter a valid invoice line with description, quantity, and unit price.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task<bool> UploadPoDocumentAsync(Guid invoiceId)
+    {
+        if (_poDocument is null)
+            return true;
+
+        using var content = new MultipartFormDataContent();
+        await using var stream = _poDocument.OpenReadStream(MaxInvoiceDocumentBytes);
+        using var fileContent = new StreamContent(stream);
+        if (!string.IsNullOrWhiteSpace(_poDocument.ContentType))
+        {
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(_poDocument.ContentType);
+        }
+
+        content.Add(fileContent, "file", _poDocument.Name);
+
+        var url = $"api/v1/invoices/{invoiceId}/files?customerId={_request.CustomerId}&fileType=CustomerPO";
+        var response = await Http.PostAsync(url, content);
+        return response.IsSuccessStatusCode;
+    }
+
+    private static string FormatAddress(AddressResponse? address)
+    {
+        if (address is null)
+            return string.Empty;
+
+        var parts = new[]
+        {
+            address.AddressLine1,
+            address.AddressLine2,
+            address.AddressLine3,
+            address.District,
+            address.City,
+            address.StateProvince,
+            address.PostalCode
+        };
+
+        return string.Join(", ", parts.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim()));
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+        => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatFileSize(long bytes)
+        => bytes >= 1024 * 1024
+            ? $"{bytes / 1024d / 1024d:N1} MB"
+            : $"{Math.Max(1, bytes / 1024d):N0} KB";
+
+    private static async Task<string> ReadFailureAsync(HttpResponseMessage response, string fallback)
+    {
+        var details = await response.Content.ReadAsStringAsync();
+        return string.IsNullOrWhiteSpace(details) ? fallback : $"{fallback} {details}";
     }
 }

@@ -290,6 +290,21 @@ public sealed record CreateInvoiceRequest
     /// <summary>Gets or sets the type of billing identity to use for the invoice.</summary>
     public BillingIdentityType BillingIdentityType { get; set; }
 
+    /// <summary>Gets or sets the customer display name captured on the invoice.</summary>
+    public string CustomerName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the customer tax ID captured on the invoice.</summary>
+    public string CustomerTaxId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the billing address captured on the invoice.</summary>
+    public string BillingAddress { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the optional shipping address captured on the invoice.</summary>
+    public string? ShippingAddress { get; set; }
+
+    /// <summary>Gets or sets the customer's purchase order number.</summary>
+    public string? PoNumber { get; set; }
+
     /// <summary>Gets or sets the date the invoice is issued.</summary>
     [Required]
     public DateTime IssueDate { get; set; }
@@ -306,6 +321,57 @@ public sealed record CreateInvoiceRequest
 
     /// <summary>Gets or sets the list of items to include in the invoice.</summary>
     public List<InvoiceItemDto> Items { get; set; } = [];
+}
+
+/// <summary>
+/// Request payload for registering an invoice file already uploaded to storage.
+/// </summary>
+public sealed record RegisterInvoiceFileRequest
+{
+    /// <summary>Gets or sets the file type, such as CustomerPO, PDF, or XML.</summary>
+    public string FileType { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the storage URL or storage path.</summary>
+    public string FileUrl { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the file size in bytes.</summary>
+    public long FileSizeBytes { get; set; }
+
+    /// <summary>Gets or sets the service or user that generated or uploaded the file.</summary>
+    public string GeneratedBy { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the optional checksum.</summary>
+    public string? Checksum { get; set; }
+}
+
+/// <summary>
+/// Response payload for a file linked to an invoice.
+/// </summary>
+public sealed record InvoiceFileReferenceDto
+{
+    /// <summary>Gets or sets the unique file reference identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the invoice identifier.</summary>
+    public Guid InvoiceId { get; set; }
+
+    /// <summary>Gets or sets the file type.</summary>
+    public string FileType { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the storage URL or path.</summary>
+    public string FileUrl { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the file size in bytes.</summary>
+    public long FileSizeBytes { get; set; }
+
+    /// <summary>Gets or sets the service or user that generated or uploaded the file.</summary>
+    public string GeneratedBy { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the optional checksum.</summary>
+    public string? Checksum { get; set; }
+
+    /// <summary>Gets or sets the UTC creation timestamp.</summary>
+    public DateTime CreatedAt { get; set; }
 }
 
 /// <summary>

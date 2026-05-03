@@ -244,9 +244,17 @@ public static class MalievPermissions
         /// <summary>Permission to view sales and purchase invoices.</summary>
         public const string Read = "invoice.invoices.read";
         /// <summary>Permission to update existing invoice records.</summary>
-        public const string Write = "invoice.invoices.write";
-        /// <summary>Permission to generate new invoices (mapped to Write).</summary>
-        public const string Create = "invoice.invoices.write"; // Map to Write
+        public const string Write = "invoice.invoices.update";
+        /// <summary>Permission to generate new invoices.</summary>
+        public const string Create = "invoice.invoices.create";
+        /// <summary>Permission to finalize draft invoices.</summary>
+        public const string Finalize = "invoice.invoices.finalize";
+        /// <summary>Permission to void or cancel invoices.</summary>
+        public const string Void = "invoice.invoices.void";
+        /// <summary>Permission to split invoices.</summary>
+        public const string Split = "invoice.splits.create";
+        /// <summary>Permission to upload files to invoices.</summary>
+        public const string FileUpload = "invoice.files.upload";
     }
 
     /// <summary>

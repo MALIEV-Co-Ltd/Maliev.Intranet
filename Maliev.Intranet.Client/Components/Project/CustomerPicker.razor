@@ -5,7 +5,7 @@
 @using MudBlazor
 @implements IDisposable
 
-<div class="customer-picker">
+<div class="@RootClass">
     @if (SelectedCustomer != null)
     {
         <CustomerCardCompact Customer="@SelectedCustomer"
@@ -89,6 +89,7 @@
     [Parameter] public CustomerSummaryDto? SelectedCustomer { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IEnumerable<CustomerSummaryDto>>>? SearchCustomers { get; set; }
     [Parameter] public EventCallback<CustomerSummaryDto?> OnCustomerSelected { get; set; }
+    [Parameter] public bool OpenBelow { get; set; }
 
     private readonly List<CustomerSummaryDto> _customers = [];
     private ElementReference _searchInput;
@@ -99,6 +100,7 @@
     private bool _isLoading;
     private bool _open;
     private int _loadVersion;
+    private string RootClass => OpenBelow ? "customer-picker customer-picker--below" : "customer-picker";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

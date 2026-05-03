@@ -13,11 +13,14 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 /// <param name="client">The invoice service client.</param>
 /// <param name="pdfClient">The PDF service client.</param>
+/// <param name="uploadClient">The upload service client.</param>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pdfClient) : ControllerBase
+public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pdfClient, UploadServiceClient uploadClient) : ControllerBase
 {
+    private const long MaxInvoiceAttachmentBytes = 25 * 1024 * 1024;
+
     /// <summary>
     /// Retrieves a paged list of invoices.
     /// </summary>
@@ -51,12 +54,69 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
     /// <summary>
     /// Creates a new invoice.
     /// </summary>
-    [RequirePermission(MalievPermissions.Invoice.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Invoice.Create, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost]
     public async Task<ActionResult<InvoiceSummaryDto>> Create([FromBody] CreateInvoiceRequest request, CancellationToken ct)
     {
         var result = await client.CreateInvoiceAsync(request, ct);
         return result != null ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result) : BadRequest();
+    }
+
+    /// <summary>
+    /// Uploads and links a file to an invoice.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Invoice.FileUpload, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/files")]
+    public async Task<ActionResult<InvoiceFileReferenceDto>> UploadFile(
+        Guid id,
+        IFormFile file,
+        [FromQuery] Guid customerId,
+        [FromQuery] string fileType = "CustomerPO",
+        CancellationToken ct = default)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file uploaded.");
+        }
+
+        if (file.Length > MaxInvoiceAttachmentBytes)
+        {
+            return BadRequest($"File exceeds the {MaxInvoiceAttachmentBytes / 1024 / 1024} MB limit.");
+        }
+
+        if (customerId == Guid.Empty)
+        {
+            return BadRequest("customerId is required.");
+        }
+
+        var safeFileName = Path.GetFileName(file.FileName);
+        if (string.IsNullOrWhiteSpace(safeFileName))
+        {
+            return BadRequest("File name is required.");
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+            ? "application/octet-stream"
+            : file.ContentType;
+        var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+        var storagePath = $"customers/{customerId}/invoices/{id}/{uniquePrefix}_{safeFileName}";
+
+        using var stream = file.OpenReadStream();
+        var upload = await uploadClient.UploadFileAsync(safeFileName, stream, contentType, storagePath, true, ct);
+        if (upload is null)
+        {
+            return StatusCode(500, "Upload failed.");
+        }
+
+        var fileReference = await client.RegisterFileAsync(id, new RegisterInvoiceFileRequest
+        {
+            FileType = fileType,
+            FileUrl = upload.StoragePath ?? upload.FileReference ?? storagePath,
+            FileSizeBytes = upload.FileSize,
+            GeneratedBy = User.Identity?.Name ?? "Maliev.Intranet"
+        }, ct);
+
+        return fileReference != null ? Ok(fileReference) : StatusCode(500, "Invoice file could not be linked.");
     }
 
     /// <summary>
@@ -73,7 +133,7 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
     /// <summary>
     /// Finalizes an invoice.
     /// </summary>
-    [RequirePermission(MalievPermissions.Invoice.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Invoice.Finalize, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:guid}/finalize")]
     public async Task<ActionResult> Finalize(Guid id, CancellationToken ct)
     {
@@ -84,7 +144,7 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
     /// <summary>
     /// Cancels an invoice.
     /// </summary>
-    [RequirePermission(MalievPermissions.Invoice.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Invoice.Void, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult> Cancel(Guid id, [FromBody] CancelInvoiceRequest request, CancellationToken ct)
     {
@@ -95,7 +155,7 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
     /// <summary>
     /// Splits an invoice into multiple child invoices.
     /// </summary>
-    [RequirePermission(MalievPermissions.Invoice.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Invoice.Split, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:guid}/split")]
     public async Task<ActionResult<List<InvoiceSummaryDto>>> SplitInvoice(Guid id, [FromBody] SplitInvoiceRequest request, CancellationToken ct)
     {

@@ -59,6 +59,11 @@
     box-shadow: 0 16px 38px color-mix(in oklch, black 18%, transparent);
 }
 
+.customer-picker--below .customer-picker-popover {
+    top: calc(100% + 8px);
+    bottom: auto;
+}
+
 .customer-picker-search {
     display: flex;
     align-items: center;
