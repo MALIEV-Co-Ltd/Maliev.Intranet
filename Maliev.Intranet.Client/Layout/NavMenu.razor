@@ -19,15 +19,7 @@
 
     <!-- Search -->
     <div class="px-3 pb-2" style="flex-shrink: 0;">
-        <MudTextField @bind-Value="_searchString"
-                      Placeholder="Search..."
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Adornment="Adornment.End"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      OnKeyDown="@OnSearchKeyDown"
-                      OnAdornmentClick="ExecuteSearch"
-                      FullWidth="true" />
+        <GlobalSearchBox Class="sidebar-global-search" Placeholder="Search..." Limit="6" />
     </div>
 
     <MudDivider />
@@ -169,8 +161,6 @@
     [Parameter] public string ThemeIconClass { get; set; } = "";
 
     private System.Security.Claims.ClaimsPrincipal _user = new();
-    private string _searchString = "";
-
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateTask;
@@ -187,19 +177,6 @@
         ThemeMode.Light => "Light Theme",
         _ => "Auto Theme"
     };
-
-    private void ExecuteSearch()
-    {
-        if (!string.IsNullOrWhiteSpace(_searchString))
-        {
-            Navigation.NavigateTo($"/sales/customers?search={Uri.EscapeDataString(_searchString)}");
-        }
-    }
-
-    private void OnSearchKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") ExecuteSearch();
-    }
 
     private async Task ToggleChat()
     {

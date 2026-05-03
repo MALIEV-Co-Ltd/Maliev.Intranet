@@ -1,0 +1,101 @@
+@page "/search"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Search | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Search" Subtitle="@(_queryDisplay)" />
+
+    <PageBody>
+        <div class="search-page-box">
+            <GlobalSearchBox Placeholder="Search the intranet..." Limit="10" />
+        </div>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        @if (NormalizedQuery.Length < 2)
+        {
+            <PanelCard>
+                <div class="mlv-empty">Enter at least 2 characters.</div>
+            </PanelCard>
+        }
+        else if (_results.Count == 0 && !_loading)
+        {
+            <PanelCard>
+                <div class="mlv-empty">No results for "@NormalizedQuery".</div>
+            </PanelCard>
+        }
+        else
+        {
+            @foreach (var group in _results.GroupBy(result => result.Area))
+            {
+                <PanelCard Title="@group.Key" Class="mb-3">
+                    <div class="search-results-list">
+                        @foreach (var result in group)
+                        {
+                            <button type="button" class="search-result-row" @onclick="@(() => Navigation.NavigateTo(result.Href))">
+                                <span class="search-result-title">@result.Title</span>
+                                <span class="search-result-subtitle">@(string.IsNullOrWhiteSpace(result.Subtitle) ? result.ResourceType : result.Subtitle)</span>
+                                @if (!string.IsNullOrWhiteSpace(result.Status))
+                                {
+                                    <StatusBadge Status="@result.Status" />
+                                }
+                            </button>
+                        }
+                    </div>
+                </PanelCard>
+            }
+        }
+    </PageBody>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "query")] public string? Query { get; set; }
+
+    private List<GlobalSearchResultDto> _results = [];
+    private bool _loading;
+    private string _loadedQuery = string.Empty;
+    private string _queryDisplay = "Global application results";
+
+    private string NormalizedQuery => Query?.Trim() ?? string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var normalized = NormalizedQuery;
+        _queryDisplay = normalized.Length >= 2
+            ? $"Results for {normalized}"
+            : "Global application results";
+
+        if (string.Equals(_loadedQuery, normalized, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _loadedQuery = normalized;
+        if (normalized.Length < 2)
+        {
+            _results = [];
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<GlobalSearchResponseDto>(
+                $"api/v1/search?query={Uri.EscapeDataString(normalized)}&limit=50");
+            _results = response?.Results.ToList() ?? [];
+        }
+        catch
+        {
+            _results = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

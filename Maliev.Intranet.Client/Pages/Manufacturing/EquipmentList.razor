@@ -1,0 +1,287 @@
+@page "/mfg/equipment"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Equipment | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Equipment" Subtitle="Machines, tools, attachments, maintenance, loans, and operating status.">
+        <PrimaryButton Icon="@Icons.Material.Outlined.Add" OnClick="@ShowCreateAsync">Add Equipment</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Matching assets" Value="@_meta.TotalItems.ToString("N0")" />
+            <StatTile Label="Active on page" Value="@_equipment.Count(e => string.Equals(e.Status, "Active", StringComparison.OrdinalIgnoreCase)).ToString("N0")" />
+            <StatTile Label="Maintenance" Value="@_equipment.Count(e => string.Equals(e.Status, "UnderMaintenance", StringComparison.OrdinalIgnoreCase)).ToString("N0")" />
+            <StatTile Label="Categories" Value="@_equipment.Select(e => e.Category).Distinct().Count().ToString("N0")" />
+        </StatBar>
+
+        <div class="mlv-toolbar">
+            <div class="mlv-toolbar-left">
+                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search equipment..." OnEnter="SearchAsync" />
+                <label class="mlv-filter-field">
+                    <span>Status</span>
+                    <select value="@(_status ?? string.Empty)" @onchange="OnStatusChanged">
+                        <option value="">All</option>
+                        <option value="Active">Active</option>
+                        <option value="UnderMaintenance">Under maintenance</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Decommissioned">Decommissioned</option>
+                    </select>
+                </label>
+                <label class="mlv-filter-field">
+                    <span>Category</span>
+                    <select value="@(_category ?? string.Empty)" @onchange="OnCategoryChanged">
+                        <option value="">All</option>
+                        @foreach (var category in _categories)
+                        {
+                            <option value="@category">@category</option>
+                        }
+                    </select>
+                </label>
+            </div>
+            <div class="mlv-toolbar-right">
+                <SecondaryButton Icon="@Icons.Material.Outlined.Search" OnClick="@SearchClickedAsync">Search</SecondaryButton>
+                <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+            </div>
+        </div>
+
+        @if (_showCreate)
+        {
+            <PanelCard Title="Register equipment" Class="mb-4">
+                <FormGrid>
+                    <FormField Label="Name"><InputText class="mlv-form-input" @bind-Value="_newEquipment.Name" /></FormField>
+                    <FormField Label="Category">
+                        <select class="mlv-form-input" @bind="_newEquipment.Category">
+                            @foreach (var category in _categories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </select>
+                    </FormField>
+                    <FormField Label="Brand"><InputText class="mlv-form-input" @bind-Value="_newEquipment.Brand" /></FormField>
+                    <FormField Label="Model"><InputText class="mlv-form-input" @bind-Value="_newEquipment.ModelName" /></FormField>
+                    <FormField Label="Serial"><InputText class="mlv-form-input" @bind-Value="_newEquipment.ManufacturerSerialNumber" /></FormField>
+                    <FormField Label="Sub-category"><InputText class="mlv-form-input" @bind-Value="_newEquipment.SubCategory" /></FormField>
+                    <FormField Label="Price THB"><InputNumber class="mlv-form-input" @bind-Value="_newEquipment.PurchasePriceTHB" /></FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                    <SecondaryButton OnClick="@HideCreateAsync">Cancel</SecondaryButton>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Save" OnClick="@CreateEquipmentAsync">Register</PrimaryButton>
+                </div>
+            </PanelCard>
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <PanelCard>
+            @if (_equipment.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Price</th>
+                            <th>Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var equipment in _equipment)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/mfg/equipment/{equipment.Id}"))">
+                                <td class="mlv-mono">@equipment.AssetCode</td>
+                                <td>
+                                    <div class="mlv-row-main">@equipment.Name</div>
+                                    <div class="mlv-row-sub">@($"{equipment.Brand} {equipment.ModelName}".Trim())</div>
+                                </td>
+                                <td>@equipment.Category</td>
+                                <td><StatusBadge Status="@equipment.Status" /></td>
+                                <td class="mlv-mono">@((equipment.PurchasePriceTHB ?? 0).ToString("N2"))</td>
+                                <td>@equipment.UpdatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">No equipment records match this view.</div>
+            }
+        </PanelCard>
+
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
+    </PageBody>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "category")] public string? Category { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public int? QueryPageSize { get; set; }
+
+    private readonly string[] _categories = ["FdmPrinter", "SlaPrinter", "CncMachine", "Scanner3D", "InjectionMolding", "OfficeEquipment", "MeasuringEquipment", "ITEquipment", "HandTool", "Other"];
+    private List<EquipmentSummaryDto> _equipment = [];
+    private PaginationMeta _meta = new();
+    private bool _loading = true;
+    private bool _showCreate;
+    private string? _search;
+    private string? _status;
+    private string? _category;
+    private int _page = 1;
+    private int _pageSize = 20;
+    private RegisterEquipmentRequest _newEquipment = new() { Category = "FdmPrinter" };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _search = Search;
+        _status = string.IsNullOrWhiteSpace(Status) ? null : Status;
+        _category = string.IsNullOrWhiteSpace(Category) ? null : Category;
+        _page = Math.Max(1, QueryPage ?? 1);
+        _pageSize = NormalizePageSize(QueryPageSize ?? 20);
+        await LoadAsync();
+    }
+
+    private Task OnSearchChanged(string? value)
+    {
+        _search = value;
+        return Task.CompletedTask;
+    }
+
+    private async Task OnStatusChanged(ChangeEventArgs e)
+    {
+        _status = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value.ToString();
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnCategoryChanged(ChangeEventArgs e)
+    {
+        _category = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value.ToString();
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task SearchClickedAsync(MouseEventArgs _) => await SearchAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = NormalizePageSize(pageSize);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private Task ShowCreateAsync(MouseEventArgs _)
+    {
+        _showCreate = true;
+        return Task.CompletedTask;
+    }
+
+    private Task HideCreateAsync(MouseEventArgs _)
+    {
+        _showCreate = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task CreateEquipmentAsync(MouseEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_newEquipment.Name))
+        {
+            Snackbar.Add("Enter equipment name.", Severity.Warning);
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/v1/equipments", _newEquipment);
+        Snackbar.Add(response.IsSuccessStatusCode ? "Equipment registered." : "Equipment could not be registered.", response.IsSuccessStatusCode ? Severity.Success : Severity.Warning);
+        if (response.IsSuccessStatusCode)
+        {
+            _showCreate = false;
+            _newEquipment = new RegisterEquipmentRequest { Category = "FdmPrinter" };
+            await LoadAsync();
+        }
+    }
+
+    private async Task NavigateAndLoadAsync()
+    {
+        Navigation.NavigateTo(BuildPageUri(), replace: true);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<EquipmentSummaryDto>>(BuildApiUrl());
+            _equipment = response?.Data.ToList() ?? [];
+            _meta = response?.Meta ?? new();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Equipment records could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+            _equipment = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string BuildApiUrl()
+    {
+        var query = new List<string> { $"page={_page}", $"pageSize={_pageSize}" };
+        if (!string.IsNullOrWhiteSpace(_category)) query.Add($"category={Uri.EscapeDataString(_category)}");
+        if (!string.IsNullOrWhiteSpace(_status)) query.Add($"status={Uri.EscapeDataString(_status)}");
+        if (!string.IsNullOrWhiteSpace(_search)) query.Add($"search={Uri.EscapeDataString(_search)}");
+        return $"api/v1/equipments?{string.Join("&", query)}";
+    }
+
+    private string BuildPageUri()
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_category)) query.Add($"category={Uri.EscapeDataString(_category)}");
+        if (!string.IsNullOrWhiteSpace(_status)) query.Add($"status={Uri.EscapeDataString(_status)}");
+        if (!string.IsNullOrWhiteSpace(_search)) query.Add($"search={Uri.EscapeDataString(_search)}");
+        if (_page > 1) query.Add($"page={_page}");
+        if (_pageSize != 20) query.Add($"pageSize={_pageSize}");
+        return query.Count == 0 ? "/mfg/equipment" : $"/mfg/equipment?{string.Join("&", query)}";
+    }
+
+    private static int NormalizePageSize(int pageSize) => pageSize switch
+    {
+        <= 10 => 10,
+        <= 20 => 20,
+        _ => 50
+    };
+}

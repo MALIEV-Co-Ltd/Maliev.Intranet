@@ -63,6 +63,35 @@ public class ProjectServiceClientCreateTests
     }
 
     [Fact]
+    public async Task GetProjectsAsync_ForwardsSearchAsQueryParameter()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            capturedRequest = request;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    items = Array.Empty<object>(),
+                    page = 3,
+                    pageSize = 25,
+                    totalCount = 0,
+                    totalPages = 0
+                })
+            });
+        });
+        var client = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+
+        await client.GetProjectsAsync("Configuring", "fixture", Guid.Parse("11111111-1111-1111-1111-111111111111"), 3, 25);
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(
+            "/project/v1/projects?page=3&pageSize=25&status=Configuring&query=fixture&customerId=11111111-1111-1111-1111-111111111111",
+            capturedRequest.RequestUri!.PathAndQuery);
+    }
+
+    [Fact]
     public async Task GetProjectByIdAsync_WhenProjectServiceShape_ReturnsMappedIntranetDto()
     {
         var projectId = Guid.NewGuid();

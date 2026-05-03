@@ -1,0 +1,215 @@
+@implements IDisposable
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="global-search @Class">
+    <div class="global-search-input-wrap">
+        <MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" Class="global-search-icon" />
+        <input class="global-search-input"
+               value="@_query"
+               placeholder="@Placeholder"
+               aria-label="@AriaLabel"
+               autocomplete="off"
+               @onfocus="HandleFocus"
+               @oninput="HandleInput"
+               @onkeydown="HandleKeyDown" />
+        @if (_loading)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="global-search-spinner" />
+        }
+    </div>
+
+    @if (_open)
+    {
+        <div class="global-search-panel">
+            @if (_query.Trim().Length < 2)
+            {
+                <div class="global-search-empty">Type at least 2 characters.</div>
+            }
+            else if (_loading && _results.Count == 0)
+            {
+                <div class="global-search-empty">Searching...</div>
+            }
+            else if (_results.Count == 0)
+            {
+                <div class="global-search-empty">No results.</div>
+            }
+            else
+            {
+                @foreach (var group in _results.GroupBy(result => result.Area))
+                {
+                    <div class="global-search-group">
+                        <div class="global-search-group-label">@group.Key</div>
+                        @foreach (var result in group)
+                        {
+                            var index = _results.IndexOf(result);
+                            <button type="button"
+                                    class="global-search-result @(index == _selectedIndex ? "is-active" : null)"
+                                    @onmouseenter="@(() => _selectedIndex = index)"
+                                    @onclick="@(() => NavigateTo(result.Href))">
+                                <span class="global-search-result-main">
+                                    <span class="global-search-result-title">@result.Title</span>
+                                    @if (!string.IsNullOrWhiteSpace(result.Status))
+                                    {
+                                        <span class="global-search-result-status">@result.Status</span>
+                                    }
+                                </span>
+                                <span class="global-search-result-sub">
+                                    <span>@(string.IsNullOrWhiteSpace(result.Subtitle) ? result.ResourceType : result.Subtitle)</span>
+                                    <span class="global-search-result-type">@result.ResourceType</span>
+                                </span>
+                            </button>
+                        }
+                    </div>
+                }
+
+                <button type="button" class="global-search-view-all" @onclick="NavigateToAllResults">
+                    View all results
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Placeholder { get; set; } = "Search...";
+    [Parameter] public string AriaLabel { get; set; } = "Global search";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public int Limit { get; set; } = 8;
+
+    private string _query = string.Empty;
+    private List<GlobalSearchResultDto> _results = [];
+    private bool _loading;
+    private bool _open;
+    private int _selectedIndex = -1;
+    private CancellationTokenSource? _debounceCts;
+
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? string.Empty;
+        _selectedIndex = -1;
+        _debounceCts?.Cancel();
+
+        if (_query.Trim().Length < 2)
+        {
+            _results.Clear();
+            _loading = false;
+            _open = !string.IsNullOrWhiteSpace(_query);
+            return;
+        }
+
+        _open = true;
+        _loading = true;
+        await InvokeAsync(StateHasChanged);
+        var cts = new CancellationTokenSource();
+        _debounceCts = cts;
+
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            await LoadResultsAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer keystroke.
+        }
+    }
+
+    private void HandleFocus()
+    {
+        if (_query.Trim().Length >= 2)
+        {
+            _open = true;
+        }
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowDown" && _results.Count > 0)
+        {
+            _open = true;
+            _selectedIndex = (_selectedIndex + 1) % _results.Count;
+        }
+        else if (e.Key == "ArrowUp" && _results.Count > 0)
+        {
+            _open = true;
+            _selectedIndex = _selectedIndex <= 0 ? _results.Count - 1 : _selectedIndex - 1;
+        }
+        else if (e.Key == "Enter")
+        {
+            if (_open && _selectedIndex >= 0 && _selectedIndex < _results.Count)
+            {
+                NavigateTo(_results[_selectedIndex].Href);
+            }
+            else if (_query.Trim().Length >= 2)
+            {
+                NavigateToAllResults();
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            _open = false;
+        }
+    }
+
+    private async Task LoadResultsAsync(CancellationToken ct)
+    {
+        var query = _query.Trim();
+        var limit = Math.Clamp(Limit, 1, 50);
+        var url = $"api/v1/search?query={Uri.EscapeDataString(query)}&limit={limit}";
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<GlobalSearchResponseDto>(url, ct);
+            if (ct.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _results = response?.Results.ToList() ?? [];
+            _selectedIndex = _results.Count > 0 ? 0 : -1;
+        }
+        catch when (!ct.IsCancellationRequested)
+        {
+            _results = [];
+            _selectedIndex = -1;
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                _loading = false;
+                _open = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private void NavigateTo(string href)
+    {
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            return;
+        }
+
+        _open = false;
+        Navigation.NavigateTo(href);
+    }
+
+    private void NavigateToAllResults()
+    {
+        var query = _query.Trim();
+        if (query.Length < 2)
+        {
+            return;
+        }
+
+        NavigateTo($"/search?query={Uri.EscapeDataString(query)}");
+    }
+
+    public void Dispose()
+    {
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+    }
+}

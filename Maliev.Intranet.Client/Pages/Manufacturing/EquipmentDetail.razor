@@ -1,0 +1,69 @@
+@page "/mfg/equipment/{Id:guid}"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Equipment | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@(_equipment?.Name ?? "Equipment")" Subtitle="@_equipment?.AssetCode" BackHref="/mfg/equipment">
+        @if (_equipment is not null)
+        {
+            <StatusBadge Status="@_equipment.Status" />
+        }
+    </PageHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_equipment is null)
+        {
+            <div class="mlv-empty">Equipment record was not found.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Category" Value="@_equipment.Category" />
+                <StatTile Label="Brand" Value="@(_equipment.Brand ?? "-")" />
+                <StatTile Label="Model" Value="@(_equipment.ModelName ?? "-")" />
+                <StatTile Label="Updated" Value="@_equipment.UpdatedAt.ToString("dd MMM yyyy")" />
+            </StatBar>
+
+            <PanelCard Title="Equipment">
+                <table class="mlv-table">
+                    <tbody>
+                        <tr><th>Asset code</th><td class="mlv-mono">@_equipment.AssetCode</td></tr>
+                        <tr><th>Serial number</th><td>@(_equipment.ManufacturerSerialNumber ?? "-")</td></tr>
+                        <tr><th>Sub-category</th><td>@(_equipment.SubCategory ?? "-")</td></tr>
+                        <tr><th>Warranty</th><td>@(_equipment.WarrantyExpiryDate?.ToString("dd MMM yyyy") ?? "-")</td></tr>
+                    </tbody>
+                </table>
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private EquipmentDetailDto? _equipment;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _equipment = await Http.GetFromJsonAsync<EquipmentDetailDto>($"api/v1/equipments/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Equipment record could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

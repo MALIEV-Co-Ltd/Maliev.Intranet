@@ -29,7 +29,7 @@ public class ProjectServiceClient(HttpClient httpClient)
     {
         var url = $"/project/v1/projects?page={page}&pageSize={pageSize}";
         if (!string.IsNullOrEmpty(status)) url += $"&status={Uri.EscapeDataString(status)}";
-        if (!string.IsNullOrEmpty(search)) url += $"&search={Uri.EscapeDataString(search)}";
+        if (!string.IsNullOrEmpty(search)) url += $"&query={Uri.EscapeDataString(search)}";
         if (customerId.HasValue) url += $"&customerId={customerId.Value}";
 
         var response = await httpClient.GetFromJsonAsync<ProjectServicePagedProjectResponse>(url, ct);

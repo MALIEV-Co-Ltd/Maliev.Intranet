@@ -227,6 +227,15 @@ public static class MalievPermissions
         public const string DiagnosticsRead = "system.diagnostics.read";
     }
 
+    /// <summary>
+    /// Permissions for global search.
+    /// </summary>
+    public static class Search
+    {
+        /// <summary>Permission to query the global search index.</summary>
+        public const string Read = "search.documents.read";
+    }
+
     // New Domains
 
     /// <summary>
