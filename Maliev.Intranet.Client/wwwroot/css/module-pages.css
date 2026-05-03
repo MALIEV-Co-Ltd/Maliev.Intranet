@@ -163,6 +163,55 @@
     padding-top: 8px;
 }
 
+.mlv-filter-field {
+    display: grid;
+    gap: 4px;
+    min-width: 140px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.mlv-filter-field.compact {
+    min-width: 110px;
+}
+
+.mlv-filter-field select,
+.mlv-filter-field input {
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+    font: inherit;
+}
+
+.mlv-two-column-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.mlv-detail-list {
+    display: grid;
+    grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+    gap: 10px 14px;
+    margin: 0;
+}
+
+.mlv-detail-list dt {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.mlv-detail-list dd {
+    margin: 0;
+    min-width: 0;
+    color: var(--maliev-ink);
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+
 .mlv-error {
     margin-bottom: 12px;
     padding: 10px 12px;
@@ -233,6 +282,10 @@
         display: block;
         overflow-x: auto;
         white-space: nowrap;
+    }
+
+    .mlv-two-column-grid {
+        grid-template-columns: 1fr;
     }
 
     .mlv-pagination-footer {

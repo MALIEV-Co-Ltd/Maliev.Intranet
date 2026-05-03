@@ -74,6 +74,22 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void PurchasingPages_UseIntIdsAndServerPagination()
+    {
+        var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor");
+        var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoDetail.razor");
+
+        Assert.Contains("PaginationFooter", list, StringComparison.Ordinal);
+        Assert.Contains("pageSize={_pageSize}", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("page=1&pageSize=50", list, StringComparison.Ordinal);
+        Assert.Contains("@page \"/purchasing/{Id:int}\"", detail, StringComparison.Ordinal);
+        Assert.Contains("/approve", detail, StringComparison.Ordinal);
+        Assert.Contains("/send-to-supplier", detail, StringComparison.Ordinal);
+        Assert.Contains("/receive", detail, StringComparison.Ordinal);
+        Assert.Contains("/cancel", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_CurrencySelectorTrigger_RemainsCompact()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");

@@ -1,4 +1,5 @@
 @page "/purchasing/new"
+@using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -17,11 +18,39 @@
             <EditForm Model="@_request" OnValidSubmit="SaveAsync">
                 <DataAnnotationsValidator />
                 <FormGrid>
-                    <FormField Label="Supplier ID"><InputText class="mlv-form-input" @bind-Value="_supplierId" /></FormField>
-                    <FormField Label="Date"><InputDate class="mlv-form-input" @bind-Value="_request.Date" /></FormField>
-                    <FormField Label="Material ID"><InputText class="mlv-form-input" @bind-Value="_materialId" /></FormField>
-                    <FormField Label="Quantity"><InputNumber class="mlv-form-input" @bind-Value="_line.Quantity" /></FormField>
-                    <FormField Label="Unit price"><InputNumber class="mlv-form-input" @bind-Value="_line.UnitPrice" /></FormField>
+                    <FormField Label="Order type">
+                        <select class="mlv-form-input" @bind="_request.OrderType">
+                            <option value="0">Internal</option>
+                            <option value="1">External</option>
+                        </select>
+                    </FormField>
+                    <FormField Label="Supplier ID">
+                        <InputNumber class="mlv-form-input" @bind-Value="_request.SupplierId" />
+                    </FormField>
+                    <FormField Label="Source order ID">
+                        <InputNumber class="mlv-form-input" @bind-Value="_request.OrderId" />
+                    </FormField>
+                    <FormField Label="Customer PO">
+                        <InputText class="mlv-form-input" @bind-Value="_request.CustomerPo" />
+                    </FormField>
+                    <FormField Label="Currency ID">
+                        <InputNumber class="mlv-form-input" @bind-Value="_request.CurrencyId" />
+                    </FormField>
+                    <FormField Label="Expected delivery">
+                        <InputDate class="mlv-form-input" @bind-Value="_request.ExpectedDeliveryDate" />
+                    </FormField>
+                    <FormField Label="WHT rate">
+                        <InputNumber class="mlv-form-input" @bind-Value="_request.WhtRate" />
+                    </FormField>
+                    <FormField Label="External item ID">
+                        <InputNumber class="mlv-form-input" @bind-Value="_line.ExternalOrderItemId" />
+                    </FormField>
+                    <FormField Label="Quantity">
+                        <InputNumber class="mlv-form-input" @bind-Value="_line.Quantity" />
+                    </FormField>
+                    <FormField Label="Notes" Class="mlv-span-6">
+                        <InputTextArea class="mlv-form-textarea" @bind-Value="_request.Notes" />
+                    </FormField>
                 </FormGrid>
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
                     <SecondaryButton Href="/purchasing">Cancel</SecondaryButton>
@@ -33,25 +62,32 @@
 </div>
 
 @code {
-    private CreatePurchaseOrderRequest _request = new() { Date = DateTime.Today };
-    private PurchaseOrderLineItemDto _line = new() { Quantity = 1, UnitPrice = 0 };
-    private string _supplierId = string.Empty;
-    private string _materialId = string.Empty;
+    private CreatePurchaseOrderRequest _request = new()
+    {
+        CurrencyId = 1,
+        ExpectedDeliveryDate = DateTime.Today.AddDays(14)
+    };
+
+    private PurchaseOrderLineItemDto _line = new() { Quantity = 1 };
     private bool _saving;
     private string? _error;
 
     private async Task SaveAsync()
     {
-        if (!Guid.TryParse(_supplierId, out var supplierId) || !Guid.TryParse(_materialId, out var materialId))
+        if (_request.SupplierId <= 0 || _request.OrderId <= 0 || _request.CurrencyId <= 0)
         {
-            _error = "Enter valid supplier and material IDs.";
+            _error = "Enter valid supplier, source order, and currency IDs.";
+            return;
+        }
+
+        if (_line.ExternalOrderItemId <= 0 || _line.Quantity <= 0)
+        {
+            _error = "Enter a valid external order item and quantity.";
             return;
         }
 
         _saving = true;
         _error = null;
-        _request.SupplierId = supplierId;
-        _line.MaterialId = materialId;
         _request.Items = [_line];
 
         try
@@ -59,8 +95,9 @@
             var response = await Http.PostAsJsonAsync("api/v1/procurement", _request);
             if (response.IsSuccessStatusCode)
             {
+                var created = await response.Content.ReadFromJsonAsync<PurchaseOrderDto>();
                 Snackbar.Add("Purchase order created.", Severity.Success);
-                Navigation.NavigateTo("/purchasing");
+                Navigation.NavigateTo(created is null ? "/purchasing" : $"/purchasing/{created.Id}");
             }
             else
             {
