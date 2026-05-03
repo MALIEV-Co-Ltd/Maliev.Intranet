@@ -126,6 +126,23 @@ public class ProjectQuotationPdfMapperTests
     }
 
     /// <summary>
+    /// Verifies the standard inspection selection is still visible in PDF part details.
+    /// </summary>
+    [Fact]
+    public void BuildLineItemDetailLines_WithStandardInspection_IncludesInspection()
+    {
+        var part = new PartViewModel
+        {
+            Name = "bracket.step",
+            InspectionLevel = InspectionLevel.Standard,
+        };
+
+        var lines = ProjectQuotationPdfMapper.BuildLineItemDetailLines(part);
+
+        Assert.Contains("Inspection: Standard", lines);
+    }
+
+    /// <summary>
     /// Verifies Thai company quotation data uses Thai branch and multiline address format.
     /// </summary>
     [Fact]

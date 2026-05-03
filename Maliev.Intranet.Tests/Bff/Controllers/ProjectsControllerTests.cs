@@ -193,6 +193,19 @@ public class ProjectsControllerTests
     }
 
     [Fact]
+    public async Task AddPart_WhenProjectServiceReturnsBadRequest_ShouldForwardBadRequest()
+    {
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.BadRequest), StubJobClient(), StubFacilityClient(), Logger);
+
+        var result = await controller.AddPart(Guid.NewGuid(),
+            new AddProjectPartRequest { FileId = Guid.NewGuid(), FileName = "bracket.stl" },
+            CancellationToken.None);
+
+        var status = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(400, status.StatusCode);
+    }
+
+    [Fact]
     public async Task UpdatePart_WhenSuccessful_ShouldReturnNoContent()
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);

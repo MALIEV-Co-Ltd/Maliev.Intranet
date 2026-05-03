@@ -148,8 +148,11 @@ public class ProjectsController(
     [HttpPost("{id:guid}/parts")]
     public async Task<ActionResult<ProjectPartDto>> AddPart(Guid id, [FromBody] AddProjectPartRequest request, CancellationToken ct)
     {
-        var result = await client.AddPartAsync(id, request, ct);
-        return result != null ? Ok(result) : StatusCode(502, "ProjectService returned an error.");
+        var (result, errorContent, statusCode) = await client.AddPartAsync(id, request, ct);
+        if (result != null)
+            return Ok(result);
+
+        return StatusCode(statusCode == 0 ? 502 : statusCode, errorContent ?? "ProjectService returned an error.");
     }
 
     /// <summary>

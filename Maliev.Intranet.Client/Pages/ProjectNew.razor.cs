@@ -1476,6 +1476,7 @@ public partial class ProjectNew : IAsyncDisposable
                                 var addPartRequest = new AddProjectPartRequest
                                 {
                                     FileId = part.FileId,
+                                    FileReference = part.StoragePath,
                                     FileName = part.Name,
                                     ProcessType = part.ProcessCode,
                                     MaterialId = part.MaterialId,
@@ -1536,6 +1537,7 @@ public partial class ProjectNew : IAsyncDisposable
                             var addPartRequest = new AddProjectPartRequest
                             {
                                 FileId = part.FileId,
+                                FileReference = part.StoragePath,
                                 FileName = part.Name,
                                 ProcessType = part.ProcessCode,
                                 MaterialId = part.MaterialId,
@@ -1856,6 +1858,7 @@ public partial class ProjectNew : IAsyncDisposable
                     var addPartRequest = new AddProjectPartRequest
                     {
                         FileId = part.FileId,
+                        FileReference = part.StoragePath,
                         FileName = part.Name,
                         ProcessType = part.ProcessCode,
                         MaterialId = part.MaterialId,
@@ -1909,6 +1912,7 @@ public partial class ProjectNew : IAsyncDisposable
                     var addPartRequest = new AddProjectPartRequest
                     {
                         FileId = part.FileId,
+                        FileReference = part.StoragePath,
                         FileName = part.Name,
                         ProcessType = part.ProcessCode,
                         MaterialId = part.MaterialId,

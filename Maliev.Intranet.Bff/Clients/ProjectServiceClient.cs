@@ -102,13 +102,14 @@ public class ProjectServiceClient(HttpClient httpClient)
     /// Adds a new part to an existing project.
     /// Maps the Intranet DTO to the ProjectService DTO shape (field name differences).
     /// </summary>
-    public async Task<ProjectPartDto?> AddPartAsync(Guid projectId, AddProjectPartRequest request, CancellationToken ct = default)
+    public async Task<(ProjectPartDto? Result, string? ErrorContent, int StatusCode)> AddPartAsync(Guid projectId, AddProjectPartRequest request, CancellationToken ct = default)
     {
         var payload = new
         {
             request.FileId,
+            request.FileReference,
             request.FileName,
-            request.ProcessType,
+            ProcessType = MapManufacturingProcess(request.ProcessType),
             request.MaterialId,
             request.Quantity,
             FinishType = request.Finish,
@@ -117,8 +118,14 @@ public class ProjectServiceClient(HttpClient httpClient)
         };
 
         var response = await httpClient.PostAsJsonAsync($"/project/v1/projects/{projectId}/parts", payload, ct);
-        if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<ProjectPartDto>(cancellationToken: ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(ct);
+            return (null, errorContent, (int)response.StatusCode);
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<ProjectPartDto>(cancellationToken: ct);
+        return (result, null, (int)response.StatusCode);
     }
 
     /// <summary>
@@ -129,7 +136,7 @@ public class ProjectServiceClient(HttpClient httpClient)
     {
         var payload = new
         {
-            request.ProcessType,
+            ProcessType = MapManufacturingProcess(request.ProcessType),
             request.MaterialId,
             request.Quantity,
             FinishType = request.Finish,
@@ -138,6 +145,35 @@ public class ProjectServiceClient(HttpClient httpClient)
         };
 
         return await httpClient.PutAsJsonAsync($"/project/v1/projects/{projectId}/parts/{partId}", payload, ct);
+    }
+
+    private static int? MapManufacturingProcess(string? processType)
+    {
+        if (string.IsNullOrWhiteSpace(processType))
+            return null;
+
+        var normalized = processType.Trim()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", "_", StringComparison.Ordinal)
+            .ToUpperInvariant();
+
+        return normalized switch
+        {
+            "FDM" => 1,
+            "SLA" or "DLP" or "SLA_DLP" => 2,
+            "SLS" => 3,
+            "CNC" or "CNC_MILL" or "CNC_MILLING" or "MILLING" => 10,
+            "CNC_TURN" or "CNC_TURNING" or "TURNING" or "LATHE" => 11,
+            "CNC_5AXIS" or "CNC_5_AXIS" or "5_AXIS" => 12,
+            "SHEET_METAL" or "SHEETMETAL" or "SHEET_METAL_CUTTING" => 20,
+            "SHEET_METAL_BENDING" => 21,
+            "SHEET_METAL_WELDING" => 22,
+            "INJECTION" or "INJECTION_MOLDING" or "INJECTIONMOULDING" => 30,
+            "3D_SCANNING" or "THREEDSCANNING" => 40,
+            "DESIGN" => 50,
+            "ASSEMBLY" or "FINISHING" => 60,
+            _ => null,
+        };
     }
 
     /// <summary>

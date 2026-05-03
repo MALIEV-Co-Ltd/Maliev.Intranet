@@ -289,6 +289,9 @@ public class AddProjectPartRequest
     /// <summary>Gets or sets the uploaded file reference from UploadService.</summary>
     public Guid FileId { get; set; }
 
+    /// <summary>Gets or sets the GCS storage path for the uploaded file.</summary>
+    public string? FileReference { get; set; }
+
     /// <summary>Gets or sets the original filename.</summary>
     public string FileName { get; set; } = string.Empty;
 

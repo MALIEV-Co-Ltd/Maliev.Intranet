@@ -125,8 +125,7 @@ public static class ProjectQuotationPdfMapper
         if (ResolveDeburring(part) is { Length: > 0 } deburring)
             notes.Add(deburring);
 
-        if (part.InspectionLevel != InspectionLevel.Standard)
-            notes.Add($"Inspection: {part.InspectionLevel}");
+        notes.Add($"Inspection: {part.InspectionLevel}");
 
         if (part.DrawingFiles.Count > 0)
             notes.Add($"Drawing: {string.Join(", ", part.DrawingFiles.Select(file => file.Name).Where(name => !string.IsNullOrWhiteSpace(name)))}");
