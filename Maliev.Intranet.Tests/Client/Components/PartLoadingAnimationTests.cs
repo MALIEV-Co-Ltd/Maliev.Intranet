@@ -38,11 +38,18 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartProcessingLoader.razor.css");
 
-        Assert.Contains("--s: clamp(44px, 8vmin, 88px)", source);
+        Assert.Contains("--s: 25px", source);
+        Assert.Contains("width: calc(var(--s) + var(--_d))", source);
+        Assert.Contains(".part-processing-loader::before,", source);
+        Assert.Contains(".part-processing-loader::after", source);
         Assert.Contains("clip-path: polygon", source);
-        Assert.Contains("conic-gradient(from -90deg at var(--s) var(--_d)", source);
+        Assert.Contains("conic-gradient(from -90deg at calc(100% - var(--_d)) var(--_d)", source);
+        Assert.Contains("animation-delay: 0.6s", source);
         Assert.Contains("@keyframes part-processing-loader", source);
-        Assert.Contains("height: 40%", source);
+        Assert.Contains("16.67%", source);
+        Assert.Contains("33.33%", source);
+        Assert.Contains("transform: translateY(-10px)", source);
+        Assert.Contains("transform: translateY(10px)", source);
     }
 
     [Fact]
@@ -50,11 +57,18 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartQueueLoader.razor.css");
 
-        Assert.Contains("--queue-size: 32px", source);
-        Assert.Contains("filter: blur(2px) contrast(10)", source);
-        Assert.Contains("radial-gradient(farthest-side", source);
+        Assert.Contains("background: transparent", source);
+        Assert.Contains(".part-queue-loader::before", source);
+        Assert.Contains("width: 80px", source);
+        Assert.Contains("border: 10px solid #000", source);
+        Assert.Contains("radial-gradient(farthest-side, #fff 98%, #0000)", source);
+        Assert.Contains("#000;", source);
+        Assert.Contains("filter: blur(4px) contrast(10)", source);
         Assert.Contains("@keyframes part-queue-loader", source);
-        Assert.Contains("background-position:", source);
+        Assert.Contains("50% -20px", source);
+        Assert.Contains("-20px 50%", source);
+        Assert.Contains("60px 50%", source);
+        Assert.Contains("50% 60px", source);
     }
 
     [Fact]
