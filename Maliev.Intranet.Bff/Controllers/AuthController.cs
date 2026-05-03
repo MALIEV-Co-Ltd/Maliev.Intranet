@@ -40,21 +40,46 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
     [HttpPost("login")]
     public async Task<IActionResult> LoginStandard([FromBody] InternalLoginRequest request)
     {
+        var signedIn = await TrySignInWithCorporateCredentialsAsync(request.Username, request.Password, request.RememberMe);
+        return signedIn ? Ok() : Unauthorized("Invalid corporate credentials.");
+    }
+
+    /// <summary>
+    /// Authenticates a user from the server-owned login form.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("login-form")]
+    public async Task<IActionResult> LoginForm([FromForm] InternalLoginFormRequest request)
+    {
+        var returnUrl = Url.IsLocalUrl(request.ReturnUrl) ? request.ReturnUrl : "/";
+        var signedIn = await TrySignInWithCorporateCredentialsAsync(request.Username, request.Password, request.RememberMe);
+
+        if (signedIn)
+        {
+            return LocalRedirect(returnUrl);
+        }
+
+        var encodedReturnUrl = System.Net.WebUtility.UrlEncode(returnUrl);
+        var encodedError = System.Net.WebUtility.UrlEncode("Invalid credentials. Please try again.");
+        return Redirect($"/login?returnUrl={encodedReturnUrl}&error={encodedError}");
+    }
+
+    private async Task<bool> TrySignInWithCorporateCredentialsAsync(string username, string password, bool rememberMe)
+    {
         var authClient = httpClientFactory.CreateClient("AuthService");
 
         // Proxy request to the real AuthService (snake_case property names)
         var response = await authClient.PostAsJsonAsync("/auth/v1/login", new
         {
-            username = request.Username,
-            password = request.Password,
+            username,
+            password,
             user_type = "employee"
         });
 
         if (!response.IsSuccessStatusCode)
         {
-            var errorContent = await response.Content.ReadAsStringAsync();
-            logger.LogWarning("Login failed for {Username}. Status: {StatusCode}", request.Username, response.StatusCode);
-            return Unauthorized("Invalid corporate credentials.");
+            logger.LogWarning("Login failed for {Username}. Status: {StatusCode}", username, response.StatusCode);
+            return false;
         }
 
         // Read and deserialize response (AuthService returns snake_case)
@@ -67,8 +92,8 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
 
         if (authResult?.User == null || string.IsNullOrEmpty(authResult.AccessToken))
         {
-            logger.LogWarning("Login failed for {Username}: Invalid response from AuthService", request.Username);
-            return Unauthorized();
+            logger.LogWarning("Login failed for {Username}: Invalid response from AuthService", username);
+            return false;
         }
 
         // Parse JWT to extract claims
@@ -78,8 +103,8 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? authResult.User.UserId),
-            new Claim(ClaimTypes.Name, jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value ?? authResult.User.Name ?? request.Username),
-            new Claim("email", jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? authResult.User.Email ?? request.Username),
+            new Claim(ClaimTypes.Name, jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value ?? authResult.User.Name ?? username),
+            new Claim("email", jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? authResult.User.Email ?? username),
             new Claim("user_type", jwtToken.Claims.FirstOrDefault(c => c.Type == "user_type")?.Value ?? authResult.User.UserType),
             new Claim("permissions", MalievPermissions.Auth.SessionsRead),
             new Claim("access_token", authResult.AccessToken)
@@ -100,7 +125,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var authProperties = new AuthenticationProperties
         {
-            IsPersistent = request.RememberMe,
+            IsPersistent = rememberMe,
             ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) // Cookie expires in 8 hours
         };
 
@@ -115,7 +140,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             new ClaimsPrincipal(claimsIdentity),
             authProperties);
 
-        logger.LogInformation("User {Username} logged in successfully", request.Username);
+        logger.LogInformation("User {Username} logged in successfully", username);
 
         // Auto-bootstrap: promote first employee to platform owner in Development
         // Calls promote directly — the IAM endpoint has its own guard (humanUsers.Count <= 1)
@@ -130,16 +155,16 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
                 var promoteResp = await bootstrapClient.PostAsync("/iam/v1/principals/bootstrap/promote", null);
                 if (promoteResp.IsSuccessStatusCode)
                 {
-                    logger.LogInformation("Auto-bootstrapped first user {Username} as platform owner", request.Username);
+                    logger.LogInformation("Auto-bootstrapped first user {Username} as platform owner", username);
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Bootstrap auto-promotion check failed for {Username} (non-fatal)", request.Username);
+                logger.LogWarning(ex, "Bootstrap auto-promotion check failed for {Username} (non-fatal)", username);
             }
         }
 
-        return Ok();
+        return true;
     }
 
     /// <summary>
@@ -220,6 +245,17 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         /// Gets or sets a value indicating whether to persist the session.
         /// </summary>
         public bool RememberMe { get; set; }
+    }
+
+    /// <summary>
+    /// Internal request model for the server-owned login form.
+    /// </summary>
+    public class InternalLoginFormRequest : InternalLoginRequest
+    {
+        /// <summary>
+        /// Gets or sets the local URL to redirect to after successful authentication.
+        /// </summary>
+        public string ReturnUrl { get; set; } = "/";
     }
 
     /// <summary>

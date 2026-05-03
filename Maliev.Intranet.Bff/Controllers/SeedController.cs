@@ -1,7 +1,9 @@
 using Asp.Versioning;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Bff.Hubs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Bff.Controllers;
@@ -16,6 +18,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 [AllowAnonymous]
 public class SeedController(
     IHttpClientFactory httpClientFactory,
+    IHubContext<NotificationHub> hubContext,
     ILogger<SeedController> logger) : ControllerBase
 {
     private Guid _thailandCountryId;
@@ -87,6 +90,7 @@ public class SeedController(
                 "Company seeded via database seeder. Enterprise tier account with platinum status.", ct);
 
             logger.LogInformation("Successfully seeded 1 company, 1 customer, 2 addresses, and 2 internal notes.");
+            await hubContext.Clients.All.SendAsync("CustomerChanged", cancellationToken: ct);
 
             return Ok(new MalievResponse<object>
             {

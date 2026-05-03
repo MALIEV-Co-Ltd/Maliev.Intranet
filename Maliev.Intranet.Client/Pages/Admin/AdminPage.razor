@@ -5,7 +5,7 @@
 <PageTitle>Admin | MALIEV Intranet</PageTitle>
 
 <div class="mlv-module-shell">
-    <ModuleHeader Title="Admin" Subtitle="Company settings, machines, notifications, and integrations." />
+    <ModuleHeader Title="Admin" Subtitle="Company settings, machines, and notifications." />
 
     <PageBody>
         @if (_loading)
@@ -109,34 +109,11 @@
                 }
             </PanelCard>
         }
-        else
-        {
-            <PanelCard Title="Integrations">
-                <div class="mlv-list">
-                    @foreach (var integration in _integrations)
-                    {
-                        <div class="mlv-list-row">
-                            <div>
-                                <div class="mlv-row-main">@integration.Name</div>
-                                <div class="mlv-row-sub">@integration.Description</div>
-                            </div>
-                            <StatusBadge Status="@integration.Status" />
-                        </div>
-                    }
-                </div>
-            </PanelCard>
-        }
     </PageBody>
 </div>
 
 @code {
-    private readonly string[] _tabs = ["Company", "Machines", "Notifications", "Integrations"];
-    private readonly (string Name, string Description, string Status)[] _integrations =
-    [
-        ("QuickBooks", "Accounting sync", "Pending"),
-        ("Slack", "Team notifications", "Pending"),
-        ("Stripe", "Payment intake", "Pending")
-    ];
+    private readonly string[] _tabs = ["Company", "Machines", "Notifications"];
 
     private string _tab = "Company";
     private List<EquipmentSummaryDto> _equipment = [];

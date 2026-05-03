@@ -1,7 +1,10 @@
 @page "/customers"
+@using Maliev.Intranet.Client.Services
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject ISignalRCustomerService CustomerRealtime
+@implements IAsyncDisposable
 
 <PageTitle>Customers | MALIEV Intranet</PageTitle>
 
@@ -111,8 +114,24 @@
     protected override async Task OnInitializedAsync()
     {
         _search = Search;
+        CustomerRealtime.OnCustomerChanged += OnCustomerChangedAsync;
+        try
+        {
+            await CustomerRealtime.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Realtime customer updates are unavailable.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
         await LoadAsync();
     }
+
+    private Task OnCustomerChangedAsync() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
 
     private async Task OnSearchChanged(string? value)
     {
@@ -153,5 +172,11 @@
         {
             _loading = false;
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        CustomerRealtime.OnCustomerChanged -= OnCustomerChangedAsync;
+        await CustomerRealtime.DisposeAsync();
     }
 }
