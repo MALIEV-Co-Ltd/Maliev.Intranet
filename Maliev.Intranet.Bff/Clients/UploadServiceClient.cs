@@ -298,6 +298,60 @@ public class UploadServiceClient
         var response = await _httpClient.PostAsync(url, null, ct);
         return response.IsSuccessStatusCode;
     }
+
+    /// <summary>
+    /// Copies a GCS object and creates independent UploadService metadata for the copied file.
+    /// </summary>
+    public async Task<CopyFileWithMetadataResponse?> CopyFileWithMetadataAsync(
+        string sourcePath,
+        string destinationPath,
+        string fileName,
+        string serviceName = "Intranet",
+        Dictionary<string, string>? metadata = null,
+        CancellationToken ct = default)
+    {
+        var request = new
+        {
+            sourcePath,
+            destinationPath,
+            fileName,
+            serviceName,
+            metadata
+        };
+
+        var response = await _httpClient.PostAsJsonAsync("/upload/v1/admin/copy-file-with-metadata", request, ct);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        return await response.Content.ReadFromJsonAsync<CopyFileWithMetadataResponse>(cancellationToken: ct);
+    }
+}
+
+/// <summary>
+/// Response from UploadService when a file has been copied with independent metadata.
+/// </summary>
+public class CopyFileWithMetadataResponse
+{
+    /// <summary>Gets or sets the copied file ID.</summary>
+    public string FileId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copied upload ID.</summary>
+    public string UploadId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copied storage path.</summary>
+    public string StoragePath { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copied file name.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copied file size in bytes.</summary>
+    public long SizeBytes { get; set; }
+
+    /// <summary>Gets or sets the copied content type.</summary>
+    public string ContentType { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copy timestamp.</summary>
+    public DateTime UploadedAt { get; set; }
 }
 
 /// <summary>

@@ -305,4 +305,61 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             "MigrateGlbStoragePathAsync: migrated cache entry {OldKey} → {NewKey}, GlbStoragePath {OldGlbPath} → {NewGlbPath}",
             oldKey, $"{CacheKeyPrefix}{newStoragePath}", existing.GlbStoragePath, newGlbViewerPath);
     }
+
+    /// <inheritdoc />
+    public Task CloneStatusAsync(
+        string sourceStoragePath,
+        string destinationStoragePath,
+        string? destinationThumbnailSmallUrl = null,
+        string? destinationThumbnailLargeUrl = null,
+        string? destinationThumbnailSmallGcsPath = null,
+        string? destinationThumbnailLargeGcsPath = null,
+        string? destinationGlbStoragePath = null,
+        string? destinationGlbSignedUrl = null,
+        CancellationToken cancellationToken = default)
+    {
+        var oldKey = $"{CacheKeyPrefix}{sourceStoragePath}";
+        if (!_cache.TryGetValue(oldKey, out FileAnalysisStatusDto? existing) || existing is null)
+        {
+            _logger.LogDebug("CloneStatusAsync: no cache entry found for source key={OldKey}", oldKey);
+            return Task.CompletedTask;
+        }
+
+        var previewUrls = existing.PreviewUrls is null
+            ? null
+            : existing.PreviewUrls with
+            {
+                ThumbnailSmall = destinationThumbnailSmallUrl ?? existing.PreviewUrls.ThumbnailSmall,
+                ThumbnailLargeUrl = destinationThumbnailLargeUrl ?? existing.PreviewUrls.ThumbnailLargeUrl,
+                ThumbnailSmallGcsPath = destinationThumbnailSmallGcsPath ?? existing.PreviewUrls.ThumbnailSmallGcsPath,
+                ThumbnailLargeGcsPath = destinationThumbnailLargeGcsPath ?? existing.PreviewUrls.ThumbnailLargeGcsPath
+            };
+
+        var cloned = new FileAnalysisStatusDto
+        {
+            UploadId = destinationStoragePath,
+            Status = existing.Status,
+            Dimensions = existing.Dimensions,
+            IsManifold = existing.IsManifold,
+            NonManifoldReason = existing.NonManifoldReason,
+            NonManifoldFaceCount = existing.NonManifoldFaceCount,
+            ThumbnailUrl = destinationThumbnailSmallUrl ?? existing.ThumbnailUrl,
+            HiResThumbnailUrl = destinationThumbnailLargeUrl ?? existing.HiResThumbnailUrl,
+            PreviewUrls = previewUrls,
+            GlbStoragePath = destinationGlbStoragePath ?? existing.GlbStoragePath,
+            GlbSignedUrl = destinationGlbSignedUrl ?? existing.GlbSignedUrl,
+            PreviewProcessingStatus = existing.PreviewProcessingStatus,
+            ErrorCode = existing.ErrorCode,
+            ProcessedAt = existing.ProcessedAt,
+            DfmReport = existing.DfmReport,
+        };
+
+        Set(destinationStoragePath, cloned);
+        _logger.LogInformation(
+            "CloneStatusAsync: cloned cache entry {OldKey} to {NewKey}",
+            oldKey,
+            $"{CacheKeyPrefix}{destinationStoragePath}");
+
+        return Task.CompletedTask;
+    }
 }

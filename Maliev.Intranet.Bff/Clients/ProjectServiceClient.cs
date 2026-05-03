@@ -1,5 +1,6 @@
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using System.Text.Json;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -109,6 +110,10 @@ public class ProjectServiceClient(HttpClient httpClient)
         {
             request.FileId,
             request.FileReference,
+            request.ThumbnailSmallGcsPath,
+            request.ThumbnailLargeGcsPath,
+            request.GlbStoragePath,
+            request.OverlayPaths,
             request.FileName,
             ProcessType = MapManufacturingProcess(request.ProcessType),
             request.MaterialId,
@@ -118,6 +123,25 @@ public class ProjectServiceClient(HttpClient httpClient)
             FinishType = request.Finish,
             request.Color,
             request.Tolerance,
+            request.RoughnessCode,
+            MarkingType = request.MarkingType.ToString(),
+            request.MarkingText,
+            request.DfmAcknowledged,
+            request.HasThreadedHoles,
+            request.ThreadedHoleSpec,
+            request.ThreadedHoleCount,
+            request.HasInserts,
+            InsertType = request.InsertType.ToString(),
+            request.InsertCount,
+            request.BagAndTag,
+            InspectionLevel = request.InspectionLevel.ToString(),
+            request.Certificates,
+            request.DrawingFiles,
+            request.SupplementaryFiles,
+            request.ProcessConfig,
+            request.BodyCount,
+            request.BodiesJson,
+            request.SelectedBodyIndex,
             request.VolumeCm3,
             request.SupportVolumeCm3,
             request.SurfaceAreaCm2,
@@ -154,6 +178,29 @@ public class ProjectServiceClient(HttpClient httpClient)
             FinishType = request.Finish,
             request.Color,
             request.Tolerance,
+            request.RoughnessCode,
+            MarkingType = request.MarkingType.ToString(),
+            request.MarkingText,
+            request.DfmAcknowledged,
+            request.HasThreadedHoles,
+            request.ThreadedHoleSpec,
+            request.ThreadedHoleCount,
+            request.HasInserts,
+            InsertType = request.InsertType.ToString(),
+            request.InsertCount,
+            request.BagAndTag,
+            InspectionLevel = request.InspectionLevel.ToString(),
+            request.Certificates,
+            request.DrawingFiles,
+            request.SupplementaryFiles,
+            request.ProcessConfig,
+            request.ThumbnailSmallGcsPath,
+            request.ThumbnailLargeGcsPath,
+            request.GlbStoragePath,
+            request.OverlayPaths,
+            request.BodyCount,
+            request.BodiesJson,
+            request.SelectedBodyIndex,
         };
 
         return await httpClient.PutAsJsonAsync($"/project/v1/projects/{projectId}/parts/{partId}", payload, ct);
@@ -401,6 +448,14 @@ public class ProjectServiceClient(HttpClient httpClient)
 
         public string? ModelPreviewUrl { get; set; }
 
+        public string? ThumbnailSmallGcsPath { get; set; }
+
+        public string? ThumbnailLargeGcsPath { get; set; }
+
+        public string? GlbStoragePath { get; set; }
+
+        public Dictionary<string, string> OverlayPaths { get; set; } = [];
+
         public string? ProcessType { get; set; }
 
         public Guid? MaterialId { get; set; }
@@ -418,6 +473,44 @@ public class ProjectServiceClient(HttpClient httpClient)
         public string? Color { get; set; }
 
         public string? Tolerance { get; set; }
+
+        public string? RoughnessCode { get; set; }
+
+        public JsonElement? MarkingType { get; set; }
+
+        public string? MarkingText { get; set; }
+
+        public bool DfmAcknowledged { get; set; }
+
+        public bool HasThreadedHoles { get; set; }
+
+        public string? ThreadedHoleSpec { get; set; }
+
+        public int ThreadedHoleCount { get; set; }
+
+        public bool HasInserts { get; set; }
+
+        public JsonElement? InsertType { get; set; }
+
+        public int InsertCount { get; set; }
+
+        public bool BagAndTag { get; set; } = true;
+
+        public JsonElement? InspectionLevel { get; set; }
+
+        public List<string> Certificates { get; set; } = [];
+
+        public List<ProjectPartAttachmentDto> DrawingFiles { get; set; } = [];
+
+        public List<ProjectPartAttachmentDto> SupplementaryFiles { get; set; } = [];
+
+        public Dictionary<string, string> ProcessConfig { get; set; } = [];
+
+        public int? BodyCount { get; set; }
+
+        public string? BodiesJson { get; set; }
+
+        public int? SelectedBodyIndex { get; set; }
 
         public decimal? AiSuggestedPrice { get; set; }
 
@@ -479,6 +572,10 @@ public class ProjectServiceClient(HttpClient httpClient)
                 Status = Status,
                 ModelPreviewUrl = previewUrl,
                 ThumbnailUrl = ThumbnailUrl,
+                ThumbnailSmallGcsPath = ThumbnailSmallGcsPath,
+                ThumbnailLargeGcsPath = ThumbnailLargeGcsPath,
+                GlbStoragePath = GlbStoragePath,
+                OverlayPaths = new Dictionary<string, string>(OverlayPaths),
                 Dimensions = BoundingBoxX.HasValue || BoundingBoxY.HasValue || BoundingBoxZ.HasValue
                     ? new ModelDimensionsDto
                     {
@@ -488,6 +585,25 @@ public class ProjectServiceClient(HttpClient httpClient)
                     }
                     : null,
                 IsManifold = IsManifold,
+                RoughnessCode = RoughnessCode,
+                MarkingType = ParseEnumOrDefault(MarkingType, PartMarkingType.None),
+                MarkingText = MarkingText,
+                DfmAcknowledged = DfmAcknowledged,
+                HasThreadedHoles = HasThreadedHoles,
+                ThreadedHoleSpec = ThreadedHoleSpec,
+                ThreadedHoleCount = ThreadedHoleCount,
+                HasInserts = HasInserts,
+                InsertType = ParseEnumOrDefault(InsertType, Maliev.Intranet.Shared.InsertType.None),
+                InsertCount = InsertCount,
+                BagAndTag = BagAndTag,
+                InspectionLevel = ParseEnumOrDefault(InspectionLevel, Maliev.Intranet.Shared.InspectionLevel.Standard),
+                Certificates = [.. Certificates],
+                DrawingFiles = [.. DrawingFiles],
+                SupplementaryFiles = [.. SupplementaryFiles],
+                ProcessConfig = new Dictionary<string, string>(ProcessConfig),
+                BodyCount = BodyCount,
+                BodiesJson = BodiesJson,
+                SelectedBodyIndex = SelectedBodyIndex,
                 JobId = JobId,
                 JobStatus = JobStatus,
                 JobProgressPercent = JobProgressPercent,
@@ -504,6 +620,29 @@ public class ProjectServiceClient(HttpClient httpClient)
 
     private static string? FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+    private static TEnum ParseEnumOrDefault<TEnum>(string? value, TEnum defaultValue)
+        where TEnum : struct, Enum
+    {
+        return Enum.TryParse<TEnum>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            : defaultValue;
+    }
+
+    private static TEnum ParseEnumOrDefault<TEnum>(JsonElement? value, TEnum defaultValue)
+        where TEnum : struct, Enum
+    {
+        if (value is null)
+            return defaultValue;
+
+        return value.Value.ValueKind switch
+        {
+            JsonValueKind.String => ParseEnumOrDefault(value.Value.GetString(), defaultValue),
+            JsonValueKind.Number when value.Value.TryGetInt32(out var numeric) && Enum.IsDefined(typeof(TEnum), numeric) =>
+                (TEnum)Enum.ToObject(typeof(TEnum), numeric),
+            _ => defaultValue
+        };
+    }
 
     private static string? ResolveQuotationStatus(string status, string? explicitStatus, Guid? quotationId)
     {
