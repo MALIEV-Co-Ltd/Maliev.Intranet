@@ -510,6 +510,220 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task DuplicateProjectAsync_WhenServerDraftExists_PreservesCustomerConfigSelectionsAndFiles()
+    {
+        var sourceProjectId = Guid.NewGuid();
+        var duplicatedProjectId = Guid.NewGuid();
+        var sourcePartId = Guid.NewGuid();
+        var duplicatedPartId = Guid.NewGuid();
+        var sourceFileId = Guid.NewGuid();
+        var duplicatedFileId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var processId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+        string? duplicateBody = null;
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            if (path == $"/api/v1/projects/{sourceProjectId}" && request.Method == HttpMethod.Put)
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+
+            if (path == $"/api/v1/projects/{sourceProjectId}/parts/{sourcePartId}" && request.Method == HttpMethod.Put)
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+
+            if (path == $"/api/v1/projects/{sourceProjectId}/duplicate" && request.Method == HttpMethod.Post)
+            {
+                duplicateBody = await request.Content!.ReadAsStringAsync(ct);
+                var duplicated = new ProjectDetailDto
+                {
+                    Id = duplicatedProjectId,
+                    CustomerId = customerId,
+                    CustomerName = "MaliEV Manufacturing",
+                    Title = "Repeat bracket (Copy)",
+                    Status = "Draft",
+                    Currency = "THB",
+                    Parts =
+                    [
+                        new ProjectPartDto
+                        {
+                            Id = duplicatedPartId,
+                            FileId = duplicatedFileId,
+                            FileReference = "customers/customer-1/projects/copied/bracket.stl",
+                            FileName = "bracket.stl",
+                            ProcessType = "CNC_MILL",
+                            MaterialId = materialId,
+                            MaterialCode = "AL6061",
+                            Quantity = 6,
+                            Finish = "BEAD_BLAST",
+                            Tolerance = "ISO2768_M",
+                            ThumbnailUrl = "https://signed.example/thumb.webp",
+                            ThumbnailSmallGcsPath = "customers/customer-1/projects/copied/thumb-small.webp",
+                            ThumbnailLargeGcsPath = "customers/customer-1/projects/copied/thumb-large.webp",
+                            GlbStoragePath = "customers/customer-1/projects/copied/viewer.glb",
+                            ModelPreviewUrl = "https://signed.example/viewer.glb",
+                            OverlayPaths = new Dictionary<string, string>
+                            {
+                                ["CNC__sharp_corner"] = "customers/customer-1/projects/copied/overlays/sharp.glb"
+                            },
+                            RoughnessCode = "RA_1_6",
+                            MarkingType = PartMarkingType.Laser,
+                            MarkingText = "LOT-42",
+                            DfmAcknowledged = true,
+                            HasThreadedHoles = true,
+                            ThreadedHoleSpec = "M4",
+                            ThreadedHoleCount = 2,
+                            HasInserts = true,
+                            InsertType = InsertType.HeatSet,
+                            InsertCount = 2,
+                            BagAndTag = false,
+                            InspectionLevel = InspectionLevel.Dimensional,
+                            Certificates = ["MaterialCert"],
+                            DrawingFiles =
+                            [
+                                new ProjectPartAttachmentDto
+                                {
+                                    FileId = Guid.NewGuid(),
+                                    FileName = "bracket-drawing.pdf",
+                                    StoragePath = "customers/customer-1/projects/copied/drawings/bracket-drawing.pdf",
+                                    ContentType = "application/pdf",
+                                    SizeBytes = 2048,
+                                    UploadedAt = DateTime.UtcNow
+                                }
+                            ],
+                            SupplementaryFiles =
+                            [
+                                new ProjectPartAttachmentDto
+                                {
+                                    FileId = Guid.NewGuid(),
+                                    FileName = "readme.txt",
+                                    StoragePath = "customers/customer-1/projects/copied/supplementary/readme.txt",
+                                    ContentType = "text/plain",
+                                    SizeBytes = 128,
+                                    UploadedAt = DateTime.UtcNow
+                                }
+                            ],
+                            ProcessConfig = new Dictionary<string, string>
+                            {
+                                ["deburring"] = "standard"
+                            },
+                            BodyCount = 1,
+                            BodiesJson = "[{\"index\":0,\"name\":\"Body_01\",\"volumeCm3\":12.5,\"bboxMin\":[0,0,0],\"bboxMax\":[10,20,30],\"colorHex\":\"#4488CC\"}]",
+                            SelectedBodyIndex = 0
+                        }
+                    ],
+                };
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(duplicated), Encoding.UTF8, "application/json")
+                };
+            }
+
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        SetPrivateField(cut.Instance, "_serverProjectId", (Guid?)sourceProjectId);
+        SetPrivateField(cut.Instance, "_title", "Repeat bracket");
+        SetPrivateField(cut.Instance, "_selectedCustomer", new CustomerSummaryDto
+        {
+            Id = customerId,
+            Name = "MaliEV Manufacturing",
+            Email = "orders@example.test",
+        });
+        SetPrivateField(cut.Instance, "_selectedLeadTime", new LeadTimeOptionDto("STANDARD", "Standard", 7, 10, 1m, true));
+        SetPrivateField(cut.Instance, "_processes", new List<ProcessDto>
+        {
+            new(processId, "CNC_MILL", "CNC Milling", null, 10),
+        });
+        GetParts(cut.Instance).Add(new PartViewModel
+        {
+            FileId = sourceFileId,
+            ServerPartId = sourcePartId,
+            Name = "bracket.stl",
+            StoragePath = "customers/customer-1/projects/source/bracket.stl",
+            ProcessId = processId,
+            ProcessCode = "CNC_MILL",
+            MaterialId = materialId,
+            MaterialCode = "AL6061",
+            Quantity = 6,
+            FinishCode = "BEAD_BLAST",
+            ToleranceCode = "ISO2768_M",
+            RoughnessCode = "RA_1_6",
+            MarkingType = PartMarkingType.Laser,
+            MarkingText = "LOT-42",
+            DfmAcknowledged = true,
+            HasThreadedHoles = true,
+            ThreadedHoleSpec = "M4",
+            ThreadedHoleCount = 2,
+            HasInserts = true,
+            InsertType = InsertType.HeatSet,
+            InsertCount = 2,
+            BagAndTag = false,
+            InspectionLevel = InspectionLevel.Dimensional,
+            Certificates = ["MaterialCert"],
+            ProcessOptionValues = new Dictionary<string, string?> { ["deburring"] = "standard" },
+            DrawingFiles =
+            [
+                new DraftProjectAttachmentDto
+                {
+                    FileId = Guid.NewGuid(),
+                    Name = "bracket-drawing.pdf",
+                    StoragePath = "customers/customer-1/projects/source/drawings/bracket-drawing.pdf",
+                    FileType = "application/pdf",
+                    FileSizeBytes = 2048,
+                    Kind = DraftAttachmentKind.Drawing
+                }
+            ],
+        });
+
+        await InvokePrivateTaskAsync(cut, "DuplicateProjectAsync");
+
+        Assert.NotNull(duplicateBody);
+        using (var requestJson = JsonDocument.Parse(duplicateBody))
+        {
+            Assert.Equal("Repeat bracket (Copy)", requestJson.RootElement.GetProperty("title").GetString());
+        }
+
+        Assert.Equal(duplicatedProjectId, GetPrivateField<Guid>(cut.Instance, "_serverProjectId"));
+        var selectedCustomer = GetPrivateField<CustomerSummaryDto?>(cut.Instance, "_selectedCustomer");
+        Assert.Equal(customerId, selectedCustomer?.Id);
+
+        var duplicatedPart = Assert.Single(GetParts(cut.Instance));
+        Assert.Equal(duplicatedPartId, duplicatedPart.ServerPartId);
+        Assert.Equal(duplicatedFileId, duplicatedPart.FileId);
+        Assert.Equal("customers/customer-1/projects/copied/bracket.stl", duplicatedPart.StoragePath);
+        Assert.Equal("CNC_MILL", duplicatedPart.ProcessCode);
+        Assert.Equal(processId, duplicatedPart.ProcessId);
+        Assert.Equal(materialId, duplicatedPart.MaterialId);
+        Assert.Equal("RA_1_6", duplicatedPart.RoughnessCode);
+        Assert.Equal(PartMarkingType.Laser, duplicatedPart.MarkingType);
+        Assert.True(duplicatedPart.DfmAcknowledged);
+        Assert.True(duplicatedPart.HasThreadedHoles);
+        Assert.True(duplicatedPart.HasInserts);
+        Assert.False(duplicatedPart.BagAndTag);
+        Assert.Equal(InspectionLevel.Dimensional, duplicatedPart.InspectionLevel);
+        Assert.Equal("MaterialCert", Assert.Single(duplicatedPart.Certificates));
+        Assert.Equal("bracket-drawing.pdf", Assert.Single(duplicatedPart.DrawingFiles).Name);
+        Assert.Equal("readme.txt", Assert.Single(duplicatedPart.SupplementaryFiles).Name);
+        Assert.Equal("deburring", Assert.Single(duplicatedPart.ProcessOptionValues).Key);
+        Assert.Equal("customers/customer-1/projects/copied/thumb-small.webp", duplicatedPart.ThumbnailSmallGcsPath);
+        Assert.Equal("customers/customer-1/projects/copied/viewer.glb", duplicatedPart.GlbStoragePath);
+        Assert.Equal("customers/customer-1/projects/copied/overlays/sharp.glb", duplicatedPart.OverlayPaths?["CNC__sharp_corner"]);
+        Assert.Equal(1, duplicatedPart.BodyCount);
+        Assert.Equal(0, duplicatedPart.SelectedBodyIndex);
+        Assert.Single(duplicatedPart.Bodies);
+
+        var snackbar = Services.GetRequiredService<ISnackbar>();
+        Assert.Contains(snackbar.ShownSnackbars, item => item.Message == "Project duplicated.");
+        Assert.DoesNotContain(snackbar.ShownSnackbars, item =>
+            item.Message?.Contains("re-upload", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
     public void ResumeFromServerAsync_WhenApiReturns404_ComponentRendersWithoutError()
     {
         _httpHandler.HandlerFunc = (request, ct) =>
