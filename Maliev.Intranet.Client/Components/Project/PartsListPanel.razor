@@ -46,17 +46,18 @@
                 @* Row 1: thumb + info *@
                 <div class="plp-part-main">
                     <div class="plp-thumb">
-                        @if ((part.Uploading || part.QueuedUpload || part.AwaitingPreview) && part.ProgressPercent > 0)
+                        @if (part.QueuedUpload)
+                        {
+                            <PartQueueLoader Class="part-queue-loader--thumb" />
+                        }
+                        else if (part.Uploading)
                         {
                             <MudProgressCircular Size="Size.Small" Indeterminate="false" Value="@part.ProgressPercent"
                                                  Color="Color.Primary" />
                         }
-                        else if (part.Uploading || part.QueuedUpload || part.AwaitingPreview)
+                        else if (part.AwaitingPreview)
                         {
-                            <MudSkeleton SkeletonType="SkeletonType.Rectangle"
-                                         Width="100%"
-                                         Height="100%"
-                                         Animation="Animation.Wave" />
+                            <PartProcessingLoader Class="part-processing-loader--thumb" />
                         }
                         else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
                         {

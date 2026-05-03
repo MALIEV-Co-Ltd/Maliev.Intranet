@@ -165,10 +165,21 @@
                 @if (Part.QueuedUpload || Part.Uploading || Part.AwaitingPreview)
                 {
                     <div class="pdc-upload-progress">
-                        <MudProgressCircular Indeterminate="@(!Part.Uploading)"
-                                             Value="@Part.ProgressPercent"
-                                             Size="Size.Small"
-                                             Class="mb-2" />
+                        @if (Part.QueuedUpload)
+                        {
+                            <PartQueueLoader Class="part-queue-loader--canvas" />
+                        }
+                        else if (Part.Uploading)
+                        {
+                            <MudProgressCircular Indeterminate="false"
+                                                 Value="@Part.ProgressPercent"
+                                                 Size="Size.Medium"
+                                                 Class="mb-2" />
+                        }
+                        else
+                        {
+                            <PartProcessingLoader Class="part-processing-loader--canvas" />
+                        }
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@Part.StatusText</MudText>
                     </div>
                 }

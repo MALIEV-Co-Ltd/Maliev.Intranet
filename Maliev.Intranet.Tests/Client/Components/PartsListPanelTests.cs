@@ -28,7 +28,7 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
-    public void PartsListPanel_AwaitingPreviewWithoutThumbnail_ShowsSkeletonInsteadOfSpinnerOrFallbackIcon()
+    public void PartsListPanel_AwaitingPreviewWithoutThumbnail_ShowsProcessingLoaderInsteadOfSpinnerOrFallbackIcon()
     {
         var parts = new List<PartViewModel>
         {
@@ -44,13 +44,14 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
             .Add(p => p.Title, "Test quote")
             .Add(p => p.Parts, parts));
 
-        Assert.NotEmpty(cut.FindAll(".plp-thumb .mud-skeleton"));
+        Assert.NotEmpty(cut.FindAll(".plp-thumb .part-processing-loader"));
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-skeleton"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-progress-circular"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
     }
 
     [Fact]
-    public void PartsListPanel_QueuedUploadBeforeProgress_ShowsSkeletonInsteadOfSpinnerOrFallbackIcon()
+    public void PartsListPanel_QueuedUploadBeforeProgress_ShowsQueueLoaderInsteadOfSpinnerOrFallbackIcon()
     {
         var parts = new List<PartViewModel>
         {
@@ -65,13 +66,14 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
             .Add(p => p.Title, "Test quote")
             .Add(p => p.Parts, parts));
 
-        Assert.NotEmpty(cut.FindAll(".plp-thumb .mud-skeleton"));
+        Assert.NotEmpty(cut.FindAll(".plp-thumb .part-queue-loader"));
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-skeleton"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-progress-circular"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
     }
 
     [Fact]
-    public void PartsListPanel_UploadingBeforeFirstProgress_ShowsSkeletonInsteadOfSpinnerOrFallbackIcon()
+    public void PartsListPanel_UploadingBeforeFirstProgress_ShowsDeterminateUploadProgress()
     {
         var parts = new List<PartViewModel>
         {
@@ -87,8 +89,11 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
             .Add(p => p.Title, "Test quote")
             .Add(p => p.Parts, parts));
 
-        Assert.NotEmpty(cut.FindAll(".plp-thumb .mud-skeleton"));
-        Assert.Empty(cut.FindAll(".plp-thumb .mud-progress-circular"));
+        var progress = cut.Find(".plp-thumb .mud-progress-circular");
+
+        Assert.Equal("0", progress.GetAttribute("aria-valuenow"));
+        Assert.DoesNotContain("mud-progress-circular-indeterminate", progress.ClassList);
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-skeleton"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
     }
 
@@ -110,10 +115,8 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
             .Add(p => p.Title, "Test quote")
             .Add(p => p.Parts, parts));
 
-        var progress = cut.Find(".plp-thumb .mud-progress-circular");
-
-        Assert.Equal("100", progress.GetAttribute("aria-valuenow"));
-        Assert.DoesNotContain("mud-progress-circular-indeterminate", progress.ClassList);
+        Assert.NotEmpty(cut.FindAll(".plp-thumb .part-processing-loader"));
+        Assert.Empty(cut.FindAll(".plp-thumb .mud-progress-circular"));
     }
 
     [Fact]

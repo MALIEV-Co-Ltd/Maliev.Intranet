@@ -1,0 +1,50 @@
+.part-queue-loader {
+    --queue-size: 32px;
+    --queue-border: calc(var(--queue-size) * 0.125);
+    --queue-dot: calc(var(--queue-size) * 0.25);
+    --queue-ink: var(--maliev-ink);
+    --queue-cutout: var(--maliev-panel);
+    width: var(--queue-size);
+    aspect-ratio: 1;
+    border: var(--queue-border) solid var(--queue-ink);
+    box-sizing: border-box;
+    background:
+        radial-gradient(farthest-side, var(--queue-cutout) 98%, transparent) 50% / var(--queue-dot) var(--queue-dot),
+        radial-gradient(farthest-side, var(--queue-cutout) 98%, transparent) 50% / var(--queue-dot) var(--queue-dot),
+        radial-gradient(farthest-side, var(--queue-cutout) 98%, transparent) 50% / var(--queue-dot) var(--queue-dot),
+        radial-gradient(farthest-side, var(--queue-cutout) 98%, transparent) 50% / var(--queue-dot) var(--queue-dot),
+        radial-gradient(farthest-side, var(--queue-cutout) 98%, transparent) 50% / var(--queue-dot) var(--queue-dot),
+        linear-gradient(var(--queue-cutout) 0 0) 50% / 100% var(--queue-border),
+        linear-gradient(var(--queue-cutout) 0 0) 50% / var(--queue-border) 100%,
+        var(--queue-ink);
+    background-repeat: no-repeat;
+    filter: blur(2px) contrast(10);
+    animation: part-queue-loader 0.8s infinite;
+}
+
+.part-queue-loader--thumb {
+    --queue-size: 32px;
+}
+
+.part-queue-loader--canvas {
+    --queue-size: clamp(52px, 9vmin, 92px);
+}
+
+@keyframes part-queue-loader {
+    100% {
+        background-position:
+            50% calc(var(--queue-dot) * -1),
+            calc(var(--queue-dot) * -1) 50%,
+            calc(100% - var(--queue-dot)) 50%,
+            50% calc(100% - var(--queue-dot)),
+            50%,
+            50%,
+            50%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .part-queue-loader {
+        animation: none;
+    }
+}
