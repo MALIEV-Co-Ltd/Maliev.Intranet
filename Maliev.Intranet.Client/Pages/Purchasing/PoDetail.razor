@@ -61,8 +61,8 @@
                     <dl class="mlv-detail-list">
                         <dt>Type</dt><dd>@Display(_order.OrderType)</dd>
                         <dt>Status</dt><dd>@Display(_order.Status)</dd>
-                        <dt>Supplier ID</dt><dd class="mlv-mono">@_order.SupplierId</dd>
-                        <dt>Source order</dt><dd class="mlv-mono">@_order.OrderId</dd>
+                        <dt>Supplier</dt><dd>@Display(_order.SupplierName)</dd>
+                        <dt>Source order</dt><dd>@Display(_order.SourceOrderId ?? (_order.OrderId > 0 ? _order.OrderId.ToString() : null))</dd>
                         <dt>Customer PO</dt><dd>@Display(_order.CustomerPo)</dd>
                         <dt>Currency</dt><dd>@Display(_order.CurrencyCode)</dd>
                         <dt>WHT</dt><dd>@((_order.WhtRate ?? 0).ToString("N2"))%</dd>
@@ -88,7 +88,6 @@
                         <thead>
                             <tr>
                                 <th>Item</th>
-                                <th>External ID</th>
                                 <th>Qty</th>
                                 <th>Unit</th>
                                 <th>Unit price</th>
@@ -103,7 +102,6 @@
                                         <div class="mlv-row-main">@Display(item.ProductName)</div>
                                         <div class="mlv-row-sub mlv-mono">@Display(item.ProductCode)</div>
                                     </td>
-                                    <td class="mlv-mono">@item.ExternalOrderItemId</td>
                                     <td>@item.Quantity.ToString("N2")</td>
                                     <td>@Display(item.UnitOfMeasure)</td>
                                     <td class="mlv-mono">@item.UnitPrice.ToString("N2")</td>
