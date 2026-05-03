@@ -80,6 +80,33 @@
             </div>
         </section>
 
+        @if (RequiresDedicatedMaterialColorSelection)
+        {
+            @* ── Material Color ───────────────────────────────────────────── *@
+            <section class="pcs-section">
+                <div class="pcs-section-header">
+                    <span class="pcs-section-title">Material Color</span>
+                    <span class="pcs-section-count">@PomMaterialColors.Count options</span>
+                </div>
+                <div class="pcs-color-choice-grid">
+                    @foreach (var color in PomMaterialColors)
+                    {
+                        var currentColor = GetProcessOptionValue(MaterialColorKey, PomMaterialColors[0]);
+                        var active = string.Equals(currentColor, color, StringComparison.OrdinalIgnoreCase);
+                        <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
+                                @onclick="@(() => OnMaterialColorChanged(color))">
+                            <span class="pcs-color-chip" style="background: @GetOptionColor(color)" />
+                            <span>@color</span>
+                            @if (active)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            }
+                        </button>
+                    }
+                </div>
+            </section>
+        }
+
         @* ── Surface Finish ───────────────────────────────────────────── *@
         <section class="pcs-section">
             @{

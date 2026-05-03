@@ -44,6 +44,15 @@ public sealed class DraftProjectState
     /// <summary>The selected currency code (e.g. "THB", "USD"). Null restores the primary default.</summary>
     public string? SelectedCurrencyCode { get; set; }
 
+    /// <summary>Shipping cost entered for draft quotation PDF generation.</summary>
+    public decimal ShippingCost { get; set; }
+
+    /// <summary>Manual discount entered for draft quotation PDF generation.</summary>
+    public decimal ManualDiscountAmount { get; set; }
+
+    /// <summary>Customer-facing quotation terms entered on the project page.</summary>
+    public string? QuotationTerms { get; set; }
+
     /// <summary>Timestamp of the last modification to this draft.</summary>
     public DateTime LastModified { get; set; }
 

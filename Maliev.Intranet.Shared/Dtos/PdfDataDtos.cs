@@ -95,6 +95,12 @@ public class QuotationPdfData
     /// <summary>Total discount amount applied to the quotation.</summary>
     public decimal TotalDiscount { get; set; }
 
+    /// <summary>Manual discount amount entered for this quotation.</summary>
+    public decimal ManualDiscountAmount { get; set; }
+
+    /// <summary>Shipping or delivery cost applied to the quotation.</summary>
+    public decimal ShippingCost { get; set; }
+
     /// <summary>Subtotal after discounts and before tax.</summary>
     public decimal Subtotal { get; set; }
 
@@ -154,6 +160,9 @@ public class QuotationPdfItem
 
     /// <summary>Additional notes shown below the material or service name.</summary>
     public string? Notes { get; set; }
+
+    /// <summary>Optional thumbnail image URL for the quoted part.</summary>
+    public string? ThumbnailUrl { get; set; }
 
     /// <summary>Backward-compatible alias for older callers.</summary>
     [JsonPropertyName("description")]

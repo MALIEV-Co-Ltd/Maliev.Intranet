@@ -34,6 +34,9 @@ public partial class ProjectNew : IAsyncDisposable
     private List<LeadTimeOptionDto> _leadTimeCatalogOptions = [];
     private List<LeadTimeOptionDto> _leadTimeOptions = [];
     private LeadTimeOptionDto? _selectedLeadTime;
+    private decimal _shippingCost;
+    private decimal _manualDiscountAmount;
+    private string? _quotationTerms;
     private List<ProcessDto> _processes = [];
     private bool _saving;
     private bool _autoSaving;
@@ -1368,6 +1371,79 @@ public partial class ProjectNew : IAsyncDisposable
     /// </summary>
     private bool _projectLocked;
 
+    private AddProjectPartRequest? BuildAddProjectPartRequest(PartViewModel part)
+    {
+        var processCode = ResolvePartProcessCode(part);
+        if (string.IsNullOrWhiteSpace(processCode))
+            return null;
+
+        part.ProcessCode ??= processCode;
+
+        return new AddProjectPartRequest
+        {
+            FileId = part.FileId,
+            FileReference = part.StoragePath,
+            FileName = part.Name,
+            ProcessType = processCode,
+            MaterialId = part.MaterialId,
+            Quantity = part.Quantity,
+            Finish = part.FinishCode,
+            Color = ResolvePartColor(part),
+            Tolerance = part.ToleranceCode,
+            RoughnessCode = part.RoughnessCode,
+            HasThreadedHoles = part.HasThreadedHoles,
+            ThreadedHoleSpec = part.ThreadedHoleSpec,
+            ThreadedHoleCount = part.ThreadedHoleCount,
+            HasInserts = part.HasInserts,
+            InsertType = part.InsertType,
+            InsertCount = part.InsertCount,
+            BagAndTag = part.BagAndTag,
+            InspectionLevel = part.InspectionLevel,
+        };
+    }
+
+    private UpdateProjectPartRequest? BuildUpdateProjectPartRequest(PartViewModel part)
+    {
+        var processCode = ResolvePartProcessCode(part);
+        if (string.IsNullOrWhiteSpace(processCode))
+            return null;
+
+        part.ProcessCode ??= processCode;
+
+        return new UpdateProjectPartRequest
+        {
+            ProcessType = processCode,
+            MaterialId = part.MaterialId,
+            Quantity = part.Quantity,
+            Finish = part.FinishCode,
+            Color = ResolvePartColor(part),
+            Tolerance = part.ToleranceCode,
+        };
+    }
+
+    private string? ResolvePartProcessCode(PartViewModel part)
+    {
+        if (!string.IsNullOrWhiteSpace(part.ProcessCode))
+            return part.ProcessCode;
+
+        return part.ProcessId.HasValue
+            ? _processes.FirstOrDefault(process => process.Id == part.ProcessId.Value)?.Code
+            : null;
+    }
+
+    private static string? ResolvePartColor(PartViewModel part)
+    {
+        foreach (var key in new[] { "paint_color_reference", "paint_color", "paint_colour", "material_color", "material_colour", "plastic_color", "plastic_colour", "anodize_color", "anodise_color" })
+        {
+            if (part.ProcessOptionValues.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return part.ProcessOptionValues.TryGetValue("paint_color_hex", out var hex) && !string.IsNullOrWhiteSpace(hex)
+            ? hex
+            : null;
+    }
+
     private async Task SaveDraftAsync()
     {
         _autoSaving = true;
@@ -1389,6 +1465,9 @@ public partial class ProjectNew : IAsyncDisposable
                 CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
                 SelectedLeadTimeCode = _selectedLeadTime?.Code ?? "STANDARD",
                 SelectedCurrencyCode = CurrencyService.Code,
+                ShippingCost = _shippingCost,
+                ManualDiscountAmount = _manualDiscountAmount,
+                QuotationTerms = _quotationTerms,
                 LastModified = DateTime.UtcNow,
                 Parts = _parts.Select(p => p.ToDraftPartState()).ToList(),
             };
@@ -1444,17 +1523,10 @@ public partial class ProjectNew : IAsyncDisposable
                         {
                             try
                             {
-                                var addPartRequest = new AddProjectPartRequest
-                                {
-                                    FileId = part.FileId,
-                                    FileReference = part.StoragePath,
-                                    FileName = part.Name,
-                                    ProcessType = part.ProcessCode,
-                                    MaterialId = part.MaterialId,
-                                    Quantity = part.Quantity,
-                                    Finish = part.FinishCode,
-                                    Tolerance = part.ToleranceCode,
-                                };
+                                var addPartRequest = BuildAddProjectPartRequest(part);
+                                if (addPartRequest == null)
+                                    continue;
+
                                 var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{_serverProjectId}/parts", addPartRequest);
                                 if (partResponse.IsSuccessStatusCode)
                                 {
@@ -1485,6 +1557,9 @@ public partial class ProjectNew : IAsyncDisposable
                             CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
                             SelectedLeadTimeCode = _selectedLeadTime?.Code ?? "STANDARD",
                             SelectedCurrencyCode = CurrencyService.Code,
+                            ShippingCost = _shippingCost,
+                            ManualDiscountAmount = _manualDiscountAmount,
+                            QuotationTerms = _quotationTerms,
                             LastModified = DateTime.UtcNow,
                             Parts = _parts.Select(p => p.ToDraftPartState()).ToList(),
                         };
@@ -1505,17 +1580,10 @@ public partial class ProjectNew : IAsyncDisposable
                         // Parts not yet synced to the server need to be created first
                         if (!part.ServerPartId.HasValue)
                         {
-                            var addPartRequest = new AddProjectPartRequest
-                            {
-                                FileId = part.FileId,
-                                FileReference = part.StoragePath,
-                                FileName = part.Name,
-                                ProcessType = part.ProcessCode,
-                                MaterialId = part.MaterialId,
-                                Quantity = part.Quantity,
-                                Finish = part.FinishCode,
-                                Tolerance = part.ToleranceCode,
-                            };
+                            var addPartRequest = BuildAddProjectPartRequest(part);
+                            if (addPartRequest == null)
+                                continue;
+
                             var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{_serverProjectId}/parts", addPartRequest);
                             if (partResponse.IsSuccessStatusCode)
                             {
@@ -1529,14 +1597,10 @@ public partial class ProjectNew : IAsyncDisposable
                             continue;
                         }
 
-                        var partRequest = new UpdateProjectPartRequest
-                        {
-                            ProcessType = part.ProcessCode,
-                            MaterialId = part.MaterialId,
-                            Quantity = part.Quantity,
-                            Finish = part.FinishCode,
-                            Tolerance = part.ToleranceCode,
-                        };
+                        var partRequest = BuildUpdateProjectPartRequest(part);
+                        if (partRequest == null)
+                            continue;
+
                         await Http.PutAsJsonAsync(
                             $"api/v1/projects/{_serverProjectId}/parts/{part.ServerPartId}",
                             partRequest);
@@ -1583,6 +1647,9 @@ public partial class ProjectNew : IAsyncDisposable
             _tempProjectId = draft.TempProjectId;
             _serverProjectId = draft.ServerProjectId;
             _title = draft.Title;
+            _shippingCost = Math.Max(0m, draft.ShippingCost);
+            _manualDiscountAmount = Math.Max(0m, draft.ManualDiscountAmount);
+            _quotationTerms = draft.QuotationTerms;
             _selectedLeadTime = string.IsNullOrEmpty(draft.SelectedLeadTimeCode)
                 ? null
                 : _leadTimeOptions.FirstOrDefault(lt => lt.Code == draft.SelectedLeadTimeCode);
@@ -1760,7 +1827,11 @@ public partial class ProjectNew : IAsyncDisposable
                 nowUtc,
                 ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
                 _parts,
-                _processes);
+                _processes,
+                _quotationTerms,
+                _shippingCost,
+                _manualDiscountAmount,
+                CurrencyService.ExchangeRate);
 
             var response = await Http.PostAsJsonAsync("api/v1/quotations/draft-pdf", pdfData);
             if (response.IsSuccessStatusCode)
@@ -1826,17 +1897,9 @@ public partial class ProjectNew : IAsyncDisposable
 
                 foreach (var part in _parts.Where(p => p.IsFullyConfigured && !string.IsNullOrEmpty(p.StoragePath) && !p.ServerPartId.HasValue))
                 {
-                    var addPartRequest = new AddProjectPartRequest
-                    {
-                        FileId = part.FileId,
-                        FileReference = part.StoragePath,
-                        FileName = part.Name,
-                        ProcessType = part.ProcessCode,
-                        MaterialId = part.MaterialId,
-                        Quantity = part.Quantity,
-                        Finish = part.FinishCode,
-                        Tolerance = part.ToleranceCode,
-                    };
+                    var addPartRequest = BuildAddProjectPartRequest(part);
+                    if (addPartRequest == null)
+                        continue;
 
                     try
                     {
@@ -1880,17 +1943,9 @@ public partial class ProjectNew : IAsyncDisposable
 
                 foreach (var part in _parts.Where(p => p.IsFullyConfigured))
                 {
-                    var addPartRequest = new AddProjectPartRequest
-                    {
-                        FileId = part.FileId,
-                        FileReference = part.StoragePath,
-                        FileName = part.Name,
-                        ProcessType = part.ProcessCode,
-                        MaterialId = part.MaterialId,
-                        Quantity = part.Quantity,
-                        Finish = part.FinishCode,
-                        Tolerance = part.ToleranceCode,
-                    };
+                    var addPartRequest = BuildAddProjectPartRequest(part);
+                    if (addPartRequest == null)
+                        continue;
 
                     using var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addPartRequest);
                     if (partResponse.IsSuccessStatusCode)

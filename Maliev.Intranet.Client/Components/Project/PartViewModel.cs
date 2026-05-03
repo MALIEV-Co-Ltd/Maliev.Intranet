@@ -428,6 +428,9 @@ public class PartViewModel
         // Persist pricing snapshot so the panel shows instantly on restore
         EstimatedUnitPrice = EstimatedUnitPrice,
         EstimatedTotalAmount = EstimatedTotalAmount,
+        ProcessConfig = ProcessOptionValues
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => pair.Value!),
         // Serialise typed DFM payloads to JSON so BuildDfmIssues works after restore
         FdmDfmReportJson = FdmDfmReport is FdmDfmReportPayload fdm ? JsonSerializer.Serialize(fdm) : null,
         SlaDfmReportJson = SlaDfmReport is SlaDfmReportPayload sla ? JsonSerializer.Serialize(sla) : null,
@@ -491,6 +494,9 @@ public class PartViewModel
             // Restore pricing snapshot for instant display while background recalculation runs
             EstimatedUnitPrice = s.EstimatedUnitPrice,
             EstimatedTotalAmount = s.EstimatedTotalAmount,
+            ProcessOptionValues = s.ProcessConfig.ToDictionary(
+                pair => pair.Key,
+                pair => (string?)pair.Value),
             OverlayPaths = s.OverlayPaths,
             BodyCount = s.BodyCount,
             SelectedBodyIndex = s.SelectedBodyIndex,

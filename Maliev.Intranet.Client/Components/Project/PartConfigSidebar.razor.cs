@@ -75,6 +75,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private const string PaintColorHexKey = "paint_color_hex";
     private const string PaintColorReferenceKey = "paint_color_reference";
+    private const string MaterialColorKey = "material_color";
 
     private static readonly HashSet<string> HiddenCustomerOptionKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -137,6 +138,14 @@ public partial class PartConfigSidebar : ComponentBase
         "Green",
     ];
 
+    private static readonly IReadOnlyList<string> PomMaterialColors =
+    [
+        "Natural",
+        "Black",
+        "White",
+        "Blue",
+    ];
+
     private static readonly IReadOnlyList<string> DefaultAnodizeColors =
     [
         "Clear",
@@ -182,6 +191,9 @@ public partial class PartConfigSidebar : ComponentBase
 
     private bool HasPaintSpecificColorOption =>
         (Part?.AvailableProcessOptions ?? []).Any(IsPaintSpecificColorOption);
+
+    private bool RequiresDedicatedMaterialColorSelection =>
+        SelectedMaterial != null && IsPomMaterial(SelectedMaterial);
 
     private bool IsFdmProcess =>
         IsProcess("FDM") || IsProcess("FDM_3D_PRINTING");
@@ -364,6 +376,16 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null) return;
         Part.MaterialCode = m?.Code;
         Part.MaterialId = m?.Id;
+        if (m == null || !IsPomMaterial(m))
+        {
+            Part.ProcessOptionValues.Remove(MaterialColorKey);
+        }
+        else if (!Part.ProcessOptionValues.TryGetValue(MaterialColorKey, out var color)
+            || string.IsNullOrWhiteSpace(color))
+        {
+            Part.ProcessOptionValues[MaterialColorKey] = PomMaterialColors[0];
+        }
+
         await OnPartChanged.InvokeAsync(Part);
         _ = RefreshFinishPricesAsync();
     }
@@ -410,6 +432,14 @@ public partial class PartConfigSidebar : ComponentBase
     private async Task OnProcessOptionBoolChanged(string key, bool value)
     {
         await OnProcessOptionValueChanged(key, value ? "true" : null);
+    }
+
+    private async Task OnMaterialColorChanged(string color)
+    {
+        if (Part == null) return;
+
+        Part.ProcessOptionValues[MaterialColorKey] = color;
+        await OnPartChanged.InvokeAsync(Part);
     }
 
     private async Task OnPaintColorHexChanged(string catalogKey, string? value)
@@ -629,7 +659,7 @@ public partial class PartConfigSidebar : ComponentBase
             return false;
 
         if (IsMaterialColorOption(option) || IsGenericColorOption(option))
-            return !IsPaintedFinish();
+            return !RequiresDedicatedMaterialColorSelection && !IsPaintedFinish();
 
         return true;
     }
@@ -734,6 +764,14 @@ public partial class PartConfigSidebar : ComponentBase
         || option.ConfigKey.Equals("anodise_color", StringComparison.OrdinalIgnoreCase)
         || option.Label.Contains("anodize", StringComparison.OrdinalIgnoreCase)
         || option.Label.Contains("anodise", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPomMaterial(CatalogMaterialDto material)
+    {
+        var normalized = NormalizeOptionText($"{material.Code} {material.Name} {material.Description}");
+        return normalized.Contains("pom", StringComparison.Ordinal)
+            || normalized.Contains("delrin", StringComparison.Ordinal)
+            || normalized.Contains("acetal", StringComparison.Ordinal);
+    }
 
     private static IReadOnlyList<CatalogSurfaceFinishDto> GetVisibleFinishes(IReadOnlyList<CatalogSurfaceFinishDto> finishes) =>
         finishes

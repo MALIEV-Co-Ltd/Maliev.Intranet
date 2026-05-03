@@ -55,7 +55,43 @@
 
     <div class="qsb-divider" />
 
-    @* ── Zone 2: Total + Actions ──────────────────────────────────────────── *@
+    @* ── Zone 2: Adjustments ──────────────────────────────────────────────── *@
+    <div class="qsb-zone-adjustments">
+        <div class="qsb-zone-label">
+            <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
+            Quote Details
+        </div>
+        <div class="qsb-adjustment-grid">
+            <MudNumericField T="decimal"
+                             Label="Shipping"
+                             Value="@ShippingCost"
+                             ValueChanged="OnShippingCostChanged"
+                             Min="0m"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             HideSpinButtons="true" />
+            <MudNumericField T="decimal"
+                             Label="Discount"
+                             Value="@ManualDiscountAmount"
+                             ValueChanged="OnManualDiscountAmountChanged"
+                             Min="0m"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             HideSpinButtons="true" />
+        </div>
+        <MudTextField T="string"
+                      Label="Terms"
+                      Value="@QuotationTerms"
+                      ValueChanged="OnQuotationTermsChanged"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Lines="1"
+                      FullWidth="true" />
+    </div>
+
+    <div class="qsb-divider" />
+
+    @* ── Zone 3: Total + Actions ──────────────────────────────────────────── *@
     <div class="qsb-zone-total">
         <div class="qsb-total-top">
             <div class="qsb-total-ships">
@@ -78,7 +114,7 @@
             }
             else
             {
-                var total = ComputeSubtotal();
+                var total = ComputeQuoteTotal();
                 <div class="qsb-total-amount">
                     @if (total == 0 && Parts.Count == 0)
                     {
@@ -271,7 +307,33 @@
         font-size: 12px;
     }
 
-    /* ── Zone 2: Total + Actions ─────────────────────────────────────────── */
+    /* ── Zone 2: Adjustments ─────────────────────────────────────────────── */
+    .qsb-zone-adjustments {
+        width: 270px;
+        padding: 8px 12px 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        flex-shrink: 0;
+        gap: 4px;
+    }
+
+    .qsb-adjustment-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .qsb-zone-adjustments ::deep .mud-input-control {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .qsb-zone-adjustments ::deep .mud-input-slot {
+        font-size: 12px;
+    }
+
+    /* ── Zone 3: Total + Actions ─────────────────────────────────────────── */
     .qsb-zone-total {
         width: 340px;
         padding: 8px 16px 10px;
@@ -353,8 +415,14 @@
             border-top: 1px solid var(--maliev-border);
             padding: 10px 16px;
         }
+        .qsb-zone-adjustments {
+            width: 50%;
+            min-width: 260px;
+            border-top: 1px solid var(--maliev-border);
+            padding: 8px 16px 10px;
+        }
         .qsb-zone-total {
-            width: 100%;
+            flex: 1 1 320px;
             border-top: 1px solid var(--maliev-border);
             padding: 8px 16px 10px;
         }
@@ -368,6 +436,7 @@
         }
         .qsb-zone-customer,
         .qsb-zone-lead,
+        .qsb-zone-adjustments,
         .qsb-zone-total {
             width: 100%;
             max-width: none;
@@ -386,6 +455,9 @@
         .qsb-lead-btn {
             width: 100%;
             min-width: 0;
+        }
+        .qsb-adjustment-grid {
+            grid-template-columns: 1fr;
         }
         .qsb-lead-skeleton {
             width: 100%;
@@ -423,6 +495,12 @@
     [Parameter] public List<LeadTimeOptionDto> LeadTimeOptions { get; set; } = [];
     [Parameter] public LeadTimeOptionDto? SelectedLeadTime { get; set; }
     [Parameter] public EventCallback<LeadTimeOptionDto> OnLeadTimeChanged { get; set; }
+    [Parameter] public decimal ShippingCost { get; set; }
+    [Parameter] public EventCallback<decimal> ShippingCostChanged { get; set; }
+    [Parameter] public decimal ManualDiscountAmount { get; set; }
+    [Parameter] public EventCallback<decimal> ManualDiscountAmountChanged { get; set; }
+    [Parameter] public string? QuotationTerms { get; set; }
+    [Parameter] public EventCallback<string?> QuotationTermsChanged { get; set; }
     [Parameter] public bool CanQuote { get; set; }
     [Parameter] public bool Saving { get; set; }
     [Parameter] public EventCallback OnQuote { get; set; }
@@ -455,8 +533,23 @@
 
     private void OnCurrencyChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
 
-    private decimal ComputeSubtotal() =>
-        Parts.Sum(p => (p.EstimatedTotalAmount ?? 0) * CurrencyService.ExchangeRate);
+    private async Task OnShippingCostChanged(decimal value) =>
+        await ShippingCostChanged.InvokeAsync(Math.Max(0m, value));
+
+    private async Task OnManualDiscountAmountChanged(decimal value) =>
+        await ManualDiscountAmountChanged.InvokeAsync(Math.Max(0m, value));
+
+    private async Task OnQuotationTermsChanged(string? value) =>
+        await QuotationTermsChanged.InvokeAsync(value);
+
+    private decimal ComputeQuoteTotal()
+    {
+        var lineSubtotal = Parts.Sum(p => (p.EstimatedTotalAmount ?? 0) * CurrencyService.ExchangeRate);
+        var discount = Math.Min(Math.Max(0m, ManualDiscountAmount), lineSubtotal);
+        var taxableSubtotal = lineSubtotal - discount + Math.Max(0m, ShippingCost);
+        var vat = Math.Round(taxableSubtotal * 0.07m, 2, MidpointRounding.AwayFromZero);
+        return taxableSubtotal + vat;
+    }
 
     private string ComputeShipDate()
     {

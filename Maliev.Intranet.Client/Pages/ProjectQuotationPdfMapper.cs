@@ -1,3 +1,4 @@
+using System.Globalization;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Constants;
@@ -23,9 +24,17 @@ public static class ProjectQuotationPdfMapper
         DateTime nowUtc,
         string deliveryExpectations,
         IReadOnlyList<PartViewModel> parts,
-        IReadOnlyList<ProcessDto> processes)
+        IReadOnlyList<ProcessDto> processes,
+        string? quotationTerms = null,
+        decimal shippingCost = 0m,
+        decimal manualDiscountAmount = 0m,
+        decimal currencyExchangeRate = 1m)
     {
-        var subtotal = parts.Sum(part => part.EstimatedTotalAmount ?? 0m);
+        var exchangeRate = currencyExchangeRate <= 0m ? 1m : currencyExchangeRate;
+        var itemSubtotal = parts.Sum(part => ConvertCurrency(part.EstimatedTotalAmount ?? 0m, exchangeRate));
+        var discount = Math.Min(Math.Max(0m, manualDiscountAmount), itemSubtotal);
+        var normalizedShippingCost = Math.Max(0m, shippingCost);
+        var subtotal = itemSubtotal - discount + normalizedShippingCost;
         var taxAmount = Math.Round(subtotal * ThailandVatRate, 2, MidpointRounding.AwayFromZero);
         var customerType = string.IsNullOrWhiteSpace(selectedCustomer?.CompanyName) && string.IsNullOrWhiteSpace(customerDetail?.CompanyName)
             ? "Individual"
@@ -58,12 +67,15 @@ public static class ProjectQuotationPdfMapper
             ValidityStart = nowUtc,
             ValidityEnd = nowUtc.AddDays(30),
             Currency = string.IsNullOrWhiteSpace(currency) ? "THB" : currency,
-            SubtotalBeforeDiscount = subtotal,
+            SubtotalBeforeDiscount = itemSubtotal,
+            TotalDiscount = discount,
+            ManualDiscountAmount = discount,
+            ShippingCost = normalizedShippingCost,
             Subtotal = subtotal,
             TaxAmount = taxAmount,
             TotalAmount = subtotal + taxAmount,
             DeliveryExpectations = deliveryExpectations,
-            SpecialTerms = "Prices are indicative until project review is completed and all files are confirmed manufacturable.",
+            SpecialTerms = string.IsNullOrWhiteSpace(quotationTerms) ? null : quotationTerms.Trim(),
             Items = parts.Select((part, index) => new QuotationPdfItem
             {
                 Index = index + 1,
@@ -73,9 +85,10 @@ public static class ProjectQuotationPdfMapper
                 DetailLines = BuildLineItemDetailLines(part),
                 Quantity = part.Quantity,
                 QuantityUnit = "pcs",
-                UnitPrice = part.EstimatedUnitPrice ?? 0m,
-                LineTotal = part.EstimatedTotalAmount ?? 0m,
+                UnitPrice = ConvertCurrency(part.EstimatedUnitPrice ?? 0m, exchangeRate),
+                LineTotal = ConvertCurrency(part.EstimatedTotalAmount ?? 0m, exchangeRate),
                 Notes = BuildLineItemNotes(part),
+                ThumbnailUrl = FirstNonEmpty(part.ThumbnailSmallUrl, part.ThumbnailLargeUrl),
             }).ToList(),
         };
     }
@@ -97,17 +110,20 @@ public static class ProjectQuotationPdfMapper
     {
         var notes = new List<string>();
 
+        if (FormatBoundingBox(part.Dimensions) is { Length: > 0 } boundingBox)
+            notes.Add($"Bounding box: {boundingBox}");
+
         if (ResolveFinishName(part) is { Length: > 0 } finishName)
-            notes.Add(finishName);
+            notes.Add($"Surface finish: {finishName}");
 
         if (ResolveToleranceName(part) is { Length: > 0 } toleranceName)
-            notes.Add(toleranceName);
+            notes.Add($"Tolerance: {toleranceName}");
 
         if (ResolveRoughnessName(part) is { Length: > 0 } roughness)
-            notes.Add(roughness);
+            notes.Add($"Surface roughness: {roughness}");
 
         if (ResolveColor(part) is { Length: > 0 } color)
-            notes.Add(color);
+            notes.Add($"Color: {color}");
 
         if (part.HasThreadedHoles)
         {
@@ -153,6 +169,9 @@ public static class ProjectQuotationPdfMapper
 
     private static string TruncateQuotationNumber(string value) => value[..Math.Min(24, value.Length)];
 
+    private static decimal ConvertCurrency(decimal amount, decimal exchangeRate) =>
+        Math.Round(amount * exchangeRate, 2, MidpointRounding.AwayFromZero);
+
     private static string ResolveCustomerName(CustomerSummaryDto? selectedCustomer, CustomerDetailDto? customerDetail)
     {
         if (!string.IsNullOrWhiteSpace(customerDetail?.CompanyName))
@@ -185,11 +204,16 @@ public static class ProjectQuotationPdfMapper
 
         if (customerType == "Corporate")
         {
-            if (!string.IsNullOrWhiteSpace(contactName))
-                lines.Add(string.IsNullOrWhiteSpace(customerPhone) ? contactName : $"{contactName} ({customerPhone})");
-
             var branch = string.IsNullOrWhiteSpace(customerBranch) ? string.Empty : $" ({customerBranch})";
             lines.Add($"{customerName}{branch}");
+
+            if (!string.IsNullOrWhiteSpace(contactName))
+            {
+                var contactLine = string.IsNullOrWhiteSpace(customerPhone)
+                    ? contactName
+                    : $"{contactName} ({customerPhone})";
+                lines.Add($"Attn: {contactLine}");
+            }
         }
         else
         {
@@ -262,7 +286,7 @@ public static class ProjectQuotationPdfMapper
             ? part.AvailableFinishes.FirstOrDefault(item => item.Id == part.FinishId.Value)
             : null;
 
-        return finish?.Name ?? part.FinishCode;
+        return finish?.Name ?? FormatKnownFinishCode(part.FinishCode);
     }
 
     private static string? ResolveToleranceName(PartViewModel part)
@@ -272,11 +296,20 @@ public static class ProjectQuotationPdfMapper
             : null;
 
         if (tolerance == null)
-            return part.ToleranceCode;
+            return FormatKnownToleranceCode(part.ToleranceCode, IsFdmProcess(part));
 
-        return string.IsNullOrWhiteSpace(tolerance.ToleranceRange)
-            ? tolerance.Name
-            : $"{tolerance.Name} {tolerance.ToleranceRange}";
+        if (IsFdmProcess(part) && !string.IsNullOrWhiteSpace(tolerance.ToleranceRange))
+            return $"{tolerance.Name} {NormalizeToleranceRange(tolerance.ToleranceRange)}";
+
+        var name = StripToleranceRange(tolerance.Name);
+        if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(tolerance.IsoStandard)
+            && !name.Contains(tolerance.IsoStandard, StringComparison.OrdinalIgnoreCase)
+            && !name.Contains(tolerance.IsoStandard.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{name} ({NormalizeIsoStandard(tolerance.IsoStandard)})";
+        }
+
+        return name;
     }
 
     private static string? ResolveColor(PartViewModel part)
@@ -307,6 +340,96 @@ public static class ProjectQuotationPdfMapper
             _ => part.RoughnessCode.Replace("_", " ", StringComparison.Ordinal),
         };
     }
+
+    private static string? FormatBoundingBox(FileAnalysisDimensionsDto? dimensions)
+    {
+        if (dimensions is not { X: > 0, Y: > 0, Z: > 0 })
+            return null;
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{FormatDimension(dimensions.X)} x {FormatDimension(dimensions.Y)} x {FormatDimension(dimensions.Z)} mm");
+    }
+
+    private static string FormatDimension(double value) =>
+        value.ToString(value >= 10 ? "0.#" : "0.##", CultureInfo.InvariantCulture);
+
+    private static string? FormatKnownFinishCode(string? finishCode)
+    {
+        if (string.IsNullOrWhiteSpace(finishCode))
+            return null;
+
+        var normalized = NormalizeCode(finishCode);
+        return normalized switch
+        {
+            "AS_PRNTED" or "AS_PRINTED" or "ASPRINTED" => "As-printed",
+            "AS_MACHINED" or "ASMACHINED" => "As-machined",
+            _ => FormatOptionName(finishCode),
+        };
+    }
+
+    private static string? FormatKnownToleranceCode(string? toleranceCode, bool isFdmProcess)
+    {
+        if (string.IsNullOrWhiteSpace(toleranceCode))
+            return null;
+
+        var normalized = NormalizeCode(toleranceCode);
+        if (isFdmProcess)
+        {
+            return normalized switch
+            {
+                "FDM_STD" or "FDM_STANDARD" or "FDMSTANDARD" => "FDM Standard +-0.3mm",
+                "FDM_FINE" or "FDMFINE" => "FDM Fine +-0.15mm",
+                _ => FormatOptionName(toleranceCode),
+            };
+        }
+
+        return normalized switch
+        {
+            "ISO2768_M" or "ISO_2768_M" or "MEDIUM" => "Medium (ISO2768-m)",
+            "ISO2768_F" or "ISO_2768_F" or "FINE" => "Fine (ISO2768-f)",
+            _ => FormatOptionName(toleranceCode),
+        };
+    }
+
+    private static string StripToleranceRange(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var cutIndex = value.IndexOfAny(['±', '+']);
+        if (cutIndex > 0)
+            value = value[..cutIndex];
+
+        return value.Trim();
+    }
+
+    private static string NormalizeToleranceRange(string value) =>
+        value.Replace("±", "+-", StringComparison.Ordinal)
+            .Replace("+/-", "+-", StringComparison.Ordinal)
+            .Replace("  ", " ", StringComparison.Ordinal)
+            .Trim();
+
+    private static string NormalizeIsoStandard(string value) =>
+        value.Replace(" ", string.Empty, StringComparison.Ordinal).Trim();
+
+    private static bool IsFdmProcess(PartViewModel part) =>
+        part.ProcessCode?.Contains("FDM", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static string NormalizeCode(string value) =>
+        value.Trim().ToUpperInvariant();
+
+    private static string FormatOptionName(string value) =>
+        string.Join(
+            " ",
+            value.Replace("_", " ", StringComparison.Ordinal)
+                .Replace("-", " ", StringComparison.Ordinal)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .ToLowerInvariant() switch
+            {
+                var text when string.IsNullOrWhiteSpace(text) => value,
+                var text => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(text),
+            };
 
     private static string? ResolveDeburring(PartViewModel part)
     {

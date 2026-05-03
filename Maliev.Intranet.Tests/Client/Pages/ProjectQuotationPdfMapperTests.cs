@@ -70,6 +70,7 @@ public class ProjectQuotationPdfMapperTests
                     ToleranceId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd"),
                     ToleranceCode = "FDM_STD",
                     RoughnessCode = "RA_1_6",
+                    Dimensions = new FileAnalysisDimensionsDto { X = 12.5, Y = 30, Z = 4.25 },
                     HasThreadedHoles = true,
                     ThreadedHoleSpec = "M3",
                     ThreadedHoleCount = 4,
@@ -114,10 +115,11 @@ public class ProjectQuotationPdfMapperTests
         Assert.Equal("bracket.step", data.Items[0].PartName);
         Assert.Equal("PLA", data.Items[0].MaterialName);
         Assert.Equal("3D Printing (FDM)", data.Items[0].ManufacturingProcess);
-        Assert.Contains("As-printed", data.Items[0].DetailLines);
-        Assert.Contains("FDM Standard +-0.3mm", data.Items[0].DetailLines);
-        Assert.Contains("Ra 1.6 um", data.Items[0].DetailLines);
-        Assert.Contains("Black", data.Items[0].DetailLines);
+        Assert.Contains("Bounding box: 12.5 x 30 x 4.25 mm", data.Items[0].DetailLines);
+        Assert.Contains("Surface finish: As-printed", data.Items[0].DetailLines);
+        Assert.Contains("Tolerance: FDM Standard +-0.3mm", data.Items[0].DetailLines);
+        Assert.Contains("Surface roughness: Ra 1.6 um", data.Items[0].DetailLines);
+        Assert.Contains("Color: Black", data.Items[0].DetailLines);
         Assert.Contains("Tapped holes: 4 x M3", data.Items[0].Notes);
         Assert.Contains("Inserts: 2 x HeatSet", data.Items[0].Notes);
         Assert.Contains("Deburring", data.Items[0].DetailLines);
@@ -191,10 +193,48 @@ public class ProjectQuotationPdfMapperTests
             []);
 
         Assert.Equal("สำนักงานใหญ่", data.CustomerBranch);
-        Assert.Equal("ณฐพล วนาศรีวิไล (028816002)", data.CustomerDisplayLines[0]);
-        Assert.Equal("บริษัท มาลีฟ จำกัด (สำนักงานใหญ่)", data.CustomerDisplayLines[1]);
+        Assert.Equal("บริษัท มาลีฟ จำกัด (สำนักงานใหญ่)", data.CustomerDisplayLines[0]);
+        Assert.Equal("Attn: ณฐพล วนาศรีวิไล (028816002)", data.CustomerDisplayLines[1]);
         Assert.Equal(["36/1 หมู่ 3", "ตำบลคลองข่อย", "อำเภอปากเกร็ด", "จังหวัดนนทบุรี 11120"], data.BillingAddressLines);
         Assert.Equal(["36/2 หมู่ 4", "ตำบลบางจาก", "อำเภอภาษีเจริญ", "จังหวัดกรุงเทพมหานคร 10160"], data.ShippingAddressLines);
+    }
+
+    /// <summary>
+    /// Verifies selected display currency, shipping, manual discount, and user-entered terms are mapped to the PDF payload.
+    /// </summary>
+    [Fact]
+    public void BuildDraftPdfData_WithAdjustments_UsesSelectedCurrencyAndTerms()
+    {
+        var data = ProjectQuotationPdfMapper.BuildDraftPdfData(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            null,
+            null,
+            "USD",
+            DateTime.SpecifyKind(new DateTime(2026, 5, 2), DateTimeKind.Utc),
+            "Standard: 5 business days after order confirmation",
+            [
+                new PartViewModel
+                {
+                    Name = "gear.step",
+                    Quantity = 1,
+                    EstimatedUnitPrice = 1000,
+                    EstimatedTotalAmount = 1000,
+                },
+            ],
+            [],
+            "Payment due before production.",
+            shippingCost: 20,
+            manualDiscountAmount: 5,
+            currencyExchangeRate: 0.03m);
+
+        Assert.Equal("USD", data.Currency);
+        Assert.Equal(30, data.SubtotalBeforeDiscount);
+        Assert.Equal(5, data.ManualDiscountAmount);
+        Assert.Equal(20, data.ShippingCost);
+        Assert.Equal(45, data.Subtotal);
+        Assert.Equal(3.15m, data.TaxAmount);
+        Assert.Equal(48.15m, data.TotalAmount);
+        Assert.Equal("Payment due before production.", data.SpecialTerms);
     }
 
     /// <summary>
