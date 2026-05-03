@@ -29,6 +29,16 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("@page \"/login\"", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TopBar_DoesNotContainDesignIterationDisplayTweaks()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
+
+        Assert.DoesNotContain("Display tweaks", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Accent color", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SetAccentHue", source, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

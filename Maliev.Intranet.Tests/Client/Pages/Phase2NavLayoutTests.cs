@@ -89,6 +89,14 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void TopBar_ShouldNotExpose_DisplayTweaks()
+    {
+        var cut = Render<TopBar>();
+        Assert.DoesNotContain("Display tweaks", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Accent color", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void BreadcrumbService_SetPageLabel_UpdatesCurrentLabel()
     {
         var svc = new BreadcrumbService();

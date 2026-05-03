@@ -232,8 +232,6 @@ public sealed class LoginPageController : Controller
                 let pref = cookie('maliev_theme') || localStorage.getItem('maliev_theme') || 'system';
                 const dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
                 document.documentElement.setAttribute('data-maliev-theme', dark ? 'dark' : 'light');
-                const accent = localStorage.getItem('maliev_accent_hue') || cookie('maliev_accent_hue') || '250';
-                document.documentElement.style.setProperty('--accent-hue', accent);
             }
             window.toggleTheme = function() {
                 const current = document.documentElement.getAttribute('data-maliev-theme') === 'dark' ? 'light' : 'dark';

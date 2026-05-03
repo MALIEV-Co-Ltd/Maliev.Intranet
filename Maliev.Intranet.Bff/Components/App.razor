@@ -142,11 +142,6 @@
                 // Apply theme SYNCHRONOUSLY (blocks rendering)
                 document.documentElement.setAttribute('data-maliev-theme', effectiveTheme);
 
-                try {
-                    const accent = localStorage.getItem('maliev_accent_hue') || getCookie('maliev_accent_hue') || '250';
-                    document.documentElement.style.setProperty('--maliev-accent-hue', accent);
-                } catch (e) { /* ignore unavailable storage */ }
-                
                 // Set a short-lived hint cookie for the server to avoid flicker on refresh
                 document.cookie = `maliev_system_dark=${systemDark}; path=/; max-age=31536000; SameSite=Lax`;
             }

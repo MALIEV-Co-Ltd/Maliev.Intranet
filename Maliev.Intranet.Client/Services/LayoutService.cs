@@ -38,8 +38,6 @@ public class LayoutService : IDisposable
     private bool _isInitialized;
     private bool _systemPreferencesIsDark;
     private const string ThemeCookieName = "maliev_theme";
-    private const string AccentHueCookieName = "maliev_accent_hue";
-    private int _accentHue = 250;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LayoutService"/> class.
@@ -100,11 +98,6 @@ public class LayoutService : IDisposable
     public ThemeMode CurrentMode => _currentMode;
 
     /// <summary>
-    /// Gets the current accent hue used by MALIEV design tokens.
-    /// </summary>
-    public int AccentHue => _accentHue;
-
-    /// <summary>
     /// Initializes the theme service by reading from DOM.
     /// This should be called in OnAfterRenderAsync after JS interop is available.
     /// </summary>
@@ -144,16 +137,6 @@ public class LayoutService : IDisposable
                 "eval",
                 "window.matchMedia('(prefers-color-scheme: dark)').matches"
             );
-
-            var accentHueValue = await _jsRuntime.InvokeAsync<string>(
-                "eval",
-                $"document.cookie.split('; ').find(row => row.startsWith('{AccentHueCookieName}='))?.split('=')[1] || localStorage.getItem('{AccentHueCookieName}') || '250'"
-            );
-
-            if (int.TryParse(accentHueValue, out var accentHue))
-            {
-                _accentHue = NormalizeHue(accentHue);
-            }
 
             // Calculate what theme should be active based on preference
             CalculateEffectiveTheme();
@@ -272,33 +255,6 @@ public class LayoutService : IDisposable
         }
     }
 
-    /// <summary>
-    /// Sets the accent hue used by the global MALIEV design system.
-    /// </summary>
-    /// <param name="hue">The hue value, normalized to the 0-360 range.</param>
-    public async Task SetAccentHueAsync(int hue)
-    {
-        _accentHue = NormalizeHue(hue);
-
-        try
-        {
-            await _jsRuntime.InvokeVoidAsync(
-                "eval",
-                $"document.documentElement.style.setProperty('--maliev-accent-hue', '{_accentHue}')"
-            );
-            await _jsRuntime.InvokeVoidAsync(
-                "eval",
-                $"document.cookie = '{AccentHueCookieName}={_accentHue}; path=/; max-age=31536000; SameSite=Lax'"
-            );
-            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", AccentHueCookieName, _accentHue.ToString());
-            MajorUpdateOccurred?.Invoke(this, EventArgs.Empty);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to set accent hue");
-        }
-    }
-
     private void CalculateEffectiveTheme()
     {
         _isDarkMode = _currentMode switch
@@ -308,12 +264,6 @@ public class LayoutService : IDisposable
             ThemeMode.System => _systemPreferencesIsDark,
             _ => false
         };
-    }
-
-    private static int NormalizeHue(int hue)
-    {
-        var normalized = hue % 361;
-        return normalized < 0 ? normalized + 361 : normalized;
     }
 
     /// <summary>

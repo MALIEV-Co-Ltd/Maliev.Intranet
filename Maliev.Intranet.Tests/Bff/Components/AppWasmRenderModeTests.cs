@@ -22,7 +22,7 @@ public class AppWasmRenderModeTests
         Assert.Contains("Loading workspace", source);
         Assert.Contains("data-maliev-theme", source);
         Assert.Contains("maliev_theme", source);
-        Assert.Contains("maliev_accent_hue", source);
+        Assert.DoesNotContain("maliev_accent_hue", source, StringComparison.Ordinal);
     }
 
     [Fact]
