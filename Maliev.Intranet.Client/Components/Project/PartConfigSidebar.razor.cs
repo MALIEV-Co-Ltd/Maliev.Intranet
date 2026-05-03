@@ -53,7 +53,7 @@ public partial class PartConfigSidebar : ComponentBase
     /// <summary>Controls the layout mode of the sidebar. Sidebar renders the full-width panel; Inline renders a compact version for use inside cards.</summary>
     [Parameter] public PartConfigSidebarDisplayMode DisplayMode { get; set; } = PartConfigSidebarDisplayMode.Sidebar;
 
-    private bool _routingExpanded = true;
+    private bool _routingExpanded;
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
     private IReadOnlyCollection<string> _selectedFeatures = [];
     private readonly Dictionary<Guid, decimal> _basePricesByPart = new();
@@ -75,6 +75,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private const string PaintColorHexKey = "paint_color_hex";
     private const string PaintColorReferenceKey = "paint_color_reference";
+    private const string MaterialColorKey = "material_color";
 
     private static readonly HashSet<string> HiddenCustomerOptionKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -137,6 +138,14 @@ public partial class PartConfigSidebar : ComponentBase
         "Green",
     ];
 
+    private static readonly IReadOnlyList<string> PomMaterialColors =
+    [
+        "Natural",
+        "Black",
+        "White",
+        "Blue",
+    ];
+
     private static readonly IReadOnlyList<string> DefaultAnodizeColors =
     [
         "Clear",
@@ -183,11 +192,17 @@ public partial class PartConfigSidebar : ComponentBase
     private bool HasPaintSpecificColorOption =>
         (Part?.AvailableProcessOptions ?? []).Any(IsPaintSpecificColorOption);
 
+    private bool RequiresDedicatedMaterialColorSelection =>
+        SelectedMaterial != null && IsPomMaterial(SelectedMaterial);
+
     private bool IsFdmProcess =>
         IsProcess("FDM") || IsProcess("FDM_3D_PRINTING");
 
     private bool IsCncProcess =>
         IsProcess("CNC") || IsProcess("CNC_MILL") || IsProcess("CNC_TURN");
+
+    private IReadOnlyList<CatalogToleranceDto> VisibleToleranceList =>
+        VisibleTolerances.OrderBy(t => t.SortOrder).ToList();
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -361,6 +376,16 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null) return;
         Part.MaterialCode = m?.Code;
         Part.MaterialId = m?.Id;
+        if (m == null || !IsPomMaterial(m))
+        {
+            Part.ProcessOptionValues.Remove(MaterialColorKey);
+        }
+        else if (!Part.ProcessOptionValues.TryGetValue(MaterialColorKey, out var color)
+            || string.IsNullOrWhiteSpace(color))
+        {
+            Part.ProcessOptionValues[MaterialColorKey] = PomMaterialColors[0];
+        }
+
         await OnPartChanged.InvokeAsync(Part);
         _ = RefreshFinishPricesAsync();
     }
@@ -372,6 +397,17 @@ public partial class PartConfigSidebar : ComponentBase
         Part.FinishId = f?.Id;
         RemoveFinishSpecificOptionValues();
         await OnPartChanged.InvokeAsync(Part);
+    }
+
+    private bool IsSelectedFinishGroup(CatalogSurfaceFinishDto finish)
+    {
+        if (SelectedFinish == null)
+            return false;
+
+        return string.Equals(
+            GetSurfaceFinishDisplayKey(SelectedFinish),
+            GetSurfaceFinishDisplayKey(finish),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task OnToleranceChanged(CatalogToleranceDto? t)
@@ -396,6 +432,14 @@ public partial class PartConfigSidebar : ComponentBase
     private async Task OnProcessOptionBoolChanged(string key, bool value)
     {
         await OnProcessOptionValueChanged(key, value ? "true" : null);
+    }
+
+    private async Task OnMaterialColorChanged(string color)
+    {
+        if (Part == null) return;
+
+        Part.ProcessOptionValues[MaterialColorKey] = color;
+        await OnPartChanged.InvokeAsync(Part);
     }
 
     private async Task OnPaintColorHexChanged(string catalogKey, string? value)
@@ -615,7 +659,7 @@ public partial class PartConfigSidebar : ComponentBase
             return false;
 
         if (IsMaterialColorOption(option) || IsGenericColorOption(option))
-            return !IsPaintedFinish();
+            return !RequiresDedicatedMaterialColorSelection && !IsPaintedFinish();
 
         return true;
     }
@@ -630,13 +674,17 @@ public partial class PartConfigSidebar : ComponentBase
         normalized.Contains("layerheight", StringComparison.Ordinal)
         || normalized.Contains("infill", StringComparison.Ordinal)
         || normalized.Contains("supporttype", StringComparison.Ordinal)
+        || normalized.Contains("threadspec", StringComparison.Ordinal)
+        || normalized.Contains("threadspecification", StringComparison.Ordinal)
         || normalized.Contains("threadedhole", StringComparison.Ordinal)
         || normalized.Contains("threadhole", StringComparison.Ordinal)
         || normalized.Contains("tappedhole", StringComparison.Ordinal)
         || normalized.Contains("taphole", StringComparison.Ordinal)
         || normalized.Contains("threadinsert", StringComparison.Ordinal)
         || normalized.Contains("threadedinsert", StringComparison.Ordinal)
-        || normalized.Contains("heatsetinsert", StringComparison.Ordinal);
+        || normalized.Contains("heatsetinsert", StringComparison.Ordinal)
+        || normalized.Contains("groove", StringComparison.Ordinal)
+        || normalized.Contains("undercut", StringComparison.Ordinal);
 
     private bool IsBooleanOption(ProcessConfigOptionDto option)
     {
@@ -716,6 +764,47 @@ public partial class PartConfigSidebar : ComponentBase
         || option.ConfigKey.Equals("anodise_color", StringComparison.OrdinalIgnoreCase)
         || option.Label.Contains("anodize", StringComparison.OrdinalIgnoreCase)
         || option.Label.Contains("anodise", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPomMaterial(CatalogMaterialDto material)
+    {
+        var normalized = NormalizeOptionText($"{material.Code} {material.Name} {material.Description}");
+        return normalized.Contains("pom", StringComparison.Ordinal)
+            || normalized.Contains("delrin", StringComparison.Ordinal)
+            || normalized.Contains("acetal", StringComparison.Ordinal);
+    }
+
+    private static IReadOnlyList<CatalogSurfaceFinishDto> GetVisibleFinishes(IReadOnlyList<CatalogSurfaceFinishDto> finishes) =>
+        finishes
+            .OrderBy(f => f.SortOrder)
+            .GroupBy(GetSurfaceFinishDisplayKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+    private static string GetSurfaceFinishDisplayName(CatalogSurfaceFinishDto finish)
+    {
+        var key = GetSurfaceFinishDisplayKey(finish);
+        return key switch
+        {
+            "ANODIZE_TYPE_II" => "Anodized Type II",
+            "ANODIZE_TYPE_III" => "Anodized Type III",
+            _ => finish.Name,
+        };
+    }
+
+    private static string GetSurfaceFinishDisplayKey(CatalogSurfaceFinishDto finish)
+    {
+        var normalized = NormalizeOptionText($"{finish.Code} {finish.Name}");
+        if (normalized.Contains("anod", StringComparison.Ordinal))
+        {
+            if (normalized.Contains("typeiii", StringComparison.Ordinal)
+                || normalized.Contains("hard", StringComparison.Ordinal))
+                return "ANODIZE_TYPE_III";
+
+            return "ANODIZE_TYPE_II";
+        }
+
+        return finish.Code;
+    }
 
     private static string NormalizeOptionText(string value)
     {
@@ -873,6 +962,17 @@ public partial class PartConfigSidebar : ComponentBase
         return Icons.Material.Outlined.Tune;
     }
 
+    private static string GetBooleanOptionIcon(ProcessConfigOptionDto option)
+    {
+        var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        if (normalized.Contains("deburr", StringComparison.Ordinal))
+            return Icons.Material.Outlined.CleaningServices;
+        if (normalized.Contains("cert", StringComparison.Ordinal))
+            return Icons.Material.Outlined.Verified;
+
+        return Icons.Material.Outlined.CheckCircle;
+    }
+
     private static string GetOptionColor(string value)
     {
         var normalized = value.Trim().ToLowerInvariant();
@@ -981,6 +1081,24 @@ public partial class PartConfigSidebar : ComponentBase
         };
         DialogService.ShowAsync<ScheduleDialogContent>("Planning Schedule", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+    }
+
+    private void OpenToleranceInfoDialog()
+    {
+        var tolerances = VisibleToleranceList;
+        if (tolerances.Count == 0)
+            return;
+
+        var parameters = new DialogParameters<ToleranceInfoDialog>
+        {
+            { x => x.Tolerances, tolerances },
+            { x => x.GetRange, GetToleranceRange },
+        };
+
+        DialogService.ShowAsync<ToleranceInfoDialog>(
+            "Tolerance Information",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
     }
 
     // ── Two-phase DFM analysis ─────────────────────────────────────────────

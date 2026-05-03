@@ -54,3 +54,5 @@ docker-compose*.yml
 docker-compose.override.yml
 .gemini-clipboard/
 tmpclaude-*
+.claude/settings.local.json
+temp/

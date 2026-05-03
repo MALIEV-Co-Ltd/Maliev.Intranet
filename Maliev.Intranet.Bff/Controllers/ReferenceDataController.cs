@@ -61,7 +61,7 @@ public class ReferenceDataController : ControllerBase
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of currencies.</returns>
-    [RequirePermission(MalievPermissions.Registry.LocationsRead, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Currency.CurrenciesRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("currencies")]
     public async Task<ActionResult<List<CurrencyDto>>> GetCurrencies(CancellationToken cancellationToken)
     {
@@ -82,7 +82,7 @@ public class ReferenceDataController : ControllerBase
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The primary currency.</returns>
-    [RequirePermission(MalievPermissions.Registry.LocationsRead, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Currency.CurrenciesRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("currencies/primary")]
     public async Task<ActionResult<CurrencyDto>> GetPrimaryCurrency(CancellationToken cancellationToken)
     {
@@ -110,7 +110,7 @@ public class ReferenceDataController : ControllerBase
     /// <param name="to">Target currency code (ISO 4217).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The exchange rate as a decimal.</returns>
-    [RequirePermission(MalievPermissions.Registry.LocationsRead, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Currency.RatesRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("currencies/rate")]
     public async Task<ActionResult<ExchangeRateResponse>> GetExchangeRate(
         [FromQuery] string from,

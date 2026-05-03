@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="jobClient">The typed JobService HTTP client (used for routing queue depth).</param>
 /// <param name="facilityClient">The typed FacilityService HTTP client (used for routing machine lookup).</param>
 /// <param name="logger">The logger instance.</param>
+/// <param name="uploadClient">The typed UploadService HTTP client used when duplicating project file artifacts.</param>
+/// <param name="analysisStatusService">The file analysis status cache used when restoring duplicated part previews.</param>
 [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [ApiVersion("1.0")]
@@ -22,7 +25,9 @@ public class ProjectsController(
     ProjectServiceClient client,
     JobServiceClient jobClient,
     IFacilityServiceClient facilityClient,
-    ILogger<ProjectsController> logger) : ControllerBase
+    ILogger<ProjectsController> logger,
+    UploadServiceClient? uploadClient = null,
+    IFileAnalysisStatusService? analysisStatusService = null) : ControllerBase
 {
     private readonly ILogger<ProjectsController> _logger = logger;
     // ── Query endpoints ──────────────────────────────────────────────────────
@@ -107,6 +112,78 @@ public class ProjectsController(
     }
 
     /// <summary>
+    /// Duplicates a project into a new independent reorder draft.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/duplicate")]
+    public async Task<ActionResult<ProjectDetailDto>> Duplicate(
+        Guid id,
+        [FromBody] DuplicateProjectRequest? request,
+        CancellationToken ct)
+    {
+        if (uploadClient is null)
+            return StatusCode(StatusCodes.Status500InternalServerError, "UploadServiceClient is not configured.");
+
+        var source = await client.GetProjectByIdAsync(id, ct);
+        if (source is null)
+            return NotFound();
+
+        var createRequest = new CreateProjectRequest
+        {
+            CustomerId = source.CustomerId,
+            CustomerName = source.CustomerName,
+            Title = string.IsNullOrWhiteSpace(request?.Title) ? BuildCopyTitle(source.Title) : request!.Title!,
+            Description = source.Description,
+            Currency = string.IsNullOrWhiteSpace(source.Currency) ? "THB" : source.Currency
+        };
+
+        var (created, errorContent, statusCode) = await client.CreateProjectAsync(createRequest, ct);
+        if (created is null)
+        {
+            return StatusCode(
+                statusCode == 0 ? StatusCodes.Status502BadGateway : statusCode,
+                errorContent ?? "ProjectService returned an error while creating the duplicate project.");
+        }
+
+        var copiedFileIds = new List<Guid>();
+        var createdParts = new List<ProjectPartDto>();
+
+        try
+        {
+            foreach (var sourcePart in source.Parts)
+            {
+                var copiedPart = await CopyPartForDuplicateAsync(
+                    source,
+                    created,
+                    sourcePart,
+                    uploadClient,
+                    copiedFileIds,
+                    ct);
+
+                var (createdPart, addErrorContent, addStatusCode) = await client.AddPartAsync(created.Id, copiedPart, ct);
+                if (createdPart is null)
+                {
+                    throw new InvalidOperationException(
+                        $"ProjectService failed to add duplicated part '{sourcePart.FileName}' with HTTP {(addStatusCode == 0 ? 502 : addStatusCode)}: {addErrorContent}");
+                }
+
+                await EnrichSignedArtifactUrlsAsync(createdPart, uploadClient, ct);
+                createdParts.Add(createdPart);
+            }
+
+            var duplicated = await client.GetProjectByIdAsync(created.Id, ct) ?? created;
+            duplicated.Parts = createdParts.Count > 0 ? createdParts : duplicated.Parts;
+            return Ok(duplicated);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to duplicate project {ProjectId}; cleaning up duplicate project {DuplicateProjectId}", id, created.Id);
+            await CleanupDuplicateAsync(created.Id, copiedFileIds, uploadClient, ct);
+            return StatusCode(StatusCodes.Status502BadGateway, "Failed to duplicate the project. No reorder draft was created.");
+        }
+    }
+
+    /// <summary>
     /// Updates a project's metadata fields (title, description, notes, validity period).
     /// </summary>
     /// <param name="id">The project GUID.</param>
@@ -148,8 +225,11 @@ public class ProjectsController(
     [HttpPost("{id:guid}/parts")]
     public async Task<ActionResult<ProjectPartDto>> AddPart(Guid id, [FromBody] AddProjectPartRequest request, CancellationToken ct)
     {
-        var result = await client.AddPartAsync(id, request, ct);
-        return result != null ? Ok(result) : StatusCode(502, "ProjectService returned an error.");
+        var (result, errorContent, statusCode) = await client.AddPartAsync(id, request, ct);
+        if (result != null)
+            return Ok(result);
+
+        return StatusCode(statusCode == 0 ? 502 : statusCode, errorContent ?? "ProjectService returned an error.");
     }
 
     /// <summary>
@@ -223,14 +303,25 @@ public class ProjectsController(
     /// Only allowed when all parts have confirmed prices.
     /// </summary>
     /// <param name="id">The project GUID.</param>
+    /// <param name="request">Quotation validity and delivery expectations.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:guid}/generate-quotation")]
-    public async Task<IActionResult> GenerateQuotation(Guid id, CancellationToken ct)
+    public async Task<IActionResult> GenerateQuotation(
+        Guid id,
+        [FromBody] GenerateQuotationRequest? request,
+        CancellationToken ct)
     {
-        var response = await client.GenerateQuotationAsync(id, ct);
-        return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
+        var response = await client.GenerateQuotationAsync(id, request ?? new GenerateQuotationRequest(), ct);
+        if (response.IsSuccessStatusCode)
+            return NoContent();
+
+        var errorContent = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(errorContent))
+            return StatusCode((int)response.StatusCode);
+
+        return StatusCode((int)response.StatusCode, errorContent);
     }
 
     /// <summary>
@@ -380,6 +471,312 @@ public class ProjectsController(
             ScheduleItems: scheduleItems,
             ProposedSlotStart: proposedSlotStart,
             ProposedSlotEnd: proposedSlotEnd));
+    }
+
+    private async Task<AddProjectPartRequest> CopyPartForDuplicateAsync(
+        ProjectDetailDto sourceProject,
+        ProjectDetailDto duplicateProject,
+        ProjectPartDto sourcePart,
+        UploadServiceClient upload,
+        List<Guid> copiedFileIds,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePart.FileReference))
+            throw new InvalidOperationException($"Source part '{sourcePart.FileName}' does not have a file reference.");
+
+        var destinationPath = BuildProjectUploadPath(duplicateProject.Id, sourceProject.CustomerId, sourcePart.FileName);
+        var copiedFile = await upload.CopyFileWithMetadataAsync(
+            sourcePart.FileReference,
+            destinationPath,
+            sourcePart.FileName,
+            metadata: new Dictionary<string, string>
+            {
+                ["source_project_id"] = sourceProject.Id.ToString(),
+                ["source_part_id"] = sourcePart.Id.ToString(),
+                ["source_file_id"] = sourcePart.FileId.ToString()
+            },
+            ct: ct);
+
+        if (copiedFile is null || !Guid.TryParse(copiedFile.FileId, out var copiedFileId))
+            throw new InvalidOperationException($"UploadService failed to copy source file for part '{sourcePart.FileName}'.");
+
+        copiedFileIds.Add(copiedFileId);
+
+        var thumbnailSmallPath = await CopyArtifactPathAsync(
+            upload,
+            sourcePart.FileReference,
+            copiedFile.StoragePath,
+            sourcePart.ThumbnailSmallGcsPath,
+            "thumbnail_small",
+            ct);
+        var thumbnailLargePath = await CopyArtifactPathAsync(
+            upload,
+            sourcePart.FileReference,
+            copiedFile.StoragePath,
+            sourcePart.ThumbnailLargeGcsPath,
+            "thumbnail_large",
+            ct);
+        var glbPath = await CopyArtifactPathAsync(
+            upload,
+            sourcePart.FileReference,
+            copiedFile.StoragePath,
+            sourcePart.GlbStoragePath,
+            "viewer",
+            ct);
+        var overlayPaths = await CopyOverlayPathsAsync(
+            upload,
+            sourcePart.FileReference,
+            copiedFile.StoragePath,
+            sourcePart.OverlayPaths,
+            ct);
+        var drawingFiles = await CopyAttachmentsAsync(
+            upload,
+            duplicateProject.Id,
+            sourceProject.CustomerId,
+            sourcePart.DrawingFiles,
+            copiedFileIds,
+            "drawings",
+            ct);
+        var supplementaryFiles = await CopyAttachmentsAsync(
+            upload,
+            duplicateProject.Id,
+            sourceProject.CustomerId,
+            sourcePart.SupplementaryFiles,
+            copiedFileIds,
+            "supplementary",
+            ct);
+
+        var thumbnailSmallUrl = await GetSignedUrlIfPresentAsync(upload, thumbnailSmallPath, ct);
+        var thumbnailLargeUrl = await GetSignedUrlIfPresentAsync(upload, thumbnailLargePath, ct);
+        var glbSignedUrl = await GetSignedUrlIfPresentAsync(upload, glbPath, ct);
+
+        if (analysisStatusService is not null)
+        {
+            await analysisStatusService.CloneStatusAsync(
+                sourcePart.FileReference,
+                copiedFile.StoragePath,
+                thumbnailSmallUrl,
+                thumbnailLargeUrl,
+                thumbnailSmallPath,
+                thumbnailLargePath,
+                glbPath,
+                glbSignedUrl,
+                ct);
+        }
+
+        return new AddProjectPartRequest
+        {
+            FileId = copiedFileId,
+            FileReference = copiedFile.StoragePath,
+            ThumbnailSmallGcsPath = thumbnailSmallPath,
+            ThumbnailLargeGcsPath = thumbnailLargePath,
+            GlbStoragePath = glbPath,
+            OverlayPaths = overlayPaths,
+            FileName = sourcePart.FileName,
+            ProcessType = sourcePart.ProcessType,
+            MaterialId = sourcePart.MaterialId,
+            MaterialName = sourcePart.MaterialName,
+            MaterialCode = sourcePart.MaterialCode,
+            Quantity = sourcePart.Quantity,
+            Finish = sourcePart.Finish,
+            Color = sourcePart.Color,
+            Tolerance = sourcePart.Tolerance,
+            RoughnessCode = sourcePart.RoughnessCode,
+            MarkingType = sourcePart.MarkingType,
+            MarkingText = sourcePart.MarkingText,
+            DfmAcknowledged = sourcePart.DfmAcknowledged,
+            HasThreadedHoles = sourcePart.HasThreadedHoles,
+            ThreadedHoleSpec = sourcePart.ThreadedHoleSpec,
+            ThreadedHoleCount = sourcePart.ThreadedHoleCount,
+            HasInserts = sourcePart.HasInserts,
+            InsertType = sourcePart.InsertType,
+            InsertCount = sourcePart.InsertCount,
+            BagAndTag = sourcePart.BagAndTag,
+            InspectionLevel = sourcePart.InspectionLevel,
+            Certificates = [.. sourcePart.Certificates],
+            DrawingFiles = drawingFiles,
+            SupplementaryFiles = supplementaryFiles,
+            ProcessConfig = new Dictionary<string, string>(sourcePart.ProcessConfig),
+            BodyCount = sourcePart.BodyCount,
+            BodiesJson = sourcePart.BodiesJson,
+            SelectedBodyIndex = sourcePart.SelectedBodyIndex,
+            VolumeCm3 = null,
+            BoundingBoxX = sourcePart.Dimensions is null ? null : (decimal)sourcePart.Dimensions.X,
+            BoundingBoxY = sourcePart.Dimensions is null ? null : (decimal)sourcePart.Dimensions.Y,
+            BoundingBoxZ = sourcePart.Dimensions is null ? null : (decimal)sourcePart.Dimensions.Z,
+            IsManifold = sourcePart.IsManifold
+        };
+    }
+
+    private static async Task<string?> CopyArtifactPathAsync(
+        UploadServiceClient upload,
+        string sourceFilePath,
+        string destinationFilePath,
+        string? sourceArtifactPath,
+        string artifactKey,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(sourceArtifactPath))
+            return null;
+
+        var destinationPath = BuildArtifactDestinationPath(
+            sourceFilePath,
+            destinationFilePath,
+            sourceArtifactPath,
+            artifactKey);
+
+        return await upload.CopyFileAsync(sourceArtifactPath, destinationPath, ct)
+            ? destinationPath
+            : null;
+    }
+
+    private static async Task<Dictionary<string, string>> CopyOverlayPathsAsync(
+        UploadServiceClient upload,
+        string sourceFilePath,
+        string destinationFilePath,
+        Dictionary<string, string> sourceOverlayPaths,
+        CancellationToken ct)
+    {
+        var copied = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, path) in sourceOverlayPaths)
+        {
+            var copiedPath = await CopyArtifactPathAsync(upload, sourceFilePath, destinationFilePath, path, key, ct);
+            if (!string.IsNullOrWhiteSpace(copiedPath))
+                copied[key] = copiedPath;
+        }
+
+        return copied;
+    }
+
+    private static async Task<List<ProjectPartAttachmentDto>> CopyAttachmentsAsync(
+        UploadServiceClient upload,
+        Guid duplicateProjectId,
+        Guid customerId,
+        List<ProjectPartAttachmentDto> sourceAttachments,
+        List<Guid> copiedFileIds,
+        string attachmentFolder,
+        CancellationToken ct)
+    {
+        var copied = new List<ProjectPartAttachmentDto>();
+        foreach (var source in sourceAttachments)
+        {
+            if (string.IsNullOrWhiteSpace(source.StoragePath))
+                continue;
+
+            var destinationPath = BuildAttachmentPath(duplicateProjectId, customerId, attachmentFolder, source.FileName);
+            var copiedFile = await upload.CopyFileWithMetadataAsync(
+                source.StoragePath,
+                destinationPath,
+                source.FileName,
+                metadata: new Dictionary<string, string>
+                {
+                    ["source_attachment_file_id"] = source.FileId?.ToString() ?? string.Empty,
+                    ["source_attachment_path"] = source.StoragePath
+                },
+                ct: ct);
+
+            if (copiedFile is null || !Guid.TryParse(copiedFile.FileId, out var copiedFileId))
+                throw new InvalidOperationException($"UploadService failed to copy attachment '{source.FileName}'.");
+
+            copiedFileIds.Add(copiedFileId);
+            copied.Add(new ProjectPartAttachmentDto
+            {
+                FileId = copiedFileId,
+                FileName = source.FileName,
+                StoragePath = copiedFile.StoragePath,
+                SignedUrl = await upload.GetDownloadUrlByPathAsync(copiedFile.StoragePath, ct),
+                SizeBytes = copiedFile.SizeBytes,
+                ContentType = copiedFile.ContentType,
+                UploadedAt = copiedFile.UploadedAt
+            });
+        }
+
+        return copied;
+    }
+
+    private static async Task EnrichSignedArtifactUrlsAsync(
+        ProjectPartDto part,
+        UploadServiceClient upload,
+        CancellationToken ct)
+    {
+        part.ThumbnailUrl = await GetSignedUrlIfPresentAsync(upload, part.ThumbnailSmallGcsPath, ct) ?? part.ThumbnailUrl;
+        part.ModelPreviewUrl = await GetSignedUrlIfPresentAsync(upload, part.GlbStoragePath, ct) ?? part.ModelPreviewUrl;
+    }
+
+    private static async Task<string?> GetSignedUrlIfPresentAsync(
+        UploadServiceClient upload,
+        string? storagePath,
+        CancellationToken ct)
+    {
+        return string.IsNullOrWhiteSpace(storagePath)
+            ? null
+            : await upload.GetDownloadUrlByPathAsync(storagePath, ct);
+    }
+
+    private async Task CleanupDuplicateAsync(
+        Guid duplicateProjectId,
+        IReadOnlyCollection<Guid> copiedFileIds,
+        UploadServiceClient upload,
+        CancellationToken ct)
+    {
+        try
+        {
+            await client.DeleteProjectAsync(duplicateProjectId, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to clean up duplicate project {DuplicateProjectId}", duplicateProjectId);
+        }
+
+        foreach (var fileId in copiedFileIds)
+        {
+            try
+            {
+                await upload.DeleteFileAsync(fileId, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to clean up copied file {FileId}", fileId);
+            }
+        }
+    }
+
+    private static string BuildCopyTitle(string title)
+    {
+        return string.IsNullOrWhiteSpace(title) ? "Copy" : $"{title} (Copy)";
+    }
+
+    private static string BuildProjectUploadPath(Guid projectId, Guid customerId, string fileName)
+    {
+        var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+        return $"customers/{customerId}/projects/{projectId}/{uniquePrefix}_{fileName}";
+    }
+
+    private static string BuildAttachmentPath(Guid projectId, Guid customerId, string folder, string fileName)
+    {
+        var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+        return $"customers/{customerId}/projects/{projectId}/{folder}/{uniquePrefix}_{fileName}";
+    }
+
+    private static string BuildArtifactDestinationPath(
+        string sourceFilePath,
+        string destinationFilePath,
+        string sourceArtifactPath,
+        string artifactKey)
+    {
+        if (sourceArtifactPath.StartsWith(sourceFilePath, StringComparison.OrdinalIgnoreCase))
+            return destinationFilePath + sourceArtifactPath[sourceFilePath.Length..];
+
+        var extension = GetStoragePathExtension(sourceArtifactPath);
+        var safeKey = string.Concat(artifactKey.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_'));
+        return $"{destinationFilePath}_{safeKey}{extension}";
+    }
+
+    private static string GetStoragePathExtension(string storagePath)
+    {
+        var fileName = storagePath.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? storagePath;
+        var extension = Path.GetExtension(fileName);
+        return string.IsNullOrWhiteSpace(extension) ? string.Empty : extension;
     }
 
     private static string? MapProcessToEquipmentCategory(string processType) => processType switch

@@ -109,7 +109,7 @@ public class DtoSerializationTests
     [Fact]
     public void PurchaseOrderDto_ShouldRoundtrip()
     {
-        var dto = new PurchaseOrderDto { Id = Guid.NewGuid(), PoNumber = "PO-123", TotalAmount = 5000m };
+        var dto = new PurchaseOrderDto { Id = 123, PoNumber = "PO-123", TotalAmount = 5000m };
         var json = JsonSerializer.Serialize(dto, Options);
         var result = JsonSerializer.Deserialize<PurchaseOrderDto>(json, Options);
         Assert.NotNull(result);

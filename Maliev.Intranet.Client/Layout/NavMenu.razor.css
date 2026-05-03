@@ -14,3 +14,16 @@
 .auto-mode-icon ::deep svg path {
     fill: url(#auto-mode-gradient) !important;
 }
+.nav-logo-button {
+    display: inline-flex;
+    align-items: center;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+}
+
+.nav-logo-button:focus-visible {
+    outline: 2px solid var(--maliev-accent);
+    outline-offset: 4px;
+}

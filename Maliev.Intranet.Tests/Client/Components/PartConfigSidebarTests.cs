@@ -65,6 +65,61 @@ public class PartConfigSidebarTests
         Assert.True(IsCustomPaintColorSelected(part.ProcessOptionValues["paint_color_hex"], null));
     }
 
+    [Fact]
+    public void GetVisibleFinishes_WhenAnodizeColorsShareType_ShowsOneTypeTwoAndOneTypeThree()
+    {
+        var finishes = new List<CatalogSurfaceFinishDto>
+        {
+            new(Guid.NewGuid(), "Anodized Natural (Type II)", "ANODIZE_CLEAR", 1.6m, 12m, null, 30),
+            new(Guid.NewGuid(), "Anodized Black (Type II)", "ANODIZE_BLACK", 1.6m, 15m, null, 40),
+            new(Guid.NewGuid(), "Hard Anodized (Type III)", "ANODIZE_HARD", 1.0m, 25m, null, 50),
+        };
+
+        var visible = GetVisibleFinishes(finishes).ToList();
+
+        Assert.Equal(2, visible.Count);
+        Assert.Contains(visible, f => GetSurfaceFinishDisplayName(f) == "Anodized Type II");
+        Assert.Contains(visible, f => GetSurfaceFinishDisplayName(f) == "Anodized Type III");
+    }
+
+    [Fact]
+    public void IsVisibleProcessOption_WhenThreadSpecificationCatalogOption_ReturnsFalse()
+    {
+        var sidebar = new PartConfigSidebar();
+        var option = new ProcessConfigOptionDto(
+            Guid.NewGuid(),
+            "thread_spec",
+            "Thread Specification",
+            "text",
+            null,
+            null,
+            null,
+            "e.g. M6x1.0, 1/4-20 UNC",
+            false,
+            30);
+
+        Assert.False(IsVisibleProcessOption(sidebar, option));
+    }
+
+    [Fact]
+    public void IsVisibleProcessOption_WhenGrooveUndercutCatalogOption_ReturnsFalse()
+    {
+        var sidebar = new PartConfigSidebar();
+        var option = new ProcessConfigOptionDto(
+            Guid.NewGuid(),
+            "groove_undercut",
+            "Groove/Undercut",
+            "boolean",
+            null,
+            null,
+            null,
+            "Detected from drawing or model geometry",
+            false,
+            40);
+
+        Assert.False(IsVisibleProcessOption(sidebar, option));
+    }
+
     private static async Task InvokeOnParametersSetAsync(PartConfigSidebar sidebar)
     {
         await InvokePrivateTask(sidebar, "OnParametersSetAsync");
@@ -90,6 +145,37 @@ public class PartConfigSidebarTests
 
         Assert.NotNull(method);
         return Assert.IsType<bool>(method.Invoke(null, [paintHex, paintReference]));
+    }
+
+    private static IReadOnlyList<CatalogSurfaceFinishDto> GetVisibleFinishes(
+        IReadOnlyList<CatalogSurfaceFinishDto> finishes)
+    {
+        var method = typeof(PartConfigSidebar).GetMethod(
+            "GetVisibleFinishes",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+        return Assert.IsAssignableFrom<IReadOnlyList<CatalogSurfaceFinishDto>>(method.Invoke(null, [finishes]));
+    }
+
+    private static string GetSurfaceFinishDisplayName(CatalogSurfaceFinishDto finish)
+    {
+        var method = typeof(PartConfigSidebar).GetMethod(
+            "GetSurfaceFinishDisplayName",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+        return Assert.IsType<string>(method.Invoke(null, [finish]));
+    }
+
+    private static bool IsVisibleProcessOption(PartConfigSidebar sidebar, ProcessConfigOptionDto option)
+    {
+        var method = typeof(PartConfigSidebar).GetMethod(
+            "IsVisibleProcessOption",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+        return Assert.IsType<bool>(method.Invoke(sidebar, [option]));
     }
 
     private static void SetPartParameter(PartConfigSidebar sidebar, PartViewModel part)

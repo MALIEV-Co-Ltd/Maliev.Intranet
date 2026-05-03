@@ -58,10 +58,88 @@ public class CustomerServiceClientTests
     }
 
     [Fact]
+    public async Task CreateAddressesAsync_WithBillingOnlyAndNoExistingShipping_CreatesDefaultShippingAddress()
+    {
+        var customerId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        var postedAddressPayloads = new List<string>();
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m =>
+                    m.Method == HttpMethod.Get &&
+                    m.RequestUri!.PathAndQuery.Contains($"/addresses?ownerType=Customer&ownerId={customerId}")),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new List<AddressResponse>())
+            });
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m =>
+                    m.Method == HttpMethod.Post &&
+                    m.RequestUri!.PathAndQuery.Contains("/addresses")),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(async (HttpRequestMessage message, CancellationToken _) =>
+            {
+                postedAddressPayloads.Add(await message.Content!.ReadAsStringAsync());
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new AddressResponse { Id = Guid.NewGuid() })
+                };
+            });
+
+        var result = await _client.CreateAddressesAsync(customerId,
+        [
+            new CreateAddressRequest
+            {
+                Type = "Billing",
+                IsDefault = true,
+                AddressLine1 = "36/1 Moo 3",
+                AddressLine2 = "Unit A",
+                AddressLine3 = "Building B",
+                District = "Khlong Khoi",
+                City = "Pak Kret",
+                StateProvince = "Nonthaburi",
+                PostalCode = "11120",
+                CountryId = countryId,
+                RecipientName = "Natthaphon",
+                RecipientPhone = "028816002"
+            }
+        ]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(2, postedAddressPayloads.Count);
+
+        using var billingPayload = System.Text.Json.JsonDocument.Parse(postedAddressPayloads[0]);
+        using var shippingPayload = System.Text.Json.JsonDocument.Parse(postedAddressPayloads[1]);
+        var billingRoot = billingPayload.RootElement;
+        var shippingRoot = shippingPayload.RootElement;
+
+        Assert.Equal("Billing", billingRoot.GetProperty("type").GetString());
+        Assert.Equal("Shipping", shippingRoot.GetProperty("type").GetString());
+        Assert.True(shippingRoot.GetProperty("isDefault").GetBoolean());
+        Assert.Equal(billingRoot.GetProperty("addressLine1").GetString(), shippingRoot.GetProperty("addressLine1").GetString());
+        Assert.Equal(billingRoot.GetProperty("addressLine2").GetString(), shippingRoot.GetProperty("addressLine2").GetString());
+        Assert.Equal(billingRoot.GetProperty("addressLine3").GetString(), shippingRoot.GetProperty("addressLine3").GetString());
+        Assert.Equal(billingRoot.GetProperty("district").GetString(), shippingRoot.GetProperty("district").GetString());
+        Assert.Equal(billingRoot.GetProperty("city").GetString(), shippingRoot.GetProperty("city").GetString());
+        Assert.Equal(billingRoot.GetProperty("stateProvince").GetString(), shippingRoot.GetProperty("stateProvince").GetString());
+        Assert.Equal(billingRoot.GetProperty("postalCode").GetString(), shippingRoot.GetProperty("postalCode").GetString());
+        Assert.Equal(billingRoot.GetProperty("countryId").GetString(), shippingRoot.GetProperty("countryId").GetString());
+        Assert.Equal(billingRoot.GetProperty("recipientName").GetString(), shippingRoot.GetProperty("recipientName").GetString());
+        Assert.Equal(billingRoot.GetProperty("recipientPhone").GetString(), shippingRoot.GetProperty("recipientPhone").GetString());
+    }
+
+    [Fact]
     public async Task GetCustomerByIdAsync_ShouldAggregateData()
     {
         var customerId = Guid.NewGuid();
-        var customer = new CustomerDetailDto { Id = customerId, FirstName = "John" };
+        var accountManagerId = Guid.NewGuid();
+        var customer = new CustomerDetailDto { Id = customerId, FirstName = "John", AccountManagerEmployeeId = accountManagerId };
 
         _httpMessageHandlerMock.Protected()
             .Setup<Task<HttpResponseMessage>>(
@@ -85,6 +163,77 @@ public class CustomerServiceClientTests
 
         Assert.NotNull(result);
         Assert.Equal("John", result.FirstName);
+        Assert.Equal(accountManagerId, result.AccountManagerEmployeeId);
+    }
+
+    [Fact]
+    public async Task UpdateCustomerFullAsync_ForwardsXminAndAccountManagerEmployeeId()
+    {
+        var customerId = Guid.NewGuid();
+        var accountManagerId = Guid.NewGuid();
+        var capturedPayload = string.Empty;
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(message =>
+                    message.Method == HttpMethod.Get &&
+                    message.RequestUri!.PathAndQuery == $"/customer/v1/customers/{customerId}"),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new CustomerDetailDto { Id = customerId, Xmin = 123 })
+            });
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(message =>
+                    message.Method == HttpMethod.Patch &&
+                    message.RequestUri!.PathAndQuery == $"/customer/v1/customers/{customerId}"),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(async (HttpRequestMessage message, CancellationToken _) =>
+            {
+                capturedPayload = await message.Content!.ReadAsStringAsync();
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new CustomerResponse { Id = customerId, AccountManagerEmployeeId = accountManagerId })
+                };
+            });
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(message =>
+                    message.Method == HttpMethod.Get &&
+                    message.RequestUri!.PathAndQuery.Contains("/customer/v1/addresses?ownerType=Customer", StringComparison.Ordinal)),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new List<AddressResponse>())
+            });
+
+        var result = await _client.UpdateCustomerFullAsync(customerId, new CustomerOnboardingRequest
+        {
+            Customer = new CreateCustomerRequest
+            {
+                FirstName = "Sarah",
+                LastName = "Chen",
+                Email = "sarah@example.com",
+                Segment = "Enterprise",
+                Tier = "Gold",
+                PreferredLanguage = "en",
+                Timezone = "Asia/Bangkok",
+                AccountManagerEmployeeId = accountManagerId
+            }
+        });
+
+        Assert.NotNull(result);
+        using var document = System.Text.Json.JsonDocument.Parse(capturedPayload);
+        var root = document.RootElement;
+        Assert.Equal(accountManagerId.ToString(), root.GetProperty("accountManagerEmployeeId").GetString());
+        Assert.False(root.GetProperty("clearAccountManager").GetBoolean());
+        Assert.Equal(123u, root.GetProperty("xmin").GetUInt32());
     }
 
     [Fact]
@@ -113,6 +262,37 @@ public class CustomerServiceClientTests
 
         Assert.NotNull(result);
         Assert.Single(result.Data);
+    }
+
+    [Fact]
+    public async Task GetCustomersAsync_ForwardsPaginationAndSupportedFilters()
+    {
+        var response = new
+        {
+            items = new List<CustomerSummaryDto> { new() { Name = "Test" } },
+            totalCount = 1,
+            page = 2,
+            pageSize = 10,
+            totalPages = 4
+        };
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m =>
+                    m.RequestUri!.PathAndQuery == "/customer/v1/customers?page=2&pageSize=10&sortBy=createdAt&sortDirection=desc&query=acme&segment=Enterprise&tier=VIP&includeDeleted=true"),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(response)
+            });
+
+        var result = await _client.GetCustomersAsync("acme", "Enterprise", "VIP", includeDeleted: true, page: 2, pageSize: 10);
+
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Meta.CurrentPage);
+        Assert.Equal(10, result.Meta.PageSize);
+        Assert.Equal(4, result.Meta.TotalPages);
     }
 
     [Fact]

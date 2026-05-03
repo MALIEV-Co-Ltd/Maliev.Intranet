@@ -11,8 +11,13 @@
 <header class="topbar-root">
     @* ── Left: Logo ── *@
     <div class="topbar-left">
-        <MudImage Src="@LogoUrl" Alt="Maliev" Height="22" Style="cursor: pointer;"
-                  @onclick="@(() => Navigation.NavigateTo("/"))" />
+        <button type="button"
+                class="topbar-logo-button"
+                title="Dashboard"
+                aria-label="Go to dashboard"
+                @onclick="@(() => Navigation.NavigateTo("/"))">
+            <MudImage Src="@LogoUrl" Alt="MALIEV" Height="22" />
+        </button>
     </div>
 
     @* ── Divider ── *@
@@ -20,24 +25,17 @@
 
     @* ── Center: Navigation ── *@
     <nav class="topbar-nav">
-        <MudNavLink Href="" Match="NavLinkMatch.All">Dashboard</MudNavLink>
-        <MudNavLink Href="sales/projects" Match="NavLinkMatch.Prefix">Projects</MudNavLink>
         @foreach (var item in _navItems)
         {
-            <MudNavLink Href="@item.Href" Match="NavLinkMatch.Prefix">@item.Label</MudNavLink>
+            <MudNavLink Href="@item.Href" Match="@item.Match" Class="@item.Class">@item.Label</MudNavLink>
         }
     </nav>
 
     @* ── Search ── *@
     <div class="topbar-search">
-        <div class="topbar-search-wrap">
-            <svg class="topbar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input class="topbar-search-input"
-                   placeholder="Search parts, quotes…"
-                   value="@_searchString"
-                   @oninput="@(e => _searchString = e.Value?.ToString() ?? "")"
-                   @onkeydown="@OnSearchKeyDown" />
-        </div>
+        <GlobalSearchBox Class="topbar-global-search"
+                         Placeholder="Search customers, projects, invoices..."
+                         Limit="8" />
     </div>
 
     <div style="flex: 1;" />
@@ -113,7 +111,10 @@
                         </div>
                     </ActivatorContent>
                     <ChildContent>
-                        <MudMenuItem OnClick="@HandleLogout">Logout</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.AccountCircle" Href="/hr/profile">My Profile</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Tune" Href="/hr/profile?tab=preferences">Preferences</MudMenuItem>
+                        <MudDivider />
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Logout" OnClick="@HandleLogout">Sign out</MudMenuItem>
                     </ChildContent>
                 </MudMenu>
             </Authorized>
@@ -129,13 +130,16 @@
     [Parameter] public EventCallback<bool> ChatDrawerOpenChanged { get; set; }
     [Parameter] public EventCallback OnToggleTheme { get; set; }
 
-    private string _searchString = "";
-
-    private record NavItem(string Label, string Href);
+    private record NavItem(string Label, string Href, NavLinkMatch Match = NavLinkMatch.Prefix, string? Class = null);
 
     private readonly List<NavItem> _navItems =
     [
-        new("Customers", "sales/customers"),
+        new("Quote", "sales/projects/new", NavLinkMatch.Prefix, "topbar-nav-quote"),
+        new("Customers", "customers"),
+        new("Accounting", "accounting"),
+        new("Purchasing", "purchasing"),
+        new("Admin", "admin"),
+        new("IAM", "iam"),
     ];
 
     private string LogoUrl => LayoutService.IsDarkMode
@@ -216,17 +220,6 @@
         if (c == null) return;
         _selectedCurrency = c;
         await CurrencyService.SetCurrencyAsync(c);
-    }
-
-    private void ExecuteSearch()
-    {
-        if (!string.IsNullOrWhiteSpace(_searchString))
-            Navigation.NavigateTo($"/sales/customers?search={Uri.EscapeDataString(_searchString)}");
-    }
-
-    private void OnSearchKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") ExecuteSearch();
     }
 
     private async Task ToggleChat() => await ChatDrawerOpenChanged.InvokeAsync(!ChatDrawerOpen);

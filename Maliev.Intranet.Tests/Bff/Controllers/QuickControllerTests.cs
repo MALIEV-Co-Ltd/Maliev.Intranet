@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
@@ -48,6 +49,45 @@ public class QuickControllerTests
         var controller = new QuotationsController(new QuotationServiceClient(CreateClient(new PagedResponse<QuotationSummaryDto>())), CreatePdfClient());
         var result = await controller.Get(null, 1, 20);
         Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Quotations_GenerateDraftPdf_StampsQuotedByFromAuthenticatedEmployee()
+    {
+        JsonDocument? capturedRequest = null;
+        var handler = new MockHttpMessageHandler(async (req, ct) =>
+        {
+            capturedRequest = JsonDocument.Parse(await req.Content!.ReadAsStringAsync(ct));
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { storageUrl = "http://test.pdf" })
+            };
+        });
+        var pdfClient = new PdfServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+        var controller = new QuotationsController(new QuotationServiceClient(CreateClient(new PagedResponse<QuotationSummaryDto>())), pdfClient)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim(ClaimTypes.Name, "Alex Kim"),
+                        new Claim("email", "alex.kim@maliev.com"),
+                    ], "Test"))
+                }
+            }
+        };
+
+        var result = await controller.GenerateDraftPdf(new QuotationPdfData { QuotationNumber = "Q-DRAFT" }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(capturedRequest);
+        var data = capturedRequest.RootElement.GetProperty("data");
+        Assert.Equal("Alex Kim", data.GetProperty("QuotedByName").GetString());
+        Assert.Equal("alex.kim@maliev.com", data.GetProperty("QuotedByEmail").GetString());
+        Assert.True(data.TryGetProperty("QuotedAt", out var quotedAt));
+        Assert.False(string.IsNullOrWhiteSpace(quotedAt.GetString()));
     }
 
     [Fact]

@@ -1,0 +1,86 @@
+@page "/accounting/{Id:guid}"
+@page "/finance/invoices/{Id:guid}"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Invoice Detail | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@(_invoice?.InvoiceNumber ?? "Invoice")" Subtitle="@_invoice?.CustomerName" BackHref="/accounting">
+        @if (_invoice is not null)
+        {
+            <StatusBadge Status="@_invoice.Status" />
+        }
+    </PageHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_invoice is null)
+        {
+            <div class="mlv-empty">Invoice was not found.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Total" Value="@_invoice.Total.ToString("N2")" />
+                <StatTile Label="Tax" Value="@_invoice.TaxAmount.ToString("N2")" />
+                <StatTile Label="Currency" Value="@_invoice.Currency" />
+                <StatTile Label="Due" Value="@_invoice.DueDate.ToString("dd MMM")" />
+            </StatBar>
+
+            <div class="mlv-grid">
+                <PanelCard Title="Billing" Class="mlv-span-5">
+                    <div class="mlv-list">
+                        <div class="mlv-list-row"><span>Customer</span><strong>@_invoice.CustomerName</strong></div>
+                        <div class="mlv-list-row"><span>Tax ID</span><strong>@_invoice.CustomerTaxId</strong></div>
+                        <div class="mlv-list-row"><span>PO</span><strong>@(_invoice.PoNumber ?? "-")</strong></div>
+                    </div>
+                </PanelCard>
+                <PanelCard Title="Line items" Class="mlv-span-7">
+                    @if (_invoice.Items.Count > 0)
+                    {
+                        <table class="mlv-table">
+                            <thead><tr><th>Description</th><th>Qty</th><th>Unit</th></tr></thead>
+                            <tbody>
+                                @foreach (var item in _invoice.Items)
+                                {
+                                    <tr><td>@item.Description</td><td>@item.Quantity.ToString("N2")</td><td>@item.UnitPrice.ToString("N2")</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">No line items.</div>
+                    }
+                </PanelCard>
+            </div>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private InvoiceDetailDto? _invoice;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _invoice = await Http.GetFromJsonAsync<InvoiceDetailDto>($"api/v1/invoices/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Invoice could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

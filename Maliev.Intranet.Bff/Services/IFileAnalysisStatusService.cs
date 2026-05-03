@@ -69,4 +69,18 @@ public interface IFileAnalysisStatusService
     /// <param name="newStoragePath">The new customer-bucket path prefix (e.g. "customers/{guid}/projects/{guid}/").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task MigrateGlbStoragePathAsync(string oldStoragePath, string newStoragePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clones a cached analysis status entry for an independently copied file.
+    /// </summary>
+    Task CloneStatusAsync(
+        string sourceStoragePath,
+        string destinationStoragePath,
+        string? destinationThumbnailSmallUrl = null,
+        string? destinationThumbnailLargeUrl = null,
+        string? destinationThumbnailSmallGcsPath = null,
+        string? destinationThumbnailLargeGcsPath = null,
+        string? destinationGlbStoragePath = null,
+        string? destinationGlbSignedUrl = null,
+        CancellationToken cancellationToken = default);
 }

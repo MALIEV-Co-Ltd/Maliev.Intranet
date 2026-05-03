@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -135,19 +136,30 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
         var pdfData = new QuotationPdfData
         {
             QuotationNumber = quotation.QuotationNumber,
+            VersionNumber = quotation.CurrentVersionNumber,
             CustomerName = quotation.CustomerName,
+            CustomerType = "Corporate",
             QuotationDate = quotation.CreatedAt,
-            TotalAmount = (double)quotation.Total,
+            ValidityStart = quotation.ValidityPeriodStart,
+            ValidityEnd = quotation.ValidityPeriodEnd,
+            SubtotalBeforeDiscount = quotation.SubTotal,
+            Subtotal = quotation.SubTotal,
+            TaxAmount = quotation.Tax,
+            TotalAmount = quotation.Total,
             Currency = !string.IsNullOrEmpty(quotation.CurrencyCode) ? quotation.CurrencyCode : "THB",
+            DeliveryExpectations = quotation.DeliveryExpectations,
+            ChangeSummary = quotation.Versions?.OrderByDescending(version => version.VersionNumber).FirstOrDefault()?.ChangeSummary,
             Items = quotation.Versions?.FirstOrDefault()?.LineItems?.Select((item, index) => new QuotationPdfItem
             {
                 Index = index + 1,
-                Description = item.Description,
-                Quantity = (double)item.Quantity,
-                UnitPrice = (double)item.UnitPrice,
-                TotalPrice = (double)(item.Quantity * item.UnitPrice)
+                MaterialName = item.Description,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                LineTotal = item.Quantity * item.UnitPrice
             }).ToList() ?? []
         };
+
+        ApplyQuotedByMetadata(pdfData);
 
         var pdfUrl = await pdfClient.GeneratePdfAsync(
             PdfDocumentType.Quotation,
@@ -169,6 +181,7 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
     public async Task<ActionResult> GenerateDraftPdf([FromBody] QuotationPdfData pdfData, CancellationToken ct)
     {
         var referenceId = Guid.NewGuid().ToString();
+        ApplyQuotedByMetadata(pdfData);
         var pdfUrl = await pdfClient.GeneratePdfAsync(
             PdfDocumentType.Quotation,
             referenceId,
@@ -176,4 +189,25 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             ct: ct);
         return pdfUrl != null ? Ok(new { storageUrl = pdfUrl }) : BadRequest("Failed to generate PDF");
     }
+
+    private void ApplyQuotedByMetadata(QuotationPdfData pdfData)
+    {
+        pdfData.QuotedByName = FirstNonEmpty(
+            User.Identity?.Name,
+            User.FindFirst("name")?.Value,
+            User.FindFirst("preferred_username")?.Value,
+            User.FindFirst("email")?.Value,
+            User.FindFirst(ClaimTypes.Email)?.Value,
+            pdfData.QuotedByName);
+
+        pdfData.QuotedByEmail = FirstNonEmpty(
+            User.FindFirst("email")?.Value,
+            User.FindFirst(ClaimTypes.Email)?.Value,
+            pdfData.QuotedByEmail);
+
+        pdfData.QuotedAt = DateTime.UtcNow;
+    }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 }

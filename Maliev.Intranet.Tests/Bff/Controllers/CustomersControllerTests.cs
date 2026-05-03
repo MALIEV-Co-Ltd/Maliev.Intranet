@@ -46,10 +46,17 @@ public class CustomersControllerTests
     public async Task Get_ShouldReturnOk_WhenSuccessful()
     {
         var response = new PagedResponse<CustomerSummaryDto>();
-        _customerClientMock.Setup(x => x.GetCustomersAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _customerClientMock.Setup(x => x.GetCustomersAsync(
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<bool>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
 
-        var result = await _controller.Get(null, 1, CancellationToken.None);
+        var result = await _controller.Get(null, null, null, false, 1, 20, CancellationToken.None);
 
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         Assert.Equal(response, okResult.Value);

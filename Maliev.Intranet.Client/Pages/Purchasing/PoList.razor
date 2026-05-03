@@ -1,0 +1,318 @@
+@page "/purchasing"
+@page "/mfg/procurement"
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Purchasing | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Purchasing" Subtitle="Purchase orders, supplier commitments, approvals, and inbound receiving.">
+        <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">New PO</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Matching POs" Value="@_meta.TotalItems.ToString("N0")" />
+            <StatTile Label="Page spend" Value="@_orders.Sum(o => o.TotalAmount).ToString("N2")" />
+            <StatTile Label="Open" Value="@_orders.Count(o => IsOpenStatus(o.Status)).ToString("N0")" />
+            <StatTile Label="Suppliers" Value="@_orders.Select(o => o.SupplierId).Where(id => id > 0).Distinct().Count().ToString("N0")" />
+        </StatBar>
+
+        <div class="mlv-toolbar">
+            <div class="mlv-toolbar-left">
+                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Order ID..." OnEnter="SearchAsync" />
+                <label class="mlv-filter-field">
+                    <span>Status</span>
+                    <select value="@(_status ?? string.Empty)" @onchange="OnStatusChanged">
+                        @foreach (var status in _statuses)
+                        {
+                            <option value="@status.Value">@status.Label</option>
+                        }
+                    </select>
+                </label>
+                <label class="mlv-filter-field">
+                    <span>Type</span>
+                    <select value="@(_orderType ?? string.Empty)" @onchange="OnOrderTypeChanged">
+                        @foreach (var type in _orderTypes)
+                        {
+                            <option value="@type.Value">@type.Label</option>
+                        }
+                    </select>
+                </label>
+                <label class="mlv-filter-field compact">
+                    <span>Supplier</span>
+                    <input value="@_supplierIdText" @oninput="OnSupplierChanged" inputmode="numeric" />
+                </label>
+            </div>
+            <div class="mlv-toolbar-right">
+                <SecondaryButton Icon="@Icons.Material.Outlined.Search" OnClick="@SearchClickedAsync">Search</SecondaryButton>
+                <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <PanelCard>
+            @if (_orders.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>PO</th>
+                            <th>Supplier</th>
+                            <th>Status</th>
+                            <th>Type</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Expected</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in _orders)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/purchasing/{order.Id}"))">
+                                <td>
+                                    <div class="mlv-row-main mlv-mono">@Display(order.PoNumber)</div>
+                                    <div class="mlv-row-sub">Order @order.OrderId</div>
+                                </td>
+                                <td>@Display(order.SupplierName)</td>
+                                <td><StatusBadge Status="@order.Status" /></td>
+                                <td>@Display(order.OrderType)</td>
+                                <td>@order.ItemsCount.ToString("N0")</td>
+                                <td class="mlv-mono">@FormatMoney(order.TotalAmount, order.CurrencyCode)</td>
+                                <td>@(order.ExpectedDelivery?.ToString("dd MMM yyyy") ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">
+                    No purchase orders match this view.
+                    <div class="mt-3">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">Create Purchase Order</PrimaryButton>
+                    </div>
+                </div>
+            }
+        </PanelCard>
+
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
+    </PageBody>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "orderType")] public string? OrderType { get; set; }
+    [SupplyParameterFromQuery(Name = "orderId")] public int? OrderId { get; set; }
+    [SupplyParameterFromQuery(Name = "supplierId")] public int? SupplierId { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public int? QueryPageSize { get; set; }
+
+    private readonly (string Label, string Value)[] _statuses =
+    [
+        ("All", string.Empty),
+        ("Pending", "Pending"),
+        ("Approved", "Approved"),
+        ("Ordered", "Ordered"),
+        ("Delivered", "Delivered"),
+        ("Cancelled", "Cancelled"),
+        ("PDF Pending", "PDFPending")
+    ];
+
+    private readonly (string Label, string Value)[] _orderTypes =
+    [
+        ("All", string.Empty),
+        ("Internal", "Internal"),
+        ("External", "External")
+    ];
+
+    private List<PurchaseOrderDto> _orders = [];
+    private PaginationMeta _meta = new();
+    private bool _loading = true;
+    private string? _error;
+    private string? _status;
+    private string? _orderType;
+    private string? _search;
+    private string _supplierIdText = string.Empty;
+    private int? _supplierId;
+    private int? _orderId;
+    private int _page = 1;
+    private int _pageSize = 20;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _status = Normalize(Status, _statuses);
+        _orderType = Normalize(OrderType, _orderTypes);
+        _orderId = OrderId is > 0 ? OrderId : null;
+        _search = _orderId?.ToString();
+        _supplierId = SupplierId is > 0 ? SupplierId : null;
+        _supplierIdText = _supplierId?.ToString() ?? string.Empty;
+        _page = Math.Max(1, QueryPage ?? 1);
+        _pageSize = NormalizePageSize(QueryPageSize ?? 20);
+        await LoadOrdersAsync();
+    }
+
+    private Task OnSearchChanged(string? value)
+    {
+        _search = value;
+        return Task.CompletedTask;
+    }
+
+    private async Task OnStatusChanged(ChangeEventArgs e)
+    {
+        _status = Normalize(e.Value?.ToString(), _statuses);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnOrderTypeChanged(ChangeEventArgs e)
+    {
+        _orderType = Normalize(e.Value?.ToString(), _orderTypes);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private Task OnSupplierChanged(ChangeEventArgs e)
+    {
+        _supplierIdText = e.Value?.ToString() ?? string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private async Task SearchAsync()
+    {
+        _error = null;
+        _supplierId = ParsePositiveInt(_supplierIdText, "supplier");
+        _orderId = ParsePositiveInt(_search, "order");
+
+        if (_error is not null)
+        {
+            Snackbar.Add(_error, Severity.Warning);
+            return;
+        }
+
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task SearchClickedAsync(MouseEventArgs _) => await SearchAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadOrdersAsync();
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = NormalizePageSize(pageSize);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task NavigateAndLoadAsync()
+    {
+        Navigation.NavigateTo(BuildPageUri(), replace: true);
+        await LoadOrdersAsync();
+    }
+
+    private async Task LoadOrdersAsync(CancellationToken ct = default)
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<PurchaseOrderDto>>(BuildApiUrl(), ct);
+            _orders = response?.Data.ToList() ?? [];
+            _meta = response?.Meta ?? new();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
+        }
+        catch (Exception ex)
+        {
+            _error = "Purchase orders could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string BuildApiUrl()
+    {
+        var query = new List<string>
+        {
+            $"page={_page}",
+            $"pageSize={_pageSize}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(_status)) query.Add($"status={Uri.EscapeDataString(_status)}");
+        if (!string.IsNullOrWhiteSpace(_orderType)) query.Add($"orderType={Uri.EscapeDataString(_orderType)}");
+        if (_supplierId is > 0) query.Add($"supplierId={_supplierId.Value}");
+        if (_orderId is > 0) query.Add($"orderId={_orderId.Value}");
+        return $"api/v1/procurement?{string.Join("&", query)}";
+    }
+
+    private string BuildPageUri()
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_status)) query.Add($"status={Uri.EscapeDataString(_status)}");
+        if (!string.IsNullOrWhiteSpace(_orderType)) query.Add($"orderType={Uri.EscapeDataString(_orderType)}");
+        if (_supplierId is > 0) query.Add($"supplierId={_supplierId.Value}");
+        if (_orderId is > 0) query.Add($"orderId={_orderId.Value}");
+        if (_page > 1) query.Add($"page={_page}");
+        if (_pageSize != 20) query.Add($"pageSize={_pageSize}");
+        return query.Count == 0 ? "/purchasing" : $"/purchasing?{string.Join("&", query)}";
+    }
+
+    private int? ParsePositiveInt(string? value, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (int.TryParse(value, out var parsed) && parsed > 0) return parsed;
+        _error = $"Enter a valid {label} ID.";
+        return null;
+    }
+
+    private static string? Normalize(string? value, IReadOnlyList<(string Label, string Value)> options)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var match = options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase));
+        return string.IsNullOrWhiteSpace(match.Value) ? null : match.Value;
+    }
+
+    private static int NormalizePageSize(int pageSize) => pageSize switch
+    {
+        <= 10 => 10,
+        <= 20 => 20,
+        _ => 50
+    };
+
+    private static bool IsOpenStatus(string status) =>
+        !string.Equals(status, "Delivered", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatMoney(decimal amount, string currency) => $"{amount:N2} {currency}";
+}

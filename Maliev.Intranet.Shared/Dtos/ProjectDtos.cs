@@ -137,6 +137,9 @@ public class ProjectPartDto
     /// <summary>Gets or sets the reference to the uploaded 3D file.</summary>
     public Guid FileId { get; set; }
 
+    /// <summary>Gets or sets the GCS storage path for the uploaded file.</summary>
+    public string? FileReference { get; set; }
+
     /// <summary>Gets or sets the original uploaded filename (e.g. bracket_v2.stl).</summary>
     public string FileName { get; set; } = string.Empty;
 
@@ -148,6 +151,9 @@ public class ProjectPartDto
 
     /// <summary>Gets or sets the material display name.</summary>
     public string? MaterialName { get; set; }
+
+    /// <summary>Gets or sets the material SKU/code used for pricing and quotation handoff.</summary>
+    public string? MaterialCode { get; set; }
 
     /// <summary>Gets or sets the ordered quantity.</summary>
     public int Quantity { get; set; } = 1;
@@ -167,6 +173,12 @@ public class ProjectPartDto
     /// <summary>Gets or sets the employee-confirmed price per unit.</summary>
     public decimal? ConfirmedPrice { get; set; }
 
+    /// <summary>Gets or sets the AI-suggested unit price returned by ProjectService.</summary>
+    public decimal? AiSuggestedPrice { get; set; }
+
+    /// <summary>Gets or sets the employee-confirmed unit price returned by ProjectService.</summary>
+    public decimal? ConfirmedUnitPrice { get; set; }
+
     /// <summary>Gets or sets the reason the employee overrode the AI price, if applicable.</summary>
     public string? OverrideReason { get; set; }
 
@@ -179,8 +191,83 @@ public class ProjectPartDto
     /// <summary>Gets or sets the signed URL for 3D model preview from UploadService.</summary>
     public string? ModelPreviewUrl { get; set; }
 
+    /// <summary>Gets or sets the thumbnail URL returned by ProjectService.</summary>
+    public string? ThumbnailUrl { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the small thumbnail artifact.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the large thumbnail artifact.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the GLB viewer artifact.</summary>
+    public string? GlbStoragePath { get; set; }
+
+    /// <summary>Gets or sets raw GCS overlay artifact paths keyed by process/category.</summary>
+    public Dictionary<string, string> OverlayPaths { get; set; } = [];
+
     /// <summary>Gets or sets bounding box dimensions (X × Y × Z in mm).</summary>
     public ModelDimensionsDto? Dimensions { get; set; }
+
+    /// <summary>Gets or sets whether the analyzed mesh is manifold.</summary>
+    public bool? IsManifold { get; set; }
+
+    /// <summary>CNC surface roughness code.</summary>
+    public string? RoughnessCode { get; set; }
+
+    /// <summary>Part marking type.</summary>
+    public PartMarkingType MarkingType { get; set; } = PartMarkingType.None;
+
+    /// <summary>Part marking text content.</summary>
+    public string? MarkingText { get; set; }
+
+    /// <summary>True when DFM warnings have been acknowledged.</summary>
+    public bool DfmAcknowledged { get; set; }
+
+    /// <summary>True when the part requires threaded/tapped holes.</summary>
+    public bool HasThreadedHoles { get; set; }
+
+    /// <summary>Threaded hole specification.</summary>
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>Number of threaded holes.</summary>
+    public int ThreadedHoleCount { get; set; }
+
+    /// <summary>True when the part requires inserts.</summary>
+    public bool HasInserts { get; set; }
+
+    /// <summary>Insert type.</summary>
+    public InsertType InsertType { get; set; } = InsertType.None;
+
+    /// <summary>Number of inserts.</summary>
+    public int InsertCount { get; set; }
+
+    /// <summary>True when the part should be individually bagged and tagged.</summary>
+    public bool BagAndTag { get; set; } = true;
+
+    /// <summary>Inspection level for quality control.</summary>
+    public InspectionLevel InspectionLevel { get; set; } = InspectionLevel.Standard;
+
+    /// <summary>Requested quality certificates.</summary>
+    public List<string> Certificates { get; set; } = [];
+
+    /// <summary>Technical drawing files attached to this part.</summary>
+    public List<ProjectPartAttachmentDto> DrawingFiles { get; set; } = [];
+
+    /// <summary>Supplementary files attached to this part.</summary>
+    public List<ProjectPartAttachmentDto> SupplementaryFiles { get; set; } = [];
+
+    /// <summary>Dynamic process configuration selections keyed by config key.</summary>
+    public Dictionary<string, string> ProcessConfig { get; set; } = [];
+
+    /// <summary>Number of mesh bodies detected in the uploaded file.</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Serialized body metadata from geometry analysis.</summary>
+    public string? BodiesJson { get; set; }
+
+    /// <summary>Selected body index for multi-body files.</summary>
+    public int? SelectedBodyIndex { get; set; }
 
     /// <summary>Gets or sets the production job ID once the order is placed.</summary>
     public Guid? JobId { get; set; }
@@ -193,6 +280,33 @@ public class ProjectPartDto
 
     /// <summary>Gets or sets the assigned machine name.</summary>
     public string? MachineName { get; set; }
+}
+
+/// <summary>
+/// Attachment metadata for project part drawings and supplementary files.
+/// </summary>
+public class ProjectPartAttachmentDto
+{
+    /// <summary>Gets or sets the UploadService file ID for the attachment.</summary>
+    public Guid? FileId { get; set; }
+
+    /// <summary>Gets or sets the original file name.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the raw GCS storage path.</summary>
+    public string? StoragePath { get; set; }
+
+    /// <summary>Gets or sets a signed URL when resolved for the client.</summary>
+    public string? SignedUrl { get; set; }
+
+    /// <summary>Gets or sets the file size in bytes.</summary>
+    public long? SizeBytes { get; set; }
+
+    /// <summary>Gets or sets the MIME content type.</summary>
+    public string? ContentType { get; set; }
+
+    /// <summary>Gets or sets the upload timestamp.</summary>
+    public DateTime? UploadedAt { get; set; }
 }
 
 /// <summary>
@@ -282,12 +396,37 @@ public class CreateProjectRequest
 }
 
 /// <summary>
+/// Optional request payload for creating a reorder draft from an existing project.
+/// </summary>
+public class DuplicateProjectRequest
+{
+    /// <summary>Gets or sets an optional replacement title for the duplicated project.</summary>
+    [MaxLength(500)]
+    public string? Title { get; set; }
+}
+
+/// <summary>
 /// Request to add a new part to an existing project.
 /// </summary>
 public class AddProjectPartRequest
 {
     /// <summary>Gets or sets the uploaded file reference from UploadService.</summary>
     public Guid FileId { get; set; }
+
+    /// <summary>Gets or sets the GCS storage path for the uploaded file.</summary>
+    public string? FileReference { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the small thumbnail artifact.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the large thumbnail artifact.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the GLB viewer artifact.</summary>
+    public string? GlbStoragePath { get; set; }
+
+    /// <summary>Gets or sets raw GCS overlay artifact paths keyed by process/category.</summary>
+    public Dictionary<string, string> OverlayPaths { get; set; } = [];
 
     /// <summary>Gets or sets the original filename.</summary>
     public string FileName { get; set; } = string.Empty;
@@ -297,6 +436,12 @@ public class AddProjectPartRequest
 
     /// <summary>Gets or sets the material ID.</summary>
     public Guid? MaterialId { get; set; }
+
+    /// <summary>Gets or sets the denormalized material display name.</summary>
+    public string? MaterialName { get; set; }
+
+    /// <summary>Gets or sets the material SKU/code used for pricing and quotation handoff.</summary>
+    public string? MaterialCode { get; set; }
 
     /// <summary>Gets or sets the ordered quantity.</summary>
     public int Quantity { get; set; } = 1;
@@ -312,6 +457,15 @@ public class AddProjectPartRequest
 
     /// <summary>CNC surface roughness code (e.g. "Ra0.8").</summary>
     public string? RoughnessCode { get; set; }
+
+    /// <summary>Part marking type.</summary>
+    public PartMarkingType MarkingType { get; set; } = PartMarkingType.None;
+
+    /// <summary>Part marking text content.</summary>
+    public string? MarkingText { get; set; }
+
+    /// <summary>True when DFM warnings have been acknowledged.</summary>
+    public bool DfmAcknowledged { get; set; }
 
     /// <summary>True when the part requires threaded/tapped holes.</summary>
     public bool HasThreadedHoles { get; set; }
@@ -336,6 +490,48 @@ public class AddProjectPartRequest
 
     /// <summary>Inspection level for quality control.</summary>
     public InspectionLevel InspectionLevel { get; set; } = InspectionLevel.Standard;
+
+    /// <summary>Requested quality certificates.</summary>
+    public List<string> Certificates { get; set; } = [];
+
+    /// <summary>Technical drawing files attached to this part.</summary>
+    public List<ProjectPartAttachmentDto> DrawingFiles { get; set; } = [];
+
+    /// <summary>Supplementary files attached to this part.</summary>
+    public List<ProjectPartAttachmentDto> SupplementaryFiles { get; set; } = [];
+
+    /// <summary>Dynamic process configuration selections keyed by config key.</summary>
+    public Dictionary<string, string> ProcessConfig { get; set; } = [];
+
+    /// <summary>Number of mesh bodies detected in the uploaded file.</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Serialized body metadata from geometry analysis.</summary>
+    public string? BodiesJson { get; set; }
+
+    /// <summary>Selected body index for multi-body files.</summary>
+    public int? SelectedBodyIndex { get; set; }
+
+    /// <summary>Volume in cubic centimeters, when geometry analysis is available.</summary>
+    public decimal? VolumeCm3 { get; set; }
+
+    /// <summary>Support volume in cubic centimeters, when geometry analysis is available.</summary>
+    public decimal? SupportVolumeCm3 { get; set; }
+
+    /// <summary>Surface area in square centimeters, when geometry analysis is available.</summary>
+    public decimal? SurfaceAreaCm2 { get; set; }
+
+    /// <summary>Bounding box X dimension in millimeters.</summary>
+    public decimal? BoundingBoxX { get; set; }
+
+    /// <summary>Bounding box Y dimension in millimeters.</summary>
+    public decimal? BoundingBoxY { get; set; }
+
+    /// <summary>Bounding box Z dimension in millimeters.</summary>
+    public decimal? BoundingBoxZ { get; set; }
+
+    /// <summary>Whether the analyzed mesh is manifold.</summary>
+    public bool? IsManifold { get; set; }
 }
 
 /// <summary>
@@ -349,6 +545,12 @@ public class UpdateProjectPartRequest
     /// <summary>Gets or sets the updated material ID.</summary>
     public Guid? MaterialId { get; set; }
 
+    /// <summary>Gets or sets the updated denormalized material display name.</summary>
+    public string? MaterialName { get; set; }
+
+    /// <summary>Gets or sets the updated material SKU/code.</summary>
+    public string? MaterialCode { get; set; }
+
     /// <summary>Gets or sets the updated quantity.</summary>
     public int Quantity { get; set; } = 1;
 
@@ -360,6 +562,89 @@ public class UpdateProjectPartRequest
 
     /// <summary>Gets or sets the updated tolerance.</summary>
     public string? Tolerance { get; set; }
+
+    /// <summary>CNC surface roughness code.</summary>
+    public string? RoughnessCode { get; set; }
+
+    /// <summary>Part marking type.</summary>
+    public PartMarkingType MarkingType { get; set; } = PartMarkingType.None;
+
+    /// <summary>Part marking text content.</summary>
+    public string? MarkingText { get; set; }
+
+    /// <summary>True when DFM warnings have been acknowledged.</summary>
+    public bool DfmAcknowledged { get; set; }
+
+    /// <summary>True when the part requires threaded/tapped holes.</summary>
+    public bool HasThreadedHoles { get; set; }
+
+    /// <summary>Threaded hole specification.</summary>
+    public string? ThreadedHoleSpec { get; set; }
+
+    /// <summary>Number of threaded holes.</summary>
+    public int ThreadedHoleCount { get; set; }
+
+    /// <summary>True when the part requires inserts.</summary>
+    public bool HasInserts { get; set; }
+
+    /// <summary>Insert type.</summary>
+    public InsertType InsertType { get; set; } = InsertType.None;
+
+    /// <summary>Number of inserts.</summary>
+    public int InsertCount { get; set; }
+
+    /// <summary>True when the part should be individually bagged and tagged.</summary>
+    public bool BagAndTag { get; set; } = true;
+
+    /// <summary>Inspection level for quality control.</summary>
+    public InspectionLevel InspectionLevel { get; set; } = InspectionLevel.Standard;
+
+    /// <summary>Requested quality certificates.</summary>
+    public List<string> Certificates { get; set; } = [];
+
+    /// <summary>Technical drawing files attached to this part.</summary>
+    public List<ProjectPartAttachmentDto> DrawingFiles { get; set; } = [];
+
+    /// <summary>Supplementary files attached to this part.</summary>
+    public List<ProjectPartAttachmentDto> SupplementaryFiles { get; set; } = [];
+
+    /// <summary>Dynamic process configuration selections keyed by config key.</summary>
+    public Dictionary<string, string> ProcessConfig { get; set; } = [];
+
+    /// <summary>Gets or sets the raw GCS path for the small thumbnail artifact.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the large thumbnail artifact.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the GLB viewer artifact.</summary>
+    public string? GlbStoragePath { get; set; }
+
+    /// <summary>Gets or sets raw GCS overlay artifact paths keyed by process/category.</summary>
+    public Dictionary<string, string> OverlayPaths { get; set; } = [];
+
+    /// <summary>Number of mesh bodies detected in the uploaded file.</summary>
+    public int? BodyCount { get; set; }
+
+    /// <summary>Serialized body metadata from geometry analysis.</summary>
+    public string? BodiesJson { get; set; }
+
+    /// <summary>Selected body index for multi-body files.</summary>
+    public int? SelectedBodyIndex { get; set; }
+}
+
+/// <summary>
+/// Request to generate a quotation from confirmed project parts.
+/// </summary>
+public class GenerateQuotationRequest
+{
+    /// <summary>Gets or sets the number of days the quotation remains valid.</summary>
+    [Range(1, 365)]
+    public int ValidityDays { get; set; } = 30;
+
+    /// <summary>Gets or sets delivery expectations or lead-time notes shown on the quotation.</summary>
+    [MaxLength(1000)]
+    public string? DeliveryExpectations { get; set; }
 }
 
 /// <summary>
@@ -368,10 +653,10 @@ public class UpdateProjectPartRequest
 public class ConfirmPartPriceRequest
 {
     /// <summary>Gets or sets the employee-confirmed price per unit.</summary>
-    public decimal ConfirmedPrice { get; set; }
+    public decimal ConfirmedUnitPrice { get; set; }
 
     /// <summary>Gets or sets an optional reason when overriding the AI estimate.</summary>
-    public string? OverrideReason { get; set; }
+    public string? PriceOverrideReason { get; set; }
 }
 
 /// <summary>

@@ -1,109 +1,126 @@
 @page "/sales/projects/{Id:guid}"
-@using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Client.Components.Shared
 @using Maliev.Intranet.Client.Helpers
+@using Maliev.Intranet.Shared.Dtos
+@using Microsoft.AspNetCore.Components.Rendering
 @inject HttpClient Http
+@inject IJSRuntime JS
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
-<PageTitle>Project | Intranet Gateway</PageTitle>
+<PageTitle>@ProjectTitle | MALIEV Intranet</PageTitle>
 
-<MudStack Spacing="3">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-            <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
-                           Color="Color.Default"
-                           OnClick="@(() => Navigation.NavigateTo("/sales/projects"))" />
-            <div>
-                <MudText Typo="Typo.h5" Style="font-weight: 700;">@ProjectTitle</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Default">@ProjectSubtitle</MudText>
-            </div>
-        </MudStack>
-
-        @if (_project is not null)
-        {
-            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_project.Status)">
-                @_project.Status
-            </MudChip>
-        }
-    </MudStack>
-
+<div class="project-record-shell">
     @if (_loading)
     {
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" />
-        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="260px" />
+        <PageHeader Title="Project" Subtitle="Loading project record" BackLabel="Projects" BackHref="/sales/projects" />
+        <PageBody Class="project-record-body">
+            <div class="project-loading-grid">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="92px" />
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="92px" />
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="260px" />
+            </div>
+        </PageBody>
     }
     else if (_project is null)
     {
-        <MudAlert Severity="Severity.Error">Project not found.</MudAlert>
+        <PageHeader Title="Project not found" Subtitle="The project may have been deleted or moved" BackLabel="Projects" BackHref="/sales/projects" />
+        <PageBody Class="project-record-body">
+            <PanelCard Class="project-empty-panel">
+                <MudIcon Icon="@Icons.Material.Outlined.FolderOff" Size="Size.Large" />
+                <p>Project not found.</p>
+                <SecondaryButton Href="/sales/projects" Icon="@Icons.Material.Outlined.ArrowBack">
+                    Back to projects
+                </SecondaryButton>
+            </PanelCard>
+        </PageBody>
     }
     else
     {
-        <MudGrid Spacing="3">
-            <MudItem xs="12" md="4">
-                <MudPaper Elevation="0" Class="pa-4 rounded-lg">
-                    <MudStack Spacing="2">
-                        <MudText Typo="Typo.subtitle2">Customer</MudText>
-                        <MudText Typo="Typo.body1">@_project.CustomerName</MudText>
-                        <MudDivider />
-                        <MudText Typo="Typo.subtitle2">Quotation</MudText>
-                        <MudText Typo="Typo.body1">@QuotationLabel</MudText>
-                        <MudDivider />
-                        <MudText Typo="Typo.subtitle2">Total</MudText>
-                        <MudText Typo="Typo.h6">@CurrencyFormatter.Format(_project.TotalPrice, ProjectCurrency, 2)</MudText>
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
+        <PageHeader Title="@ProjectTitle" Subtitle="@ProjectSubtitle" BackLabel="Projects" BackHref="/sales/projects">
+            <SecondaryButton Class="project-action-edit" Icon="@Icons.Material.Outlined.Edit" OnClick="@(_ => EditProject())">
+                Edit project
+            </SecondaryButton>
+            <SecondaryButton Class="project-action-download" Icon="@Icons.Material.Outlined.Download" Disabled="@(!HasQuotation || _pdfLoading)" OnClick="@DownloadQuoteAsync">
+                @(_pdfLoading ? "Preparing" : "Download quote")
+            </SecondaryButton>
+            <PrimaryButton Class="project-action-accept" Icon="@Icons.Material.Outlined.Check" Disabled="@(!CanAcceptQuote || _accepting)" OnClick="@AcceptQuoteAsync">
+                @(_accepting ? "Accepting" : "Accept quote")
+            </PrimaryButton>
+        </PageHeader>
 
-            <MudItem xs="12" md="8">
-                <MudPaper Elevation="0" Class="pa-4 rounded-lg">
-                    <MudStack Spacing="2">
-                        <MudText Typo="Typo.subtitle2">Parts</MudText>
-                        <MudTable Items="@_project.Parts" Dense="true" Hover="true" Elevation="0">
-                            <HeaderContent>
-                                <MudTh>File</MudTh>
-                                <MudTh>Process</MudTh>
-                                <MudTh>Material</MudTh>
-                                <MudTh Style="text-align: right;">Qty</MudTh>
-                                <MudTh Style="text-align: right;">Unit</MudTh>
-                            </HeaderContent>
-                            <RowTemplate>
-                                <MudTd DataLabel="File">@context.FileName</MudTd>
-                                <MudTd DataLabel="Process">@(context.ProcessType ?? "-")</MudTd>
-                                <MudTd DataLabel="Material">@(context.MaterialName ?? "-")</MudTd>
-                                <MudTd DataLabel="Qty" Style="text-align: right;">@context.Quantity</MudTd>
-                                <MudTd DataLabel="Unit" Style="text-align: right;">
-                                    @CurrencyFormatter.Format(context.ConfirmedPrice ?? context.EstimatedPrice ?? 0, ProjectCurrency, 2)
-                                </MudTd>
-                            </RowTemplate>
-                            <NoRecordsContent>
-                                <MudText Typo="Typo.body2" Color="Color.Default">No parts found.</MudText>
-                            </NoRecordsContent>
-                        </MudTable>
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
-        </MudGrid>
+        <nav class="project-record-tabs" aria-label="Project detail sections">
+            @foreach (var tab in Tabs)
+            {
+                <button type="button"
+                        class="@(IsActive(tab.Key) ? "active" : null)"
+                        data-tab="@tab.Key"
+                        @onclick="@(() => _activeTab = tab.Key)">
+                    @tab.Label
+                </button>
+            }
+        </nav>
+
+        <PageBody Class="project-record-body">
+            @if (_activeTab == "overview")
+            {
+                @RenderOverview()
+            }
+            else if (_activeTab == "quote")
+            {
+                @RenderQuote()
+            }
+            else if (_activeTab == "parts")
+            {
+                @RenderParts()
+            }
+            else if (_activeTab == "timeline")
+            {
+                @RenderTimelinePanel(full: true)
+            }
+            else if (_activeTab == "notes")
+            {
+                @RenderNotes()
+            }
+        </PageBody>
     }
-</MudStack>
+</div>
 
 @code {
     [Parameter] public Guid Id { get; set; }
 
     private ProjectDetailDto? _project;
     private bool _loading = true;
+    private bool _pdfLoading;
+    private bool _accepting;
+    private string _activeTab = "overview";
+
+    private IReadOnlyList<(string Key, string Label)> Tabs =>
+    [
+        ("overview", "Overview"),
+        ("quote", "Quote"),
+        ("parts", $"Parts ({_project?.Parts.Count ?? 0})"),
+        ("timeline", "Timeline"),
+        ("notes", $"Notes ({_project?.Notes?.Count ?? 0})")
+    ];
 
     private string ProjectTitle => _project is null
         ? "Project"
         : string.IsNullOrWhiteSpace(_project.ProjectNumber) ? _project.Title : _project.ProjectNumber;
 
     private string ProjectSubtitle => _project is null
-        ? "Loading"
-        : string.IsNullOrWhiteSpace(_project.Title) ? _project.CreatedAt.ToString("dd MMM yyyy") : _project.Title;
+        ? "Loading project record"
+        : string.IsNullOrWhiteSpace(_project.Title)
+            ? _project.CustomerName
+            : $"{_project.Title} - {_project.CustomerName}";
 
     private string ProjectCurrency => string.IsNullOrWhiteSpace(_project?.Currency) ? "THB" : _project.Currency;
 
-    private string QuotationLabel => _project?.QuotationNumber
-        ?? (_project?.QuotationId is null ? "Not generated" : _project.QuotationId.Value.ToString("N"));
+    private bool HasQuotation => _project?.QuotationId is not null;
+
+    private bool CanAcceptQuote => HasQuotation && IsAcceptableQuoteStatus(_project?.Status);
+
+    private decimal PartsSubtotal => _project?.Parts.Sum(part => GetPartLineTotal(part)) ?? 0m;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -123,15 +140,437 @@
         }
     }
 
-    private static Color GetStatusColor(string status) => status switch
+    private RenderFragment RenderOverview() => builder =>
     {
-        "Draft" => Color.Default,
-        "Configuring" => Color.Warning,
-        "Priced" => Color.Info,
-        "Quoted" => Color.Primary,
-        "In Production" => Color.Default,
-        "Completed" => Color.Success,
-        "Cancelled" => Color.Error,
-        _ => Color.Default
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "project-record-grid");
+
+        builder.OpenElement(2, "div");
+        builder.AddAttribute(3, "class", "project-record-main");
+        builder.AddContent(4, RenderProjectInformation());
+        builder.AddContent(5, RenderManufacturingSummary());
+        builder.CloseElement();
+
+        builder.OpenElement(6, "aside");
+        builder.AddAttribute(7, "class", "project-record-sidebar");
+        builder.AddContent(8, RenderQuoteSnapshot());
+        builder.AddContent(9, RenderCustomerPanel());
+        builder.AddContent(10, RenderTimelinePanel(full: false));
+        builder.CloseElement();
+
+        builder.CloseElement();
     };
+
+    private RenderFragment RenderProjectInformation() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", "Project information");
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+        {
+            content.OpenElement(3, "div");
+            content.AddAttribute(4, "class", "project-field-grid");
+            AddReadOnlyField(content, 5, "Project #", ProjectTitle);
+            AddReadOnlyField(content, 9, "Title", _project?.Title);
+            AddReadOnlyField(content, 13, "Customer", _project?.CustomerName);
+            AddReadOnlyField(content, 17, "Status", _project?.Status);
+            AddReadOnlyField(content, 21, "Created", FormatDateTime(_project?.CreatedAt));
+            AddReadOnlyField(content, 25, "Updated", FormatDateTime(_project?.UpdatedAt));
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    private RenderFragment RenderManufacturingSummary() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", "Manufacturing summary");
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+        {
+            content.OpenElement(3, "div");
+            content.AddAttribute(4, "class", "project-metric-row");
+            content.OpenComponent<StatTile>(5);
+            content.AddAttribute(6, "Label", "Parts");
+            content.AddAttribute(7, "Value", (_project?.Parts.Count ?? 0).ToString());
+            content.AddAttribute(8, "Subtext", "configured line items");
+            content.CloseComponent();
+            content.OpenComponent<StatTile>(9);
+            content.AddAttribute(10, "Label", "Confirmed total");
+            content.AddAttribute(11, "Value", FormatMoney(_project?.TotalPrice ?? 0m));
+            content.AddAttribute(12, "Subtext", ProjectCurrency);
+            content.CloseComponent();
+            content.OpenComponent<StatTile>(13);
+            content.AddAttribute(14, "Label", "Quotation");
+            content.AddAttribute(15, "Value", QuotationLabel);
+            content.AddAttribute(16, "Subtext", _project?.QuotationStatus ?? "Not generated");
+            content.CloseComponent();
+            content.CloseElement();
+
+            content.AddContent(17, RenderPartsTable(compact: true));
+        }));
+        builder.CloseComponent();
+    };
+
+    private RenderFragment RenderQuoteSnapshot() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", "Quote snapshot");
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+        {
+            content.OpenElement(3, "dl");
+            content.AddAttribute(4, "class", "project-snapshot");
+            AddSnapshot(content, 5, "Project status", builder2 =>
+            {
+                builder2.OpenComponent<StatusBadge>(6);
+                builder2.AddAttribute(7, "Status", _project?.Status);
+                builder2.CloseComponent();
+            });
+            AddSnapshot(content, 8, "Quote #", QuotationLabel);
+            AddSnapshot(content, 12, "Quote status", _project?.QuotationStatus ?? "Not generated");
+            AddSnapshot(content, 16, "Valid until", FormatDate(_project?.ValidUntil));
+            AddSnapshot(content, 20, "Subtotal", FormatMoney(PartsSubtotal));
+            AddSnapshot(content, 24, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    private RenderFragment RenderCustomerPanel() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", "Customer");
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+        {
+            content.OpenElement(3, "div");
+            content.AddAttribute(4, "class", "project-customer-panel");
+            content.OpenElement(5, "strong");
+            content.AddContent(6, _project?.CustomerName ?? "Unknown customer");
+            content.CloseElement();
+            content.OpenElement(7, "span");
+            content.AddContent(8, $"Customer ID {_project?.CustomerId.ToString("N")[..8].ToUpperInvariant()}");
+            content.CloseElement();
+            content.OpenElement(9, "a");
+            content.AddAttribute(10, "href", $"/customers/{_project?.CustomerId}");
+            content.AddContent(11, "Open customer record");
+            content.CloseElement();
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    private RenderFragment RenderQuote() => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "project-quote-layout");
+        builder.AddContent(2, RenderQuoteSnapshot());
+        builder.OpenComponent<PanelCard>(3);
+        builder.AddAttribute(4, "Title", "Commercial controls");
+        builder.AddAttribute(5, "ChildContent", (RenderFragment)(content =>
+        {
+            content.OpenElement(6, "div");
+            content.AddAttribute(7, "class", "project-action-panel");
+            content.OpenElement(8, "p");
+            content.AddContent(9, HasQuotation
+                ? "The generated quotation is available for customer follow-up. Reopen the project when line items need revision."
+                : "Generate a quote from the editor once all parts have confirmed pricing.");
+            content.CloseElement();
+            content.OpenElement(10, "div");
+            content.AddAttribute(11, "class", "project-panel-actions");
+            content.OpenComponent<SecondaryButton>(12);
+            content.AddAttribute(13, "Icon", Icons.Material.Outlined.Edit);
+            content.AddAttribute(14, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, EditProject));
+            content.AddContent(15, "Edit project");
+            content.CloseComponent();
+            content.OpenComponent<SecondaryButton>(16);
+            content.AddAttribute(17, "Icon", Icons.Material.Outlined.Download);
+            content.AddAttribute(18, "Disabled", !HasQuotation || _pdfLoading);
+            content.AddAttribute(19, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, DownloadQuoteAsync));
+            content.AddContent(20, _pdfLoading ? "Preparing" : "Download quote");
+            content.CloseComponent();
+            content.OpenComponent<PrimaryButton>(21);
+            content.AddAttribute(22, "Icon", Icons.Material.Outlined.Check);
+            content.AddAttribute(23, "Disabled", !CanAcceptQuote || _accepting);
+            content.AddAttribute(24, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, AcceptQuoteAsync));
+            content.AddContent(25, _accepting ? "Accepting" : "Accept quote");
+            content.CloseComponent();
+            content.CloseElement();
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderParts() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", $"Parts ({_project?.Parts.Count ?? 0})");
+        builder.AddAttribute(2, "Class", "project-parts-panel");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(content => content.AddContent(4, RenderPartsTable(compact: false))));
+        builder.CloseComponent();
+    };
+
+    private RenderFragment RenderPartsTable(bool compact) => builder =>
+    {
+        var parts = _project?.Parts ?? [];
+        if (parts.Count == 0)
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "project-muted-box");
+            builder.AddContent(2, "No parts have been attached to this project.");
+            builder.CloseElement();
+            return;
+        }
+
+        builder.OpenElement(3, "div");
+        builder.AddAttribute(4, "class", compact ? "project-table-wrap compact" : "project-table-wrap");
+        builder.OpenElement(5, "table");
+        builder.AddAttribute(6, "class", "project-parts-table");
+        builder.OpenElement(7, "thead");
+        builder.OpenElement(8, "tr");
+        foreach (var heading in new[] { "File", "Process", "Material", "Configuration", "Qty", "Unit", "Total", "Status" })
+        {
+            builder.OpenElement(9, "th");
+            builder.AddContent(10, heading);
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.OpenElement(11, "tbody");
+        var sequence = 12;
+        foreach (var part in parts)
+        {
+            builder.OpenElement(sequence++, "tr");
+            AddCell(builder, ref sequence, part.FileName);
+            AddCell(builder, ref sequence, FormatProcess(part.ProcessType));
+            AddCell(builder, ref sequence, part.MaterialName ?? "-");
+            AddCell(builder, ref sequence, FormatPartConfiguration(part));
+            AddCell(builder, ref sequence, part.Quantity.ToString(), "numeric");
+            AddCell(builder, ref sequence, FormatMoney(GetPartUnitPrice(part)), "numeric");
+            AddCell(builder, ref sequence, FormatMoney(GetPartLineTotal(part)), "numeric");
+            builder.OpenElement(sequence++, "td");
+            builder.OpenComponent<StatusBadge>(sequence++);
+            builder.AddAttribute(sequence++, "Status", part.Status);
+            builder.CloseComponent();
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderTimelinePanel(bool full) => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", full ? "Timeline" : "Recent activity");
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+        {
+            var events = _project?.Timeline?.OrderByDescending(item => item.Timestamp).ToList() ?? [];
+            if (events.Count == 0)
+            {
+                content.OpenElement(3, "div");
+                content.AddAttribute(4, "class", "project-muted-box compact");
+                content.AddContent(5, "No timeline events yet.");
+                content.CloseElement();
+                return;
+            }
+
+            content.OpenElement(6, "div");
+            content.AddAttribute(7, "class", full ? "project-timeline full" : "project-timeline");
+            var sequence = 8;
+            foreach (var item in events)
+            {
+                content.OpenElement(sequence++, "div");
+                content.AddAttribute(sequence++, "class", item.Completed ? "project-timeline-item completed" : "project-timeline-item");
+                content.OpenElement(sequence++, "span");
+                content.AddAttribute(sequence++, "class", "project-timeline-dot");
+                content.CloseElement();
+                content.OpenElement(sequence++, "div");
+                content.OpenElement(sequence++, "strong");
+                content.AddContent(sequence++, item.Label);
+                content.CloseElement();
+                content.OpenElement(sequence++, "span");
+                content.AddContent(sequence++, FormatDateTime(item.Timestamp));
+                content.CloseElement();
+                content.CloseElement();
+                content.CloseElement();
+            }
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    private RenderFragment RenderNotes() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", $"Internal notes ({_project?.Notes?.Count ?? 0})");
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+        {
+            var notes = _project?.Notes?.OrderByDescending(note => note.CreatedAt).ToList() ?? [];
+            if (notes.Count == 0)
+            {
+                content.OpenElement(3, "div");
+                content.AddAttribute(4, "class", "project-muted-box");
+                content.AddContent(5, "No internal notes have been added.");
+                content.CloseElement();
+                return;
+            }
+
+            content.OpenElement(6, "div");
+            content.AddAttribute(7, "class", "project-note-list");
+            var sequence = 8;
+            foreach (var note in notes)
+            {
+                content.OpenElement(sequence++, "article");
+                content.AddAttribute(sequence++, "class", "project-note-card");
+                content.OpenElement(sequence++, "strong");
+                content.AddContent(sequence++, note.AuthorName);
+                content.CloseElement();
+                content.OpenElement(sequence++, "span");
+                content.AddContent(sequence++, FormatDateTime(note.CreatedAt));
+                content.CloseElement();
+                content.OpenElement(sequence++, "p");
+                content.AddContent(sequence++, note.Content);
+                content.CloseElement();
+                content.CloseElement();
+            }
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    private string QuotationLabel => _project?.QuotationNumber
+        ?? (_project?.QuotationId is null ? "Not generated" : _project.QuotationId.Value.ToString("N")[..8].ToUpperInvariant());
+
+    private bool IsActive(string tab) => string.Equals(_activeTab, tab, StringComparison.Ordinal);
+
+    private void EditProject() => Navigation.NavigateTo($"/sales/projects/new?resume={Id}");
+
+    private async Task DownloadQuoteAsync()
+    {
+        if (_project?.QuotationId is null)
+            return;
+
+        _pdfLoading = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/v1/quotations/{_project.QuotationId}/pdf", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Failed to generate quotation PDF.", Severity.Error);
+                return;
+            }
+
+            var url = await response.Content.ReadFromJsonAsync<string>();
+            if (!string.IsNullOrWhiteSpace(url))
+                await JS.InvokeVoidAsync("window.open", url, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Quotation PDF error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _pdfLoading = false;
+        }
+    }
+
+    private async Task AcceptQuoteAsync()
+    {
+        if (!CanAcceptQuote)
+            return;
+
+        _accepting = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/v1/projects/{Id}/accept-quotation", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Failed to accept quotation.", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Quotation accepted.", Severity.Success);
+            await OnParametersSetAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Accept quote error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _accepting = false;
+        }
+    }
+
+    private static void AddReadOnlyField(RenderTreeBuilder builder, int sequence, string label, string? value)
+    {
+        builder.OpenElement(sequence, "label");
+        builder.AddAttribute(sequence + 1, "class", "project-field");
+        builder.OpenElement(sequence + 2, "span");
+        builder.AddContent(sequence + 3, label);
+        builder.CloseElement();
+        builder.OpenElement(sequence + 4, "input");
+        builder.AddAttribute(sequence + 5, "class", "project-input");
+        builder.AddAttribute(sequence + 6, "readonly", "readonly");
+        builder.AddAttribute(sequence + 7, "value", string.IsNullOrWhiteSpace(value) ? "-" : value);
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private static void AddSnapshot(RenderTreeBuilder builder, int sequence, string label, string value)
+    {
+        AddSnapshot(builder, sequence, label, content => content.AddContent(sequence + 1, value));
+    }
+
+    private static void AddSnapshot(RenderTreeBuilder builder, int sequence, string label, RenderFragment value)
+    {
+        builder.OpenElement(sequence, "div");
+        builder.OpenElement(sequence + 1, "dt");
+        builder.AddContent(sequence + 2, label);
+        builder.CloseElement();
+        builder.OpenElement(sequence + 3, "dd");
+        builder.AddContent(sequence + 4, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private static void AddCell(RenderTreeBuilder builder, ref int sequence, string value, string? @class = null)
+    {
+        builder.OpenElement(sequence++, "td");
+        if (!string.IsNullOrWhiteSpace(@class))
+            builder.AddAttribute(sequence++, "class", @class);
+        builder.AddContent(sequence++, value);
+        builder.CloseElement();
+    }
+
+    private string FormatMoney(decimal value) => CurrencyFormatter.Format(value, ProjectCurrency, 2);
+
+    private static bool IsAcceptableQuoteStatus(string? status) =>
+        NormalizeStatus(status) is "quoted" or "quotationgenerated" or "quotationsent";
+
+    private static string NormalizeStatus(string? status) =>
+        string.IsNullOrWhiteSpace(status)
+            ? string.Empty
+            : status.Replace(" ", string.Empty, StringComparison.Ordinal).Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+
+    private static decimal GetPartUnitPrice(ProjectPartDto part) =>
+        part.ConfirmedPrice ?? part.ConfirmedUnitPrice ?? part.EstimatedPrice ?? part.AiSuggestedPrice ?? 0m;
+
+    private static decimal GetPartLineTotal(ProjectPartDto part) => GetPartUnitPrice(part) * Math.Max(part.Quantity, 0);
+
+    private static string FormatDate(DateTime? value) => value.HasValue ? value.Value.ToString("MMM d, yyyy") : "-";
+
+    private static string FormatDateTime(DateTime? value) => value.HasValue ? value.Value.ToString("MMM d, yyyy HH:mm") : "-";
+
+    private static string FormatProcess(string? process) => string.IsNullOrWhiteSpace(process)
+        ? "-"
+        : process.Replace("_", " ", StringComparison.Ordinal).Replace("-", " ", StringComparison.Ordinal);
+
+    private static string FormatPartConfiguration(ProjectPartDto part)
+    {
+        var values = new[] { part.Finish, part.Color, part.Tolerance }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+        var label = string.Join(" - ", values);
+        return string.IsNullOrWhiteSpace(label) ? "-" : label;
+    }
 }

@@ -115,6 +115,26 @@ public class ServiceHealthStatus
     public string ServiceName { get; set; } = string.Empty;
 
     /// <summary>
+    /// The domain group this service belongs to.
+    /// </summary>
+    public string DomainGroup { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The service route prefix used for HTTP endpoints.
+    /// </summary>
+    public string RoutePrefix { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The health endpoint path used for liveness checks.
+    /// </summary>
+    public string HealthPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Indicates whether the service is critical for core business operations.
+    /// </summary>
+    public bool IsCritical { get; set; }
+
+    /// <summary>
     /// The current status of the service (e.g., Healthy, Unhealthy, Unknown).
     /// </summary>
     public string Status { get; set; } = "Unknown";
@@ -143,6 +163,11 @@ public class ServiceHealthStatus
     /// An optional error message if the health check failed.
     /// </summary>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// The response body returned by the health endpoint when the check fails.
+    /// </summary>
+    public string? ErrorBody { get; set; }
 }
 
 /// <summary>
@@ -205,6 +230,84 @@ public class BffUploadResponse
     /// </summary>
     [JsonPropertyName("fileReference")]
     public string? FileReference { get; set; }
+}
+
+/// <summary>
+/// Request model for initiating a BFF-mediated resumable upload.
+/// </summary>
+public class BffInitiateResumableUploadRequest
+{
+    /// <summary>
+    /// The original file name selected by the user.
+    /// </summary>
+    [JsonPropertyName("fileName")]
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The content type reported by the browser.
+    /// </summary>
+    [JsonPropertyName("contentType")]
+    public string? ContentType { get; set; }
+
+    /// <summary>
+    /// The file size in bytes.
+    /// </summary>
+    [JsonPropertyName("fileSize")]
+    public long FileSize { get; set; }
+
+    /// <summary>
+    /// The temporary or persisted project identifier that scopes the upload path.
+    /// </summary>
+    [JsonPropertyName("projectId")]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>
+    /// The customer identifier that owns the project, when already selected.
+    /// </summary>
+    [JsonPropertyName("customerId")]
+    public Guid? CustomerId { get; set; }
+}
+
+/// <summary>
+/// Response model containing a direct GCS resumable upload session.
+/// </summary>
+public class BffResumableUploadSessionResponse
+{
+    /// <summary>
+    /// The UploadService identifier for the resumable upload session.
+    /// </summary>
+    [JsonPropertyName("uploadId")]
+    public string UploadId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The short-lived GCS session URI used by the browser to upload bytes.
+    /// </summary>
+    [JsonPropertyName("sessionUri")]
+    public string SessionUri { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The storage path assigned to the upload.
+    /// </summary>
+    [JsonPropertyName("storagePath")]
+    public string StoragePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The original file name selected by the user.
+    /// </summary>
+    [JsonPropertyName("fileName")]
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The file size in bytes.
+    /// </summary>
+    [JsonPropertyName("fileSize")]
+    public long FileSize { get; set; }
+
+    /// <summary>
+    /// The timestamp when the GCS resumable session expires.
+    /// </summary>
+    [JsonPropertyName("expiresAt")]
+    public DateTime ExpiresAt { get; set; }
 }
 
 /// <summary>

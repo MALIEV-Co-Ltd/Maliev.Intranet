@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
@@ -87,5 +88,28 @@ public class SharedDtoTests
         _ = new CreateEmployeeRequest { Email = "test@test.com" };
 
         Assert.True(true);
+    }
+
+    [Fact]
+    public void QuotationPdfItem_LegacyAliases_PopulateRichTemplateFields()
+    {
+        var item = new QuotationPdfItem
+        {
+            Description = "Bracket",
+            TotalPrice = 250m
+        };
+
+        Assert.Equal("Bracket", item.MaterialName);
+        Assert.Equal(250m, item.LineTotal);
+    }
+
+    [Fact]
+    public void QuotationPdfItem_LegacyJsonFields_PopulateRichTemplateFields()
+    {
+        var item = JsonSerializer.Deserialize<QuotationPdfItem>("""{"description":"Bracket","totalPrice":250}""");
+
+        Assert.NotNull(item);
+        Assert.Equal("Bracket", item.MaterialName);
+        Assert.Equal(250m, item.LineTotal);
     }
 }

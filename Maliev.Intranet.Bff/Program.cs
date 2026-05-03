@@ -70,26 +70,48 @@ try
     builder.Services.AddTransient<UserContextHandler>();
     builder.Services.AddTransient<Maliev.Intranet.Bff.Handlers.CookieForwardingHandler>();
 
+    var dataProtectionBuilder = builder.Services.AddDataProtection()
+        .SetApplicationName("MalievIntranet");
+
     var redisConnectionString = builder.Configuration.GetConnectionString("redis");
+    IConnectionMultiplexer? redis = null;
     if (!string.IsNullOrEmpty(redisConnectionString))
     {
-        var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+        redis = ConnectionMultiplexer.Connect(redisConnectionString);
         builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+    }
 
-        var dataProtectionBuilder = builder.Services.AddDataProtection()
-            .PersistKeysToStackExchangeRedis(redis, "Maliev:DataProtection:Keys")
-            .SetApplicationName("MalievIntranet");
+    if (builder.Environment.IsDevelopment())
+    {
+        var configuredKeysDirectory = builder.Configuration["DataProtection:KeysDirectory"];
+        var keysDirectory = string.IsNullOrWhiteSpace(configuredKeysDirectory)
+            ? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Maliev",
+                "IntranetBff",
+                "DataProtection-Keys")
+            : configuredKeysDirectory;
 
-        var certPath = builder.Configuration["DataProtection:CertificatePath"];
-        if (!string.IsNullOrEmpty(certPath))
-        {
-            var certPassword = builder.Configuration["DataProtection:CertificatePassword"];
-            var certData = File.ReadAllBytes(certPath);
-            var certificate = string.IsNullOrEmpty(certPassword)
-                ? X509Certificate2.CreateFromPemFile(certPath)
-                : X509Certificate2.CreateFromEncryptedPemFile(certPath, certPassword);
-            dataProtectionBuilder.ProtectKeysWithCertificate(certificate);
-        }
+        Directory.CreateDirectory(keysDirectory);
+        dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
+    }
+    else if (!string.IsNullOrEmpty(redisConnectionString))
+    {
+        dataProtectionBuilder.PersistKeysToStackExchangeRedis(redis!, "Maliev:DataProtection:Keys");
+    }
+
+    var certPath = builder.Configuration["DataProtection:CertificatePath"];
+    if (!string.IsNullOrEmpty(certPath))
+    {
+        var certPassword = builder.Configuration["DataProtection:CertificatePassword"];
+        var certificate = string.IsNullOrEmpty(certPassword)
+            ? X509Certificate2.CreateFromPemFile(certPath)
+            : X509Certificate2.CreateFromEncryptedPemFile(certPath, certPassword);
+        dataProtectionBuilder.ProtectKeysWithCertificate(certificate);
+    }
+    else if (builder.Environment.IsDevelopment() && OperatingSystem.IsWindows())
+    {
+        dataProtectionBuilder.ProtectKeysWithDpapi(protectToLocalMachine: true);
     }
 
     // Configure Authentication
@@ -100,6 +122,7 @@ try
     {
         client.BaseAddress = new Uri("http://IAMService");
     })
+    .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
     .AddServiceDiscovery();
 
     // Named client for IAM bootstrap (no UserContextHandler - token attached manually)
@@ -362,6 +385,7 @@ try
     builder.AddBffServiceClient<ProjectServiceClient>("ProjectService");
     builder.AddBffServiceClient<JobServiceClient>("JobService");
     builder.AddBffServiceClient<CurrencyServiceClient>("CurrencyService");
+    builder.AddBffServiceClient<SearchServiceClient>("SearchService");
     // GeometryService runs DFM analysis + overlay generation — long-running, non-retryable.
     builder.AddBffLongRunningServiceClient<GeometryServiceClient>("GeometryService",
         attemptTimeout: TimeSpan.FromSeconds(300));
@@ -543,7 +567,6 @@ try
     builder.Services.AddProblemDetails();
     builder.Services.AddControllersWithViews();
     builder.Services.AddRazorComponents()
-        .AddInteractiveServerComponents()
         .AddInteractiveWebAssemblyComponents();
 
     var app = builder.Build();
@@ -578,12 +601,15 @@ try
         context => !IsStaticResource(context.Request.Path),
         appBuilder => appBuilder.UseMiddleware<JwtClaimsEnrichmentMiddleware>());
 
-    // Redirect unauthenticated root requests to login to avoid 401/NavigationException loops
+    // Redirect unauthenticated page requests to the BFF-owned login page before
+    // serving the WASM shell. APIs still return normal auth challenges.
     app.Use(async (context, next) =>
     {
-        if (context.Request.Path == "/" && context.User.Identity?.IsAuthenticated != true)
+        if (IsEmployeeAppRoute(context.Request.Path) &&
+            context.User.Identity?.IsAuthenticated != true)
         {
-            context.Response.Redirect("/login");
+            var returnUrl = $"{context.Request.PathBase}{context.Request.Path}{context.Request.QueryString}";
+            context.Response.Redirect($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
             return;
         }
         await next();
@@ -594,7 +620,6 @@ try
     // Do NOT add .RequireAuthorization() here - it conflicts with AuthorizeRouteView
     // Authorization is handled by AuthorizeRouteView in Routes.razor + [AllowAnonymous] on Login page
     app.MapRazorComponents<Maliev.Intranet.Bff.Components.App>()
-        .AddInteractiveServerRenderMode()
         .AddInteractiveWebAssemblyRenderMode()
         .AddAdditionalAssemblies(typeof(Maliev.Intranet.Client._Imports).Assembly);
 
@@ -640,9 +665,27 @@ public partial class Program
         return pathValue.StartsWith("/_framework/", StringComparison.OrdinalIgnoreCase) ||
                pathValue.StartsWith("/_content/", StringComparison.OrdinalIgnoreCase) ||
                pathValue.StartsWith("/css/", StringComparison.OrdinalIgnoreCase) ||
+               pathValue.StartsWith("/images/", StringComparison.OrdinalIgnoreCase) ||
                pathValue.StartsWith("/js/", StringComparison.OrdinalIgnoreCase) ||
                pathValue.Contains("/hubs/", StringComparison.OrdinalIgnoreCase) ||
-               pathValue.EndsWith(".styles.css", StringComparison.OrdinalIgnoreCase);
+               pathValue.EndsWith(".styles.css", StringComparison.OrdinalIgnoreCase) ||
+               Path.HasExtension(pathValue);
+    }
+
+    /// <summary>
+    /// Determines if the request path is an employee app route that should not boot WASM
+    /// until the user is authenticated.
+    /// </summary>
+    /// <param name="path">The request path to check.</param>
+    /// <returns>True if the path is a client app route; otherwise, false.</returns>
+    private static bool IsEmployeeAppRoute(PathString path)
+    {
+        var pathValue = path.Value ?? "/";
+        return !pathValue.StartsWith("/login", StringComparison.OrdinalIgnoreCase) &&
+               !pathValue.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) &&
+               !pathValue.StartsWith("/signin-google", StringComparison.OrdinalIgnoreCase) &&
+               !pathValue.StartsWith("/hubs/", StringComparison.OrdinalIgnoreCase) &&
+               !IsStaticResource(path);
     }
 
     internal static partial class Log

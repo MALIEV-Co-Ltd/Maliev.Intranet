@@ -1,0 +1,9 @@
+@namespace Maliev.Intranet.Client.Components.Project
+
+<div class="part-queue-loader @Class" role="status" aria-label="@Label"></div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter] public string Label { get; set; } = "Part queued";
+}

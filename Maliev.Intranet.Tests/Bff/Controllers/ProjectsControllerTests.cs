@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -193,6 +195,316 @@ public class ProjectsControllerTests
     }
 
     [Fact]
+    public async Task AddPart_WhenProjectServiceReturnsBadRequest_ShouldForwardBadRequest()
+    {
+        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.BadRequest), StubJobClient(), StubFacilityClient(), Logger);
+
+        var result = await controller.AddPart(Guid.NewGuid(),
+            new AddProjectPartRequest { FileId = Guid.NewGuid(), FileName = "bracket.stl" },
+            CancellationToken.None);
+
+        var status = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(400, status.StatusCode);
+    }
+
+    [Fact]
+    public async Task Duplicate_WhenSuccessful_CreatesCopiedProjectPartsFilesAndClonesAnalysisStatus()
+    {
+        var sourceProjectId = Guid.NewGuid();
+        var duplicateProjectId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var sourceFileId = Guid.NewGuid();
+        var copiedFileId = Guid.NewGuid();
+        JsonElement? createdProjectPayload = null;
+        JsonElement? addedPartPayload = null;
+
+        var sourceProject = new ProjectDetailDto
+        {
+            Id = sourceProjectId,
+            CustomerId = customerId,
+            CustomerName = "ACME",
+            Title = "Bracket",
+            Currency = "THB",
+            Parts =
+            [
+                new ProjectPartDto
+                {
+                    Id = Guid.NewGuid(),
+                    FileId = sourceFileId,
+                    FileName = "bracket.step",
+                    FileReference = $"customers/{customerId}/projects/{sourceProjectId}/source/bracket.step",
+                    ThumbnailSmallGcsPath = "customers/c1/projects/p1/source/bracket_small.webp",
+                    ThumbnailLargeGcsPath = "customers/c1/projects/p1/source/bracket_large.webp",
+                    GlbStoragePath = "customers/c1/projects/p1/source/bracket_viewer.glb",
+                    OverlayPaths = new Dictionary<string, string>
+                    {
+                        ["CNC__tool_access"] = "customers/c1/projects/p1/source/bracket_tool.glb"
+                    },
+                    ProcessType = "CNC_MILL",
+                    MaterialName = "Aluminium 6061",
+                    MaterialCode = "AL6061",
+                    Quantity = 4,
+                    Finish = "Anodized",
+                    Color = "Black",
+                    Tolerance = "ISO 2768-m",
+                    RoughnessCode = "Ra1.6",
+                    MarkingType = PartMarkingType.Engraving,
+                    MarkingText = "PN-100",
+                    DfmAcknowledged = true,
+                    HasThreadedHoles = true,
+                    ThreadedHoleSpec = "M6",
+                    ThreadedHoleCount = 4,
+                    HasInserts = true,
+                    InsertType = InsertType.HeatSet,
+                    InsertCount = 2,
+                    BagAndTag = false,
+                    InspectionLevel = InspectionLevel.Dimensional,
+                    Certificates = ["MaterialCert"],
+                    DrawingFiles =
+                    [
+                        new ProjectPartAttachmentDto
+                        {
+                            FileId = Guid.NewGuid(),
+                            FileName = "drawing.pdf",
+                            StoragePath = "customers/c1/projects/p1/drawing.pdf"
+                        }
+                    ],
+                    ProcessConfig = new Dictionary<string, string>
+                    {
+                        ["anodizeColor"] = "Black"
+                    },
+                    BodyCount = 2,
+                    BodiesJson = """[{"index":0,"name":"Body_01"}]""",
+                    SelectedBodyIndex = 0
+                }
+            ]
+        };
+        var createdProject = new ProjectDetailDto
+        {
+            Id = duplicateProjectId,
+            CustomerId = customerId,
+            CustomerName = "ACME",
+            Title = "Bracket (Copy)",
+            Currency = "THB"
+        };
+
+        var projectHandler = new MockHttpMessageHandler(async (req, ct) =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith($"/project/v1/projects/{sourceProjectId}", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(sourceProject) };
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/project/v1/projects", StringComparison.Ordinal))
+            {
+                createdProjectPayload = await req.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(createdProject) };
+            }
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith($"/project/v1/projects/{duplicateProjectId}/parts", StringComparison.Ordinal))
+            {
+                addedPartPayload = await req.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        id = Guid.NewGuid(),
+                        fileId = copiedFileId,
+                        fileName = "bracket.step",
+                        fileReference = addedPartPayload.Value.GetProperty("fileReference").GetString(),
+                        thumbnailSmallGcsPath = addedPartPayload.Value.GetProperty("thumbnailSmallGcsPath").GetString(),
+                        glbStoragePath = addedPartPayload.Value.GetProperty("glbStoragePath").GetString(),
+                        overlayPaths = new Dictionary<string, string> { ["CNC__tool_access"] = "copied-overlay.glb" },
+                        processType = "CNC_Milling",
+                        quantity = 4,
+                        roughnessCode = "Ra1.6",
+                        markingType = "Engraving",
+                        insertType = "HeatSet",
+                        inspectionLevel = "Dimensional",
+                        certificates = new[] { "MaterialCert" },
+                        processConfig = new Dictionary<string, string> { ["anodizeColor"] = "Black" },
+                        bodyCount = 2,
+                        bodiesJson = """[{"index":0,"name":"Body_01"}]""",
+                        selectedBodyIndex = 0
+                    })
+                };
+            }
+
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith($"/project/v1/projects/{duplicateProjectId}", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(createdProject) };
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var uploadHandler = new MockHttpMessageHandler(async (req, ct) =>
+        {
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/upload/v1/admin/copy-file-with-metadata", StringComparison.Ordinal))
+            {
+                var body = await req.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+                var sourcePath = body.GetProperty("sourcePath").GetString()!;
+                var fileName = body.GetProperty("fileName").GetString()!;
+                var fileId = sourcePath.EndsWith("drawing.pdf", StringComparison.Ordinal) ? Guid.NewGuid() : copiedFileId;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new CopyFileWithMetadataResponse
+                    {
+                        FileId = fileId.ToString(),
+                        UploadId = Guid.NewGuid().ToString(),
+                        StoragePath = body.GetProperty("destinationPath").GetString()!,
+                        FileName = fileName,
+                        SizeBytes = 123,
+                        ContentType = "application/octet-stream",
+                        UploadedAt = DateTime.UtcNow
+                    })
+                };
+            }
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/upload/v1/admin/copy-file", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { storagePath = "copied-artifact", sizeBytes = 1 }) };
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/upload/v1/files/by-path/signed-url", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { signedUrl = "https://signed.example/file" }) };
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var statusService = new Mock<IFileAnalysisStatusService>();
+        var controller = new ProjectsController(
+            new ProjectServiceClient(new HttpClient(projectHandler) { BaseAddress = new Uri("http://test") }),
+            StubJobClient(),
+            StubFacilityClient(),
+            Logger,
+            new UploadServiceClient(new HttpClient(uploadHandler) { BaseAddress = new Uri("http://test") }),
+            statusService.Object);
+
+        var result = await controller.Duplicate(sourceProjectId, new DuplicateProjectRequest(), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var duplicated = Assert.IsType<ProjectDetailDto>(ok.Value);
+        Assert.Equal(duplicateProjectId, duplicated.Id);
+        Assert.Single(duplicated.Parts);
+        Assert.NotEqual(sourceFileId, duplicated.Parts[0].FileId);
+        Assert.NotNull(createdProjectPayload);
+        Assert.Equal("Bracket (Copy)", createdProjectPayload.Value.GetProperty("title").GetString());
+        Assert.NotNull(addedPartPayload);
+        Assert.Equal(copiedFileId, addedPartPayload.Value.GetProperty("fileId").GetGuid());
+        Assert.True(addedPartPayload.Value.GetProperty("fileReference").GetString()!.Contains($"/projects/{duplicateProjectId}/", StringComparison.Ordinal));
+        Assert.True(addedPartPayload.Value.TryGetProperty("overlayPaths", out _));
+        Assert.Equal("Ra1.6", addedPartPayload.Value.GetProperty("roughnessCode").GetString());
+        statusService.Verify(service => service.CloneStatusAsync(
+            sourceProject.Parts[0].FileReference!,
+            It.Is<string>(path => path.Contains($"/projects/{duplicateProjectId}/", StringComparison.Ordinal)),
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Duplicate_WhenPartCreationFails_CleansUpCreatedProjectAndCopiedFiles()
+    {
+        var sourceProjectId = Guid.NewGuid();
+        var duplicateProjectId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var copiedFileId = Guid.NewGuid();
+        var deleteProjectCalled = false;
+        var deletedFileId = Guid.Empty;
+
+        var sourceProject = new ProjectDetailDto
+        {
+            Id = sourceProjectId,
+            CustomerId = customerId,
+            CustomerName = "ACME",
+            Title = "Bracket",
+            Currency = "THB",
+            Parts =
+            [
+                new ProjectPartDto
+                {
+                    Id = Guid.NewGuid(),
+                    FileId = Guid.NewGuid(),
+                    FileName = "bracket.step",
+                    FileReference = $"customers/{customerId}/projects/{sourceProjectId}/source/bracket.step",
+                    ProcessType = "FDM",
+                    Quantity = 1
+                }
+            ]
+        };
+        var createdProject = new ProjectDetailDto
+        {
+            Id = duplicateProjectId,
+            CustomerId = customerId,
+            CustomerName = "ACME",
+            Title = "Bracket (Copy)",
+            Currency = "THB"
+        };
+
+        var projectHandler = new MockHttpMessageHandler((req, ct) =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith($"/project/v1/projects/{sourceProjectId}", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(sourceProject) });
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/project/v1/projects", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(createdProject) });
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith($"/project/v1/projects/{duplicateProjectId}/parts", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = JsonContent.Create(new { error = "failed" }) });
+
+            if (req.Method == HttpMethod.Delete && req.RequestUri!.AbsolutePath.EndsWith($"/project/v1/projects/{duplicateProjectId}", StringComparison.Ordinal))
+            {
+                deleteProjectCalled = true;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+
+        var uploadHandler = new MockHttpMessageHandler((req, ct) =>
+        {
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/upload/v1/admin/copy-file-with-metadata", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new CopyFileWithMetadataResponse
+                    {
+                        FileId = copiedFileId.ToString(),
+                        UploadId = Guid.NewGuid().ToString(),
+                        StoragePath = $"customers/{customerId}/projects/{duplicateProjectId}/copy/bracket.step",
+                        FileName = "bracket.step",
+                        SizeBytes = 123,
+                        ContentType = "application/octet-stream",
+                        UploadedAt = DateTime.UtcNow
+                    })
+                });
+            }
+
+            if (req.Method == HttpMethod.Delete && req.RequestUri!.AbsolutePath.EndsWith($"/upload/v1/files/{copiedFileId}", StringComparison.Ordinal))
+            {
+                deletedFileId = copiedFileId;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+
+        var controller = new ProjectsController(
+            new ProjectServiceClient(new HttpClient(projectHandler) { BaseAddress = new Uri("http://test") }),
+            StubJobClient(),
+            StubFacilityClient(),
+            Logger,
+            new UploadServiceClient(new HttpClient(uploadHandler) { BaseAddress = new Uri("http://test") }),
+            Mock.Of<IFileAnalysisStatusService>());
+
+        var result = await controller.Duplicate(sourceProjectId, new DuplicateProjectRequest(), CancellationToken.None);
+
+        var status = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(502, status.StatusCode);
+        Assert.True(deleteProjectCalled);
+        Assert.Equal(copiedFileId, deletedFileId);
+    }
+
+    [Fact]
     public async Task UpdatePart_WhenSuccessful_ShouldReturnNoContent()
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);
@@ -219,8 +531,8 @@ public class ProjectsControllerTests
     [Fact]
     public async Task GetPartPrice_WhenSuccessful_ShouldReturnBreakdown()
     {
-        var breakdown = new ProjectPriceBreakdownDto { TotalPerUnit = 250m };
-        var controller = new ProjectsController(CreateClient(breakdown), StubJobClient(), StubFacilityClient(), Logger);
+        var projectServicePart = new { effectiveUnitPrice = 250m };
+        var controller = new ProjectsController(CreateClient(projectServicePart), StubJobClient(), StubFacilityClient(), Logger);
 
         var result = await controller.GetPartPrice(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -247,7 +559,7 @@ public class ProjectsControllerTests
 
         var result = await controller.ConfirmPartPrice(
             Guid.NewGuid(), Guid.NewGuid(),
-            new ConfirmPartPriceRequest { ConfirmedPrice = 300m },
+            new ConfirmPartPriceRequest { ConfirmedUnitPrice = 300m },
             CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
@@ -260,7 +572,7 @@ public class ProjectsControllerTests
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);
 
-        var result = await controller.GenerateQuotation(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.GenerateQuotation(Guid.NewGuid(), new GenerateQuotationRequest(), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
     }
@@ -270,7 +582,7 @@ public class ProjectsControllerTests
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.UnprocessableEntity), StubJobClient(), StubFacilityClient(), Logger);
 
-        var result = await controller.GenerateQuotation(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.GenerateQuotation(Guid.NewGuid(), new GenerateQuotationRequest(), CancellationToken.None);
 
         var status = Assert.IsType<StatusCodeResult>(result);
         Assert.Equal(422, status.StatusCode);

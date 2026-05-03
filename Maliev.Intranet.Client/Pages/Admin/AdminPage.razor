@@ -1,0 +1,158 @@
+@page "/admin"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Admin | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Admin" Subtitle="Platform operations and notification configuration." />
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <div class="mlv-toolbar">
+            <div class="mlv-segmented">
+                @foreach (var tab in _tabs)
+                {
+                    <button type="button" class="@(_tab == tab ? "active" : "")" @onclick="@(() => _tab = tab)">@tab</button>
+                }
+            </div>
+        </div>
+
+        @if (_tab == "Operations")
+        {
+            <div class="mlv-grid">
+                <PanelCard Title="Operations" Class="mlv-span-6">
+                    <div class="mlv-list">
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">System health checks</div>
+                                <div class="mlv-row-sub">All HTTP service liveness checks and response diagnostics.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.MonitorHeart" Href="/admin/system-health">Open</SecondaryButton>
+                        </div>
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">Equipment management</div>
+                                <div class="mlv-row-sub">Moved to Manufacturing Equipment and backed by FacilityService.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.PrecisionManufacturing" Href="/mfg/equipment">Open</SecondaryButton>
+                        </div>
+                    </div>
+                </PanelCard>
+                <PanelCard Title="Health snapshot" Class="mlv-span-12">
+                    @if (_health?.Services.Count > 0)
+                    {
+                        <div class="mlv-list">
+                            @foreach (var service in _health.Services.Where(s => s.IsCritical).Take(12))
+                            {
+                                <div class="mlv-list-row">
+                                    <div>
+                                        <div class="mlv-row-main">@service.ServiceName</div>
+                                        <div class="mlv-row-sub">@service.DomainGroup · @service.ResponseTimeMs.ToString("N0") ms</div>
+                                    </div>
+                                    <StatusBadge Status="@service.Status" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">@_healthError</div>
+                    }
+                </PanelCard>
+            </div>
+        }
+        else if (_tab == "Notifications")
+        {
+            <PanelCard>
+                @if (_templates.Count > 0)
+                {
+                    <table class="mlv-table">
+                        <thead><tr><th>Template</th><th>Key</th><th>Channel</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var template in _templates)
+                            {
+                                <tr>
+                                    <td>@template.Name</td>
+                                    <td class="mlv-mono">@template.TemplateKey</td>
+                                    <td>@template.ChannelType</td>
+                                    <td><StatusBadge Status="@(template.IsActive ? "Active" : "Inactive")" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty">@_notificationError</div>
+                }
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    private readonly string[] _tabs = ["Operations", "Notifications"];
+
+    private string _tab = "Operations";
+    private List<NotificationTemplateDto> _templates = [];
+    private SystemHealthDto? _health;
+    private bool _loading = true;
+    private string _healthError = "Health data is not available.";
+    private string _notificationError = "No notification templates are registered.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            await LoadHealthAsync();
+        }
+        finally
+        {
+            try
+            {
+                await LoadNotificationTemplatesAsync();
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private async Task LoadHealthAsync()
+    {
+        try
+        {
+            _health = await Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
+        }
+        catch (Exception ex)
+        {
+            _health = null;
+            _healthError = "Health data could not be loaded.";
+            Snackbar.Add(_healthError, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task LoadNotificationTemplatesAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<NotificationTemplateDto>>("api/v1/notifications/templates?page=1&pageSize=50");
+            _templates = response?.Data.ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            _templates = [];
+            _notificationError = "Notification templates could not be loaded.";
+            Snackbar.Add(_notificationError, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+}

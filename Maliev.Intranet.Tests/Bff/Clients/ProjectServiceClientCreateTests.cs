@@ -62,6 +62,179 @@ public class ProjectServiceClientCreateTests
         Assert.Null(error);
     }
 
+    [Fact]
+    public async Task GetProjectsAsync_ForwardsSearchAsQueryParameter()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            capturedRequest = request;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    items = Array.Empty<object>(),
+                    page = 3,
+                    pageSize = 25,
+                    totalCount = 0,
+                    totalPages = 0
+                })
+            });
+        });
+        var client = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+
+        await client.GetProjectsAsync("Configuring", "fixture", Guid.Parse("11111111-1111-1111-1111-111111111111"), 3, 25);
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(
+            "/project/v1/projects?page=3&pageSize=25&status=Configuring&query=fixture&customerId=11111111-1111-1111-1111-111111111111",
+            capturedRequest.RequestUri!.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task GetProjectByIdAsync_WhenProjectServiceShape_ReturnsMappedIntranetDto()
+    {
+        var projectId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+        var quotationId = Guid.NewGuid();
+        var responseBody = $$"""
+        {
+          "id": "{{projectId}}",
+          "projectNumber": "PRJ-2026-0001",
+          "customerId": "{{customerId}}",
+          "customerName": "Axion Robotics",
+          "title": "Fixture",
+          "status": "QuotationGenerated",
+          "quotationId": "{{quotationId}}",
+          "quotationNumber": "Q-ABCD1234",
+          "totalEstimatedPrice": 2500,
+          "currency": "THB",
+          "validUntil": "2026-06-02T00:00:00Z",
+          "createdAt": "2026-05-03T04:30:00Z",
+          "updatedAt": "2026-05-03T05:30:00Z",
+          "parts": [
+            {
+              "id": "{{partId}}",
+              "fileId": "{{fileId}}",
+              "fileReference": "projects/fixture.stl",
+              "fileName": "fixture.stl",
+              "thumbnailUrl": "https://storage.example/thumb.png",
+              "processType": "FDM",
+              "materialId": "{{materialId}}",
+              "materialName": "PLA",
+              "materialCode": "PLA-BLK",
+              "quantity": 2,
+              "finishType": "FDM_STD",
+              "aiSuggestedPrice": 1200,
+              "confirmedUnitPrice": 1250,
+              "boundingBoxX": 80,
+              "boundingBoxY": 149,
+              "boundingBoxZ": 5,
+              "isManifold": true,
+              "status": "Confirmed"
+            }
+          ]
+        }
+        """;
+        var client = MakeClient(HttpStatusCode.OK, responseBody);
+
+        var result = await client.GetProjectByIdAsync(projectId);
+
+        Assert.NotNull(result);
+        Assert.Equal(2500m, result.TotalPrice);
+        Assert.Equal("Generated", result.QuotationStatus);
+        Assert.NotEmpty(result.Timeline);
+        var part = Assert.Single(result.Parts);
+        Assert.Equal("projects/fixture.stl", part.FileReference);
+        Assert.Equal("PLA", part.MaterialName);
+        Assert.Equal("PLA-BLK", part.MaterialCode);
+        Assert.Equal("FDM_STD", part.Finish);
+        Assert.Equal(1200m, part.EstimatedPrice);
+        Assert.Equal(1250m, part.ConfirmedPrice);
+        Assert.Equal(1250m, part.ConfirmedUnitPrice);
+        Assert.Equal("https://storage.example/thumb.png", part.ModelPreviewUrl);
+        Assert.Equal(80d, part.Dimensions?.X);
+        Assert.True(part.IsManifold);
+    }
+
+    [Fact]
+    public async Task GenerateQuotationAsync_PostsValidityAndDeliveryExpectations()
+    {
+        string? body = null;
+        var handler = new MockHttpMessageHandler(async (request, ct) =>
+        {
+            body = await request.Content!.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        });
+        var client = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+
+        await client.GenerateQuotationAsync(
+            Guid.NewGuid(),
+            new GenerateQuotationRequest
+            {
+                ValidityDays = 45,
+                DeliveryExpectations = "Standard lead time"
+            });
+
+        Assert.NotNull(body);
+        using var json = System.Text.Json.JsonDocument.Parse(body);
+        Assert.Equal(45, json.RootElement.GetProperty("validityDays").GetInt32());
+        Assert.Equal("Standard lead time", json.RootElement.GetProperty("deliveryExpectations").GetString());
+    }
+
+    [Fact]
+    public async Task AddPartAsync_PostsMaterialAndGeometryContract()
+    {
+        string? body = null;
+        var projectId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+        var handler = new MockHttpMessageHandler(async (request, ct) =>
+        {
+            body = await request.Content!.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = JsonContent.Create(new
+                {
+                    id = Guid.NewGuid(),
+                    fileName = "fixture.stl",
+                    processType = "FDM",
+                    materialId,
+                    materialName = "PLA",
+                    materialCode = "PLA-BLK",
+                    quantity = 2,
+                    aiSuggestedPrice = 120m
+                })
+            };
+        });
+        var client = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+
+        await client.AddPartAsync(projectId, new AddProjectPartRequest
+        {
+            FileName = "fixture.stl",
+            ProcessType = "FDM",
+            MaterialId = materialId,
+            MaterialName = "PLA",
+            MaterialCode = "PLA-BLK",
+            Quantity = 2,
+            VolumeCm3 = 12.5m,
+            BoundingBoxX = 80m,
+            BoundingBoxY = 149m,
+            BoundingBoxZ = 5m,
+            IsManifold = true
+        });
+
+        Assert.NotNull(body);
+        using var json = System.Text.Json.JsonDocument.Parse(body);
+        Assert.Equal("PLA", json.RootElement.GetProperty("materialName").GetString());
+        Assert.Equal("PLA-BLK", json.RootElement.GetProperty("materialCode").GetString());
+        Assert.Equal(12.5m, json.RootElement.GetProperty("volumeCm3").GetDecimal());
+        Assert.Equal(80m, json.RootElement.GetProperty("boundingBoxX").GetDecimal());
+        Assert.True(json.RootElement.GetProperty("isManifold").GetBoolean());
+    }
+
     // ── Error path — error content surfaced ───────────────────────────────────
 
     [Fact]

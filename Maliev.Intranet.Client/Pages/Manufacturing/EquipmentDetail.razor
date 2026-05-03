@@ -1,0 +1,239 @@
+@page "/mfg/equipment/{Id:guid}"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Equipment | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@(_equipment?.Name ?? "Equipment")" Subtitle="@_equipment?.AssetCode" BackHref="/mfg/equipment">
+        @if (_equipment is not null)
+        {
+            <StatusBadge Status="@_equipment.Status" />
+        }
+    </PageHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_equipment is null)
+        {
+            <div class="mlv-empty">Equipment record was not found.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Category" Value="@_equipment.Category" />
+                <StatTile Label="Brand" Value="@(_equipment.Brand ?? "-")" />
+                <StatTile Label="Model" Value="@(_equipment.ModelName ?? "-")" />
+                <StatTile Label="Service due" Value="@(_equipment.NextServiceDueDate?.ToString("dd MMM yyyy") ?? "-")" />
+            </StatBar>
+
+            <div class="mlv-two-column-grid">
+                <PanelCard Title="Equipment">
+                    <dl class="mlv-detail-list">
+                        <dt>Asset code</dt><dd class="mlv-mono">@_equipment.AssetCode</dd>
+                        <dt>Serial number</dt><dd>@Display(_equipment.ManufacturerSerialNumber)</dd>
+                        <dt>Sub-category</dt><dd>@Display(_equipment.SubCategory)</dd>
+                        <dt>Purchase</dt><dd>@(_equipment.PurchaseDate?.ToString("dd MMM yyyy") ?? "-")</dd>
+                        <dt>Warranty</dt><dd>@(_equipment.WarrantyExpiryDate?.ToString("dd MMM yyyy") ?? "-")</dd>
+                        <dt>Updated</dt><dd>@_equipment.UpdatedAt.ToString("dd MMM yyyy")</dd>
+                    </dl>
+                </PanelCard>
+
+                <PanelCard Title="Add note">
+                    <textarea class="mlv-form-textarea" @bind="_newNote" placeholder="Maintenance observation, operating issue, or asset note"></textarea>
+                    <div class="mlv-toolbar mt-3" style="justify-content:flex-end">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.NoteAdd" OnClick="@AddNoteAsync">Add Note</PrimaryButton>
+                    </div>
+                </PanelCard>
+            </div>
+
+            <PanelCard Title="Maintenance" Class="mt-4">
+                <FormGrid>
+                    <FormField Label="Type"><InputText class="mlv-form-input" @bind-Value="_maintenance.Type" /></FormField>
+                    <FormField Label="Occurred"><InputDate class="mlv-form-input" @bind-Value="_maintenanceDate" /></FormField>
+                    <FormField Label="Vendor"><InputText class="mlv-form-input" @bind-Value="_maintenance.VendorName" /></FormField>
+                    <FormField Label="Cost THB"><InputNumber class="mlv-form-input" @bind-Value="_maintenance.CostTHB" /></FormField>
+                    <FormField Label="Description" Class="mlv-span-6"><InputTextArea class="mlv-form-textarea" @bind-Value="_maintenance.Description" /></FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-3" style="justify-content:flex-end">
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Build" OnClick="@AddMaintenanceAsync">Add Maintenance</PrimaryButton>
+                </div>
+                @if (_maintenanceLogs.Count > 0)
+                {
+                    <table class="mlv-table mt-4">
+                        <thead><tr><th>Type</th><th>Description</th><th>Vendor</th><th>Cost</th><th>Date</th></tr></thead>
+                        <tbody>
+                            @foreach (var log in _maintenanceLogs)
+                            {
+                                <tr>
+                                    <td>@log.Type</td>
+                                    <td>@log.Description</td>
+                                    <td>@Display(log.VendorName)</td>
+                                    <td class="mlv-mono">@((log.CostTHB ?? 0).ToString("N2"))</td>
+                                    <td>@log.OccurredAt.ToString("dd MMM yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty mt-4">No maintenance logs.</div>
+                }
+            </PanelCard>
+
+            <div class="mlv-two-column-grid mt-4">
+                <PanelCard Title="Loans">
+                    @if (_loans.Count > 0)
+                    {
+                        <table class="mlv-table">
+                            <thead><tr><th>Borrower</th><th>Status</th><th>Dates</th></tr></thead>
+                            <tbody>
+                                @foreach (var loan in _loans)
+                                {
+                                    <tr>
+                                        <td class="mlv-mono">@loan.BorrowerId</td>
+                                        <td><StatusBadge Status="@loan.LoanStatus" /></td>
+                                        <td>@loan.LoanStartDate.ToString("dd MMM") - @loan.ExpectedReturnDate.ToString("dd MMM")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">No loans.</div>
+                    }
+                </PanelCard>
+
+                <PanelCard Title="Attachments">
+                    @if (_attachments.Count > 0)
+                    {
+                        <table class="mlv-table">
+                            <thead><tr><th>Name</th><th>Type</th><th>Status</th></tr></thead>
+                            <tbody>
+                                @foreach (var attachment in _attachments)
+                                {
+                                    <tr>
+                                        <td>@attachment.Name</td>
+                                        <td>@attachment.AttachmentType</td>
+                                        <td>@(attachment.IsActive ? "Active" : "Inactive")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">No attachments.</div>
+                    }
+                </PanelCard>
+            </div>
+
+            <PanelCard Title="Notes" Class="mt-4">
+                @if (_notes.Count > 0)
+                {
+                    <div class="mlv-list">
+                        @foreach (var note in _notes)
+                        {
+                            <div class="mlv-list-row">
+                                <div>@note.Content</div>
+                                <div class="mlv-row-sub">@note.CreatedAt.ToString("dd MMM yyyy HH:mm")</div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="mlv-empty">No notes.</div>
+                }
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private EquipmentDetailDto? _equipment;
+    private List<EquipmentNoteDto> _notes = [];
+    private List<MaintenanceLogDto> _maintenanceLogs = [];
+    private List<EquipmentLoanDto> _loans = [];
+    private List<EquipmentAttachmentDto> _attachments = [];
+    private bool _loading = true;
+    private string _newNote = string.Empty;
+    private DateTime _maintenanceDate = DateTime.Today;
+    private AddMaintenanceLogRequest _maintenance = new() { Type = "Preventive", Description = string.Empty, OccurredAt = DateTime.UtcNow };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var equipmentTask = Http.GetFromJsonAsync<EquipmentDetailDto>($"api/v1/equipments/{Id}");
+            var notesTask = Http.GetFromJsonAsync<IReadOnlyList<EquipmentNoteDto>>($"api/v1/equipments/{Id}/notes");
+            var maintenanceTask = Http.GetFromJsonAsync<IReadOnlyList<MaintenanceLogDto>>($"api/v1/equipments/{Id}/maintenance");
+            var loansTask = Http.GetFromJsonAsync<IReadOnlyList<EquipmentLoanDto>>($"api/v1/equipments/{Id}/loans");
+            var attachmentsTask = Http.GetFromJsonAsync<IReadOnlyList<EquipmentAttachmentDto>>($"api/v1/equipments/{Id}/attachments");
+            await Task.WhenAll(equipmentTask, notesTask, maintenanceTask, loansTask, attachmentsTask);
+
+            _equipment = await equipmentTask;
+            _notes = (await notesTask)?.ToList() ?? [];
+            _maintenanceLogs = (await maintenanceTask)?.ToList() ?? [];
+            _loans = (await loansTask)?.ToList() ?? [];
+            _attachments = (await attachmentsTask)?.ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Equipment record could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task AddNoteAsync(MouseEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_newNote))
+        {
+            Snackbar.Add("Enter a note.", Severity.Warning);
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync($"api/v1/equipments/{Id}/notes", new AddEquipmentNoteRequest { Content = _newNote });
+        Snackbar.Add(response.IsSuccessStatusCode ? "Note added." : "Note could not be added.", response.IsSuccessStatusCode ? Severity.Success : Severity.Warning);
+        if (response.IsSuccessStatusCode)
+        {
+            _newNote = string.Empty;
+            await LoadAsync();
+        }
+    }
+
+    private async Task AddMaintenanceAsync(MouseEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_maintenance.Description))
+        {
+            Snackbar.Add("Enter maintenance description.", Severity.Warning);
+            return;
+        }
+
+        _maintenance.OccurredAt = DateTime.SpecifyKind(_maintenanceDate, DateTimeKind.Local).ToUniversalTime();
+        var response = await Http.PostAsJsonAsync($"api/v1/equipments/{Id}/maintenance", _maintenance);
+        Snackbar.Add(response.IsSuccessStatusCode ? "Maintenance log added." : "Maintenance log could not be added.", response.IsSuccessStatusCode ? Severity.Success : Severity.Warning);
+        if (response.IsSuccessStatusCode)
+        {
+            _maintenance = new AddMaintenanceLogRequest { Type = "Preventive", Description = string.Empty, OccurredAt = DateTime.UtcNow };
+            await LoadAsync();
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+}

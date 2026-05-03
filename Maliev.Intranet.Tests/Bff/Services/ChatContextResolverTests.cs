@@ -66,7 +66,14 @@ public class ChatContextResolverTests
             new() { Id = Guid.NewGuid(), Name = "John Alpha", Email = "a@test.com" },
             new() { Id = Guid.NewGuid(), Name = "John Beta", Email = "b@test.com" }
         };
-        _customerClientMock.Setup(x => x.GetCustomersAsync("John", It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _customerClientMock.Setup(x => x.GetCustomersAsync(
+                "John",
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<bool>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResponse<CustomerSummaryDto> { Data = customers });
 
         var result = await _resolver.ResolveContextAsync("find John", null, Guid.NewGuid(), CancellationToken.None);

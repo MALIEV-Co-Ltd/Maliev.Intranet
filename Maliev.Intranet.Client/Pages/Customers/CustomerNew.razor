@@ -1,0 +1,76 @@
+@page "/customers/new"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>New Customer | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="New Customer" Subtitle="Create an employee-visible customer record." BackHref="/customers" />
+
+    <PageBody>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <PanelCard Title="Customer profile">
+            <EditForm Model="@_request" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <FormGrid>
+                    <FormField Label="First name"><InputText class="mlv-form-input" @bind-Value="_request.FirstName" /></FormField>
+                    <FormField Label="Last name"><InputText class="mlv-form-input" @bind-Value="_request.LastName" /></FormField>
+                    <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_request.Email" /></FormField>
+                    <FormField Label="Mobile"><InputText class="mlv-form-input" @bind-Value="_request.Mobile" /></FormField>
+                    <FormField Label="Segment"><InputText class="mlv-form-input" @bind-Value="_request.Segment" /></FormField>
+                    <FormField Label="Tier"><InputText class="mlv-form-input" @bind-Value="_request.Tier" /></FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                    <SecondaryButton Href="/customers">Cancel</SecondaryButton>
+                    <PrimaryButton Type="submit" Disabled="@_saving">Create Customer</PrimaryButton>
+                </div>
+            </EditForm>
+        </PanelCard>
+    </PageBody>
+</div>
+
+@code {
+    private CreateCustomerRequest _request = new()
+    {
+        Segment = "Retail",
+        Tier = "Bronze",
+        PreferredLanguage = "en",
+        Timezone = "Asia/Bangkok"
+    };
+
+    private bool _saving;
+    private string? _error;
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/customers", _request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Customer created.", Severity.Success);
+                Navigation.NavigateTo("/customers");
+            }
+            else
+            {
+                _error = "Customer could not be created.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Customer could not be created.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

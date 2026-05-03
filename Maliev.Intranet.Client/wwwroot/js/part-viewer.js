@@ -418,6 +418,15 @@ const modelCenterOffsets    = {};   // canvasId → { cx, cy, zLift } (centering
 const bboxLines             = {};   // canvasId → BABYLON.LinesMesh
 const bboxLabels            = {};   // canvasId → [ { div, worldPos } ]
 const bboxObservers         = {};   // canvasId → scene render observable handle
+const turningAxisLayers     = {};   // canvasId → { svg, labels, pointerObserver, renderObserver, hovered }
+const turningAxisRequests   = {};   // canvasId → latest requested turning-axis payload
+const TURNING_AXIS_HOVER_DISTANCE_PX = 14;
+const TURNING_AXIS_MAX_VERTEX_SAMPLES = 18000;
+const TURNING_AXIS_RING_MIN_POINTS = 10;
+const TURNING_AXIS_MIN_RING_COVERAGE = 0.42;
+const TURNING_AXIS_MIN_CENTER_SCORE = 12;
+const TURNING_AXIS_RELIABLE_RING_COVERAGE = 0.72;
+const TURNING_AXIS_RELIABLE_RING_RESIDUAL_RATIO = 0.04;
 const axisGizmoLayer        = {};   // canvasId → { dispose() }
 const axisLabelDivs         = {};   // canvasId → [ { div, localPos } ]
 const axisMouseHandlers     = {};   // canvasId → mousemove handler function
@@ -473,6 +482,740 @@ function computeSceneBounds(scene) {
     });
     if (!isFinite(minX)) return null;
     return { min: { x: minX, y: minY, z: minZ }, max: { x: maxX, y: maxY, z: maxZ } };
+}
+
+function toWorldPoint(point) {
+    return new BABYLON.Vector3(point.x, point.y, point.z);
+}
+
+function normalizeViewerSettings(viewerSettings) {
+    const settings = viewerSettings && typeof viewerSettings === 'object' ? viewerSettings : {};
+    const renderMode = settings.renderMode === 'wireframe' || settings.renderMode === 'transparent'
+        ? settings.renderMode
+        : 'solid';
+    const cameraMode = settings.cameraProjection === 'perspective'
+        ? 'perspective'
+        : 'orthographic';
+    const sectionAxis = settings.sectionAxis === 'y' || settings.sectionAxis === 'z'
+        ? settings.sectionAxis
+        : 'x';
+
+    return {
+        renderMode,
+        cameraProjection: cameraMode,
+        edgesEnabled: !!settings.edgesEnabled && renderMode !== 'wireframe',
+        gridEnabled: !!settings.gridEnabled,
+        boundingBoxEnabled: !!settings.boundingBoxEnabled,
+        sectionEnabled: !!settings.sectionEnabled,
+        sectionAxis,
+        sectionOffsetMm: Number.isFinite(Number(settings.sectionOffsetMm)) ? Number(settings.sectionOffsetMm) : 0,
+        sectionInverted: !!settings.sectionInverted,
+    };
+}
+
+function normalizeAxisVector(axisVector) {
+    if (!Array.isArray(axisVector) || axisVector.length < 3) return null;
+
+    const direction = new BABYLON.Vector3(
+        Number(axisVector[0]),
+        Number(axisVector[1]),
+        Number(axisVector[2])
+    );
+    if (!isFinite(direction.x) || !isFinite(direction.y) || !isFinite(direction.z) || direction.length() < 1e-6) {
+        return null;
+    }
+
+    const worldDirection = BABYLON.Vector3.TransformNormal(direction, BABYLON.Matrix.RotationX(Math.PI / 2));
+    if (worldDirection.length() < 1e-6) return null;
+    return worldDirection.normalize();
+}
+
+function transformBackendAxisPoint(canvasId, axisPoint) {
+    if (!Array.isArray(axisPoint) || axisPoint.length < 3) return null;
+
+    const sourcePoint = new BABYLON.Vector3(
+        Number(axisPoint[0]),
+        Number(axisPoint[1]),
+        Number(axisPoint[2])
+    );
+    if (!isFinite(sourcePoint.x) || !isFinite(sourcePoint.y) || !isFinite(sourcePoint.z)) {
+        return null;
+    }
+
+    const scaleFactor = modelScaleFactors[canvasId] ?? 1;
+    const scaled = sourcePoint.scale(scaleFactor);
+    const rotated = BABYLON.Vector3.TransformCoordinates(scaled, BABYLON.Matrix.RotationX(Math.PI / 2));
+    const offset = modelCenterOffsets[canvasId] ?? { cx: 0, cy: 0, zLift: 0 };
+    return new BABYLON.Vector3(
+        rotated.x - offset.cx,
+        rotated.y - offset.cy,
+        rotated.z + offset.zLift
+    );
+}
+
+function directionFromPrimaryAxis(primaryAxis) {
+    const axis = String(primaryAxis || '').toUpperCase();
+    if (axis === 'X') return new BABYLON.Vector3(1, 0, 0);
+    if (axis === 'Y') return BABYLON.Vector3.TransformNormal(new BABYLON.Vector3(0, 1, 0), BABYLON.Matrix.RotationX(Math.PI / 2)).normalize();
+    if (axis === 'Z') return BABYLON.Vector3.TransformNormal(new BABYLON.Vector3(0, 0, 1), BABYLON.Matrix.RotationX(Math.PI / 2)).normalize();
+    return null;
+}
+
+function detectTurningAxisDirectionFromBounds(bb) {
+    const x = Math.abs(bb.max.x - bb.min.x);
+    const y = Math.abs(bb.max.y - bb.min.y);
+    const z = Math.abs(bb.max.z - bb.min.z);
+
+    if (x >= y && x >= z) return new BABYLON.Vector3(1, 0, 0);
+    if (y >= x && y >= z) return new BABYLON.Vector3(0, 1, 0);
+    return new BABYLON.Vector3(0, 0, 1);
+}
+
+function getBoundingBoxCorners(bb) {
+    const min = toWorldPoint(bb.min);
+    const max = toWorldPoint(bb.max);
+    return [
+        new BABYLON.Vector3(min.x, min.y, min.z),
+        new BABYLON.Vector3(min.x, min.y, max.z),
+        new BABYLON.Vector3(min.x, max.y, min.z),
+        new BABYLON.Vector3(min.x, max.y, max.z),
+        new BABYLON.Vector3(max.x, min.y, min.z),
+        new BABYLON.Vector3(max.x, min.y, max.z),
+        new BABYLON.Vector3(max.x, max.y, min.z),
+        new BABYLON.Vector3(max.x, max.y, max.z),
+    ];
+}
+
+function isSystemMeshForTurningAxis(mesh, canvasId) {
+    if (!mesh || !mesh.name) return true;
+    if (mesh.name === '__grid__' || mesh.name === '__shadow_catcher__') return true;
+    if (mesh.name.startsWith('__axis') || mesh.name.startsWith('bbox_')) return true;
+    if (mesh.name.startsWith('__flipped_overlay__') || mesh.name.startsWith('measure_')) return true;
+
+    const directOverlayMap = overlayMeshes?.[canvasId];
+    if (directOverlayMap instanceof Map) {
+        for (const [, meshArr] of directOverlayMap) {
+            if (meshArr?.some(m => m.uniqueId === mesh.uniqueId)) return true;
+        }
+    }
+
+    const prefix = `${canvasId}::`;
+    for (const key of Object.keys(overlayMeshes ?? {})) {
+        if (!key.startsWith(prefix) || !(overlayMeshes[key] instanceof Map)) continue;
+        for (const [, meshArr] of overlayMeshes[key]) {
+            if (meshArr?.some(m => m.uniqueId === mesh.uniqueId)) return true;
+        }
+    }
+
+    return false;
+}
+
+function collectTurningAxisSamplePoints(scene, canvasId) {
+    const points = [];
+    const candidateMeshes = scene.meshes.filter(mesh =>
+        !isSystemMeshForTurningAxis(mesh, canvasId)
+        && mesh.getVerticesData
+        && mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind)
+        && mesh.getTotalVertices?.() > 0
+    );
+
+    const totalVertices = candidateMeshes.reduce((sum, mesh) => sum + (mesh.getTotalVertices?.() ?? 0), 0);
+    const globalStep = Math.max(1, Math.ceil(totalVertices / TURNING_AXIS_MAX_VERTEX_SAMPLES));
+
+    candidateMeshes.forEach(mesh => {
+        const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+        if (!positions) return;
+
+        mesh.computeWorldMatrix(true);
+        const matrix = mesh.getWorldMatrix();
+        for (let i = 0; i < positions.length; i += 3 * globalStep) {
+            points.push(BABYLON.Vector3.TransformCoordinates(
+                new BABYLON.Vector3(positions[i], positions[i + 1], positions[i + 2]),
+                matrix
+            ));
+        }
+    });
+
+    return points;
+}
+
+function buildAxisBasis(direction) {
+    let helper = Math.abs(BABYLON.Vector3.Dot(direction, BABYLON.Axis.Z)) < 0.9
+        ? BABYLON.Axis.Z
+        : BABYLON.Axis.Y;
+    let u = BABYLON.Vector3.Cross(direction, helper);
+    if (u.length() < 1e-6) {
+        helper = BABYLON.Axis.X;
+        u = BABYLON.Vector3.Cross(direction, helper);
+    }
+
+    u.normalize();
+    const v = BABYLON.Vector3.Cross(direction, u).normalize();
+    return { u, v };
+}
+
+function solve3x3(matrix, rhs) {
+    const a = matrix.map((row, index) => [...row, rhs[index]]);
+
+    for (let col = 0; col < 3; col += 1) {
+        let pivot = col;
+        for (let row = col + 1; row < 3; row += 1) {
+            if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) pivot = row;
+        }
+
+        if (Math.abs(a[pivot][col]) < 1e-9) return null;
+        if (pivot !== col) [a[col], a[pivot]] = [a[pivot], a[col]];
+
+        const divisor = a[col][col];
+        for (let j = col; j < 4; j += 1) a[col][j] /= divisor;
+
+        for (let row = 0; row < 3; row += 1) {
+            if (row === col) continue;
+            const factor = a[row][col];
+            for (let j = col; j < 4; j += 1) {
+                a[row][j] -= factor * a[col][j];
+            }
+        }
+    }
+
+    return [a[0][3], a[1][3], a[2][3]];
+}
+
+function unique2DPoints(points, tolerance) {
+    const unique = new Map();
+    points.forEach(point => {
+        const key = `${Math.round(point.x / tolerance)},${Math.round(point.y / tolerance)}`;
+        if (!unique.has(key)) unique.set(key, point);
+    });
+    return [...unique.values()];
+}
+
+function fitCircle2D(points) {
+    if (points.length < TURNING_AXIS_RING_MIN_POINTS) return null;
+
+    let sA = 0, sB = 0, sC = 0, sD = 0, sE = 0, sF = 0;
+    let rA = 0, rB = 0, rC = 0;
+    points.forEach(point => {
+        const a = 2 * point.x;
+        const b = 2 * point.y;
+        const c = 1;
+        const rhs = point.x * point.x + point.y * point.y;
+        sA += a * a;
+        sB += a * b;
+        sC += a * c;
+        sD += b * b;
+        sE += b * c;
+        sF += c * c;
+        rA += a * rhs;
+        rB += b * rhs;
+        rC += rhs;
+    });
+
+    const solved = solve3x3(
+        [[sA, sB, sC], [sB, sD, sE], [sC, sE, sF]],
+        [rA, rB, rC]
+    );
+    if (!solved) return null;
+
+    const [cx, cy, constant] = solved;
+    const radiusSquared = cx * cx + cy * cy + constant;
+    if (!isFinite(radiusSquared) || radiusSquared <= 1e-9) return null;
+
+    const radius = Math.sqrt(radiusSquared);
+    let residualSum = 0;
+    const angles = [];
+    points.forEach(point => {
+        const dist = Math.hypot(point.x - cx, point.y - cy);
+        residualSum += (dist - radius) * (dist - radius);
+        angles.push(Math.atan2(point.y - cy, point.x - cx));
+    });
+    angles.sort((a, b) => a - b);
+
+    let maxGap = 0;
+    for (let i = 1; i < angles.length; i += 1) {
+        maxGap = Math.max(maxGap, angles[i] - angles[i - 1]);
+    }
+    if (angles.length > 1) {
+        maxGap = Math.max(maxGap, (angles[0] + Math.PI * 2) - angles[angles.length - 1]);
+    }
+
+    return {
+        centerU: cx,
+        centerV: cy,
+        radius,
+        residual: Math.sqrt(residualSum / points.length),
+        coverage: Math.max(0, Math.min(1, (Math.PI * 2 - maxGap) / (Math.PI * 2))),
+        count: points.length,
+    };
+}
+
+function splitRadialPointGroups(points, centerU, centerV, tolerance) {
+    const sorted = points
+        .map(point => ({
+            point,
+            radius: Math.hypot(point.x - centerU, point.y - centerV),
+        }))
+        .sort((a, b) => a.radius - b.radius);
+
+    const groups = [];
+    let current = [];
+    let previousRadius = null;
+
+    sorted.forEach(entry => {
+        if (previousRadius !== null
+            && entry.radius - previousRadius > tolerance
+            && current.length >= TURNING_AXIS_RING_MIN_POINTS) {
+            groups.push(current.map(item => item.point));
+            current = [];
+        }
+
+        current.push(entry);
+        previousRadius = entry.radius;
+    });
+
+    if (current.length >= TURNING_AXIS_RING_MIN_POINTS) {
+        groups.push(current.map(item => item.point));
+    }
+
+    return groups;
+}
+
+function buildCirclePointGroups(points, fallbackU, fallbackV, diagonal) {
+    const groups = [points];
+    const tolerance = Math.max(0.2, diagonal * 0.01);
+    splitRadialPointGroups(points, fallbackU, fallbackV, tolerance)
+        .forEach(group => groups.push(group));
+
+    const mean = points.reduce(
+        (acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }),
+        { x: 0, y: 0 });
+    mean.x /= points.length;
+    mean.y /= points.length;
+    splitRadialPointGroups(points, mean.x, mean.y, tolerance)
+        .forEach(group => groups.push(group));
+
+    return groups;
+}
+
+function getRingResidualRatio(ring) {
+    return ring.residual / Math.max(ring.radius, 1e-6);
+}
+
+function getRingQuality(ring) {
+    return Math.sqrt(ring.count)
+        * ring.coverage
+        / (1 + getRingResidualRatio(ring) * 12);
+}
+
+function isReliableTurningRing(ring) {
+    return ring.coverage >= TURNING_AXIS_RELIABLE_RING_COVERAGE
+        && getRingResidualRatio(ring) <= TURNING_AXIS_RELIABLE_RING_RESIDUAL_RATIO;
+}
+
+function addRingToCenterCluster(clusters, entry, tolerance) {
+    let target = null;
+    let bestDistance = Infinity;
+
+    clusters.forEach(cluster => {
+        const distance = Math.hypot(
+            cluster.centerU - entry.ring.centerU,
+            cluster.centerV - entry.ring.centerV);
+        if (distance <= tolerance && distance < bestDistance) {
+            target = cluster;
+            bestDistance = distance;
+        }
+    });
+
+    if (!target) {
+        clusters.push({
+            centerU: entry.ring.centerU,
+            centerV: entry.ring.centerV,
+            minRadius: entry.ring.radius,
+            totalQuality: entry.quality,
+            ringCount: 1,
+        });
+        return;
+    }
+
+    const totalQuality = target.totalQuality + entry.quality;
+    target.centerU = ((target.centerU * target.totalQuality) + (entry.ring.centerU * entry.quality)) / totalQuality;
+    target.centerV = ((target.centerV * target.totalQuality) + (entry.ring.centerV * entry.quality)) / totalQuality;
+    target.minRadius = Math.min(target.minRadius, entry.ring.radius);
+    target.totalQuality = totalQuality;
+    target.ringCount += 1;
+}
+
+function selectTurningAxisCenterCluster(rings, diagonal) {
+    const entries = rings
+        .map(ring => ({ ring, quality: getRingQuality(ring), reliable: isReliableTurningRing(ring) }))
+        .filter(entry => entry.quality > 0);
+    if (entries.length === 0) return null;
+
+    const reliableEntries = entries.filter(entry => entry.reliable);
+    const source = reliableEntries.length > 0 ? reliableEntries : entries;
+    const tolerance = Math.max(0.12, diagonal * 0.012);
+    const clusters = [];
+
+    source
+        .sort((a, b) => a.ring.radius - b.ring.radius)
+        .forEach(entry => addRingToCenterCluster(clusters, entry, tolerance));
+
+    if (clusters.length === 0) return null;
+
+    clusters.sort((a, b) => {
+        if (reliableEntries.length > 0) {
+            const radiusDelta = a.minRadius - b.minRadius;
+            if (Math.abs(radiusDelta) > 1e-6) return radiusDelta;
+        }
+
+        return b.totalQuality - a.totalQuality;
+    });
+
+    const selected = clusters[0];
+    return {
+        centerU: selected.centerU,
+        centerV: selected.centerV,
+        score: selected.totalQuality,
+        ringCount: selected.ringCount,
+    };
+}
+
+function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
+    const normalizedDirection = direction.clone();
+    normalizedDirection.normalize();
+    const { u, v } = buildAxisBasis(normalizedDirection);
+    const corners = getBoundingBoxCorners(bb);
+    let minT = Infinity;
+    let maxT = -Infinity;
+    corners.forEach(corner => {
+        const t = BABYLON.Vector3.Dot(corner, normalizedDirection);
+        minT = Math.min(minT, t);
+        maxT = Math.max(maxT, t);
+    });
+
+    const axisLength = Math.max(maxT - minT, 1);
+    const diagonal = toWorldPoint(bb.max).subtract(toWorldPoint(bb.min)).length();
+    const bucketSize = Math.max(0.08, Math.min(1.25, axisLength * 0.015));
+    const uniqueTolerance = Math.max(0.02, diagonal * 0.0004);
+    const minRadius = Math.max(0.04, diagonal * 0.002);
+    const fallbackU = BABYLON.Vector3.Dot(fallbackCenter, u);
+    const fallbackV = BABYLON.Vector3.Dot(fallbackCenter, v);
+    const buckets = new Map();
+
+    points.forEach(point => {
+        const t = BABYLON.Vector3.Dot(point, normalizedDirection);
+        const key = Math.round(t / bucketSize);
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push({
+            x: BABYLON.Vector3.Dot(point, u),
+            y: BABYLON.Vector3.Dot(point, v),
+        });
+    });
+
+    const rings = [];
+    for (const bucketPoints of buckets.values()) {
+        if (bucketPoints.length < TURNING_AXIS_RING_MIN_POINTS) continue;
+
+        const uniquePoints = unique2DPoints(bucketPoints, uniqueTolerance);
+        if (uniquePoints.length < TURNING_AXIS_RING_MIN_POINTS) continue;
+
+        const pointGroups = buildCirclePointGroups(uniquePoints, fallbackU, fallbackV, diagonal);
+        pointGroups.forEach(group => {
+            const sampledPoints = group.length > 220
+                ? group.filter((_, index) => index % Math.ceil(group.length / 220) === 0)
+                : group;
+            const fit = fitCircle2D(sampledPoints);
+            if (!fit || fit.radius < minRadius) return;
+
+            const residualLimit = Math.max(0.22, fit.radius * 0.10);
+            if (fit.coverage < TURNING_AXIS_MIN_RING_COVERAGE || fit.residual > residualLimit) return;
+
+            rings.push(fit);
+        });
+    }
+
+    if (rings.length === 0) {
+        return {
+            direction: normalizedDirection,
+            center: fallbackCenter,
+            score: 0,
+            ringCount: 0,
+        };
+    }
+
+    const selectedCluster = selectTurningAxisCenterCluster(rings, diagonal);
+    if (!selectedCluster) {
+        return {
+            direction: normalizedDirection,
+            center: fallbackCenter,
+            score: 0,
+            ringCount: 0,
+        };
+    }
+
+    const axisMid = (minT + maxT) / 2;
+    const center = u.scale(selectedCluster.centerU)
+        .add(v.scale(selectedCluster.centerV))
+        .add(normalizedDirection.scale(axisMid));
+
+    return {
+        direction: normalizedDirection,
+        center,
+        score: selectedCluster.score,
+        ringCount: selectedCluster.ringCount,
+    };
+}
+
+function resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, axisPoint, bb, fallbackCenter) {
+    const points = collectTurningAxisSamplePoints(scene, canvasId);
+    const direction = normalizeAxisVector(axisVector)
+        || directionFromPrimaryAxis(primaryAxis)
+        || detectTurningAxisDirectionFromBounds(bb);
+    const backendCenter = transformBackendAxisPoint(canvasId, axisPoint);
+    if (backendCenter) {
+        return {
+            direction,
+            center: backendCenter,
+            score: Number.POSITIVE_INFINITY,
+            ringCount: 0,
+        };
+    }
+
+    const evaluated = evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter);
+    return {
+        direction,
+        center: evaluated.score >= TURNING_AXIS_MIN_CENTER_SCORE && evaluated.ringCount > 0
+            ? evaluated.center
+            : fallbackCenter,
+        score: evaluated.score,
+        ringCount: evaluated.ringCount,
+    };
+}
+
+function createTurningAxisLabel(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    div.style.position = 'fixed';
+    div.style.zIndex = '10020';
+    div.style.pointerEvents = 'none';
+    div.style.padding = '5px 9px';
+    div.style.border = '1px solid #2563eb';
+    div.style.borderRadius = '4px';
+    div.style.background = 'rgba(255, 255, 255, 0.96)';
+    div.style.color = '#2563eb';
+    div.style.font = '600 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    div.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.16)';
+    div.style.whiteSpace = 'nowrap';
+    div.style.transform = 'translate(-50%, -130%)';
+    div.style.display = 'none';
+    document.body.appendChild(div);
+    return div;
+}
+
+function createTurningAxisSvg() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.position = 'fixed';
+    svg.style.left = '0';
+    svg.style.top = '0';
+    svg.style.width = '100vw';
+    svg.style.height = '100vh';
+    svg.style.overflow = 'visible';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '10010';
+
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('stroke', '#2563eb');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('opacity', '0.45');
+    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('stroke-dasharray', '9 7');
+
+    svg.appendChild(line);
+    document.body.appendChild(svg);
+
+    return { svg, line };
+}
+
+function projectWorldPointToScreen(worldPos, canvasId) {
+    const cam = mainCameras[canvasId];
+    const engine = engines[canvasId];
+    if (!cam || !engine) return null;
+
+    const canvas = engine.getRenderingCanvas();
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const rw = engine.getRenderWidth();
+    const rh = engine.getRenderHeight();
+    const viewProj = cam.getViewMatrix().multiply(cam.getProjectionMatrix());
+    const projected = BABYLON.Vector3.Project(
+        worldPos,
+        BABYLON.Matrix.Identity(),
+        viewProj,
+        cam.viewport.toGlobal(rw, rh)
+    );
+
+    if (projected.z < 0 || projected.z > 1) return null;
+    return {
+        x: rect.left + (projected.x / rw) * rect.width,
+        y: rect.top + (projected.y / rh) * rect.height,
+    };
+}
+
+function projectTurningAxisLabel(div, worldPos, canvasId, visible) {
+    if (!visible) {
+        div.style.display = 'none';
+        return;
+    }
+
+    const projected = projectWorldPointToScreen(worldPos, canvasId);
+    if (!projected) {
+        div.style.display = 'none';
+        return;
+    }
+
+    div.style.left = `${projected.x}px`;
+    div.style.top = `${projected.y}px`;
+    div.style.display = '';
+}
+
+function distancePointToSegmentPx(px, py, a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 <= 1e-6) return Math.hypot(px - a.x, py - a.y);
+
+    const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / len2));
+    const x = a.x + t * dx;
+    const y = a.y + t * dy;
+    return Math.hypot(px - x, py - y);
+}
+
+function isPointerNearTurningAxis(canvasId, state, pointerEvent) {
+    const start = projectWorldPointToScreen(state.start, canvasId);
+    const end = projectWorldPointToScreen(state.end, canvasId);
+    if (!start || !end) return false;
+
+    return distancePointToSegmentPx(
+        pointerEvent.clientX,
+        pointerEvent.clientY,
+        start,
+        end
+    ) <= TURNING_AXIS_HOVER_DISTANCE_PX;
+}
+
+function updateTurningAxisSvg(canvasId, state) {
+    const start = projectWorldPointToScreen(state.start, canvasId);
+    const end = projectWorldPointToScreen(state.end, canvasId);
+
+    if (!start || !end) {
+        state.svg.style.display = 'none';
+        state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, false));
+        return;
+    }
+
+    state.svg.style.display = '';
+    state.line.setAttribute('x1', start.x.toString());
+    state.line.setAttribute('y1', start.y.toString());
+    state.line.setAttribute('x2', end.x.toString());
+    state.line.setAttribute('y2', end.y.toString());
+    state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, state.hovered));
+}
+
+function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector, axisPoint) {
+    const scene = scenes[canvasId];
+    const bb = sceneBoundingBoxes[canvasId];
+    const centerData = meshCenters[canvasId];
+    if (!scene || !bb || !centerData) return false;
+
+    const fallbackCenter = toWorldPoint(centerData);
+    const resolvedAxis = resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, axisPoint, bb, fallbackCenter);
+    const direction = resolvedAxis?.direction;
+    if (!direction) {
+        clearTurningAxis(canvasId, false);
+        return false;
+    }
+
+    clearTurningAxis(canvasId, false);
+
+    const center = resolvedAxis.center ?? fallbackCenter;
+    const min = toWorldPoint(bb.min);
+    const max = toWorldPoint(bb.max);
+    const corners = getBoundingBoxCorners(bb);
+
+    let minDot = Infinity;
+    let maxDot = -Infinity;
+    corners.forEach(corner => {
+        const dot = BABYLON.Vector3.Dot(corner.subtract(center), direction);
+        minDot = Math.min(minDot, dot);
+        maxDot = Math.max(maxDot, dot);
+    });
+
+    const diagonal = max.subtract(min).length();
+    const padding = Math.max(diagonal * 0.08, 8);
+    const start = center.add(direction.scale(minDot - padding));
+    const end = center.add(direction.scale(maxDot + padding));
+    const length = BABYLON.Vector3.Distance(start, end);
+
+    const overlay = createTurningAxisSvg();
+    const axisLabel = createTurningAxisLabel('Axis of Turning');
+    const labelPositions = [
+        { div: axisLabel, worldPos: center.add(direction.scale(length * 0.10)) },
+    ];
+
+    const state = {
+        svg: overlay.svg,
+        line: overlay.line,
+        labels: labelPositions,
+        pointerObserver: null,
+        renderObserver: null,
+        canvasLeaveHandler: null,
+        hovered: false,
+        start,
+        end,
+    };
+
+    state.pointerObserver = scene.onPointerObservable.add(pointerInfo => {
+        if (pointerInfo.type !== BABYLON.PointerEventTypes.POINTERMOVE) return;
+        state.hovered = pointerInfo.event
+            ? isPointerNearTurningAxis(canvasId, state, pointerInfo.event)
+            : false;
+    });
+    const canvas = engines[canvasId]?.getRenderingCanvas();
+    if (canvas) {
+        state.canvasLeaveHandler = () => { state.hovered = false; };
+        canvas.addEventListener('pointerleave', state.canvasLeaveHandler);
+    }
+    state.renderObserver = scene.onBeforeRenderObservable.add(() => {
+        updateTurningAxisSvg(canvasId, state);
+    });
+    updateTurningAxisSvg(canvasId, state);
+
+    turningAxisLayers[canvasId] = state;
+    return true;
+}
+
+export function setTurningAxis(canvasId, primaryAxis, axisVector, axisPoint) {
+    turningAxisRequests[canvasId] = { primaryAxis, axisVector, axisPoint };
+    buildTurningAxisGeometry(canvasId, primaryAxis, axisVector, axisPoint);
+}
+
+export function clearTurningAxis(canvasId, clearRequest = true) {
+    const state = turningAxisLayers[canvasId];
+    if (state) {
+        const scene = scenes[canvasId];
+        const canvas = engines[canvasId]?.getRenderingCanvas();
+        if (state.pointerObserver && scene) scene.onPointerObservable.remove(state.pointerObserver);
+        if (state.renderObserver && scene) scene.onBeforeRenderObservable.remove(state.renderObserver);
+        if (state.canvasLeaveHandler && canvas) canvas.removeEventListener('pointerleave', state.canvasLeaveHandler);
+        if (state.svg) { try { state.svg.remove(); } catch (_) {} }
+        state.labels.forEach(({ div }) => { try { div.remove(); } catch (_) {} });
+        delete turningAxisLayers[canvasId];
+    }
+
+    if (clearRequest) delete turningAxisRequests[canvasId];
 }
 
 /**
@@ -906,14 +1649,13 @@ function applyPreset(cam, presetName, smooth = false, canvasId = null) {
  * @param {boolean} isDark
  * @param {object|null} knownDimsMm  Optional { x, y, z } bounding box in mm from server
  * @param {object|null} dotNetRef   Optional DotNetObjectReference for error callbacks
- * @param {string}  renderMode     Optional render mode: "solid", "wireframe", "transparent" (default: "solid")
- * @param {string}  cameraProjection  Optional camera projection: "perspective" or "orthographic" (default: "perspective")
+ * @param {object|null} viewerSettings  Per-part render/projection/section settings
  */
-export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef, renderMode = "solid", cameraProjection = "perspective") {
+export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef, viewerSettings = {}) {
+    viewerSettings = normalizeViewerSettings(viewerSettings);
     // Debug logging: track when initialize is called
     const sanitizedUrl = fileUrl ? (fileUrl.includes('?') ? fileUrl.substring(0, fileUrl.indexOf('?')) + '?[SIGNED_URL]' : fileUrl) : '(none)';
-    const prevGen = loadGenerations[canvasId] || 0;
-    debugLog('[BabylonViewer] initialize START:', { canvasId, url: sanitizedUrl, fileExt, prevGen, timestamp: Date.now() });
+    debugLog('[BabylonViewer] initialize START:', { canvasId, url: sanitizedUrl, fileExt, prevGen: loadGenerations[canvasId] || 0, timestamp: Date.now() });
 
     try {
         await loadScript('./lib/babylonjs/babylon.js');
@@ -932,7 +1674,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
         // Generation counter: any stale retry or async callback from a previous initialize()
         // call will see a mismatched generation and bail out, preventing duplicate mesh appends.
-        loadGenerations[canvasId] = prevGen + 1;
+        loadGenerations[canvasId] = (loadGenerations[canvasId] || 0) + 1;
         const currentGen = loadGenerations[canvasId];
 
         darkModes[canvasId]        = !!isDark;
@@ -940,9 +1682,13 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         originalMaterials[canvasId]= {};
         sceneBoundingBoxes[canvasId] = null;
         meshCenters[canvasId]      = null;
-        edgesEnabled[canvasId]     = false;
+        edgesEnabled[canvasId]     = !!viewerSettings.edgesEnabled;
 
-        const engine = new BABYLON.Engine(canvas, true, { premultipliedAlpha: false, alpha: true, reverseDepthBuffer: true });
+        const engine = new BABYLON.Engine(canvas, true, {
+            premultipliedAlpha: false,
+            alpha: true,
+            disableUniformBuffers: true,
+        });
         const scene  = new BABYLON.Scene(engine);
         engine.resize();
 
@@ -965,8 +1711,8 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         mainCameras[canvasId] = camera;
 
         // Set initial projection mode based on parameter
-        debugLog('[BabylonViewer] initialize: cameraProjection =', cameraProjection);
-        if (cameraProjection === 'orthographic') {
+        debugLog('[BabylonViewer] initialize: cameraProjection =', viewerSettings.cameraProjection);
+        if (viewerSettings.cameraProjection === 'orthographic') {
             setCameraProjection(canvasId, 'orthographic');
         }
 
@@ -1137,6 +1883,10 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     y: (finalBb.min.y + finalBb.max.y) / 2,
                     z: (finalBb.min.z + finalBb.max.z) / 2,
                 };
+                if (turningAxisRequests[canvasId]) {
+                    const request = turningAxisRequests[canvasId];
+                    buildTurningAxisGeometry(canvasId, request.primaryAxis, request.axisVector, request.axisPoint);
+                }
 
                 // ── Permanent shadow-catcher ground plane ──
                 // Creates an always-on ground mesh to catch shadows from the model.
@@ -1294,7 +2044,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     // _loadAttempt is started, before the async callback fires), so
                     // setCameraProjection will no longer return early. This also recalculates
                     // ortho bounds using the correct model-scale radius.
-                    setCameraProjection(canvasId, cameraProjection);
+                    setCameraProjection(canvasId, viewerSettings.cameraProjection);
                 }
 
                 // ── Post Processing ──
@@ -1341,8 +2091,17 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 ro.observe(canvas);
                 resizeObservers[canvasId] = ro;
 
-                setRenderMode(canvasId, renderMode);
-                toggleEdges(canvasId, false);
+                setRenderMode(canvasId, viewerSettings.renderMode);
+                toggleEdges(canvasId, !!viewerSettings.edgesEnabled);
+                toggleBoundingBox(canvasId, !!viewerSettings.boundingBoxEnabled);
+                viewerSettings.gridEnabled ? showGrid(canvasId) : hideGrid(canvasId);
+                setSectionPlane(
+                    canvasId,
+                    !!viewerSettings.sectionEnabled,
+                    viewerSettings.sectionAxis,
+                    viewerSettings.sectionOffsetMm,
+                    !!viewerSettings.sectionInverted
+                );
             },
             null,
             (_scene, message, exception) => {
@@ -1378,6 +2137,10 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         _loadAttempt(0);
 
         engine.runRenderLoop(() => {
+            if (loadGenerations[canvasId] !== currentGen || engines[canvasId] !== engine || scenes[canvasId] !== scene) {
+                return;
+            }
+
             // Smooth speed interpolation (lerp toward target)
             const curr   = autoSpeedCurrent[canvasId] ?? 0;
             const target = autoSpeedTarget[canvasId]  ?? 0;
@@ -1739,14 +2502,21 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
 
     const labelDivs = labelDefs.map(({ name, color, pos }) => {
         const div = document.createElement('div');
+        div.className = 'axis-gizmo-label';
         div.textContent = name;
+        div.setAttribute('translate', 'no');
+        div.setAttribute('aria-label', `${name} axis`);
+        div.lang = 'zxx';
         div.style.cssText = `
             position: fixed;
             transform: translate(-50%, -50%);
             color: ${color};
             font-size: ${CONFIG.AXIS_GIZMO.labelFontSize};
             font-weight: 700;
-            font-family: monospace;
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, 'Courier New', monospace !important;
+            font-variant-ligatures: none;
+            font-feature-settings: "liga" 0, "clig" 0;
+            text-transform: none;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.18s ease;
@@ -2739,7 +3509,14 @@ export function clearDfmOverlays(canvasId, partKey) {
     const slot = partKey ? `${canvasId}::${partKey}` : canvasId;
     const map = overlayMeshes[slot];
     if (map) {
-        map.forEach(meshes => meshes.forEach(m => m.dispose()));
+        map.forEach(meshes => meshes.forEach(m => {
+            if (!m || (typeof m.isDisposed === 'function' && m.isDisposed())) return;
+            try {
+                m.dispose();
+            } catch (error) {
+                debugLog('clearDfmOverlays dispose skipped', error);
+            }
+        }));
         map.clear();
         delete overlayMeshes[slot];
     }
@@ -2748,6 +3525,34 @@ export function clearDfmOverlays(canvasId, partKey) {
 }
 
 // ── setSectionPlane ──────────────────────────────────────────────────────────
+
+function disposeSectionVisuals(canvasId, scene = scenes[canvasId]) {
+    if (sectionEdgeMeshes[canvasId]) {
+        sectionEdgeMeshes[canvasId].dispose();
+        sectionEdgeMeshes[canvasId] = null;
+    }
+    if (sectionHatchMeshes[canvasId]) {
+        sectionHatchMeshes[canvasId].dispose();
+        sectionHatchMeshes[canvasId] = null;
+    }
+    if (sectionObservers[canvasId]) {
+        if (scene) scene.onBeforeRenderObservable.remove(sectionObservers[canvasId]);
+        sectionObservers[canvasId] = null;
+    }
+    _disposeSectionGhosts(canvasId);
+    _sectionRebuildPending[canvasId] = false;
+}
+
+function scheduleSectionRebuild(canvasId, scene, planeNormal, planeD) {
+    if (_sectionRebuildPending[canvasId]) return;
+    _sectionRebuildPending[canvasId] = true;
+    requestAnimationFrame(() => {
+        _sectionRebuildPending[canvasId] = false;
+        if (scenes[canvasId] !== scene || !scene.clipPlane) return;
+        _rebuildSectionEdges(canvasId, scene, planeNormal, planeD);
+        _rebuildSectionHatch(canvasId, scene, planeNormal, planeD);
+    });
+}
 
 /**
  * Sets or clears the scene clipping plane and redraws the cut-edge lines.
@@ -2762,24 +3567,10 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
-    // Dispose any existing cut-edge lines, hatch lines, and observer
-    if (sectionEdgeMeshes[canvasId]) {
-        sectionEdgeMeshes[canvasId].dispose();
-        sectionEdgeMeshes[canvasId] = null;
-    }
-    if (sectionHatchMeshes[canvasId]) {
-        sectionHatchMeshes[canvasId].dispose();
-        sectionHatchMeshes[canvasId] = null;
-    }
-    if (sectionObservers[canvasId]) {
-        scene.onBeforeRenderObservable.remove(sectionObservers[canvasId]);
-        sectionObservers[canvasId] = null;
-    }
-    _sectionRebuildPending[canvasId] = false;
+    disposeSectionVisuals(canvasId, scene);
 
     if (!enabled) {
         scene.clipPlane = null;
-        _disposeSectionGhosts(canvasId);
         return;
     }
 
@@ -2806,12 +3597,7 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     // Create ghost clones for the hidden half (xray silhouette)
     _createSectionGhosts(canvasId, scene, nx, ny, nz, d);
 
-    // Build cut-edge lines once — edges are world-space segments that don't change
-    // when the ArcRotateCamera orbits. No per-frame rebuild needed.
-    _rebuildSectionEdges(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
-
-    // Build cross-hatch lines on the section face to indicate solid material
-    _rebuildSectionHatch(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
+    scheduleSectionRebuild(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
 }
 
 /**
@@ -2990,88 +3776,70 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
         }
     }
 
-    // Generate diagonal hatch lines across the bounding box
-    const hatchSpacing = 0.003; // ~3mm in Babylon units
-    const hatchAngle = Math.PI / 4; // 45 degrees
+    // Generate diagonal cross-hatch lines across the bounding box.
+    const hatchSpacing = Math.max(3.0 * (modelScaleFactors[canvasId] ?? 1), 0.5);
+    const hatchAngles = [Math.PI / 4, -Math.PI / 4];
     const hatchLines = [];
 
-    // Project the diagonal direction: hatch lines run along (cos45, sin45) in UV space
-    const cosA = Math.cos(hatchAngle);
-    const sinA = Math.sin(hatchAngle);
-    // Perpendicular to hatch direction = normal of hatch lines = (-sin45, cos45)
-    const perpU = -sinA;
-    const perpV = cosA;
-
-    // For each triangle that crosses the section plane, check if a hatch line intersects it
-    // Simpler approach: for each hatch line, test intersection with each edge segment
     const hatchExtent = Math.max(maxU - minU, maxV - minV) * 1.5;
+    const planeLift = planeNormal.scale(0.02);
 
-    for (let offset = -hatchExtent; offset <= hatchExtent; offset += hatchSpacing) {
-        // This hatch line passes through: (u, v) where perpU * u + perpV * v = offset
-        // Parameterize as: u = offset * cosA + t * sinA, v = offset * sinA - t * cosA (or similar)
-        // Actually: line is { (u,v) | perpU*u + perpV*v = offset }
-        // Direction along line: (cosA, sinA)
-        // So: u = (offset * perpU + t * cosA) ... let me just do proper intersection
+    for (const hatchAngle of hatchAngles) {
+        const cosA = Math.cos(hatchAngle);
+        const sinA = Math.sin(hatchAngle);
+        const perpU = -sinA;
+        const perpV = cosA;
 
-        const intersectPts = [];
-        for (const seg of allSegments) {
-            // Project segment endpoints to 2D
-            const u0 = BABYLON.Vector3.Dot(seg[0], uAxis);
-            const v0 = BABYLON.Vector3.Dot(seg[0], vAxis);
-            const u1 = BABYLON.Vector3.Dot(seg[1], uAxis);
-            const v1 = BABYLON.Vector3.Dot(seg[1], vAxis);
+        for (let offset = -hatchExtent; offset <= hatchExtent; offset += hatchSpacing) {
+            const intersectPts = [];
+            for (const seg of allSegments) {
+                const u0 = BABYLON.Vector3.Dot(seg[0], uAxis);
+                const v0 = BABYLON.Vector3.Dot(seg[0], vAxis);
+                const u1 = BABYLON.Vector3.Dot(seg[1], uAxis);
+                const v1 = BABYLON.Vector3.Dot(seg[1], vAxis);
 
-            // Distance of each endpoint from the hatch line
-            const d0 = perpU * u0 + perpV * v0 - offset;
-            const d1 = perpU * u1 + perpV * v1 - offset;
+                const d0 = perpU * u0 + perpV * v0 - offset;
+                const d1 = perpU * u1 + perpV * v1 - offset;
 
-            if (d0 * d1 < 0) {
-                // Edge crosses the hatch line
-                const t = -d0 / (d1 - d0);
-                const hu = u0 + t * (u1 - u0);
-                const hv = v0 + t * (v1 - v0);
-                // Convert back to 3D: point = origin + hu*uAxis + hv*vAxis
-                // But we need a reference point on the plane
-                // Use the centroid of the first segment as a reference
-                intersectPts.push({ u: hu, v: hv, t: t });
+                if (d0 * d1 < 0) {
+                    const t = -d0 / (d1 - d0);
+                    const hu = u0 + t * (u1 - u0);
+                    const hv = v0 + t * (v1 - v0);
+                    intersectPts.push({ u: hu, v: hv });
+                }
             }
-        }
 
-        // Sort intersection points along the hatch line direction and pair them
-        if (intersectPts.length >= 2) {
-            intersectPts.sort((a, b) => cosA * (a.u - b.u) + sinA * (a.v - b.v));
-            for (let i = 0; i < intersectPts.length - 1; i += 2) {
-                const p1 = intersectPts[i];
-                const p2 = intersectPts[i + 1];
-                // Convert 2D back to 3D
-                // Point on plane = somePointOnPlane + p.u * uAxis + p.v * vAxis
-                // We can reconstruct using the plane equation
-                const pt1 = new BABYLON.Vector3(
-                    p1.u * uAxis.x + p1.v * vAxis.x - planeD * planeNormal.x,
-                    p1.u * uAxis.y + p1.v * vAxis.y - planeD * planeNormal.y,
-                    p1.u * uAxis.z + p1.v * vAxis.z - planeD * planeNormal.z
-                );
-                const pt2 = new BABYLON.Vector3(
-                    p2.u * uAxis.x + p2.v * vAxis.x - planeD * planeNormal.x,
-                    p2.u * uAxis.y + p2.v * vAxis.y - planeD * planeNormal.y,
-                    p2.u * uAxis.z + p2.v * vAxis.z - planeD * planeNormal.z
-                );
-                hatchLines.push([pt1, pt2]);
+            if (intersectPts.length >= 2) {
+                intersectPts.sort((a, b) => cosA * (a.u - b.u) + sinA * (a.v - b.v));
+                for (let i = 0; i < intersectPts.length - 1; i += 2) {
+                    const p1 = intersectPts[i];
+                    const p2 = intersectPts[i + 1];
+                    const pt1 = new BABYLON.Vector3(
+                        p1.u * uAxis.x + p1.v * vAxis.x - planeD * planeNormal.x,
+                        p1.u * uAxis.y + p1.v * vAxis.y - planeD * planeNormal.y,
+                        p1.u * uAxis.z + p1.v * vAxis.z - planeD * planeNormal.z
+                    ).addInPlace(planeLift);
+                    const pt2 = new BABYLON.Vector3(
+                        p2.u * uAxis.x + p2.v * vAxis.x - planeD * planeNormal.x,
+                        p2.u * uAxis.y + p2.v * vAxis.y - planeD * planeNormal.y,
+                        p2.u * uAxis.z + p2.v * vAxis.z - planeD * planeNormal.z
+                    ).addInPlace(planeLift);
+                    hatchLines.push([pt1, pt2]);
+                }
             }
         }
     }
 
     if (hatchLines.length === 0) return;
 
-    const dark = isDarkMode(canvasId);
-    const hatchColor = dark ? { r: 0.45, g: 0.45, b: 0.55 } : { r: 0.65, g: 0.65, b: 0.70 };
     const hatchMesh = BABYLON.MeshBuilder.CreateLineSystem(
         `__section_hatch_${canvasId}__`,
         { lines: hatchLines, updatable: false },
         scene
     );
-    hatchMesh.color = new BABYLON.Color3(hatchColor.r, hatchColor.g, hatchColor.b);
+    hatchMesh.color = new BABYLON.Color3(1.0, 0.22, 0.68);
     hatchMesh.isPickable = false;
+    hatchMesh.renderingGroupId = 2;
     sectionHatchMeshes[canvasId] = hatchMesh;
 }
 
@@ -3191,9 +3959,13 @@ export function zoomToFit(canvasId, smooth = true) {
 // ── dispose ───────────────────────────────────────────────────────────────────
 
 export function dispose(canvasId) {
+    loadGenerations[canvasId] = (loadGenerations[canvasId] || 0) + 1;
+
     const engine = engines[canvasId];
     if (engine?._resizeHandler) window.removeEventListener('resize', engine._resizeHandler);
+    try { engine?.stopRenderLoop(); } catch (_) {}
 
+    clearTurningAxis(canvasId);
     if (resizeObservers[canvasId]) { resizeObservers[canvasId].disconnect(); delete resizeObservers[canvasId]; }
     if (axisGizmoLayer[canvasId])  { try { axisGizmoLayer[canvasId].dispose(); } catch (_) {} delete axisGizmoLayer[canvasId]; }
     if (axisLabelDivs[canvasId])   { axisLabelDivs[canvasId].forEach(({ div }) => div.remove()); delete axisLabelDivs[canvasId]; }
@@ -3281,9 +4053,6 @@ export function dispose(canvasId) {
         delete perCanvasBodyMap[canvasId];
     }
 
-    // Invalidate any pending load attempts for this canvas
-    delete loadGenerations[canvasId];
-
     // Clean up shadow generator
     if (shadowGenerators[canvasId]) {
         try { shadowGenerators[canvasId].dispose(); } catch (_) {}
@@ -3323,14 +4092,11 @@ export function dispose(canvasId) {
     delete modelScaleFactors[canvasId];
     delete modelCenterOffsets[canvasId];
 
-    // Section-view cleanup (scene already disposed above, just clear state)
-    if (sectionEdgeMeshes[canvasId]) {
-        try { sectionEdgeMeshes[canvasId].dispose(); } catch (_) {}
-        delete sectionEdgeMeshes[canvasId];
-    }
-    if (sectionObservers[canvasId]) {
-        delete sectionObservers[canvasId];
-    }
+    disposeSectionVisuals(canvasId, scenes[canvasId]);
+    delete sectionEdgeMeshes[canvasId];
+    delete sectionHatchMeshes[canvasId];
+    delete sectionGhostMeshes[canvasId];
+    delete sectionObservers[canvasId];
     delete _sectionRebuildPending[canvasId];
 }
 
@@ -3653,6 +4419,148 @@ function pickMeshPoint(scene, x, y) {
     return result;
 }
 
+function withBackFaceCullingDisabled(scene, action) {
+    const restore = [];
+    scene.meshes.forEach(m => {
+        if (isMeasurablePredicate(m) && m.material && m.material.backFaceCulling) {
+            restore.push(m);
+            m.material.backFaceCulling = false;
+        }
+    });
+    try {
+        return action();
+    } finally {
+        restore.forEach(m => { m.material.backFaceCulling = true; });
+    }
+}
+
+function inferRoundFeatureFromPick(pickResult) {
+    const mesh = pickResult?.pickedMesh;
+    if (!mesh) return null;
+
+    const bb = mesh.getBoundingInfo()?.boundingBox;
+    if (!bb) return null;
+
+    const min = bb.minimumWorld;
+    const max = bb.maximumWorld;
+    const dims = [
+        { axis: 'x', size: Math.abs(max.x - min.x) },
+        { axis: 'y', size: Math.abs(max.y - min.y) },
+        { axis: 'z', size: Math.abs(max.z - min.z) },
+    ].sort((a, b) => b.size - a.size);
+
+    const longAxis = dims[0];
+    const radialA = dims[1];
+    const radialB = dims[2];
+    if (radialA.size <= 1e-6 || radialB.size <= 1e-6) return null;
+    const radialMismatch = Math.abs(radialA.size - radialB.size) / Math.max(radialA.size, radialB.size);
+    if (radialMismatch > 0.12 || longAxis.size < radialA.size * 1.2) return null;
+
+    const center = new BABYLON.Vector3(
+        (min.x + max.x) / 2,
+        (min.y + max.y) / 2,
+        (min.z + max.z) / 2
+    );
+    const axisVector = longAxis.axis === 'x'
+        ? new BABYLON.Vector3(1, 0, 0)
+        : longAxis.axis === 'y'
+            ? new BABYLON.Vector3(0, 1, 0)
+            : new BABYLON.Vector3(0, 0, 1);
+
+    return {
+        kind: 'round',
+        point: pickResult.pickedPoint?.clone() ?? center.clone(),
+        anchor: center,
+        axis: axisVector,
+        radius: (radialA.size + radialB.size) / 4,
+        diameter: (radialA.size + radialB.size) / 2,
+        label: 'Diameter',
+    };
+}
+
+function pickCadFeature(scene, x, y) {
+    const pickResult = pickMeshPoint(scene, x, y);
+    if (!pickResult?.hit || !pickResult.pickedPoint || !pickResult.pickedMesh) return null;
+
+    const normal = pickResult.getNormal(true, false) || new BABYLON.Vector3(0, 0, 1);
+    const roundFeature = inferRoundFeatureFromPick(pickResult);
+    if (roundFeature) return roundFeature;
+
+    return {
+        kind: 'face',
+        point: pickResult.pickedPoint.clone(),
+        anchor: pickResult.pickedPoint.clone(),
+        normal: normal.clone(),
+        label: 'Face',
+    };
+}
+
+function createRoundFeatureHighlight(scene, feature) {
+    if (!feature || feature.kind !== 'round') return null;
+
+    const axis = feature.axis.clone().normalize();
+    const helper = Math.abs(axis.z) < 0.9 ? new BABYLON.Vector3(0, 0, 1) : new BABYLON.Vector3(0, 1, 0);
+    const u = BABYLON.Vector3.Cross(axis, helper).normalize();
+    const v = BABYLON.Vector3.Cross(axis, u).normalize();
+    const points = [];
+    const segments = 96;
+    for (let i = 0; i <= segments; i += 1) {
+        const a = (Math.PI * 2 * i) / segments;
+        points.push(feature.anchor
+            .add(u.scale(Math.cos(a) * feature.radius))
+            .add(v.scale(Math.sin(a) * feature.radius)));
+    }
+
+    const line = BABYLON.MeshBuilder.CreateLines('measure_round_highlight', { points }, scene);
+    line.color = new BABYLON.Color3(1, 0.22, 0.68);
+    line.isPickable = false;
+    return line;
+}
+
+function pickOppositeThicknessHit(scene, entryPoint, normal, entryMesh, entryFaceId) {
+    if (!normal) return null;
+
+    return withBackFaceCullingDisabled(scene, () => {
+        const candidates = [];
+        for (const dir of [normal.scale(-1), normal]) {
+            if (dir.length() < 1e-6) continue;
+            dir.normalize();
+            const ray = new BABYLON.Ray(
+                entryPoint.add(dir.scale(0.15)),
+                dir,
+                CONFIG.THICKNESS.maxRayDistance
+            );
+            const hits = scene.multiPickWithRay
+                ? (scene.multiPickWithRay(ray, isMeasurablePredicate) || [])
+                : [scene.pickWithRay(ray, isMeasurablePredicate)].filter(Boolean);
+
+            hits.forEach(hit => {
+                if (!hit?.hit || !hit.pickedPoint) return;
+                const distance = BABYLON.Vector3.Distance(entryPoint, hit.pickedPoint);
+                if (distance < 0.25) return;
+                if (hit.pickedMesh === entryMesh && hit.faceId === entryFaceId) return;
+
+                let normalScore = 0;
+                try {
+                    const hitNormal = hit.getNormal(true, false);
+                    if (hitNormal) normalScore = -BABYLON.Vector3.Dot(normal.clone().normalize(), hitNormal.normalize());
+                } catch (_) {
+                    normalScore = 0;
+                }
+                candidates.push({ hit, distance, normalScore });
+            });
+        }
+
+        if (candidates.length === 0) return null;
+        candidates.sort((a, b) => {
+            const aOpposed = a.normalScore > 0.15 ? 0 : 1;
+            const bOpposed = b.normalScore > 0.15 ? 0 : 1;
+            return aOpposed - bOpposed || a.distance - b.distance;
+        });
+        return candidates[0].hit;
+    });
+}
+
 /**
  * Enables the measure tool for point-to-point distance and angle measurement.
  * @param {string} canvasId - Canvas identifier
@@ -3669,12 +4577,15 @@ export function enableMeasureTool(canvasId, dotNetRef) {
         active: true,
         pointA: null,
         pointB: null,
+        featureA: null,
+        featureB: null,
         normalA: null,
         normalB: null,
         lines: [],
         labels: [],
         observer: null,
         hoverDot: null,
+        hoverFeatureHighlight: null,
         cursorDots: [],
         _downX: null,
         _downY: null,
@@ -3690,6 +4601,7 @@ export function enableMeasureTool(canvasId, dotNetRef) {
 
     function createHoverDot(point) {
         if (state.hoverDot) { try { state.hoverDot.dispose(); } catch (_) {} }
+        if (state.hoverFeatureHighlight) { try { state.hoverFeatureHighlight.dispose(); } catch (_) {} state.hoverFeatureHighlight = null; }
         const dot = BABYLON.MeshBuilder.CreateSphere('measure_hover_dot', { diameter: 0.8 }, scene);
         dot.position = point.clone();
         const mat = new BABYLON.StandardMaterial('measure_hover_dot_mat', scene);
@@ -3699,6 +4611,23 @@ export function enableMeasureTool(canvasId, dotNetRef) {
         dot.material = mat;
         makeUnpickable(dot);
         state.hoverDot = dot;
+    }
+
+    function showDiameterLabel(feature) {
+        if (feature.kind !== 'round') return;
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'measure-label';
+        labelDiv.style.cssText = `
+            position: fixed; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85); color: #ff4fb3;
+            padding: 6px 10px; border-radius: 4px;
+            font-family: 'Segoe UI', sans-serif; font-size: 13px; font-weight: 600;
+            pointer-events: none; white-space: nowrap; z-index: 1000;
+            border: 1px solid #ff4fb3;
+        `;
+        labelDiv.innerHTML = `Ø ${feature.diameter.toFixed(2)} mm`;
+        document.body.appendChild(labelDiv);
+        state.labels.push({ div: labelDiv, worldPos: feature.anchor.clone() });
     }
 
     function createCursorDot(point) {
@@ -3740,13 +4669,15 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                 state._downX = null; state._downY = null;
 
                 const pickResult = pickMeshPoint(scene, scene.pointerX, scene.pointerY);
-                if (!pickResult?.hit || !pickResult.pickedMesh) return;
+                const feature = pickCadFeature(scene, scene.pointerX, scene.pointerY);
+                if (!pickResult?.hit || !pickResult.pickedMesh || !feature) return;
 
-                const pickedPoint = pickResult.pickedPoint;
-                const normal = pickResult.getNormal(true);
+                const pickedPoint = feature.anchor ?? pickResult.pickedPoint;
+                const normal = feature.normal ?? pickResult.getNormal(true) ?? feature.axis;
 
                 if (!state.pointA) {
                     state.pointA = pickedPoint.clone();
+                    state.featureA = feature;
                     state.normalA = normal?.clone() || new BABYLON.Vector3(0, 0, 1);
 
                     const markerA = BABYLON.MeshBuilder.CreateSphere('measure_A', { diameter: CONFIG.MEASURE.endpointSize }, scene);
@@ -3758,9 +4689,13 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                     makeUnpickable(markerA);
                     state.lines.push(markerA);
                     createCursorDot(pickedPoint);
+                    const roundHighlight = createRoundFeatureHighlight(scene, feature);
+                    if (roundHighlight) state.lines.push(roundHighlight);
+                    showDiameterLabel(feature);
 
                 } else if (!state.pointB) {
                     state.pointB = pickedPoint.clone();
+                    state.featureB = feature;
                     state.normalB = normal?.clone() || new BABYLON.Vector3(0, 0, 1);
 
                     const markerB = BABYLON.MeshBuilder.CreateSphere('measure_B', { diameter: CONFIG.MEASURE.endpointSize }, scene);
@@ -3828,7 +4763,13 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                         pointer-events: none; white-space: nowrap; z-index: 1000;
                         border: 1px solid #ffd700;
                     `;
-                    labelDiv.innerHTML = `${distance.toFixed(2)} mm<br><span style="font-size: 11px; opacity: 0.8;">∠ ${angleDeg.toFixed(1)}°</span>`;
+                    const diameterNotes = [state.featureA, state.featureB]
+                        .filter(f => f?.kind === 'round')
+                        .map(f => `Ø ${f.diameter.toFixed(2)} mm`);
+                    const diameterHtml = diameterNotes.length > 0
+                        ? `<br><span style="font-size: 11px; opacity: 0.9;">${diameterNotes.join(' · ')}</span>`
+                        : '';
+                    labelDiv.innerHTML = `${distance.toFixed(2)} mm${diameterHtml}<br><span style="font-size: 11px; opacity: 0.8;">∠ ${angleDeg.toFixed(1)}°</span>`;
                     document.body.appendChild(labelDiv);
                     state.labels.push({ div: labelDiv, worldPos: midPoint });
 
@@ -3842,6 +4783,8 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                     clearMeasureHelpers();
                     state.pointA = pickedPoint.clone();
                     state.pointB = null;
+                    state.featureA = feature;
+                    state.featureB = null;
                     state.normalA = normal?.clone() || new BABYLON.Vector3(0, 0, 1);
                     state.normalB = null;
 
@@ -3854,23 +4797,28 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                     makeUnpickable(markerA);
                     state.lines.push(markerA);
                     createCursorDot(pickedPoint);
+                    const roundHighlight = createRoundFeatureHighlight(scene, feature);
+                    if (roundHighlight) state.lines.push(roundHighlight);
+                    showDiameterLabel(feature);
                 }
                 break;
             }
 
             case BABYLON.PointerEventTypes.POINTERMOVE: {
-                const hoverPick = pickMeshPoint(scene, scene.pointerX, scene.pointerY);
+                const hoverFeature = pickCadFeature(scene, scene.pointerX, scene.pointerY);
 
                 // Update hover dot position (face-precise feedback)
-                if (hoverPick?.hit && hoverPick.pickedPoint) {
-                    createHoverDot(hoverPick.pickedPoint);
+                if (hoverFeature) {
+                    createHoverDot(hoverFeature.point ?? hoverFeature.anchor);
+                    state.hoverFeatureHighlight = createRoundFeatureHighlight(scene, hoverFeature);
                 } else if (state.hoverDot) {
                     try { state.hoverDot.dispose(); } catch (_) {}
                     state.hoverDot = null;
+                    if (state.hoverFeatureHighlight) { try { state.hoverFeatureHighlight.dispose(); } catch (_) {} state.hoverFeatureHighlight = null; }
                 }
 
                 // Preview line from A to cursor (only while waiting for second click)
-                if (state.pointA && !state.pointB && hoverPick?.hit && hoverPick.pickedPoint) {
+                if (state.pointA && !state.pointB && hoverFeature) {
                     const prevPreview = state.lines.find(l => l.name === 'measure_preview');
                     if (prevPreview) {
                         prevPreview.dispose();
@@ -3878,7 +4826,7 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                     }
 
                     const previewLine = BABYLON.MeshBuilder.CreateLines('measure_preview', {
-                        points: [state.pointA, hoverPick.pickedPoint],
+                        points: [state.pointA, hoverFeature.anchor],
                         updatable: true
                     }, scene);
                     previewLine.color = toColor3({ r: 1.0, g: 0.85, b: 0.0, a: 0.5 });
@@ -3922,6 +4870,7 @@ export function disableMeasureTool(canvasId) {
 
     // Dispose hover dot and cursor dots
     if (state.hoverDot) { try { state.hoverDot.dispose(); } catch (_) {} }
+    if (state.hoverFeatureHighlight) { try { state.hoverFeatureHighlight.dispose(); } catch (_) {} }
     state.cursorDots?.forEach(mesh => { try { mesh.dispose(); } catch (_) {} });
 
     // Dispose lines and meshes
@@ -4064,24 +5013,13 @@ export function enableThicknessAnalysis(canvasId) {
                 const entryPoint = pickResult.pickedPoint;
                 if (!normal) return;
 
-                // Shoot ray inward from surface
-                const inwardDir = normal.scale(-1);
-                const rayOrigin = entryPoint.add(inwardDir.scale(0.1));
-                const ray = new BABYLON.Ray(rayOrigin, inwardDir, CONFIG.THICKNESS.maxRayDistance);
-
-                const hit = (() => {
-                    // Temporarily disable backFaceCulling so inward ray hits back faces too
-                    const restore = [];
-                    scene.meshes.forEach(m => {
-                        if (isMeasurablePredicate(m) && m.material && m.material.backFaceCulling) {
-                            restore.push(m);
-                            m.material.backFaceCulling = false;
-                        }
-                    });
-                    const r = scene.pickWithRay(ray, isMeasurablePredicate);
-                    restore.forEach(m => { m.material.backFaceCulling = true; });
-                    return r;
-                })();
+                const hit = pickOppositeThicknessHit(
+                    scene,
+                    entryPoint,
+                    normal,
+                    pickResult.pickedMesh,
+                    pickResult.faceId
+                );
 
                 if (hit?.hit && hit.pickedPoint) {
                     const thickness = BABYLON.Vector3.Distance(entryPoint, hit.pickedPoint);
@@ -4208,6 +5146,8 @@ window.babylonViewer = {
     setCameraProjection,
     toggleDfmOverlay,
     clearDfmOverlays,
+    setTurningAxis,
+    clearTurningAxis,
     setBodies,
     selectBody,
     clearBodySelection,

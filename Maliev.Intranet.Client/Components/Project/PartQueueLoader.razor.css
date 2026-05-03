@@ -1,0 +1,50 @@
+.part-queue-loader {
+    --queue-scale: 0.4;
+    width: calc(80px * var(--queue-scale));
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    overflow: visible;
+}
+
+.part-queue-loader::before {
+    content: "";
+    width: 80px;
+    aspect-ratio: 1;
+    border: 10px solid #000;
+    box-sizing: border-box;
+    background:
+        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
+        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
+        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
+        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
+        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
+        linear-gradient(#fff 0 0) 50% / 100% 10px,
+        linear-gradient(#fff 0 0) 50% / 10px 100%,
+        #000;
+    background-repeat: no-repeat;
+    filter: blur(4px) contrast(10);
+    animation: part-queue-loader 0.8s infinite;
+    transform: scale(var(--queue-scale));
+}
+
+.part-queue-loader--thumb {
+    --queue-scale: 0.4;
+}
+
+.part-queue-loader--canvas {
+    --queue-scale: 1;
+}
+
+@keyframes part-queue-loader {
+    100% {
+        background-position: 50% -20px, -20px 50%, 60px 50%, 50% 60px, 50%, 50%, 50%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .part-queue-loader::before {
+        animation: none;
+    }
+}

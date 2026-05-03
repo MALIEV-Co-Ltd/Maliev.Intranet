@@ -80,7 +80,7 @@ public class PricingController(IPricingServiceClient pricingClient, MaterialServ
                 var finish = finishes?.FirstOrDefault(f => f.Id == request.FinishId.Value);
                 if (finish != null)
                 {
-                    var surcharge = Math.Round(result.TotalUnitPrice * finish.AdditionalCostPercent, 2);
+                    var surcharge = CalculateAdditionalCost(result.TotalUnitPrice, finish.AdditionalCostPercent);
                     result = result with
                     {
                         TotalUnitPrice = result.TotalUnitPrice + surcharge,
@@ -117,7 +117,7 @@ public class PricingController(IPricingServiceClient pricingClient, MaterialServ
 
     /// <summary>
     /// Returns the absolute additional unit cost for each requested surface finish,
-    /// computed from the catalog's cost-percent multiplied by the caller-supplied base price.
+    /// computed from the catalog's cost percentage applied to the caller-supplied base price.
     /// The base price should reflect the process + material + tolerance combination already
     /// factored in by the pricing engine.
     /// </summary>
@@ -135,10 +135,13 @@ public class PricingController(IPricingServiceClient pricingClient, MaterialServ
             .Where(f => finishIdSet.Contains(f.Id))
             .Select(f => new FinishPriceItemDto(
                 f.Id,
-                Math.Round(request.BaseUnitPrice * f.AdditionalCostPercent, 2),
+                CalculateAdditionalCost(request.BaseUnitPrice, f.AdditionalCostPercent),
                 "THB"))
             .ToList();
 
         return Ok(result);
     }
+
+    private static decimal CalculateAdditionalCost(decimal baseUnitPrice, decimal additionalCostPercent) =>
+        Math.Round(baseUnitPrice * additionalCostPercent / 100m, 2);
 }

@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -116,6 +117,103 @@ public class UploadsController(
         }
 
         return Ok(results);
+    }
+
+    /// <summary>
+    /// Initiates a direct browser-to-GCS resumable upload for a project model file.
+    /// </summary>
+    /// <param name="request">The file metadata used to create the UploadService session.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The resumable upload session URI and storage metadata.</returns>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("resumable")]
+    [ProducesResponseType(typeof(BffResumableUploadSessionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<BffResumableUploadSessionResponse>> InitiateResumableUploadAsync(
+        [FromBody] BffInitiateResumableUploadRequest request,
+        CancellationToken ct)
+    {
+        if (request.ProjectId == Guid.Empty)
+            return BadRequest("projectId is required.");
+
+        if (request.FileSize <= 0)
+            return BadRequest("fileSize must be greater than zero.");
+
+        var fileName = Path.GetFileName(request.FileName);
+        if (string.IsNullOrWhiteSpace(fileName))
+            return BadRequest("fileName is required.");
+
+        var extension = Path.GetExtension(fileName);
+        if (!fileTypes.ThreeDExtensions.Contains(extension))
+            return BadRequest($"File type '{extension}' is not allowed for model uploads.");
+
+        var contentType = string.IsNullOrWhiteSpace(request.ContentType)
+            ? GetMimeTypeFromExtension(extension)
+            : request.ContentType;
+
+        var storagePath = BuildProjectUploadPath(request.ProjectId, request.CustomerId, fileName);
+        var session = await uploadClient.InitiateResumableUploadAsync(
+            fileName,
+            contentType,
+            request.FileSize,
+            storagePath,
+            true,
+            ct);
+
+        return session != null ? Ok(session) : StatusCode(500, "Upload initiation failed.");
+    }
+
+    /// <summary>
+    /// Completes a direct browser-to-GCS resumable upload after the browser sends the file bytes.
+    /// </summary>
+    /// <param name="uploadId">The UploadService upload session identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The completed upload metadata.</returns>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("resumable/{uploadId}/complete")]
+    [ProducesResponseType(typeof(BffUploadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<BffUploadResponse>> CompleteResumableUploadAsync(
+        [FromRoute] string uploadId,
+        CancellationToken ct)
+    {
+        var result = await uploadClient.CompleteResumableUploadAsync(uploadId, ct);
+        return result != null ? Ok(result) : StatusCode(500, "Upload completion failed.");
+    }
+
+    /// <summary>
+    /// Proxies a raw resumable upload body to UploadService when direct GCS upload is unavailable.
+    /// </summary>
+    /// <param name="uploadId">The UploadService upload session identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The UploadService resumable upload response.</returns>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("resumable/{uploadId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status308PermanentRedirect)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ProxyResumableUploadAsync(
+        [FromRoute] string uploadId,
+        CancellationToken ct)
+    {
+        var contentRange = Request.Headers.ContentRange.ToString();
+        if (string.IsNullOrWhiteSpace(contentRange))
+            return BadRequest("Content-Range header is required.");
+
+        if (!ContentRangeHeaderValue.TryParse(contentRange, out _))
+            return BadRequest("Content-Range header is invalid.");
+
+        using var response = await uploadClient.ResumeResumableUploadAsync(
+            uploadId,
+            Request.Body,
+            Request.ContentType,
+            Request.ContentLength,
+            contentRange,
+            ct);
+
+        var responseBody = await response.Content.ReadAsStringAsync(ct);
+        return StatusCode((int)response.StatusCode, responseBody);
     }
 
     /// <summary>
@@ -410,5 +508,13 @@ public class UploadsController(
             ".7z" => "application/x-7z-compressed",
             _ => "application/octet-stream"
         };
+    }
+
+    private static string BuildProjectUploadPath(Guid projectId, Guid? customerId, string fileName)
+    {
+        var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+        return customerId.HasValue
+            ? $"customers/{customerId}/projects/{projectId}/{uniquePrefix}_{fileName}"
+            : $"projects/{projectId}/{uniquePrefix}_{fileName}";
     }
 }

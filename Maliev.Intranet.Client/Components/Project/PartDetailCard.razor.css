@@ -90,8 +90,11 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 10px;
     z-index: 1;
+    padding: 12px;
+    border-radius: var(--maliev-radius-sm);
+    color: var(--maliev-ink);
 }
 .pdc-3d-viewer-container {
     position: absolute;

@@ -29,9 +29,16 @@ public class CustomersController(
     /// <summary>Gets all customers</summary>
     [RequirePermission(MalievPermissions.Customer.List)]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get(string? query = null, int page = 1, CancellationToken ct = default)
+    public async Task<ActionResult<PagedResponse<CustomerSummaryDto>>> Get(
+        [FromQuery] string? query = null,
+        [FromQuery] string? segment = null,
+        [FromQuery] string? tier = null,
+        [FromQuery] bool includeDeleted = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
     {
-        var result = await client.GetCustomersAsync(query, page, ct);
+        var result = await client.GetCustomersAsync(query, segment, tier, includeDeleted, page, pageSize, ct);
         return Ok(result);
     }
 
@@ -146,6 +153,21 @@ public class CustomersController(
             await _hubContext.Clients.All.SendAsync("CustomerChanged", cancellationToken: ct);
             return Ok();
         }
+        return BadRequest();
+    }
+
+    /// <summary>Deletes a single address</summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write)]
+    [HttpDelete("addresses/{id:guid}")]
+    public async Task<IActionResult> DeleteAddress(Guid id, [FromQuery] uint xmin, CancellationToken ct)
+    {
+        var result = await client.DeleteAddressAsync(id, xmin, ct);
+        if (result)
+        {
+            await _hubContext.Clients.All.SendAsync("CustomerChanged", cancellationToken: ct);
+            return NoContent();
+        }
+
         return BadRequest();
     }
 
@@ -305,7 +327,7 @@ public class CustomersController(
     }
 
     /// <summary>Searches for Thai companies by Tax ID or name</summary>
-    [RequirePermission(MalievPermissions.Registry.LocationsRead)]
+    [RequirePermission(MalievPermissions.Registry.CompaniesRead)]
     [HttpGet("companies/search")]
     public async Task<ActionResult<List<RegistryCompanyProfile>>> SearchCompanies([FromQuery] string query, [FromQuery] int limit = 10, CancellationToken ct = default)
     {

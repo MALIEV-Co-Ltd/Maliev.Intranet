@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -21,10 +22,10 @@ namespace Maliev.Intranet.Client.Pages;
 public partial class ProjectNew : IAsyncDisposable
 {
     /// <summary>
-    /// Holds a live DotNetObjectReference to a callback instance so JS Interop can
-    /// invoke OnUploadProgress and update the part's progress bar.
+    /// Holds live DotNetObjectReference instances so JS Interop can invoke
+    /// OnUploadProgress and update the matching part's progress bar.
     /// </summary>
-    private readonly Dictionary<Guid, DotNetObjectReference<UploadProgressCallback>> _uploadCallbacks = [];
+    private readonly ConcurrentDictionary<Guid, DotNetObjectReference<UploadProgressCallback>> _uploadCallbacks = [];
 
     // ── Project-level state ───────────────────────────────────────────
     private Guid _tempProjectId = Guid.NewGuid();  // non-readonly; reassigned on Duplicate
@@ -33,12 +34,16 @@ public partial class ProjectNew : IAsyncDisposable
     private List<LeadTimeOptionDto> _leadTimeCatalogOptions = [];
     private List<LeadTimeOptionDto> _leadTimeOptions = [];
     private LeadTimeOptionDto? _selectedLeadTime;
+    private decimal _shippingCost;
+    private decimal _manualDiscountAmount;
+    private string? _quotationTerms;
     private List<ProcessDto> _processes = [];
     private bool _saving;
     private bool _autoSaving;
     private DateTimeOffset? _lastSavedAt;
 
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
+    private const string ProjectUploadContainerId = "project-new-file-upload";
 
     // ── Validation ────────────────────────────────────────────────────
     private bool _titleHasError;
@@ -54,7 +59,8 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Upload catch-up / watchdog ─────────────────────────────────────
     private const int CatchUpDelayMs = 5000;   // first fetch after SignalR group join
     private const int StatusPollIntervalMs = 30_000; // subsequent interval
-    private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new();
+    private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _storageMigrationSemaphore = new(1, 1);
 
     // ── Pricing debounce ───────────────────────────────────────────────
     private readonly Dictionary<Guid, CancellationTokenSource> _pricingTokens = new();
@@ -93,8 +99,9 @@ public partial class ProjectNew : IAsyncDisposable
         !_titleHasError &&
         _selectedLeadTime != null &&
         _parts.Count > 0 &&
-        !_parts.Any(p => p.Uploading || p.PricingLoading) &&
+        !_parts.Any(p => p.QueuedUpload || p.Uploading || p.PricingLoading) &&
         _parts.All(p => p.IsFullyConfigured && !p.PricingFailed) &&
+        _parts.All(p => ResolvePartUnitPriceForConfirmation(p).GetValueOrDefault() > 0m) &&
         _parts.All(p => p.IsManifold != false || p.DfmAcknowledged);
 
     /// <inheritdoc />
@@ -103,10 +110,13 @@ public partial class ProjectNew : IAsyncDisposable
         foreach (var cts in _pricingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         foreach (var cts in _statusPollCts.Values) { cts.Cancel(); cts.Dispose(); }
         _statusPollCts.Clear();
+        foreach (var callbackRef in _uploadCallbacks.Values) { callbackRef.Dispose(); }
+        _uploadCallbacks.Clear();
         _autoSaveDebounceTimer?.Dispose();
         if (_searchCts != null) { await _searchCts.CancelAsync(); _searchCts.Dispose(); }
         if (_hubConnection != null)
             await _hubConnection.DisposeAsync();
+        _storageMigrationSemaphore.Dispose();
     }
 
     // ── Task 4: Initialize ─────────────────────────────────────────────
@@ -164,8 +174,9 @@ public partial class ProjectNew : IAsyncDisposable
         RefreshLeadTimeOptionsFromPricing();
 
         // ── Server resume: if ?resume={id} or draft has ServerProjectId, hydrate from server ──
-        var serverResumeId = Guid.TryParse(resumeParam, out var parsedResumeId) ? parsedResumeId : _serverProjectId;
-        if (serverResumeId.HasValue && _selectedCustomer == null)
+        var hasExplicitResume = Guid.TryParse(resumeParam, out var parsedResumeId);
+        var serverResumeId = hasExplicitResume ? parsedResumeId : _serverProjectId;
+        if (serverResumeId.HasValue && (hasExplicitResume || _selectedCustomer == null))
         {
             await ResumeFromServerAsync(serverResumeId.Value);
         }
@@ -179,12 +190,12 @@ public partial class ProjectNew : IAsyncDisposable
         _hubConnection.Reconnected += async _ =>
         {
             foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
-                await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
+                await JoinPartFileGroupsAsync(part);
         };
 
         _hubConnection.On<SignalRFileAnalysisPayload>("FileAnalysisCompleted", async payload =>
         {
-            var parts = _parts.Where(p => p.StoragePath == payload.StoragePath).ToList();
+            var parts = FindPartsByStoragePath(payload.StoragePath);
             if (parts.Count == 0) return;
 
             if (payload.Failed)
@@ -196,7 +207,7 @@ public partial class ProjectNew : IAsyncDisposable
                     p.DfmAnalysisTimedOut = true;
                     p.StatusText = DfmStatusMessages.GetStatusText(payload.ErrorCode);
                 }
-                StopStatusWatchdog(payload.StoragePath);
+                StopStatusWatchdogs(parts);
                 TriggerAutoSave();
                 await InvokeAsync(StateHasChanged);
                 return;
@@ -260,7 +271,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         _hubConnection.On<SignalRGlbReadyPayload>("GlbReady", async payload =>
         {
-            var parts = _parts.Where(p => p.StoragePath == payload.StoragePath).ToList();
+            var parts = FindPartsByStoragePath(payload.StoragePath);
             if (parts.Count == 0) return;
 
             if (!payload.Failed)
@@ -292,7 +303,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         _hubConnection.On<SignalRDfmAnalysisPayload>("DfmAnalysisReady", async payload =>
         {
-            var parts = _parts.Where(p => p.StoragePath == payload.StoragePath).ToList();
+            var parts = FindPartsByStoragePath(payload.StoragePath);
             if (parts.Count == 0) return;
 
             foreach (var part in parts)
@@ -323,7 +334,7 @@ public partial class ProjectNew : IAsyncDisposable
                 }
                 part.ResolveDfmReport();
             }
-            StopStatusWatchdog(payload.StoragePath);
+            StopStatusWatchdogs(parts);
 
             await InvokeAsync(StateHasChanged);
         });
@@ -331,7 +342,7 @@ public partial class ProjectNew : IAsyncDisposable
         await _hubConnection.StartAsync();
 
         foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
-            await _hubConnection.InvokeAsync("JoinFileGroup", part.StoragePath);
+            await JoinPartFileGroupsAsync(part);
     }
 
     // ── Task 4: Customer search ────────────────────────────────────────
@@ -339,7 +350,8 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private async Task<IEnumerable<CustomerSummaryDto>> SearchCustomersAsync(string value, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+        var query = value?.Trim() ?? string.Empty;
+        if (query.Length == 1)
             return [];
 
         // Cancel any in-flight search request so debounced keystrokes don't
@@ -350,8 +362,12 @@ public partial class ProjectNew : IAsyncDisposable
 
         try
         {
+            var url = string.IsNullOrWhiteSpace(query)
+                ? "api/v1/customers?page=1&pageSize=10"
+                : $"api/v1/customers?query={Uri.EscapeDataString(query)}&page=1&pageSize=10";
+
             var result = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(
-                $"api/v1/customers?query={Uri.EscapeDataString(value)}&page=1&pageSize=10",
+                url,
                 _searchCts.Token);
             return result?.Data ?? [];
         }
@@ -374,14 +390,16 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private async Task HandleFileSelected(IReadOnlyList<IBrowserFile> files)
     {
-        var validFiles = new List<(IBrowserFile File, PartViewModel Part)>();
+        var validFiles = new List<ProjectUploadItem>();
+        var fileIndex = 0;
 
         foreach (var file in files)
         {
             var ext = Path.GetExtension(file.Name);
-            if (!FileTypes.AllUploadExtensions.Contains(ext))
+            if (!FileTypes.ThreeDExtensions.Contains(ext))
             {
                 Snackbar.Add($"File type '{ext}' is not allowed.", Severity.Warning);
+                fileIndex++;
                 continue;
             }
 
@@ -392,98 +410,166 @@ public partial class ProjectNew : IAsyncDisposable
                     $"File '{file.Name}' ({sizeMB:F1} MB) exceeds the {UploadSettings.ThreeDModelLimit / (1024.0 * 1024.0):F0} MB limit.",
                     Severity.Error
                 );
+                fileIndex++;
                 continue;
             }
 
+            var clientUploadId = Guid.NewGuid().ToString("N");
             var part = new PartViewModel
             {
                 Name = file.Name,
-                Uploading = true,
-                AwaitingPreview = true,
-                StatusText = "Uploading...",
+                QueuedUpload = true,
+                Uploading = false,
+                AwaitingPreview = false,
+                StatusText = "Queued...",
                 FileSizeBytes = file.Size,
                 UploadedAt = DateTimeOffset.UtcNow,
+                ClientUploadId = clientUploadId,
             };
 
             _parts.Add(part);
             _selectedPartIndex = _parts.Count - 1;
-            validFiles.Add((file, part));
+            validFiles.Add(new ProjectUploadItem(file, part, fileIndex, clientUploadId));
+            fileIndex++;
         }
 
         if (validFiles.Count > 0)
-            _ = UploadBatchAndPollAsync(validFiles);
+        {
+            try
+            {
+                await CaptureBrowserFilesAsync(validFiles);
+            }
+            catch (JSException ex)
+            {
+                Logger.LogError(ex, "Failed to capture selected browser files for direct upload.");
+                foreach (var item in validFiles)
+                    await MarkUploadFailedAsync(item.Part, "Browser file capture failed.");
+                return;
+            }
+
+            _ = UploadFilesConcurrentlyAsync(validFiles);
+        }
     }
 
-    private async Task UploadBatchAndPollAsync(List<(IBrowserFile File, PartViewModel Part)> items)
+    private async Task CaptureBrowserFilesAsync(IReadOnlyList<ProjectUploadItem> items)
     {
-        var uploadId = Guid.NewGuid();
+        var mappings = items.Select(item => new
+        {
+            clientUploadId = item.ClientUploadId,
+            index = item.InputIndex
+        });
+
+        await JS.InvokeVoidAsync("window.projectNewUploads.captureFiles", ProjectUploadContainerId, mappings);
+    }
+
+    private async Task UploadFilesConcurrentlyAsync(IReadOnlyList<ProjectUploadItem> items)
+    {
+        var maxConcurrency = Math.Max(1, UploadSettings.MaxConcurrentUploads);
+        using var semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+
+        await Task.WhenAll(items.Select(item => UploadSingleProjectFileAsync(item, semaphore)));
+    }
+
+    private async Task UploadSingleProjectFileAsync(ProjectUploadItem item, SemaphoreSlim semaphore)
+    {
+        await semaphore.WaitAsync();
+
+        var part = item.Part;
+        var callbackId = Guid.NewGuid();
         DotNetObjectReference<UploadProgressCallback>? callbackRef = null;
 
         try
         {
-            // Use the first part as the progress reporter for aggregate progress
-            var progressPart = items[0].Part;
-            var callback = new UploadProgressCallback(progressPart, () => InvokeAsync(StateHasChanged));
+            part.QueuedUpload = false;
+            part.Uploading = true;
+            part.AwaitingPreview = false;
+            part.ProgressPercent = 0;
+            part.StatusText = "Uploading...";
+            part.Error = null;
+            await InvokeAsync(StateHasChanged);
+
+            var browserContentType = string.IsNullOrWhiteSpace(item.File.ContentType)
+                ? null
+                : item.File.ContentType;
+
+            var initiateRequest = new BffInitiateResumableUploadRequest
+            {
+                FileName = item.File.Name,
+                ContentType = browserContentType,
+                FileSize = item.File.Size,
+                ProjectId = _tempProjectId,
+                CustomerId = _selectedCustomerId
+            };
+
+            var initiateResponse = await Http.PostAsJsonAsync("api/v1/uploads/resumable", initiateRequest);
+            if (!initiateResponse.IsSuccessStatusCode)
+            {
+                await MarkUploadFailedAsync(part, $"Upload initiation failed ({(int)initiateResponse.StatusCode}).");
+                return;
+            }
+
+            var session = await initiateResponse.Content.ReadFromJsonAsync<BffResumableUploadSessionResponse>();
+            if (session == null || string.IsNullOrWhiteSpace(session.UploadId) || string.IsNullOrWhiteSpace(session.SessionUri))
+            {
+                await MarkUploadFailedAsync(part, "Upload initiation response was invalid.");
+                return;
+            }
+
+            var callback = new UploadProgressCallback(part, () => InvokeAsync(StateHasChanged));
             callbackRef = DotNetObjectReference.Create(callback);
-            _uploadCallbacks[uploadId] = callbackRef;
+            _uploadCallbacks[callbackId] = callbackRef;
 
-            // Read all file bytes
-            var jsFiles = new List<object>();
-            foreach (var (file, _) in items)
+            var uploadResult = await JS.InvokeAsync<UploadResult>(
+                "window.projectNewUploads.uploadFile",
+                item.ClientUploadId,
+                session.SessionUri,
+                $"api/v1/uploads/resumable/{Uri.EscapeDataString(session.UploadId)}",
+                browserContentType ?? "application/octet-stream",
+                item.File.Size,
+                callbackRef);
+
+            if (uploadResult == null || uploadResult.Status < 200 || uploadResult.Status >= 300)
             {
-                using var ms = new MemoryStream();
-                await using var rs = file.OpenReadStream(maxAllowedSize: UploadSettings.ThreeDModelLimit);
-                await rs.CopyToAsync(ms);
-                jsFiles.Add(new { bytes = ms.ToArray(), name = file.Name });
-            }
-
-            var url = $"api/v1/uploads/batch?projectId={_tempProjectId}&customerId={_selectedCustomerId}";
-            var result = await JS.InvokeAsync<UploadResult>("window.uploadBatchWithProgress", url, jsFiles, callbackRef);
-
-            if (result.Status != 200)
-            {
-                foreach (var (_, part) in items)
-                {
-                    part.Uploading = false;
-                    part.AwaitingPreview = false;
-                    part.Error = $"Upload failed ({result.Status})";
-                }
-                Snackbar.Add($"Batch upload failed ({result.Status}).", Severity.Error);
+                var status = uploadResult?.Status ?? 0;
+                await MarkUploadFailedAsync(part, $"Upload failed ({status}).");
                 return;
             }
 
-            var uploadResults = JsonSerializer.Deserialize<List<BffUploadResponse>>(result.Body);
-            if (uploadResults == null || uploadResults.Count == 0)
+            var completeResponse = await Http.PostAsJsonAsync(
+                $"api/v1/uploads/resumable/{Uri.EscapeDataString(session.UploadId)}/complete",
+                new { });
+
+            if (!completeResponse.IsSuccessStatusCode)
             {
-                foreach (var (_, part) in items)
-                {
-                    part.Uploading = false;
-                    part.AwaitingPreview = false;
-                    part.Error = "Upload response was empty.";
-                }
-                Snackbar.Add("Upload response was empty.", Severity.Error);
+                await MarkUploadFailedAsync(part, $"Upload completion failed ({(int)completeResponse.StatusCode}).");
                 return;
             }
 
-            // Map results back to parts by filename order
-            for (var i = 0; i < Math.Min(items.Count, uploadResults.Count); i++)
+            var completedUpload = await completeResponse.Content.ReadFromJsonAsync<BffUploadResponse>();
+            if (completedUpload == null || string.IsNullOrWhiteSpace(completedUpload.StoragePath))
             {
-                var part = items[i].Part;
-                var uploadResult = uploadResults[i];
-
-                part.StoragePath = uploadResult.StoragePath;
-                part.FileId = Guid.TryParse(uploadResult.UploadId, out var fid) ? fid : Guid.NewGuid();
-                part.Uploading = false;
-                part.ProgressPercent = 0;
-                part.StatusText = "Processing geometry...";
-
-                if (_hubConnection?.State == HubConnectionState.Connected)
-                    await _hubConnection.InvokeAsync("JoinFileGroup", uploadResult.StoragePath);
-
-                var pollCts = new CancellationTokenSource();
-                _statusPollCts[uploadResult.StoragePath!] = pollCts;
-                _ = Task.Run(() => StatusWatchdogLoopAsync(part, uploadResult.StoragePath!, pollCts.Token));
+                await MarkUploadFailedAsync(part, "Upload completion response was invalid.");
+                return;
             }
+
+            part.StoragePath = completedUpload.StoragePath;
+            part.FileId = Guid.TryParse(completedUpload.UploadId, out var fileId) ? fileId : Guid.NewGuid();
+            part.QueuedUpload = false;
+            part.Uploading = false;
+            part.ProgressPercent = 100;
+            part.AwaitingPreview = true;
+            part.StatusText = "Processing geometry...";
+
+            await JoinPartFileGroupsAsync(part);
+            StartStatusWatchdog(part, completedUpload.StoragePath);
+
+            if (_selectedCustomerId.HasValue &&
+                completedUpload.StoragePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase))
+            {
+                await MigrateTempProjectFilesAsync();
+            }
+
+            await InvokeAsync(StateHasChanged);
         }
         catch (OperationCanceledException)
         {
@@ -491,25 +577,52 @@ public partial class ProjectNew : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            foreach (var (_, part) in items)
-            {
-                part.Uploading = false;
-                part.AwaitingPreview = false;
-                part.Error = $"Upload error: {ex.Message}";
-            }
-            Snackbar.Add($"Batch upload error: {ex.Message}", Severity.Error);
+            await MarkUploadFailedAsync(part, $"Upload error: {ex.Message}");
         }
         finally
         {
             if (callbackRef != null)
             {
-                _uploadCallbacks.Remove(uploadId);
+                _uploadCallbacks.TryRemove(callbackId, out _);
                 callbackRef.Dispose();
             }
+
+            try
+            {
+                await JS.InvokeVoidAsync("window.projectNewUploads.clearFile", item.ClientUploadId);
+            }
+            catch (JSDisconnectedException)
+            {
+                // Component disposal can race with background upload cleanup.
+            }
+            catch (JSException ex)
+            {
+                Logger.LogDebug(ex, "Failed to clear browser upload file reference.");
+            }
+
+            semaphore.Release();
         }
     }
 
     private sealed record UploadResult(int Status, string Body);
+
+    private sealed record ProjectUploadItem(
+        IBrowserFile File,
+        PartViewModel Part,
+        int InputIndex,
+        string ClientUploadId);
+
+    private async Task MarkUploadFailedAsync(PartViewModel part, string message)
+    {
+        part.QueuedUpload = false;
+        part.Uploading = false;
+        part.AwaitingPreview = false;
+        part.ProgressPercent = 0;
+        part.StatusText = "Upload failed";
+        part.Error = message;
+        Snackbar.Add($"{part.Name}: {message}", Severity.Error);
+        await InvokeAsync(StateHasChanged);
+    }
 
     // Maximum wall-clock time to wait for DFM analysis before declaring a client-side
     // timeout. Chosen to exceed the server's Phase 1 (300 s) + Phase 2 (360 s) hard
@@ -576,6 +689,74 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
+    private void StartStatusWatchdog(PartViewModel part, string? storagePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return;
+
+        if (_statusPollCts.ContainsKey(storagePath))
+            return;
+
+        var pollCts = new CancellationTokenSource();
+        _statusPollCts[storagePath] = pollCts;
+        _ = Task.Run(() => StatusWatchdogLoopAsync(part, storagePath, pollCts.Token));
+    }
+
+    private void StopStatusWatchdogs(PartViewModel part)
+    {
+        foreach (var storagePath in part.GetSignalRStoragePaths())
+            StopStatusWatchdog(storagePath);
+    }
+
+    private void StopStatusWatchdogs(IEnumerable<PartViewModel> parts)
+    {
+        foreach (var part in parts)
+            StopStatusWatchdogs(part);
+    }
+
+    private List<PartViewModel> FindPartsByStoragePath(string? storagePath) =>
+        string.IsNullOrWhiteSpace(storagePath)
+            ? []
+            : _parts.Where(part => part.MatchesSourceStoragePath(storagePath)).ToList();
+
+    private async Task JoinPartFileGroupsAsync(PartViewModel part)
+    {
+        var hubConnection = _hubConnection;
+        if (hubConnection?.State != HubConnectionState.Connected)
+            return;
+
+        foreach (var storagePath in part.GetSignalRStoragePaths().Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await hubConnection.InvokeAsync("JoinFileGroup", storagePath);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to join file SignalR group for {StoragePath}", storagePath);
+            }
+        }
+    }
+
+    private async Task LeavePartFileGroupsAsync(PartViewModel part)
+    {
+        var hubConnection = _hubConnection;
+        if (hubConnection?.State != HubConnectionState.Connected)
+            return;
+
+        foreach (var storagePath in part.GetSignalRStoragePaths().Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await hubConnection.InvokeAsync("LeaveFileGroup", storagePath);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "Failed to leave file SignalR group for {StoragePath}", storagePath);
+            }
+        }
+    }
+
     /// <summary>
     /// Catch-up fetch for analysis status — called by the watchdog loop.
     /// Live updates arrive via SignalR; this is a safety net for missed events.
@@ -633,6 +814,8 @@ public partial class ProjectNew : IAsyncDisposable
                     part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl;
                 else if (!string.IsNullOrEmpty(status.HiResThumbnailUrl))
                     part.ThumbnailLargeUrl = status.HiResThumbnailUrl;
+                part.ThumbnailSmallGcsPath = status.PreviewUrls.ThumbnailSmallGcsPath;
+                part.ThumbnailLargeGcsPath = status.PreviewUrls.ThumbnailLargeGcsPath;
             }
             else if (!string.IsNullOrEmpty(status.ThumbnailUrl))
             {
@@ -750,7 +933,9 @@ public partial class ProjectNew : IAsyncDisposable
     /// </summary>
     private async Task RequestFreshViewerUrlAsync(string storagePath)
     {
-        var part = _parts.FirstOrDefault(p => p.GlbStoragePath == storagePath || p.StoragePath == storagePath);
+        var part = _parts.FirstOrDefault(p =>
+            p.MatchesSourceStoragePath(storagePath)
+            || string.Equals(p.GlbStoragePath, storagePath, StringComparison.OrdinalIgnoreCase));
         if (part == null)
         {
             Snackbar.Add("Part not found for URL refresh.", Severity.Warning);
@@ -794,10 +979,8 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private async Task RemovePart(PartViewModel part)
     {
-        if (!string.IsNullOrEmpty(part.StoragePath) && _hubConnection?.State == HubConnectionState.Connected)
-            await _hubConnection.InvokeAsync("LeaveFileGroup", part.StoragePath);
-
-        StopStatusWatchdog(part.StoragePath);
+        await LeavePartFileGroupsAsync(part);
+        StopStatusWatchdogs(part);
 
         // Cascade delete all attachment files before removing the part
         foreach (var att in part.DrawingFiles.Concat(part.SupplementaryFiles))
@@ -806,9 +989,9 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         // Delete from server if the project has been cloud-saved
-        if (_serverProjectId.HasValue && !string.IsNullOrEmpty(part.StoragePath))
+        if (_serverProjectId.HasValue && part.ServerPartId.HasValue)
         {
-            try { await Http.DeleteAsync($"api/v1/projects/{_serverProjectId}/parts/{part.FileId}"); } catch { /* non-fatal */ }
+            try { await Http.DeleteAsync($"api/v1/projects/{_serverProjectId}/parts/{part.ServerPartId.Value}"); } catch { /* non-fatal */ }
         }
 
         _parts.Remove(part);
@@ -873,42 +1056,7 @@ public partial class ProjectNew : IAsyncDisposable
                 part.AvailableTolerances = FilterProcessTolerances(processCode, tolerancesTask.Result ?? []).ToList();
                 part.AvailableProcessOptions = configOptionsTask.Result ?? [];
 
-                if (!part.MaterialId.HasValue)
-                {
-                    var defaultMaterial = part.AvailableMaterials.OrderBy(m => m.SortOrder).FirstOrDefault();
-                    if (defaultMaterial != null)
-                    {
-                        part.MaterialId = defaultMaterial.Id;
-                        part.MaterialCode = defaultMaterial.Code;
-                    }
-                }
-
-                if (!part.FinishId.HasValue)
-                {
-                    var defaultFinish = part.AvailableFinishes.OrderBy(f => f.SortOrder).FirstOrDefault();
-                    if (defaultFinish != null)
-                    {
-                        part.FinishId = defaultFinish.Id;
-                        part.FinishCode = defaultFinish.Code;
-                    }
-                }
-
-                if (part.ToleranceId.HasValue
-                    && part.AvailableTolerances.All(t => t.Id != part.ToleranceId.Value))
-                {
-                    part.ToleranceId = null;
-                    part.ToleranceCode = null;
-                }
-
-                if (!part.ToleranceId.HasValue)
-                {
-                    var defaultTolerance = part.AvailableTolerances.OrderBy(t => t.SortOrder).FirstOrDefault();
-                    if (defaultTolerance != null)
-                    {
-                        part.ToleranceId = defaultTolerance.Id;
-                        part.ToleranceCode = defaultTolerance.Code;
-                    }
-                }
+                ApplyCatalogDefaults(part);
             }
             catch (Exception)
             {
@@ -960,8 +1108,8 @@ public partial class ProjectNew : IAsyncDisposable
         _leadTimeOptions = _leadTimeCatalogOptions
             .Select(option => option with
             {
-                MinDays = projectLeadTimeDays,
-                MaxDays = projectLeadTimeDays
+                MinDays = GetBufferedLeadTimeRange(option, projectLeadTimeDays).MinDays,
+                MaxDays = GetBufferedLeadTimeRange(option, projectLeadTimeDays).MaxDays
             })
             .ToList();
 
@@ -969,6 +1117,107 @@ public partial class ProjectNew : IAsyncDisposable
         {
             _selectedLeadTime = _leadTimeOptions.FirstOrDefault(lt => lt.Code == _selectedLeadTime.Code);
         }
+        else
+        {
+            _selectedLeadTime = _leadTimeOptions.FirstOrDefault(lt => lt.IsDefault)
+                ?? _leadTimeOptions.FirstOrDefault(lt => lt.Code.Equals("STANDARD", StringComparison.OrdinalIgnoreCase))
+                ?? _leadTimeOptions.FirstOrDefault();
+        }
+    }
+
+    private static (int MinDays, int MaxDays) GetBufferedLeadTimeRange(
+        LeadTimeOptionDto option,
+        int standardLeadTimeDays)
+    {
+        var code = option.Code.ToUpperInvariant();
+        var minDays = standardLeadTimeDays;
+        var maxDays = standardLeadTimeDays + 3;
+
+        if (code.Contains("ECONOMY", StringComparison.Ordinal))
+        {
+            minDays = standardLeadTimeDays + 2;
+            maxDays = standardLeadTimeDays + 5;
+        }
+        else if (code.Contains("EXPRESS", StringComparison.Ordinal))
+        {
+            minDays = Math.Max(1, standardLeadTimeDays - 3);
+            maxDays = Math.Max(minDays + 2, standardLeadTimeDays - 1);
+        }
+
+        return (minDays, maxDays);
+    }
+
+    private static void ApplyCatalogDefaults(PartViewModel part)
+    {
+        if (!part.MaterialId.HasValue)
+        {
+            var defaultMaterial = part.AvailableMaterials.OrderBy(m => m.SortOrder).FirstOrDefault();
+            if (defaultMaterial != null)
+            {
+                part.MaterialId = defaultMaterial.Id;
+                part.MaterialCode = defaultMaterial.Code;
+            }
+        }
+
+        if (!part.FinishId.HasValue)
+        {
+            var defaultFinish = part.AvailableFinishes.OrderBy(f => f.SortOrder).FirstOrDefault();
+            if (defaultFinish != null)
+            {
+                part.FinishId = defaultFinish.Id;
+                part.FinishCode = defaultFinish.Code;
+            }
+        }
+
+        if (part.ToleranceId.HasValue
+            && part.AvailableTolerances.All(t => t.Id != part.ToleranceId.Value))
+        {
+            part.ToleranceId = null;
+            part.ToleranceCode = null;
+        }
+
+        if (!part.ToleranceId.HasValue)
+        {
+            var defaultTolerance = SelectDefaultTolerance(part.ProcessCode, part.AvailableTolerances);
+            if (defaultTolerance != null)
+            {
+                part.ToleranceId = defaultTolerance.Id;
+                part.ToleranceCode = defaultTolerance.Code;
+            }
+        }
+
+        if (IsCncProcessCode(part.ProcessCode) && string.IsNullOrWhiteSpace(part.RoughnessCode))
+            part.RoughnessCode = "RA_3_2";
+    }
+
+    private static CatalogToleranceDto? SelectDefaultTolerance(
+        string? processCode,
+        IEnumerable<CatalogToleranceDto> tolerances)
+    {
+        var ordered = tolerances.OrderBy(t => t.SortOrder).ToList();
+        if (IsCncProcessCode(processCode))
+        {
+            var medium = ordered.FirstOrDefault(IsIso2768MediumTolerance);
+            if (medium != null)
+                return medium;
+        }
+
+        return ordered.FirstOrDefault();
+    }
+
+    private static bool IsCncProcessCode(string? processCode) =>
+        string.Equals(processCode, "CNC", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(processCode, "CNC_MILL", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(processCode, "CNC_TURN", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsIso2768MediumTolerance(CatalogToleranceDto tolerance)
+    {
+        var combined = $"{tolerance.Code} {tolerance.Name} {tolerance.IsoStandard} {tolerance.Grade}";
+        return combined.Contains("ISO2768_M", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("ISO_2768_M", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("ISO 2768-m", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("ISO 2768 m", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tolerance.Grade, "m", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<CatalogToleranceDto> FilterProcessTolerances(
@@ -1194,10 +1443,170 @@ public partial class ProjectNew : IAsyncDisposable
     private bool _serverSaveInProgress;
 
     /// <summary>
-    /// True when the project has transitioned past Draft/Configuring (e.g. Quoted or Accepted).
-    /// Pricing must not re-trigger for locked projects.
+    /// True after this editor has just generated a quotation and is navigating away.
+    /// Reopened quoted projects are editable again and should be repriced when inputs change.
     /// </summary>
     private bool _projectLocked;
+
+    private AddProjectPartRequest? BuildAddProjectPartRequest(PartViewModel part)
+    {
+        var processCode = ResolvePartProcessCode(part);
+        if (string.IsNullOrWhiteSpace(processCode))
+            return null;
+
+        part.ProcessCode ??= processCode;
+
+        return new AddProjectPartRequest
+        {
+            FileId = part.FileId,
+            FileReference = part.StoragePath,
+            FileName = part.Name,
+            ProcessType = processCode,
+            MaterialId = part.MaterialId,
+            MaterialName = ResolvePartMaterialName(part),
+            MaterialCode = ResolvePartMaterialCode(part),
+            Quantity = part.Quantity,
+            Finish = part.FinishCode,
+            Color = ResolvePartColor(part),
+            Tolerance = part.ToleranceCode,
+            ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
+            GlbStoragePath = part.GlbStoragePath,
+            OverlayPaths = part.OverlayPaths is null ? [] : new Dictionary<string, string>(part.OverlayPaths),
+            RoughnessCode = part.RoughnessCode,
+            MarkingType = part.MarkingType,
+            MarkingText = part.MarkingText,
+            DfmAcknowledged = part.DfmAcknowledged,
+            HasThreadedHoles = part.HasThreadedHoles,
+            ThreadedHoleSpec = part.ThreadedHoleSpec,
+            ThreadedHoleCount = part.ThreadedHoleCount,
+            HasInserts = part.HasInserts,
+            InsertType = part.InsertType,
+            InsertCount = part.InsertCount,
+            BagAndTag = part.BagAndTag,
+            InspectionLevel = part.InspectionLevel,
+            Certificates = [.. part.Certificates],
+            DrawingFiles = ToProjectPartAttachments(part.DrawingFiles),
+            SupplementaryFiles = ToProjectPartAttachments(part.SupplementaryFiles),
+            ProcessConfig = BuildProcessConfig(part),
+            BodyCount = part.BodyCount,
+            BodiesJson = part.Bodies.Count > 0 ? JsonSerializer.Serialize(part.Bodies) : null,
+            SelectedBodyIndex = part.SelectedBodyIndex,
+            VolumeCm3 = part.VolumeMm3.HasValue ? (decimal)part.VolumeMm3.Value / 1_000m : null,
+            BoundingBoxX = part.Dimensions is null ? null : (decimal)part.Dimensions.X,
+            BoundingBoxY = part.Dimensions is null ? null : (decimal)part.Dimensions.Y,
+            BoundingBoxZ = part.Dimensions is null ? null : (decimal)part.Dimensions.Z,
+            IsManifold = part.IsManifold,
+        };
+    }
+
+    private UpdateProjectPartRequest? BuildUpdateProjectPartRequest(PartViewModel part)
+    {
+        var processCode = ResolvePartProcessCode(part);
+        if (string.IsNullOrWhiteSpace(processCode))
+            return null;
+
+        part.ProcessCode ??= processCode;
+
+        return new UpdateProjectPartRequest
+        {
+            ProcessType = processCode,
+            MaterialId = part.MaterialId,
+            MaterialName = ResolvePartMaterialName(part),
+            MaterialCode = ResolvePartMaterialCode(part),
+            Quantity = part.Quantity,
+            Finish = part.FinishCode,
+            Color = ResolvePartColor(part),
+            Tolerance = part.ToleranceCode,
+            ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
+            GlbStoragePath = part.GlbStoragePath,
+            OverlayPaths = part.OverlayPaths is null ? [] : new Dictionary<string, string>(part.OverlayPaths),
+            RoughnessCode = part.RoughnessCode,
+            MarkingType = part.MarkingType,
+            MarkingText = part.MarkingText,
+            DfmAcknowledged = part.DfmAcknowledged,
+            HasThreadedHoles = part.HasThreadedHoles,
+            ThreadedHoleSpec = part.ThreadedHoleSpec,
+            ThreadedHoleCount = part.ThreadedHoleCount,
+            HasInserts = part.HasInserts,
+            InsertType = part.InsertType,
+            InsertCount = part.InsertCount,
+            BagAndTag = part.BagAndTag,
+            InspectionLevel = part.InspectionLevel,
+            Certificates = [.. part.Certificates],
+            DrawingFiles = ToProjectPartAttachments(part.DrawingFiles),
+            SupplementaryFiles = ToProjectPartAttachments(part.SupplementaryFiles),
+            ProcessConfig = BuildProcessConfig(part),
+            BodyCount = part.BodyCount,
+            BodiesJson = part.Bodies.Count > 0 ? JsonSerializer.Serialize(part.Bodies) : null,
+            SelectedBodyIndex = part.SelectedBodyIndex,
+        };
+    }
+
+    private static Dictionary<string, string> BuildProcessConfig(PartViewModel part) =>
+        part.ProcessOptionValues
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => pair.Value!, StringComparer.Ordinal);
+
+    private static List<ProjectPartAttachmentDto> ToProjectPartAttachments(IEnumerable<DraftProjectAttachmentDto> attachments) =>
+        attachments.Select(attachment => new ProjectPartAttachmentDto
+        {
+            FileId = attachment.FileId,
+            FileName = attachment.Name,
+            StoragePath = attachment.StoragePath,
+            SizeBytes = attachment.FileSizeBytes,
+            ContentType = attachment.FileType,
+            UploadedAt = attachment.UploadedAt,
+        }).ToList();
+
+    private string? ResolvePartProcessCode(PartViewModel part)
+    {
+        if (!string.IsNullOrWhiteSpace(part.ProcessCode))
+            return part.ProcessCode;
+
+        return part.ProcessId.HasValue
+            ? _processes.FirstOrDefault(process => process.Id == part.ProcessId.Value)?.Code
+            : null;
+    }
+
+    private static string? ResolvePartMaterialName(PartViewModel part)
+    {
+        if (part.MaterialId.HasValue)
+        {
+            var material = part.AvailableMaterials.FirstOrDefault(item => item.Id == part.MaterialId.Value);
+            if (!string.IsNullOrWhiteSpace(material?.Name))
+                return material.Name;
+        }
+
+        return part.MaterialCode;
+    }
+
+    private static string? ResolvePartMaterialCode(PartViewModel part)
+    {
+        if (!string.IsNullOrWhiteSpace(part.MaterialCode))
+            return part.MaterialCode;
+
+        return part.MaterialId.HasValue
+            ? part.AvailableMaterials.FirstOrDefault(item => item.Id == part.MaterialId.Value)?.Code
+            : null;
+    }
+
+    private static string? ResolvePartColor(PartViewModel part)
+    {
+        foreach (var key in new[] { "paint_color_reference", "paint_color", "paint_colour", "material_color", "material_colour", "plastic_color", "plastic_colour", "anodize_color", "anodise_color" })
+        {
+            if (part.ProcessOptionValues.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return part.ProcessOptionValues.TryGetValue("paint_color_hex", out var hex) && !string.IsNullOrWhiteSpace(hex)
+            ? hex
+            : null;
+    }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private async Task SaveDraftAsync()
     {
@@ -1220,6 +1629,9 @@ public partial class ProjectNew : IAsyncDisposable
                 CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
                 SelectedLeadTimeCode = _selectedLeadTime?.Code ?? "STANDARD",
                 SelectedCurrencyCode = CurrencyService.Code,
+                ShippingCost = _shippingCost,
+                ManualDiscountAmount = _manualDiscountAmount,
+                QuotationTerms = _quotationTerms,
                 LastModified = DateTime.UtcNow,
                 Parts = _parts.Select(p => p.ToDraftPartState()).ToList(),
             };
@@ -1247,9 +1659,10 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
-    private async Task SaveDraftToServerAsync()
+    private async Task<bool> SaveDraftToServerAsync()
     {
         _serverSaveInProgress = true;
+        var saved = true;
         try
         {
             if (_serverProjectId == null)
@@ -1275,16 +1688,10 @@ public partial class ProjectNew : IAsyncDisposable
                         {
                             try
                             {
-                                var addPartRequest = new AddProjectPartRequest
-                                {
-                                    FileId = part.FileId,
-                                    FileName = part.Name,
-                                    ProcessType = part.ProcessCode,
-                                    MaterialId = part.MaterialId,
-                                    Quantity = part.Quantity,
-                                    Finish = part.FinishCode,
-                                    Tolerance = part.ToleranceCode,
-                                };
+                                var addPartRequest = BuildAddProjectPartRequest(part);
+                                if (addPartRequest == null)
+                                    continue;
+
                                 var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{_serverProjectId}/parts", addPartRequest);
                                 if (partResponse.IsSuccessStatusCode)
                                 {
@@ -1293,11 +1700,20 @@ public partial class ProjectNew : IAsyncDisposable
                                     {
                                         part.ServerPartId = createdPart.Id;
                                     }
+                                    else
+                                    {
+                                        saved = false;
+                                    }
+                                }
+                                else
+                                {
+                                    saved = false;
                                 }
                             }
                             catch
                             {
                                 // Non-fatal: part sync will retry on next auto-save
+                                saved = false;
                             }
                         }
 
@@ -1315,6 +1731,9 @@ public partial class ProjectNew : IAsyncDisposable
                             CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
                             SelectedLeadTimeCode = _selectedLeadTime?.Code ?? "STANDARD",
                             SelectedCurrencyCode = CurrencyService.Code,
+                            ShippingCost = _shippingCost,
+                            ManualDiscountAmount = _manualDiscountAmount,
+                            QuotationTerms = _quotationTerms,
                             LastModified = DateTime.UtcNow,
                             Parts = _parts.Select(p => p.ToDraftPartState()).ToList(),
                         };
@@ -1322,11 +1741,21 @@ public partial class ProjectNew : IAsyncDisposable
                         await JS.InvokeVoidAsync("sessionStorage.setItem", DraftStorageKey, updatedJson);
                         _lastSavedAt = DateTimeOffset.UtcNow;
                     }
+                    else
+                    {
+                        saved = false;
+                    }
+                }
+                else
+                {
+                    saved = false;
                 }
             }
             else
             {
-                await Http.PutAsJsonAsync($"api/v1/projects/{_serverProjectId}", new { Title = _title });
+                var projectUpdateResponse = await Http.PutAsJsonAsync($"api/v1/projects/{_serverProjectId}", new { Title = _title });
+                if (!projectUpdateResponse.IsSuccessStatusCode)
+                    saved = false;
 
                 foreach (var part in _parts.Where(p => p.IsFullyConfigured))
                 {
@@ -1335,16 +1764,10 @@ public partial class ProjectNew : IAsyncDisposable
                         // Parts not yet synced to the server need to be created first
                         if (!part.ServerPartId.HasValue)
                         {
-                            var addPartRequest = new AddProjectPartRequest
-                            {
-                                FileId = part.FileId,
-                                FileName = part.Name,
-                                ProcessType = part.ProcessCode,
-                                MaterialId = part.MaterialId,
-                                Quantity = part.Quantity,
-                                Finish = part.FinishCode,
-                                Tolerance = part.ToleranceCode,
-                            };
+                            var addPartRequest = BuildAddProjectPartRequest(part);
+                            if (addPartRequest == null)
+                                continue;
+
                             var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{_serverProjectId}/parts", addPartRequest);
                             if (partResponse.IsSuccessStatusCode)
                             {
@@ -1353,26 +1776,33 @@ public partial class ProjectNew : IAsyncDisposable
                                 {
                                     part.ServerPartId = createdPart.Id;
                                 }
+                                else
+                                {
+                                    saved = false;
+                                }
+                            }
+                            else
+                            {
+                                saved = false;
                             }
 
                             continue;
                         }
 
-                        var partRequest = new UpdateProjectPartRequest
-                        {
-                            ProcessType = part.ProcessCode,
-                            MaterialId = part.MaterialId,
-                            Quantity = part.Quantity,
-                            Finish = part.FinishCode,
-                            Tolerance = part.ToleranceCode,
-                        };
-                        await Http.PutAsJsonAsync(
+                        var partRequest = BuildUpdateProjectPartRequest(part);
+                        if (partRequest == null)
+                            continue;
+
+                        var partUpdateResponse = await Http.PutAsJsonAsync(
                             $"api/v1/projects/{_serverProjectId}/parts/{part.ServerPartId}",
                             partRequest);
+                        if (!partUpdateResponse.IsSuccessStatusCode)
+                            saved = false;
                     }
                     catch
                     {
                         // Non-fatal: part update will retry on next auto-save
+                        saved = false;
                     }
                 }
 
@@ -1388,6 +1818,7 @@ public partial class ProjectNew : IAsyncDisposable
         catch
         {
             // Server save failure is non-fatal; sessionStorage draft is the fallback
+            saved = false;
         }
         finally
         {
@@ -1395,6 +1826,8 @@ public partial class ProjectNew : IAsyncDisposable
             _autoSaving = false;
             _ = InvokeAsync(StateHasChanged);
         }
+
+        return saved;
     }
 
     private async Task RestoreDraftAsync()
@@ -1412,6 +1845,9 @@ public partial class ProjectNew : IAsyncDisposable
             _tempProjectId = draft.TempProjectId;
             _serverProjectId = draft.ServerProjectId;
             _title = draft.Title;
+            _shippingCost = Math.Max(0m, draft.ShippingCost);
+            _manualDiscountAmount = Math.Max(0m, draft.ManualDiscountAmount);
+            _quotationTerms = draft.QuotationTerms;
             _selectedLeadTime = string.IsNullOrEmpty(draft.SelectedLeadTimeCode)
                 ? null
                 : _leadTimeOptions.FirstOrDefault(lt => lt.Code == draft.SelectedLeadTimeCode);
@@ -1447,8 +1883,12 @@ public partial class ProjectNew : IAsyncDisposable
                 // restores DFM results from BFF cache, and repopulates GlbStoragePath.
                 if (!string.IsNullOrEmpty(partVm.StoragePath))
                 {
-                    var p = partVm; var path = partVm.StoragePath!;
-                    _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(p, path); });
+                    var p = partVm;
+                    foreach (var path in partVm.GetSignalRStoragePaths())
+                    {
+                        var statusPath = path;
+                        _ = Task.Run(async () => { await Task.Delay(CatchUpDelayMs); await FetchCurrentStatusAsync(p, statusPath); });
+                    }
                 }
 
                 _parts.Add(partVm);
@@ -1473,72 +1913,170 @@ public partial class ProjectNew : IAsyncDisposable
 
             var project = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
             if (project == null) return;
-            if (project.Status != "Draft" && project.Status != "Configuring") return;
+            if (!CanResumeProjectForEditing(project.Status)) return;
 
-            _serverProjectId = project.Id;
-            _tempProjectId = project.Id;
-            _title = project.Title;
-
-            if (!string.IsNullOrEmpty(project.Currency))
-            {
-                var c = CurrencyService.Currencies.FirstOrDefault(x => x.Code == project.Currency);
-                if (c != null) await CurrencyService.SetCurrencyAsync(c);
-            }
-
-            _selectedCustomer = new CustomerSummaryDto
-            {
-                Id = project.CustomerId,
-                Name = project.CustomerName,
-            };
-
-            foreach (var part in project.Parts)
-            {
-                var existing = _parts.FirstOrDefault(p => p.ServerPartId == part.Id || p.FileId == part.FileId);
-                if (existing == null && !string.IsNullOrEmpty(part.FileName))
-                {
-                    var partVm = new PartViewModel
-                    {
-                        FileId = part.FileId,
-                        ServerPartId = part.Id,
-                        Name = part.FileName,
-                        ProcessCode = part.ProcessType,
-                        MaterialId = part.MaterialId,
-                        MaterialCode = part.MaterialName,
-                        Quantity = part.Quantity,
-                        FinishCode = part.Finish,
-                        ToleranceCode = part.Tolerance,
-                        EstimatedUnitPrice = part.ConfirmedPrice ?? part.EstimatedPrice,
-                    };
-
-                    if (!string.IsNullOrEmpty(part.ProcessType))
-                    {
-                        var process = _processes.FirstOrDefault(p =>
-                            p.Code.Equals(part.ProcessType, StringComparison.OrdinalIgnoreCase));
-                        if (process != null)
-                        {
-                            partVm.ProcessId = process.Id;
-                            partVm.ProcessCode = process.Code;
-                            _ = ReloadPartCatalogAsync(partVm);
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(part.ModelPreviewUrl))
-                    {
-                        partVm.ThumbnailSmallUrl = part.ModelPreviewUrl;
-                    }
-
-                    _parts.Add(partVm);
-                }
-            }
-
-            _selectedPartIndex = 0;
-            await SaveDraftAsync();
+            await ApplyProjectDetailAsync(project);
             Snackbar.Add("Draft restored from server.", Severity.Info);
         }
         catch (Exception)
         {
             // Server resume failures are non-fatal; sessionStorage draft is the fallback
         }
+    }
+
+    private async Task ApplyProjectDetailAsync(ProjectDetailDto project)
+    {
+        _serverProjectId = project.Id;
+        _tempProjectId = project.Id;
+        _title = project.Title;
+        _parts.Clear();
+
+        if (!string.IsNullOrEmpty(project.Currency))
+        {
+            var c = CurrencyService.Currencies.FirstOrDefault(x => x.Code == project.Currency);
+            if (c != null) await CurrencyService.SetCurrencyAsync(c);
+        }
+
+        _selectedCustomer = new CustomerSummaryDto
+        {
+            Id = project.CustomerId,
+            Name = project.CustomerName,
+        };
+
+        foreach (var part in project.Parts.Where(part => !string.IsNullOrEmpty(part.FileName)))
+        {
+            var partVm = CreatePartViewModelFromProjectPart(part);
+            _parts.Add(partVm);
+
+            if (partVm.ProcessId.HasValue && !string.IsNullOrEmpty(partVm.ProcessCode))
+                _ = ReloadPartCatalogAsync(partVm);
+
+            ScheduleStatusCatchUp(partVm);
+        }
+
+        _selectedPartIndex = 0;
+        await SaveDraftAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private PartViewModel CreatePartViewModelFromProjectPart(ProjectPartDto part)
+    {
+        var unitPrice = part.ConfirmedPrice ?? part.ConfirmedUnitPrice ?? part.EstimatedPrice ?? part.AiSuggestedPrice;
+        var bodies = DeserializeBodies(part.BodiesJson);
+        var process = string.IsNullOrWhiteSpace(part.ProcessType)
+            ? null
+            : _processes.FirstOrDefault(p => p.Code.Equals(part.ProcessType, StringComparison.OrdinalIgnoreCase));
+
+        var partVm = new PartViewModel
+        {
+            FileId = part.FileId,
+            ServerPartId = part.Id,
+            Name = part.FileName,
+            StoragePath = part.FileReference,
+            ProcessCode = process?.Code ?? part.ProcessType,
+            ProcessId = process?.Id,
+            MaterialId = part.MaterialId,
+            MaterialCode = part.MaterialCode,
+            Quantity = part.Quantity,
+            FinishCode = part.Finish,
+            ToleranceCode = part.Tolerance,
+            EstimatedUnitPrice = unitPrice,
+            EstimatedTotalAmount = unitPrice * Math.Max(part.Quantity, 1),
+            Dimensions = part.Dimensions is null
+                ? null
+                : new FileAnalysisDimensionsDto
+                {
+                    X = part.Dimensions.X,
+                    Y = part.Dimensions.Y,
+                    Z = part.Dimensions.Z,
+                },
+            IsManifold = part.IsManifold,
+            ThumbnailSmallUrl = part.ThumbnailUrl,
+            ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
+            GlbStoragePath = part.GlbStoragePath,
+            GlbSignedUrl = string.IsNullOrWhiteSpace(part.GlbStoragePath) ? null : part.ModelPreviewUrl,
+            ViewerUrl = string.IsNullOrWhiteSpace(part.GlbStoragePath) ? null : part.ModelPreviewUrl,
+            OverlayPaths = part.OverlayPaths.Count == 0 ? null : new Dictionary<string, string>(part.OverlayPaths),
+            RoughnessCode = part.RoughnessCode,
+            MarkingType = part.MarkingType,
+            MarkingText = part.MarkingText,
+            DfmAcknowledged = part.DfmAcknowledged,
+            HasThreadedHoles = part.HasThreadedHoles,
+            ThreadedHoleSpec = part.ThreadedHoleSpec,
+            ThreadedHoleCount = part.ThreadedHoleCount,
+            HasInserts = part.HasInserts,
+            InsertType = part.InsertType,
+            InsertCount = part.InsertCount,
+            BagAndTag = part.BagAndTag,
+            InspectionLevel = part.InspectionLevel,
+            Certificates = [.. part.Certificates],
+            DrawingFiles = ToDraftAttachments(part.DrawingFiles, DraftAttachmentKind.Drawing),
+            SupplementaryFiles = ToDraftAttachments(part.SupplementaryFiles, DraftAttachmentKind.Supplementary),
+            ProcessOptionValues = part.ProcessConfig.ToDictionary(pair => pair.Key, pair => (string?)pair.Value),
+            BodyCount = part.BodyCount ?? (bodies.Count > 0 ? bodies.Count : null),
+            Bodies = bodies,
+            SelectedBodyIndex = part.SelectedBodyIndex,
+            AwaitingPreview = false,
+            StatusText = "Ready",
+        };
+
+        partVm.ResolveDfmReport();
+        return partVm;
+    }
+
+    private void ScheduleStatusCatchUp(PartViewModel part)
+    {
+        if (string.IsNullOrEmpty(part.StoragePath))
+            return;
+
+        foreach (var path in part.GetSignalRStoragePaths())
+        {
+            var statusPath = path;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(CatchUpDelayMs);
+                await FetchCurrentStatusAsync(part, statusPath);
+            });
+        }
+    }
+
+    private static List<DraftProjectAttachmentDto> ToDraftAttachments(
+        IEnumerable<ProjectPartAttachmentDto> attachments,
+        DraftAttachmentKind kind) =>
+        attachments.Select(attachment => new DraftProjectAttachmentDto
+        {
+            FileId = attachment.FileId.GetValueOrDefault(),
+            StoragePath = attachment.StoragePath ?? string.Empty,
+            Name = attachment.FileName,
+            FileType = attachment.ContentType ?? string.Empty,
+            FileSizeBytes = attachment.SizeBytes.GetValueOrDefault(),
+            Kind = kind,
+            UploadedAt = attachment.UploadedAt ?? DateTime.UtcNow,
+        }).ToList();
+
+    private static List<PartViewModel.BodyInfo> DeserializeBodies(string? bodiesJson)
+    {
+        if (string.IsNullOrWhiteSpace(bodiesJson))
+            return [];
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<PartViewModel.BodyInfo>>(bodiesJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static bool CanResumeProjectForEditing(string? status)
+    {
+        return status?.Trim().ToLowerInvariant() switch
+        {
+            "draft" or "configuring" or "priced" or "quoted" => true,
+            _ => false,
+        };
     }
 
     private async Task ReloadPartCatalogAsync(PartViewModel part)
@@ -1563,6 +2101,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.AvailableFinishes = finishesTask.Result ?? [];
             part.AvailableTolerances = FilterProcessTolerances(part.ProcessCode, tolerancesTask.Result ?? []).ToList();
             part.AvailableProcessOptions = configOptionsTask.Result ?? [];
+            RestoreCatalogSelections(part);
 
             if (part.MaterialId.HasValue)
                 await ComputePriceAsync(part, CancellationToken.None);
@@ -1573,28 +2112,61 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
+    private static void RestoreCatalogSelections(PartViewModel part)
+    {
+        if (part.MaterialId.HasValue)
+        {
+            var material = part.AvailableMaterials.FirstOrDefault(item => item.Id == part.MaterialId.Value);
+            if (material is not null)
+                part.MaterialCode = material.Code;
+        }
+
+        if (!part.FinishId.HasValue && !string.IsNullOrWhiteSpace(part.FinishCode))
+        {
+            var finish = part.AvailableFinishes.FirstOrDefault(item =>
+                item.Code.Equals(part.FinishCode, StringComparison.OrdinalIgnoreCase)
+                || item.Name.Equals(part.FinishCode, StringComparison.OrdinalIgnoreCase));
+            if (finish is not null)
+            {
+                part.FinishId = finish.Id;
+                part.FinishCode = finish.Code;
+            }
+        }
+
+        if (!part.ToleranceId.HasValue && !string.IsNullOrWhiteSpace(part.ToleranceCode))
+        {
+            var tolerance = part.AvailableTolerances.FirstOrDefault(item =>
+                item.Code.Equals(part.ToleranceCode, StringComparison.OrdinalIgnoreCase)
+                || item.Name.Equals(part.ToleranceCode, StringComparison.OrdinalIgnoreCase));
+            if (tolerance is not null)
+            {
+                part.ToleranceId = tolerance.Id;
+                part.ToleranceCode = tolerance.Code;
+            }
+        }
+    }
+
     // ── PDF generation ─────────────────────────────────────────────────
 
     private async Task GenerateDraftPdfAsync()
     {
         try
         {
-            var pdfData = new QuotationPdfData
-            {
-                QuotationNumber = $"DRAFT-{_tempProjectId:N}"[..Math.Min(24, $"DRAFT-{_tempProjectId:N}".Length)],
-                CustomerName = _selectedCustomer?.CompanyName ?? _selectedCustomer?.Name ?? "N/A",
-                QuotationDate = DateTime.UtcNow,
-                Currency = CurrencyService.Code ?? "THB",
-                TotalAmount = (double)_parts.Sum(p => p.EstimatedTotalAmount ?? 0),
-                Items = _parts.Select((p, i) => new QuotationPdfItem
-                {
-                    Index = i + 1,
-                    Description = p.Name,
-                    Quantity = p.Quantity,
-                    UnitPrice = (double)(p.EstimatedUnitPrice ?? 0),
-                    TotalPrice = (double)(p.EstimatedTotalAmount ?? 0),
-                }).ToList()
-            };
+            var customerDetail = await GetDraftPdfCustomerDetailAsync();
+            var nowUtc = DateTime.UtcNow;
+            var pdfData = ProjectQuotationPdfMapper.BuildDraftPdfData(
+                _tempProjectId,
+                _selectedCustomer,
+                customerDetail,
+                CurrencyService.Code,
+                nowUtc,
+                ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
+                _parts,
+                _processes,
+                _quotationTerms,
+                _shippingCost,
+                _manualDiscountAmount,
+                CurrencyService.ExchangeRate);
 
             var response = await Http.PostAsJsonAsync("api/v1/quotations/draft-pdf", pdfData);
             if (response.IsSuccessStatusCode)
@@ -1614,6 +2186,22 @@ public partial class ProjectNew : IAsyncDisposable
         catch (Exception ex)
         {
             Snackbar.Add($"PDF generation error: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private async Task<CustomerDetailDto?> GetDraftPdfCustomerDetailAsync()
+    {
+        if (_selectedCustomer == null)
+            return null;
+
+        try
+        {
+            return await Http.GetFromJsonAsync<CustomerDetailDto>($"api/v1/customers/{_selectedCustomer.Id}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not load customer details for draft PDF {CustomerId}", _selectedCustomer.Id);
+            return null;
         }
     }
 
@@ -1640,32 +2228,6 @@ public partial class ProjectNew : IAsyncDisposable
                     var errorContent = await updateResponse.Content.ReadAsStringAsync();
                     Snackbar.Add($"Failed to update project: {errorContent}", Severity.Error);
                     return;
-                }
-
-                foreach (var part in _parts.Where(p => p.IsFullyConfigured && !string.IsNullOrEmpty(p.StoragePath) && !p.ServerPartId.HasValue))
-                {
-                    var addPartRequest = new AddProjectPartRequest
-                    {
-                        FileId = part.FileId,
-                        FileName = part.Name,
-                        ProcessType = part.ProcessCode,
-                        MaterialId = part.MaterialId,
-                        Quantity = part.Quantity,
-                        Finish = part.FinishCode,
-                        Tolerance = part.ToleranceCode,
-                    };
-
-                    try
-                    {
-                        var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addPartRequest);
-                        if (partResponse.IsSuccessStatusCode)
-                        {
-                            var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
-                            if (createdPart != null)
-                                part.ServerPartId = createdPart.Id;
-                        }
-                    }
-                    catch { /* parts may already exist from auto-save; non-fatal */ }
                 }
             }
             else
@@ -1694,38 +2256,29 @@ public partial class ProjectNew : IAsyncDisposable
                 }
 
                 projectId = project.Id;
-
-                foreach (var part in _parts.Where(p => p.IsFullyConfigured))
-                {
-                    var addPartRequest = new AddProjectPartRequest
-                    {
-                        FileId = part.FileId,
-                        FileName = part.Name,
-                        ProcessType = part.ProcessCode,
-                        MaterialId = part.MaterialId,
-                        Quantity = part.Quantity,
-                        Finish = part.FinishCode,
-                        Tolerance = part.ToleranceCode,
-                    };
-
-                    using var partResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addPartRequest);
-                    if (partResponse.IsSuccessStatusCode)
-                    {
-                        var createdPart = await partResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
-                        if (createdPart != null)
-                            part.ServerPartId = createdPart.Id;
-                    }
-                    else
-                    {
-                        Snackbar.Add($"Failed to add part '{part.Name}'.", Severity.Warning);
-                    }
-                }
             }
 
-            using var quoteResponse = await Http.PostAsync($"api/v1/projects/{projectId}/generate-quotation", null);
+            if (!await SyncProjectPartsForQuoteAsync(projectId))
+                return;
+
+            if (!await ConfirmProjectPartPricesForQuoteAsync(projectId))
+                return;
+
+            using var quoteResponse = await Http.PostAsJsonAsync(
+                $"api/v1/projects/{projectId}/generate-quotation",
+                new GenerateQuotationRequest
+                {
+                    ValidityDays = 30,
+                    DeliveryExpectations = ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
+                });
             if (!quoteResponse.IsSuccessStatusCode)
             {
-                Snackbar.Add("Project created but quotation generation failed.", Severity.Warning);
+                var errorContent = await quoteResponse.Content.ReadAsStringAsync();
+                Snackbar.Add(
+                    string.IsNullOrWhiteSpace(errorContent)
+                        ? "Project created but quotation generation failed."
+                        : $"Project created but quotation generation failed. {errorContent}",
+                    Severity.Warning);
                 Navigation.NavigateTo($"/sales/projects/{projectId}");
                 return;
             }
@@ -1748,48 +2301,165 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
+    private async Task<bool> SyncProjectPartsForQuoteAsync(Guid projectId)
+    {
+        foreach (var part in _parts.Where(p => p.IsFullyConfigured))
+        {
+            if (part.ServerPartId.HasValue)
+            {
+                var updateRequest = BuildUpdateProjectPartRequest(part);
+                if (updateRequest == null)
+                    return false;
+
+                using var updateResponse = await Http.PutAsJsonAsync(
+                    $"api/v1/projects/{projectId}/parts/{part.ServerPartId.Value}",
+                    updateRequest);
+
+                if (!updateResponse.IsSuccessStatusCode)
+                {
+                    Snackbar.Add($"Failed to update part '{part.Name}'.", Severity.Warning);
+                    return false;
+                }
+
+                continue;
+            }
+
+            var addRequest = BuildAddProjectPartRequest(part);
+            if (addRequest == null)
+                return false;
+
+            using var addResponse = await Http.PostAsJsonAsync($"api/v1/projects/{projectId}/parts", addRequest);
+            if (!addResponse.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Failed to add part '{part.Name}'.", Severity.Warning);
+                return false;
+            }
+
+            var createdPart = await addResponse.Content.ReadFromJsonAsync<ProjectPartDto>();
+            if (createdPart == null)
+            {
+                Snackbar.Add($"Project part '{part.Name}' was saved but returned no part ID.", Severity.Warning);
+                return false;
+            }
+
+            part.ServerPartId = createdPart.Id;
+        }
+
+        return true;
+    }
+
+    private async Task<bool> ConfirmProjectPartPricesForQuoteAsync(Guid projectId)
+    {
+        foreach (var part in _parts.Where(p => p.IsFullyConfigured))
+        {
+            if (!part.ServerPartId.HasValue)
+            {
+                Snackbar.Add($"Part '{part.Name}' has not been saved to the project yet.", Severity.Warning);
+                return false;
+            }
+
+            var unitPrice = ResolvePartUnitPriceForConfirmation(part);
+            if (!unitPrice.HasValue || unitPrice.Value <= 0m)
+            {
+                Snackbar.Add($"Part '{part.Name}' has no calculated price yet.", Severity.Warning);
+                return false;
+            }
+
+            using var response = await Http.PostAsJsonAsync(
+                $"api/v1/projects/{projectId}/parts/{part.ServerPartId.Value}/confirm-price",
+                new ConfirmPartPriceRequest { ConfirmedUnitPrice = unitPrice.Value });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Failed to confirm price for '{part.Name}'.", Severity.Warning);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static decimal? ResolvePartUnitPriceForConfirmation(PartViewModel part)
+    {
+        if (part.EstimatedUnitPrice.HasValue)
+            return part.EstimatedUnitPrice.Value;
+
+        return part.Quantity > 0 && part.EstimatedTotalAmount.HasValue
+            ? part.EstimatedTotalAmount.Value / part.Quantity
+            : null;
+    }
+
     // ── Task 15: Duplicate project ─────────────────────────────────────
 
     /// <inheritdoc />
-    private void DuplicateProject()
+    private async Task DuplicateProjectAsync()
     {
         if (_parts.Count == 0)
             return;
 
-        _tempProjectId = Guid.NewGuid();
-        _serverProjectId = null;
-        _title = string.IsNullOrEmpty(_title) ? string.Empty : $"{_title} (Copy)";
-        _selectedCustomer = null;
-        _lastSavedAt = null;
-
-        var clonedParts = _parts.Select(p => new PartViewModel
+        _saving = true;
+        try
         {
-            Name = p.Name,
-            FileId = Guid.NewGuid(),
-            StoragePath = null,
-            Quantity = p.Quantity,
-            ProcessId = p.ProcessId,
-            ProcessCode = p.ProcessCode,
-            MaterialId = p.MaterialId,
-            MaterialCode = p.MaterialCode,
-            FinishId = p.FinishId,
-            FinishCode = p.FinishCode,
-            ToleranceId = p.ToleranceId,
-            ToleranceCode = p.ToleranceCode,
-            PartNotes = p.PartNotes,
-            DfmAcknowledged = p.DfmAcknowledged,
-            BagAndTag = true,
-            AvailableMaterials = p.AvailableMaterials,
-            AvailableFinishes = p.AvailableFinishes,
-            AvailableTolerances = p.AvailableTolerances,
-        }).ToList();
+            var saved = await SaveDraftToServerAsync();
+            if (!_serverProjectId.HasValue)
+            {
+                Snackbar.Add("Select a customer before duplicating this draft.", Severity.Warning);
+                return;
+            }
 
-        _parts.Clear();
-        _parts.AddRange(clonedParts);
-        _selectedPartIndex = 0;
+            if (!saved)
+            {
+                Snackbar.Add("Project save did not complete. Please try duplicating again.", Severity.Warning);
+                return;
+            }
 
-        Snackbar.Add("Project duplicated. Please re-upload files for each part.", Severity.Info);
-        TriggerAutoSave();
+            var duplicateTitle = BuildDuplicateProjectTitle(_title);
+            using var response = await Http.PostAsJsonAsync(
+                $"api/v1/projects/{_serverProjectId.Value}/duplicate",
+                new DuplicateProjectRequest { Title = duplicateTitle });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(
+                    string.IsNullOrWhiteSpace(error)
+                        ? "Project duplicate failed."
+                        : $"Project duplicate failed. {error}",
+                    Severity.Error);
+                return;
+            }
+
+            var duplicate = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
+            if (duplicate == null)
+            {
+                Snackbar.Add("Project duplicate failed: response was invalid.", Severity.Error);
+                return;
+            }
+
+            await ApplyProjectDetailAsync(duplicate);
+            Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}&resume={duplicate.Id}", replace: true);
+            Snackbar.Add("Project duplicated.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Project duplicate failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string BuildDuplicateProjectTitle(string? title)
+    {
+        var baseTitle = string.IsNullOrWhiteSpace(title)
+            ? $"Project {DateTime.Today:yyyy-MM-dd}"
+            : title.Trim();
+
+        return baseTitle.EndsWith(" (Copy)", StringComparison.OrdinalIgnoreCase)
+            ? baseTitle
+            : $"{baseTitle} (Copy)";
     }
 
     /// <summary>Duplicates a single part within the project, reusing the source's analysis artifacts.</summary>
@@ -1801,6 +2471,7 @@ public partial class ProjectNew : IAsyncDisposable
             Name = sourcePart.Name,
             FileId = sourcePart.FileId,
             StoragePath = sourcePart.StoragePath,
+            StoragePathAliases = [.. sourcePart.StoragePathAliases],
             FileSizeBytes = sourcePart.FileSizeBytes,
             UploadedAt = sourcePart.UploadedAt,
 
@@ -1849,11 +2520,7 @@ public partial class ProjectNew : IAsyncDisposable
         _selectedPartIndex = index + 1;
 
         // Join the file group so late-arriving events reach this clone too.
-        if (!string.IsNullOrEmpty(cloned.StoragePath) && _hubConnection is not null)
-        {
-            try { await _hubConnection.InvokeAsync("JoinFileGroup", cloned.StoragePath); }
-            catch (Exception ex) { Logger.LogWarning(ex, "Duplicate: JoinFileGroup failed"); }
-        }
+        await JoinPartFileGroupsAsync(cloned);
 
         await TriggerRoutingFetchAsync(cloned);
 
@@ -1893,115 +2560,119 @@ public partial class ProjectNew : IAsyncDisposable
         if (previousCustomerId.HasValue || !_selectedCustomerId.HasValue)
             return;
 
-        var partsInTemp = _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath) && p.StoragePath.StartsWith("projects/")).ToList();
-        if (partsInTemp.Count == 0)
+        await MigrateTempProjectFilesAsync();
+    }
+
+    private async Task MigrateTempProjectFilesAsync()
+    {
+        if (!_selectedCustomerId.HasValue)
             return;
 
-        var migrationResult = await Http.PostAsJsonAsync(
-            $"api/v1/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
-            (object?)null);
-
-        if (!migrationResult.IsSuccessStatusCode)
+        await _storageMigrationSemaphore.WaitAsync();
+        try
         {
-            Snackbar.Add("Failed to migrate files to customer storage. Please try again.", Severity.Error);
-            return;
-        }
-
-        var migrated = await migrationResult.Content.ReadFromJsonAsync<JsonDocument>();
-        if (migrated == null)
-        {
-            Snackbar.Add("Migration failed.", Severity.Error);
-            return;
-        }
-
-        var root = migrated.RootElement;
-
-        if (!root.TryGetProperty("errors", out var errorsElement) &&
-            !root.TryGetProperty("Errors", out errorsElement))
-        {
-            Snackbar.Add("Migration response is invalid: missing errors property.", Severity.Error);
-            return;
-        }
-
-        var totalMigrated = 0;
-        if (root.TryGetProperty("total_migrated", out var totalMigratedElement) ||
-            root.TryGetProperty("TotalMigrated", out totalMigratedElement))
-        {
-            totalMigrated = totalMigratedElement.GetInt32();
-        }
-
-        if (!root.TryGetProperty("migrated_files", out var migratedFilesElement) &&
-            !root.TryGetProperty("MigratedFiles", out migratedFilesElement) &&
-            !root.TryGetProperty("migratedFiles", out migratedFilesElement))
-        {
-            Snackbar.Add("Migration response is invalid: missing migrated_files property.", Severity.Error);
-            return;
-        }
-
-        var successfullyMigratedParts = new List<PartViewModel>();
-
-        foreach (var entry in migratedFilesElement.EnumerateArray())
-        {
-            if (!entry.TryGetProperty("file_id", out var fileIdElement) &&
-                !entry.TryGetProperty("FileId", out fileIdElement))
-                continue;
-            if (!entry.TryGetProperty("new_path", out var newPathElement) &&
-                !entry.TryGetProperty("NewPath", out newPathElement))
-                continue;
-            if (!entry.TryGetProperty("old_path", out var oldPathElement) &&
-                !entry.TryGetProperty("OldPath", out oldPathElement))
-                continue;
-
-            var fileId = fileIdElement.GetString();
-            var newBasePath = newPathElement.GetString();
-            var oldBasePath = oldPathElement.GetString();
-
-            if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(newBasePath) || string.IsNullOrEmpty(oldBasePath))
-                continue;
-
-            var part = _parts.FirstOrDefault(p => p.FileId.ToString() == fileId);
-            if (part == null) continue;
-
-            part.StoragePath = newBasePath;
-
-            if (!string.IsNullOrEmpty(part.GlbStoragePath))
-            {
-                var oldGlbViewerPath = oldBasePath + "_viewer.glb";
-                if (part.GlbStoragePath.StartsWith(oldGlbViewerPath))
-                    part.GlbStoragePath = newBasePath + "_viewer.glb";
-                else if (part.GlbStoragePath.StartsWith(oldBasePath))
-                    part.GlbStoragePath = newBasePath;
-            }
-
-            if (!string.IsNullOrEmpty(part.ThumbnailSmallGcsPath) && part.ThumbnailSmallGcsPath.StartsWith(oldBasePath))
-                part.ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath.Replace(oldBasePath, newBasePath);
-
-            if (!string.IsNullOrEmpty(part.ThumbnailLargeGcsPath) && part.ThumbnailLargeGcsPath.StartsWith(oldBasePath))
-                part.ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath.Replace(oldBasePath, newBasePath);
-
-            part.GlbSignedUrl = null;
-            successfullyMigratedParts.Add(part);
-        }
-
-        await InvokeAsync(StateHasChanged);
-
-        foreach (var part in successfullyMigratedParts.Where(p => p.ProcessId.HasValue && p.MaterialId.HasValue))
-            TriggerPricingAsync(part);
-
-        if (errorsElement.GetArrayLength() > 0)
-        {
-            var errorMessages = errorsElement.EnumerateArray()
-                .Select(e => e.GetString() ?? string.Empty)
-                .Where(e => !string.IsNullOrEmpty(e))
+            var partsInTemp = _parts
+                .Where(p => !string.IsNullOrEmpty(p.StoragePath) &&
+                            p.StoragePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase))
                 .ToList();
+            if (partsInTemp.Count == 0)
+                return;
 
-            var summary = $"Migration completed with {errorsElement.GetArrayLength()} error(s). {successfullyMigratedParts.Count} file(s) migrated successfully.";
-            if (errorMessages.Count > 0 && errorMessages.Count <= 3)
+            var migrationResult = await Http.PostAsJsonAsync(
+                $"api/v1/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
+                (object?)null);
+
+            if (!migrationResult.IsSuccessStatusCode)
             {
-                summary += " Errors: " + string.Join("; ", errorMessages);
+                Snackbar.Add("Failed to migrate files to customer storage. Please try again.", Severity.Error);
+                return;
             }
 
-            Snackbar.Add(summary, Severity.Warning);
+            var migrated = await migrationResult.Content.ReadFromJsonAsync<JsonDocument>();
+            if (migrated == null)
+            {
+                Snackbar.Add("Migration failed.", Severity.Error);
+                return;
+            }
+
+            var root = migrated.RootElement;
+
+            if (!root.TryGetProperty("errors", out var errorsElement) &&
+                !root.TryGetProperty("Errors", out errorsElement))
+            {
+                Snackbar.Add("Migration response is invalid: missing errors property.", Severity.Error);
+                return;
+            }
+
+            if (!root.TryGetProperty("migrated_files", out var migratedFilesElement) &&
+                !root.TryGetProperty("MigratedFiles", out migratedFilesElement) &&
+                !root.TryGetProperty("migratedFiles", out migratedFilesElement))
+            {
+                Snackbar.Add("Migration response is invalid: missing migrated_files property.", Severity.Error);
+                return;
+            }
+
+            var successfullyMigratedParts = new List<PartViewModel>();
+
+            foreach (var entry in migratedFilesElement.EnumerateArray())
+            {
+                if (!entry.TryGetProperty("file_id", out var fileIdElement) &&
+                    !entry.TryGetProperty("FileId", out fileIdElement))
+                    continue;
+                if (!entry.TryGetProperty("new_path", out var newPathElement) &&
+                    !entry.TryGetProperty("NewPath", out newPathElement))
+                    continue;
+                if (!entry.TryGetProperty("old_path", out var oldPathElement) &&
+                    !entry.TryGetProperty("OldPath", out oldPathElement))
+                    continue;
+
+                var fileId = fileIdElement.GetString();
+                var newBasePath = newPathElement.GetString();
+                var oldBasePath = oldPathElement.GetString();
+
+                if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(newBasePath) || string.IsNullOrEmpty(oldBasePath))
+                    continue;
+
+                var part = _parts.FirstOrDefault(p => p.FileId.ToString() == fileId);
+                if (part == null) continue;
+
+                part.AddStoragePathAlias(oldBasePath);
+                part.StoragePath = newBasePath;
+
+                await JoinPartFileGroupsAsync(part);
+                StartStatusWatchdog(part, oldBasePath);
+                StartStatusWatchdog(part, newBasePath);
+                successfullyMigratedParts.Add(part);
+            }
+
+            if (successfullyMigratedParts.Count > 0)
+            {
+                TriggerAutoSave();
+                await InvokeAsync(StateHasChanged);
+
+                foreach (var part in successfullyMigratedParts.Where(p => p.ProcessId.HasValue && p.MaterialId.HasValue))
+                    TriggerPricingAsync(part);
+            }
+
+            if (errorsElement.GetArrayLength() > 0)
+            {
+                var errorMessages = errorsElement.EnumerateArray()
+                    .Select(e => e.GetString() ?? string.Empty)
+                    .Where(e => !string.IsNullOrEmpty(e))
+                    .ToList();
+
+                var summary = $"Migration completed with {errorsElement.GetArrayLength()} error(s). {successfullyMigratedParts.Count} file(s) migrated successfully.";
+                if (errorMessages.Count > 0 && errorMessages.Count <= 3)
+                {
+                    summary += " Errors: " + string.Join("; ", errorMessages);
+                }
+
+                Snackbar.Add(summary, Severity.Warning);
+            }
+        }
+        finally
+        {
+            _storageMigrationSemaphore.Release();
         }
     }
 

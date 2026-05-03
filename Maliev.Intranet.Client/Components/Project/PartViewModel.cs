@@ -26,6 +26,12 @@ public class PartViewModel
     /// <summary>The storage path of the uploaded file.</summary>
     public string? StoragePath { get; set; }
 
+    /// <summary>
+    /// Previous source storage paths for this part. These remain valid SignalR aliases while
+    /// GeometryService finishes work that started before the file moved into customer storage.
+    /// </summary>
+    public List<string> StoragePathAliases { get; set; } = [];
+
     /// <summary>The manufacturing process code (e.g. "FDM", "CNC").</summary>
     public string? ProcessCode { get; set; }
 
@@ -72,6 +78,12 @@ public class PartViewModel
 
     /// <summary>True while the file is being uploaded.</summary>
     public bool Uploading { get; set; }
+
+    /// <summary>True when the file is waiting for an upload concurrency slot.</summary>
+    public bool QueuedUpload { get; set; }
+
+    /// <summary>Client-side identifier that binds the UI part to a browser File object.</summary>
+    public string? ClientUploadId { get; set; }
 
     /// <summary>
     /// Upload progress percentage (0-100). Updated by JS Interop during HTTP upload.
@@ -159,6 +171,9 @@ public class PartViewModel
 
     /// <summary>Zero-based index of the currently selected body. Null when no body is selected.</summary>
     public int? SelectedBodyIndex { get; set; }
+
+    /// <summary>Per-part visual settings for the 3D viewer.</summary>
+    public PartViewerSettings ViewerSettings { get; set; } = new();
 
     /// <summary>
     /// Per-body metadata for multi-body CAD files. Matches SignalRBodyInfo structure from BFF.
@@ -316,6 +331,46 @@ public class PartViewModel
         Error == null &&
         HasRequiredThreadSpecificationDrawing;
 
+    /// <summary>Adds a previous storage path as a SignalR/event matching alias.</summary>
+    /// <param name="storagePath">The previous storage path.</param>
+    public void AddStoragePathAlias(string? storagePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return;
+
+        if (string.Equals(storagePath, StoragePath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (StoragePathAliases.Any(alias => string.Equals(alias, storagePath, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        StoragePathAliases.Add(storagePath);
+    }
+
+    /// <summary>Returns true when a SignalR event storage path belongs to this part.</summary>
+    /// <param name="storagePath">The event storage path.</param>
+    public bool MatchesSourceStoragePath(string? storagePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return false;
+
+        return string.Equals(StoragePath, storagePath, StringComparison.OrdinalIgnoreCase)
+            || StoragePathAliases.Any(alias => string.Equals(alias, storagePath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Returns the current and previous source paths that should receive SignalR events.</summary>
+    public IEnumerable<string> GetSignalRStoragePaths()
+    {
+        if (!string.IsNullOrWhiteSpace(StoragePath))
+            yield return StoragePath;
+
+        foreach (var alias in StoragePathAliases.Where(alias => !string.IsNullOrWhiteSpace(alias)))
+        {
+            if (!string.Equals(alias, StoragePath, StringComparison.OrdinalIgnoreCase))
+                yield return alias;
+        }
+    }
+
     /// <summary>
     /// True when this part has DFM issues that should be surfaced to the user.
     /// Mirrors the logic from PartDetailCard.BuildDfmIssues to ensure consistency
@@ -381,6 +436,7 @@ public class PartViewModel
         FileId = FileId,
         ServerPartId = ServerPartId,
         StoragePath = StoragePath ?? string.Empty,
+        StoragePathAliases = [.. StoragePathAliases],
         Name = Name,
         Quantity = Quantity,
         ProcessCode = ProcessCode,
@@ -422,6 +478,9 @@ public class PartViewModel
         // Persist pricing snapshot so the panel shows instantly on restore
         EstimatedUnitPrice = EstimatedUnitPrice,
         EstimatedTotalAmount = EstimatedTotalAmount,
+        ProcessConfig = ProcessOptionValues
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => pair.Value!),
         // Serialise typed DFM payloads to JSON so BuildDfmIssues works after restore
         FdmDfmReportJson = FdmDfmReport is FdmDfmReportPayload fdm ? JsonSerializer.Serialize(fdm) : null,
         SlaDfmReportJson = SlaDfmReport is SlaDfmReportPayload sla ? JsonSerializer.Serialize(sla) : null,
@@ -430,6 +489,7 @@ public class PartViewModel
         BodyCount = BodyCount,
         BodiesJson = Bodies.Count > 0 ? JsonSerializer.Serialize(Bodies) : null,
         SelectedBodyIndex = SelectedBodyIndex,
+        ViewerSettings = ViewerSettings.Clone(),
     };
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
@@ -440,6 +500,7 @@ public class PartViewModel
             FileId = s.FileId,
             ServerPartId = s.ServerPartId,
             StoragePath = s.StoragePath,
+            StoragePathAliases = [.. s.StoragePathAliases],
             Name = s.Name,
             Quantity = s.Quantity,
             ProcessCode = s.ProcessCode,
@@ -485,9 +546,13 @@ public class PartViewModel
             // Restore pricing snapshot for instant display while background recalculation runs
             EstimatedUnitPrice = s.EstimatedUnitPrice,
             EstimatedTotalAmount = s.EstimatedTotalAmount,
+            ProcessOptionValues = s.ProcessConfig.ToDictionary(
+                pair => pair.Key,
+                pair => (string?)pair.Value),
             OverlayPaths = s.OverlayPaths,
             BodyCount = s.BodyCount,
             SelectedBodyIndex = s.SelectedBodyIndex,
+            ViewerSettings = s.ViewerSettings.Clone(),
         };
 
         // Deserialise body metadata from JSON

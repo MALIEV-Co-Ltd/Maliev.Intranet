@@ -29,7 +29,7 @@
                         LastSavedAt="@_lastSavedAt"
                         HasCustomerSelected="@(_selectedCustomer != null)"
                         CanDuplicateProject="@(_parts.Count > 0)"
-                        OnDuplicate="DuplicateProject"
+                        OnDuplicate="DuplicateProjectAsync"
                         OnSelectPart="SelectPartFromPanel"
                         OnAddPart="OpenFilePicker"
                         OnRemovePart="RemovePart"
@@ -42,7 +42,8 @@
                            Elevation="6"
                            ClipMode="DrawerClipMode.Never"
                            Class="pn-parts-drawer"
-                           Style="--mud-drawer-width: min(420px, 100vw); --mud-drawer-width-left: min(420px, 100vw);">
+                           Width="min(270px, 100vw)"
+                           Style="--mud-drawer-width: min(270px, 100vw); --mud-drawer-width-left: min(270px, 100vw);">
                     <PartsListPanel
                         Parts="@_parts"
                         SelectedIndex="@_selectedPartIndex"
@@ -53,7 +54,7 @@
                         LastSavedAt="@_lastSavedAt"
                         HasCustomerSelected="@(_selectedCustomer != null)"
                         CanDuplicateProject="@(_parts.Count > 0)"
-                        OnDuplicate="DuplicateProject"
+                        OnDuplicate="DuplicateProjectAsync"
                         OnSelectPart="SelectPartFromDrawer"
                         OnAddPart="OpenFilePicker"
                         OnRemovePart="RemovePart"
@@ -119,6 +120,12 @@
                         LeadTimeOptions="@_leadTimeOptions"
                         SelectedLeadTime="@_selectedLeadTime"
                         OnLeadTimeChanged="@(async lt => { _selectedLeadTime = lt; TriggerAutoSave(); foreach (var p in _parts) { TriggerPricingAsync(p); await TriggerRoutingFetchAsync(p); } })"
+                        ShippingCost="@_shippingCost"
+                        ShippingCostChanged="@(value => { _shippingCost = Math.Max(0m, value); TriggerAutoSave(); })"
+                        ManualDiscountAmount="@_manualDiscountAmount"
+                        ManualDiscountAmountChanged="@(value => { _manualDiscountAmount = Math.Max(0m, value); TriggerAutoSave(); })"
+                        QuotationTerms="@_quotationTerms"
+                        QuotationTermsChanged="@(value => { _quotationTerms = value; TriggerAutoSave(); })"
                         CanQuote="@CanSubmit"
                         Saving="@_saving"
                         OnQuote="CreateProjectAndQuoteAsync"
@@ -133,11 +140,12 @@
     </ErrorBoundary>
 </div>
 
-<MudFileUpload T="IReadOnlyList<IBrowserFile>"
-               @ref="_fileUpload"
-               FilesChanged="HandleFileSelected"
-               Accept="@FileTypes.ThreeDAcceptString"
-               MaximumFileCount="20"
-               Hidden="true"
-               Style="display:none;" />
+<div id="@ProjectUploadContainerId" style="display:none;">
+    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                   @ref="_fileUpload"
+                   FilesChanged="HandleFileSelected"
+                   Accept="@FileTypes.ThreeDAcceptString"
+                   MaximumFileCount="20"
+                   Hidden="true" />
+</div>
 

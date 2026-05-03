@@ -65,14 +65,11 @@ public class Phase3DashboardTests : BunitContext, IAsyncLifetime
     public void Dashboard_ShouldShowLoadingOrContent_OnInitialRender()
     {
         var cut = Render<Home>();
-        // While loading, either skeletons or the content is visible
         var markup = cut.Markup;
         Assert.True(
-            markup.Contains("mud-skeleton", StringComparison.OrdinalIgnoreCase) ||
-            markup.Contains("mud-card", StringComparison.OrdinalIgnoreCase) ||
-            markup.Contains("widget-card", StringComparison.OrdinalIgnoreCase) ||
-            markup.Contains("mud-paper", StringComparison.OrdinalIgnoreCase),
-            "Expected loading skeletons or dashboard content");
+            markup.Contains("mlv-module-shell", StringComparison.OrdinalIgnoreCase) ||
+            markup.Contains("Loading operations", StringComparison.OrdinalIgnoreCase),
+            "Expected loading or dashboard module content");
     }
 
     [Fact]
@@ -80,12 +77,11 @@ public class Phase3DashboardTests : BunitContext, IAsyncLifetime
     {
         var cut = Render<Home>();
         var markup = cut.Markup;
-        // Home renders widgets, action items, or loading skeletons
         Assert.True(
-            markup.Contains("widget-card", StringComparison.OrdinalIgnoreCase) ||
-            markup.Contains("mud-card", StringComparison.OrdinalIgnoreCase) ||
-            markup.Contains("action", StringComparison.OrdinalIgnoreCase) ||
-            markup.Contains("mud-skeleton", StringComparison.OrdinalIgnoreCase),
-            "Expected widget, action items, or loading skeleton content");
+            markup.Contains("Dashboard", StringComparison.OrdinalIgnoreCase) ||
+            markup.Contains("New Quote", StringComparison.OrdinalIgnoreCase) ||
+            markup.Contains("Action queue", StringComparison.OrdinalIgnoreCase) ||
+            markup.Contains("Loading operations", StringComparison.OrdinalIgnoreCase),
+            "Expected operational dashboard content");
     }
 }

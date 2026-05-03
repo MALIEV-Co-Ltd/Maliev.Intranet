@@ -62,36 +62,52 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                 "RAW preview paths from GeometryService - FrontSmall: {Front}, ThumbnailSmall: {Iso}, TopSmall: {Top}, BottomSmall: {Bottom}, LeftSmall: {Left}, RightSmall: {Right}, BackSmall: {Back}",
                 previews.FrontSmall, previews.ThumbnailSmall, previews.TopSmall, previews.BottomSmall, previews.LeftSmall, previews.RightSmall, previews.BackSmall);
 
-            async Task<(string? Url, bool Failed)> ResolveUrlAsync(string? path)
+            async Task<ResolvedPreviewUrl> ResolveUrlAsync(string assetName, string? path)
             {
                 if (string.IsNullOrEmpty(path))
-                    return (null, false);
+                    return new ResolvedPreviewUrl(assetName, null, null, false);
+
                 var url = await CreateUploadClient().GetDownloadUrlByPathAsync(path, context.CancellationToken, expirationMinutes: 10080);
                 if (string.IsNullOrEmpty(url))
                 {
                     _logger.LogWarning(
-                        "PreviewImagesGeneratedConsumer: signed URL resolution failed for path={Path}",
-                        path);
-                    return (null, true);
+                        "PreviewImagesGeneratedConsumer: signed URL resolution failed for {AssetName} path={Path}",
+                        assetName, path);
+                    return new ResolvedPreviewUrl(assetName, path, null, true);
                 }
-                return (url, false);
+
+                _logger.LogDebug(
+                    "PreviewImagesGeneratedConsumer: signed URL resolved for {AssetName} path={Path}",
+                    assetName, path);
+                return new ResolvedPreviewUrl(assetName, path, url, false);
             }
 
-            var frontResult = await ResolveUrlAsync(previews.FrontSmall);
-            var thumbnailSmallResult = await ResolveUrlAsync(previews.ThumbnailSmall);
-            var thumbnailLargeResult = await ResolveUrlAsync(previews.ThumbnailLarge);
-            var backResult = await ResolveUrlAsync(previews.BackSmall);
-            var leftResult = await ResolveUrlAsync(previews.LeftSmall);
-            var rightResult = await ResolveUrlAsync(previews.RightSmall);
-            var topResult = await ResolveUrlAsync(previews.TopSmall);
-            var bottomResult = await ResolveUrlAsync(previews.BottomSmall);
+            var resolvedUrls = await Task.WhenAll(
+                ResolveUrlAsync(nameof(previews.FrontSmall), previews.FrontSmall),
+                ResolveUrlAsync(nameof(previews.ThumbnailSmall), previews.ThumbnailSmall),
+                ResolveUrlAsync(nameof(previews.ThumbnailLarge), previews.ThumbnailLarge),
+                ResolveUrlAsync(nameof(previews.BackSmall), previews.BackSmall),
+                ResolveUrlAsync(nameof(previews.LeftSmall), previews.LeftSmall),
+                ResolveUrlAsync(nameof(previews.RightSmall), previews.RightSmall),
+                ResolveUrlAsync(nameof(previews.TopSmall), previews.TopSmall),
+                ResolveUrlAsync(nameof(previews.BottomSmall), previews.BottomSmall));
+
+            var resultsByAsset = resolvedUrls.ToDictionary(result => result.AssetName, StringComparer.Ordinal);
+            var frontResult = resultsByAsset[nameof(previews.FrontSmall)];
+            var thumbnailSmallResult = resultsByAsset[nameof(previews.ThumbnailSmall)];
+            var thumbnailLargeResult = resultsByAsset[nameof(previews.ThumbnailLarge)];
+            var backResult = resultsByAsset[nameof(previews.BackSmall)];
+            var leftResult = resultsByAsset[nameof(previews.LeftSmall)];
+            var rightResult = resultsByAsset[nameof(previews.RightSmall)];
+            var topResult = resultsByAsset[nameof(previews.TopSmall)];
+            var bottomResult = resultsByAsset[nameof(previews.BottomSmall)];
 
             bool anyUrlFailed = frontResult.Failed || thumbnailSmallResult.Failed || thumbnailLargeResult.Failed
                 || backResult.Failed || leftResult.Failed || rightResult.Failed || topResult.Failed || bottomResult.Failed;
 
             _logger.LogInformation(
-                "ResolveUrl results for storagePath={StoragePath} - FrontSmall: {FrontUrl}, ThumbnailSmall: {IsoUrl}, ThumbnailLarge: {Iso1000Url}, anyFailed={AnyFailed}",
-                payload.StoragePath, frontResult.Url, thumbnailSmallResult.Url, thumbnailLargeResult.Url, anyUrlFailed);
+                "Resolved preview URLs for storagePath={StoragePath}: resolvedCount={ResolvedCount}, anyFailed={AnyFailed}",
+                payload.StoragePath, resolvedUrls.Count(result => !string.IsNullOrEmpty(result.Url)), anyUrlFailed);
 
             var previewUrlsDto = new FileAnalysisPreviewUrlsDto
             {
@@ -165,4 +181,6 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             throw;
         }
     }
+
+    private sealed record ResolvedPreviewUrl(string AssetName, string? StoragePath, string? Url, bool Failed);
 }

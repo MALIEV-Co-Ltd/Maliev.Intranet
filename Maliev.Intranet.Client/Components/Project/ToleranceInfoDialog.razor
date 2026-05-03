@@ -1,0 +1,101 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Shared.Dtos
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <div class="tid-table-wrap">
+            <table class="tid-table">
+                <thead>
+                    <tr>
+                        <th>Class</th>
+                        <th>Standard</th>
+                        <th>Grade</th>
+                        <th>Range</th>
+                        <th>Cost Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var tolerance in Tolerances)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@tolerance.Name</strong>
+                                <span>@tolerance.Code</span>
+                            </td>
+                            <td>@tolerance.IsoStandard</td>
+                            <td>@tolerance.Grade</td>
+                            <td class="tid-range">@GetRange(tolerance)</td>
+                            <td>@FormatCostImpact(tolerance.AdditionalCostPercent)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .tid-table-wrap {
+        overflow-x: auto;
+    }
+
+    .tid-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+
+    .tid-table th,
+    .tid-table td {
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--maliev-border);
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .tid-table th {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0;
+        text-transform: uppercase;
+        color: var(--maliev-muted);
+        background: var(--maliev-panel-3);
+    }
+
+    .tid-table strong,
+    .tid-table span {
+        display: block;
+    }
+
+    .tid-table span {
+        margin-top: 2px;
+        color: var(--maliev-muted);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10.5px;
+    }
+
+    .tid-range {
+        color: var(--mud-palette-primary);
+        font-family: 'JetBrains Mono', monospace;
+        white-space: nowrap;
+    }
+</style>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Tolerances to display in the information table.</summary>
+    [Parameter] public IReadOnlyList<CatalogToleranceDto> Tolerances { get; set; } = [];
+
+    /// <summary>Formats the range value for a tolerance row.</summary>
+    [Parameter] public Func<CatalogToleranceDto, string> GetRange { get; set; } = tolerance => tolerance.ToleranceRange ?? tolerance.Grade;
+
+    private static string FormatCostImpact(decimal percent) =>
+        percent == 0 ? "Included" : $"+{percent:0.##}%";
+
+    private void Close() => MudDialog.Close();
+}

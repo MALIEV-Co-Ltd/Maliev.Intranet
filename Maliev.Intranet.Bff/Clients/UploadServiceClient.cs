@@ -1,8 +1,8 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -37,21 +37,7 @@ public class UploadServiceClient
     public async Task<BffUploadResponse?> UploadFileAsync(string fileName, Stream content, string contentType, string path, bool overwrite = true, CancellationToken ct = default)
     {
         var totalSize = GetStreamLength(content);
-        var initiateRequest = new InitiateResumableUploadRequest(
-            Path: path,
-            FileName: fileName,
-            ServiceName: "Intranet",
-            ContentType: contentType,
-            TotalSize: totalSize,
-            Overwrite: overwrite);
-
-        var initiateResponse = await _httpClient.PostAsJsonAsync("/upload/v1/uploads/resumable", initiateRequest, ct);
-        if (!initiateResponse.IsSuccessStatusCode)
-        {
-            return null;
-        }
-
-        var session = await initiateResponse.Content.ReadFromJsonAsync<InitiateResumableUploadResponse>(cancellationToken: ct);
+        var session = await InitiateResumableUploadAsync(fileName, contentType, totalSize, path, overwrite, ct);
         if (session == null || string.IsNullOrWhiteSpace(session.SessionUri))
         {
             return null;
@@ -74,8 +60,58 @@ public class UploadServiceClient
             return null;
         }
 
+        return await CompleteResumableUploadAsync(session.UploadId, ct);
+    }
+
+    /// <summary>
+    /// Initiates a resumable upload session through UploadService.
+    /// </summary>
+    public async Task<BffResumableUploadSessionResponse?> InitiateResumableUploadAsync(
+        string fileName,
+        string contentType,
+        long fileSize,
+        string path,
+        bool overwrite = true,
+        CancellationToken ct = default)
+    {
+        var initiateRequest = new InitiateResumableUploadRequest(
+            Path: path,
+            FileName: fileName,
+            ServiceName: "Intranet",
+            ContentType: contentType,
+            TotalSize: fileSize,
+            Overwrite: overwrite);
+
+        var initiateResponse = await _httpClient.PostAsJsonAsync("/upload/v1/uploads/resumable", initiateRequest, ct);
+        if (!initiateResponse.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var session = await initiateResponse.Content.ReadFromJsonAsync<InitiateResumableUploadResponse>(cancellationToken: ct);
+        if (session == null || string.IsNullOrWhiteSpace(session.SessionUri))
+        {
+            return null;
+        }
+
+        return new BffResumableUploadSessionResponse
+        {
+            UploadId = session.UploadId,
+            SessionUri = session.SessionUri,
+            StoragePath = path,
+            FileName = fileName,
+            FileSize = fileSize,
+            ExpiresAt = session.ExpiresAt
+        };
+    }
+
+    /// <summary>
+    /// Completes a resumable upload after the browser has sent bytes to GCS.
+    /// </summary>
+    public async Task<BffUploadResponse?> CompleteResumableUploadAsync(string uploadId, CancellationToken ct = default)
+    {
         var completeResponse = await _httpClient.PostAsJsonAsync(
-            $"/upload/v1/uploads/resumable/{session.UploadId}/complete",
+            $"/upload/v1/uploads/resumable/{uploadId}/complete",
             new { },
             ct);
 
@@ -85,6 +121,37 @@ public class UploadServiceClient
         }
 
         return await completeResponse.Content.ReadFromJsonAsync<BffUploadResponse>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Proxies a raw resumable upload body to UploadService for clients that cannot reach GCS directly.
+    /// </summary>
+    public async Task<HttpResponseMessage> ResumeResumableUploadAsync(
+        string uploadId,
+        Stream content,
+        string? contentType,
+        long? contentLength,
+        string contentRange,
+        CancellationToken ct = default)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Put, $"/upload/v1/uploads/resumable/{uploadId}");
+        var uploadContent = new StreamContent(content);
+
+        if (!string.IsNullOrWhiteSpace(contentType) &&
+            MediaTypeHeaderValue.TryParse(contentType, out var mediaType))
+        {
+            uploadContent.Headers.ContentType = mediaType;
+        }
+
+        if (contentLength.HasValue)
+        {
+            uploadContent.Headers.ContentLength = contentLength.Value;
+        }
+
+        uploadContent.Headers.ContentRange = ContentRangeHeaderValue.Parse(contentRange);
+        request.Content = uploadContent;
+
+        return await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
     }
 
     private static long GetStreamLength(Stream content)
@@ -231,6 +298,60 @@ public class UploadServiceClient
         var response = await _httpClient.PostAsync(url, null, ct);
         return response.IsSuccessStatusCode;
     }
+
+    /// <summary>
+    /// Copies a GCS object and creates independent UploadService metadata for the copied file.
+    /// </summary>
+    public async Task<CopyFileWithMetadataResponse?> CopyFileWithMetadataAsync(
+        string sourcePath,
+        string destinationPath,
+        string fileName,
+        string serviceName = "Intranet",
+        Dictionary<string, string>? metadata = null,
+        CancellationToken ct = default)
+    {
+        var request = new
+        {
+            sourcePath,
+            destinationPath,
+            fileName,
+            serviceName,
+            metadata
+        };
+
+        var response = await _httpClient.PostAsJsonAsync("/upload/v1/admin/copy-file-with-metadata", request, ct);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        return await response.Content.ReadFromJsonAsync<CopyFileWithMetadataResponse>(cancellationToken: ct);
+    }
+}
+
+/// <summary>
+/// Response from UploadService when a file has been copied with independent metadata.
+/// </summary>
+public class CopyFileWithMetadataResponse
+{
+    /// <summary>Gets or sets the copied file ID.</summary>
+    public string FileId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copied upload ID.</summary>
+    public string UploadId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copied storage path.</summary>
+    public string StoragePath { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copied file name.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copied file size in bytes.</summary>
+    public long SizeBytes { get; set; }
+
+    /// <summary>Gets or sets the copied content type.</summary>
+    public string ContentType { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the copy timestamp.</summary>
+    public DateTime UploadedAt { get; set; }
 }
 
 /// <summary>

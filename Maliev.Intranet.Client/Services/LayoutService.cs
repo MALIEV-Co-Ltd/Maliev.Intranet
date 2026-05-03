@@ -112,11 +112,11 @@ public class LayoutService : IDisposable
 
         try
         {
-            // CRITICAL: Read from data-theme attribute first (set by blocking script)
+            // CRITICAL: Read from data-maliev-theme attribute first (set by blocking script)
             // This ensures we sync with what the user sees on initial render
             var currentThemeAttr = await _jsRuntime.InvokeAsync<string>(
                 "eval",
-                "document.documentElement.getAttribute('data-theme') || 'light'"
+                "document.documentElement.getAttribute('data-maliev-theme') || 'light'"
             );
 
             // Read user preference from cookie/storage
@@ -141,7 +141,7 @@ public class LayoutService : IDisposable
             // Calculate what theme should be active based on preference
             CalculateEffectiveTheme();
 
-            // Trust the blocking script's decision (it ran first and set data-theme)
+            // Trust the blocking script's decision (it ran first and set data-maliev-theme)
             // This prevents any flash
             var expectedTheme = _isDarkMode ? "dark" : "light";
             if (currentThemeAttr != expectedTheme)
@@ -218,7 +218,7 @@ public class LayoutService : IDisposable
             // Update DOM immediately for responsiveness
             await _jsRuntime.InvokeVoidAsync(
                 "eval",
-                $"document.documentElement.setAttribute('data-theme', '{effectiveTheme}')"
+                $"document.documentElement.setAttribute('data-maliev-theme', '{effectiveTheme}')"
             );
 
             // Persist preference to cookie

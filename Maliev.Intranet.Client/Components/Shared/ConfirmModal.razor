@@ -1,0 +1,34 @@
+@if (Open)
+{
+    <div class="mlv-modal-backdrop" @onclick="CancelAsync">
+        <div class="mlv-modal @Class" @onclick:stopPropagation="true">
+            <div class="mlv-modal-header">
+                <h2>@Title</h2>
+                <button type="button" @onclick="CancelAsync" aria-label="Close">
+                    <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                </button>
+            </div>
+            <div class="mlv-modal-body">
+                @ChildContent
+            </div>
+            <div class="mlv-modal-actions">
+                <SecondaryButton OnClick="@CancelAsync">Cancel</SecondaryButton>
+                <PrimaryButton Class="@(Danger ? "danger" : null)" OnClick="@ConfirmAsync">@ConfirmLabel</PrimaryButton>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string ConfirmLabel { get; set; } = "Confirm";
+    [Parameter] public bool Danger { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+    private Task ConfirmAsync() => OnConfirm.InvokeAsync();
+}

@@ -1,0 +1,261 @@
+@page "/customers"
+@using Maliev.Intranet.Client.Services
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ISignalRCustomerService CustomerRealtime
+@implements IAsyncDisposable
+
+<PageTitle>Customers | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Customers" Subtitle="Customer accounts, company contacts, NDA status, and balances.">
+        <PrimaryButton Icon="@Icons.Material.Outlined.PersonAdd" Href="/customers/new">New Customer</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        <div class="mlv-toolbar">
+            <div class="mlv-toolbar-left">
+                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search customers..." OnEnter="SearchAsync" />
+                <div class="mlv-segmented">
+                    @foreach (var filter in _filters)
+                    {
+                        <button type="button" class="@(_filter == filter.Key ? "active" : "")" @onclick="@(() => SetFilterAsync(filter.Key))">@filter.Label</button>
+                    }
+                </div>
+            </div>
+            <div class="mlv-toolbar-right">
+                <SecondaryButton Icon="@Icons.Material.Outlined.Search" OnClick="@SearchClickedAsync">Search</SecondaryButton>
+                <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <PanelCard>
+            @if (_customers.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Company</th>
+                            <th>Status</th>
+                            <th>NDA</th>
+                            <th>Balance</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var customer in _customers)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/customers/{customer.Id}"))">
+                                <td>
+                                    <div class="mlv-row-title">
+                                        <Avatar Name="@customer.Name" />
+                                        <div>
+                                            <div class="mlv-row-main">@customer.Name</div>
+                                            <div class="mlv-row-sub">@customer.Email</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>@(customer.CompanyName ?? "Private")</td>
+                                <td><StatusBadge Status="@customer.Status" /></td>
+                                <td><StatusBadge Status="@(customer.NdaStatus ?? "None")" /></td>
+                                <td class="mlv-mono">@customer.OutstandingBalance.ToString("N2")</td>
+                                <td>@customer.CreatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">No customers match this view.</div>
+            }
+        </PanelCard>
+
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
+    </PageBody>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "filter")] public string? Filter { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public int? QueryPageSize { get; set; }
+
+    private sealed record CustomerFilter(string Key, string Label, string? Segment = null, string? Tier = null, bool IncludeDeleted = false);
+
+    private readonly CustomerFilter[] _filters =
+    [
+        new("all", "All"),
+        new("enterprise", "Enterprise", Segment: "Enterprise"),
+        new("vip", "VIP", Tier: "VIP"),
+        new("deleted", "Deleted", IncludeDeleted: true)
+    ];
+
+    private List<CustomerSummaryDto> _customers = [];
+    private PaginationMeta _meta = new();
+    private bool _loading = true;
+    private string _filter = "all";
+    private string? _search;
+    private string? _error;
+    private int _page = 1;
+    private int _pageSize = 20;
+    private bool _realtimeStarted;
+
+    private CustomerFilter ActiveFilter => _filters.FirstOrDefault(f => f.Key == _filter) ?? _filters[0];
+
+    protected override async Task OnInitializedAsync()
+    {
+        CustomerRealtime.OnCustomerChanged += OnCustomerChangedAsync;
+        try
+        {
+            await CustomerRealtime.StartAsync();
+            _realtimeStarted = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Realtime customer updates are unavailable.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _search = Search;
+        _filter = _filters.Any(f => f.Key == Filter) ? Filter! : "all";
+        _page = Math.Max(1, QueryPage ?? 1);
+        _pageSize = NormalizePageSize(QueryPageSize ?? 20);
+        await LoadAsync();
+    }
+
+    private Task OnCustomerChangedAsync() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    private Task OnSearchChanged(string? value)
+    {
+        _search = value;
+        return Task.CompletedTask;
+    }
+
+    private async Task SearchAsync()
+    {
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task SearchClickedAsync(MouseEventArgs _) => await SearchAsync();
+
+    private async Task SetFilterAsync(string filter)
+    {
+        _filter = filter;
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = NormalizePageSize(pageSize);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task NavigateAndLoadAsync()
+    {
+        Navigation.NavigateTo(BuildPageUri(), replace: true);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(BuildApiUrl());
+            _customers = response?.Data.ToList() ?? [];
+            _meta = response?.Meta ?? new();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
+        }
+        catch (Exception ex)
+        {
+            _error = "Customer data could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string BuildApiUrl()
+    {
+        var filter = ActiveFilter;
+        var query = new List<string>
+        {
+            $"page={_page}",
+            $"pageSize={_pageSize}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(_search)) query.Add($"query={Uri.EscapeDataString(_search)}");
+        if (!string.IsNullOrWhiteSpace(filter.Segment)) query.Add($"segment={Uri.EscapeDataString(filter.Segment)}");
+        if (!string.IsNullOrWhiteSpace(filter.Tier)) query.Add($"tier={Uri.EscapeDataString(filter.Tier)}");
+        if (filter.IncludeDeleted) query.Add("includeDeleted=true");
+
+        return $"api/v1/customers?{string.Join("&", query)}";
+    }
+
+    private string BuildPageUri()
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_search)) query.Add($"search={Uri.EscapeDataString(_search)}");
+        if (_filter != "all") query.Add($"filter={Uri.EscapeDataString(_filter)}");
+        if (_page > 1) query.Add($"page={_page}");
+        if (_pageSize != 20) query.Add($"pageSize={_pageSize}");
+        return query.Count == 0 ? "/customers" : $"/customers?{string.Join("&", query)}";
+    }
+
+    private static int NormalizePageSize(int pageSize) => pageSize switch
+    {
+        <= 10 => 10,
+        <= 20 => 20,
+        _ => 50
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        CustomerRealtime.OnCustomerChanged -= OnCustomerChangedAsync;
+        if (_realtimeStarted)
+        {
+            await CustomerRealtime.DisposeAsync();
+        }
+    }
+}

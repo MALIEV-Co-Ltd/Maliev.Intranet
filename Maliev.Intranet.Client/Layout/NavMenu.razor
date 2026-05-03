@@ -8,20 +8,18 @@
 <div class="nav-sidebar d-flex flex-column" style="height: 100%; overflow: hidden;">
     <!-- Logo -->
     <div class="d-flex align-center px-4 py-3" style="min-height: 56px; flex-shrink: 0;">
-        <MudImage Src="@LogoUrl" Alt="Maliev Logo" Height="22" />
+        <button type="button"
+                class="nav-logo-button"
+                title="Dashboard"
+                aria-label="Go to dashboard"
+                @onclick="@(() => Navigation.NavigateTo("/"))">
+            <MudImage Src="@LogoUrl" Alt="Maliev Logo" Height="22" />
+        </button>
     </div>
 
     <!-- Search -->
     <div class="px-3 pb-2" style="flex-shrink: 0;">
-        <MudTextField @bind-Value="_searchString"
-                      Placeholder="Search..."
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Adornment="Adornment.End"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      OnKeyDown="@OnSearchKeyDown"
-                      OnAdornmentClick="ExecuteSearch"
-                      FullWidth="true" />
+        <GlobalSearchBox Class="sidebar-global-search" Placeholder="Search..." Limit="6" />
     </div>
 
     <MudDivider />
@@ -33,68 +31,42 @@
 
             <!-- Sales & CRM -->
             <MudNavGroup Title="Sales & CRM" Icon="@Icons.Material.Outlined.Business" Expanded="false">
-                <MudNavLink Href="sales/customers" Icon="@Icons.Material.Outlined.People"
+                <MudNavLink Href="customers" Icon="@Icons.Material.Outlined.People"
                             Style="@NavStyle(MalievPermissions.Customer.Read)">Customers</MudNavLink>
-                <MudNavLink Href="sales/companies" Icon="@Icons.Material.Outlined.Business"
-                            Style="@NavStyle(MalievPermissions.Registry.CompaniesRead)">Companies</MudNavLink>
                 <MudNavLink Href="sales/projects" Icon="@Icons.Material.Outlined.FolderSpecial"
                             Style="@NavStyle(MalievPermissions.Project.Read)">Projects</MudNavLink>
-                <MudNavLink Href="sales/quotations" Icon="@Icons.Material.Outlined.Description"
-                            Style="@NavStyle(MalievPermissions.Quotation.Read)">Quotations</MudNavLink>
-                <MudNavLink Href="sales/orders" Icon="@Icons.Material.Outlined.ShoppingCart"
-                            Style="@NavStyle(MalievPermissions.Order.Read)">Orders</MudNavLink>
             </MudNavGroup>
 
             <!-- Manufacturing -->
             <MudNavGroup Title="Manufacturing" Icon="@Icons.Material.Outlined.PrecisionManufacturing" Expanded="false">
-                <MudNavLink Href="mfg/materials" Icon="@Icons.Material.Outlined.Inventory2"
-                            Style="@NavStyle(MalievPermissions.Material.Read)">Materials &amp; Inventory</MudNavLink>
                 <MudNavLink Href="mfg/equipment" Icon="@Icons.Material.Outlined.PrecisionManufacturing"
                             Style="@NavStyle(MalievPermissions.Facility.Read)">Equipment</MudNavLink>
-                <MudNavLink Href="mfg/production-queue" Icon="@Icons.Material.Outlined.Factory"
-                            Style="@NavStyle(MalievPermissions.Job.Read)">Production Queue</MudNavLink>
-                <MudNavLink Href="mfg/procurement" Icon="@Icons.Material.Outlined.ShoppingBag"
+                <MudNavLink Href="purchasing" Icon="@Icons.Material.Outlined.ShoppingBag"
                             Style="@NavStyle(MalievPermissions.PurchaseOrder.Read)">Procurement &amp; Suppliers</MudNavLink>
             </MudNavGroup>
 
             <!-- Finance -->
             <MudNavGroup Title="Finance" Icon="@Icons.Material.Outlined.AccountBalanceWallet" Expanded="false">
-                <MudNavLink Href="finance/invoices" Icon="@Icons.Material.Outlined.Receipt"
+                <MudNavLink Href="accounting" Icon="@Icons.Material.Outlined.Receipt"
                             Style="@NavStyle(MalievPermissions.Invoice.Read)">Invoices</MudNavLink>
-                <MudNavLink Href="finance/payments" Icon="@Icons.Material.Outlined.Payments"
-                            Style="@NavStyle(MalievPermissions.Payment.Read)">Payments &amp; Receipts</MudNavLink>
-                <MudNavLink Href="finance/delivery-notes" Icon="@Icons.Material.Outlined.LocalShipping"
-                            Style="@NavStyle(MalievPermissions.Delivery.Read)">Delivery Notes</MudNavLink>
-                <MudNavLink Href="finance/accounting" Icon="@Icons.Material.Outlined.AccountBalance"
+                <MudNavLink Href="accounting" Icon="@Icons.Material.Outlined.AccountBalance"
                             Style="@NavStyle(MalievPermissions.Accounting.Read)">Accounting</MudNavLink>
             </MudNavGroup>
 
             <!-- HR & People -->
             <MudNavGroup Title="HR & People" Icon="@Icons.Material.Outlined.Groups" Expanded="false">
-                <MudNavLink Href="hr/directory" Icon="@Icons.Material.Outlined.ContactPage"
-                            Style="@NavStyle(MalievPermissions.Employee.Read)">People Directory</MudNavLink>
-                <MudNavLink Href="hr/recruitment" Icon="@Icons.Material.Outlined.WorkOutline"
-                            Style="@NavStyle(MalievPermissions.Career.Read)">Recruitment</MudNavLink>
-                <MudNavLink Href="hr/leave" Icon="@Icons.Material.Outlined.EventBusy"
-                            Style="@NavStyle(MalievPermissions.Leave.Read)">Leave &amp; Onboarding</MudNavLink>
-                <MudNavLink Href="hr/training" Icon="@Icons.Material.Outlined.School"
-                            Style="@NavStyle(MalievPermissions.Performance.Read)">Training &amp; Performance</MudNavLink>
-                <MudNavLink Href="hr/compensation" Icon="@Icons.Material.Outlined.MonetizationOn"
-                            Style="@NavStyle(MalievPermissions.Compensation.Read)">Compensation</MudNavLink>
-                <MudNavLink Href="hr/compliance" Icon="@Icons.Material.Outlined.FactCheck"
-                            Style="@NavStyle(MalievPermissions.Compliance.Read)">Compliance &amp; Analytics</MudNavLink>
+                <MudNavLink Href="hr/profile" Icon="@Icons.Material.Outlined.AccountCircle"
+                            Style="@NavStyle(MalievPermissions.Employee.Read)">My Profile</MudNavLink>
             </MudNavGroup>
 
             <!-- Operations -->
             <MudNavGroup Title="Operations" Icon="@Icons.Material.Outlined.AdminPanelSettings" Expanded="false">
-                <MudNavLink Href="admin/iam" Icon="@Icons.Material.Outlined.Security"
+                <MudNavLink Href="iam" Icon="@Icons.Material.Outlined.Security"
                             Style="@NavStyle(MalievPermissions.Iam.Manage)">IAM Console</MudNavLink>
                 <MudNavLink Href="admin/system-health" Icon="@Icons.Material.Outlined.HealthAndSafety"
                             Style="@NavStyle(MalievPermissions.System.HealthRead)">System Health</MudNavLink>
-                <MudNavLink Href="admin/audit" Icon="@Icons.Material.Outlined.History"
-                            Style="@NavStyle(MalievPermissions.Iam.Read)">Audit Log</MudNavLink>
-                <MudNavLink Href="admin/settings" Icon="@Icons.Material.Outlined.Settings"
-                            Style="@NavStyle(MalievPermissions.Iam.Manage)">Settings</MudNavLink>
+                <MudNavLink Href="admin" Icon="@Icons.Material.Outlined.Settings"
+                            Style="@NavStyle(MalievPermissions.Iam.Manage)">Admin</MudNavLink>
             </MudNavGroup>
         </MudNavMenu>
     </div>
@@ -153,8 +125,10 @@
                         </div>
                     </ActivatorContent>
                     <ChildContent>
-                        <MudMenuItem Href="/hr/profile">My Profile</MudMenuItem>
-                        <MudMenuItem OnClick="@HandleLogout">Logout</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.AccountCircle" Href="/hr/profile">My Profile</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Tune" Href="/hr/profile?tab=preferences">Preferences</MudMenuItem>
+                        <MudDivider />
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Logout" OnClick="@HandleLogout">Sign out</MudMenuItem>
                     </ChildContent>
                 </MudMenu>
             </Authorized>
@@ -187,8 +161,6 @@
     [Parameter] public string ThemeIconClass { get; set; } = "";
 
     private System.Security.Claims.ClaimsPrincipal _user = new();
-    private string _searchString = "";
-
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateTask;
@@ -205,19 +177,6 @@
         ThemeMode.Light => "Light Theme",
         _ => "Auto Theme"
     };
-
-    private void ExecuteSearch()
-    {
-        if (!string.IsNullOrWhiteSpace(_searchString))
-        {
-            Navigation.NavigateTo($"/sales/customers?search={Uri.EscapeDataString(_searchString)}");
-        }
-    }
-
-    private void OnSearchKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") ExecuteSearch();
-    }
 
     private async Task ToggleChat()
     {

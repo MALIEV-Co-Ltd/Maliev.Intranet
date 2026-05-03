@@ -1,10 +1,12 @@
+using System.Net;
+using System.Reflection;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
-using System.Net;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
@@ -117,5 +119,25 @@ public class NotificationControllerTests
 
         var result = await _controller.UpdatePreferences("u1", new UpdateNotificationPreferenceRequest(), CancellationToken.None);
         Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Theory]
+    [InlineData(nameof(NotificationController.GetTemplates), MalievPermissions.Notification.ReadTemplate)]
+    [InlineData(nameof(NotificationController.CreateTemplate), MalievPermissions.Notification.CreateTemplate)]
+    [InlineData(nameof(NotificationController.UpdateTemplate), MalievPermissions.Notification.UpdateTemplate)]
+    [InlineData(nameof(NotificationController.DeleteTemplate), MalievPermissions.Notification.DeleteTemplate)]
+    [InlineData(nameof(NotificationController.GetDeliveryLogs), MalievPermissions.Notification.ReadLogs)]
+    [InlineData(nameof(NotificationController.GetPreferences), MalievPermissions.Preference.Read)]
+    [InlineData(nameof(NotificationController.UpdatePreferences), MalievPermissions.Preference.Write)]
+    public void NotificationEndpoints_RequireActualNotificationServicePermissions(string actionName, string expectedPermission)
+    {
+        var method = typeof(NotificationController)
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public)
+            .Single(method => method.Name == actionName);
+
+        var attribute = Assert.Single(method.GetCustomAttributes<RequirePermissionAttribute>());
+
+        Assert.Contains(expectedPermission, attribute.Policy, StringComparison.Ordinal);
+        Assert.Equal("Bearer,Cookies", attribute.AuthenticationSchemes);
     }
 }

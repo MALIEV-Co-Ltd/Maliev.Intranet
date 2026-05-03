@@ -1,0 +1,109 @@
+@page "/admin/system-health"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>System Health | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="System Health" Subtitle="Liveness checks for MALIEV HTTP services." BackHref="/admin">
+        @if (_health is not null)
+        {
+            <StatusBadge Status="@_health.OverallStatus" />
+        }
+    </PageHeader>
+
+    <PageBody>
+        <div class="mlv-toolbar">
+            <div class="mlv-row-sub">Last checked @(_health?.CheckedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss") ?? "-")</div>
+            <PrimaryButton Icon="@Icons.Material.Outlined.Refresh" Disabled="@_loading" OnClick="@ReloadAsync">Refresh</PrimaryButton>
+        </div>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+        else if (_health is null)
+        {
+            <div class="mlv-empty">System health data is not available.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Services" Value="@_health.Services.Count.ToString("N0")" />
+                <StatTile Label="Healthy" Value="@_health.Services.Count(s => s.Status == "Healthy").ToString("N0")" Trend="true" />
+                <StatTile Label="Issues" Value="@_health.Services.Count(s => s.Status != "Healthy").ToString("N0")" Trend="@(!_health.Services.Any(s => s.Status != "Healthy"))" />
+                <StatTile Label="Critical issues" Value="@_health.Services.Count(s => s.IsCritical && s.Status != "Healthy").ToString("N0")" />
+            </StatBar>
+
+            @foreach (var group in _health.Services.GroupBy(s => s.DomainGroup).OrderBy(g => g.Key))
+            {
+                <PanelCard Title="@group.Key" Class="mb-4">
+                    <table class="mlv-table">
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Status</th>
+                                <th>Critical</th>
+                                <th>Health path</th>
+                                <th>Response</th>
+                                <th>Last checked</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var service in group.OrderBy(s => s.ServiceName))
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="mlv-row-main">@service.ServiceName</div>
+                                        <div class="mlv-row-sub">@service.RoutePrefix</div>
+                                        @if (!string.IsNullOrWhiteSpace(service.ErrorMessage))
+                                        {
+                                            <div class="mlv-row-sub">@service.ErrorMessage</div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(service.ErrorBody))
+                                        {
+                                            <pre class="mlv-error mt-2">@service.ErrorBody</pre>
+                                        }
+                                    </td>
+                                    <td><StatusBadge Status="@service.Status" /></td>
+                                    <td>@(service.IsCritical ? "Critical" : "Standard")</td>
+                                    <td class="mlv-mono">@service.HealthPath</td>
+                                    <td class="mlv-mono">@service.ResponseTimeMs.ToString("N0") ms</td>
+                                    <td>@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </PanelCard>
+            }
+        }
+    </PageBody>
+</div>
+
+@code {
+    private SystemHealthDto? _health;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _health = await Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("System health could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

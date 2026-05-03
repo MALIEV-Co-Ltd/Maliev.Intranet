@@ -18,6 +18,28 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     };
 
     /// <summary>
+    /// Checks whether the ChatbotService is reachable without creating a chat session.
+    /// </summary>
+    public virtual async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            using var response = await httpClient.GetAsync("/chatbot/aspire-liveness", ct);
+            return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("ChatbotService health check timed out.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ChatbotService health check failed unexpectedly.");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Initiates a new chatbot session.
     /// </summary>
     public virtual async Task<ChatbotSessionResponse?> InitiateSessionAsync(string channel, string language, CancellationToken ct = default)

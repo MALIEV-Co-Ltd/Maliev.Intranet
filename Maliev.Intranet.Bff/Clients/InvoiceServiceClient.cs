@@ -22,7 +22,8 @@ public class InvoiceServiceClient(HttpClient httpClient)
     {
         var url = $"/invoice/v1/invoices?page={page}&pageSize={pageSize}";
         if (customerId.HasValue) url += $"&customerId={customerId.Value}";
-        return await httpClient.GetFromJsonAsync<PagedResponse<InvoiceSummaryDto>>(url, ct);
+        var response = await httpClient.GetFromJsonAsync<InvoiceServicePaginatedResponse<InvoiceServiceInvoiceResponse>>(url, ct);
+        return response?.ToPagedResponse(invoice => invoice.ToSummary()) ?? new PagedResponse<InvoiceSummaryDto>();
     }
 
     /// <summary>
@@ -32,7 +33,8 @@ public class InvoiceServiceClient(HttpClient httpClient)
     {
         try
         {
-            return await httpClient.GetFromJsonAsync<InvoiceDetailDto>($"/invoice/v1/invoices/{id}", ct);
+            var invoice = await httpClient.GetFromJsonAsync<InvoiceServiceInvoiceResponse>($"/invoice/v1/invoices/{id}", ct);
+            return invoice?.ToDetail();
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -45,12 +47,49 @@ public class InvoiceServiceClient(HttpClient httpClient)
     /// </summary>
     public async Task<InvoiceSummaryDto?> CreateInvoiceAsync(CreateInvoiceRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/invoice/v1/invoices", request, ct);
+        var response = await httpClient.PostAsJsonAsync("/invoice/v1/invoices", new
+        {
+            customerId = request.CustomerId,
+            billingIdentityType = request.BillingIdentityType,
+            customerName = request.CustomerName,
+            customerTaxId = request.CustomerTaxId,
+            billingAddress = request.BillingAddress,
+            shippingAddress = request.ShippingAddress,
+            poNumber = request.PoNumber,
+            currency = request.Currency,
+            issueDate = request.IssueDate,
+            dueDate = request.DueDate,
+            paymentTermsDays = request.PaymentTermsDays,
+            lines = request.Items.Select((item, index) => new
+            {
+                lineNumber = index + 1,
+                description = item.Description,
+                quantity = item.Quantity,
+                unitPrice = item.UnitPrice,
+                taxCategory = item.TaxRate > 0 ? "VAT" : "Exempt",
+                taxRate = item.TaxRate
+            }).ToList()
+        }, ct);
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<InvoiceSummaryDto>(cancellationToken: ct);
+            var invoice = await response.Content.ReadFromJsonAsync<InvoiceServiceInvoiceResponse>(cancellationToken: ct);
+            return invoice?.ToSummary();
         }
         return null;
+    }
+
+    /// <summary>
+    /// Registers an invoice file reference after upload.
+    /// </summary>
+    public async Task<InvoiceFileReferenceDto?> RegisterFileAsync(Guid invoiceId, RegisterInvoiceFileRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/invoice/v1/invoices/{invoiceId}/files", request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<InvoiceFileReferenceDto>(cancellationToken: ct);
     }
 
     /// <summary>
@@ -154,8 +193,130 @@ public class InvoiceServiceClient(HttpClient httpClient)
         var response = await httpClient.GetAsync(
             $"/invoice/v1/invoices?poNumber={Uri.EscapeDataString(poNumber)}&pageSize=1", ct);
         if (!response.IsSuccessStatusCode) return null;
-        var paged = await response.Content.ReadFromJsonAsync<PagedResponse<InvoiceSummaryDto>>(cancellationToken: ct);
-        return paged?.Data.FirstOrDefault();
+        var paged = await response.Content.ReadFromJsonAsync<InvoiceServicePaginatedResponse<InvoiceServiceInvoiceResponse>>(cancellationToken: ct);
+        return paged?.Items.FirstOrDefault()?.ToSummary();
+    }
+
+    private sealed class InvoiceServicePaginatedResponse<T>
+    {
+        public List<T> Items { get; set; } = [];
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalCount { get; set; }
+        public int TotalPages { get; set; }
+
+        public PagedResponse<TResult> ToPagedResponse<TResult>(Func<T, TResult> selector)
+        {
+            var pageSize = PageSize > 0 ? PageSize : Items.Count;
+            var totalPages = TotalPages > 0
+                ? TotalPages
+                : pageSize > 0 ? (int)Math.Ceiling(TotalCount / (double)pageSize) : 0;
+
+            return new PagedResponse<TResult>
+            {
+                Data = Items.Select(selector).ToList(),
+                Meta = new PaginationMeta
+                {
+                    CurrentPage = Page,
+                    PageSize = pageSize,
+                    TotalCount = TotalCount,
+                    TotalItems = TotalCount,
+                    TotalPages = totalPages
+                }
+            };
+        }
+    }
+
+    private sealed class InvoiceServiceInvoiceResponse
+    {
+        public Guid Id { get; set; }
+        public string? InvoiceNumber { get; set; }
+        public Guid? ParentInvoiceId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public Guid CustomerId { get; set; }
+        public string CustomerTaxId { get; set; } = string.Empty;
+        public string BillingAddress { get; set; } = string.Empty;
+        public string? ShippingAddress { get; set; }
+        public string? QuotationReference { get; set; }
+        public string? PoNumber { get; set; }
+        public string Currency { get; set; } = string.Empty;
+        public decimal? ExchangeRate { get; set; }
+        public decimal Subtotal { get; set; }
+        public decimal TaxAmount { get; set; }
+        public decimal WithholdingTaxAmount { get; set; }
+        public decimal GrandTotal { get; set; }
+        public DateTime IssueDate { get; set; }
+        public DateTime DueDate { get; set; }
+        public int PaymentTermsDays { get; set; }
+        public DateTime? FinalizedAt { get; set; }
+        public string? FinalizedBy { get; set; }
+        public DateTime? CancelledAt { get; set; }
+        public string? CancelledBy { get; set; }
+        public string? CancellationReason { get; set; }
+        public string? PdfFileReference { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public List<InvoiceServiceLineResponse> Lines { get; set; } = [];
+
+        public InvoiceSummaryDto ToSummary() => new()
+        {
+            Id = Id,
+            InvoiceNumber = InvoiceNumber ?? string.Empty,
+            CustomerName = CustomerName,
+            Total = GrandTotal,
+            Balance = GrandTotal,
+            IssueDate = IssueDate,
+            DueDate = DueDate,
+            Status = Status,
+            CreatedAt = CreatedAt
+        };
+
+        public InvoiceDetailDto ToDetail() => new()
+        {
+            Id = Id,
+            InvoiceNumber = InvoiceNumber,
+            ParentInvoiceId = ParentInvoiceId,
+            CustomerId = CustomerId,
+            CustomerName = CustomerName,
+            CustomerTaxId = CustomerTaxId,
+            BillingAddress = BillingAddress,
+            ShippingAddress = ShippingAddress,
+            QuotationReference = QuotationReference,
+            PoNumber = PoNumber,
+            Status = Status,
+            Currency = Currency,
+            ExchangeRate = ExchangeRate,
+            SubTotal = Subtotal,
+            TaxAmount = TaxAmount,
+            WithholdingTaxAmount = WithholdingTaxAmount,
+            Total = GrandTotal,
+            IssueDate = IssueDate,
+            DueDate = DueDate,
+            PaymentTermsDays = PaymentTermsDays,
+            FinalizedAt = FinalizedAt,
+            FinalizedBy = FinalizedBy,
+            CancelledAt = CancelledAt,
+            CancelledBy = CancelledBy,
+            CancellationReason = CancellationReason,
+            PdfFileReference = PdfFileReference,
+            Items = Lines.Select(line => new InvoiceItemDto
+            {
+                Description = line.Description,
+                Quantity = line.Quantity,
+                UnitPrice = line.UnitPrice,
+                TaxRate = line.TaxRate
+            }).ToList(),
+            CreatedAt = CreatedAt,
+            UpdatedAt = UpdatedAt
+        };
+    }
+
+    private sealed class InvoiceServiceLineResponse
+    {
+        public string Description { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal TaxRate { get; set; }
     }
 }
-

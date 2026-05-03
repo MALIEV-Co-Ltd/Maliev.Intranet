@@ -1,0 +1,67 @@
+.mlv-page-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--maliev-border);
+    background: var(--maliev-panel);
+    flex-shrink: 0;
+}
+
+.mlv-back-button {
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--maliev-radius-xs);
+    background: var(--maliev-panel-3);
+    color: var(--maliev-ink-2);
+    font-size: var(--maliev-font-small);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.mlv-page-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--maliev-border);
+}
+
+.mlv-page-copy {
+    flex: 1;
+    min-width: 0;
+}
+
+.mlv-page-copy h1 {
+    margin: 0;
+    color: var(--maliev-ink);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.mlv-page-copy p {
+    margin: 2px 0 0;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.mlv-page-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+@media (max-width: 720px) {
+    .mlv-page-header {
+        flex-wrap: wrap;
+        padding: 12px;
+    }
+
+    .mlv-page-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+}

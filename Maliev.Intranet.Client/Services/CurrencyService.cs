@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Microsoft.AspNetCore.Components;
 
 namespace Maliev.Intranet.Client.Services;
 
@@ -11,8 +12,12 @@ namespace Maliev.Intranet.Client.Services;
 /// </summary>
 public sealed class CurrencyService : IDisposable
 {
+    private const string CurrencyStateKey = "CurrencyService.InitialState";
+
     private readonly HttpClient _http;
     private readonly ILogger<CurrencyService> _logger;
+    private readonly PersistentComponentState? _componentState;
+    private PersistingComponentStateSubscription? _persistingSubscription;
     private bool _initialized;
 
     /// <summary>All available currencies loaded from the API.</summary>
@@ -37,10 +42,11 @@ public sealed class CurrencyService : IDisposable
     public event EventHandler? Changed;
 
     /// <summary>Initializes a new instance of <see cref="CurrencyService"/>.</summary>
-    public CurrencyService(HttpClient http, ILogger<CurrencyService> logger)
+    public CurrencyService(HttpClient http, ILogger<CurrencyService> logger, PersistentComponentState? componentState = null)
     {
         _http = http;
         _logger = logger;
+        _componentState = componentState;
     }
 
     /// <summary>
@@ -50,6 +56,22 @@ public sealed class CurrencyService : IDisposable
     {
         if (_initialized) return;
         _initialized = true;
+        _persistingSubscription ??= _componentState?.RegisterOnPersisting(PersistStateAsync);
+
+        if (_componentState?.TryTakeFromJson<CurrencyState>(CurrencyStateKey, out var state) == true &&
+            state?.Currencies is { Count: > 0 })
+        {
+            Currencies = state.Currencies;
+            SelectedCurrency = state.SelectedCurrencyCode == null
+                ? Currencies.FirstOrDefault(c => c.IsPrimary) ?? Currencies.FirstOrDefault(c => c.Code == "THB") ?? Currencies.First()
+                : Currencies.FirstOrDefault(c => c.Code == state.SelectedCurrencyCode)
+                    ?? Currencies.FirstOrDefault(c => c.IsPrimary)
+                    ?? Currencies.FirstOrDefault(c => c.Code == "THB")
+                    ?? Currencies.First();
+            ExchangeRate = state.ExchangeRate <= 0 ? 1m : state.ExchangeRate;
+            Changed?.Invoke(this, EventArgs.Empty);
+            return;
+        }
 
         try
         {
@@ -127,5 +149,22 @@ public sealed class CurrencyService : IDisposable
     }
 
     /// <inheritdoc/>
-    public void Dispose() { }
+    public void Dispose() => _persistingSubscription?.Dispose();
+
+    private Task PersistStateAsync()
+    {
+        if (_componentState != null && Currencies.Count > 0)
+        {
+            _componentState.PersistAsJson(
+                CurrencyStateKey,
+                new CurrencyState(Currencies, SelectedCurrency?.Code, ExchangeRate));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private sealed record CurrencyState(
+        List<CurrencyDto> Currencies,
+        string? SelectedCurrencyCode,
+        decimal ExchangeRate);
 }

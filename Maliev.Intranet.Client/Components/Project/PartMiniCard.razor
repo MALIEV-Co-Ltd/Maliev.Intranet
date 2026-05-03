@@ -4,7 +4,13 @@
      @onclick="@OnClick">
     @* Thumbnail *@
     <div class="pmc-thumb">
-        @if (Part.Uploading)
+        @if (Part.QueuedUpload)
+        {
+            <MudProgressCircular Size="Size.Small"
+                                 Indeterminate="true"
+                                 Color="Color.Secondary" />
+        }
+        else if (Part.Uploading)
         {
             <MudProgressCircular Size="Size.Small"
                                  Indeterminate="false"

@@ -14,6 +14,83 @@ public static class MalievPermissions
         public const string Manage = "iam.principals.manage";
         /// <summary>Permission to read IAM information.</summary>
         public const string Read = "iam.principals.read";
+
+        /// <summary>
+        /// Permissions for IAM principals.
+        /// </summary>
+        public static class Principals
+        {
+            /// <summary>Permission to create a principal.</summary>
+            public const string Create = "iam.principals.create";
+            /// <summary>Permission to read a principal.</summary>
+            public const string Read = "iam.principals.read";
+            /// <summary>Permission to update a principal.</summary>
+            public const string Update = "iam.principals.update";
+            /// <summary>Permission to delete a principal.</summary>
+            public const string Delete = "iam.principals.delete";
+            /// <summary>Permission to list principals.</summary>
+            public const string List = "iam.principals.list";
+        }
+
+        /// <summary>
+        /// Permissions for IAM roles.
+        /// </summary>
+        public static class Roles
+        {
+            /// <summary>Permission to create a role.</summary>
+            public const string Create = "iam.roles.create";
+            /// <summary>Permission to read a role.</summary>
+            public const string Read = "iam.roles.read";
+            /// <summary>Permission to update a role.</summary>
+            public const string Update = "iam.roles.update";
+            /// <summary>Permission to delete a role.</summary>
+            public const string Delete = "iam.roles.delete";
+            /// <summary>Permission to list roles.</summary>
+            public const string List = "iam.roles.list";
+        }
+
+        /// <summary>
+        /// Permissions for IAM permission catalog entries.
+        /// </summary>
+        public static class Permissions
+        {
+            /// <summary>Permission to create a permission.</summary>
+            public const string Create = "iam.permissions.create";
+            /// <summary>Permission to read a permission.</summary>
+            public const string Read = "iam.permissions.read";
+            /// <summary>Permission to update a permission.</summary>
+            public const string Update = "iam.permissions.update";
+            /// <summary>Permission to delete a permission.</summary>
+            public const string Delete = "iam.permissions.delete";
+            /// <summary>Permission to list permissions.</summary>
+            public const string List = "iam.permissions.list";
+        }
+
+        /// <summary>
+        /// Permissions for IAM role bindings.
+        /// </summary>
+        public static class Bindings
+        {
+            /// <summary>Permission to create a role binding.</summary>
+            public const string Create = "iam.bindings.create";
+            /// <summary>Permission to read a role binding.</summary>
+            public const string Read = "iam.bindings.read";
+            /// <summary>Permission to delete a role binding.</summary>
+            public const string Delete = "iam.bindings.delete";
+            /// <summary>Permission to list role bindings.</summary>
+            public const string List = "iam.bindings.list";
+        }
+
+        /// <summary>
+        /// Permissions for IAM audit records.
+        /// </summary>
+        public static class Audit
+        {
+            /// <summary>Permission to read audit records.</summary>
+            public const string Read = "iam.audit.read";
+            /// <summary>Permission to list audit records.</summary>
+            public const string List = "iam.audit.list";
+        }
     }
 
     /// <summary>
@@ -25,6 +102,26 @@ public static class MalievPermissions
         public const string Manage = "iam.principals.manage";
         /// <summary>Permission to read IAM information.</summary>
         public const string Read = "iam.principals.read";
+        /// <summary>Permission to create IAM principals.</summary>
+        public const string PrincipalsCreate = IAM.Principals.Create;
+        /// <summary>Permission to read IAM principals.</summary>
+        public const string PrincipalsRead = IAM.Principals.Read;
+        /// <summary>Permission to update IAM principals.</summary>
+        public const string PrincipalsUpdate = IAM.Principals.Update;
+        /// <summary>Permission to delete IAM principals.</summary>
+        public const string PrincipalsDelete = IAM.Principals.Delete;
+        /// <summary>Permission to list IAM principals.</summary>
+        public const string PrincipalsList = IAM.Principals.List;
+        /// <summary>Permission to list IAM roles.</summary>
+        public const string RolesList = IAM.Roles.List;
+        /// <summary>Permission to list IAM permissions.</summary>
+        public const string PermissionsList = IAM.Permissions.List;
+        /// <summary>Permission to create IAM role bindings.</summary>
+        public const string BindingsCreate = IAM.Bindings.Create;
+        /// <summary>Permission to list IAM role bindings.</summary>
+        public const string BindingsList = IAM.Bindings.List;
+        /// <summary>Permission to delete IAM role bindings.</summary>
+        public const string BindingsDelete = IAM.Bindings.Delete;
     }
 
     /// <summary>
@@ -92,6 +189,17 @@ public static class MalievPermissions
     }
 
     /// <summary>
+    /// Permissions for currency catalog and exchange-rate lookups.
+    /// </summary>
+    public static class Currency
+    {
+        /// <summary>Permission to view currency metadata.</summary>
+        public const string CurrenciesRead = "currency.currencies.read";
+        /// <summary>Permission to view exchange rates.</summary>
+        public const string RatesRead = "currency.rates.read";
+    }
+
+    /// <summary>
     /// Permissions for managing external supplier relationships.
     /// </summary>
     public static class Supplier
@@ -136,9 +244,17 @@ public static class MalievPermissions
         /// <summary>Permission to view sales and purchase invoices.</summary>
         public const string Read = "invoice.invoices.read";
         /// <summary>Permission to update existing invoice records.</summary>
-        public const string Write = "invoice.invoices.write";
-        /// <summary>Permission to generate new invoices (mapped to Write).</summary>
-        public const string Create = "invoice.invoices.write"; // Map to Write
+        public const string Write = "invoice.invoices.update";
+        /// <summary>Permission to generate new invoices.</summary>
+        public const string Create = "invoice.invoices.create";
+        /// <summary>Permission to finalize draft invoices.</summary>
+        public const string Finalize = "invoice.invoices.finalize";
+        /// <summary>Permission to void or cancel invoices.</summary>
+        public const string Void = "invoice.invoices.void";
+        /// <summary>Permission to split invoices.</summary>
+        public const string Split = "invoice.splits.create";
+        /// <summary>Permission to upload files to invoices.</summary>
+        public const string FileUpload = "invoice.files.upload";
     }
 
     /// <summary>
@@ -216,6 +332,15 @@ public static class MalievPermissions
         public const string DiagnosticsRead = "system.diagnostics.read";
     }
 
+    /// <summary>
+    /// Permissions for global search.
+    /// </summary>
+    public static class Search
+    {
+        /// <summary>Permission to query the global search index.</summary>
+        public const string Read = "search.documents.read";
+    }
+
     // New Domains
 
     /// <summary>
@@ -225,8 +350,16 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view chart of accounts and balances.</summary>
         public const string Read = "accounting.accounts.read";
-        /// <summary>Permission to manage accounts and financial configurations.</summary>
-        public const string Write = "accounting.accounts.write";
+        /// <summary>Permission to update accounts and financial configurations.</summary>
+        public const string Write = "accounting.accounts.update";
+        /// <summary>Permission to open accounting periods.</summary>
+        public const string PeriodsOpen = "accounting.periods.open";
+        /// <summary>Permission to close accounting periods.</summary>
+        public const string PeriodsClose = "accounting.periods.close";
+        /// <summary>Permission to reopen accounting periods.</summary>
+        public const string PeriodsReopen = "accounting.periods.reopen";
+        /// <summary>Permission to run reconciliation.</summary>
+        public const string ReconciliationRun = "accounting.reconciliation.run";
 
         /// <summary>
         /// Permissions for journal entry management.
@@ -234,9 +367,13 @@ public static class MalievPermissions
         public static class Journal
         {
             /// <summary>Permission to view accounting journal entries.</summary>
-            public const string Read = "accounting.journals.read";
-            /// <summary>Permission to post or adjust journal entries.</summary>
-            public const string Write = "accounting.journals.write";
+            public const string Read = "accounting.journal-entries.read";
+            /// <summary>Permission to create journal entries.</summary>
+            public const string Create = "accounting.journal-entries.create";
+            /// <summary>Permission to update journal entries.</summary>
+            public const string Write = "accounting.journal-entries.update";
+            /// <summary>Permission to post journal entries.</summary>
+            public const string Post = "accounting.journal-entries.post";
         }
     }
 
@@ -269,8 +406,20 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view purchase order details.</summary>
         public const string Read = "purchase-order.orders.read";
-        /// <summary>Permission to create and manage purchase orders with suppliers.</summary>
-        public const string Write = "purchase-order.orders.write";
+        /// <summary>Permission to update purchase orders.</summary>
+        public const string Write = "purchase-order.orders.update";
+        /// <summary>Permission to create purchase orders.</summary>
+        public const string Create = "purchase-order.orders.create";
+        /// <summary>Permission to approve purchase orders.</summary>
+        public const string Approve = "purchase-order.orders.approve";
+        /// <summary>Permission to send purchase orders to suppliers.</summary>
+        public const string Send = "purchase-order.orders.send";
+        /// <summary>Permission to receive purchase order items.</summary>
+        public const string Receive = "purchase-order.orders.receive";
+        /// <summary>Permission to cancel purchase orders.</summary>
+        public const string Cancel = "purchase-order.orders.cancel";
+        /// <summary>Permission to upload files to purchase orders.</summary>
+        public const string FileUpload = "purchase-order.files.upload";
     }
 
     /// <summary>
@@ -323,9 +472,9 @@ public static class MalievPermissions
     public static class Preference
     {
         /// <summary>Permission to read system or user settings.</summary>
-        public const string Read = "preference.preferences.read";
+        public const string Read = "notification.preferences.read";
         /// <summary>Permission to update configuration and preference values.</summary>
-        public const string Write = "preference.preferences.write";
+        public const string Write = "notification.preferences.update";
     }
 
     /// <summary>
@@ -335,8 +484,16 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view email and message templates.</summary>
         public const string ReadTemplate = "notification.templates.read";
-        /// <summary>Permission to define or update notification templates.</summary>
-        public const string WriteTemplate = "notification.templates.write";
+        /// <summary>Permission to create notification templates.</summary>
+        public const string CreateTemplate = "notification.templates.create";
+        /// <summary>Permission to update notification templates.</summary>
+        public const string UpdateTemplate = "notification.templates.update";
+        /// <summary>Permission to delete notification templates.</summary>
+        public const string DeleteTemplate = "notification.templates.delete";
+        /// <summary>Permission to manage notification templates.</summary>
+        public const string WriteTemplate = "notification.templates.manage";
+        /// <summary>Permission to view notification delivery logs.</summary>
+        public const string ReadLogs = "notification.logs.read";
     }
 
     /// <summary>

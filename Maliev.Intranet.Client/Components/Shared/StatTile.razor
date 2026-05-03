@@ -1,0 +1,30 @@
+<div class="mlv-stat-tile @Class">
+    <div class="mlv-stat-label">@Label</div>
+    <div class="mlv-stat-value" style="@ValueStyle">@Value</div>
+    @if (!string.IsNullOrWhiteSpace(Subtext))
+    {
+        <div class="mlv-stat-sub @TrendClass">
+            @if (Trend == true)
+            {
+                <MudIcon Icon="@Icons.Material.Outlined.TrendingUp" Size="Size.Small" />
+            }
+            else if (Trend == false)
+            {
+                <MudIcon Icon="@Icons.Material.Outlined.TrendingDown" Size="Size.Small" />
+            }
+            <span>@Subtext</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? Subtext { get; set; }
+    [Parameter] public bool? Trend { get; set; }
+    [Parameter] public string? Color { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private string? ValueStyle => string.IsNullOrWhiteSpace(Color) ? null : $"color:{Color}";
+    private string TrendClass => Trend == true ? "up" : Trend == false ? "down" : string.Empty;
+}

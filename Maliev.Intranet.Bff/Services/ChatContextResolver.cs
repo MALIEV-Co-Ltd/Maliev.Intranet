@@ -33,7 +33,7 @@ public class ChatContextResolver(
     ILogger<ChatContextResolver> logger) : IChatContextResolver
 {
     private static readonly Regex CustomerDetailPattern = new(
-        @"/sales/customers/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+        @"(?:/sales)?/customers/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <inheritdoc />

@@ -1,0 +1,22 @@
+<span class="mlv-status-badge @StatusClass @Class">@DisplayText</span>
+
+@code {
+    [Parameter] public string? Status { get; set; }
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private string Normalized => (Status ?? Text ?? "active").Trim().ToLowerInvariant().Replace(" ", "-");
+    private string StatusClass => $"status-{Normalized}";
+    private string DisplayText => Text ?? ToDisplay(Status);
+
+    private static string ToDisplay(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Active";
+        }
+
+        return string.Join(" ", value.Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
+    }
+}

@@ -8,33 +8,10 @@
 <div class="qsb-root">
     @* ── Zone 0: Customer ─────────────────────────────────────────────────── *@
     <div class="qsb-zone-customer">
-        <div class="qsb-zone-label">Customer</div>
-        @if (SelectedCustomer != null)
-        {
-            <CustomerCardCompact Customer="@SelectedCustomer"
-                                 OnClear="@(() => OnCustomerSelected.InvokeAsync(null))" />
-        }
-        else
-        {
-            <MudAutocomplete T="CustomerSummaryDto"
-                             Value="@SelectedCustomer"
-                             ValueChanged="@OnCustomerSelected"
-                             ToStringFunc="@(c => c?.Name ?? "")"
-                             SearchFunc="@SearchCustomers"
-                             Variant="Variant.Outlined"
-                             Margin="Margin.Dense"
-                             Dense="true"
-                             Clearable="false"
-                             ShowProgressIndicator="true"
-                             DebounceInterval="300"
-                             CoerceText="true"
-                             Placeholder="Search customer…"
-                             Class="qsb-customer-search">
-                <ItemTemplate Context="item">
-                    <CustomerCardCompact Customer="@item" ShowClear="false" />
-                </ItemTemplate>
-            </MudAutocomplete>
-        }
+        <div class="qsb-zone-label">Bill To</div>
+        <CustomerPicker SelectedCustomer="@SelectedCustomer"
+                        SearchCustomers="@SearchCustomers"
+                        OnCustomerSelected="@OnCustomerSelected" />
     </div>
 
     <div class="qsb-divider" />
@@ -69,7 +46,7 @@
                         <span class="qsb-lead-mult">@(lt.PriceMultiplier < 1 ? $"-{Math.Round((1 - lt.PriceMultiplier) * 100)}%" : lt.PriceMultiplier > 1 ? $"+{Math.Round((lt.PriceMultiplier - 1) * 100)}%" : "base")</span>
                     </div>
                     <div class="qsb-lead-days">
-                        @lt.MinDays <span class="qsb-bd-full">business days</span><span class="qsb-bd-short">days</span>
+                        @FormatLeadTimeDays(lt) <span class="qsb-bd-full">business days</span><span class="qsb-bd-short">days</span>
                     </div>
                 </button>
             }
@@ -101,7 +78,7 @@
             }
             else
             {
-                var total = ComputeSubtotal();
+                var total = ComputeQuoteTotal();
                 <div class="qsb-total-amount">
                     @if (total == 0 && Parts.Count == 0)
                     {
@@ -119,6 +96,14 @@
             }
         </div>
         <div class="qsb-actions">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Outlined.EditNote"
+                       OnClick="ToggleDetails"
+                       Class="@($"qsb-btn-details {(_detailsOpen ? "qsb-btn-details--active" : "")}")">
+                Details
+            </MudButton>
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Default"
                        Size="Size.Small"
@@ -142,10 +127,57 @@
                 {
                     <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
                 }
-                Generate Quote
+                Quote
                 <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
             </MudButton>
         </div>
+        @if (_detailsOpen)
+        {
+            <button type="button"
+                    class="qsb-details-click-away"
+                    aria-label="Close quote details"
+                    @onclick="CloseDetails"></button>
+            <div class="qsb-details-popover">
+                <div class="qsb-details-header">
+                    <div class="qsb-zone-label qsb-details-title">
+                        <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
+                        Quote Details
+                    </div>
+                    <button type="button" class="qsb-details-close" title="Close quote details" @onclick="ToggleDetails">
+                        <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
+                    </button>
+                </div>
+                <div class="qsb-details-grid">
+                    <MudNumericField T="decimal"
+                                     Label="Shipping"
+                                     Value="@ShippingCost"
+                                     ValueChanged="OnShippingCostChanged"
+                                     Min="0m"
+                                     Immediate="true"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     HideSpinButtons="true" />
+                    <MudNumericField T="decimal"
+                                     Label="Discount"
+                                     Value="@ManualDiscountAmount"
+                                     ValueChanged="OnManualDiscountAmountChanged"
+                                     Min="0m"
+                                     Immediate="true"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     HideSpinButtons="true" />
+                </div>
+                <MudTextField T="string"
+                              Label="Terms"
+                              Value="@QuotationTerms"
+                              ValueChanged="OnQuotationTermsChanged"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="4"
+                              FullWidth="true"
+                              Class="qsb-terms-field" />
+            </div>
+        }
     </div>
 </div>
 
@@ -156,7 +188,7 @@
         background: var(--maliev-panel);
         border-top: 1px solid var(--maliev-border);
         flex-shrink: 0;
-        overflow: hidden;
+        overflow: visible;
     }
 
     .qsb-divider {
@@ -180,6 +212,8 @@
 
     /* ── Zone 0: Customer ─────────────────────────────────────────────────── */
     .qsb-zone-customer {
+        position: relative;
+        z-index: 5;
         flex: 1 1 220px;
         max-width: 270px;
         padding: 10px 16px;
@@ -188,7 +222,6 @@
         justify-content: center;
         flex-shrink: 0;
     }
-    .qsb-customer-search { width: 100%; }
 
     /* ── Zone 1: Lead Time ────────────────────────────────────────────────── */
     .qsb-zone-lead {
@@ -302,6 +335,7 @@
         justify-content: space-between;
         flex-shrink: 0;
         gap: 4px;
+        position: relative;
     }
 
     .qsb-total-top {
@@ -340,6 +374,23 @@
         gap: 6px;
     }
 
+    .qsb-btn-details {
+        padding: 0 10px;
+        height: 32px;
+        border: 1px solid var(--maliev-border) !important;
+        border-radius: 5px !important;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--maliev-muted) !important;
+        flex: 0 0 auto;
+    }
+
+    .qsb-btn-details--active {
+        border-color: var(--mud-palette-primary) !important;
+        color: var(--mud-palette-primary) !important;
+        background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent) !important;
+    }
+
     .qsb-btn-pdf {
         padding: 0 12px;
         height: 32px;
@@ -358,7 +409,81 @@
         font-weight: 600;
     }
 
-    @@media (max-width: 1200px) {
+    .qsb-details-click-away {
+        position: fixed;
+        inset: 0;
+        z-index: 19;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        cursor: default;
+    }
+
+    .qsb-details-popover {
+        position: absolute;
+        right: 16px;
+        bottom: calc(100% + 8px);
+        z-index: 20;
+        width: min(420px, calc(100vw - 32px));
+        padding: 10px 12px 12px;
+        background: var(--maliev-panel);
+        border: 1px solid var(--maliev-border);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .qsb-details-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .qsb-details-title {
+        margin-bottom: 0;
+    }
+
+    .qsb-details-close {
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--maliev-muted);
+        cursor: pointer;
+    }
+
+    .qsb-details-close:hover {
+        background: var(--maliev-panel-3);
+        color: var(--maliev-ink);
+    }
+
+    .qsb-details-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .qsb-details-popover ::deep .mud-input-control {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .qsb-details-popover ::deep .mud-input-slot {
+        font-size: 12px;
+    }
+
+    .qsb-details-popover ::deep textarea {
+        min-height: 74px !important;
+        line-height: 1.3;
+        resize: vertical;
+    }
+
+    @@media (max-width: 1400px) {
         .qsb-root {
             height: auto;
             flex-wrap: wrap;
@@ -367,18 +492,36 @@
         }
         .qsb-zone-customer {
             max-width: none;
-            flex: 1 1 260px;
+            flex: 0 1 280px;
             padding: 10px 16px;
         }
         .qsb-zone-lead {
-            width: 100%;
-            border-top: 1px solid var(--maliev-border);
+            flex: 1 1 420px;
+            min-width: 420px;
             padding: 10px 16px;
         }
         .qsb-zone-total {
-            width: 100%;
-            border-top: 1px solid var(--maliev-border);
+            width: 330px;
             padding: 8px 16px 10px;
+        }
+    }
+
+    @@media (max-width: 900px) {
+        .qsb-zone-customer {
+            flex: 1 1 260px;
+        }
+        .qsb-zone-lead {
+            order: 3;
+            flex: 1 0 100%;
+            min-width: 0;
+            border-top: 1px solid var(--maliev-border);
+        }
+        .qsb-zone-total {
+            flex: 1 1 320px;
+            width: auto;
+        }
+        .qsb-details-popover {
+            right: 16px;
         }
     }
 
@@ -429,6 +572,19 @@
         .qsb-actions {
             flex-direction: column;
         }
+        .qsb-details-popover {
+            position: static;
+            width: 100%;
+            margin-top: 8px;
+            box-shadow: none;
+        }
+        .qsb-details-grid {
+            grid-template-columns: 1fr;
+        }
+        .qsb-details-popover ::deep textarea {
+            min-height: 90px !important;
+        }
+        .qsb-btn-details,
         .qsb-btn-pdf,
         .qsb-btn-checkout {
             width: 100%;
@@ -445,12 +601,19 @@
     [Parameter] public List<LeadTimeOptionDto> LeadTimeOptions { get; set; } = [];
     [Parameter] public LeadTimeOptionDto? SelectedLeadTime { get; set; }
     [Parameter] public EventCallback<LeadTimeOptionDto> OnLeadTimeChanged { get; set; }
+    [Parameter] public decimal ShippingCost { get; set; }
+    [Parameter] public EventCallback<decimal> ShippingCostChanged { get; set; }
+    [Parameter] public decimal ManualDiscountAmount { get; set; }
+    [Parameter] public EventCallback<decimal> ManualDiscountAmountChanged { get; set; }
+    [Parameter] public string? QuotationTerms { get; set; }
+    [Parameter] public EventCallback<string?> QuotationTermsChanged { get; set; }
     [Parameter] public bool CanQuote { get; set; }
     [Parameter] public bool Saving { get; set; }
     [Parameter] public EventCallback OnQuote { get; set; }
     [Parameter] public EventCallback OnGeneratePdf { get; set; }
 
     private bool _generatingPdf;
+    private bool _detailsOpen;
     private bool IsLeadTimeLoading => LeadTimeOptions.Count == 0 && Parts.Any(p => p.PricingLoading);
     private string LeadTimeEmptyText => Parts.Count == 0
         ? "Configure a part to calculate lead time."
@@ -477,17 +640,41 @@
 
     private void OnCurrencyChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
 
-    private decimal ComputeSubtotal() =>
-        Parts.Sum(p => (p.EstimatedTotalAmount ?? 0) * CurrencyService.ExchangeRate);
+    private void ToggleDetails() => _detailsOpen = !_detailsOpen;
+
+    private void CloseDetails() => _detailsOpen = false;
+
+    private async Task OnShippingCostChanged(decimal value) =>
+        await ShippingCostChanged.InvokeAsync(Math.Max(0m, value));
+
+    private async Task OnManualDiscountAmountChanged(decimal value) =>
+        await ManualDiscountAmountChanged.InvokeAsync(Math.Max(0m, value));
+
+    private async Task OnQuotationTermsChanged(string? value) =>
+        await QuotationTermsChanged.InvokeAsync(value);
+
+    private decimal ComputeQuoteTotal()
+    {
+        var lineSubtotal = Parts.Sum(p => (p.EstimatedTotalAmount ?? 0) * CurrencyService.ExchangeRate);
+        var discount = Math.Min(Math.Max(0m, ManualDiscountAmount), lineSubtotal);
+        var taxableSubtotal = lineSubtotal - discount + Math.Max(0m, ShippingCost);
+        var vat = Math.Round(taxableSubtotal * 0.07m, 2, MidpointRounding.AwayFromZero);
+        return taxableSubtotal + vat;
+    }
 
     private string ComputeShipDate()
     {
         if (SelectedLeadTime == null || SelectedLeadTime.MinDays <= 0)
             return "—";
-        var days = SelectedLeadTime.MinDays;
+        var days = Math.Max(SelectedLeadTime.MinDays, SelectedLeadTime.MaxDays);
         var shipDate = AddBusinessDays(DateTime.UtcNow.Date, days);
         return shipDate.ToString("MMM d");
     }
+
+    private static string FormatLeadTimeDays(LeadTimeOptionDto leadTime) =>
+        leadTime.MaxDays > leadTime.MinDays
+            ? $"{leadTime.MinDays} - {leadTime.MaxDays}"
+            : leadTime.MinDays.ToString();
 
     private static DateTime AddBusinessDays(DateTime date, int businessDays)
     {

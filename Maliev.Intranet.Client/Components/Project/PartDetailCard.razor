@@ -121,6 +121,9 @@
                         <ModelViewer @ref="_modelViewer"
                                      ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
                                      KnownDimensions="@Part.Dimensions"
+                                     TurningAxis="@BuildTurningAxis()"
+                                     ViewerSettings="@Part.ViewerSettings"
+                                     ViewerSettingsChanged="HandleViewerSettingsChangedAsync"
                                      OnLoadFailed="HandleViewerLoadFailed"
                                      OnBodyPicked="HandleBodyPickedAsync" />
                     }
@@ -161,16 +164,30 @@
                 }
 
                 @* Upload / processing progress overlay *@
-                @if (Part.Uploading || Part.AwaitingPreview)
+                @if (Part.QueuedUpload || Part.Uploading || Part.AwaitingPreview)
                 {
                     <div class="pdc-upload-progress">
-                        <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mb-2" />
+                        @if (Part.QueuedUpload)
+                        {
+                            <PartQueueLoader Class="part-queue-loader--canvas" />
+                        }
+                        else if (Part.Uploading)
+                        {
+                            <MudProgressCircular Indeterminate="false"
+                                                 Value="@Part.ProgressPercent"
+                                                 Size="Size.Medium"
+                                                 Class="mb-2" />
+                        }
+                        else
+                        {
+                            <PartProcessingLoader Class="part-processing-loader--canvas" />
+                        }
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@Part.StatusText</MudText>
                     </div>
                 }
 
                 @* Fallback grey background — no preview *@
-                @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.AwaitingPreview && !Part.Uploading)
+                @if (string.IsNullOrEmpty(Part.ThumbnailSmallUrl) && string.IsNullOrEmpty(Part.ThumbnailLargeUrl) && !Part.QueuedUpload && !Part.AwaitingPreview && !Part.Uploading)
                 {
                     <MudIcon Icon="@FileTypes.GetIcon(Path.GetExtension(Part.Name))" Size="Size.Large" Color="Color.Default" />
                 }
@@ -317,6 +334,7 @@
 
     private string GetStatusClass() => Part switch
     {
+        { QueuedUpload: true } => "muted",
         { Uploading: true } => "muted",
         { AwaitingPreview: true } => "warn",
         { Error: not null } => "error",
@@ -329,6 +347,7 @@
 
     private string GetStatusLabel() => Part switch
     {
+        { QueuedUpload: true } => "QUEUED",
         { Uploading: true } => "UPLOADING",
         { AwaitingPreview: true } => "PROCESSING",
         { Error: not null } => "ERROR",
@@ -341,6 +360,7 @@
 
     private string GetUploadedLabel()
     {
+        if (Part.QueuedUpload) return "Queued...";
         if (Part.Uploading) return "Uploading…";
         if (Part.AwaitingPreview) return "Processing…";
         if (Part.UploadedAt.HasValue)
@@ -538,6 +558,12 @@
         OnPartChanged.InvokeAsync(Part);
     }
 
+    private Task HandleViewerSettingsChangedAsync(PartViewerSettings settings)
+    {
+        Part.ViewerSettings = settings.Clone();
+        return OnPartChanged.InvokeAsync(Part);
+    }
+
     private Task HandleDfmAcknowledged()
     {
         NotifyChanged(p => p.DfmAcknowledged = true);
@@ -556,6 +582,67 @@
         Part.DfmAllClearNotified = true;
         return Task.CompletedTask;
     }
+
+    private ModelViewer.TurningAxisViewModel? BuildTurningAxis()
+    {
+        if (!IsCncTurningProcess(Part.ProcessCode))
+            return null;
+
+        if (Part.CncDfmReport is CncDfmReportPayload cnc)
+        {
+            if (IsNotTurnableReport(cnc))
+                return null;
+
+            if (cnc.AxisVector.Count >= 3
+                && cnc.AxisPoint.Count >= 3
+                && !string.IsNullOrWhiteSpace(cnc.PrimaryAxis))
+            {
+                return new ModelViewer.TurningAxisViewModel(cnc.PrimaryAxis, cnc.AxisVector.Take(3).ToArray(), cnc.AxisPoint.Take(3).ToArray());
+            }
+        }
+
+        if (Part.DfmReport is DfmReport dto
+            && string.Equals(dto.ReportType, "CNC_TURN", StringComparison.OrdinalIgnoreCase)
+            && !IsNotTurnableReport(dto)
+            && dto.AxisVector.Count >= 3
+            && dto.AxisPoint.Count >= 3
+            && !string.IsNullOrWhiteSpace(dto.PrimaryAxis))
+        {
+            return new ModelViewer.TurningAxisViewModel(dto.PrimaryAxis, dto.AxisVector.Take(3).ToArray(), dto.AxisPoint.Take(3).ToArray());
+        }
+
+        if (Part.CncDfmReport is DfmReport cachedDto
+            && !IsNotTurnableReport(cachedDto)
+            && cachedDto.AxisVector.Count >= 3
+            && cachedDto.AxisPoint.Count >= 3
+            && !string.IsNullOrWhiteSpace(cachedDto.PrimaryAxis))
+        {
+            return new ModelViewer.TurningAxisViewModel(cachedDto.PrimaryAxis, cachedDto.AxisVector.Take(3).ToArray(), cachedDto.AxisPoint.Take(3).ToArray());
+        }
+
+        return null;
+    }
+
+    private static bool IsCncTurningProcess(string? processCode) =>
+        string.Equals(processCode, "CNC_TURN", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(processCode, "CNC_TURNING", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsNotTurnableReport(CncDfmReportPayload report) =>
+        !report.IsTurnable && HasNotTurnableIssue(report.Issues);
+
+    private static bool IsNotTurnableReport(DfmReport report) =>
+        report.IsTurnable == false || HasNotTurnableIssue(report.Issues);
+
+    private static bool HasNotTurnableIssue(IEnumerable<CncDfmReportPayloadIssuesItem> issues) =>
+        issues.Any(issue => IsNotTurnableIssue(issue.Category, issue.Title));
+
+    private static bool HasNotTurnableIssue(IEnumerable<Maliev.Intranet.Shared.Dtos.DfmIssue> issues) =>
+        issues.Any(issue => IsNotTurnableIssue(issue.Category, issue.Title));
+
+    private static bool IsNotTurnableIssue(string? category, string? title) =>
+        string.Equals(category, "not_turnable", StringComparison.OrdinalIgnoreCase)
+        || (!string.IsNullOrWhiteSpace(title)
+            && title.Contains("Not Suitable for Turning", StringComparison.OrdinalIgnoreCase));
 
     private async Task HandleViewerLoadFailed(string errorMessage)
     {

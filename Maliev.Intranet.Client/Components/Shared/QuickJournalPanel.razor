@@ -1,0 +1,76 @@
+<PanelCard Title="@Title">
+    <FormGrid>
+        <FormField Label="Date"><input class="mlv-form-input" type="date" value="@GetDate("Date")" @onchange="@(e => SetDate("Date", e.Value?.ToString()))" /></FormField>
+        <FormField Label="Description"><input class="mlv-form-input" value="@GetString("Description")" @onchange="@(e => SetString("Description", e.Value?.ToString()))" /></FormField>
+        <FormField Label="Reference"><input class="mlv-form-input" value="@GetString("Reference")" @onchange="@(e => SetString("Reference", e.Value?.ToString()))" /></FormField>
+        <FormField Label="Debit account"><input class="mlv-form-input" value="@GetGuid("DebitAccountId")" @onchange="@(e => SetGuid("DebitAccountId", e.Value?.ToString()))" /></FormField>
+        <FormField Label="Credit account"><input class="mlv-form-input" value="@GetGuid("CreditAccountId")" @onchange="@(e => SetGuid("CreditAccountId", e.Value?.ToString()))" /></FormField>
+        <FormField Label="Amount"><input class="mlv-form-input" type="number" step="0.01" value="@GetDecimal("Amount")" @onchange="@(e => SetDecimal("Amount", e.Value?.ToString()))" /></FormField>
+    </FormGrid>
+    <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+        <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@SubmitAsync">@SubmitText</PrimaryButton>
+    </div>
+</PanelCard>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public object? Form { get; set; }
+    [Parameter] public string SubmitText { get; set; } = "Create journal";
+    [Parameter] public EventCallback OnSubmit { get; set; }
+
+    private Task SubmitAsync(MouseEventArgs _) => OnSubmit.InvokeAsync();
+
+    private string GetString(string propertyName) => GetPropertyValue(propertyName)?.ToString() ?? string.Empty;
+
+    private string GetGuid(string propertyName)
+    {
+        var value = GetPropertyValue(propertyName);
+        return value is Guid guid && guid != Guid.Empty ? guid.ToString() : string.Empty;
+    }
+
+    private string GetDate(string propertyName)
+    {
+        var value = GetPropertyValue(propertyName);
+        return value is DateTime date ? date.ToString("yyyy-MM-dd") : string.Empty;
+    }
+
+    private string GetDecimal(string propertyName)
+    {
+        var value = GetPropertyValue(propertyName);
+        return value is decimal number ? number.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
+    }
+
+    private object? GetPropertyValue(string propertyName) =>
+        Form?.GetType().GetProperty(propertyName)?.GetValue(Form);
+
+    private void SetString(string propertyName, string? value) => SetPropertyValue(propertyName, value ?? string.Empty);
+
+    private void SetGuid(string propertyName, string? value)
+    {
+        if (Guid.TryParse(value, out var guid))
+        {
+            SetPropertyValue(propertyName, guid);
+        }
+    }
+
+    private void SetDate(string propertyName, string? value)
+    {
+        if (DateTime.TryParse(value, out var date))
+        {
+            SetPropertyValue(propertyName, date);
+        }
+    }
+
+    private void SetDecimal(string propertyName, string? value)
+    {
+        if (decimal.TryParse(value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var amount))
+        {
+            SetPropertyValue(propertyName, amount);
+        }
+    }
+
+    private void SetPropertyValue(string propertyName, object value)
+    {
+        Form?.GetType().GetProperty(propertyName)?.SetValue(Form, value);
+    }
+}

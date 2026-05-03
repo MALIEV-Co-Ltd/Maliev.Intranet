@@ -49,13 +49,20 @@ public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
             "SmallThumbnailReadyConsumer: received event for file {FileId}, storagePath={StoragePath}",
             payload.FileId, payload.StoragePath);
 
-        var thumbnailUrl = await CreateUploadClient()
+        var uploadClient = CreateUploadClient();
+        var storagePath = await ResolveCurrentStoragePathAsync(
+            uploadClient,
+            payload.FileId,
+            payload.StoragePath,
+            context.CancellationToken);
+
+        var thumbnailUrl = await uploadClient
             .GetDownloadUrlByPathAsync(payload.ThumbnailStoragePath, context.CancellationToken);
 
         bool failed = string.IsNullOrEmpty(thumbnailUrl);
 
         var signalRPayload = new FileAnalysisCompletedPayload(
-            StoragePath: payload.StoragePath,
+            StoragePath: storagePath,
             UploadId: payload.FileId,
             ThumbnailUrl: failed ? null : thumbnailUrl,
             HiResThumbnailUrl: null,
@@ -64,13 +71,52 @@ public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
             Failed: failed,
             ErrorCode: failed ? "thumbnail-url-resolution-failed" : null);
 
-        await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
-            "FileAnalysisCompleted",
-            signalRPayload,
-            context.CancellationToken);
+        await SendToFileGroupsAsync(payload.StoragePath, storagePath, signalRPayload, context.CancellationToken);
 
         _logger.LogInformation(
             "SmallThumbnailReadyConsumer: pushed thumbnail URL via SignalR for {StoragePath}",
-            payload.StoragePath);
+            storagePath);
+    }
+
+    private async Task<string> ResolveCurrentStoragePathAsync(
+        UploadServiceClient uploadClient,
+        string fileId,
+        string eventStoragePath,
+        CancellationToken cancellationToken)
+    {
+        var currentPath = await uploadClient.GetStoragePathAsync(fileId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(currentPath) ||
+            string.Equals(currentPath, eventStoragePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return eventStoragePath;
+        }
+
+        _logger.LogInformation(
+            "SmallThumbnailReadyConsumer: file {FileId} moved while analysis was in flight; using current storage path {CurrentPath} instead of event path {EventPath}.",
+            fileId,
+            currentPath,
+            eventStoragePath);
+        return currentPath;
+    }
+
+    private async Task SendToFileGroupsAsync(
+        string eventStoragePath,
+        string currentStoragePath,
+        FileAnalysisCompletedPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            eventStoragePath,
+            currentStoragePath
+        };
+
+        foreach (var storagePath in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            await _hub.Clients.Group($"file:{storagePath}").SendAsync(
+                "FileAnalysisCompleted",
+                payload,
+                cancellationToken);
+        }
     }
 }

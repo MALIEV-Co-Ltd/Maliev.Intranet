@@ -167,6 +167,7 @@
     private static readonly IReadOnlyList<CheckDef> CncChecks =
     [
         new("internal_radius","Internal radii"),
+        new("cavity_depth",   "Deep cavities"),
         new("undercut",       "Undercuts"),
         new("drill_hole",     "Drill holes"),
         new("edm",            "EDM required"),
@@ -235,17 +236,28 @@
         ("hollow",          SlaDfmReportPayload sla) => sla.HollowRegions?.Count > 0,
         (_,                 CncDfmReportPayload cnc)
             when cnc.Issues.Any(i => string.Equals(i.Category, category, StringComparison.OrdinalIgnoreCase)) => true,
-        ("internal_radius", CncDfmReportPayload cnc) => cnc.SharpCornerCount > 0,
+        ("internal_radius", CncDfmReportPayload cnc) => cnc.SharpCornerCount > 0
+            || HasCncIssue(cnc, "sharp_corner")
+            || HasCncIssue(cnc, "internal_radius"),
+        ("cavity_depth",    CncDfmReportPayload cnc) => HasCncIssue(cnc, "cavity_depth"),
         ("undercut",        CncDfmReportPayload cnc) => cnc.HasUndercuts,
         ("drill_hole",      CncDfmReportPayload cnc) => cnc.HasDrillHoles && cnc.DrillHoleCount > 0,
         ("edm",             CncDfmReportPayload cnc) => cnc.RequiresEdm,
         ("grinding",        CncDfmReportPayload cnc) => cnc.RequiresGrinding,
+        ("internal_radius", DfmReport dto) => HasDfmDtoIssue(dto, "sharp_corner") || HasDfmDtoIssue(dto, "internal_radius"),
+        ("cavity_depth",    DfmReport dto) => HasDfmDtoIssue(dto, "cavity_depth"),
         // Fallback for DfmReport DTO (from HTTP on-demand analysis path).
         // When the report comes through the two-phase DFM endpoint, it's a DfmReport DTO
         // rather than a typed payload — match by issue category.
         (_, DfmReport dto) => dto.Issues.Any(i => string.Equals(i.Category, category, StringComparison.OrdinalIgnoreCase)),
         _ => false,
     };
+
+    private static bool HasCncIssue(CncDfmReportPayload report, string category) =>
+        report.Issues.Any(issue => string.Equals(issue.Category, category, StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasDfmDtoIssue(DfmReport report, string category) =>
+        report.Issues.Any(issue => string.Equals(issue.Category, category, StringComparison.OrdinalIgnoreCase));
 
     // ── Header counts ─────────────────────────────────────────────────
 
@@ -271,6 +283,7 @@
         "escape_hole"    => "No enclosed cavities",
         "hollow"         => "No hollow regions detected",
         "internal_radius"=> "All corners compatible with end mills",
+        "cavity_depth"   => "Cavities within depth / width limits",
         "undercut"       => "No undercut features",
         "drill_hole"     => "Hole geometry compatible with standard drills",
         "edm"            => "No EDM-required features",
@@ -303,6 +316,7 @@
             cnc.SharpCornerCount == 0
                 ? "All internal corners have adequate radius for standard end mill tooling."
                 : $"0 sharp corners detected — all corners are within tolerance.",
+        "cavity_depth"   => "All cavities are shallow enough for standard end mill reach and tool stiffness.",
         "undercut"       => "No undercut features detected. Part is accessible by standard 3-axis CNC tooling.",
         "drill_hole" when Part.DfmReport is CncDfmReportPayload cnc =>
             cnc.HasDrillHoles && cnc.DrillHoleCount > 0
@@ -354,9 +368,16 @@
             ["Add 2 mm drainage holes at the lowest print point", "Fill hollow regions if structural", "Re-orient so drainage is natural during printing"]),
         "internal_radius" => new CheckDetail(
             "CNC end mills are cylindrical, so they cannot cut perfectly sharp internal corners. The minimum internal radius equals at least half the tool diameter.",
-            "Sharp corners incompatible with end mills",
-            $"{(Part.DfmReport is CncDfmReportPayload c ? c.SharpCornerCount : 0)} sharp corner(s)", "Radius ≥ tool radius",
+            GetCncIssueTitle("sharp_corner", "internal_radius") ?? "Sharp corners incompatible with end mills",
+            GetCncIssueMeasuredLabel("sharp_corner", "internal_radius") ?? $"{(Part.DfmReport is CncDfmReportPayload c ? c.SharpCornerCount : 0)} sharp corner(s)", "Radius ≥ tool radius",
             ["Add fillet radius ≥ 1 mm to all internal corners", "Specify the acceptable corner radius in your drawing", "Use undercut relief (\"dogbone\") cutouts to accommodate tool geometry"]),
+        "cavity_depth" => BuildCncIssueDetail(
+            check.Category,
+            "Deep, narrow cavities require long tool stick-out and can cause chatter, poor finish, or inaccessible geometry in standard CNC milling.",
+            "Deep cavities exceed machining limits",
+            "Depth / width ratio exceeds limit",
+            "Depth / width <= 4.0:1",
+            ["Reduce cavity depth where possible", "Increase cavity width to allow a stiffer end mill", "Split the part or add access from another setup"]),
         "undercut" => new CheckDetail(
             "Undercut features — geometry hidden from a straight cutting path — require special tooling such as T-slot cutters, EDM, or multi-axis strategies.",
             "Undercut features need special tooling",
@@ -468,4 +489,19 @@
             issue is null ? defaultRecommendedLabel : $"{defaultRecommendedLabel}: {issue.Threshold:0.###}",
             fixes);
     }
+
+    private CncDfmReportPayloadIssuesItem? FindCncIssue(params string[] categories)
+    {
+        if (Part.DfmReport is not CncDfmReportPayload cnc)
+            return null;
+
+        return cnc.Issues.FirstOrDefault(issue =>
+            categories.Any(category => string.Equals(issue.Category, category, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private string? GetCncIssueTitle(params string[] categories) =>
+        FindCncIssue(categories) is { Title.Length: > 0 } issue ? issue.Title : null;
+
+    private string? GetCncIssueMeasuredLabel(params string[] categories) =>
+        FindCncIssue(categories) is { Value: var value } ? $"{value:0.###} issue(s)" : null;
 }

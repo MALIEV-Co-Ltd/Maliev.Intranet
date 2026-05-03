@@ -24,11 +24,17 @@ public class OrdersController(OrderServiceClient client) : ControllerBase
     /// <param name="page">The page number.</param>
     /// <param name="search">Optional free-text search term matched against order number and customer name.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="pageSize">The number of items per page.</param>
     /// <returns>A paged list of orders.</returns>
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<OrderSummaryDto>>> Get([FromQuery] Guid? customerId = null, [FromQuery] int page = 1, [FromQuery] string? search = null, CancellationToken ct = default)
+    public async Task<ActionResult<PagedResponse<OrderSummaryDto>>> Get(
+        [FromQuery] Guid? customerId = null,
+        [FromQuery] int page = 1,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default,
+        [FromQuery] int pageSize = 20)
     {
-        var result = await client.GetOrdersAsync(customerId, page, search, ct);
+        var result = await client.GetOrdersAsync(customerId, page, search, ct, pageSize);
         return result != null ? Ok(result) : Ok(new PagedResponse<OrderSummaryDto>());
     }
 

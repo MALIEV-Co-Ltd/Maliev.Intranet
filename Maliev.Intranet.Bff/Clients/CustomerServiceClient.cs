@@ -54,8 +54,9 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// </summary>
     public virtual async Task<List<AddressResponse>> CreateAddressesAsync(Guid customerId, List<CreateAddressRequest> addresses, CancellationToken ct = default)
     {
+        var addressesToCreate = await EnsureDefaultShippingAddressAsync(customerId, addresses, ct);
         var results = new List<AddressResponse>();
-        foreach (var address in addresses)
+        foreach (var address in addressesToCreate)
         {
             var response = await httpClient.PostAsJsonAsync("/customer/v1/addresses", new
             {
@@ -84,14 +85,89 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         return results;
     }
 
+    private async Task<IReadOnlyList<CreateAddressRequest>> EnsureDefaultShippingAddressAsync(
+        Guid customerId,
+        IReadOnlyList<CreateAddressRequest> addresses,
+        CancellationToken ct)
+    {
+        if (addresses.Count == 0 || addresses.Any(IsShippingAddress))
+            return addresses;
+
+        var billingAddress = addresses.FirstOrDefault(IsBillingAddress);
+        if (billingAddress is null || !HasRequiredAddressFields(billingAddress))
+            return addresses;
+
+        try
+        {
+            var existingAddresses = await httpClient.GetFromJsonAsync<List<AddressResponse>>($"/customer/v1/addresses?ownerType=Customer&ownerId={customerId}", ct) ?? [];
+            if (existingAddresses.Any(IsShippingAddress))
+                return addresses;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not check existing shipping address for customer {CustomerId}; applying billing address fallback.", customerId);
+        }
+
+        var normalizedAddresses = addresses.ToList();
+        normalizedAddresses.Add(CloneAsShippingAddress(billingAddress));
+        return normalizedAddresses;
+    }
+
+    private static CreateAddressRequest CloneAsShippingAddress(CreateAddressRequest billingAddress)
+    {
+        return new CreateAddressRequest
+        {
+            Type = "Shipping",
+            IsDefault = true,
+            AddressLine1 = billingAddress.AddressLine1,
+            AddressLine2 = billingAddress.AddressLine2,
+            AddressLine3 = billingAddress.AddressLine3,
+            District = billingAddress.District,
+            City = billingAddress.City,
+            StateProvince = billingAddress.StateProvince,
+            PostalCode = billingAddress.PostalCode,
+            CountryId = billingAddress.CountryId,
+            RecipientName = billingAddress.RecipientName,
+            RecipientPhone = billingAddress.RecipientPhone
+        };
+    }
+
+    private static bool HasRequiredAddressFields(CreateAddressRequest address)
+    {
+        return !string.IsNullOrWhiteSpace(address.AddressLine1)
+            && !string.IsNullOrWhiteSpace(address.City)
+            && !string.IsNullOrWhiteSpace(address.StateProvince)
+            && !string.IsNullOrWhiteSpace(address.PostalCode)
+            && address.CountryId != Guid.Empty;
+    }
+
+    private static bool IsBillingAddress(CreateAddressRequest address) =>
+        string.Equals(address.Type, "Billing", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsShippingAddress(CreateAddressRequest address) =>
+        string.Equals(address.Type, "Shipping", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsShippingAddress(AddressResponse address) =>
+        string.Equals(address.Type, "Shipping", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// Retrieves a paged list of customers, optionally filtered by a search query.
     /// Sorted by creation date descending (newest first).
     /// </summary>
-    public virtual async Task<PagedResponse<CustomerSummaryDto>?> GetCustomersAsync(string? query = null, int page = 1, CancellationToken ct = default)
+    public virtual async Task<PagedResponse<CustomerSummaryDto>?> GetCustomersAsync(
+        string? query = null,
+        string? segment = null,
+        string? tier = null,
+        bool includeDeleted = false,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken ct = default)
     {
-        var url = $"/customer/v1/customers?page={page}&sortBy=createdAt&sortDirection=desc";
+        var url = $"/customer/v1/customers?page={page}&pageSize={pageSize}&sortBy=createdAt&sortDirection=desc";
         if (!string.IsNullOrEmpty(query)) url += $"&query={Uri.EscapeDataString(query)}";
+        if (!string.IsNullOrEmpty(segment)) url += $"&segment={Uri.EscapeDataString(segment)}";
+        if (!string.IsNullOrEmpty(tier)) url += $"&tier={Uri.EscapeDataString(tier)}";
+        if (includeDeleted) url += "&includeDeleted=true";
 
         var response = await httpClient.GetFromJsonAsync<CustomerServicePaginatedResponse<CustomerSummaryDto>>(url, ct);
         if (response == null) return new PagedResponse<CustomerSummaryDto>();
@@ -239,6 +315,35 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
+    /// Searches companies using the CustomerService unified internal/registry search endpoint.
+    /// </summary>
+    public virtual async Task<List<CompanySearchResultDto>> SearchCompanyResultsAsync(string query, int limit = 10, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        var response = await httpClient.GetFromJsonAsync<List<CompanySearchResultDto>>(
+            $"/customer/v1/companies/search?query={Uri.EscapeDataString(query)}&limit={limit}", ct);
+        return response ?? [];
+    }
+
+    /// <summary>
+    /// Creates a company in CustomerService.
+    /// </summary>
+    public virtual async Task<CompanyResponse?> CreateCompanyAsync(CreateCompanyRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/customer/v1/companies", request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<CompanyResponse>(ct);
+    }
+
+    /// <summary>
     /// Updates a customer profile.
     /// </summary>
     public virtual async Task<CustomerResponse?> UpdateCustomerAsync(Guid id, object request, CancellationToken ct = default)
@@ -270,7 +375,9 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             timezone = request.Customer.Timezone,
             communicationPreferences = request.Customer.CommunicationPreferences,
             companyId = request.Customer.CompanyId,
-            version = current.Version
+            accountManagerEmployeeId = request.Customer.AccountManagerEmployeeId,
+            clearAccountManager = request.Customer.AccountManagerEmployeeId is null,
+            xmin = current.Xmin
         };
 
         var response = await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", patchRequest, ct);
@@ -289,7 +396,7 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 {
                     var company = await companyResponse.Content.ReadFromJsonAsync<CompanySummaryDto>(ct);
                     if (company != null)
-                        await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", new { companyId = company.Id, version = updatedCustomer?.Version }, ct);
+                        await httpClient.PatchAsJsonAsync($"/customer/v1/customers/{id}", new { companyId = company.Id, xmin = updatedCustomer?.Xmin ?? current.Xmin }, ct);
                 }
             }
         }
@@ -475,7 +582,35 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// </summary>
     public virtual async Task<bool> UpdateAddressAsync(Guid addressId, UpdateAddressRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/addresses/{addressId}", request, ct);
+        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/addresses/{addressId}", new
+        {
+            type = request.Type,
+            isDefault = request.IsDefault,
+            addressLine1 = request.AddressLine1,
+            addressLine2 = request.AddressLine2,
+            addressLine3 = request.AddressLine3,
+            district = request.District,
+            city = request.City,
+            stateProvince = request.StateProvince,
+            postalCode = request.PostalCode,
+            countryId = request.CountryId,
+            recipientName = request.RecipientName,
+            recipientPhone = request.RecipientPhone,
+            xmin = request.Xmin
+        }, ct);
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>
+    /// Deletes a customer address.
+    /// </summary>
+    public virtual async Task<bool> DeleteAddressAsync(Guid addressId, uint xmin, CancellationToken ct = default)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addressId}")
+        {
+            Content = JsonContent.Create(new { xmin })
+        };
+        var response = await httpClient.SendAsync(request, ct);
         return response.IsSuccessStatusCode;
     }
 
