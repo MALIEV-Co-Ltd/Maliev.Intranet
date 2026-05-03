@@ -147,6 +147,19 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void IamUserList_UsesPagedBffUsersEndpoint()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserList.razor");
+        var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "IamController.cs");
+
+        Assert.Contains("PagedResponse<PrincipalSummaryDto>", source, StringComparison.Ordinal);
+        Assert.Contains("PaginationFooter", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/iam/users?{string.Join", source, StringComparison.Ordinal);
+        Assert.Contains("Task<ActionResult<PagedResponse<PrincipalSummaryDto>>> GetUsers", controller, StringComparison.Ordinal);
+        Assert.Contains("CreatePrincipalAsync", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_CurrencySelectorTrigger_RemainsCompact()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");

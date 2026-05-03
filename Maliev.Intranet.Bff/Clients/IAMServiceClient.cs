@@ -35,8 +35,45 @@ public class IAMServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<List<PrincipalSummaryDto>> GetPrincipalsAsync(CancellationToken ct = default)
     {
-        var response = await httpClient.GetFromJsonAsync<List<PrincipalSummaryDto>>("/iam/v1/principals", ct);
-        return response ?? new();
+        var response = await httpClient.GetFromJsonAsync<List<IamPrincipalResponse>>("/iam/v1/principals", ct);
+        return response?.Select(MapPrincipal).ToList() ?? new();
+    }
+
+    /// <summary>
+    /// Creates a new human IAM principal.
+    /// </summary>
+    public virtual async Task<PrincipalSummaryDto?> CreatePrincipalAsync(string email, string displayName, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/iam/v1/principals", new
+        {
+            principalType = "user",
+            email,
+            displayName
+        }, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var created = await response.Content.ReadFromJsonAsync<CreatePrincipalResponse>(cancellationToken: ct);
+        if (created is null)
+        {
+            return null;
+        }
+
+        return new PrincipalSummaryDto
+        {
+            Id = created.PrincipalId,
+            PrincipalId = created.PrincipalId,
+            Type = "user",
+            Identifier = email,
+            Email = email,
+            DisplayName = displayName,
+            IsActive = true,
+            IsEnabled = true,
+            CreatedAt = created.CreatedAt
+        };
     }
 
     /// <summary>
@@ -58,6 +95,32 @@ public class IAMServiceClient(HttpClient httpClient)
     }
 
     private record BootstrapStatusDto(int Count);
+
+    private sealed record CreatePrincipalResponse(Guid PrincipalId, DateTime CreatedAt);
+
+    private sealed record IamPrincipalResponse(
+        Guid PrincipalId,
+        string PrincipalType,
+        string? Email,
+        string? DisplayName,
+        string? LinkedService,
+        Guid? LinkedEntityId,
+        bool IsActive,
+        DateTime CreatedAt,
+        DateTime UpdatedAt);
+
+    private static PrincipalSummaryDto MapPrincipal(IamPrincipalResponse principal) => new()
+    {
+        Id = principal.PrincipalId,
+        PrincipalId = principal.PrincipalId,
+        Type = principal.PrincipalType,
+        Identifier = principal.Email ?? principal.LinkedService ?? principal.PrincipalId.ToString(),
+        DisplayName = string.IsNullOrWhiteSpace(principal.DisplayName) ? principal.Email ?? principal.PrincipalId.ToString() : principal.DisplayName,
+        Email = principal.Email ?? string.Empty,
+        IsActive = principal.IsActive,
+        IsEnabled = principal.IsActive,
+        CreatedAt = principal.CreatedAt
+    };
 
 
     /// <summary>

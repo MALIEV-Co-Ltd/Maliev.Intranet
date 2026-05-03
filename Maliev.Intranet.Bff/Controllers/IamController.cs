@@ -49,12 +49,45 @@ public class IamController(
     /// <returns>A list of principals.</returns>
     [RequirePermission(MalievPermissions.IAM.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("users")]
-    public async Task<ActionResult<List<PrincipalSummaryDto>>> GetUsers()
+    public async Task<ActionResult<PagedResponse<PrincipalSummaryDto>>> GetUsers(
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         if (!await IsAuthorizedAsync()) return Forbid();
 
         var principals = await client.GetPrincipalsAsync();
-        return Ok(principals);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            principals = principals
+                .Where(principal =>
+                    principal.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    principal.Email.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    principal.Type.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        var normalizedPage = Math.Max(1, page);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, 100);
+        var totalCount = principals.Count;
+        var data = principals
+            .OrderBy(principal => principal.DisplayName)
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .ToList();
+
+        return Ok(new PagedResponse<PrincipalSummaryDto>
+        {
+            Data = data,
+            Meta = new PaginationMeta
+            {
+                CurrentPage = normalizedPage,
+                PageSize = normalizedPageSize,
+                TotalCount = totalCount,
+                TotalItems = totalCount,
+                TotalPages = normalizedPageSize > 0 ? (int)Math.Ceiling(totalCount / (double)normalizedPageSize) : 0
+            }
+        });
     }
 
     /// <summary>
@@ -137,7 +170,22 @@ public class IamController(
     public async Task<IActionResult> InviteUser([FromBody] InviteUserRequest request)
     {
         if (!await IsAuthorizedAsync()) return Forbid();
-        return Accepted(new { request.Email, request.DisplayName, request.RoleId, Status = "Queued" });
+        var principal = await client.CreatePrincipalAsync(request.Email, request.DisplayName);
+        if (principal is null)
+        {
+            return BadRequest("Failed to create IAM principal.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.RoleId))
+        {
+            var granted = await client.GrantRoleAsync(principal.PrincipalId, new GrantRoleRequestDto { RoleId = request.RoleId });
+            if (!granted)
+            {
+                return BadRequest("Principal was created but the role could not be granted.");
+            }
+        }
+
+        return CreatedAtAction(nameof(GetUserRoles), new { principalId = principal.PrincipalId }, principal);
     }
 
     /// <summary>
