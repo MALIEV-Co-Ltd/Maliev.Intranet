@@ -55,46 +55,7 @@
 
     <div class="qsb-divider" />
 
-    @* ── Zone 2: Adjustments ──────────────────────────────────────────────── *@
-    <div class="qsb-zone-adjustments">
-        <div class="qsb-adjustment-row">
-            <div class="qsb-zone-label qsb-adjustment-label">
-                <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
-                Quote Details
-            </div>
-            <div class="qsb-adjustment-fields">
-                <MudNumericField T="decimal"
-                                 Label="Shipping"
-                                 Value="@ShippingCost"
-                                 ValueChanged="OnShippingCostChanged"
-                                 Min="0m"
-                                 Variant="Variant.Outlined"
-                                 Margin="Margin.Dense"
-                                 HideSpinButtons="true" />
-                <MudNumericField T="decimal"
-                                 Label="Discount"
-                                 Value="@ManualDiscountAmount"
-                                 ValueChanged="OnManualDiscountAmountChanged"
-                                 Min="0m"
-                                 Variant="Variant.Outlined"
-                                 Margin="Margin.Dense"
-                                 HideSpinButtons="true" />
-                <MudTextField T="string"
-                              Label="Terms"
-                              Value="@QuotationTerms"
-                              ValueChanged="OnQuotationTermsChanged"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Lines="2"
-                              FullWidth="true"
-                              Class="qsb-terms-field" />
-            </div>
-        </div>
-    </div>
-
-    <div class="qsb-divider" />
-
-    @* ── Zone 3: Total + Actions ──────────────────────────────────────────── *@
+    @* ── Zone 2: Total + Actions ──────────────────────────────────────────── *@
     <div class="qsb-zone-total">
         <div class="qsb-total-top">
             <div class="qsb-total-ships">
@@ -138,6 +99,14 @@
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Default"
                        Size="Size.Small"
+                       StartIcon="@Icons.Material.Outlined.EditNote"
+                       OnClick="ToggleDetails"
+                       Class="@($"qsb-btn-details {(_detailsOpen ? "qsb-btn-details--active" : "")}")">
+                Details
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       Size="Size.Small"
                        StartIcon="@Icons.Material.Outlined.PictureAsPdf"
                        Disabled="@(!CanQuote || Parts.Count == 0 || _generatingPdf)"
                        OnClick="@HandleGeneratePdfAsync"
@@ -162,6 +131,47 @@
                 <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
             </MudButton>
         </div>
+        @if (_detailsOpen)
+        {
+            <div class="qsb-details-popover">
+                <div class="qsb-details-header">
+                    <div class="qsb-zone-label qsb-details-title">
+                        <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
+                        Quote Details
+                    </div>
+                    <button type="button" class="qsb-details-close" title="Close quote details" @onclick="ToggleDetails">
+                        <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
+                    </button>
+                </div>
+                <div class="qsb-details-grid">
+                    <MudNumericField T="decimal"
+                                     Label="Shipping"
+                                     Value="@ShippingCost"
+                                     ValueChanged="OnShippingCostChanged"
+                                     Min="0m"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     HideSpinButtons="true" />
+                    <MudNumericField T="decimal"
+                                     Label="Discount"
+                                     Value="@ManualDiscountAmount"
+                                     ValueChanged="OnManualDiscountAmountChanged"
+                                     Min="0m"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     HideSpinButtons="true" />
+                </div>
+                <MudTextField T="string"
+                              Label="Terms"
+                              Value="@QuotationTerms"
+                              ValueChanged="OnQuotationTermsChanged"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="4"
+                              FullWidth="true"
+                              Class="qsb-terms-field" />
+            </div>
+        }
     </div>
 </div>
 
@@ -310,53 +320,7 @@
         font-size: 12px;
     }
 
-    /* ── Zone 2: Adjustments ─────────────────────────────────────────────── */
-    .qsb-zone-adjustments {
-        flex: 0 1 430px;
-        min-width: 360px;
-        padding: 8px 12px;
-        display: grid;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-
-    .qsb-adjustment-row {
-        display: grid;
-        grid-template-columns: 92px minmax(0, 1fr);
-        gap: 8px;
-        align-items: center;
-        width: 100%;
-    }
-
-    .qsb-adjustment-label {
-        margin-bottom: 0;
-        line-height: 1.2;
-    }
-
-    .qsb-adjustment-fields {
-        display: grid;
-        grid-template-columns: minmax(84px, 0.55fr) minmax(84px, 0.55fr) minmax(150px, 1.4fr);
-        gap: 6px;
-        align-items: stretch;
-    }
-
-    .qsb-zone-adjustments ::deep .mud-input-control {
-        margin-top: 0;
-        margin-bottom: 0;
-    }
-
-    .qsb-zone-adjustments ::deep .mud-input-slot {
-        font-size: 12px;
-    }
-
-    .qsb-zone-adjustments ::deep textarea {
-        min-height: 34px !important;
-        line-height: 1.25;
-        resize: none;
-    }
-
-    /* ── Zone 3: Total + Actions ─────────────────────────────────────────── */
+    /* ── Zone 2: Total + Actions ─────────────────────────────────────────── */
     .qsb-zone-total {
         width: 340px;
         padding: 8px 16px 10px;
@@ -365,6 +329,7 @@
         justify-content: space-between;
         flex-shrink: 0;
         gap: 4px;
+        position: relative;
     }
 
     .qsb-total-top {
@@ -403,6 +368,23 @@
         gap: 6px;
     }
 
+    .qsb-btn-details {
+        padding: 0 10px;
+        height: 32px;
+        border: 1px solid var(--maliev-border) !important;
+        border-radius: 5px !important;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--maliev-muted) !important;
+        flex: 0 0 auto;
+    }
+
+    .qsb-btn-details--active {
+        border-color: var(--mud-palette-primary) !important;
+        color: var(--mud-palette-primary) !important;
+        background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent) !important;
+    }
+
     .qsb-btn-pdf {
         padding: 0 12px;
         height: 32px;
@@ -421,6 +403,70 @@
         font-weight: 600;
     }
 
+    .qsb-details-popover {
+        position: absolute;
+        right: 16px;
+        bottom: calc(100% + 8px);
+        z-index: 20;
+        width: min(420px, calc(100vw - 32px));
+        padding: 10px 12px 12px;
+        background: var(--maliev-panel);
+        border: 1px solid var(--maliev-border);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .qsb-details-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .qsb-details-title {
+        margin-bottom: 0;
+    }
+
+    .qsb-details-close {
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--maliev-muted);
+        cursor: pointer;
+    }
+
+    .qsb-details-close:hover {
+        background: var(--maliev-panel-3);
+        color: var(--maliev-ink);
+    }
+
+    .qsb-details-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .qsb-details-popover ::deep .mud-input-control {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .qsb-details-popover ::deep .mud-input-slot {
+        font-size: 12px;
+    }
+
+    .qsb-details-popover ::deep textarea {
+        min-height: 74px !important;
+        line-height: 1.3;
+        resize: vertical;
+    }
+
     @@media (max-width: 1400px) {
         .qsb-root {
             height: auto;
@@ -437,16 +483,6 @@
             flex: 1 1 420px;
             min-width: 420px;
             padding: 10px 16px;
-        }
-        .qsb-zone-adjustments {
-            order: 4;
-            flex: 1 0 100%;
-            min-width: 0;
-            border-top: 1px solid var(--maliev-border);
-            padding: 8px 16px;
-        }
-        .qsb-adjustment-fields {
-            grid-template-columns: minmax(120px, 0.35fr) minmax(120px, 0.35fr) minmax(320px, 1fr);
         }
         .qsb-zone-total {
             width: 330px;
@@ -468,11 +504,8 @@
             flex: 1 1 320px;
             width: auto;
         }
-        .qsb-zone-adjustments {
-            order: 4;
-        }
-        .qsb-adjustment-fields {
-            grid-template-columns: minmax(110px, 0.4fr) minmax(110px, 0.4fr) minmax(260px, 1fr);
+        .qsb-details-popover {
+            right: 16px;
         }
     }
 
@@ -484,7 +517,6 @@
         }
         .qsb-zone-customer,
         .qsb-zone-lead,
-        .qsb-zone-adjustments,
         .qsb-zone-total {
             width: 100%;
             max-width: none;
@@ -497,25 +529,12 @@
         .qsb-zone-lead {
             padding: 10px 0;
         }
-        .qsb-adjustment-row {
-            grid-template-columns: 1fr;
-            gap: 6px;
-        }
-        .qsb-adjustment-label {
-            margin-bottom: 0;
-        }
         .qsb-lead-options {
             flex-direction: column;
         }
         .qsb-lead-btn {
             width: 100%;
             min-width: 0;
-        }
-        .qsb-adjustment-fields {
-            grid-template-columns: 1fr;
-        }
-        .qsb-zone-adjustments ::deep textarea {
-            min-height: 58px !important;
         }
         .qsb-lead-skeleton {
             width: 100%;
@@ -537,6 +556,19 @@
         .qsb-actions {
             flex-direction: column;
         }
+        .qsb-details-popover {
+            position: static;
+            width: 100%;
+            margin-top: 8px;
+            box-shadow: none;
+        }
+        .qsb-details-grid {
+            grid-template-columns: 1fr;
+        }
+        .qsb-details-popover ::deep textarea {
+            min-height: 90px !important;
+        }
+        .qsb-btn-details,
         .qsb-btn-pdf,
         .qsb-btn-checkout {
             width: 100%;
@@ -565,6 +597,7 @@
     [Parameter] public EventCallback OnGeneratePdf { get; set; }
 
     private bool _generatingPdf;
+    private bool _detailsOpen;
     private bool IsLeadTimeLoading => LeadTimeOptions.Count == 0 && Parts.Any(p => p.PricingLoading);
     private string LeadTimeEmptyText => Parts.Count == 0
         ? "Configure a part to calculate lead time."
@@ -590,6 +623,8 @@
     public void Dispose() => CurrencyService.Changed -= OnCurrencyChanged;
 
     private void OnCurrencyChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
+
+    private void ToggleDetails() => _detailsOpen = !_detailsOpen;
 
     private async Task OnShippingCostChanged(decimal value) =>
         await ShippingCostChanged.InvokeAsync(Math.Max(0m, value));
