@@ -19,6 +19,7 @@ public class AppWasmRenderModeTests
         var source = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
 
         Assert.Contains("id=\"wasm-loading\"", source);
+        Assert.Contains("class=\"wasm-app-host\"", source);
         Assert.Contains("<WasmLogoLoadingAnimation", source);
         Assert.Contains("data-maliev-theme", source);
         Assert.Contains("maliev_theme", source);
@@ -48,6 +49,19 @@ public class AppWasmRenderModeTests
         Assert.DoesNotContain("conic-gradient", source, StringComparison.Ordinal);
         Assert.DoesNotContain("animation: maliev-logo-load", source, StringComparison.Ordinal);
         Assert.DoesNotContain("@@keyframes maliev-logo-load", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AppRoot_FadesRenderedWasmAppInAfterLoaderCompletes()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
+
+        Assert.Contains(".wasm-app-host", source);
+        Assert.Contains("opacity: 0", source);
+        Assert.Contains("transform: translateY(6px)", source);
+        Assert.Contains("html.maliev-wasm-ready .wasm-app-host", source);
+        Assert.Contains("opacity: 1", source);
+        Assert.Contains("prefers-reduced-motion: reduce", source);
     }
 
     [Fact]
