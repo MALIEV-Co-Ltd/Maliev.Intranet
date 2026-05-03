@@ -5,6 +5,7 @@ using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
@@ -455,6 +456,57 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         };
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
         Assert.NotNull(cut.Instance);
+    }
+
+    [Fact]
+    public void ResumeFromServerAsync_WhenProjectStatusIsQuoted_LoadsProjectForEditing()
+    {
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        Services.GetRequiredService<NavigationManager>()
+            .NavigateTo($"/sales/projects/new?session={sessionId}&resume={projectId}");
+
+        _httpHandler.HandlerFunc = (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path.Contains("projects") && request.Method == HttpMethod.Get
+                && path.Split('/').LastOrDefault() == projectId.ToString())
+            {
+                var detail = new ProjectDetailDto
+                {
+                    Id = projectId,
+                    CustomerId = Guid.NewGuid(),
+                    CustomerName = "Axion Robotics",
+                    Title = "Generated Quote Project",
+                    Status = "Quoted",
+                    Currency = "THB",
+                    Parts =
+                    [
+                        new ProjectPartDto
+                        {
+                            Id = Guid.NewGuid(),
+                            FileId = Guid.NewGuid(),
+                            FileName = "quoted-part.stl",
+                            ProcessType = "FDM",
+                            MaterialName = "PLA",
+                            Quantity = 2,
+                            ConfirmedPrice = 125m
+                        }
+                    ],
+                };
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(detail), Encoding.UTF8, "application/json")
+                });
+            }
+            return DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+
+        cut.WaitForAssertion(() => Assert.Contains("Generated Quote Project", cut.Markup));
+        Assert.Contains("quoted-part.stl", cut.Markup);
     }
 
     [Fact]

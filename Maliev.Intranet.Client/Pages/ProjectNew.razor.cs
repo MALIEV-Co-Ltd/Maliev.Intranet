@@ -1366,8 +1366,8 @@ public partial class ProjectNew : IAsyncDisposable
     private bool _serverSaveInProgress;
 
     /// <summary>
-    /// True when the project has transitioned past Draft/Configuring (e.g. Quoted or Accepted).
-    /// Pricing must not re-trigger for locked projects.
+    /// True after this editor has just generated a quotation and is navigating away.
+    /// Reopened quoted projects are editable again and should be repriced when inputs change.
     /// </summary>
     private bool _projectLocked;
 
@@ -1711,7 +1711,7 @@ public partial class ProjectNew : IAsyncDisposable
 
             var project = await response.Content.ReadFromJsonAsync<ProjectDetailDto>();
             if (project == null) return;
-            if (project.Status != "Draft" && project.Status != "Configuring") return;
+            if (!CanResumeProjectForEditing(project.Status)) return;
 
             _serverProjectId = project.Id;
             _tempProjectId = project.Id;
@@ -1777,6 +1777,15 @@ public partial class ProjectNew : IAsyncDisposable
         {
             // Server resume failures are non-fatal; sessionStorage draft is the fallback
         }
+    }
+
+    private static bool CanResumeProjectForEditing(string? status)
+    {
+        return status?.Trim().ToLowerInvariant() switch
+        {
+            "draft" or "configuring" or "priced" or "quoted" => true,
+            _ => false,
+        };
     }
 
     private async Task ReloadPartCatalogAsync(PartViewModel part)

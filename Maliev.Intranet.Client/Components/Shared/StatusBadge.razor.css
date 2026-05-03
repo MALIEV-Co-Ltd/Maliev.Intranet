@@ -50,7 +50,10 @@
 
 .status-engineer,
 .status-open,
-.status-info {
+.status-info,
+.status-priced,
+.status-quoted,
+.status-confirmed {
     background: var(--maliev-accent-soft);
     color: var(--maliev-accent);
 }
