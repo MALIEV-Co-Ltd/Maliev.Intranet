@@ -1,0 +1,119 @@
+@page "/mfg/materials"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Materials | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="Materials" Subtitle="Catalog materials and stock levels" BackHref="/mfg" />
+
+    <section class="mlv-stats-grid">
+        <StatTile Label="Materials" Value="@_meta.TotalItems.ToString("N0")" />
+        <StatTile Label="On page" Value="@_materials.Count.ToString("N0")" />
+        <StatTile Label="Active" Value="@_materials.Count(IsActive).ToString("N0")" />
+        <StatTile Label="Stock value" Value="@_materials.Sum(m => m.UnitPrice * m.QuantityOnHand).ToString("N2")" />
+    </section>
+
+    <section class="mlv-panel">
+        @if (_loading)
+        {
+            <div class="mlv-empty">Loading materials...</div>
+        }
+        else if (_materials.Count == 0)
+        {
+            <div class="mlv-empty">No materials found.</div>
+        }
+        else
+        {
+            <div class="mlv-table-wrap">
+                <table class="mlv-data-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Stock</th>
+                            <th>Unit price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var material in _materials)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/mfg/materials/{material.Id}"))">
+                                <td class="mlv-mono">@material.SKU</td>
+                                <td>@material.Name</td>
+                                <td>@(string.IsNullOrWhiteSpace(material.Category) ? "-" : material.Category)</td>
+                                <td><StatusBadge Status="@material.Status" /></td>
+                                <td class="mlv-mono">@material.QuantityOnHand.ToString("N0") @material.Unit</td>
+                                <td class="mlv-mono">@material.UnitPrice.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <PaginationFooter Meta="@_meta"
+                      CurrentPage="@_page"
+                      PageSize="@_pageSize"
+                      PageChanged="OnPageChanged"
+                      PageSizeChanged="OnPageSizeChanged"
+                      Disabled="@_loading" />
+</div>
+
+@code {
+    private readonly List<MaterialSummaryDto> _materials = [];
+    private PaginationMeta _meta = new();
+    private bool _loading = true;
+    private int _page = 1;
+    private int _pageSize = 20;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>($"api/v1/materials?page={_page}&pageSize={_pageSize}");
+            _materials.Clear();
+            _materials.AddRange(response?.Data ?? []);
+            _meta = response?.Meta ?? new PaginationMeta();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load materials: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = pageSize;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private static bool IsActive(MaterialSummaryDto material)
+    {
+        return string.Equals(material.Status, "Active", StringComparison.OrdinalIgnoreCase);
+    }
+}

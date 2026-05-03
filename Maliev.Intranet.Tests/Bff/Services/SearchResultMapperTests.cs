@@ -39,6 +39,17 @@ public class SearchResultMapperTests
     }
 
     [Fact]
+    public void ResolveHref_ForMaterialResult_MapsToMaterialDetail()
+    {
+        var materialId = Guid.NewGuid();
+        var result = Result("MaterialService", "material", materialId.ToString(), "Aluminum 6061");
+
+        var href = SearchResultMapper.ResolveHref(result);
+
+        Assert.Equal($"/mfg/materials/{materialId}", href);
+    }
+
+    [Fact]
     public void ToGlobalSearchResponse_UsesKnownApplicationArea()
     {
         var response = new SearchServiceResponseDto(

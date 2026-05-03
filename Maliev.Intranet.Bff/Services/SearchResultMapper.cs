@@ -70,6 +70,8 @@ public static class SearchResultMapper
             "purchaseorder" or "purchase-order" or "purchase-orders" when IsInteger(id) => $"/purchasing/{id}",
             "purchaseorder" or "purchase-order" or "purchase-orders" => $"/purchasing?search={titleQuery}",
             "supplier" or "suppliers" => $"/purchasing?search={titleQuery}",
+            "material" or "materials" when IsGuid(id) => $"/mfg/materials/{id}",
+            "material" or "materials" => $"/mfg/materials?search={titleQuery}",
             "equipment" or "equipments" when IsGuid(id) => $"/mfg/equipment/{id}",
             "equipment" or "equipments" => $"/mfg/equipment?search={titleQuery}",
 
