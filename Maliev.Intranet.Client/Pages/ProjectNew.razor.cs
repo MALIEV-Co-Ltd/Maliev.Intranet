@@ -2031,7 +2031,7 @@ public partial class ProjectNew : IAsyncDisposable
 
             using var response = await Http.PostAsJsonAsync(
                 $"api/v1/projects/{projectId}/parts/{part.ServerPartId.Value}/confirm-price",
-                new ConfirmPartPriceRequest { ConfirmedPrice = unitPrice.Value });
+                new ConfirmPartPriceRequest { ConfirmedUnitPrice = unitPrice.Value });
 
             if (!response.IsSuccessStatusCode)
             {

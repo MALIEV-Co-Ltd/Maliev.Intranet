@@ -550,7 +550,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             {
                 var body = await request.Content!.ReadAsStringAsync(ct);
                 using var json = JsonDocument.Parse(body);
-                confirmedPrice = json.RootElement.GetProperty("confirmedPrice").GetDecimal();
+                confirmedPrice = json.RootElement.GetProperty("confirmedUnitPrice").GetDecimal();
                 return new HttpResponseMessage(HttpStatusCode.NoContent);
             }
 

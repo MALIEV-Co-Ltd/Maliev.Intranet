@@ -371,10 +371,10 @@ public class UpdateProjectPartRequest
 public class ConfirmPartPriceRequest
 {
     /// <summary>Gets or sets the employee-confirmed price per unit.</summary>
-    public decimal ConfirmedPrice { get; set; }
+    public decimal ConfirmedUnitPrice { get; set; }
 
     /// <summary>Gets or sets an optional reason when overriding the AI estimate.</summary>
-    public string? OverrideReason { get; set; }
+    public string? PriceOverrideReason { get; set; }
 }
 
 /// <summary>

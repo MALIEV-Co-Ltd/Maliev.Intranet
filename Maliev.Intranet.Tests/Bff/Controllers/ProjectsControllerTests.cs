@@ -260,7 +260,7 @@ public class ProjectsControllerTests
 
         var result = await controller.ConfirmPartPrice(
             Guid.NewGuid(), Guid.NewGuid(),
-            new ConfirmPartPriceRequest { ConfirmedPrice = 300m },
+            new ConfirmPartPriceRequest { ConfirmedUnitPrice = 300m },
             CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
