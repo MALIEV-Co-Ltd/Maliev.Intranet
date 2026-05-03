@@ -26,6 +26,28 @@ public class CompaniesController(CustomerServiceClient client) : ControllerBase
     }
 
     /// <summary>
+    /// Searches companies by name or tax ID using internal CustomerService records and RegistryService-backed results.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("search")]
+    public async Task<ActionResult<List<CompanySearchResultDto>>> Search([FromQuery] string query, [FromQuery] int limit = 10, CancellationToken ct = default)
+    {
+        var result = await client.SearchCompanyResultsAsync(query, limit, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Creates a company.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost]
+    public async Task<ActionResult<CompanyResponse>> Create([FromBody] CreateCompanyRequest request, CancellationToken ct = default)
+    {
+        var result = await client.CreateCompanyAsync(request, ct);
+        return result != null ? Ok(result) : BadRequest();
+    }
+
+    /// <summary>
     /// Retrieves a single company by ID.
     /// </summary>
     /// <param name="id">The company ID.</param>

@@ -50,8 +50,9 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Snapshot", cut.Markup);
         Assert.Contains("Default addresses", cut.Markup);
         Assert.Contains("Recent activity", cut.Markup);
-        Assert.Contains("Password reset", cut.Markup);
+        Assert.Contains("Link", cut.Markup);
         Assert.DoesNotContain("Impersonate", cut.Markup);
+        Assert.DoesNotContain("Password reset", cut.Markup);
         Assert.Contains("Discard", cut.Markup);
         Assert.Contains("Save", cut.Markup);
         Assert.DoesNotContain("mlv-stat-tile", cut.Markup, StringComparison.Ordinal);
@@ -105,16 +106,10 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
 
         cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
 
-        cut.Find("button.customer-action-email").Click();
-        Assert.Contains("Send email", cut.Markup);
-        Assert.Contains("customer-modal-wide", cut.Markup);
-        Assert.Contains("Invoice reminder", cut.Markup);
-        Assert.Contains("Quote follow-up", cut.Markup);
-
-        cut.Find("button[aria-label='Close']").Click();
-        cut.Find("button.customer-action-password").Click();
-        Assert.Contains("Send password reset?", cut.Markup);
-        Assert.Contains("A password reset link will be emailed to sarah@axion.io.", cut.Markup);
+        cut.Find(".customer-split-field .customer-inline-action").Click();
+        Assert.Contains("Link company", cut.Markup);
+        Assert.Contains("Company lookup", cut.Markup);
+        Assert.Contains("Company name", cut.Markup);
 
         cut.Find("button[aria-label='Close']").Click();
         cut.Find("button[data-tab='addresses']").Click();
@@ -122,6 +117,9 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Edit address", cut.Markup);
         Assert.Contains("customer-address-form", cut.Markup);
         Assert.Contains("HQ - Billing", cut.Markup);
+        Assert.Contains("Recipient name", cut.Markup);
+        Assert.Contains("Address lookup", cut.Markup);
+        Assert.Contains("Country", cut.Markup);
     }
 
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
@@ -167,6 +165,19 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
             });
         }
 
+        if (pathAndQuery.Equals("/api/v1/customers/countries", StringComparison.Ordinal))
+        {
+            return Json(new List<CountryDto>
+            {
+                new()
+                {
+                    Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                    Code = "US",
+                    Name = "United States"
+                }
+            });
+        }
+
         if (pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
         {
             return Json(new CustomerDetailDto
@@ -193,6 +204,8 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                     new AddressResponse
                     {
                         Type = "Billing",
+                        CountryId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                        Xmin = 101,
                         IsDefault = true,
                         RecipientName = "HQ - Billing",
                         AddressLine1 = "100 Tech Blvd",
@@ -204,6 +217,8 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                     new AddressResponse
                     {
                         Type = "Shipping",
+                        CountryId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                        Xmin = 102,
                         IsDefault = true,
                         RecipientName = "Manufacturing Dock",
                         AddressLine1 = "2200 Industrial Pkwy",

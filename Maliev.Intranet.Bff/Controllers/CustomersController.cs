@@ -156,6 +156,21 @@ public class CustomersController(
         return BadRequest();
     }
 
+    /// <summary>Deletes a single address</summary>
+    [RequirePermission(MalievPermissions.Customer.Profile.Write)]
+    [HttpDelete("addresses/{id:guid}")]
+    public async Task<IActionResult> DeleteAddress(Guid id, [FromQuery] uint xmin, CancellationToken ct)
+    {
+        var result = await client.DeleteAddressAsync(id, xmin, ct);
+        if (result)
+        {
+            await _hubContext.Clients.All.SendAsync("CustomerChanged", cancellationToken: ct);
+            return NoContent();
+        }
+
+        return BadRequest();
+    }
+
     /// <summary>Creates a standalone NDA record</summary>
     [RequirePermission(MalievPermissions.Customer.Profile.Write)]
     [HttpPost("ndas")]
@@ -312,7 +327,7 @@ public class CustomersController(
     }
 
     /// <summary>Searches for Thai companies by Tax ID or name</summary>
-    [RequirePermission(MalievPermissions.Registry.LocationsRead)]
+    [RequirePermission(MalievPermissions.Registry.CompaniesRead)]
     [HttpGet("companies/search")]
     public async Task<ActionResult<List<RegistryCompanyProfile>>> SearchCompanies([FromQuery] string query, [FromQuery] int limit = 10, CancellationToken ct = default)
     {

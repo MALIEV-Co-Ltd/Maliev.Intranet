@@ -147,6 +147,9 @@ public class CustomerDetailDto
     public Dictionary<string, bool> CommunicationPreferences { get; set; } = [];
     /// <summary>Concurrency version token for the customer record.</summary>
     public byte[] Version { get; set; } = [];
+    /// <summary>The PostgreSQL xmin concurrency token returned by CustomerService.</summary>
+    [JsonPropertyName("xmin")]
+    public uint Xmin { get; set; }
 }
 
 /// <summary>
@@ -190,6 +193,9 @@ public class AddressResponse
     public DateTime UpdatedAt { get; set; }
     /// <summary>Concurrency version token for the address record.</summary>
     public byte[] Version { get; set; } = [];
+    /// <summary>The PostgreSQL xmin concurrency token returned by CustomerService.</summary>
+    [JsonPropertyName("xmin")]
+    public uint Xmin { get; set; }
 }
 
 /// <summary>
@@ -554,6 +560,9 @@ public class UpdateAddressRequest
     /// <summary>Concurrency version token required for updates.</summary>
     [Required]
     public byte[] Version { get; set; } = [];
+    /// <summary>The PostgreSQL xmin concurrency token required by CustomerService.</summary>
+    [JsonPropertyName("xmin")]
+    public uint Xmin { get; set; }
 }
 
 /// <summary>
@@ -687,6 +696,9 @@ public class UpdateCustomerRequest
 
     /// <summary>Concurrency version token required for updates.</summary>
     public byte[] Version { get; set; } = [];
+    /// <summary>The PostgreSQL xmin concurrency token required by CustomerService.</summary>
+    [JsonPropertyName("xmin")]
+    public uint Xmin { get; set; }
 }
 
 /// <summary>
@@ -736,6 +748,9 @@ public class CustomerResponse
     public DateTime UpdatedAt { get; set; }
     /// <summary>Concurrency version token for the record.</summary>
     public byte[] Version { get; set; } = [];
+    /// <summary>The PostgreSQL xmin concurrency token returned by CustomerService.</summary>
+    [JsonPropertyName("xmin")]
+    public uint Xmin { get; set; }
 }
 
 /// <summary>
@@ -931,7 +946,7 @@ public class ExtractedAddress
 public class CompanySearchResultDto
 {
     /// <summary>The unique identifier for the company.</summary>
-    public Guid Id { get; set; }
+    public Guid? Id { get; set; }
     /// <summary>The full legal name of the company.</summary>
     public string Name { get; set; } = string.Empty;
     /// <summary>The company's VAT identification number.</summary>
@@ -948,6 +963,10 @@ public class CompanySearchResultDto
     public string Tier { get; set; } = string.Empty;
     /// <summary>The company's default billing address details.</summary>
     public AddressResponse? DefaultBillingAddress { get; set; }
+    /// <summary>The origin of the result, such as Internal or Registry.</summary>
+    public string? Source { get; set; }
+    /// <summary>The business type returned by registry-backed search, if available.</summary>
+    public string? BusinessType { get; set; }
 }
 
 /// <summary>

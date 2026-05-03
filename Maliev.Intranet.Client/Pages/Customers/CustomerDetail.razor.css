@@ -498,6 +498,61 @@
     color: var(--maliev-info);
 }
 
+.customer-split-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.customer-inline-action {
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+    font: inherit;
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.customer-inline-action:hover {
+    border-color: var(--maliev-info);
+    color: var(--maliev-info);
+}
+
+.customer-result-list {
+    display: grid;
+    gap: 8px;
+}
+
+.customer-result-list button {
+    min-height: 36px;
+    padding: 8px 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-surface);
+    color: var(--maliev-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.customer-result-list button:hover {
+    border-color: var(--maliev-info);
+}
+
+.customer-checkbox-row {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    color: var(--maliev-ink-2);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+}
+
 @media (max-width: 1120px) {
     .customer-record-grid {
         grid-template-columns: 1fr;

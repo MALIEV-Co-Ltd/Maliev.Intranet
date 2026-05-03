@@ -315,6 +315,35 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
+    /// Searches companies using the CustomerService unified internal/registry search endpoint.
+    /// </summary>
+    public virtual async Task<List<CompanySearchResultDto>> SearchCompanyResultsAsync(string query, int limit = 10, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        var response = await httpClient.GetFromJsonAsync<List<CompanySearchResultDto>>(
+            $"/customer/v1/companies/search?query={Uri.EscapeDataString(query)}&limit={limit}", ct);
+        return response ?? [];
+    }
+
+    /// <summary>
+    /// Creates a company in CustomerService.
+    /// </summary>
+    public virtual async Task<CompanyResponse?> CreateCompanyAsync(CreateCompanyRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/customer/v1/companies", request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<CompanyResponse>(ct);
+    }
+
+    /// <summary>
     /// Updates a customer profile.
     /// </summary>
     public virtual async Task<CustomerResponse?> UpdateCustomerAsync(Guid id, object request, CancellationToken ct = default)
@@ -551,7 +580,35 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// </summary>
     public virtual async Task<bool> UpdateAddressAsync(Guid addressId, UpdateAddressRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/addresses/{addressId}", request, ct);
+        var response = await httpClient.PatchAsJsonAsync($"/customer/v1/addresses/{addressId}", new
+        {
+            type = request.Type,
+            isDefault = request.IsDefault,
+            addressLine1 = request.AddressLine1,
+            addressLine2 = request.AddressLine2,
+            addressLine3 = request.AddressLine3,
+            district = request.District,
+            city = request.City,
+            stateProvince = request.StateProvince,
+            postalCode = request.PostalCode,
+            countryId = request.CountryId,
+            recipientName = request.RecipientName,
+            recipientPhone = request.RecipientPhone,
+            xmin = request.Xmin
+        }, ct);
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>
+    /// Deletes a customer address.
+    /// </summary>
+    public virtual async Task<bool> DeleteAddressAsync(Guid addressId, uint xmin, CancellationToken ct = default)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addressId}")
+        {
+            Content = JsonContent.Create(new { xmin })
+        };
+        var response = await httpClient.SendAsync(request, ct);
         return response.IsSuccessStatusCode;
     }
 
