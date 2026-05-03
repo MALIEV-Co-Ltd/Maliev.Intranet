@@ -1,4 +1,5 @@
 @page "/purchasing/new"
+@using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -7,7 +8,7 @@
 <PageTitle>New Purchase Order | MALIEV Intranet</PageTitle>
 
 <div class="mlv-module-shell">
-    <PageHeader Title="New Purchase Order" Subtitle="Create a draft procurement request." BackHref="/purchasing" />
+    <PageHeader Title="New Purchase Order" Subtitle="Create a supplier purchase order from an existing sales order." BackHref="/purchasing" />
     <PageBody>
         @if (!string.IsNullOrWhiteSpace(_error))
         {
@@ -15,48 +16,78 @@
         }
 
         <PanelCard Title="PO details">
-            <EditForm Model="@_request" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <FormGrid>
-                    <FormField Label="Order type">
-                        <select class="mlv-form-input" @bind="_request.OrderType">
-                            <option value="0">Internal</option>
-                            <option value="1">External</option>
-                        </select>
-                    </FormField>
-                    <FormField Label="Supplier ID">
-                        <InputNumber class="mlv-form-input" @bind-Value="_request.SupplierId" />
-                    </FormField>
-                    <FormField Label="Source order ID">
-                        <InputNumber class="mlv-form-input" @bind-Value="_request.OrderId" />
-                    </FormField>
-                    <FormField Label="Customer PO">
-                        <InputText class="mlv-form-input" @bind-Value="_request.CustomerPo" />
-                    </FormField>
-                    <FormField Label="Currency ID">
-                        <InputNumber class="mlv-form-input" @bind-Value="_request.CurrencyId" />
-                    </FormField>
-                    <FormField Label="Expected delivery">
-                        <InputDate class="mlv-form-input" @bind-Value="_request.ExpectedDeliveryDate" />
-                    </FormField>
-                    <FormField Label="WHT rate">
-                        <InputNumber class="mlv-form-input" @bind-Value="_request.WhtRate" />
-                    </FormField>
-                    <FormField Label="External item ID">
-                        <InputNumber class="mlv-form-input" @bind-Value="_line.ExternalOrderItemId" />
-                    </FormField>
-                    <FormField Label="Quantity">
-                        <InputNumber class="mlv-form-input" @bind-Value="_line.Quantity" />
-                    </FormField>
-                    <FormField Label="Notes" Class="mlv-span-6">
-                        <InputTextArea class="mlv-form-textarea" @bind-Value="_request.Notes" />
-                    </FormField>
-                </FormGrid>
-                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
-                    <SecondaryButton Href="/purchasing">Cancel</SecondaryButton>
-                    <PrimaryButton Type="submit" Disabled="@_saving">Create PO</PrimaryButton>
-                </div>
-            </EditForm>
+            @if (_loadingReferences)
+            {
+                <div class="mlv-empty">Loading purchasing references...</div>
+            }
+            else
+            {
+                <EditForm Model="@_request" OnValidSubmit="SaveAsync">
+                    <DataAnnotationsValidator />
+                    <FormGrid>
+                        <FormField Label="Order type">
+                            <select class="mlv-form-input" @bind="_request.OrderType">
+                                <option value="0">Internal</option>
+                                <option value="1">External</option>
+                            </select>
+                        </FormField>
+                        <FormField Label="Supplier">
+                            <select class="mlv-form-input" value="@_selectedSupplierId" @onchange="OnSupplierChanged">
+                                <option value="">Select supplier</option>
+                                @foreach (var supplier in _suppliers)
+                                {
+                                    <option value="@supplier.Id">@supplier.Name</option>
+                                }
+                            </select>
+                        </FormField>
+                        <FormField Label="Source order">
+                            <select class="mlv-form-input" value="@_selectedSourceOrderId" @onchange="OnSourceOrderChanged">
+                                <option value="">Select order</option>
+                                @foreach (var order in _orders)
+                                {
+                                    <option value="@order.OrderNumber">@OrderLabel(order)</option>
+                                }
+                            </select>
+                        </FormField>
+                        <FormField Label="Currency">
+                            <select class="mlv-form-input" value="@_selectedCurrencyCode" @onchange="OnCurrencyChanged">
+                                <option value="">Select currency</option>
+                                @foreach (var currency in _currencies)
+                                {
+                                    <option value="@currency.Code">@currency.Code - @currency.Name</option>
+                                }
+                            </select>
+                        </FormField>
+                        <FormField Label="Customer PO">
+                            <InputText class="mlv-form-input" @bind-Value="_request.CustomerPo" />
+                        </FormField>
+                        <FormField Label="Expected delivery">
+                            <InputDate class="mlv-form-input" @bind-Value="_request.ExpectedDeliveryDate" />
+                        </FormField>
+                        <FormField Label="WHT rate">
+                            <InputNumber class="mlv-form-input" @bind-Value="_request.WhtRate" />
+                        </FormField>
+                        <FormField Label="Order item">
+                            <select class="mlv-form-input" @bind="_selectedSourceOrderItemId" disabled="@(!_lineOptions.Any())">
+                                @foreach (var item in _lineOptions)
+                                {
+                                    <option value="@item.SourceItemId">@item.Label</option>
+                                }
+                            </select>
+                        </FormField>
+                        <FormField Label="Quantity">
+                            <InputNumber class="mlv-form-input" @bind-Value="_line.Quantity" />
+                        </FormField>
+                        <FormField Label="Notes" Class="mlv-span-6">
+                            <InputTextArea class="mlv-form-textarea" @bind-Value="_request.Notes" />
+                        </FormField>
+                    </FormGrid>
+                    <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                        <SecondaryButton Href="/purchasing">Cancel</SecondaryButton>
+                        <PrimaryButton Type="submit" Disabled="@_saving">Create PO</PrimaryButton>
+                    </div>
+                </EditForm>
+            }
         </PanelCard>
     </PageBody>
 </div>
@@ -64,31 +95,131 @@
 @code {
     private CreatePurchaseOrderRequest _request = new()
     {
-        CurrencyId = 1,
+        CurrencyCode = "THB",
         ExpectedDeliveryDate = DateTime.Today.AddDays(14)
     };
 
-    private PurchaseOrderLineItemDto _line = new() { Quantity = 1 };
+    private PurchaseOrderLineItemDto _line = new() { Quantity = 1, SourceOrderItemId = "primary" };
+    private List<SupplierSummaryDto> _suppliers = [];
+    private List<OrderSummaryDto> _orders = [];
+    private List<CurrencyDto> _currencies = [];
+    private List<LineOption> _lineOptions = [];
+    private Guid? _selectedSupplierId;
+    private string? _selectedSourceOrderId;
+    private string? _selectedCurrencyCode = "THB";
+    private string? _selectedSourceOrderItemId = "primary";
+    private bool _loadingReferences = true;
     private bool _saving;
     private string? _error;
 
-    private async Task SaveAsync()
+    protected override async Task OnInitializedAsync()
     {
-        if (_request.SupplierId <= 0 || _request.OrderId <= 0 || _request.CurrencyId <= 0)
+        try
         {
-            _error = "Enter valid supplier, source order, and currency IDs.";
+            var suppliersTask = Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>("api/v1/suppliers?page=1&pageSize=100");
+            var ordersTask = Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/v1/orders?page=1&pageSize=100");
+            var currenciesTask = Http.GetFromJsonAsync<List<CurrencyDto>>("api/v1/reference-data/currencies");
+
+            await Task.WhenAll(suppliersTask!, ordersTask!, currenciesTask!);
+
+            _suppliers = (suppliersTask.Result?.Data ?? []).Where(supplier => supplier.Id != Guid.Empty).ToList();
+            _orders = (ordersTask.Result?.Data ?? []).Where(order => !string.IsNullOrWhiteSpace(order.OrderNumber)).ToList();
+            _currencies = (currenciesTask.Result ?? []).Where(currency => currency.IsActive || currency.Code == "THB").ToList();
+
+            ApplyDefaultCurrency();
+        }
+        catch (Exception ex)
+        {
+            _error = "Purchasing references could not be loaded.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loadingReferences = false;
+        }
+    }
+
+    private void OnSupplierChanged(ChangeEventArgs args)
+    {
+        _selectedSupplierId = Guid.TryParse(args.Value?.ToString(), out var supplierId) ? supplierId : null;
+        _request.SupplierServiceId = _selectedSupplierId;
+    }
+
+    private async Task OnSourceOrderChanged(ChangeEventArgs args)
+    {
+        _selectedSourceOrderId = args.Value?.ToString();
+        _request.SourceOrderId = _selectedSourceOrderId;
+        _lineOptions = [];
+        _selectedSourceOrderItemId = null;
+
+        if (string.IsNullOrWhiteSpace(_selectedSourceOrderId))
+        {
             return;
         }
 
-        if (_line.ExternalOrderItemId <= 0 || _line.Quantity <= 0)
+        try
         {
-            _error = "Enter a valid external order item and quantity.";
+            var order = await Http.GetFromJsonAsync<OrderDetailDto>($"api/v1/orders/{Uri.EscapeDataString(_selectedSourceOrderId)}");
+            _lineOptions = BuildLineOptions(order);
+            var firstLine = _lineOptions.FirstOrDefault();
+            _selectedSourceOrderItemId = firstLine?.SourceItemId;
+            _line.SourceOrderItemId = _selectedSourceOrderItemId;
+            _line.Quantity = firstLine?.Quantity ?? 1;
+        }
+        catch (Exception ex)
+        {
+            _error = "Source order details could not be loaded.";
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void OnCurrencyChanged(ChangeEventArgs args)
+    {
+        _selectedCurrencyCode = args.Value?.ToString();
+        var currency = _currencies.FirstOrDefault(item => string.Equals(item.Code, _selectedCurrencyCode, StringComparison.OrdinalIgnoreCase));
+        _request.CurrencyCode = currency?.Code;
+        _request.CurrencyServiceId = currency?.Id;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_selectedSupplierId is null)
+        {
+            _error = "Select a supplier.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedSourceOrderId))
+        {
+            _error = "Select a source order.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedCurrencyCode))
+        {
+            _error = "Select a currency.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedSourceOrderItemId) || _line.Quantity <= 0)
+        {
+            _error = "Select an order item and quantity.";
             return;
         }
 
         _saving = true;
         _error = null;
-        _request.Items = [_line];
+        _request.SupplierServiceId = _selectedSupplierId;
+        _request.SourceOrderId = _selectedSourceOrderId;
+        _request.CurrencyCode = _selectedCurrencyCode;
+        _request.Items =
+        [
+            _line with
+            {
+                SourceOrderItemId = _selectedSourceOrderItemId,
+                ExternalOrderItemId = 0
+            }
+        ];
 
         try
         {
@@ -101,7 +232,8 @@
             }
             else
             {
-                _error = "Purchase order could not be created.";
+                var body = await response.Content.ReadAsStringAsync();
+                _error = string.IsNullOrWhiteSpace(body) ? "Purchase order could not be created." : body;
             }
         }
         catch (Exception ex)
@@ -114,4 +246,47 @@
             _saving = false;
         }
     }
+
+    private void ApplyDefaultCurrency()
+    {
+        var currency = _currencies.FirstOrDefault(item => item.IsPrimary)
+            ?? _currencies.FirstOrDefault(item => item.Code == "THB")
+            ?? _currencies.FirstOrDefault();
+
+        if (currency is null)
+        {
+            return;
+        }
+
+        _selectedCurrencyCode = currency.Code;
+        _request.CurrencyCode = currency.Code;
+        _request.CurrencyServiceId = currency.Id;
+    }
+
+    private static List<LineOption> BuildLineOptions(OrderDetailDto? order)
+    {
+        if (order?.Items is { Count: > 0 })
+        {
+            return order.Items.Select((item, index) =>
+            {
+                var sourceItemId = item.Id == Guid.Empty ? "primary" : item.Id.ToString();
+                var label = string.IsNullOrWhiteSpace(item.Description)
+                    ? $"Line {index + 1}"
+                    : item.Description;
+
+                return new LineOption(sourceItemId, label, item.Quantity <= 0 ? 1 : item.Quantity);
+            }).ToList();
+        }
+
+        return [new LineOption("primary", "Order total", 1)];
+    }
+
+    private static string OrderLabel(OrderSummaryDto order)
+    {
+        var customer = string.IsNullOrWhiteSpace(order.CustomerName) ? "Customer not assigned" : order.CustomerName;
+        var status = string.IsNullOrWhiteSpace(order.Status) ? "No status" : order.Status;
+        return $"{order.OrderNumber} - {customer} - {status}";
+    }
+
+    private sealed record LineOption(string SourceItemId, string Label, decimal Quantity);
 }

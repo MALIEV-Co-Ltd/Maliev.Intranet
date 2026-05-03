@@ -1,4 +1,5 @@
 using Maliev.Intranet.Shared;
+using System.Text.Json.Serialization;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -17,7 +18,14 @@ public class SupplierServiceClient(HttpClient httpClient)
     /// <returns>A paged response containing supplier summaries.</returns>
     public async Task<PagedResponse<SupplierSummaryDto>?> GetSuppliersAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>($"/supplier/v1/suppliers?page={page}&pageSize={pageSize}", ct);
+        var response = await httpClient.GetAsync($"/supplier/v1/suppliers?page={page}&pageSize={pageSize}", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var downstream = await response.Content.ReadFromJsonAsync<SupplierListResponse>(cancellationToken: ct);
+        return downstream?.ToPagedResponse();
     }
 
     /// <summary>
@@ -31,7 +39,8 @@ public class SupplierServiceClient(HttpClient httpClient)
         var response = await httpClient.GetAsync($"/supplier/v1/suppliers/{id}", ct);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<SupplierDetailDto>(cancellationToken: ct);
+        var downstream = await response.Content.ReadFromJsonAsync<SupplierDetailResponse>(cancellationToken: ct);
+        return downstream?.ToDto();
     }
 
     /// <summary>
@@ -57,4 +66,90 @@ public class SupplierServiceClient(HttpClient httpClient)
     {
         return await httpClient.PatchAsync($"/supplier/v1/suppliers/{id}/deactivate", null, ct);
     }
+
+    private sealed record SupplierListResponse(
+        IReadOnlyList<SupplierResponse> Items,
+        int TotalCount,
+        int Page,
+        int PageSize,
+        int TotalPages)
+    {
+        public PagedResponse<SupplierSummaryDto> ToPagedResponse()
+        {
+            return new PagedResponse<SupplierSummaryDto>
+            {
+                Data = Items.Select(item => item.ToSummaryDto()).ToList(),
+                Meta = new PaginationMeta
+                {
+                    CurrentPage = Page,
+                    PageSize = PageSize,
+                    TotalCount = TotalCount,
+                    TotalItems = TotalCount,
+                    TotalPages = TotalPages
+                }
+            };
+        }
+    }
+
+    private sealed record SupplierResponse(
+        Guid Id,
+        string CompanyName,
+        string? TaxId,
+        string? Address,
+        string? City,
+        string? Country,
+        string? PostalCode,
+        string? Status,
+        DateTime CreatedAt)
+    {
+        public SupplierSummaryDto ToSummaryDto()
+        {
+            return new SupplierSummaryDto
+            {
+                Id = Id,
+                Name = CompanyName,
+                Status = Status ?? string.Empty,
+                Email = string.Empty,
+                Rating = 0m
+            };
+        }
+    }
+
+    private sealed record SupplierDetailResponse(
+        Guid Id,
+        string CompanyName,
+        string? Address,
+        string? City,
+        string? Country,
+        string? PostalCode,
+        string? Status,
+        IReadOnlyList<SupplierContactResponse>? Contacts,
+        PerformanceSummaryResponse? PerformanceSummary,
+        DateTime CreatedAt)
+    {
+        public SupplierDetailDto ToDto()
+        {
+            var contact = Contacts?.FirstOrDefault();
+            return new SupplierDetailDto
+            {
+                Id = Id,
+                Name = CompanyName,
+                Email = contact?.Email ?? string.Empty,
+                Phone = contact?.PhoneNumber,
+                Country = Country ?? string.Empty,
+                Address = string.Join(", ", new[] { Address, City, PostalCode, Country }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                Status = Status ?? string.Empty,
+                Rating = PerformanceSummary?.OverallRating ?? 0m,
+                ContactPerson = contact?.Name,
+                CreatedAt = CreatedAt
+            };
+        }
+    }
+
+    private sealed record SupplierContactResponse(
+        string Name,
+        string? Email,
+        [property: JsonPropertyName("phoneNumber")] string? PhoneNumber);
+
+    private sealed record PerformanceSummaryResponse(decimal? OverallRating);
 }

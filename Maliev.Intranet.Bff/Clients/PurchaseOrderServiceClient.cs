@@ -113,15 +113,19 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
         {
             OrderType = request.OrderType,
             SupplierID = request.SupplierId,
+            SupplierServiceId = request.SupplierServiceId,
             OrderID = request.OrderId,
+            SourceOrderId = request.SourceOrderId,
             CustomerPO = request.CustomerPo,
             CurrencyID = request.CurrencyId,
+            CurrencyServiceId = request.CurrencyServiceId,
+            CurrencyCode = request.CurrencyCode,
             WHTRate = request.WhtRate,
             ExpectedDeliveryDate = request.ExpectedDeliveryDate,
             Notes = request.Notes,
             Items = request.Items
-                .Where(item => item.ExternalOrderItemId > 0 && item.Quantity > 0)
-                .Select(item => new DownstreamPartialOrderItemRequest(item.ExternalOrderItemId, item.Quantity))
+                .Where(item => (item.ExternalOrderItemId > 0 || !string.IsNullOrWhiteSpace(item.SourceOrderItemId)) && item.Quantity > 0)
+                .Select(item => new DownstreamPartialOrderItemRequest(item.ExternalOrderItemId, item.SourceOrderItemId, item.Quantity))
                 .ToList()
         };
 
@@ -259,9 +263,13 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
 
         public int SupplierID { get; set; }
 
+        public Guid? SupplierServiceId { get; set; }
+
         public string SupplierName { get; set; } = string.Empty;
 
         public int OrderID { get; set; }
+
+        public string? SourceOrderId { get; set; }
 
         public string CurrencyCode { get; set; } = "THB";
 
@@ -278,8 +286,10 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
             OrderType = OrderType,
             Status = Status,
             SupplierId = SupplierID,
+            SupplierServiceId = SupplierServiceId,
             SupplierName = SupplierName,
             OrderId = OrderID,
+            SourceOrderId = SourceOrderId,
             CurrencyCode = CurrencyCode,
             TotalAmount = TotalAmount,
             Date = CreatedAt,
@@ -295,6 +305,8 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
         public string? CustomerPO { get; set; }
 
         public int CurrencyID { get; set; }
+
+        public Guid? CurrencyServiceId { get; set; }
 
         public string? CurrencySymbol { get; set; }
 
@@ -329,6 +341,7 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
             var dto = base.ToDto();
             dto.CustomerPo = CustomerPO;
             dto.CurrencyId = CurrencyID;
+            dto.CurrencyServiceId = CurrencyServiceId;
             dto.CurrencySymbol = CurrencySymbol;
             dto.Date = OrderDate ?? dto.Date;
             dto.SubtotalAmount = SubtotalAmount;
@@ -354,6 +367,8 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
 
         public int ExternalOrderItemId { get; set; }
 
+        public string? SourceOrderItemId { get; set; }
+
         public string ProductCode { get; set; } = string.Empty;
 
         public string ProductName { get; set; } = string.Empty;
@@ -378,6 +393,7 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
         {
             Id = Id,
             ExternalOrderItemId = ExternalOrderItemId,
+            SourceOrderItemId = SourceOrderItemId,
             ProductCode = ProductCode,
             ProductName = ProductName,
             Quantity = Quantity,
@@ -436,14 +452,26 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
         [JsonPropertyName("supplierID")]
         public int SupplierID { get; set; }
 
+        [JsonPropertyName("supplierServiceId")]
+        public Guid? SupplierServiceId { get; set; }
+
         [JsonPropertyName("orderID")]
         public int OrderID { get; set; }
+
+        [JsonPropertyName("sourceOrderId")]
+        public string? SourceOrderId { get; set; }
 
         [JsonPropertyName("customerPO")]
         public string? CustomerPO { get; set; }
 
         [JsonPropertyName("currencyID")]
         public int CurrencyID { get; set; }
+
+        [JsonPropertyName("currencyServiceId")]
+        public Guid? CurrencyServiceId { get; set; }
+
+        [JsonPropertyName("currencyCode")]
+        public string? CurrencyCode { get; set; }
 
         [JsonPropertyName("whtRate")]
         public decimal WHTRate { get; set; }
@@ -460,6 +488,7 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
 
     private sealed record DownstreamPartialOrderItemRequest(
         [property: JsonPropertyName("externalOrderItemId")] int ExternalOrderItemId,
+        [property: JsonPropertyName("sourceOrderItemId")] string? SourceOrderItemId,
         [property: JsonPropertyName("quantity")] decimal Quantity);
 
     private sealed record DownstreamCancelPurchaseOrderRequest(

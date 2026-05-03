@@ -70,7 +70,9 @@ public class ProcurementController(IPurchaseOrderServiceClient client) : Control
     public async Task<ActionResult<PurchaseOrderDto>> Create([FromBody] CreatePurchaseOrderRequest request, CancellationToken ct)
     {
         var result = await client.CreatePurchaseOrderAsync(request, ct);
-        return result is not null ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result) : BadRequest();
+        return result is not null
+            ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result)
+            : BadRequest("Purchase order could not be created. Check the selected supplier, source order, currency, and line item.");
     }
 
     /// <summary>

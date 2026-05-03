@@ -22,17 +22,26 @@ public sealed record PurchaseOrderDto
     /// <summary>The supplier identifier assigned by the purchasing service.</summary>
     public int SupplierId { get; set; }
 
+    /// <summary>The supplier identifier assigned by SupplierService.</summary>
+    public Guid? SupplierServiceId { get; set; }
+
     /// <summary>The display name of the supplier receiving the order.</summary>
     public string SupplierName { get; set; } = string.Empty;
 
     /// <summary>The source customer or sales order identifier associated with this purchase order.</summary>
     public int OrderId { get; set; }
 
+    /// <summary>The source order identifier assigned by OrderService.</summary>
+    public string? SourceOrderId { get; set; }
+
     /// <summary>The optional customer purchase order reference.</summary>
     public string? CustomerPo { get; set; }
 
     /// <summary>The currency identifier assigned by the currency service.</summary>
     public int CurrencyId { get; set; }
+
+    /// <summary>The currency identifier assigned by CurrencyService.</summary>
+    public Guid? CurrencyServiceId { get; set; }
 
     /// <summary>The ISO currency code used by this purchase order.</summary>
     public string CurrencyCode { get; set; } = "THB";
@@ -108,6 +117,9 @@ public sealed record PurchaseOrderLineItemDto
 
     /// <summary>The external order item identifier that PurchaseOrderService uses to hydrate product data.</summary>
     public int ExternalOrderItemId { get; set; }
+
+    /// <summary>The source order item identifier assigned by OrderService.</summary>
+    public string? SourceOrderItemId { get; set; }
 
     /// <summary>The product code copied from the source order item.</summary>
     public string ProductCode { get; set; } = string.Empty;
@@ -186,19 +198,28 @@ public sealed record CreatePurchaseOrderRequest
     public int OrderType { get; set; }
 
     /// <summary>The supplier identifier assigned by the purchasing service.</summary>
-    [Range(1, int.MaxValue)]
     public int SupplierId { get; set; }
 
+    /// <summary>The supplier identifier assigned by SupplierService.</summary>
+    public Guid? SupplierServiceId { get; set; }
+
     /// <summary>The source sales or customer order identifier.</summary>
-    [Range(1, int.MaxValue)]
     public int OrderId { get; set; }
+
+    /// <summary>The source sales or customer order identifier assigned by OrderService.</summary>
+    public string? SourceOrderId { get; set; }
 
     /// <summary>Optional customer purchase order reference.</summary>
     public string? CustomerPo { get; set; }
 
     /// <summary>The currency identifier assigned by CurrencyService.</summary>
-    [Range(1, int.MaxValue)]
     public int CurrencyId { get; set; } = 1;
+
+    /// <summary>The currency identifier assigned by CurrencyService.</summary>
+    public Guid? CurrencyServiceId { get; set; }
+
+    /// <summary>The ISO 4217 currency code selected for the purchase order.</summary>
+    public string? CurrencyCode { get; set; }
 
     /// <summary>The withholding tax rate to apply.</summary>
     [Range(0, 100)]
