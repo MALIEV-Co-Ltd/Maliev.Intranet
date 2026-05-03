@@ -39,6 +39,17 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("SetAccentHue", source, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void TopBar_CurrencySelectorTrigger_RemainsCompact()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+
+        Assert.Contains("flex: 0 0 86px;", source, StringComparison.Ordinal);
+        Assert.Contains("width: 86px;", source, StringComparison.Ordinal);
+        Assert.Contains("min-width: 220px;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("min-width: 120px;", source, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

@@ -138,8 +138,9 @@
 
 /* Currency autocomplete */
 .topbar-currency-autocomplete {
-    min-width: 120px;
-    width: auto;
+    flex: 0 0 86px;
+    width: 86px;
+    max-width: 86px;
     font-size: var(--maliev-font-small);
     font-weight: 600;
     font-family: var(--maliev-font-mono);
