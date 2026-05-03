@@ -255,6 +255,58 @@ public sealed class DraftPartState
     /// Zero-based index of the currently selected body. Null when no body is selected.
     /// </summary>
     public int? SelectedBodyIndex { get; set; }
+
+    /// <summary>
+    /// Per-part 3D viewer visual settings.
+    /// </summary>
+    public PartViewerSettings ViewerSettings { get; set; } = new();
+}
+
+/// <summary>
+/// Persisted visual settings for the 3D part viewer.
+/// </summary>
+public sealed class PartViewerSettings
+{
+    /// <summary>The active render mode: solid, wireframe, or transparent.</summary>
+    public string RenderMode { get; set; } = "solid";
+
+    /// <summary>The active camera projection: perspective or orthographic.</summary>
+    public string CameraProjection { get; set; } = "orthographic";
+
+    /// <summary>True when edge rendering is enabled.</summary>
+    public bool EdgesEnabled { get; set; }
+
+    /// <summary>True when the grid floor is enabled.</summary>
+    public bool GridEnabled { get; set; }
+
+    /// <summary>True when the part bounding box is enabled.</summary>
+    public bool BoundingBoxEnabled { get; set; }
+
+    /// <summary>True when section view is enabled.</summary>
+    public bool SectionEnabled { get; set; }
+
+    /// <summary>The section axis: x, y, or z.</summary>
+    public string SectionAxis { get; set; } = "x";
+
+    /// <summary>The section plane offset in millimeters.</summary>
+    public double SectionOffsetMm { get; set; }
+
+    /// <summary>True when the section clip plane is inverted.</summary>
+    public bool SectionInverted { get; set; }
+
+    /// <summary>Creates a detached copy.</summary>
+    public PartViewerSettings Clone() => new()
+    {
+        RenderMode = RenderMode,
+        CameraProjection = CameraProjection,
+        EdgesEnabled = EdgesEnabled,
+        GridEnabled = GridEnabled,
+        BoundingBoxEnabled = BoundingBoxEnabled,
+        SectionEnabled = SectionEnabled,
+        SectionAxis = SectionAxis,
+        SectionOffsetMm = SectionOffsetMm,
+        SectionInverted = SectionInverted,
+    };
 }
 
 /// <summary>

@@ -1,4 +1,5 @@
 @using Maliev.Intranet.Shared.Dtos
+@using Maliev.Intranet.Shared
 @using Maliev.Intranet.Client.Services
 @using System.Globalization
 @implements IAsyncDisposable
@@ -6,7 +7,7 @@
 @inject LayoutService LayoutService
 @inject ILogger<ModelViewer> Logger
 
-<div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: visible; contain: layout style;" @onclick="CloseAnalysisMenuOutside">
+<div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: visible; contain: layout style;" @onclick="CloseAnalysisPanels">
     <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block;"></canvas>
 
     @if (Model != null)
@@ -31,6 +32,59 @@
                 <MudText Typo="Typo.caption" Class="mt-2" Style="display: block; color: #ffd700;">@_lastMeasurement</MudText>
             }
         </div>
+    }
+
+    @* ── Analysis tools — top-right rail beside the axis gizmo ── *@
+    <div class="vp-analysis-rail" @onclick:stopPropagation>
+        <MudTooltip Text="Section View" Placement="Placement.Left" Arrow="false">
+            <button class="@($"vp-cube-btn {(_sectionEnabled ? "vp-active" : "")}")"
+                    @onclick="ToggleSectionMenu" type="button">
+                <MudIcon Icon="@Icons.Material.Filled.ContentCut" Size="Size.Small" />
+            </button>
+        </MudTooltip>
+        @foreach (var tool in _analysisTools)
+        {
+            <MudTooltip Text="@tool.Label" Placement="Placement.Left" Arrow="false">
+                <button class="@($"vp-cube-btn {(_activeAnalysisTool == tool.Key ? "vp-active" : "")}")"
+                        @onclick="@(() => SetAnalysisTool(tool.Key))" type="button">
+                    <MudIcon Icon="@tool.Icon" Size="Size.Small" />
+                </button>
+            </MudTooltip>
+        }
+        @if (_activeAnalysisTool != null)
+        {
+            <MudTooltip Text="Clear Analysis Tool" Placement="Placement.Left" Arrow="false">
+                <button class="vp-cube-btn" @onclick="ClearAnalysisTool" type="button">
+                    <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
+                </button>
+            </MudTooltip>
+        }
+    </div>
+
+    @if (_sectionMenuOpen)
+    {
+        <MudPaper Elevation="16" Class="pa-3 vp-section-panel" @onclick:stopPropagation>
+            <MudSwitch T="bool" Value="_sectionEnabled"
+                       ValueChanged="@((bool v) => SetSectionEnabledAsync(v))"
+                       Label="Enable section view"
+                       Color="Color.Primary" Class="mb-2" />
+            <div class="d-flex gap-1 mb-2">
+                @foreach (var ax in new[] { "x", "y", "z" })
+                {
+                    <button class="@($"vp-cube-btn {(_sectionAxis == ax ? "vp-active" : "")}")"
+                            @onclick='@(() => SetSectionAxisAsync(ax))' type="button"
+                            style="width: 56px;">@ax.ToUpperInvariant()</button>
+                }
+            </div>
+            <MudSlider T="double" Min="@SectionMin" Max="@SectionMax" Step="0.5"
+                       Value="_sectionOffset"
+                       ValueChanged="@((double v) => SetSectionOffsetAsync(v))">
+                Offset: @_sectionOffset.ToString("F1") mm
+            </MudSlider>
+            <MudCheckBox T="bool" Value="_sectionInverted"
+                         ValueChanged="@((bool v) => SetSectionInvertedAsync(v))"
+                         Label="Invert" Color="Color.Primary" />
+        </MudPaper>
     }
 
     @* ── CAD Toolbar — bottom-center, floating ── *@
@@ -101,45 +155,12 @@
                     @GetModeIconSvg("bounds", _bboxEnabled)
                 </button>
             </MudTooltip>
-
-            <div class="vp-divider" />
-
-            @* Section view *@
-            <div style="position: relative;">
-                <MudTooltip Text="Section View" Placement="Placement.Top" Arrow="false">
-                    <button class="@($"vp-cube-btn {(_sectionEnabled ? "vp-active" : "")}")"
-                            @onclick="ToggleSectionMenu" @onclick:stopPropagation="true" type="button">
-                        <MudIcon Icon="@Icons.Material.Filled.ContentCut" Size="Size.Small" />
-                    </button>
-                </MudTooltip>
-                @if (_sectionMenuOpen)
-                {
-                    <MudPaper Elevation="16" Class="pa-3"
-                              Style="position: absolute; bottom: 100%; right: 0; margin-bottom: 8px; min-width: 240px; z-index: 1000;"
-                              @onclick:stopPropagation>
-                        <MudSwitch T="bool" Value="_sectionEnabled"
-                                   ValueChanged="@((bool v) => SetSectionEnabledAsync(v))"
-                                   Label="Enable section view"
-                                   Color="Color.Primary" Class="mb-2" />
-                        <div class="d-flex gap-1 mb-2">
-                            @foreach (var ax in new[] { "x", "y", "z" })
-                            {
-                                <button class="@($"vp-cube-btn {(_sectionAxis == ax ? "vp-active" : "")}")"
-                                        @onclick='@(() => SetSectionAxisAsync(ax))' type="button"
-                                        style="width: 56px;">@ax.ToUpperInvariant()</button>
-                            }
-                        </div>
-                        <MudSlider T="double" Min="@SectionMin" Max="@SectionMax" Step="0.5"
-                                   Value="_sectionOffset"
-                                   ValueChanged="@((double v) => SetSectionOffsetAsync(v))">
-                            Offset: @_sectionOffset.ToString("F1") mm
-                        </MudSlider>
-                        <MudCheckBox T="bool" Value="_sectionInverted"
-                                     ValueChanged="@((bool v) => SetSectionInvertedAsync(v))"
-                                     Label="Invert" Color="Color.Primary" />
-                    </MudPaper>
-                }
-            </div>
+            <MudTooltip Text="Grid Floor" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_gridEnabled ? "vp-active" : "")}")"
+                        @onclick="ToggleGridAsync" type="button">
+                    @GetModeIconSvg("grid", _gridEnabled)
+                </button>
+            </MudTooltip>
 
             <div class="vp-divider" />
 
@@ -155,57 +176,6 @@
                                Class="vp-icon-btn"
                                Size="Size.Small" OnClick="ResetCamera" />
             </MudTooltip>
-
-            <div class="vp-divider" />
-
-            @* Analysis menu *@
-            <div style="position: relative;">
-                <MudTooltip Text="Analysis Tools" Placement="Placement.Top" Arrow="false">
-                    <button class="vp-cube-btn" @onclick="ToggleAnalysisMenu" @onclick:stopPropagation="true"
-                            type="button" style="display: flex; align-items: center; justify-content: center; min-width: 32px;"
-                            @onmouseenter="@(() => _hoveredAnalysisTool = "button")"
-                            @onmouseleave="@(() => _hoveredAnalysisTool = null)">
-                        @if (_activeAnalysisTool != null)
-                        {
-                            <span style="position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--mud-palette-primary); border-radius: 50%;"></span>
-                        }
-                        @((MarkupString)$@"
-                        <svg viewBox=""0 0 24 24"" width=""20"" height=""20"" style=""display:block;"" aria-hidden=""true"">
-                          <path d=""M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"" fill=""currentColor""/>
-                        </svg>")
-                    </button>
-                </MudTooltip>
-                @if (_analysisMenuOpen)
-                {
-                    <MudPaper Elevation="16" Class="pa-2" Style="position: absolute; bottom: 100%; right: 0; margin-bottom: 8px; min-width: 180px; z-index: 1000;" @onclick:stopPropagation>
-                        @foreach (var tool in _analysisTools)
-                        {
-                            <div class="d-flex align-center px-2 py-2"
-                                 style="cursor: pointer; border-radius: 4px; @(_hoveredAnalysisTool == tool.Key ? "background: rgba(var(--mud-palette-primary-rgb), 0.08);" : "")"
-                                 @onclick="@(() => SetAnalysisTool(tool.Key))"
-                                 @onmouseenter="@(() => _hoveredAnalysisTool = tool.Key)"
-                                 @onmouseleave="@(() => _hoveredAnalysisTool = null)">
-                                <MudIcon Icon="@tool.Icon" Size="Size.Small" Class="mr-2" />
-                                <MudText Typo="Typo.body2">@tool.Label</MudText>
-                                <div style="flex: 1;"></div>
-                                @if (_activeAnalysisTool == tool.Key)
-                                {
-                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Primary" />
-                                }
-                            </div>
-                        }
-                        <MudDivider Class="my-1" />
-                        <div class="d-flex align-center px-2 py-2"
-                             style="cursor: pointer; border-radius: 4px; @(_hoveredAnalysisTool == "clear" ? "background: rgba(var(--mud-palette-primary-rgb), 0.08);" : "")"
-                             @onclick="ClearAnalysisTool"
-                             @onmouseenter="@(() => _hoveredAnalysisTool = "clear")"
-                             @onmouseleave="@(() => _hoveredAnalysisTool = null)">
-                            <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" Class="mr-2" />
-                            <MudText Typo="Typo.body2">Clear</MudText>
-                        </div>
-                    </MudPaper>
-                }
-            </div>
 
         </MudPaper>
     </div>
@@ -224,12 +194,16 @@
     [Parameter] public EventCallback<int?>        OnBodyPicked   { get; set; }
     /// <summary>Optional CNC turning axis overlay for the loaded model.</summary>
     [Parameter] public TurningAxisViewModel?      TurningAxis    { get; set; }
+    /// <summary>Per-part persisted viewer visual settings.</summary>
+    [Parameter] public PartViewerSettings         ViewerSettings { get; set; } = new();
+    /// <summary>Raised when a persisted viewer setting changes.</summary>
+    [Parameter] public EventCallback<PartViewerSettings> ViewerSettingsChanged { get; set; }
 
     /// <summary>Body metadata for multi-body CAD files.</summary>
     public record BodyViewModel(int Index, string Name, double? VolumeCm3, string? ColorHex);
 
     /// <summary>Detected CNC turning axis in model coordinates.</summary>
-    public record TurningAxisViewModel(string PrimaryAxis, IReadOnlyList<double> AxisVector);
+    public record TurningAxisViewModel(string PrimaryAxis, IReadOnlyList<double> AxisVector, IReadOnlyList<double> AxisPoint);
 
     private string _canvasId    = $"babylon-canvas-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
@@ -239,12 +213,12 @@
     private string _cameraProjection  = "orthographic";
     private bool   _edgesEnabled;
     private bool   _bboxEnabled;
+    private bool   _gridEnabled;
     private string? _lastViewerUrl;
     private string? _lastTurningAxisKey;
-    private bool   _analysisMenuOpen;
     private string? _activeAnalysisTool;  // "flippedTriangles" | "measure" | "thickness" | null
-    private string? _hoveredAnalysisTool;  // For hover effect in dropdown
     private string? _lastMeasurement;     // Display last measurement result in overlay
+    private string? _lastViewerSettingsKey;
 
     // ── Section view ─────────────────────────────────────────────────────────
     private bool   _sectionEnabled;
@@ -284,6 +258,83 @@
     {
         _dotNetRef = DotNetObjectReference.Create(this);
     }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        ApplyViewerSettings(ViewerSettings);
+    }
+
+    private void ApplyViewerSettings(PartViewerSettings settings)
+    {
+        var key = GetViewerSettingsKey(settings);
+        if (string.Equals(key, _lastViewerSettingsKey, StringComparison.Ordinal))
+            return;
+
+        _renderMode = NormalizeRenderMode(settings.RenderMode);
+        _cameraProjection = NormalizeProjection(settings.CameraProjection);
+        _edgesEnabled = settings.EdgesEnabled && _renderMode != "wireframe";
+        _gridEnabled = settings.GridEnabled;
+        _bboxEnabled = settings.BoundingBoxEnabled;
+        _sectionEnabled = settings.SectionEnabled;
+        _sectionAxis = NormalizeSectionAxis(settings.SectionAxis);
+        _sectionOffset = settings.SectionOffsetMm;
+        _sectionInverted = settings.SectionInverted;
+        _lastViewerSettingsKey = key;
+    }
+
+    private PartViewerSettings CaptureViewerSettings() => new()
+    {
+        RenderMode = _renderMode,
+        CameraProjection = _cameraProjection,
+        EdgesEnabled = _edgesEnabled,
+        GridEnabled = _gridEnabled,
+        BoundingBoxEnabled = _bboxEnabled,
+        SectionEnabled = _sectionEnabled,
+        SectionAxis = _sectionAxis,
+        SectionOffsetMm = _sectionOffset,
+        SectionInverted = _sectionInverted,
+    };
+
+    private async Task NotifyViewerSettingsChangedAsync()
+    {
+        var settings = CaptureViewerSettings();
+        _lastViewerSettingsKey = GetViewerSettingsKey(settings);
+        if (ViewerSettingsChanged.HasDelegate)
+            await ViewerSettingsChanged.InvokeAsync(settings);
+    }
+
+    private static string GetViewerSettingsKey(PartViewerSettings settings) =>
+        string.Join(
+            "|",
+            NormalizeRenderMode(settings.RenderMode),
+            NormalizeProjection(settings.CameraProjection),
+            settings.EdgesEnabled,
+            settings.GridEnabled,
+            settings.BoundingBoxEnabled,
+            settings.SectionEnabled,
+            NormalizeSectionAxis(settings.SectionAxis),
+            settings.SectionOffsetMm.ToString("G17", CultureInfo.InvariantCulture),
+            settings.SectionInverted);
+
+    private static string NormalizeRenderMode(string? mode) =>
+        string.Equals(mode, "wireframe", StringComparison.OrdinalIgnoreCase)
+            ? "wireframe"
+            : string.Equals(mode, "transparent", StringComparison.OrdinalIgnoreCase)
+                ? "transparent"
+                : "solid";
+
+    private static string NormalizeProjection(string? mode) =>
+        string.Equals(mode, "perspective", StringComparison.OrdinalIgnoreCase)
+            ? "perspective"
+            : "orthographic";
+
+    private static string NormalizeSectionAxis(string? axis) =>
+        string.Equals(axis, "y", StringComparison.OrdinalIgnoreCase)
+            ? "y"
+            : string.Equals(axis, "z", StringComparison.OrdinalIgnoreCase)
+                ? "z"
+                : "x";
 
     [JSInvokable]
     public async Task OnLoadError(string errorMessage)
@@ -409,6 +460,11 @@
                 <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" stroke="{edgeC}" stroke-width="2" stroke-dasharray="4 4" fill="none" stroke-linecap="round"/>
                 """,
 
+            "grid" => $"""
+                <path d="M16 72H84M24 60H76M32 48H68M40 36H60M26 24 12 76M42 24 34 76M58 24 66 76M74 24 88 76" stroke="{edgeC}" stroke-width="3" stroke-linecap="round"/>
+                <path d="M16 72H84M24 60H76M32 48H68M40 36H60" stroke="{backC}" stroke-width="1.5" stroke-linecap="round"/>
+                """,
+
             "ortho" => $"""
                 <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                 <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -445,10 +501,6 @@
                 if (previousUrl != null)
                     await _module.InvokeVoidAsync("dispose", _canvasId);
 
-                _renderMode  = "solid";
-                _edgesEnabled = false;
-                _bboxEnabled  = false;
-
                 // Pass known bounding-box dimensions (mm) so the viewer can correct the glTF meter scale.
                 // Prefer Model properties, fall back to KnownDimensions parameter.
                 object? dims = null;
@@ -457,6 +509,7 @@
                 else if (KnownDimensions?.X > 0 && KnownDimensions.Y > 0 && KnownDimensions.Z > 0)
                     dims = new { x = KnownDimensions.X, y = KnownDimensions.Y, z = KnownDimensions.Z };
 
+                var settings = CaptureViewerSettings();
                 Logger.LogDebug("Calling JS initialize with URL: {ViewerUrl}", ViewerUrl);
                 await _module.InvokeVoidAsync("initialize",
                     _canvasId,
@@ -465,8 +518,7 @@
                     LayoutService.IsDarkMode,
                     dims,
                     _dotNetRef,
-                    _renderMode,
-                    _cameraProjection);
+                    settings);
                 await ApplyTurningAxisAsync();
             }
             catch (Exception ex)
@@ -482,13 +534,16 @@
 
     private string GetTurningAxisKey()
     {
-        if (TurningAxis is not { AxisVector.Count: >= 3 } axis)
+        if (TurningAxis is not { AxisVector.Count: >= 3, AxisPoint.Count: >= 3 } axis)
             return string.Empty;
 
         var values = axis.AxisVector
             .Take(3)
             .Select(value => value.ToString("G17", CultureInfo.InvariantCulture));
-        return $"{axis.PrimaryAxis}:{string.Join(",", values)}";
+        var pointValues = axis.AxisPoint
+            .Take(3)
+            .Select(value => value.ToString("G17", CultureInfo.InvariantCulture));
+        return $"{axis.PrimaryAxis}:{string.Join(",", values)}:{string.Join(",", pointValues)}";
     }
 
     private async Task ApplyTurningAxisAsync()
@@ -498,9 +553,9 @@
 
         try
         {
-            if (TurningAxis is { AxisVector.Count: >= 3 } axis && !string.IsNullOrWhiteSpace(axis.PrimaryAxis))
+            if (TurningAxis is { AxisVector.Count: >= 3, AxisPoint.Count: >= 3 } axis && !string.IsNullOrWhiteSpace(axis.PrimaryAxis))
             {
-                await _module.InvokeVoidAsync("setTurningAxis", _canvasId, axis.PrimaryAxis, axis.AxisVector.Take(3).ToArray());
+                await _module.InvokeVoidAsync("setTurningAxis", _canvasId, axis.PrimaryAxis, axis.AxisVector.Take(3).ToArray(), axis.AxisPoint.Take(3).ToArray());
             }
             else
             {
@@ -541,7 +596,13 @@
         }
 
         if (_module != null)
+        {
             await _module.InvokeVoidAsync("setRenderMode", _canvasId, target);
+            if (target == "wireframe")
+                await _module.InvokeVoidAsync("toggleEdges", _canvasId, false);
+        }
+
+        await NotifyViewerSettingsChangedAsync();
     }
 
     private async Task ResetCamera()
@@ -594,6 +655,8 @@
 
         if (_module != null)
             await _module.InvokeVoidAsync("toggleEdges", _canvasId, _edgesEnabled);
+
+        await NotifyViewerSettingsChangedAsync();
     }
 
     private async Task ToggleBoundingBoxAsync()
@@ -610,17 +673,27 @@
 
         if (_module != null)
             await _module.InvokeVoidAsync("toggleBoundingBox", _canvasId, _bboxEnabled);
+
+        await NotifyViewerSettingsChangedAsync();
     }
 
-    private void ToggleAnalysisMenu()
+    private async Task ToggleGridAsync()
     {
-        _analysisMenuOpen = !_analysisMenuOpen;
-        StateHasChanged();
+        _gridEnabled = !_gridEnabled;
+
+        if (_module != null)
+        {
+            if (_gridEnabled)
+                await _module.InvokeVoidAsync("showGrid", _canvasId);
+            else
+                await _module.InvokeVoidAsync("hideGrid", _canvasId);
+        }
+
+        await NotifyViewerSettingsChangedAsync();
     }
 
-    private void CloseAnalysisMenuOutside()
+    private void CloseAnalysisPanels()
     {
-        _analysisMenuOpen = false;
         _sectionMenuOpen = false;
     }
 
@@ -638,7 +711,6 @@
         {
             _activeAnalysisTool = tool;
             _lastMeasurement = null;  // Clear when switching tools
-            _analysisMenuOpen = false;
             if (_module != null)
                 await EnableAnalysisToolAsync(tool);
         }
@@ -647,7 +719,6 @@
     private async Task ClearAnalysisTool()
     {
         _activeAnalysisTool = null;
-        _analysisMenuOpen = false;
         _lastMeasurement = null;
         if (_module != null)
             await ClearAnalysisToolsAsync();
@@ -684,6 +755,8 @@
         _cameraProjection = mode;
         if (_module != null)
             await _module.InvokeVoidAsync("setCameraProjection", _canvasId, mode);
+
+        await NotifyViewerSettingsChangedAsync();
     }
 
     // ── Section view ─────────────────────────────────────────────────────────
@@ -697,6 +770,7 @@
     {
         _sectionEnabled = v;
         await _SendSectionPlane();
+        await NotifyViewerSettingsChangedAsync();
     }
 
     private async Task SetSectionAxisAsync(string axis)
@@ -704,18 +778,21 @@
         _sectionAxis   = axis;
         _sectionOffset = 0; // reset offset to centre when axis changes
         await _SendSectionPlane();
+        await NotifyViewerSettingsChangedAsync();
     }
 
     private async Task SetSectionOffsetAsync(double mm)
     {
         _sectionOffset = mm;
         await _SendSectionPlane();
+        await NotifyViewerSettingsChangedAsync();
     }
 
     private async Task SetSectionInvertedAsync(bool v)
     {
         _sectionInverted = v;
         await _SendSectionPlane();
+        await NotifyViewerSettingsChangedAsync();
     }
 
     private async Task _SendSectionPlane()
@@ -750,7 +827,12 @@
     public async Task ShowGridAsync()
     {
         if (_module == null) return;
-        try { await _module.InvokeVoidAsync("showGrid", _canvasId); }
+        try
+        {
+            _gridEnabled = true;
+            await _module.InvokeVoidAsync("showGrid", _canvasId);
+            await NotifyViewerSettingsChangedAsync();
+        }
         catch (Exception ex) { Console.WriteLine($"[ModelViewer] showGrid error: {ex.Message}"); }
     }
 
@@ -758,7 +840,12 @@
     public async Task HideGridAsync()
     {
         if (_module == null) return;
-        try { await _module.InvokeVoidAsync("hideGrid", _canvasId); }
+        try
+        {
+            _gridEnabled = false;
+            await _module.InvokeVoidAsync("hideGrid", _canvasId);
+            await NotifyViewerSettingsChangedAsync();
+        }
         catch (Exception ex) { Console.WriteLine($"[ModelViewer] hideGrid error: {ex.Message}"); }
     }
 
@@ -810,6 +897,7 @@
             {
                 _renderMode = "solid";
                 await _module.InvokeVoidAsync("setRenderMode", _canvasId, "solid");
+                await NotifyViewerSettingsChangedAsync();
             }
 
             if (bodyIndex.HasValue)

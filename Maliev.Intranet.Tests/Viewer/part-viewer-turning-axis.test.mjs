@@ -143,7 +143,7 @@ test('turning axis resolver uses concentric bore instead of larger exterior ring
     context.fallbackCenter = new Vector3(0, 2, 0);
 
     const result = vm.runInContext(
-        "resolveTurningAxis(scene, 'viewer', 'X', [1, 0, 0], bb, fallbackCenter)",
+        "resolveTurningAxis(scene, 'viewer', 'X', [1, 0, 0], null, bb, fallbackCenter)",
         context);
 
     assert.ok(Math.abs(result.direction.x) > 0.98);
@@ -169,7 +169,7 @@ test('explicit turning axis uses low-resolution bore center instead of bounding-
     context.fallbackCenter = new Vector3(0, 2, 0);
 
     const result = vm.runInContext(
-        "resolveTurningAxis(scene, 'viewer', 'X', [1, 0, 0], bb, fallbackCenter)",
+        "resolveTurningAxis(scene, 'viewer', 'X', [1, 0, 0], null, bb, fallbackCenter)",
         context);
 
     assert.ok(Math.abs(result.direction.x) > 0.98);
@@ -184,6 +184,31 @@ test('turning axis is only requested from GeometryService report data', () => {
     assert.equal(cardSource.includes('BuildProvisionalTurningAxis'), false);
     assert.equal(cardSource.includes('"AUTO"'), false);
     assert.equal(source.includes("axis === 'AUTO'"), false);
+});
+
+test('turning axis renderer accepts backend axis point', () => {
+    const source = viewerSource();
+
+    assert.match(source, /setTurningAxis\(canvasId,\s*primaryAxis,\s*axisVector,\s*axisPoint/);
+    assert.match(source, /buildTurningAxisGeometry\(canvasId,\s*primaryAxis,\s*axisVector,\s*axisPoint/);
+    assert.match(source, /transformBackendAxisPoint/);
+});
+
+test('viewer initialization applies persisted visual toolbar state', () => {
+    const source = viewerSource();
+
+    assert.match(source, /initialize\(canvasId,\s*fileUrl,\s*fileExt,\s*isDark,\s*knownDimsMm,\s*dotNetRef,\s*viewerSettings/);
+    assert.match(source, /toggleEdges\(canvasId,\s*!!viewerSettings\.edgesEnabled\)/);
+    assert.match(source, /viewerSettings\.gridEnabled\s*\?\s*showGrid\(canvasId\)\s*:\s*hideGrid\(canvasId\)/);
+});
+
+test('section view rebuild is throttled and disposes hatch/ghost meshes', () => {
+    const source = viewerSource();
+
+    assert.match(source, /scheduleSectionRebuild/);
+    assert.match(source, /disposeSectionVisuals/);
+    assert.match(source, /sectionHatchMeshes\[canvasId\]/);
+    assert.match(source, /sectionGhostMeshes\[canvasId\]/);
 });
 
 test('turning axis overlay does not render a CW label', () => {

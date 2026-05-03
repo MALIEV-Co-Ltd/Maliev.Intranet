@@ -172,6 +172,9 @@ public class PartViewModel
     /// <summary>Zero-based index of the currently selected body. Null when no body is selected.</summary>
     public int? SelectedBodyIndex { get; set; }
 
+    /// <summary>Per-part visual settings for the 3D viewer.</summary>
+    public PartViewerSettings ViewerSettings { get; set; } = new();
+
     /// <summary>
     /// Per-body metadata for multi-body CAD files. Matches SignalRBodyInfo structure from BFF.
     /// </summary>
@@ -486,6 +489,7 @@ public class PartViewModel
         BodyCount = BodyCount,
         BodiesJson = Bodies.Count > 0 ? JsonSerializer.Serialize(Bodies) : null,
         SelectedBodyIndex = SelectedBodyIndex,
+        ViewerSettings = ViewerSettings.Clone(),
     };
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
@@ -548,6 +552,7 @@ public class PartViewModel
             OverlayPaths = s.OverlayPaths,
             BodyCount = s.BodyCount,
             SelectedBodyIndex = s.SelectedBodyIndex,
+            ViewerSettings = s.ViewerSettings.Clone(),
         };
 
         // Deserialise body metadata from JSON

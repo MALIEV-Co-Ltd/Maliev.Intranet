@@ -62,6 +62,7 @@ public class DfmChecksTabTests : BunitContext, IAsyncLifetime
         IsTurnable: issues.Count == 0,
         PrimaryAxis: "Z",
         AxisVector: [0, 0, 1],
+        AxisPoint: [0, 0, 0],
         LengthDiameterRatio: 1,
         SymmetryDeviation: issues.Count == 0 ? 0 : 1,
         Issues: issues);
@@ -81,6 +82,7 @@ public class DfmChecksTabTests : BunitContext, IAsyncLifetime
         IsTurnable: true,
         PrimaryAxis: string.Empty,
         AxisVector: [],
+        AxisPoint: [],
         LengthDiameterRatio: 0,
         SymmetryDeviation: 0,
         Issues: issues);

@@ -218,6 +218,11 @@ public class DfmReport
     public List<double> AxisVector { get; set; } = new();
 
     /// <summary>
+    /// Point on the detected turning axis in model coordinates.
+    /// </summary>
+    public List<double> AxisPoint { get; set; } = new();
+
+    /// <summary>
     /// Length-to-diameter ratio for CNC turning analysis.
     /// </summary>
     public double? LengthDiameterRatio { get; set; }

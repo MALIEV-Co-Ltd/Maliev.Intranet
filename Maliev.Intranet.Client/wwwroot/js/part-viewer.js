@@ -488,6 +488,31 @@ function toWorldPoint(point) {
     return new BABYLON.Vector3(point.x, point.y, point.z);
 }
 
+function normalizeViewerSettings(viewerSettings) {
+    const settings = viewerSettings && typeof viewerSettings === 'object' ? viewerSettings : {};
+    const renderMode = settings.renderMode === 'wireframe' || settings.renderMode === 'transparent'
+        ? settings.renderMode
+        : 'solid';
+    const cameraMode = settings.cameraProjection === 'perspective'
+        ? 'perspective'
+        : 'orthographic';
+    const sectionAxis = settings.sectionAxis === 'y' || settings.sectionAxis === 'z'
+        ? settings.sectionAxis
+        : 'x';
+
+    return {
+        renderMode,
+        cameraProjection: cameraMode,
+        edgesEnabled: !!settings.edgesEnabled && renderMode !== 'wireframe',
+        gridEnabled: !!settings.gridEnabled,
+        boundingBoxEnabled: !!settings.boundingBoxEnabled,
+        sectionEnabled: !!settings.sectionEnabled,
+        sectionAxis,
+        sectionOffsetMm: Number.isFinite(Number(settings.sectionOffsetMm)) ? Number(settings.sectionOffsetMm) : 0,
+        sectionInverted: !!settings.sectionInverted,
+    };
+}
+
 function normalizeAxisVector(axisVector) {
     if (!Array.isArray(axisVector) || axisVector.length < 3) return null;
 
@@ -503,6 +528,29 @@ function normalizeAxisVector(axisVector) {
     const worldDirection = BABYLON.Vector3.TransformNormal(direction, BABYLON.Matrix.RotationX(Math.PI / 2));
     if (worldDirection.length() < 1e-6) return null;
     return worldDirection.normalize();
+}
+
+function transformBackendAxisPoint(canvasId, axisPoint) {
+    if (!Array.isArray(axisPoint) || axisPoint.length < 3) return null;
+
+    const sourcePoint = new BABYLON.Vector3(
+        Number(axisPoint[0]),
+        Number(axisPoint[1]),
+        Number(axisPoint[2])
+    );
+    if (!isFinite(sourcePoint.x) || !isFinite(sourcePoint.y) || !isFinite(sourcePoint.z)) {
+        return null;
+    }
+
+    const scaleFactor = modelScaleFactors[canvasId] ?? 1;
+    const scaled = sourcePoint.scale(scaleFactor);
+    const rotated = BABYLON.Vector3.TransformCoordinates(scaled, BABYLON.Matrix.RotationX(Math.PI / 2));
+    const offset = modelCenterOffsets[canvasId] ?? { cx: 0, cy: 0, zLift: 0 };
+    return new BABYLON.Vector3(
+        rotated.x - offset.cx,
+        rotated.y - offset.cy,
+        rotated.z + offset.zLift
+    );
 }
 
 function directionFromPrimaryAxis(primaryAxis) {
@@ -918,11 +966,21 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
     };
 }
 
-function resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, bb, fallbackCenter) {
+function resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, axisPoint, bb, fallbackCenter) {
     const points = collectTurningAxisSamplePoints(scene, canvasId);
     const direction = normalizeAxisVector(axisVector)
         || directionFromPrimaryAxis(primaryAxis)
         || detectTurningAxisDirectionFromBounds(bb);
+    const backendCenter = transformBackendAxisPoint(canvasId, axisPoint);
+    if (backendCenter) {
+        return {
+            direction,
+            center: backendCenter,
+            score: Number.POSITIVE_INFINITY,
+            ringCount: 0,
+        };
+    }
+
     const evaluated = evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter);
     return {
         direction,
@@ -1066,14 +1124,14 @@ function updateTurningAxisSvg(canvasId, state) {
     state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, state.hovered));
 }
 
-function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
+function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector, axisPoint) {
     const scene = scenes[canvasId];
     const bb = sceneBoundingBoxes[canvasId];
     const centerData = meshCenters[canvasId];
     if (!scene || !bb || !centerData) return false;
 
     const fallbackCenter = toWorldPoint(centerData);
-    const resolvedAxis = resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, bb, fallbackCenter);
+    const resolvedAxis = resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, axisPoint, bb, fallbackCenter);
     const direction = resolvedAxis?.direction;
     if (!direction) {
         clearTurningAxis(canvasId, false);
@@ -1139,9 +1197,9 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector) {
     return true;
 }
 
-export function setTurningAxis(canvasId, primaryAxis, axisVector) {
-    turningAxisRequests[canvasId] = { primaryAxis, axisVector };
-    buildTurningAxisGeometry(canvasId, primaryAxis, axisVector);
+export function setTurningAxis(canvasId, primaryAxis, axisVector, axisPoint) {
+    turningAxisRequests[canvasId] = { primaryAxis, axisVector, axisPoint };
+    buildTurningAxisGeometry(canvasId, primaryAxis, axisVector, axisPoint);
 }
 
 export function clearTurningAxis(canvasId, clearRequest = true) {
@@ -1591,10 +1649,10 @@ function applyPreset(cam, presetName, smooth = false, canvasId = null) {
  * @param {boolean} isDark
  * @param {object|null} knownDimsMm  Optional { x, y, z } bounding box in mm from server
  * @param {object|null} dotNetRef   Optional DotNetObjectReference for error callbacks
- * @param {string}  renderMode     Optional render mode: "solid", "wireframe", "transparent" (default: "solid")
- * @param {string}  cameraProjection  Optional camera projection: "perspective" or "orthographic" (default: "perspective")
+ * @param {object|null} viewerSettings  Per-part render/projection/section settings
  */
-export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef, renderMode = "solid", cameraProjection = "perspective") {
+export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm, dotNetRef, viewerSettings = {}) {
+    viewerSettings = normalizeViewerSettings(viewerSettings);
     // Debug logging: track when initialize is called
     const sanitizedUrl = fileUrl ? (fileUrl.includes('?') ? fileUrl.substring(0, fileUrl.indexOf('?')) + '?[SIGNED_URL]' : fileUrl) : '(none)';
     debugLog('[BabylonViewer] initialize START:', { canvasId, url: sanitizedUrl, fileExt, prevGen: loadGenerations[canvasId] || 0, timestamp: Date.now() });
@@ -1624,7 +1682,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         originalMaterials[canvasId]= {};
         sceneBoundingBoxes[canvasId] = null;
         meshCenters[canvasId]      = null;
-        edgesEnabled[canvasId]     = false;
+        edgesEnabled[canvasId]     = !!viewerSettings.edgesEnabled;
 
         const engine = new BABYLON.Engine(canvas, true, {
             premultipliedAlpha: false,
@@ -1653,8 +1711,8 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         mainCameras[canvasId] = camera;
 
         // Set initial projection mode based on parameter
-        debugLog('[BabylonViewer] initialize: cameraProjection =', cameraProjection);
-        if (cameraProjection === 'orthographic') {
+        debugLog('[BabylonViewer] initialize: cameraProjection =', viewerSettings.cameraProjection);
+        if (viewerSettings.cameraProjection === 'orthographic') {
             setCameraProjection(canvasId, 'orthographic');
         }
 
@@ -1827,7 +1885,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 };
                 if (turningAxisRequests[canvasId]) {
                     const request = turningAxisRequests[canvasId];
-                    buildTurningAxisGeometry(canvasId, request.primaryAxis, request.axisVector);
+                    buildTurningAxisGeometry(canvasId, request.primaryAxis, request.axisVector, request.axisPoint);
                 }
 
                 // ── Permanent shadow-catcher ground plane ──
@@ -1986,7 +2044,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     // _loadAttempt is started, before the async callback fires), so
                     // setCameraProjection will no longer return early. This also recalculates
                     // ortho bounds using the correct model-scale radius.
-                    setCameraProjection(canvasId, cameraProjection);
+                    setCameraProjection(canvasId, viewerSettings.cameraProjection);
                 }
 
                 // ── Post Processing ──
@@ -2033,8 +2091,17 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 ro.observe(canvas);
                 resizeObservers[canvasId] = ro;
 
-                setRenderMode(canvasId, renderMode);
-                toggleEdges(canvasId, false);
+                setRenderMode(canvasId, viewerSettings.renderMode);
+                toggleEdges(canvasId, !!viewerSettings.edgesEnabled);
+                toggleBoundingBox(canvasId, !!viewerSettings.boundingBoxEnabled);
+                viewerSettings.gridEnabled ? showGrid(canvasId) : hideGrid(canvasId);
+                setSectionPlane(
+                    canvasId,
+                    !!viewerSettings.sectionEnabled,
+                    viewerSettings.sectionAxis,
+                    viewerSettings.sectionOffsetMm,
+                    !!viewerSettings.sectionInverted
+                );
             },
             null,
             (_scene, message, exception) => {
@@ -3459,6 +3526,34 @@ export function clearDfmOverlays(canvasId, partKey) {
 
 // ── setSectionPlane ──────────────────────────────────────────────────────────
 
+function disposeSectionVisuals(canvasId, scene = scenes[canvasId]) {
+    if (sectionEdgeMeshes[canvasId]) {
+        sectionEdgeMeshes[canvasId].dispose();
+        sectionEdgeMeshes[canvasId] = null;
+    }
+    if (sectionHatchMeshes[canvasId]) {
+        sectionHatchMeshes[canvasId].dispose();
+        sectionHatchMeshes[canvasId] = null;
+    }
+    if (sectionObservers[canvasId]) {
+        if (scene) scene.onBeforeRenderObservable.remove(sectionObservers[canvasId]);
+        sectionObservers[canvasId] = null;
+    }
+    _disposeSectionGhosts(canvasId);
+    _sectionRebuildPending[canvasId] = false;
+}
+
+function scheduleSectionRebuild(canvasId, scene, planeNormal, planeD) {
+    if (_sectionRebuildPending[canvasId]) return;
+    _sectionRebuildPending[canvasId] = true;
+    requestAnimationFrame(() => {
+        _sectionRebuildPending[canvasId] = false;
+        if (scenes[canvasId] !== scene || !scene.clipPlane) return;
+        _rebuildSectionEdges(canvasId, scene, planeNormal, planeD);
+        _rebuildSectionHatch(canvasId, scene, planeNormal, planeD);
+    });
+}
+
 /**
  * Sets or clears the scene clipping plane and redraws the cut-edge lines.
  * offsetMm is measured from the model centre along the chosen axis (so 0 = centre).
@@ -3472,24 +3567,10 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
-    // Dispose any existing cut-edge lines, hatch lines, and observer
-    if (sectionEdgeMeshes[canvasId]) {
-        sectionEdgeMeshes[canvasId].dispose();
-        sectionEdgeMeshes[canvasId] = null;
-    }
-    if (sectionHatchMeshes[canvasId]) {
-        sectionHatchMeshes[canvasId].dispose();
-        sectionHatchMeshes[canvasId] = null;
-    }
-    if (sectionObservers[canvasId]) {
-        scene.onBeforeRenderObservable.remove(sectionObservers[canvasId]);
-        sectionObservers[canvasId] = null;
-    }
-    _sectionRebuildPending[canvasId] = false;
+    disposeSectionVisuals(canvasId, scene);
 
     if (!enabled) {
         scene.clipPlane = null;
-        _disposeSectionGhosts(canvasId);
         return;
     }
 
@@ -3516,12 +3597,7 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     // Create ghost clones for the hidden half (xray silhouette)
     _createSectionGhosts(canvasId, scene, nx, ny, nz, d);
 
-    // Build cut-edge lines once — edges are world-space segments that don't change
-    // when the ArcRotateCamera orbits. No per-frame rebuild needed.
-    _rebuildSectionEdges(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
-
-    // Build cross-hatch lines on the section face to indicate solid material
-    _rebuildSectionHatch(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
+    scheduleSectionRebuild(canvasId, scene, new BABYLON.Vector3(nx, ny, nz), d);
 }
 
 /**
@@ -3700,88 +3776,70 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
         }
     }
 
-    // Generate diagonal hatch lines across the bounding box
-    const hatchSpacing = 0.003; // ~3mm in Babylon units
-    const hatchAngle = Math.PI / 4; // 45 degrees
+    // Generate diagonal cross-hatch lines across the bounding box.
+    const hatchSpacing = Math.max(3.0 * (modelScaleFactors[canvasId] ?? 1), 0.5);
+    const hatchAngles = [Math.PI / 4, -Math.PI / 4];
     const hatchLines = [];
 
-    // Project the diagonal direction: hatch lines run along (cos45, sin45) in UV space
-    const cosA = Math.cos(hatchAngle);
-    const sinA = Math.sin(hatchAngle);
-    // Perpendicular to hatch direction = normal of hatch lines = (-sin45, cos45)
-    const perpU = -sinA;
-    const perpV = cosA;
-
-    // For each triangle that crosses the section plane, check if a hatch line intersects it
-    // Simpler approach: for each hatch line, test intersection with each edge segment
     const hatchExtent = Math.max(maxU - minU, maxV - minV) * 1.5;
+    const planeLift = planeNormal.scale(0.02);
 
-    for (let offset = -hatchExtent; offset <= hatchExtent; offset += hatchSpacing) {
-        // This hatch line passes through: (u, v) where perpU * u + perpV * v = offset
-        // Parameterize as: u = offset * cosA + t * sinA, v = offset * sinA - t * cosA (or similar)
-        // Actually: line is { (u,v) | perpU*u + perpV*v = offset }
-        // Direction along line: (cosA, sinA)
-        // So: u = (offset * perpU + t * cosA) ... let me just do proper intersection
+    for (const hatchAngle of hatchAngles) {
+        const cosA = Math.cos(hatchAngle);
+        const sinA = Math.sin(hatchAngle);
+        const perpU = -sinA;
+        const perpV = cosA;
 
-        const intersectPts = [];
-        for (const seg of allSegments) {
-            // Project segment endpoints to 2D
-            const u0 = BABYLON.Vector3.Dot(seg[0], uAxis);
-            const v0 = BABYLON.Vector3.Dot(seg[0], vAxis);
-            const u1 = BABYLON.Vector3.Dot(seg[1], uAxis);
-            const v1 = BABYLON.Vector3.Dot(seg[1], vAxis);
+        for (let offset = -hatchExtent; offset <= hatchExtent; offset += hatchSpacing) {
+            const intersectPts = [];
+            for (const seg of allSegments) {
+                const u0 = BABYLON.Vector3.Dot(seg[0], uAxis);
+                const v0 = BABYLON.Vector3.Dot(seg[0], vAxis);
+                const u1 = BABYLON.Vector3.Dot(seg[1], uAxis);
+                const v1 = BABYLON.Vector3.Dot(seg[1], vAxis);
 
-            // Distance of each endpoint from the hatch line
-            const d0 = perpU * u0 + perpV * v0 - offset;
-            const d1 = perpU * u1 + perpV * v1 - offset;
+                const d0 = perpU * u0 + perpV * v0 - offset;
+                const d1 = perpU * u1 + perpV * v1 - offset;
 
-            if (d0 * d1 < 0) {
-                // Edge crosses the hatch line
-                const t = -d0 / (d1 - d0);
-                const hu = u0 + t * (u1 - u0);
-                const hv = v0 + t * (v1 - v0);
-                // Convert back to 3D: point = origin + hu*uAxis + hv*vAxis
-                // But we need a reference point on the plane
-                // Use the centroid of the first segment as a reference
-                intersectPts.push({ u: hu, v: hv, t: t });
+                if (d0 * d1 < 0) {
+                    const t = -d0 / (d1 - d0);
+                    const hu = u0 + t * (u1 - u0);
+                    const hv = v0 + t * (v1 - v0);
+                    intersectPts.push({ u: hu, v: hv });
+                }
             }
-        }
 
-        // Sort intersection points along the hatch line direction and pair them
-        if (intersectPts.length >= 2) {
-            intersectPts.sort((a, b) => cosA * (a.u - b.u) + sinA * (a.v - b.v));
-            for (let i = 0; i < intersectPts.length - 1; i += 2) {
-                const p1 = intersectPts[i];
-                const p2 = intersectPts[i + 1];
-                // Convert 2D back to 3D
-                // Point on plane = somePointOnPlane + p.u * uAxis + p.v * vAxis
-                // We can reconstruct using the plane equation
-                const pt1 = new BABYLON.Vector3(
-                    p1.u * uAxis.x + p1.v * vAxis.x - planeD * planeNormal.x,
-                    p1.u * uAxis.y + p1.v * vAxis.y - planeD * planeNormal.y,
-                    p1.u * uAxis.z + p1.v * vAxis.z - planeD * planeNormal.z
-                );
-                const pt2 = new BABYLON.Vector3(
-                    p2.u * uAxis.x + p2.v * vAxis.x - planeD * planeNormal.x,
-                    p2.u * uAxis.y + p2.v * vAxis.y - planeD * planeNormal.y,
-                    p2.u * uAxis.z + p2.v * vAxis.z - planeD * planeNormal.z
-                );
-                hatchLines.push([pt1, pt2]);
+            if (intersectPts.length >= 2) {
+                intersectPts.sort((a, b) => cosA * (a.u - b.u) + sinA * (a.v - b.v));
+                for (let i = 0; i < intersectPts.length - 1; i += 2) {
+                    const p1 = intersectPts[i];
+                    const p2 = intersectPts[i + 1];
+                    const pt1 = new BABYLON.Vector3(
+                        p1.u * uAxis.x + p1.v * vAxis.x - planeD * planeNormal.x,
+                        p1.u * uAxis.y + p1.v * vAxis.y - planeD * planeNormal.y,
+                        p1.u * uAxis.z + p1.v * vAxis.z - planeD * planeNormal.z
+                    ).addInPlace(planeLift);
+                    const pt2 = new BABYLON.Vector3(
+                        p2.u * uAxis.x + p2.v * vAxis.x - planeD * planeNormal.x,
+                        p2.u * uAxis.y + p2.v * vAxis.y - planeD * planeNormal.y,
+                        p2.u * uAxis.z + p2.v * vAxis.z - planeD * planeNormal.z
+                    ).addInPlace(planeLift);
+                    hatchLines.push([pt1, pt2]);
+                }
             }
         }
     }
 
     if (hatchLines.length === 0) return;
 
-    const dark = isDarkMode(canvasId);
-    const hatchColor = dark ? { r: 0.45, g: 0.45, b: 0.55 } : { r: 0.65, g: 0.65, b: 0.70 };
     const hatchMesh = BABYLON.MeshBuilder.CreateLineSystem(
         `__section_hatch_${canvasId}__`,
         { lines: hatchLines, updatable: false },
         scene
     );
-    hatchMesh.color = new BABYLON.Color3(hatchColor.r, hatchColor.g, hatchColor.b);
+    hatchMesh.color = new BABYLON.Color3(1.0, 0.22, 0.68);
     hatchMesh.isPickable = false;
+    hatchMesh.renderingGroupId = 2;
     sectionHatchMeshes[canvasId] = hatchMesh;
 }
 
@@ -4034,14 +4092,11 @@ export function dispose(canvasId) {
     delete modelScaleFactors[canvasId];
     delete modelCenterOffsets[canvasId];
 
-    // Section-view cleanup (scene already disposed above, just clear state)
-    if (sectionEdgeMeshes[canvasId]) {
-        try { sectionEdgeMeshes[canvasId].dispose(); } catch (_) {}
-        delete sectionEdgeMeshes[canvasId];
-    }
-    if (sectionObservers[canvasId]) {
-        delete sectionObservers[canvasId];
-    }
+    disposeSectionVisuals(canvasId, scenes[canvasId]);
+    delete sectionEdgeMeshes[canvasId];
+    delete sectionHatchMeshes[canvasId];
+    delete sectionGhostMeshes[canvasId];
+    delete sectionObservers[canvasId];
     delete _sectionRebuildPending[canvasId];
 }
 
@@ -4364,6 +4419,148 @@ function pickMeshPoint(scene, x, y) {
     return result;
 }
 
+function withBackFaceCullingDisabled(scene, action) {
+    const restore = [];
+    scene.meshes.forEach(m => {
+        if (isMeasurablePredicate(m) && m.material && m.material.backFaceCulling) {
+            restore.push(m);
+            m.material.backFaceCulling = false;
+        }
+    });
+    try {
+        return action();
+    } finally {
+        restore.forEach(m => { m.material.backFaceCulling = true; });
+    }
+}
+
+function inferRoundFeatureFromPick(pickResult) {
+    const mesh = pickResult?.pickedMesh;
+    if (!mesh) return null;
+
+    const bb = mesh.getBoundingInfo()?.boundingBox;
+    if (!bb) return null;
+
+    const min = bb.minimumWorld;
+    const max = bb.maximumWorld;
+    const dims = [
+        { axis: 'x', size: Math.abs(max.x - min.x) },
+        { axis: 'y', size: Math.abs(max.y - min.y) },
+        { axis: 'z', size: Math.abs(max.z - min.z) },
+    ].sort((a, b) => b.size - a.size);
+
+    const longAxis = dims[0];
+    const radialA = dims[1];
+    const radialB = dims[2];
+    if (radialA.size <= 1e-6 || radialB.size <= 1e-6) return null;
+    const radialMismatch = Math.abs(radialA.size - radialB.size) / Math.max(radialA.size, radialB.size);
+    if (radialMismatch > 0.12 || longAxis.size < radialA.size * 1.2) return null;
+
+    const center = new BABYLON.Vector3(
+        (min.x + max.x) / 2,
+        (min.y + max.y) / 2,
+        (min.z + max.z) / 2
+    );
+    const axisVector = longAxis.axis === 'x'
+        ? new BABYLON.Vector3(1, 0, 0)
+        : longAxis.axis === 'y'
+            ? new BABYLON.Vector3(0, 1, 0)
+            : new BABYLON.Vector3(0, 0, 1);
+
+    return {
+        kind: 'round',
+        point: pickResult.pickedPoint?.clone() ?? center.clone(),
+        anchor: center,
+        axis: axisVector,
+        radius: (radialA.size + radialB.size) / 4,
+        diameter: (radialA.size + radialB.size) / 2,
+        label: 'Diameter',
+    };
+}
+
+function pickCadFeature(scene, x, y) {
+    const pickResult = pickMeshPoint(scene, x, y);
+    if (!pickResult?.hit || !pickResult.pickedPoint || !pickResult.pickedMesh) return null;
+
+    const normal = pickResult.getNormal(true, false) || new BABYLON.Vector3(0, 0, 1);
+    const roundFeature = inferRoundFeatureFromPick(pickResult);
+    if (roundFeature) return roundFeature;
+
+    return {
+        kind: 'face',
+        point: pickResult.pickedPoint.clone(),
+        anchor: pickResult.pickedPoint.clone(),
+        normal: normal.clone(),
+        label: 'Face',
+    };
+}
+
+function createRoundFeatureHighlight(scene, feature) {
+    if (!feature || feature.kind !== 'round') return null;
+
+    const axis = feature.axis.clone().normalize();
+    const helper = Math.abs(axis.z) < 0.9 ? new BABYLON.Vector3(0, 0, 1) : new BABYLON.Vector3(0, 1, 0);
+    const u = BABYLON.Vector3.Cross(axis, helper).normalize();
+    const v = BABYLON.Vector3.Cross(axis, u).normalize();
+    const points = [];
+    const segments = 96;
+    for (let i = 0; i <= segments; i += 1) {
+        const a = (Math.PI * 2 * i) / segments;
+        points.push(feature.anchor
+            .add(u.scale(Math.cos(a) * feature.radius))
+            .add(v.scale(Math.sin(a) * feature.radius)));
+    }
+
+    const line = BABYLON.MeshBuilder.CreateLines('measure_round_highlight', { points }, scene);
+    line.color = new BABYLON.Color3(1, 0.22, 0.68);
+    line.isPickable = false;
+    return line;
+}
+
+function pickOppositeThicknessHit(scene, entryPoint, normal, entryMesh, entryFaceId) {
+    if (!normal) return null;
+
+    return withBackFaceCullingDisabled(scene, () => {
+        const candidates = [];
+        for (const dir of [normal.scale(-1), normal]) {
+            if (dir.length() < 1e-6) continue;
+            dir.normalize();
+            const ray = new BABYLON.Ray(
+                entryPoint.add(dir.scale(0.15)),
+                dir,
+                CONFIG.THICKNESS.maxRayDistance
+            );
+            const hits = scene.multiPickWithRay
+                ? (scene.multiPickWithRay(ray, isMeasurablePredicate) || [])
+                : [scene.pickWithRay(ray, isMeasurablePredicate)].filter(Boolean);
+
+            hits.forEach(hit => {
+                if (!hit?.hit || !hit.pickedPoint) return;
+                const distance = BABYLON.Vector3.Distance(entryPoint, hit.pickedPoint);
+                if (distance < 0.25) return;
+                if (hit.pickedMesh === entryMesh && hit.faceId === entryFaceId) return;
+
+                let normalScore = 0;
+                try {
+                    const hitNormal = hit.getNormal(true, false);
+                    if (hitNormal) normalScore = -BABYLON.Vector3.Dot(normal.clone().normalize(), hitNormal.normalize());
+                } catch (_) {
+                    normalScore = 0;
+                }
+                candidates.push({ hit, distance, normalScore });
+            });
+        }
+
+        if (candidates.length === 0) return null;
+        candidates.sort((a, b) => {
+            const aOpposed = a.normalScore > 0.15 ? 0 : 1;
+            const bOpposed = b.normalScore > 0.15 ? 0 : 1;
+            return aOpposed - bOpposed || a.distance - b.distance;
+        });
+        return candidates[0].hit;
+    });
+}
+
 /**
  * Enables the measure tool for point-to-point distance and angle measurement.
  * @param {string} canvasId - Canvas identifier
@@ -4380,12 +4577,15 @@ export function enableMeasureTool(canvasId, dotNetRef) {
         active: true,
         pointA: null,
         pointB: null,
+        featureA: null,
+        featureB: null,
         normalA: null,
         normalB: null,
         lines: [],
         labels: [],
         observer: null,
         hoverDot: null,
+        hoverFeatureHighlight: null,
         cursorDots: [],
         _downX: null,
         _downY: null,
@@ -4401,6 +4601,7 @@ export function enableMeasureTool(canvasId, dotNetRef) {
 
     function createHoverDot(point) {
         if (state.hoverDot) { try { state.hoverDot.dispose(); } catch (_) {} }
+        if (state.hoverFeatureHighlight) { try { state.hoverFeatureHighlight.dispose(); } catch (_) {} state.hoverFeatureHighlight = null; }
         const dot = BABYLON.MeshBuilder.CreateSphere('measure_hover_dot', { diameter: 0.8 }, scene);
         dot.position = point.clone();
         const mat = new BABYLON.StandardMaterial('measure_hover_dot_mat', scene);
@@ -4410,6 +4611,23 @@ export function enableMeasureTool(canvasId, dotNetRef) {
         dot.material = mat;
         makeUnpickable(dot);
         state.hoverDot = dot;
+    }
+
+    function showDiameterLabel(feature) {
+        if (feature.kind !== 'round') return;
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'measure-label';
+        labelDiv.style.cssText = `
+            position: fixed; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85); color: #ff4fb3;
+            padding: 6px 10px; border-radius: 4px;
+            font-family: 'Segoe UI', sans-serif; font-size: 13px; font-weight: 600;
+            pointer-events: none; white-space: nowrap; z-index: 1000;
+            border: 1px solid #ff4fb3;
+        `;
+        labelDiv.innerHTML = `Ø ${feature.diameter.toFixed(2)} mm`;
+        document.body.appendChild(labelDiv);
+        state.labels.push({ div: labelDiv, worldPos: feature.anchor.clone() });
     }
 
     function createCursorDot(point) {
@@ -4451,13 +4669,15 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                 state._downX = null; state._downY = null;
 
                 const pickResult = pickMeshPoint(scene, scene.pointerX, scene.pointerY);
-                if (!pickResult?.hit || !pickResult.pickedMesh) return;
+                const feature = pickCadFeature(scene, scene.pointerX, scene.pointerY);
+                if (!pickResult?.hit || !pickResult.pickedMesh || !feature) return;
 
-                const pickedPoint = pickResult.pickedPoint;
-                const normal = pickResult.getNormal(true);
+                const pickedPoint = feature.anchor ?? pickResult.pickedPoint;
+                const normal = feature.normal ?? pickResult.getNormal(true) ?? feature.axis;
 
                 if (!state.pointA) {
                     state.pointA = pickedPoint.clone();
+                    state.featureA = feature;
                     state.normalA = normal?.clone() || new BABYLON.Vector3(0, 0, 1);
 
                     const markerA = BABYLON.MeshBuilder.CreateSphere('measure_A', { diameter: CONFIG.MEASURE.endpointSize }, scene);
@@ -4469,9 +4689,13 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                     makeUnpickable(markerA);
                     state.lines.push(markerA);
                     createCursorDot(pickedPoint);
+                    const roundHighlight = createRoundFeatureHighlight(scene, feature);
+                    if (roundHighlight) state.lines.push(roundHighlight);
+                    showDiameterLabel(feature);
 
                 } else if (!state.pointB) {
                     state.pointB = pickedPoint.clone();
+                    state.featureB = feature;
                     state.normalB = normal?.clone() || new BABYLON.Vector3(0, 0, 1);
 
                     const markerB = BABYLON.MeshBuilder.CreateSphere('measure_B', { diameter: CONFIG.MEASURE.endpointSize }, scene);
@@ -4539,7 +4763,13 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                         pointer-events: none; white-space: nowrap; z-index: 1000;
                         border: 1px solid #ffd700;
                     `;
-                    labelDiv.innerHTML = `${distance.toFixed(2)} mm<br><span style="font-size: 11px; opacity: 0.8;">∠ ${angleDeg.toFixed(1)}°</span>`;
+                    const diameterNotes = [state.featureA, state.featureB]
+                        .filter(f => f?.kind === 'round')
+                        .map(f => `Ø ${f.diameter.toFixed(2)} mm`);
+                    const diameterHtml = diameterNotes.length > 0
+                        ? `<br><span style="font-size: 11px; opacity: 0.9;">${diameterNotes.join(' · ')}</span>`
+                        : '';
+                    labelDiv.innerHTML = `${distance.toFixed(2)} mm${diameterHtml}<br><span style="font-size: 11px; opacity: 0.8;">∠ ${angleDeg.toFixed(1)}°</span>`;
                     document.body.appendChild(labelDiv);
                     state.labels.push({ div: labelDiv, worldPos: midPoint });
 
@@ -4553,6 +4783,8 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                     clearMeasureHelpers();
                     state.pointA = pickedPoint.clone();
                     state.pointB = null;
+                    state.featureA = feature;
+                    state.featureB = null;
                     state.normalA = normal?.clone() || new BABYLON.Vector3(0, 0, 1);
                     state.normalB = null;
 
@@ -4565,23 +4797,28 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                     makeUnpickable(markerA);
                     state.lines.push(markerA);
                     createCursorDot(pickedPoint);
+                    const roundHighlight = createRoundFeatureHighlight(scene, feature);
+                    if (roundHighlight) state.lines.push(roundHighlight);
+                    showDiameterLabel(feature);
                 }
                 break;
             }
 
             case BABYLON.PointerEventTypes.POINTERMOVE: {
-                const hoverPick = pickMeshPoint(scene, scene.pointerX, scene.pointerY);
+                const hoverFeature = pickCadFeature(scene, scene.pointerX, scene.pointerY);
 
                 // Update hover dot position (face-precise feedback)
-                if (hoverPick?.hit && hoverPick.pickedPoint) {
-                    createHoverDot(hoverPick.pickedPoint);
+                if (hoverFeature) {
+                    createHoverDot(hoverFeature.point ?? hoverFeature.anchor);
+                    state.hoverFeatureHighlight = createRoundFeatureHighlight(scene, hoverFeature);
                 } else if (state.hoverDot) {
                     try { state.hoverDot.dispose(); } catch (_) {}
                     state.hoverDot = null;
+                    if (state.hoverFeatureHighlight) { try { state.hoverFeatureHighlight.dispose(); } catch (_) {} state.hoverFeatureHighlight = null; }
                 }
 
                 // Preview line from A to cursor (only while waiting for second click)
-                if (state.pointA && !state.pointB && hoverPick?.hit && hoverPick.pickedPoint) {
+                if (state.pointA && !state.pointB && hoverFeature) {
                     const prevPreview = state.lines.find(l => l.name === 'measure_preview');
                     if (prevPreview) {
                         prevPreview.dispose();
@@ -4589,7 +4826,7 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                     }
 
                     const previewLine = BABYLON.MeshBuilder.CreateLines('measure_preview', {
-                        points: [state.pointA, hoverPick.pickedPoint],
+                        points: [state.pointA, hoverFeature.anchor],
                         updatable: true
                     }, scene);
                     previewLine.color = toColor3({ r: 1.0, g: 0.85, b: 0.0, a: 0.5 });
@@ -4633,6 +4870,7 @@ export function disableMeasureTool(canvasId) {
 
     // Dispose hover dot and cursor dots
     if (state.hoverDot) { try { state.hoverDot.dispose(); } catch (_) {} }
+    if (state.hoverFeatureHighlight) { try { state.hoverFeatureHighlight.dispose(); } catch (_) {} }
     state.cursorDots?.forEach(mesh => { try { mesh.dispose(); } catch (_) {} });
 
     // Dispose lines and meshes
@@ -4775,24 +5013,13 @@ export function enableThicknessAnalysis(canvasId) {
                 const entryPoint = pickResult.pickedPoint;
                 if (!normal) return;
 
-                // Shoot ray inward from surface
-                const inwardDir = normal.scale(-1);
-                const rayOrigin = entryPoint.add(inwardDir.scale(0.1));
-                const ray = new BABYLON.Ray(rayOrigin, inwardDir, CONFIG.THICKNESS.maxRayDistance);
-
-                const hit = (() => {
-                    // Temporarily disable backFaceCulling so inward ray hits back faces too
-                    const restore = [];
-                    scene.meshes.forEach(m => {
-                        if (isMeasurablePredicate(m) && m.material && m.material.backFaceCulling) {
-                            restore.push(m);
-                            m.material.backFaceCulling = false;
-                        }
-                    });
-                    const r = scene.pickWithRay(ray, isMeasurablePredicate);
-                    restore.forEach(m => { m.material.backFaceCulling = true; });
-                    return r;
-                })();
+                const hit = pickOppositeThicknessHit(
+                    scene,
+                    entryPoint,
+                    normal,
+                    pickResult.pickedMesh,
+                    pickResult.faceId
+                );
 
                 if (hit?.hit && hit.pickedPoint) {
                     const thickness = BABYLON.Vector3.Distance(entryPoint, hit.pickedPoint);
