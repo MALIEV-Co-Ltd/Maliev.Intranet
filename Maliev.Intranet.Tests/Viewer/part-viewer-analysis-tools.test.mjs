@@ -129,6 +129,15 @@ function loadViewerContext() {
             Matrix: {
                 RotationX: () => ({}),
             },
+            Mesh: class Mesh {
+                constructor(name) {
+                    this.name = name;
+                    this.material = null;
+                    this.isPickable = true;
+                    this.metadata = {};
+                    this.dispose = () => {};
+                }
+            },
             Plane: class Plane {
                 constructor(a, b, c, d) {
                     this.a = a;
@@ -180,6 +189,11 @@ function loadViewerContext() {
                 }
             },
             Vector3,
+            VertexData: class VertexData {
+                applyToMesh(mesh) {
+                    mesh.vertexData = this;
+                }
+            },
             VertexBuffer: {
                 PositionKind: 'position',
             },
@@ -343,6 +357,43 @@ test('section hatch generation follows translated cut contours and stays visible
     assert.equal(result.disableClipPlanes, true);
     assert.equal(result.disableDepthWrite, true);
     assert.equal(result.alwaysActive, true);
+});
+
+test('section fill creates a light pink cap below the diagonal hatch lines', () => {
+    const context = loadViewerContext();
+    context.scene = {
+        clipPlane: {},
+        meshes: [
+            cubeSectionMesh(() => {}),
+        ],
+    };
+
+    const result = vm.runInContext(`
+        tagModelMeshesForAnalysis('viewer', scene);
+        _rebuildSectionFill('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
+        _rebuildSectionHatch('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
+        ({
+            fillName: sectionFillMeshes.viewer?.name,
+            fillPositions: sectionFillMeshes.viewer?.vertexData?.positions?.length ?? 0,
+            fillIndices: sectionFillMeshes.viewer?.vertexData?.indices?.length ?? 0,
+            fillColor: sectionFillMeshes.viewer?.material?.diffuseColor,
+            fillAlpha: sectionFillMeshes.viewer?.material?.alpha,
+            fillDisableLighting: sectionFillMeshes.viewer?.material?.disableLighting,
+            fillNoClip: sectionFillMeshes.viewer?.material?.disableClipPlanes,
+            hatchLineCount: sectionHatchMeshes.viewer?.lines?.length ?? 0
+        });
+    `, context);
+
+    assert.equal(result.fillName, '__section_fill_viewer__');
+    assert.ok(result.fillPositions > 0, 'expected section cap vertices');
+    assert.ok(result.fillIndices > 0, 'expected section cap triangles');
+    assert.deepEqual(
+        { r: result.fillColor.r, g: result.fillColor.g, b: result.fillColor.b },
+        { r: 1, g: 0.78, b: 0.88 });
+    assert.equal(result.fillAlpha, 0.78);
+    assert.equal(result.fillDisableLighting, true);
+    assert.equal(result.fillNoClip, true);
+    assert.ok(result.hatchLineCount > 0, 'expected diagonal hatch lines above the fill');
 });
 
 test('section cut edge is neutral while hatch fill keeps the pink cross lines', () => {

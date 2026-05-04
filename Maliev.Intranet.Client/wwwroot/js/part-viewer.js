@@ -260,6 +260,8 @@ const CONFIG = {
     SECTION: {
         cutEdgeColor: { r: 0.10, g: 0.18, b: 0.28 },
         hatchColor: { r: 1.0, g: 0.22, b: 0.68 },
+        fillColor: { r: 1.0, g: 0.78, b: 0.88 },
+        fillAlpha: 0.78,
         hatchSpacingMm: 3.0,
         minHatchSpacing: 0.5,
         planeLiftMm: 0.08,
@@ -385,6 +387,7 @@ function updateLabelPosition(div, worldPos, canvasId) {
 // ── Section-view state ───────────────────────────────────────────────────────
 const sectionEdgeMeshes     = {};   // canvasId → BABYLON.LinesMesh | null
 const sectionHatchMeshes    = {};   // canvasId → BABYLON.LinesMesh | null (cross-hatch fill)
+const sectionFillMeshes     = {};   // canvasId → BABYLON.Mesh | null (light-pink section cap)
 const sectionGhostMeshes    = {};   // canvasId → BABYLON.Mesh[] (xray clones of hidden half)
 const sectionObservers      = {};   // canvasId → scene.onBeforeRenderObservable handle
 const sectionClipPlanes     = {};   // canvasId → active model-material clipping plane | null
@@ -3684,6 +3687,10 @@ function disposeSectionVisuals(canvasId, scene = scenes[canvasId]) {
         sectionHatchMeshes[canvasId].dispose();
         sectionHatchMeshes[canvasId] = null;
     }
+    if (sectionFillMeshes[canvasId]) {
+        sectionFillMeshes[canvasId].dispose();
+        sectionFillMeshes[canvasId] = null;
+    }
     if (sectionObservers[canvasId]) {
         if (scene) scene.onBeforeRenderObservable.remove(sectionObservers[canvasId]);
         sectionObservers[canvasId] = null;
@@ -3771,6 +3778,7 @@ function scheduleSectionRebuild(canvasId, scene, planeNormal, planeD) {
     requestAnimationFrame(() => {
         _sectionRebuildPending[canvasId] = false;
         if (scenes[canvasId] !== scene || !sectionClipPlanes[canvasId]) return;
+        _rebuildSectionFill(canvasId, scene, planeNormal, planeD);
         _rebuildSectionEdges(canvasId, scene, planeNormal, planeD);
         _rebuildSectionHatch(canvasId, scene, planeNormal, planeD);
     });
@@ -3898,6 +3906,132 @@ function _rebuildSectionEdges(canvasId, scene, planeNormal, planeD) {
     sectionEdgeMeshes[canvasId] = linesMesh;
 }
 
+function collectSectionSegments(canvasId, scene, planeNormal, planeD) {
+    const segments = [];
+
+    for (const mesh of scene.meshes) {
+        if (!mesh.isVisible || !isModelMeshForAnalysis(mesh, canvasId)) continue;
+
+        const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+        const indices = mesh.getIndices();
+        if (!positions || !indices || indices.length === 0) continue;
+
+        const worldMatrix = mesh.getWorldMatrix();
+
+        for (let i = 0; i < indices.length; i += 3) {
+            const i0 = indices[i], i1 = indices[i + 1], i2 = indices[i + 2];
+            const wv0 = BABYLON.Vector3.TransformCoordinates(
+                new BABYLON.Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]), worldMatrix);
+            const wv1 = BABYLON.Vector3.TransformCoordinates(
+                new BABYLON.Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]), worldMatrix);
+            const wv2 = BABYLON.Vector3.TransformCoordinates(
+                new BABYLON.Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]), worldMatrix);
+
+            const d0 = BABYLON.Vector3.Dot(planeNormal, wv0) + planeD;
+            const d1 = BABYLON.Vector3.Dot(planeNormal, wv1) + planeD;
+            const d2 = BABYLON.Vector3.Dot(planeNormal, wv2) + planeD;
+
+            const pts = [];
+            const edges = [[wv0, wv1, d0, d1], [wv1, wv2, d1, d2], [wv2, wv0, d2, d0]];
+            for (const [va, vb, da, db] of edges) {
+                if (da * db < 0) {
+                    const t = -da / (db - da);
+                    pts.push(BABYLON.Vector3.Lerp(va, vb, t));
+                }
+            }
+            if (pts.length === 2) segments.push([pts[0], pts[1]]);
+        }
+    }
+
+    return segments;
+}
+
+function getSectionPlaneAxes(planeNormal) {
+    let uAxis, vAxis;
+    const absX = Math.abs(planeNormal.x), absY = Math.abs(planeNormal.y), absZ = Math.abs(planeNormal.z);
+    if (absX <= absY && absX <= absZ) {
+        uAxis = new BABYLON.Vector3(1, 0, 0);
+    } else if (absY <= absZ) {
+        uAxis = new BABYLON.Vector3(0, 1, 0);
+    } else {
+        uAxis = new BABYLON.Vector3(0, 0, 1);
+    }
+    vAxis = BABYLON.Vector3.Cross(planeNormal, uAxis);
+    vAxis.normalize();
+    uAxis = BABYLON.Vector3.Cross(vAxis, planeNormal);
+    uAxis.normalize();
+    return { uAxis, vAxis };
+}
+
+function _rebuildSectionFill(canvasId, scene, planeNormal, planeD) {
+    if (sectionFillMeshes[canvasId]) {
+        sectionFillMeshes[canvasId].dispose();
+        sectionFillMeshes[canvasId] = null;
+    }
+
+    const allSegments = collectSectionSegments(canvasId, scene, planeNormal, planeD);
+    if (allSegments.length === 0) return;
+
+    const { uAxis, vAxis } = getSectionPlaneAxes(planeNormal);
+    const planeLift = planeNormal.scale(CONFIG.SECTION.planeLiftMm * 0.5 * (modelScaleFactors[canvasId] ?? 1));
+    const unique = [];
+    const tolerance = 1e-4;
+
+    for (const seg of allSegments) {
+        for (const point of seg) {
+            const u = BABYLON.Vector3.Dot(point, uAxis);
+            const v = BABYLON.Vector3.Dot(point, vAxis);
+            if (!unique.some(existing => Math.hypot(existing.u - u, existing.v - v) <= tolerance)) {
+                unique.push({ u, v });
+            }
+        }
+    }
+
+    if (unique.length < 3) return;
+
+    const center = unique.reduce((acc, point) => ({ u: acc.u + point.u, v: acc.v + point.v }), { u: 0, v: 0 });
+    center.u /= unique.length;
+    center.v /= unique.length;
+
+    unique.sort((a, b) =>
+        Math.atan2(a.v - center.v, a.u - center.u) - Math.atan2(b.v - center.v, b.u - center.u));
+
+    const positions = [];
+    for (const point of unique) {
+        const worldPoint = new BABYLON.Vector3(
+            point.u * uAxis.x + point.v * vAxis.x - planeD * planeNormal.x,
+            point.u * uAxis.y + point.v * vAxis.y - planeD * planeNormal.y,
+            point.u * uAxis.z + point.v * vAxis.z - planeD * planeNormal.z
+        ).addInPlace(planeLift);
+        positions.push(worldPoint.x, worldPoint.y, worldPoint.z);
+    }
+
+    const indices = [];
+    for (let i = 1; i < unique.length - 1; i += 1) {
+        indices.push(0, i, i + 1);
+    }
+
+    const fillMesh = new BABYLON.Mesh(`__section_fill_${canvasId}__`, scene);
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    vertexData.applyToMesh(fillMesh);
+
+    const fillMat = new BABYLON.StandardMaterial(`__section_fill_mat_${canvasId}__`, scene);
+    fillMat.diffuseColor = toColor3(CONFIG.SECTION.fillColor);
+    fillMat.emissiveColor = toColor3({ r: 0.10, g: 0.03, b: 0.06 });
+    fillMat.alpha = CONFIG.SECTION.fillAlpha;
+    fillMat.backFaceCulling = false;
+    fillMat.disableLighting = true;
+    fillMat.disableClipPlanes = true;
+    fillMat.needDepthPrePass = false;
+    fillMat.zOffset = CONFIG.SECTION.zOffset - 1;
+    fillMesh.material = fillMat;
+    fillMesh.renderingGroupId = CONFIG.SECTION.renderingGroupId;
+    fillMesh.alwaysSelectAsActiveMesh = true;
+    sectionFillMeshes[canvasId] = markAnalysisHelperMesh(fillMesh);
+}
+
 /**
  * Draws parallel diagonal hatch lines clipped to the section polygon.
  * This creates the traditional engineering cross-section fill pattern.
@@ -3948,22 +4082,8 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
 
     if (allSegments.length === 0) return;
 
-    // Project all intersection points to 2D on the section plane
-    // Choose two perpendicular axes on the plane
-    let uAxis, vAxis;
-    const absX = Math.abs(planeNormal.x), absY = Math.abs(planeNormal.y), absZ = Math.abs(planeNormal.z);
-    if (absX <= absY && absX <= absZ) {
-        uAxis = new BABYLON.Vector3(1, 0, 0);
-    } else if (absY <= absZ) {
-        uAxis = new BABYLON.Vector3(0, 1, 0);
-    } else {
-        uAxis = new BABYLON.Vector3(0, 0, 1);
-    }
-    // vAxis = planeNormal × uAxis, then normalize
-    vAxis = BABYLON.Vector3.Cross(planeNormal, uAxis);
-    vAxis.normalize();
-    uAxis = BABYLON.Vector3.Cross(vAxis, planeNormal);
-    uAxis.normalize();
+    // Project all intersection points to 2D on the section plane.
+    const { uAxis, vAxis } = getSectionPlaneAxes(planeNormal);
 
     // Compute 2D bounding box of all intersection points
     let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
@@ -3985,7 +4105,7 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
     const hatchSpacing = Math.max(
         CONFIG.SECTION.hatchSpacingMm * (modelScaleFactors[canvasId] ?? 1),
         CONFIG.SECTION.minHatchSpacing);
-    const hatchAngles = [Math.PI / 4, -Math.PI / 4];
+    const hatchAngles = [Math.PI / 4];
     const hatchLines = [];
 
     const planeLift = planeNormal.scale(CONFIG.SECTION.planeLiftMm * (modelScaleFactors[canvasId] ?? 1));
@@ -4327,6 +4447,7 @@ export function dispose(canvasId) {
 
     delete sectionEdgeMeshes[canvasId];
     delete sectionHatchMeshes[canvasId];
+    delete sectionFillMeshes[canvasId];
     delete sectionGhostMeshes[canvasId];
     delete sectionObservers[canvasId];
     delete sectionClipPlanes[canvasId];
