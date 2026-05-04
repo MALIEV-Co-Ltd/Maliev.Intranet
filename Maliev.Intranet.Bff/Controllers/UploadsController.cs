@@ -414,7 +414,7 @@ public class UploadsController(
     /// <param name="ct">Cancellation token.</param>
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("migrate-project")]
-    [ProducesResponseType(typeof(MigrateProjectResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(BffMigrateProjectResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> MigrateProjectAsync(
@@ -433,40 +433,140 @@ public class UploadsController(
         if (result == null)
             return StatusCode(500, "Migration failed.");
 
+        var response = new BffMigrateProjectResponseDto
+        {
+            DryRun = result.DryRun,
+            TotalEvaluated = result.TotalEvaluated,
+            TotalMigrated = result.TotalMigrated,
+            Errors = [.. result.Errors],
+        };
+
         if (!dryRun && result.MigratedFiles.Count > 0)
         {
             foreach (var file in result.MigratedFiles)
             {
-                var existingStatus = await analysisStatusService.GetStatusAsync(file.OldPath, ct);
-                if (string.IsNullOrWhiteSpace(existingStatus?.GlbStoragePath))
+                var status = await ReconcileMigratedAnalysisStatusAsync(file, ct);
+                response.MigratedFiles.Add(new BffMigratedProjectFileDto
                 {
-                    logger.LogInformation(
-                        "GLB artifact for {OldPath} is not ready yet; late geometry events will resolve the migrated path by file id.",
-                        file.OldPath);
-                    continue;
-                }
-
-                var oldGlbPath = file.OldPath + "_viewer.glb";
-                var newGlbPath = file.NewPath + "_viewer.glb";
-                var glbCopied = await uploadClient.CopyFileAsync(oldGlbPath, newGlbPath, ct);
-
-                if (glbCopied)
-                {
-                    await analysisStatusService.MigrateGlbStoragePathAsync(file.OldPath, file.NewPath, ct);
-                    logger.LogInformation("Migrated GLB artifact {OldGlbPath} → {NewGlbPath}", oldGlbPath, newGlbPath);
-                }
-                else
-                {
-                    logger.LogWarning(
-                        "GLB artifact not found at {OldGlbPath} — 3D viewer will continue using the temp-bucket URL. " +
-                        "Geometry analysis may not have completed yet.",
-                        oldGlbPath);
-                }
+                    FileId = file.FileId,
+                    OldPath = file.OldPath,
+                    NewPath = file.NewPath,
+                    Status = status,
+                });
             }
         }
+        else
+        {
+            response.MigratedFiles.AddRange(result.MigratedFiles.Select(file => new BffMigratedProjectFileDto
+            {
+                FileId = file.FileId,
+                OldPath = file.OldPath,
+                NewPath = file.NewPath,
+                Status = null,
+            }));
+        }
 
-        return Ok(result);
+        return Ok(response);
     }
+
+    private async Task<FileAnalysisStatusDto?> ReconcileMigratedAnalysisStatusAsync(
+        MigratedFileEntry file,
+        CancellationToken ct)
+    {
+        var oldStatus = await analysisStatusService.GetStatusAsync(file.OldPath, ct);
+        if (oldStatus == null)
+        {
+            logger.LogInformation(
+                "No cached analysis status for migrated file {FileId} at {OldPath}; late geometry events will update {NewPath}.",
+                file.FileId,
+                file.OldPath,
+                file.NewPath);
+            return await analysisStatusService.GetStatusAsync(file.NewPath, ct);
+        }
+
+        var thumbnailSmall = await CopyMigratedArtifactAsync(
+            oldStatus.PreviewUrls?.ThumbnailSmallGcsPath,
+            file.OldPath,
+            file.NewPath,
+            oldStatus.PreviewUrls?.ThumbnailSmall,
+            expirationMinutes: 10080,
+            ct);
+        var thumbnailLarge = await CopyMigratedArtifactAsync(
+            oldStatus.PreviewUrls?.ThumbnailLargeGcsPath,
+            file.OldPath,
+            file.NewPath,
+            oldStatus.PreviewUrls?.ThumbnailLargeUrl ?? oldStatus.HiResThumbnailUrl,
+            expirationMinutes: 10080,
+            ct);
+        var glb = await CopyMigratedArtifactAsync(
+            oldStatus.GlbStoragePath,
+            file.OldPath,
+            file.NewPath,
+            oldStatus.GlbSignedUrl,
+            expirationMinutes: 60,
+            ct);
+
+        await analysisStatusService.CloneStatusAsync(
+            file.OldPath,
+            file.NewPath,
+            thumbnailSmall.SignedUrl,
+            thumbnailLarge.SignedUrl,
+            thumbnailSmall.StoragePath,
+            thumbnailLarge.StoragePath,
+            glb.StoragePath,
+            glb.SignedUrl,
+            ct);
+
+        var reconciledStatus = await analysisStatusService.GetStatusAsync(file.NewPath, ct);
+        if (reconciledStatus == null)
+        {
+            logger.LogWarning(
+                "Analysis status reconciliation for migrated file {FileId} did not produce a status at {NewPath}.",
+                file.FileId,
+                file.NewPath);
+        }
+
+        return reconciledStatus;
+    }
+
+    private async Task<MigratedArtifact> CopyMigratedArtifactAsync(
+        string? sourcePath,
+        string oldBasePath,
+        string newBasePath,
+        string? fallbackSignedUrl,
+        int expirationMinutes,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath))
+            return new MigratedArtifact(null, fallbackSignedUrl);
+
+        var destinationPath = RewriteMigratedStoragePath(sourcePath, oldBasePath, newBasePath);
+        if (string.Equals(destinationPath, sourcePath, StringComparison.OrdinalIgnoreCase))
+            return new MigratedArtifact(sourcePath, fallbackSignedUrl);
+
+        var copied = await uploadClient.CopyFileAsync(sourcePath, destinationPath, ct);
+        if (!copied)
+        {
+            logger.LogWarning(
+                "Could not copy migrated artifact {SourcePath} to {DestinationPath}; preserving existing signed URL fallback.",
+                sourcePath,
+                destinationPath);
+            return new MigratedArtifact(sourcePath, fallbackSignedUrl);
+        }
+
+        var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(destinationPath, ct, expirationMinutes);
+        return new MigratedArtifact(destinationPath, signedUrl ?? fallbackSignedUrl);
+    }
+
+    private static string RewriteMigratedStoragePath(string storagePath, string oldBasePath, string newBasePath)
+    {
+        if (!storagePath.StartsWith(oldBasePath, StringComparison.OrdinalIgnoreCase))
+            return storagePath;
+
+        return newBasePath + storagePath[oldBasePath.Length..];
+    }
+
+    private readonly record struct MigratedArtifact(string? StoragePath, string? SignedUrl);
 
     private static string GetMimeTypeFromExtension(string? extension)
     {

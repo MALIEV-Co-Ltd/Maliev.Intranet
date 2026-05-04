@@ -155,22 +155,25 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         string? nonManifoldReason = payload.NonManifoldReason;
         int? nonManifoldFaceCount = payload.NonManifoldFaceCount;
 
-        await _hub.Clients.Group($"file:{storagePath}").SendAsync(
-            "DfmAnalysisReady",
-            new DfmAnalysisReadyPayload(
-                StoragePath: storagePath,
-                FdmReport: fdmReport,
-                SlaReport: slaReport,
-                CncReport: cncReport,
-                OverlayUrls: overlayUrls != null
-                    ? new ReadOnlyDictionary<string, string>(overlayUrls)
-                    : null,
-                OverlayPaths: rawOverlayPaths != null
-                    ? new ReadOnlyDictionary<string, string>(rawOverlayPaths)
-                    : null,
-                BodyCount: bodyCount,
-                NonManifoldReason: nonManifoldReason,
-                NonManifoldFaceCount: nonManifoldFaceCount),
+        var signalRPayload = new DfmAnalysisReadyPayload(
+            StoragePath: storagePath,
+            FdmReport: fdmReport,
+            SlaReport: slaReport,
+            CncReport: cncReport,
+            OverlayUrls: overlayUrls != null
+                ? new ReadOnlyDictionary<string, string>(overlayUrls)
+                : null,
+            OverlayPaths: rawOverlayPaths != null
+                ? new ReadOnlyDictionary<string, string>(rawOverlayPaths)
+                : null,
+            BodyCount: bodyCount,
+            NonManifoldReason: nonManifoldReason,
+            NonManifoldFaceCount: nonManifoldFaceCount);
+
+        await SendToFileGroupsAsync(
+            payload.StoragePath,
+            storagePath,
+            signalRPayload,
             context.CancellationToken);
     }
 
@@ -193,6 +196,27 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
             currentPath,
             eventStoragePath);
         return currentPath;
+    }
+
+    private async Task SendToFileGroupsAsync(
+        string eventStoragePath,
+        string currentStoragePath,
+        DfmAnalysisReadyPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            eventStoragePath,
+            currentStoragePath
+        };
+
+        foreach (var storagePath in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            await _hub.Clients.Group($"file:{storagePath}").SendAsync(
+                "DfmAnalysisReady",
+                payload,
+                cancellationToken);
+        }
     }
 
     private static T? DeserializeReport<T>(object? value) where T : class

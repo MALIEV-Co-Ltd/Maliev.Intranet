@@ -126,13 +126,19 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
                         b.BboxMax?.Z ?? 0)
                 )).ToList();
 
-                await _hub.Clients.Group($"file:{gcsStoragePath}").SendAsync("GlbReady", new GlbReadyPayload(
+                var signalRPayload = new GlbReadyPayload(
                     StoragePath: gcsStoragePath,
                     GlbUrl: glbUrl,
                     Failed: string.IsNullOrEmpty(glbUrl),
                     BodyCount: payload.BodyCount,
                     Bodies: bodies
-                ), context.CancellationToken);
+                );
+
+                await SendToFileGroupsAsync(
+                    payload.StoragePath,
+                    gcsStoragePath,
+                    signalRPayload,
+                    context.CancellationToken);
             }
             catch (Exception ex)
             {
@@ -209,5 +215,26 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
             eventGlbPath,
             currentGlbPath);
         return eventGlbPath;
+    }
+
+    private async Task SendToFileGroupsAsync(
+        string eventStoragePath,
+        string currentStoragePath,
+        GlbReadyPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            eventStoragePath,
+            currentStoragePath
+        };
+
+        foreach (var storagePath in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            await _hub.Clients.Group($"file:{storagePath}").SendAsync(
+                "GlbReady",
+                payload,
+                cancellationToken);
+        }
     }
 }

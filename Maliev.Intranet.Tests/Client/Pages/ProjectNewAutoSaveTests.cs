@@ -756,18 +756,21 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
 
             if (request.RequestUri?.AbsolutePath == "/api/v1/uploads/migrate-project")
             {
-                var migrationResponse = new
+                var migrationResponse = new BffMigrateProjectResponseDto
                 {
-                    migrated_files = new[]
-                    {
-                        new
+                    DryRun = false,
+                    TotalEvaluated = 1,
+                    TotalMigrated = 1,
+                    MigratedFiles =
+                    [
+                        new BffMigratedProjectFileDto
                         {
-                            file_id = fileId.ToString(),
-                            old_path = OldBasePath,
-                            new_path = NewBasePath
+                            FileId = fileId.ToString(),
+                            OldPath = OldBasePath,
+                            NewPath = NewBasePath
                         }
-                    },
-                    errors = Array.Empty<string>()
+                    ],
+                    Errors = []
                 };
 
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -818,6 +821,107 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.Null(part.ViewerUrl);
         Assert.Equal(NewBasePath + "_overlays/sharp.glb", part.OverlayPaths?["CNC__sharp_corner"]);
         Assert.Null(part.OverlayUrls);
+    }
+
+    [Fact]
+    public async Task MigrateTempProjectFilesAsync_WhenMigrationReturnsCompletedStatus_AppliesStatusImmediately()
+    {
+        var customerId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        const string OldBasePath = "projects/temp-project/completed.stl";
+        const string NewBasePath = "customers/customer-1/projects/temp-project/completed.stl";
+
+        _httpHandler.HandlerFunc = (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+
+            if (request.RequestUri?.AbsolutePath == "/api/v1/uploads/migrate-project")
+            {
+                var migrationResponse = new BffMigrateProjectResponseDto
+                {
+                    DryRun = false,
+                    TotalEvaluated = 1,
+                    TotalMigrated = 1,
+                    MigratedFiles =
+                    [
+                        new BffMigratedProjectFileDto
+                        {
+                            FileId = fileId.ToString(),
+                            OldPath = OldBasePath,
+                            NewPath = NewBasePath,
+                            Status = new FileAnalysisStatusDto
+                            {
+                                UploadId = NewBasePath,
+                                Status = FileAnalysisStatus.Completed,
+                                Dimensions = new FileAnalysisDimensionsDto
+                                {
+                                    X = 80,
+                                    Y = 149,
+                                    Z = 5,
+                                    VolumeMm3 = 59600
+                                },
+                                IsManifold = true,
+                                ThumbnailUrl = "https://signed.example/thumb-small.webp",
+                                HiResThumbnailUrl = "https://signed.example/thumb-large.webp",
+                                PreviewUrls = new FileAnalysisPreviewUrlsDto
+                                {
+                                    ThumbnailSmall = "https://signed.example/thumb-small.webp",
+                                    ThumbnailLargeUrl = "https://signed.example/thumb-large.webp",
+                                    ThumbnailSmallGcsPath = NewBasePath + "_thumb_256.webp",
+                                    ThumbnailLargeGcsPath = NewBasePath + "_thumb_1200.webp"
+                                },
+                                GlbStoragePath = NewBasePath + "_viewer.glb",
+                                GlbSignedUrl = "https://signed.example/viewer.glb",
+                                PreviewProcessingStatus = PreviewProcessingStatus.Completed,
+                            }
+                        }
+                    ],
+                    Errors = []
+                };
+
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(migrationResponse), Encoding.UTF8, "application/json")
+                });
+            }
+
+            return DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        SetPrivateField(cut.Instance, "_selectedCustomer", new CustomerSummaryDto
+        {
+            Id = customerId,
+            Name = "MaliEV Manufacturing",
+            Email = "orders@example.test",
+        });
+        var part = new PartViewModel
+        {
+            FileId = fileId,
+            Name = "completed.stl",
+            StoragePath = OldBasePath,
+            AwaitingPreview = true,
+            StatusText = "Awaiting process"
+        };
+        GetParts(cut.Instance).Add(part);
+
+        await InvokePrivateTaskAsync(cut, "MigrateTempProjectFilesAsync");
+
+        Assert.Equal(NewBasePath, part.StoragePath);
+        Assert.Equal("Ready", part.StatusText);
+        Assert.False(part.AwaitingPreview);
+        Assert.Equal(80, part.Dimensions?.X);
+        Assert.Equal(149, part.Dimensions?.Y);
+        Assert.Equal(5, part.Dimensions?.Z);
+        Assert.Equal(59600, part.VolumeMm3);
+        Assert.True(part.IsManifold);
+        Assert.Equal("https://signed.example/thumb-small.webp", part.ThumbnailSmallUrl);
+        Assert.Equal("https://signed.example/thumb-large.webp", part.ThumbnailLargeUrl);
+        Assert.Equal(NewBasePath + "_thumb_256.webp", part.ThumbnailSmallGcsPath);
+        Assert.Equal(NewBasePath + "_thumb_1200.webp", part.ThumbnailLargeGcsPath);
+        Assert.Equal(NewBasePath + "_viewer.glb", part.GlbStoragePath);
+        Assert.Equal("https://signed.example/viewer.glb", part.GlbSignedUrl);
+        Assert.Equal("https://signed.example/viewer.glb", part.ViewerUrl);
     }
 
     [Fact]

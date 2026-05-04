@@ -215,27 +215,7 @@ public partial class ProjectNew : IAsyncDisposable
 
             foreach (var part in parts)
             {
-                if (!string.IsNullOrEmpty(payload.ThumbnailUrl) && string.IsNullOrEmpty(part.ThumbnailSmallUrl))
-                    part.ThumbnailSmallUrl = payload.ThumbnailUrl;
-
-                if (payload.Dimensions != null)
-                {
-                    part.Dimensions = new FileAnalysisDimensionsDto
-                    {
-                        X = payload.Dimensions.X,
-                        Y = payload.Dimensions.Y,
-                        Z = payload.Dimensions.Z,
-                        VolumeMm3 = payload.Dimensions.VolumeMm3
-                    };
-                    part.VolumeMm3 = payload.Dimensions.VolumeMm3;
-                }
-
-                if (payload.NonManifoldReason != null || payload.Dimensions != null || payload.BodyCount.HasValue)
-                {
-                    part.IsManifold = payload.NonManifoldReason == null;
-                    part.NonManifoldReason = payload.NonManifoldReason;
-                    part.NonManifoldFaceCount = payload.NonManifoldFaceCount;
-                }
+                await ApplyAnalysisStatusAsync(part, ToFileAnalysisStatus(payload));
 
                 if (payload.BodyCount.HasValue)
                 {
@@ -251,19 +231,6 @@ public partial class ProjectNew : IAsyncDisposable
                         )).ToList();
                 }
 
-                if (payload.PreviewUrls != null)
-                {
-                    if (!string.IsNullOrEmpty(payload.PreviewUrls.ThumbnailSmall))
-                        part.ThumbnailSmallUrl = payload.PreviewUrls.ThumbnailSmall;
-                    if (!string.IsNullOrEmpty(payload.PreviewUrls.ThumbnailLarge))
-                        part.ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge;
-                    else if (!string.IsNullOrEmpty(payload.HiResThumbnailUrl))
-                        part.ThumbnailLargeUrl = payload.HiResThumbnailUrl;
-                    part.ThumbnailSmallGcsPath = NormalizeMigratedArtifactPath(part, payload.PreviewUrls.ThumbnailSmallGcsPath);
-                    part.ThumbnailLargeGcsPath = NormalizeMigratedArtifactPath(part, payload.PreviewUrls.ThumbnailLargeGcsPath);
-                    part.AwaitingPreview = false;
-                    part.StatusText = "Ready";
-                }
             }
             TriggerAutoSave();
             await InvokeAsync(StateHasChanged);
@@ -308,32 +275,7 @@ public partial class ProjectNew : IAsyncDisposable
 
             foreach (var part in parts)
             {
-                // Only overwrite when the incoming event actually carries data.
-                // Per-process events (SLS, MJF, SLA_DLP, …) set only one of the three
-                // report fields and leave the other two null. Without this guard those
-                // null fields would wipe reports set by earlier process events.
-                if (payload.FdmReport != null) part.FdmDfmReport = payload.FdmReport;
-                if (payload.SlaReport != null) part.SlaDfmReport = payload.SlaReport;
-                if (payload.CncReport != null) part.CncDfmReport = payload.CncReport;
-                if (payload.OverlayUrls != null) part.OverlayUrls = payload.OverlayUrls;
-                if (payload.OverlayPaths != null)
-                    part.OverlayPaths = NormalizeMigratedArtifactPaths(part, payload.OverlayPaths);
-                // Stamp body count unconditionally so single-body files also resolve Pending state.
-                if (payload.BodyCount.HasValue)
-                    part.BodyCount = payload.BodyCount.Value;
-                // Stamp mesh-integrity info from DFM event if not already set (cache-miss recovery path).
-                if (payload.NonManifoldReason != null && part.NonManifoldReason == null)
-                {
-                    part.IsManifold = false;
-                    part.NonManifoldReason = payload.NonManifoldReason;
-                    part.NonManifoldFaceCount = payload.NonManifoldFaceCount;
-                }
-                else if (payload.NonManifoldReason == null && payload.BodyCount.HasValue && part.IsManifold == null)
-                {
-                    // DFM event arrived with body count but no manifold issue — mark as manifold.
-                    part.IsManifold = true;
-                }
-                part.ResolveDfmReport();
+                ApplyDfmPayload(part, payload);
             }
             StopStatusWatchdogs(parts);
 
@@ -784,75 +726,7 @@ public partial class ProjectNew : IAsyncDisposable
                 return;
             }
 
-            part.Dimensions = status.Dimensions;
-            part.VolumeMm3 = status.Dimensions?.VolumeMm3;
-            part.IsManifold = status.IsManifold;
-            part.NonManifoldReason = status.NonManifoldReason;
-            part.NonManifoldFaceCount = status.NonManifoldFaceCount;
-            part.GlbStoragePath = NormalizeMigratedArtifactPath(part, status.GlbStoragePath);
-            part.GlbSignedUrl = status.GlbSignedUrl;  // Option B: use cached signed URL directly
-
-            if (status.DfmReport is JsonElement je && je.ValueKind == JsonValueKind.Object
-                && je.TryGetProperty("FdmReport", out _))
-            {
-                var dfmPayload = JsonSerializer.Deserialize<SignalRDfmAnalysisPayload>(je.GetRawText());
-                part.FdmDfmReport = dfmPayload?.FdmReport;
-                part.SlaDfmReport = dfmPayload?.SlaReport;
-                part.CncDfmReport = dfmPayload?.CncReport;
-                part.ResolveDfmReport();
-            }
-            else
-            {
-                part.DfmReport = status.DfmReport;
-            }
-
-            if (status.PreviewUrls != null)
-            {
-                // Only update if not empty (preserves existing thumbnail from earlier SignalR event)
-                if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailSmall))
-                    part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall;
-                if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailLargeUrl))
-                    part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl;
-                else if (!string.IsNullOrEmpty(status.HiResThumbnailUrl))
-                    part.ThumbnailLargeUrl = status.HiResThumbnailUrl;
-                part.ThumbnailSmallGcsPath = NormalizeMigratedArtifactPath(part, status.PreviewUrls.ThumbnailSmallGcsPath);
-                part.ThumbnailLargeGcsPath = NormalizeMigratedArtifactPath(part, status.PreviewUrls.ThumbnailLargeGcsPath);
-            }
-            else if (!string.IsNullOrEmpty(status.ThumbnailUrl))
-            {
-                // Legacy single thumbnail - treat as small (256px)
-                part.ThumbnailSmallUrl = status.ThumbnailUrl;
-                part.ThumbnailLargeUrl = status.HiResThumbnailUrl ?? status.ThumbnailUrl;
-            }
-
-            if (status.Status == FileAnalysisStatus.Completed &&
-                (status.PreviewProcessingStatus == PreviewProcessingStatus.Completed ||
-                 status.PreviewProcessingStatus == PreviewProcessingStatus.Failed))
-            {
-                part.AwaitingPreview = false;
-                part.StatusText = "Ready";
-                TriggerAutoSave();
-            }
-            else if (status.Status == FileAnalysisStatus.Failed)
-            {
-                part.AwaitingPreview = false;
-                part.Error = $"Geometry analysis failed: {status.ErrorCode}";
-                part.StatusText = "Analysis failed";
-            }
-
-            // Bug 1 fix: resolve a signed GLB viewer URL so the 3D viewer auto-loads
-            // after a draft restore. This mirrors OpenBabylonViewer but is non-fatal.
-            await ResolveViewerUrlAsync(part);
-
-            // Re-sign overlay GLB paths so click-to-highlight works after draft restore
-            await ResolveOverlayUrlsAsync(part);
-
-            // Bug 5/6 fix: trigger pricing after the catch-up fetch has populated
-            // Dimensions/VolumeMm3 so ComputePriceAsync has accurate geometry data.
-            // Skip if catalog is not yet loaded (ReloadPartCatalogAsync will trigger pricing itself).
-            if (part.ProcessId.HasValue && part.MaterialId.HasValue
-                && part.AvailableMaterials.Count > 0)
-                TriggerPricingAsync(part);
+            await ApplyAnalysisStatusAsync(part, status);
 
             await InvokeAsync(StateHasChanged);
         }
@@ -861,6 +735,173 @@ public partial class ProjectNew : IAsyncDisposable
             // Catch-up fetch is a safety net — failures are non-fatal; SignalR will deliver the final state
             await InvokeAsync(() => Snackbar.Add($"Status fetch failed for {part.Name}: {ex.Message}", Severity.Warning));
         }
+    }
+
+    private async Task ApplyAnalysisStatusAsync(PartViewModel part, FileAnalysisStatusDto status)
+    {
+        if (status.Dimensions != null)
+        {
+            part.Dimensions = status.Dimensions;
+            part.VolumeMm3 = status.Dimensions.VolumeMm3;
+        }
+
+        if (status.IsManifold.HasValue)
+            part.IsManifold = status.IsManifold;
+        if (status.NonManifoldReason != null || status.NonManifoldFaceCount.HasValue)
+        {
+            part.NonManifoldReason = status.NonManifoldReason;
+            part.NonManifoldFaceCount = status.NonManifoldFaceCount;
+        }
+
+        var normalizedGlbStoragePath = NormalizeMigratedArtifactPath(part, status.GlbStoragePath);
+        if (!string.IsNullOrEmpty(normalizedGlbStoragePath))
+            part.GlbStoragePath = normalizedGlbStoragePath;
+        if (!string.IsNullOrEmpty(status.GlbSignedUrl))
+            part.GlbSignedUrl = status.GlbSignedUrl;
+
+        ApplyDfmStatus(part, status.DfmReport);
+        ApplyPreviewStatus(part, status);
+
+        if (status.Status == FileAnalysisStatus.Completed &&
+            (status.PreviewProcessingStatus == PreviewProcessingStatus.Completed ||
+             status.PreviewProcessingStatus == PreviewProcessingStatus.Failed))
+        {
+            part.AwaitingPreview = false;
+            part.StatusText = "Ready";
+            TriggerAutoSave();
+        }
+        else if (status.Status == FileAnalysisStatus.Failed)
+        {
+            part.AwaitingPreview = false;
+            part.Error = $"Geometry analysis failed: {status.ErrorCode}";
+            part.StatusText = "Analysis failed";
+        }
+
+        await ResolveViewerUrlAsync(part);
+        await ResolveOverlayUrlsAsync(part);
+
+        if (part.ProcessId.HasValue && part.MaterialId.HasValue
+            && part.AvailableMaterials.Count > 0)
+            TriggerPricingAsync(part);
+    }
+
+    private static FileAnalysisStatusDto ToFileAnalysisStatus(SignalRFileAnalysisPayload payload)
+    {
+        var hasGeometryState = payload.Dimensions != null || payload.BodyCount.HasValue || payload.NonManifoldReason != null;
+
+        return new FileAnalysisStatusDto
+        {
+            UploadId = payload.StoragePath,
+            Status = payload.Failed ? FileAnalysisStatus.Failed : FileAnalysisStatus.Completed,
+            Dimensions = payload.Dimensions == null
+                ? null
+                : new FileAnalysisDimensionsDto
+                {
+                    X = payload.Dimensions.X,
+                    Y = payload.Dimensions.Y,
+                    Z = payload.Dimensions.Z,
+                    VolumeMm3 = payload.Dimensions.VolumeMm3
+                },
+            IsManifold = payload.NonManifoldReason != null
+                ? false
+                : hasGeometryState ? true : null,
+            NonManifoldReason = payload.NonManifoldReason,
+            NonManifoldFaceCount = payload.NonManifoldFaceCount,
+            ThumbnailUrl = payload.ThumbnailUrl,
+            HiResThumbnailUrl = payload.HiResThumbnailUrl,
+            PreviewUrls = payload.PreviewUrls == null
+                ? null
+                : new FileAnalysisPreviewUrlsDto
+                {
+                    FrontSmall = payload.PreviewUrls.FrontSmall,
+                    BackSmall = payload.PreviewUrls.BackSmall,
+                    LeftSmall = payload.PreviewUrls.LeftSmall,
+                    RightSmall = payload.PreviewUrls.RightSmall,
+                    TopSmall = payload.PreviewUrls.TopSmall,
+                    BottomSmall = payload.PreviewUrls.BottomSmall,
+                    ThumbnailSmall = payload.PreviewUrls.ThumbnailSmall,
+                    ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge,
+                    ThumbnailSmallGcsPath = payload.PreviewUrls.ThumbnailSmallGcsPath,
+                    ThumbnailLargeGcsPath = payload.PreviewUrls.ThumbnailLargeGcsPath
+                },
+            PreviewProcessingStatus = payload.PreviewUrls == null
+                ? PreviewProcessingStatus.Pending
+                : payload.Failed ? PreviewProcessingStatus.Failed : PreviewProcessingStatus.Completed,
+            ErrorCode = payload.ErrorCode
+        };
+    }
+
+    private void ApplyPreviewStatus(PartViewModel part, FileAnalysisStatusDto status)
+    {
+        if (status.PreviewUrls != null)
+        {
+            if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailSmall))
+                part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall;
+            else if (!string.IsNullOrEmpty(status.ThumbnailUrl))
+                part.ThumbnailSmallUrl = status.ThumbnailUrl;
+
+            if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailLargeUrl))
+                part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl;
+            else if (!string.IsNullOrEmpty(status.HiResThumbnailUrl))
+                part.ThumbnailLargeUrl = status.HiResThumbnailUrl;
+
+            part.ThumbnailSmallGcsPath = NormalizeMigratedArtifactPath(part, status.PreviewUrls.ThumbnailSmallGcsPath);
+            part.ThumbnailLargeGcsPath = NormalizeMigratedArtifactPath(part, status.PreviewUrls.ThumbnailLargeGcsPath);
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(status.ThumbnailUrl))
+        {
+            part.ThumbnailSmallUrl = status.ThumbnailUrl;
+            part.ThumbnailLargeUrl = status.HiResThumbnailUrl ?? status.ThumbnailUrl;
+        }
+    }
+
+    private void ApplyDfmStatus(PartViewModel part, object? dfmReport)
+    {
+        if (dfmReport is SignalRDfmAnalysisPayload payload)
+        {
+            ApplyDfmPayload(part, payload);
+            return;
+        }
+
+        if (dfmReport is JsonElement je && je.ValueKind == JsonValueKind.Object
+            && je.TryGetProperty("FdmReport", out _))
+        {
+            var payloadFromJson = JsonSerializer.Deserialize<SignalRDfmAnalysisPayload>(je.GetRawText());
+            if (payloadFromJson != null)
+            {
+                ApplyDfmPayload(part, payloadFromJson);
+                return;
+            }
+        }
+
+        part.DfmReport = dfmReport;
+    }
+
+    private void ApplyDfmPayload(PartViewModel part, SignalRDfmAnalysisPayload payload)
+    {
+        if (payload.FdmReport != null) part.FdmDfmReport = payload.FdmReport;
+        if (payload.SlaReport != null) part.SlaDfmReport = payload.SlaReport;
+        if (payload.CncReport != null) part.CncDfmReport = payload.CncReport;
+        if (payload.OverlayUrls != null) part.OverlayUrls = payload.OverlayUrls;
+        if (payload.OverlayPaths != null)
+            part.OverlayPaths = NormalizeMigratedArtifactPaths(part, payload.OverlayPaths);
+        if (payload.BodyCount.HasValue)
+            part.BodyCount = payload.BodyCount.Value;
+
+        if (payload.NonManifoldReason != null && part.NonManifoldReason == null)
+        {
+            part.IsManifold = false;
+            part.NonManifoldReason = payload.NonManifoldReason;
+            part.NonManifoldFaceCount = payload.NonManifoldFaceCount;
+        }
+        else if (payload.NonManifoldReason == null && payload.BodyCount.HasValue && part.IsManifold == null)
+        {
+            part.IsManifold = true;
+        }
+
+        part.ResolveDfmReport();
     }
 
     private async Task ResolveViewerUrlAsync(PartViewModel part)
@@ -2668,47 +2709,20 @@ public partial class ProjectNew : IAsyncDisposable
                 return;
             }
 
-            var migrated = await migrationResult.Content.ReadFromJsonAsync<JsonDocument>();
+            var migrated = await migrationResult.Content.ReadFromJsonAsync<BffMigrateProjectResponseDto>();
             if (migrated == null)
             {
                 Snackbar.Add("Migration failed.", Severity.Error);
                 return;
             }
 
-            var root = migrated.RootElement;
-
-            if (!root.TryGetProperty("errors", out var errorsElement) &&
-                !root.TryGetProperty("Errors", out errorsElement))
-            {
-                Snackbar.Add("Migration response is invalid: missing errors property.", Severity.Error);
-                return;
-            }
-
-            if (!root.TryGetProperty("migrated_files", out var migratedFilesElement) &&
-                !root.TryGetProperty("MigratedFiles", out migratedFilesElement) &&
-                !root.TryGetProperty("migratedFiles", out migratedFilesElement))
-            {
-                Snackbar.Add("Migration response is invalid: missing migrated_files property.", Severity.Error);
-                return;
-            }
-
             var successfullyMigratedParts = new List<PartViewModel>();
 
-            foreach (var entry in migratedFilesElement.EnumerateArray())
+            foreach (var entry in migrated.MigratedFiles)
             {
-                if (!entry.TryGetProperty("file_id", out var fileIdElement) &&
-                    !entry.TryGetProperty("FileId", out fileIdElement))
-                    continue;
-                if (!entry.TryGetProperty("new_path", out var newPathElement) &&
-                    !entry.TryGetProperty("NewPath", out newPathElement))
-                    continue;
-                if (!entry.TryGetProperty("old_path", out var oldPathElement) &&
-                    !entry.TryGetProperty("OldPath", out oldPathElement))
-                    continue;
-
-                var fileId = fileIdElement.GetString();
-                var newBasePath = newPathElement.GetString();
-                var oldBasePath = oldPathElement.GetString();
+                var fileId = entry.FileId;
+                var newBasePath = entry.NewPath;
+                var oldBasePath = entry.OldPath;
 
                 if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(newBasePath) || string.IsNullOrEmpty(oldBasePath))
                     continue;
@@ -2723,6 +2737,8 @@ public partial class ProjectNew : IAsyncDisposable
                 await JoinPartFileGroupsAsync(part);
                 StartStatusWatchdog(part, oldBasePath);
                 StartStatusWatchdog(part, newBasePath);
+                if (entry.Status != null)
+                    await ApplyAnalysisStatusAsync(part, entry.Status);
                 successfullyMigratedParts.Add(part);
             }
 
@@ -2735,14 +2751,13 @@ public partial class ProjectNew : IAsyncDisposable
                     TriggerPricingAsync(part);
             }
 
-            if (errorsElement.GetArrayLength() > 0)
+            if (migrated.Errors.Count > 0)
             {
-                var errorMessages = errorsElement.EnumerateArray()
-                    .Select(e => e.GetString() ?? string.Empty)
+                var errorMessages = migrated.Errors
                     .Where(e => !string.IsNullOrEmpty(e))
                     .ToList();
 
-                var summary = $"Migration completed with {errorsElement.GetArrayLength()} error(s). {successfullyMigratedParts.Count} file(s) migrated successfully.";
+                var summary = $"Migration completed with {migrated.Errors.Count} error(s). {successfullyMigratedParts.Count} file(s) migrated successfully.";
                 if (errorMessages.Count > 0 && errorMessages.Count <= 3)
                 {
                     summary += " Errors: " + string.Join("; ", errorMessages);

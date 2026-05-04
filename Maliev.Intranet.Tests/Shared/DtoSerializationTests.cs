@@ -157,4 +157,60 @@ public class DtoSerializationTests
         Assert.Equal(dto.Title, result.Title);
         Assert.Equal(dto.Progress, result.Progress);
     }
+
+    [Fact]
+    public void BffMigrateProjectResponseDto_ShouldUseCamelCaseWireShape_WithNestedStatus()
+    {
+        var dto = new BffMigrateProjectResponseDto
+        {
+            DryRun = false,
+            TotalEvaluated = 1,
+            TotalMigrated = 1,
+            MigratedFiles =
+            [
+                new BffMigratedProjectFileDto
+                {
+                    FileId = "file-1",
+                    OldPath = "projects/project-1/part.stl",
+                    NewPath = "customers/customer-1/projects/project-1/part.stl",
+                    Status = new FileAnalysisStatusDto
+                    {
+                        UploadId = "customers/customer-1/projects/project-1/part.stl",
+                        Status = FileAnalysisStatus.Completed,
+                        Dimensions = new FileAnalysisDimensionsDto
+                        {
+                            X = 10,
+                            Y = 20,
+                            Z = 30,
+                            VolumeMm3 = 6000
+                        },
+                        PreviewProcessingStatus = PreviewProcessingStatus.Completed
+                    }
+                }
+            ],
+            Errors = []
+        };
+        var webOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        var json = JsonSerializer.Serialize(dto, webOptions);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.True(root.TryGetProperty("migratedFiles", out var migratedFiles));
+        Assert.False(root.TryGetProperty("migrated_files", out _));
+        var file = migratedFiles.EnumerateArray().Single();
+        Assert.True(file.TryGetProperty("fileId", out _));
+        Assert.True(file.TryGetProperty("oldPath", out _));
+        Assert.True(file.TryGetProperty("newPath", out _));
+        Assert.True(file.TryGetProperty("status", out var status));
+        Assert.Equal((int)FileAnalysisStatus.Completed, status.GetProperty("status").GetInt32());
+
+        var result = JsonSerializer.Deserialize<BffMigrateProjectResponseDto>(json, webOptions);
+
+        Assert.NotNull(result);
+        var migrated = Assert.Single(result.MigratedFiles);
+        Assert.Equal("file-1", migrated.FileId);
+        Assert.Equal(FileAnalysisStatus.Completed, migrated.Status?.Status);
+        Assert.Equal(6000, migrated.Status?.Dimensions?.VolumeMm3);
+    }
 }
