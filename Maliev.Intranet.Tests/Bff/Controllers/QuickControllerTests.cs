@@ -179,4 +179,56 @@ public class QuickControllerTests
         var result = await controller.GetPermissions();
         Assert.IsType<OkObjectResult>(result.Result);
     }
+
+    [Fact]
+    public async Task Iam_GetRolesPaged_FiltersAndPaginatesRoles()
+    {
+        var authMock = new Mock<IAuthorizationService>();
+        authMock.Setup(x => x.AuthorizeAsync(It.IsAny<ClaimsPrincipal>(), It.IsAny<object>(), It.IsAny<string>()))
+            .ReturnsAsync(AuthorizationResult.Success());
+        var iamClient = new Mock<IAMServiceClient>(new HttpClient { BaseAddress = new Uri("http://iam") });
+        iamClient.Setup(client => client.GetRolesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new RoleDto { RoleId = "roles.customer.viewer", ServiceName = "customer", Name = "Customer Viewer", Description = "Read-only access", PermissionIds = ["customer.customers.read"] },
+                new RoleDto { RoleId = "roles.iam.admin", ServiceName = "iam", Name = "IAM Admin", Description = "Manage IAM", PermissionIds = ["iam.roles.create"] }
+            ]);
+        var controller = new IamController(iamClient.Object, authMock.Object, new Mock<IWebHostEnvironment>().Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "u")], "Test")) } }
+        };
+
+        var result = await controller.GetRolesPaged(service: "customer", page: 1, pageSize: 10);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<PagedResponse<RoleDto>>(ok.Value);
+        var role = Assert.Single(response.Data);
+        Assert.Equal("Customer Viewer", role.Name);
+        Assert.Equal(1, response.Meta.TotalItems);
+    }
+
+    [Fact]
+    public async Task Iam_GetPermissionsPaged_SearchesAndPaginatesPermissions()
+    {
+        var authMock = new Mock<IAuthorizationService>();
+        authMock.Setup(x => x.AuthorizeAsync(It.IsAny<ClaimsPrincipal>(), It.IsAny<object>(), It.IsAny<string>()))
+            .ReturnsAsync(AuthorizationResult.Success());
+        var iamClient = new Mock<IAMServiceClient>(new HttpClient { BaseAddress = new Uri("http://iam") });
+        iamClient.Setup(client => client.GetPermissionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new PermissionDto { PermissionId = "customer.customers.read", Name = "Read customers", Category = "Customer", Description = "Read customer records" },
+                new PermissionDto { PermissionId = "iam.roles.create", Name = "Create roles", Category = "IAM", Description = "Create IAM roles" }
+            ]);
+        var controller = new IamController(iamClient.Object, authMock.Object, new Mock<IWebHostEnvironment>().Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "u")], "Test")) } }
+        };
+
+        var result = await controller.GetPermissionsPaged(category: "IAM", page: 1, pageSize: 10);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<PagedResponse<PermissionDto>>(ok.Value);
+        var permission = Assert.Single(response.Data);
+        Assert.Equal("iam.roles.create", permission.PermissionId);
+        Assert.Equal(1, response.Meta.TotalItems);
+    }
 }

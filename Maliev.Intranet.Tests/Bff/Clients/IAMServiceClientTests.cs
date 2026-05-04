@@ -77,6 +77,7 @@ public class IAMServiceClientTests
 
         var role = Assert.Single(roles);
         Assert.Equal("Contact Viewer", role.Name);
+        Assert.Equal("contact", role.ServiceName);
         Assert.Equal("Read-only access to contacts", role.Description);
         Assert.Equal(3, role.PermissionIds.Count);
     }

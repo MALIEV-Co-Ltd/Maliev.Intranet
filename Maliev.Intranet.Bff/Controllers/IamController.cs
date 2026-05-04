@@ -56,6 +56,8 @@ public class IamController(
     [HttpGet("users")]
     public async Task<ActionResult<PagedResponse<PrincipalSummaryDto>>> GetUsers(
         [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? type = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
@@ -72,27 +74,23 @@ public class IamController(
                 .ToList();
         }
 
-        var normalizedPage = Math.Max(1, page);
-        var normalizedPageSize = Math.Clamp(pageSize, 1, 100);
-        var totalCount = principals.Count;
-        var data = principals
-            .OrderBy(principal => principal.DisplayName)
-            .Skip((normalizedPage - 1) * normalizedPageSize)
-            .Take(normalizedPageSize)
-            .ToList();
-
-        return Ok(new PagedResponse<PrincipalSummaryDto>
+        if (!string.IsNullOrWhiteSpace(status))
         {
-            Data = data,
-            Meta = new PaginationMeta
-            {
-                CurrentPage = normalizedPage,
-                PageSize = normalizedPageSize,
-                TotalCount = totalCount,
-                TotalItems = totalCount,
-                TotalPages = normalizedPageSize > 0 ? (int)Math.Ceiling(totalCount / (double)normalizedPageSize) : 0
-            }
-        });
+            principals = principals
+                .Where(principal => status.Equals("active", StringComparison.OrdinalIgnoreCase)
+                    ? principal.IsActive && principal.IsEnabled
+                    : status.Equals("inactive", StringComparison.OrdinalIgnoreCase) && (!principal.IsActive || !principal.IsEnabled))
+                .ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            principals = principals
+                .Where(principal => principal.Type.Equals(type, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        return Ok(ToPagedResponse(principals.OrderBy(principal => principal.DisplayName), page, pageSize));
     }
 
     /// <summary>
@@ -124,6 +122,45 @@ public class IamController(
     }
 
     /// <summary>
+    /// Retrieves paged roles for the IAM console.
+    /// </summary>
+    /// <param name="search">Optional search text.</param>
+    /// <param name="service">Optional service/domain filter.</param>
+    /// <param name="page">The 1-based page number.</param>
+    /// <param name="pageSize">The page size.</param>
+    /// <returns>A paged list of roles.</returns>
+    [RequirePermission(MalievPermissions.IAM.Roles.List, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("roles/paged")]
+    public async Task<ActionResult<PagedResponse<RoleDto>>> GetRolesPaged(
+        [FromQuery] string? search = null,
+        [FromQuery] string? service = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Roles.List)) return Forbid();
+        var roles = await client.GetRolesAsync();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            roles = roles
+                .Where(role =>
+                    role.RoleId.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    role.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    role.Description.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(service))
+        {
+            roles = roles
+                .Where(role => role.ServiceName.Equals(service, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        return Ok(ToPagedResponse(roles.OrderBy(role => role.ServiceName).ThenBy(role => role.Name), page, pageSize));
+    }
+
+    /// <summary>
     /// Retrieves all permissions for the IAM console.
     /// </summary>
     /// <returns>A list of permissions.</returns>
@@ -134,6 +171,46 @@ public class IamController(
         if (!await IsAuthorizedAsync(MalievPermissions.IAM.Permissions.List)) return Forbid();
         var permissions = await client.GetPermissionsAsync();
         return Ok(permissions);
+    }
+
+    /// <summary>
+    /// Retrieves paged permissions for the IAM console.
+    /// </summary>
+    /// <param name="search">Optional search text.</param>
+    /// <param name="category">Optional category filter.</param>
+    /// <param name="page">The 1-based page number.</param>
+    /// <param name="pageSize">The page size.</param>
+    /// <returns>A paged list of permissions.</returns>
+    [RequirePermission(MalievPermissions.IAM.Permissions.List, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("permissions/paged")]
+    public async Task<ActionResult<PagedResponse<PermissionDto>>> GetPermissionsPaged(
+        [FromQuery] string? search = null,
+        [FromQuery] string? category = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Permissions.List)) return Forbid();
+        var permissions = await client.GetPermissionsAsync();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            permissions = permissions
+                .Where(permission =>
+                    permission.PermissionId.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    permission.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    permission.Description.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    permission.Category.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            permissions = permissions
+                .Where(permission => permission.Category.Equals(category, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        return Ok(ToPagedResponse(permissions.OrderBy(permission => permission.Category).ThenBy(permission => permission.PermissionId), page, pageSize));
     }
 
     /// <summary>
@@ -287,5 +364,30 @@ public class IamController(
 
         /// <summary>Gets or sets whether the user should be enabled.</summary>
         public bool? IsEnabled { get; set; }
+    }
+
+    private static PagedResponse<T> ToPagedResponse<T>(IEnumerable<T> items, int page, int pageSize)
+    {
+        var normalizedPage = Math.Max(1, page);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, 100);
+        var materialized = items.ToList();
+        var totalCount = materialized.Count;
+        var data = materialized
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .ToList();
+
+        return new PagedResponse<T>
+        {
+            Data = data,
+            Meta = new PaginationMeta
+            {
+                CurrentPage = normalizedPage,
+                PageSize = normalizedPageSize,
+                TotalCount = totalCount,
+                TotalItems = totalCount,
+                TotalPages = normalizedPageSize > 0 ? (int)Math.Ceiling(totalCount / (double)normalizedPageSize) : 0
+            }
+        };
     }
 }

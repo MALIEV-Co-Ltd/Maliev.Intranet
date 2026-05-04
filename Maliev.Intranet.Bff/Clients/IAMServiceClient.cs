@@ -152,6 +152,7 @@ public class IAMServiceClient(HttpClient httpClient)
     private static RoleDto MapRole(IamRoleResponse role) => new()
     {
         RoleId = role.RoleId,
+        ServiceName = FirstNonBlank(role.ServiceName, ExtractServiceName(role.RoleId)),
         Name = FirstNonBlank(role.Name, role.RoleName, HumanizeRoleId(role.RoleId)),
         Description = role.Description ?? string.Empty,
         Permissions = role.Permissions ?? [],
@@ -180,6 +181,16 @@ public class IAMServiceClient(HttpClient httpClient)
 
         var label = string.Join(" ", words);
         return string.IsNullOrWhiteSpace(label) ? roleId : label;
+    }
+
+    private static string ExtractServiceName(string roleId)
+    {
+        var normalized = roleId.StartsWith("roles.", StringComparison.OrdinalIgnoreCase)
+            ? roleId["roles.".Length..]
+            : roleId;
+
+        var separatorIndex = normalized.IndexOfAny(['.', '-', '_']);
+        return separatorIndex > 0 ? normalized[..separatorIndex] : string.Empty;
     }
 
     /// <summary>

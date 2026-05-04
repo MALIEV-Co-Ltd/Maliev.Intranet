@@ -41,6 +41,8 @@ public class RoleDto
 {
     /// <summary>The unique identifier for the role (e.g., "Admin").</summary>
     public string RoleId { get; set; } = string.Empty;
+    /// <summary>The service or domain that owns the role.</summary>
+    public string ServiceName { get; set; } = string.Empty;
     /// <summary>The display name of the role.</summary>
     public string Name { get; set; } = string.Empty;
     /// <summary>A detailed description of the role's purpose and scope.</summary>

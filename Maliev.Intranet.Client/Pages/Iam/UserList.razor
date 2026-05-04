@@ -22,15 +22,49 @@
                 <div class="mlv-segmented">
                     @foreach (var tab in _tabs)
                     {
-                        <button type="button" class="@(_tab == tab ? "active" : "")" @onclick="@(() => _tab = tab)">@tab</button>
+                        <button type="button" class="@(_tab == tab ? "active" : "")" @onclick="@(() => SelectTabAsync(tab))">@tab</button>
                     }
                 </div>
+                <SearchBox Value="@CurrentSearch" ValueChanged="OnSearchChanged" Placeholder="@SearchPlaceholder" OnEnter="SearchAsync" />
                 @if (_tab == "Users")
                 {
-                    <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search users..." OnEnter="SearchAsync" />
+                    <label class="mlv-filter-field">
+                        <span>Status</span>
+                        <select value="@(_userStatus ?? string.Empty)" @onchange="OnUserStatusChanged">
+                            <option value="">All statuses</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </label>
+                    <label class="mlv-filter-field">
+                        <span>Type</span>
+                        <select value="@(_userType ?? string.Empty)" @onchange="OnUserTypeChanged">
+                            <option value="">All types</option>
+                            <option value="user">User</option>
+                            <option value="service_account">Service account</option>
+                            <option value="system">System</option>
+                        </select>
+                    </label>
+                }
+                else if (_tab == "Roles")
+                {
+                    <label class="mlv-filter-field compact">
+                        <span>Service</span>
+                        <input value="@_roleService" @oninput="OnRoleServiceChanged" placeholder="customer, iam..." />
+                    </label>
+                }
+                else
+                {
+                    <label class="mlv-filter-field compact">
+                        <span>Category</span>
+                        <input value="@_permissionCategory" @oninput="OnPermissionCategoryChanged" placeholder="Customer..." />
+                    </label>
                 }
             </div>
-            <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+            <div class="mlv-toolbar-right">
+                <SecondaryButton Icon="@Icons.Material.Outlined.Search" OnClick="@SearchClickedAsync">Search</SecondaryButton>
+                <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+            </div>
         </div>
 
         @if (_tab == "Users")
@@ -76,37 +110,63 @@
         else if (_tab == "Roles")
         {
             <PanelCard>
-                <div class="mlv-list">
-                    @foreach (var role in _roles)
-                    {
-                        <div class="mlv-list-row" @onclick="@(() => Navigation.NavigateTo($"/iam/roles/{Uri.EscapeDataString(role.RoleId)}"))">
-                            <div>
-                                <div class="mlv-row-main">@RoleDisplayName(role)</div>
-                                <div class="mlv-row-sub">@RoleSubtitle(role)</div>
+                @if (_roles.Count > 0)
+                {
+                    <div class="mlv-list">
+                        @foreach (var role in _roles)
+                        {
+                            <div class="mlv-list-row" @onclick="@(() => Navigation.NavigateTo($"/iam/roles/{Uri.EscapeDataString(role.RoleId)}"))">
+                                <div>
+                                    <div class="mlv-row-main">@RoleDisplayName(role)</div>
+                                    <div class="mlv-row-sub">@RoleSubtitle(role)</div>
+                                </div>
+                                <StatusBadge Status="@role.RoleId" Text="@($"{role.PermissionIds.Count} permissions")" />
                             </div>
-                            <StatusBadge Status="@role.RoleId" Text="@($"{role.PermissionIds.Count} permissions")" />
-                        </div>
-                    }
-                </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="mlv-empty">No IAM roles found.</div>
+                }
             </PanelCard>
+            <PaginationFooter Meta="@_roleMeta"
+                              CurrentPage="@_rolePage"
+                              PageSize="@_pageSize"
+                              PageChanged="OnRolePageChanged"
+                              PageSizeChanged="OnPageSizeChanged"
+                              Disabled="@_loading" />
         }
         else
         {
             <PanelCard>
-                <table class="mlv-table">
-                    <thead><tr><th>Permission</th><th>Category</th><th>Description</th></tr></thead>
-                    <tbody>
-                        @foreach (var permission in _permissions)
-                        {
-                            <tr>
-                                <td class="mlv-mono">@permission.PermissionId</td>
-                                <td>@permission.Category</td>
-                                <td>@permission.Description</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                @if (_permissions.Count > 0)
+                {
+                    <table class="mlv-table">
+                        <thead><tr><th>Permission</th><th>Category</th><th>Description</th></tr></thead>
+                        <tbody>
+                            @foreach (var permission in _permissions)
+                            {
+                                <tr>
+                                    <td class="mlv-mono">@permission.PermissionId</td>
+                                    <td>@permission.Category</td>
+                                    <td>@permission.Description</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="mlv-empty">No IAM permissions found.</div>
+                }
             </PanelCard>
+            <PaginationFooter Meta="@_permissionMeta"
+                              CurrentPage="@_permissionPage"
+                              PageSize="@_pageSize"
+                              PageChanged="OnPermissionPageChanged"
+                              PageSizeChanged="OnPageSizeChanged"
+                              Disabled="@_loading" />
         }
     </PageBody>
 </div>
@@ -118,51 +178,73 @@
     private List<RoleDto> _roles = [];
     private List<PermissionDto> _permissions = [];
     private PaginationMeta _userMeta = new();
+    private PaginationMeta _roleMeta = new();
+    private PaginationMeta _permissionMeta = new();
     private bool _loading = true;
-    private string? _search;
+    private string? _userSearch;
+    private string? _roleSearch;
+    private string? _permissionSearch;
+    private string? _userStatus;
+    private string? _userType;
+    private string? _roleService;
+    private string? _permissionCategory;
     private int _userPage = 1;
+    private int _rolePage = 1;
+    private int _permissionPage = 1;
     private int _pageSize = 20;
+
+    private string? CurrentSearch => _tab switch
+    {
+        "Roles" => _roleSearch,
+        "Permissions" => _permissionSearch,
+        _ => _userSearch
+    };
+
+    private string SearchPlaceholder => _tab switch
+    {
+        "Roles" => "Search roles...",
+        "Permissions" => "Search permissions...",
+        _ => "Search users..."
+    };
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            var usersTask = Http.GetFromJsonAsync<PagedResponse<PrincipalSummaryDto>>(BuildUsersUrl());
-            var rolesTask = Http.GetFromJsonAsync<List<RoleDto>>("api/v1/iam/roles");
-            var permissionsTask = Http.GetFromJsonAsync<List<PermissionDto>>("api/v1/iam/permissions");
-            await Task.WhenAll(usersTask, rolesTask, permissionsTask);
-            var users = await usersTask;
-            _users = users?.Data.ToList() ?? [];
-            _userMeta = users?.Meta ?? new();
-            _userMeta.CurrentPage = _userMeta.CurrentPage == 0 ? _userPage : _userMeta.CurrentPage;
-            _userMeta.PageSize = _userMeta.PageSize == 0 ? _pageSize : _userMeta.PageSize;
-            _roles = await rolesTask ?? [];
-            _permissions = await permissionsTask ?? [];
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add("IAM data could not be loaded.", Severity.Warning);
-            Console.WriteLine(ex.Message);
-        }
-        finally
-        {
-            _loading = false;
-        }
+        await LoadCurrentTabAsync();
+    }
+
+    private async Task SelectTabAsync(string tab)
+    {
+        _tab = tab;
+        await LoadCurrentTabAsync();
     }
 
     private Task OnSearchChanged(string? value)
     {
-        _search = value;
+        switch (_tab)
+        {
+            case "Roles":
+                _roleSearch = value;
+                break;
+            case "Permissions":
+                _permissionSearch = value;
+                break;
+            default:
+                _userSearch = value;
+                break;
+        }
+
         return Task.CompletedTask;
     }
 
     private async Task SearchAsync()
     {
-        _userPage = 1;
-        await LoadUsersAsync();
+        ResetCurrentPage();
+        await LoadCurrentTabAsync();
     }
 
-    private async Task ReloadAsync(MouseEventArgs _) => await OnInitializedAsync();
+    private async Task SearchClickedAsync(MouseEventArgs _) => await SearchAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadCurrentTabAsync();
 
     private async Task OnUserPageChanged(int page)
     {
@@ -170,12 +252,57 @@
         await LoadUsersAsync();
     }
 
+    private async Task OnRolePageChanged(int page)
+    {
+        _rolePage = page;
+        await LoadRolesAsync();
+    }
+
+    private async Task OnPermissionPageChanged(int page)
+    {
+        _permissionPage = page;
+        await LoadPermissionsAsync();
+    }
+
     private async Task OnPageSizeChanged(int pageSize)
     {
         _pageSize = pageSize;
+        ResetCurrentPage();
+        await LoadCurrentTabAsync();
+    }
+
+    private async Task OnUserStatusChanged(ChangeEventArgs args)
+    {
+        _userStatus = args.Value?.ToString();
         _userPage = 1;
         await LoadUsersAsync();
     }
+
+    private async Task OnUserTypeChanged(ChangeEventArgs args)
+    {
+        _userType = args.Value?.ToString();
+        _userPage = 1;
+        await LoadUsersAsync();
+    }
+
+    private Task OnRoleServiceChanged(ChangeEventArgs args)
+    {
+        _roleService = args.Value?.ToString();
+        return Task.CompletedTask;
+    }
+
+    private Task OnPermissionCategoryChanged(ChangeEventArgs args)
+    {
+        _permissionCategory = args.Value?.ToString();
+        return Task.CompletedTask;
+    }
+
+    private Task LoadCurrentTabAsync() => _tab switch
+    {
+        "Roles" => LoadRolesAsync(),
+        "Permissions" => LoadPermissionsAsync(),
+        _ => LoadUsersAsync()
+    };
 
     private async Task LoadUsersAsync()
     {
@@ -184,9 +311,7 @@
         {
             var users = await Http.GetFromJsonAsync<PagedResponse<PrincipalSummaryDto>>(BuildUsersUrl());
             _users = users?.Data.ToList() ?? [];
-            _userMeta = users?.Meta ?? new();
-            _userMeta.CurrentPage = _userMeta.CurrentPage == 0 ? _userPage : _userMeta.CurrentPage;
-            _userMeta.PageSize = _userMeta.PageSize == 0 ? _pageSize : _userMeta.PageSize;
+            _userMeta = NormalizeMeta(users?.Meta, _userPage);
         }
         catch (Exception ex)
         {
@@ -199,11 +324,93 @@
         }
     }
 
+    private async Task LoadRolesAsync()
+    {
+        _loading = true;
+        try
+        {
+            var roles = await Http.GetFromJsonAsync<PagedResponse<RoleDto>>(BuildRolesUrl());
+            _roles = roles?.Data.ToList() ?? [];
+            _roleMeta = NormalizeMeta(roles?.Meta, _rolePage);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("IAM roles could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadPermissionsAsync()
+    {
+        _loading = true;
+        try
+        {
+            var permissions = await Http.GetFromJsonAsync<PagedResponse<PermissionDto>>(BuildPermissionsUrl());
+            _permissions = permissions?.Data.ToList() ?? [];
+            _permissionMeta = NormalizeMeta(permissions?.Meta, _permissionPage);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("IAM permissions could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
     private string BuildUsersUrl()
     {
         var query = new List<string> { $"page={_userPage}", $"pageSize={_pageSize}" };
-        if (!string.IsNullOrWhiteSpace(_search)) query.Add($"search={Uri.EscapeDataString(_search)}");
+        if (!string.IsNullOrWhiteSpace(_userSearch)) query.Add($"search={Uri.EscapeDataString(_userSearch)}");
+        if (!string.IsNullOrWhiteSpace(_userStatus)) query.Add($"status={Uri.EscapeDataString(_userStatus)}");
+        if (!string.IsNullOrWhiteSpace(_userType)) query.Add($"type={Uri.EscapeDataString(_userType)}");
         return $"api/v1/iam/users?{string.Join("&", query)}";
+    }
+
+    private string BuildRolesUrl()
+    {
+        var query = new List<string> { $"page={_rolePage}", $"pageSize={_pageSize}" };
+        if (!string.IsNullOrWhiteSpace(_roleSearch)) query.Add($"search={Uri.EscapeDataString(_roleSearch)}");
+        if (!string.IsNullOrWhiteSpace(_roleService)) query.Add($"service={Uri.EscapeDataString(_roleService)}");
+        return $"api/v1/iam/roles/paged?{string.Join("&", query)}";
+    }
+
+    private string BuildPermissionsUrl()
+    {
+        var query = new List<string> { $"page={_permissionPage}", $"pageSize={_pageSize}" };
+        if (!string.IsNullOrWhiteSpace(_permissionSearch)) query.Add($"search={Uri.EscapeDataString(_permissionSearch)}");
+        if (!string.IsNullOrWhiteSpace(_permissionCategory)) query.Add($"category={Uri.EscapeDataString(_permissionCategory)}");
+        return $"api/v1/iam/permissions/paged?{string.Join("&", query)}";
+    }
+
+    private void ResetCurrentPage()
+    {
+        switch (_tab)
+        {
+            case "Roles":
+                _rolePage = 1;
+                break;
+            case "Permissions":
+                _permissionPage = 1;
+                break;
+            default:
+                _userPage = 1;
+                break;
+        }
+    }
+
+    private PaginationMeta NormalizeMeta(PaginationMeta? meta, int page)
+    {
+        var normalized = meta ?? new();
+        normalized.CurrentPage = normalized.CurrentPage == 0 ? page : normalized.CurrentPage;
+        normalized.PageSize = normalized.PageSize == 0 ? _pageSize : normalized.PageSize;
+        return normalized;
     }
 
     private static string RoleDisplayName(RoleDto role)
@@ -231,11 +438,17 @@
 
     private static string RoleSubtitle(RoleDto role)
     {
-        if (!string.IsNullOrWhiteSpace(role.Description))
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(role.ServiceName))
         {
-            return role.Description;
+            parts.Add(role.ServiceName);
         }
 
-        return role.RoleId;
+        if (!string.IsNullOrWhiteSpace(role.Description))
+        {
+            parts.Add(role.Description);
+        }
+
+        return parts.Count > 0 ? string.Join(" - ", parts) : role.RoleId;
     }
 }

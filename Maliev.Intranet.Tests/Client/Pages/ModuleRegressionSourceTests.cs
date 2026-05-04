@@ -159,9 +159,19 @@ public class ModuleRegressionSourceTests
         var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "IamController.cs");
 
         Assert.Contains("PagedResponse<PrincipalSummaryDto>", source, StringComparison.Ordinal);
+        Assert.Contains("PagedResponse<RoleDto>", source, StringComparison.Ordinal);
+        Assert.Contains("PagedResponse<PermissionDto>", source, StringComparison.Ordinal);
         Assert.Contains("PaginationFooter", source, StringComparison.Ordinal);
         Assert.Contains("api/v1/iam/users?{string.Join", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/iam/roles/paged?{string.Join", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/iam/permissions/paged?{string.Join", source, StringComparison.Ordinal);
+        Assert.Contains("OnUserStatusChanged", source, StringComparison.Ordinal);
+        Assert.Contains("OnUserTypeChanged", source, StringComparison.Ordinal);
+        Assert.Contains("OnRoleServiceChanged", source, StringComparison.Ordinal);
+        Assert.Contains("OnPermissionCategoryChanged", source, StringComparison.Ordinal);
         Assert.Contains("Task<ActionResult<PagedResponse<PrincipalSummaryDto>>> GetUsers", controller, StringComparison.Ordinal);
+        Assert.Contains("Task<ActionResult<PagedResponse<RoleDto>>> GetRolesPaged", controller, StringComparison.Ordinal);
+        Assert.Contains("Task<ActionResult<PagedResponse<PermissionDto>>> GetPermissionsPaged", controller, StringComparison.Ordinal);
         Assert.Contains("CreatePrincipalAsync", controller, StringComparison.Ordinal);
     }
 
