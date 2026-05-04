@@ -80,8 +80,10 @@ public partial class ProjectNew : IAsyncDisposable
 
     // ── Auto-save debounce ─────────────────────────────────────────────
     private const int AutoSaveDebounceMs = 1000;
+    private const int StorageMigrationDebounceMs = 1000;
     private string DraftStorageKey => $"project-draft-{_sessionId}";
     private Timer? _autoSaveDebounceTimer;
+    private Timer? _storageMigrationDebounceTimer;
     private bool _serverSavePending;
     private bool _storageMigrationInProgress;
 
@@ -115,6 +117,7 @@ public partial class ProjectNew : IAsyncDisposable
         foreach (var callbackRef in _uploadCallbacks.Values) { callbackRef.Dispose(); }
         _uploadCallbacks.Clear();
         _autoSaveDebounceTimer?.Dispose();
+        _storageMigrationDebounceTimer?.Dispose();
         if (_searchCts != null) { await _searchCts.CancelAsync(); _searchCts.Dispose(); }
         if (_hubConnection != null)
             await _hubConnection.DisposeAsync();
@@ -211,6 +214,7 @@ public partial class ProjectNew : IAsyncDisposable
                 }
                 StopStatusWatchdogs(parts);
                 TriggerAutoSave();
+                TriggerDeferredStorageMigration();
                 await InvokeAsync(StateHasChanged);
                 return;
             }
@@ -511,7 +515,7 @@ public partial class ProjectNew : IAsyncDisposable
             if (_selectedCustomerId.HasValue &&
                 completedUpload.StoragePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase))
             {
-                await MigrateTempProjectFilesAsync();
+                TriggerDeferredStorageMigration();
             }
 
             await InvokeAsync(StateHasChanged);
@@ -771,12 +775,15 @@ public partial class ProjectNew : IAsyncDisposable
             part.AwaitingPreview = false;
             part.StatusText = "Ready";
             TriggerAutoSave();
+            TriggerDeferredStorageMigration();
         }
         else if (status.Status == FileAnalysisStatus.Failed)
         {
             part.AwaitingPreview = false;
             part.Error = $"Geometry analysis failed: {status.ErrorCode}";
             part.StatusText = "Analysis failed";
+            TriggerAutoSave();
+            TriggerDeferredStorageMigration();
         }
 
         await ResolveViewerUrlAsync(part);
@@ -2699,6 +2706,7 @@ public partial class ProjectNew : IAsyncDisposable
         if (previousCustomerId.HasValue || !_selectedCustomerId.HasValue)
             return;
 
+        TriggerDeferredStorageMigration();
         await MigrateTempProjectFilesAsync();
     }
 
@@ -2712,11 +2720,23 @@ public partial class ProjectNew : IAsyncDisposable
         {
             _storageMigrationInProgress = true;
             var partsInTemp = _parts
-                .Where(p => !string.IsNullOrEmpty(p.StoragePath) &&
-                            p.StoragePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase))
+                .Where(p => IsTempProjectStoragePath(p.StoragePath))
                 .ToList();
             if (partsInTemp.Count == 0)
                 return;
+
+            var processingParts = partsInTemp
+                .Where(p => !IsReadyForTempProjectMigration(p))
+                .ToList();
+            if (processingParts.Count > 0)
+            {
+                Logger.LogInformation(
+                    "Deferring storage migration for temp project {ProjectId}; {ProcessingPartCount} of {PartCount} temp part(s) are still processing",
+                    _tempProjectId,
+                    processingParts.Count,
+                    partsInTemp.Count);
+                return;
+            }
 
             var migrationResult = await Http.PostAsJsonAsync(
                 $"api/v1/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
@@ -2793,6 +2813,55 @@ public partial class ProjectNew : IAsyncDisposable
                 TriggerAutoSave();
         }
     }
+
+    private void TriggerDeferredStorageMigration()
+    {
+        if (!_selectedCustomerId.HasValue ||
+            !_parts.Any(p => IsTempProjectStoragePath(p.StoragePath)))
+        {
+            return;
+        }
+
+        _storageMigrationDebounceTimer?.Dispose();
+        _storageMigrationDebounceTimer = new Timer(_ =>
+        {
+            _ = InvokeAsync(async () =>
+            {
+                try
+                {
+                    await MigrateTempProjectFilesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Deferred temp project storage migration failed");
+                }
+            });
+        }, null, StorageMigrationDebounceMs, Timeout.Infinite);
+    }
+
+    private static bool IsTempProjectStoragePath(string? storagePath) =>
+        !string.IsNullOrWhiteSpace(storagePath) &&
+        storagePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsReadyForTempProjectMigration(PartViewModel part)
+    {
+        if (!IsTempProjectStoragePath(part.StoragePath))
+            return false;
+
+        if (part.QueuedUpload || part.Uploading || part.AwaitingPreview)
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(part.Error) || part.DfmAnalysisTimedOut)
+            return true;
+
+        return string.Equals(part.StatusText, "Ready", StringComparison.OrdinalIgnoreCase) &&
+               HasViewerArtifactForMigration(part);
+    }
+
+    private static bool HasViewerArtifactForMigration(PartViewModel part) =>
+        !string.IsNullOrWhiteSpace(part.GlbStoragePath) ||
+        !string.IsNullOrWhiteSpace(part.GlbSignedUrl) ||
+        !string.IsNullOrWhiteSpace(part.ViewerUrl);
 
     private async Task OpenBabylonViewer(PartViewModel part)
     {

@@ -743,6 +743,51 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task MigrateTempProjectFilesAsync_WhenAnyTempPartIsStillProcessing_DoesNotCallMigrationEndpoint()
+    {
+        var customerId = Guid.NewGuid();
+
+        _httpHandler.HandlerFunc = (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+
+            if (request.RequestUri?.AbsolutePath == "/api/v1/uploads/migrate-project")
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+
+            return DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        SetPrivateField(cut.Instance, "_selectedCustomer", new CustomerSummaryDto
+        {
+            Id = customerId,
+            Name = "MaliEV Manufacturing",
+            Email = "orders@example.test",
+        });
+        GetParts(cut.Instance).Add(new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "ready.stl",
+            StoragePath = "projects/temp-project/ready.stl",
+            GlbStoragePath = "projects/temp-project/ready.stl_viewer.glb",
+            AwaitingPreview = false,
+            StatusText = "Ready"
+        });
+        GetParts(cut.Instance).Add(new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "processing.stl",
+            StoragePath = "projects/temp-project/processing.stl",
+            AwaitingPreview = true,
+            StatusText = "Processing geometry..."
+        });
+
+        await InvokePrivateTaskAsync(cut, "MigrateTempProjectFilesAsync");
+
+        Assert.DoesNotContain(_sentRequests, r => r.RequestUri?.AbsolutePath == "/api/v1/uploads/migrate-project");
+    }
+
+    [Fact]
     public async Task MigrateTempProjectFilesAsync_WhenPartHasGeneratedArtifacts_RewritesViewerPathsAndClearsStaleSignedUrls()
     {
         var customerId = Guid.NewGuid();
@@ -799,6 +844,8 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             GlbStoragePath = OldBasePath + "_viewer.glb",
             GlbSignedUrl = "https://signed.example/old-viewer.glb",
             ViewerUrl = "https://signed.example/old-viewer.glb",
+            AwaitingPreview = false,
+            StatusText = "Ready",
             OverlayUrls = new Dictionary<string, string>
             {
                 ["CNC__sharp_corner"] = "https://signed.example/old-overlay.glb"
@@ -900,8 +947,9 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             FileId = fileId,
             Name = "completed.stl",
             StoragePath = OldBasePath,
-            AwaitingPreview = true,
-            StatusText = "Awaiting process"
+            GlbStoragePath = OldBasePath + "_viewer.glb",
+            AwaitingPreview = false,
+            StatusText = "Ready"
         };
         GetParts(cut.Instance).Add(part);
 
