@@ -247,7 +247,7 @@ const CONFIG = {
         lineColor: { r: 1.0, g: 0.85, b: 0.0 },         // Yellow measurement line
         endpointSize: 0.5,                               // Endpoint sphere radius (relative to mesh)
         snapDistance: 2.0,                               // Snap-to-vertex/edge threshold (mm)
-        maxPickScreenDistancePx: 36,                     // Reject stale/central hits farther than this from the pointer
+        maxPickScreenDistancePx: 120,                    // Reject stale/central hits farther than this from the pointer
     },
 
     /** Thickness analysis configuration */
@@ -260,14 +260,14 @@ const CONFIG = {
     /** Section view configuration */
     SECTION: {
         cutEdgeColor: { r: 0.10, g: 0.18, b: 0.28 },
-        hatchColor: { r: 1.0, g: 0.22, b: 0.68 },
+        hatchColor: { r: 0, g: 0, b: 0 },
         fillColor: { r: 1.0, g: 0.78, b: 0.88 },
-        fillAlpha: 0.96,
+        fillAlpha: 1.0,
         hatchSpacingMm: 3.0,
         minHatchSpacing: 0.5,
         planeLiftMm: 0.08,
-        renderingGroupId: 3,
-        zOffset: -8,
+        renderingGroupId: 0,
+        zOffset: -1,
     },
 
     // =========================================================================
@@ -2934,7 +2934,6 @@ function setAnalysisNavigationLock(canvasId, locked) {
                 ? [...pointers.buttons]
                 : [0];
         }
-        pointers.buttons = [];
         return;
     }
 
@@ -3745,7 +3744,9 @@ function configureSectionLineMesh(mesh, color) {
 
     if (mesh.material) {
         mesh.material.disableClipPlanes = true;
-        mesh.material.disableDepthWrite = true;
+        mesh.material.disableDepthWrite = false;
+        mesh.material.disableDepthTest = false;
+        mesh.material.forceDepthWrite = true;
         mesh.material.needDepthPrePass = false;
         mesh.material.zOffset = CONFIG.SECTION.zOffset;
     }
@@ -3854,7 +3855,8 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     const axisCenter = axis === 'x' ? mc.x : (axis === 'y' ? mc.y : mc.z);
     const worldOffset = axisCenter + offsetMm * scaleFactor;
 
-    const sign = inverted ? -1 : 1;
+    const defaultSign = axis === 'x' || axis === 'y' ? -1 : 1;
+    const sign = inverted ? -defaultSign : defaultSign;
     let nx = 0, ny = 0, nz = 0;
     switch (axis) {
         case 'x': nx = sign; break;
@@ -4064,6 +4066,9 @@ function _rebuildSectionFill(canvasId, scene, planeNormal, planeD) {
     fillMat.backFaceCulling = false;
     fillMat.disableLighting = true;
     fillMat.disableClipPlanes = true;
+    fillMat.disableDepthWrite = false;
+    fillMat.disableDepthTest = false;
+    fillMat.forceDepthWrite = true;
     fillMat.needDepthPrePass = false;
     fillMat.zOffset = CONFIG.SECTION.zOffset - 1;
     fillMesh.material = fillMat;

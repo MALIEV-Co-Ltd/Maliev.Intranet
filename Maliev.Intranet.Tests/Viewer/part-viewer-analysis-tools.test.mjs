@@ -358,9 +358,9 @@ test('section hatch generation follows translated cut contours and stays visible
     assert.ok(result.lineCount > 0, 'expected cross hatch lines even when the contour is far from the world origin');
     assert.deepEqual(
         { r: result.color.r, g: result.color.g, b: result.color.b },
-        { r: 1, g: 0.22, b: 0.68 });
+        { r: 0, g: 0, b: 0 });
     assert.equal(result.disableClipPlanes, true);
-    assert.equal(result.disableDepthWrite, true);
+    assert.equal(result.disableDepthWrite, false);
     assert.equal(result.alwaysActive, true);
 });
 
@@ -384,6 +384,8 @@ test('section fill creates a light pink cap below the diagonal hatch lines', () 
             fillColor: sectionFillMeshes.viewer?.material?.diffuseColor,
             fillEmissiveColor: sectionFillMeshes.viewer?.material?.emissiveColor,
             fillAlpha: sectionFillMeshes.viewer?.material?.alpha,
+            fillDisableDepthWrite: sectionFillMeshes.viewer?.material?.disableDepthWrite,
+            fillForceDepthWrite: sectionFillMeshes.viewer?.material?.forceDepthWrite,
             fillDisableLighting: sectionFillMeshes.viewer?.material?.disableLighting,
             fillNoClip: sectionFillMeshes.viewer?.material?.disableClipPlanes,
             hatchLineCount: sectionHatchMeshes.viewer?.lines?.length ?? 0
@@ -399,13 +401,15 @@ test('section fill creates a light pink cap below the diagonal hatch lines', () 
     assert.deepEqual(
         { r: result.fillEmissiveColor.r, g: result.fillEmissiveColor.g, b: result.fillEmissiveColor.b },
         { r: 1, g: 0.78, b: 0.88 });
-    assert.equal(result.fillAlpha, 0.96);
+    assert.equal(result.fillAlpha, 1);
+    assert.equal(result.fillDisableDepthWrite, false);
+    assert.equal(result.fillForceDepthWrite, true);
     assert.equal(result.fillDisableLighting, true);
     assert.equal(result.fillNoClip, true);
     assert.ok(result.hatchLineCount > 0, 'expected diagonal hatch lines above the fill');
 });
 
-test('section cut edge is neutral while hatch fill keeps the pink cross lines', () => {
+test('section cut edge and hatch lines are dark and depth-aware', () => {
     const context = loadViewerContext();
     context.scene = {
         clipPlane: {},
@@ -420,17 +424,20 @@ test('section cut edge is neutral while hatch fill keeps the pink cross lines', 
         _rebuildSectionHatch('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
         ({
             edgeColor: sectionEdgeMeshes.viewer?.color,
-            hatchColor: sectionHatchMeshes.viewer?.color
+            hatchColor: sectionHatchMeshes.viewer?.color,
+            edgeDepthWrite: sectionEdgeMeshes.viewer?.material?.disableDepthWrite,
+            hatchDepthWrite: sectionHatchMeshes.viewer?.material?.disableDepthWrite
         });
     `, context);
 
-    assert.notDeepEqual(
-        { r: result.edgeColor.r, g: result.edgeColor.g, b: result.edgeColor.b },
-        { r: result.hatchColor.r, g: result.hatchColor.g, b: result.hatchColor.b },
-        'the cut border must not be the same pink color as the hatch fill');
     assert.deepEqual(
         { r: result.hatchColor.r, g: result.hatchColor.g, b: result.hatchColor.b },
-        { r: 1, g: 0.22, b: 0.68 });
+        { r: 0, g: 0, b: 0 });
+    assert.deepEqual(
+        { r: result.edgeColor.r, g: result.edgeColor.g, b: result.edgeColor.b },
+        { r: 0.1, g: 0.18, b: 0.28 });
+    assert.equal(result.edgeDepthWrite, false);
+    assert.equal(result.hatchDepthWrite, false);
 });
 
 test('section plane clips model materials only and leaves grid floor whole', () => {
@@ -472,6 +479,47 @@ test('section plane clips model materials only and leaves grid floor whole', () 
     assert.equal(result.modelClipped, true);
     assert.equal(result.gridClipped, false);
     assert.equal(result.shadowClipped, false);
+});
+
+test('section plane defaults invert X and Y normals while preserving Z normal', () => {
+    const context = loadViewerContext();
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+        material: {},
+    });
+    model.clone = () => null;
+    const scene = {
+        clipPlane: null,
+        meshes: [model],
+        getMaterialByName: () => null,
+        onBeforeRenderObservable: {
+            remove: () => {},
+        },
+    };
+    context.scene = scene;
+    context.model = model;
+
+    const normals = vm.runInContext(`
+        scenes.viewer = scene;
+        meshCenters.viewer = { x: 0, y: 0, z: 0 };
+        modelScaleFactors.viewer = 1;
+        setSectionPlane('viewer', true, 'x', 0, false);
+        const x = model.material.clipPlane;
+        setSectionPlane('viewer', true, 'y', 0, false);
+        const y = model.material.clipPlane;
+        setSectionPlane('viewer', true, 'z', 0, false);
+        const z = model.material.clipPlane;
+        ({
+            x: { a: x.a, b: x.b, c: x.c },
+            y: { a: y.a, b: y.b, c: y.c },
+            z: { a: z.a, b: z.b, c: z.c }
+        });
+    `, context);
+
+    assert.equal(JSON.stringify(normals.x), JSON.stringify({ a: -1, b: 0, c: 0 }));
+    assert.equal(JSON.stringify(normals.y), JSON.stringify({ a: 0, b: -1, c: 0 }));
+    assert.equal(JSON.stringify(normals.z), JSON.stringify({ a: 0, b: 0, c: 1 }));
 });
 
 test('cad feature picker keeps flat mesh picks anchored to picked surface point', () => {
@@ -981,6 +1029,94 @@ test('thickness hover rejects mesh hits that project away from the actual pointe
 
     assert.equal(createdSpheres.length, 0);
     assert.equal(labels.at(0).style.display, 'none');
+});
+
+test('measure hover accepts valid hits with small projection drift', () => {
+    const context = loadViewerContext();
+    const createdSpheres = [];
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+    });
+    const canvas = {
+        style: {},
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 500 }),
+    };
+    context.canvas = canvas;
+    context.BABYLON.MeshBuilder.CreateSphere = (name) => {
+        const sphere = {
+            name,
+            isPickable: true,
+            metadata: {},
+            position: null,
+            dispose: () => {},
+        };
+        createdSpheres.push(sphere);
+        return sphere;
+    };
+    context.BABYLON.Vector3.Project = () => new Vector3(145, 92, 0.5);
+    context.scene = {
+        activeCamera: {
+            getViewMatrix: () => ({
+                multiply: () => ({}),
+            }),
+            getProjectionMatrix: () => ({}),
+            viewport: {
+                toGlobal: () => ({}),
+            },
+        },
+        meshes: [model],
+        onBeforeRenderObservable: { add: () => ({}) },
+        onPointerObservable: {
+            add(callback) {
+                this.callback = callback;
+                return callback;
+            },
+            remove: () => {},
+        },
+        pick: () => ({
+            hit: true,
+            pickedMesh: model,
+            pickedPoint: new Vector3(1, 2, 3),
+            getNormal: () => new Vector3(0, 0, 1),
+        }),
+    };
+    vm.runInContext(`
+        scenes.viewer = scene;
+        mainCameras.viewer = scene.activeCamera;
+        engines.viewer = {
+            getRenderWidth: () => 1000,
+            getRenderHeight: () => 500,
+            getRenderingCanvas: () => canvas
+        };
+    `, context);
+    context.document.getElementById = () => canvas;
+
+    vm.runInContext("enableMeasureTool('viewer', null)", context);
+    context.scene.onPointerObservable.callback({
+        type: context.BABYLON.PointerEventTypes.POINTERMOVE,
+        event: { clientX: 40, clientY: 80 },
+    });
+
+    assert.equal(createdSpheres.length, 1);
+});
+
+test('analysis tools preserve camera pointer navigation buttons', () => {
+    const context = loadViewerContext();
+    const pointers = { buttons: [0] };
+    context.pointers = pointers;
+
+    const result = vm.runInContext(`
+        mainCameras.viewer = { inputs: { attached: { pointers } } };
+        setAnalysisNavigationLock('viewer', true);
+        const lockedButtons = [...pointers.buttons];
+        setAnalysisNavigationLock('viewer', false);
+        const unlockedButtons = [...pointers.buttons];
+        ({ lockedButtons, unlockedButtons });
+    `, context);
+
+    assert.equal(JSON.stringify(result.lockedButtons), JSON.stringify([0]));
+    assert.equal(JSON.stringify(result.unlockedButtons), JSON.stringify([0]));
 });
 
 test('section panel drag clamps the panel inside the viewer container', () => {
