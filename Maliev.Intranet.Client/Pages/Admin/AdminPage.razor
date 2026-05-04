@@ -43,27 +43,6 @@
                         </div>
                     </div>
                 </PanelCard>
-                <PanelCard Title="Health snapshot" Class="mlv-span-12">
-                    @if (_health?.Services.Count > 0)
-                    {
-                        <div class="mlv-list">
-                            @foreach (var service in _health.Services.Where(s => s.IsCritical).Take(12))
-                            {
-                                <div class="mlv-list-row">
-                                    <div>
-                                        <div class="mlv-row-main">@service.ServiceName</div>
-                                        <div class="mlv-row-sub">@service.DomainGroup · @service.ResponseTimeMs.ToString("N0") ms</div>
-                                    </div>
-                                    <StatusBadge Status="@service.Status" />
-                                </div>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="mlv-empty">@_healthError</div>
-                    }
-                </PanelCard>
             </div>
         }
         else if (_tab == "Notifications")
@@ -100,9 +79,7 @@
 
     private string _tab = "Operations";
     private List<NotificationTemplateDto> _templates = [];
-    private SystemHealthDto? _health;
     private bool _loading = true;
-    private string _healthError = "Health data is not available.";
     private string _notificationError = "No notification templates are registered.";
 
     protected override async Task OnInitializedAsync()
@@ -110,33 +87,11 @@
         _loading = true;
         try
         {
-            await LoadHealthAsync();
+            await LoadNotificationTemplatesAsync();
         }
         finally
         {
-            try
-            {
-                await LoadNotificationTemplatesAsync();
-            }
-            finally
-            {
-                _loading = false;
-            }
-        }
-    }
-
-    private async Task LoadHealthAsync()
-    {
-        try
-        {
-            _health = await Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
-        }
-        catch (Exception ex)
-        {
-            _health = null;
-            _healthError = "Health data could not be loaded.";
-            Snackbar.Add(_healthError, Severity.Warning);
-            Console.WriteLine(ex.Message);
+            _loading = false;
         }
     }
 

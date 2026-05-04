@@ -33,6 +33,17 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void AdminPage_DoesNotRenderDuplicateHealthSnapshot()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "AdminPage.razor");
+
+        Assert.Contains("System health checks", source, StringComparison.Ordinal);
+        Assert.Contains("Href=\"/admin/system-health\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Health snapshot", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("api/v1/system-health", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ClientLoginRoute_IsNotUsedForEmployeeLogin()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor");
@@ -144,6 +155,10 @@ public class ModuleRegressionSourceTests
 
         Assert.Contains("@page \"/admin/system-health\"", page, StringComparison.Ordinal);
         Assert.Contains("DomainGroup", page, StringComparison.Ordinal);
+        Assert.Contains("PanelCard Title=\"Services\"", page, StringComparison.Ordinal);
+        Assert.Contains("_history.Services.OrderBy(s => s.ServiceName)", page, StringComparison.Ordinal);
+        Assert.Contains("_health.Services.OrderBy(s => s.ServiceName)", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("GroupBy(s => s.DomainGroup)", page, StringComparison.Ordinal);
         Assert.Contains("LivenessPath", page, StringComparison.Ordinal);
         Assert.Contains("ReadinessPath", page, StringComparison.Ordinal);
         Assert.Contains("ErrorBody", page, StringComparison.Ordinal);
@@ -169,7 +184,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("InventoryService", probeService, StringComparison.Ordinal);
         Assert.Contains("DeliveryService", probeService, StringComparison.Ordinal);
         Assert.Contains("ChatbotService", probeService, StringComparison.Ordinal);
-        Assert.Contains("\"prediction\"", probeService, StringComparison.Ordinal);
+        Assert.Contains("\"predictionservice\"", probeService, StringComparison.Ordinal);
         Assert.Contains("LivenessPath", probeService, StringComparison.Ordinal);
         Assert.Contains("ReadinessPath", probeService, StringComparison.Ordinal);
         Assert.Contains("TimeSpan.FromSeconds(5)", probeService, StringComparison.Ordinal);

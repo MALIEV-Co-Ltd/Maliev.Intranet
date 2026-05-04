@@ -43,8 +43,8 @@ public class SystemHealthControllerTests
         Assert.Contains("/contact/readiness", requestedPaths);
         Assert.Contains("/inventory/liveness", requestedPaths);
         Assert.Contains("/inventory/readiness", requestedPaths);
-        Assert.Contains("/prediction/liveness", requestedPaths);
-        Assert.Contains("/prediction/readiness", requestedPaths);
+        Assert.Contains("/predictionservice/liveness", requestedPaths);
+        Assert.Contains("/predictionservice/readiness", requestedPaths);
     }
 
     [Fact]

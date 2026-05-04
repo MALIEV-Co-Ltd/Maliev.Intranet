@@ -32,7 +32,7 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
         new("PdfService", "Platform", "pdf", false),
         new("GeometryService", "Manufacturing", "geometry", true),
         new("PricingService", "Manufacturing", "pricing", true),
-        new("PredictionService", "Manufacturing", "prediction", false),
+        new("PredictionService", "Manufacturing", "predictionservice", false),
         new("CurrencyService", "Reference", "currency", false),
         new("CountryService", "Reference", "country", false),
         new("RegistryService", "Reference", "registry", false),
@@ -52,7 +52,7 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
     public async Task<IReadOnlyList<ServiceHealthStatus>> CheckAllAsync(CancellationToken ct)
     {
         var healthStatuses = await Task.WhenAll(Targets.Select(target => CheckServiceHealthAsync(target, ct)));
-        return healthStatuses.OrderBy(s => s.DomainGroup).ThenBy(s => s.ServiceName).ToList();
+        return healthStatuses.OrderBy(s => s.ServiceName).ToList();
     }
 
     private async Task<ServiceHealthStatus> CheckServiceHealthAsync(SystemHealthTarget target, CancellationToken ct)

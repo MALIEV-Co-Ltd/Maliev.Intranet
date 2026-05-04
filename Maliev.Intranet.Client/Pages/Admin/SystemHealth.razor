@@ -38,37 +38,34 @@
 
             @if (_history is not null)
             {
-                @foreach (var group in _history.Services.GroupBy(s => s.DomainGroup).OrderBy(g => g.Key))
-                {
-                    <PanelCard Title="@group.Key" Class="mb-4">
-                        <div class="health-history-list">
-                            @foreach (var service in group.OrderBy(s => s.ServiceName))
-                            {
-                                var displayBuckets = GetDisplayBuckets(service, _history.BucketMinutes);
-                                <div class="health-history-row">
-                                    <div class="health-history-header">
-                                        <div>
-                                            <div class="mlv-row-main">@service.ServiceName</div>
-                                            <div class="mlv-row-sub">@service.RoutePrefix</div>
-                                        </div>
-                                        <StatusBadge Status="@service.CurrentStatus" />
+                <PanelCard Title="Services" Class="mb-4">
+                    <div class="health-history-list">
+                        @foreach (var service in _history.Services.OrderBy(s => s.ServiceName))
+                        {
+                            var displayBuckets = GetDisplayBuckets(service, _history.BucketMinutes);
+                            <div class="health-history-row">
+                                <div class="health-history-header">
+                                    <div>
+                                        <div class="mlv-row-main">@service.ServiceName</div>
+                                        <div class="mlv-row-sub">@service.DomainGroup · @service.RoutePrefix</div>
                                     </div>
-                                    <div class="health-strip" aria-label="@($"{service.ServiceName} seven day health history")">
-                                        @foreach (var bucket in displayBuckets)
-                                        {
-                                            <span class="@GetBucketClass(bucket)" title="@GetBucketTitle(bucket)"></span>
-                                        }
-                                    </div>
-                                    <div class="health-strip-axis">
-                                        <span>7 days ago</span>
-                                        <span>@service.UptimePercentage.ToString("N2") % uptime</span>
-                                        <span>Now</span>
-                                    </div>
+                                    <StatusBadge Status="@service.CurrentStatus" />
                                 </div>
-                            }
-                        </div>
-                    </PanelCard>
-                }
+                                <div class="health-strip" aria-label="@($"{service.ServiceName} seven day health history")">
+                                    @foreach (var bucket in displayBuckets)
+                                    {
+                                        <span class="@GetBucketClass(bucket)" title="@GetBucketTitle(bucket)"></span>
+                                    }
+                                </div>
+                                <div class="health-strip-axis">
+                                    <span>7 days ago</span>
+                                    <span>@service.UptimePercentage.ToString("N2") % uptime</span>
+                                    <span>Now</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </PanelCard>
             }
 
             @if (_health is not null)
@@ -82,60 +79,56 @@
 
                     @if (_showDetails)
                     {
-                        @foreach (var group in _health.Services.GroupBy(s => s.DomainGroup).OrderBy(g => g.Key))
-                        {
-                            <h3 class="system-health-detail-heading">@group.Key</h3>
-                            <table class="mlv-table system-health-table">
-                                <colgroup>
-                                    <col class="system-health-service-col" />
-                                    <col class="system-health-status-col" />
-                                    <col class="system-health-critical-col" />
-                                    <col class="system-health-path-col" />
-                                    <col class="system-health-path-col" />
-                                    <col class="system-health-response-col" />
-                                    <col class="system-health-checked-col" />
-                                </colgroup>
-                                <thead>
+                        <table class="mlv-table system-health-table">
+                            <colgroup>
+                                <col class="system-health-service-col" />
+                                <col class="system-health-status-col" />
+                                <col class="system-health-critical-col" />
+                                <col class="system-health-path-col" />
+                                <col class="system-health-path-col" />
+                                <col class="system-health-response-col" />
+                                <col class="system-health-checked-col" />
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th>Status</th>
+                                    <th>Critical</th>
+                                    <th>Liveness</th>
+                                    <th>Readiness</th>
+                                    <th>Response</th>
+                                    <th>Last checked</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var service in _health.Services.OrderBy(s => s.ServiceName))
+                                {
                                     <tr>
-                                        <th>Service</th>
-                                        <th>Status</th>
-                                        <th>Critical</th>
-                                        <th>Liveness</th>
-                                        <th>Readiness</th>
-                                        <th>Response</th>
-                                        <th>Last checked</th>
+                                        <td>
+                                            <div class="mlv-row-main">@service.ServiceName</div>
+                                            <div class="mlv-row-sub">@service.DomainGroup · @service.RoutePrefix</div>
+                                            @if (!string.IsNullOrWhiteSpace(service.ErrorMessage))
+                                            {
+                                                <div class="mlv-row-sub">@service.ErrorMessage</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(service.ErrorBody))
+                                            {
+                                                <pre class="mlv-error mt-2">@service.ErrorBody</pre>
+                                            }
+                                        </td>
+                                        <td><StatusBadge Status="@service.Status" /></td>
+                                        <td>@(service.IsCritical ? "Critical" : "Standard")</td>
+                                        <td class="mlv-mono">@service.LivenessPath</td>
+                                        <td class="mlv-mono">@service.ReadinessPath</td>
+                                        <td class="mlv-mono">
+                                            <div>@service.LivenessResponseTimeMs.ToString("N0") ms live</div>
+                                            <div class="mlv-row-sub">@service.ReadinessResponseTimeMs.ToString("N0") ms ready</div>
+                                        </td>
+                                        <td>@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var service in group.OrderBy(s => s.ServiceName))
-                                    {
-                                        <tr>
-                                            <td>
-                                                <div class="mlv-row-main">@service.ServiceName</div>
-                                                <div class="mlv-row-sub">@service.RoutePrefix</div>
-                                                @if (!string.IsNullOrWhiteSpace(service.ErrorMessage))
-                                                {
-                                                    <div class="mlv-row-sub">@service.ErrorMessage</div>
-                                                }
-                                                @if (!string.IsNullOrWhiteSpace(service.ErrorBody))
-                                                {
-                                                    <pre class="mlv-error mt-2">@service.ErrorBody</pre>
-                                                }
-                                            </td>
-                                            <td><StatusBadge Status="@service.Status" /></td>
-                                            <td>@(service.IsCritical ? "Critical" : "Standard")</td>
-                                            <td class="mlv-mono">@service.LivenessPath</td>
-                                            <td class="mlv-mono">@service.ReadinessPath</td>
-                                            <td class="mlv-mono">
-                                                <div>@service.LivenessResponseTimeMs.ToString("N0") ms live</div>
-                                                <div class="mlv-row-sub">@service.ReadinessResponseTimeMs.ToString("N0") ms ready</div>
-                                            </td>
-                                            <td>@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        }
+                                }
+                            </tbody>
+                        </table>
                     }
                 </PanelCard>
             }
