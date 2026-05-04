@@ -263,8 +263,8 @@ const CONFIG = {
         hatchColor: { r: 0, g: 0, b: 0 },
         fillColor: { r: 1.0, g: 0.78, b: 0.88 },
         fillAlpha: 1.0,
-        hatchSpacingMm: 3.0,
-        hatchWidthMm: 0.28,
+        hatchSpacingMm: 1.25,
+        hatchWidthMm: 0.045,
         minHatchSpacing: 0.5,
         planeLiftMm: 0.08,
         renderingGroupId: 0,
@@ -4004,6 +4004,14 @@ function getSectionPlaneAxes(planeNormal) {
     return { uAxis, vAxis };
 }
 
+function pointOnSectionPlane(u, v, uAxis, vAxis, planeNormal, planeD) {
+    return new BABYLON.Vector3(
+        u * uAxis.x + v * vAxis.x - planeD * planeNormal.x,
+        u * uAxis.y + v * vAxis.y - planeD * planeNormal.y,
+        u * uAxis.z + v * vAxis.z - planeD * planeNormal.z
+    );
+}
+
 function _rebuildSectionFill(canvasId, scene, planeNormal, planeD) {
     if (sectionFillMeshes[canvasId]) {
         sectionFillMeshes[canvasId].dispose();
@@ -4014,43 +4022,73 @@ function _rebuildSectionFill(canvasId, scene, planeNormal, planeD) {
     if (allSegments.length === 0) return;
 
     const { uAxis, vAxis } = getSectionPlaneAxes(planeNormal);
-    const planeLift = planeNormal.scale(CONFIG.SECTION.planeLiftMm * 0.5 * (modelScaleFactors[canvasId] ?? 1));
-    const unique = [];
-    const tolerance = 1e-4;
+    const scaleFactor = modelScaleFactors[canvasId] ?? 1;
+    const planeLift = planeNormal.scale(CONFIG.SECTION.planeLiftMm * 0.2 * scaleFactor);
+    const segments2D = [];
+    let minV = Infinity;
+    let maxV = -Infinity;
 
-    for (const seg of allSegments) {
-        for (const point of seg) {
-            const u = BABYLON.Vector3.Dot(point, uAxis);
-            const v = BABYLON.Vector3.Dot(point, vAxis);
-            if (!unique.some(existing => Math.hypot(existing.u - u, existing.v - v) <= tolerance)) {
-                unique.push({ u, v });
+    for (const [p0, p1] of allSegments) {
+        const u0 = BABYLON.Vector3.Dot(p0, uAxis);
+        const v0 = BABYLON.Vector3.Dot(p0, vAxis);
+        const u1 = BABYLON.Vector3.Dot(p1, uAxis);
+        const v1 = BABYLON.Vector3.Dot(p1, vAxis);
+        segments2D.push({ u0, v0, u1, v1 });
+        minV = Math.min(minV, v0, v1);
+        maxV = Math.max(maxV, v0, v1);
+    }
+
+    if (!Number.isFinite(minV) || !Number.isFinite(maxV)) return;
+
+    const spanV = Math.max(maxV - minV, CONFIG.SECTION.minHatchSpacing);
+    const fillStep = Math.max(Math.min(spanV / 120, 1.1 * scaleFactor), 0.35 * scaleFactor);
+    const halfBand = fillStep * 0.48;
+    const epsilon = 1e-5;
+    const positions = [];
+    const indices = [];
+
+    for (let v = minV + fillStep / 2; v <= maxV - fillStep / 2 + epsilon; v += fillStep) {
+        const intersections = [];
+        for (const segment of segments2D) {
+            const vMin = Math.min(segment.v0, segment.v1);
+            const vMax = Math.max(segment.v0, segment.v1);
+            if (v < vMin - epsilon || v > vMax + epsilon) continue;
+            const dv = segment.v1 - segment.v0;
+            if (Math.abs(dv) <= epsilon) continue;
+            const t = (v - segment.v0) / dv;
+            if (t < -epsilon || t > 1 + epsilon) continue;
+            intersections.push(segment.u0 + t * (segment.u1 - segment.u0));
+        }
+
+        intersections.sort((a, b) => a - b);
+        const unique = [];
+        for (const value of intersections) {
+            if (unique.length === 0 || Math.abs(value - unique[unique.length - 1]) > epsilon * 10) {
+                unique.push(value);
             }
+        }
+
+        for (let i = 0; i < unique.length - 1; i += 2) {
+            const u0 = unique[i];
+            const u1 = unique[i + 1];
+            if (!Number.isFinite(u0) || !Number.isFinite(u1) || Math.abs(u1 - u0) <= epsilon) continue;
+            const v0 = Math.max(minV, v - halfBand);
+            const v1 = Math.min(maxV, v + halfBand);
+            const p0 = pointOnSectionPlane(u0, v0, uAxis, vAxis, planeNormal, planeD).addInPlace(planeLift);
+            const p1 = pointOnSectionPlane(u1, v0, uAxis, vAxis, planeNormal, planeD).addInPlace(planeLift);
+            const p2 = pointOnSectionPlane(u1, v1, uAxis, vAxis, planeNormal, planeD).addInPlace(planeLift);
+            const p3 = pointOnSectionPlane(u0, v1, uAxis, vAxis, planeNormal, planeD).addInPlace(planeLift);
+            const vertexOffset = positions.length / 3;
+            positions.push(
+                p0.x, p0.y, p0.z,
+                p1.x, p1.y, p1.z,
+                p2.x, p2.y, p2.z,
+                p3.x, p3.y, p3.z);
+            indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2, vertexOffset, vertexOffset + 2, vertexOffset + 3);
         }
     }
 
-    if (unique.length < 3) return;
-
-    const center = unique.reduce((acc, point) => ({ u: acc.u + point.u, v: acc.v + point.v }), { u: 0, v: 0 });
-    center.u /= unique.length;
-    center.v /= unique.length;
-
-    unique.sort((a, b) =>
-        Math.atan2(a.v - center.v, a.u - center.u) - Math.atan2(b.v - center.v, b.u - center.u));
-
-    const positions = [];
-    for (const point of unique) {
-        const worldPoint = new BABYLON.Vector3(
-            point.u * uAxis.x + point.v * vAxis.x - planeD * planeNormal.x,
-            point.u * uAxis.y + point.v * vAxis.y - planeD * planeNormal.y,
-            point.u * uAxis.z + point.v * vAxis.z - planeD * planeNormal.z
-        ).addInPlace(planeLift);
-        positions.push(worldPoint.x, worldPoint.y, worldPoint.z);
-    }
-
-    const indices = [];
-    for (let i = 1; i < unique.length - 1; i += 1) {
-        indices.push(0, i, i + 1);
-    }
+    if (positions.length === 0 || indices.length === 0) return;
 
     const fillMesh = new BABYLON.Mesh(`__section_fill_${canvasId}__`, scene);
     const vertexData = new BABYLON.VertexData();
@@ -4076,6 +4114,10 @@ function _rebuildSectionFill(canvasId, scene, planeNormal, planeD) {
     fillMesh.renderingGroupId = CONFIG.SECTION.renderingGroupId;
     fillMesh.alwaysSelectAsActiveMesh = true;
     sectionFillMeshes[canvasId] = markAnalysisHelperMesh(fillMesh);
+    sectionFillMeshes[canvasId].metadata = {
+        ...(sectionFillMeshes[canvasId].metadata ?? {}),
+        sectionFillMode: 'scanline-bands',
+    };
 }
 
 /**
@@ -4232,7 +4274,7 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
     const hatchWidth = Math.max(
         CONFIG.SECTION.hatchWidthMm * (modelScaleFactors[canvasId] ?? 1),
         0.02);
-    const doubleSidedLift = planeNormal.scale(CONFIG.SECTION.planeLiftMm * 0.8 * (modelScaleFactors[canvasId] ?? 1));
+    const hatchLift = planeNormal.scale(CONFIG.SECTION.planeLiftMm * 0.8 * (modelScaleFactors[canvasId] ?? 1));
     const stripPaths = [];
     const positions = [];
     const indices = [];
@@ -4247,24 +4289,22 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
         widthAxis.normalize();
         const halfWidth = widthAxis.scale(hatchWidth / 2);
 
-        for (const sideLift of [doubleSidedLift, doubleSidedLift.scale(-1)]) {
-            const start = baseStart.add(sideLift);
-            const end = baseEnd.add(sideLift);
-            const p0 = start.add(halfWidth);
-            const p1 = start.subtract(halfWidth);
-            const p2 = end.subtract(halfWidth);
-            const p3 = end.add(halfWidth);
-            const vertexOffset = positions.length / 3;
-            positions.push(
-                p0.x, p0.y, p0.z,
-                p1.x, p1.y, p1.z,
-                p2.x, p2.y, p2.z,
-                p3.x, p3.y, p3.z);
-            indices.push(
-                vertexOffset, vertexOffset + 1, vertexOffset + 2,
-                vertexOffset, vertexOffset + 2, vertexOffset + 3);
-            stripPaths.push([p0, p1, p2, p3]);
-        }
+        const start = baseStart.add(hatchLift);
+        const end = baseEnd.add(hatchLift);
+        const p0 = start.add(halfWidth);
+        const p1 = start.subtract(halfWidth);
+        const p2 = end.subtract(halfWidth);
+        const p3 = end.add(halfWidth);
+        const vertexOffset = positions.length / 3;
+        positions.push(
+            p0.x, p0.y, p0.z,
+            p1.x, p1.y, p1.z,
+            p2.x, p2.y, p2.z,
+            p3.x, p3.y, p3.z);
+        indices.push(
+            vertexOffset, vertexOffset + 1, vertexOffset + 2,
+            vertexOffset, vertexOffset + 2, vertexOffset + 3);
+        stripPaths.push([p0, p1, p2, p3]);
     }
 
     if (positions.length === 0) return;

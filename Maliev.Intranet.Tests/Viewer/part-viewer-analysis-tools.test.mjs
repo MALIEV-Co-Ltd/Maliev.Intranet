@@ -399,13 +399,14 @@ test('section fill creates a light pink cap below the diagonal hatch lines', () 
             fillForceDepthWrite: sectionFillMeshes.viewer?.material?.forceDepthWrite,
             fillDisableLighting: sectionFillMeshes.viewer?.material?.disableLighting,
             fillNoClip: sectionFillMeshes.viewer?.material?.disableClipPlanes,
+            fillMode: sectionFillMeshes.viewer?.metadata?.sectionFillMode,
             hatchStripCount: sectionHatchMeshes.viewer?.pathArray?.length ?? 0
         });
     `, context);
 
     assert.equal(result.fillName, '__section_fill_viewer__');
-    assert.ok(result.fillPositions > 0, 'expected section cap vertices');
-    assert.ok(result.fillIndices > 0, 'expected section cap triangles');
+    assert.ok(result.fillPositions > 12, 'expected scanline section cap bands, not one fan triangle cap');
+    assert.ok(result.fillIndices > 6, 'expected section cap band triangles');
     assert.deepEqual(
         { r: result.fillColor.r, g: result.fillColor.g, b: result.fillColor.b },
         { r: 1, g: 0.78, b: 0.88 });
@@ -417,6 +418,7 @@ test('section fill creates a light pink cap below the diagonal hatch lines', () 
     assert.equal(result.fillForceDepthWrite, true);
     assert.equal(result.fillDisableLighting, true);
     assert.equal(result.fillNoClip, true);
+    assert.equal(result.fillMode, 'scanline-bands');
     assert.ok(result.hatchStripCount > 0, 'expected diagonal hatch strips above the fill');
 });
 
@@ -442,9 +444,16 @@ test('section hatch strips have visible width on both sides of the section face'
     `, context);
 
     assert.ok(result.stripCount > 0, 'expected hatch strips');
-    assert.ok(result.stripWidth > 0.02, 'expected hatch strip to have real geometric width');
+    assert.ok(result.stripWidth > 0.01, 'expected hatch strip to have real geometric width');
+    assert.ok(result.stripWidth < 0.12, 'expected hatch strip to stay visually thin');
     assert.equal(result.materialBackFaceCulling, false);
     assert.equal(result.meshAlwaysActive, true);
+});
+
+test('section hatch spacing is dense enough for Fusion-style section lines', () => {
+    const context = loadViewerContext();
+    const spacing = vm.runInContext('CONFIG.SECTION.hatchSpacingMm;', context);
+    assert.ok(spacing <= 1.4);
 });
 
 test('section cut edge and hatch lines are dark and depth-aware', () => {
