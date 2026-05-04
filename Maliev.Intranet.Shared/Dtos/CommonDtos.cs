@@ -217,6 +217,114 @@ public class SystemHealthDto
 }
 
 /// <summary>
+/// Bucketed system health history for the requested period.
+/// </summary>
+public class SystemHealthHistoryDto
+{
+    /// <summary>
+    /// The UTC timestamp when the history report was generated.
+    /// </summary>
+    public DateTime CheckedAt { get; set; }
+
+    /// <summary>
+    /// Inclusive UTC start of the returned history period.
+    /// </summary>
+    public DateTime PeriodStartUtc { get; set; }
+
+    /// <summary>
+    /// Exclusive UTC end of the returned history period.
+    /// </summary>
+    public DateTime PeriodEndUtc { get; set; }
+
+    /// <summary>
+    /// Width of each history bucket in minutes.
+    /// </summary>
+    public int BucketMinutes { get; set; }
+
+    /// <summary>
+    /// Service rows included in the history report.
+    /// </summary>
+    public List<SystemHealthHistoryServiceDto> Services { get; set; } = new();
+}
+
+/// <summary>
+/// Bucketed health history for one service.
+/// </summary>
+public class SystemHealthHistoryServiceDto
+{
+    /// <summary>
+    /// Unique service name from the health registry.
+    /// </summary>
+    public string ServiceName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Domain group shown on the health report.
+    /// </summary>
+    public string DomainGroup { get; set; } = string.Empty;
+
+    /// <summary>
+    /// HTTP route prefix for the service.
+    /// </summary>
+    public string RoutePrefix { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Whether the service is critical for core operations.
+    /// </summary>
+    public bool IsCritical { get; set; }
+
+    /// <summary>
+    /// Most recent sampled status in the requested period, or NoData.
+    /// </summary>
+    public string CurrentStatus { get; set; } = "NoData";
+
+    /// <summary>
+    /// Uptime percentage calculated from sampled buckets only.
+    /// </summary>
+    public decimal UptimePercentage { get; set; }
+
+    /// <summary>
+    /// Chronologically ordered health buckets for the requested period.
+    /// </summary>
+    public List<SystemHealthHistoryBucketDto> Buckets { get; set; } = new();
+}
+
+/// <summary>
+/// One rendered history bucket for a service.
+/// </summary>
+public class SystemHealthHistoryBucketDto
+{
+    /// <summary>
+    /// Inclusive UTC bucket start timestamp.
+    /// </summary>
+    public DateTime StartedAtUtc { get; set; }
+
+    /// <summary>
+    /// Exclusive UTC bucket end timestamp.
+    /// </summary>
+    public DateTime EndedAtUtc { get; set; }
+
+    /// <summary>
+    /// Bucket status, including NoData for missing samples.
+    /// </summary>
+    public string Status { get; set; } = "NoData";
+
+    /// <summary>
+    /// Indicates whether the bucket has a persisted sample.
+    /// </summary>
+    public bool HasSample { get; set; }
+
+    /// <summary>
+    /// Liveness response time in milliseconds for sampled buckets.
+    /// </summary>
+    public double LivenessResponseTimeMs { get; set; }
+
+    /// <summary>
+    /// Readiness response time in milliseconds for sampled buckets.
+    /// </summary>
+    public double ReadinessResponseTimeMs { get; set; }
+}
+
+/// <summary>
 /// Response model containing metadata for a successfully uploaded file via the Backend-for-Frontend (BFF).
 /// </summary>
 public class BffUploadResponse

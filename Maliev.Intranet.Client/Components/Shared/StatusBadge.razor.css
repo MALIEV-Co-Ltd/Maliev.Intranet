@@ -27,6 +27,7 @@
 .status-warning,
 .status-degraded,
 .status-unknown,
+.status-unhealthy,
 .status-sent,
 .status-in-transit,
 .status-pending,
@@ -39,7 +40,6 @@
 
 .status-overdue,
 .status-unreachable,
-.status-unhealthy,
 .status-cancelled,
 .status-blocked,
 .status-error,

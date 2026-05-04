@@ -2,6 +2,7 @@ using Maliev.Aspire.ServiceDefaults;
 using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Consumers;
+using Maliev.Intranet.Bff.Data;
 using Maliev.Intranet.Bff.Extensions;
 using Maliev.Intranet.Bff.Middleware;
 using Maliev.Intranet.Bff.Services;
@@ -42,6 +43,12 @@ try
     builder.AddServiceDefaults();
     builder.Services.AddDefaultApiVersioning();
     builder.AddServiceMeters("intranet-meter");
+    var useIntranetDatabase = !builder.Environment.IsEnvironment("Testing") ||
+        !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("IntranetDbContext"));
+    if (useIntranetDatabase)
+    {
+        builder.AddPostgresDbContext<IntranetDbContext>(connectionName: "IntranetDbContext");
+    }
 
     // Add services to the container.
     builder.Services.AddSingleton<BffMetrics>();
@@ -65,6 +72,16 @@ try
     builder.Services.AddMudServices();
     builder.AddStandardCache("IntranetBff");
     builder.Services.AddSingleton<IFileAnalysisStatusService, FileAnalysisStatusService>();
+    builder.Services.AddScoped<ISystemHealthProbeService, SystemHealthProbeService>();
+    if (useIntranetDatabase)
+    {
+        builder.Services.AddScoped<ISystemHealthHistoryService, SystemHealthHistoryService>();
+        builder.Services.AddHostedService<SystemHealthSamplerHostedService>();
+    }
+    else
+    {
+        builder.Services.AddScoped<ISystemHealthHistoryService, UnavailableSystemHealthHistoryService>();
+    }
 
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddTransient<UserContextHandler>();
@@ -589,6 +606,10 @@ try
 
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    if (useIntranetDatabase)
+    {
+        await app.MigrateDatabaseAsync<IntranetDbContext>();
+    }
 
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing")) app.UseWebAssemblyDebugging();
     if (app.Environment.IsEnvironment("Testing"))

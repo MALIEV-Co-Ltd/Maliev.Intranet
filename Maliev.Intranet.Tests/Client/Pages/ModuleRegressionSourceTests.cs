@@ -140,24 +140,36 @@ public class ModuleRegressionSourceTests
         var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "SystemHealth.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "SystemHealth.razor.css");
         var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "SystemHealthController.cs");
+        var probeService = ReadRepoFile("Maliev.Intranet.Bff", "Services", "SystemHealthProbeService.cs");
 
         Assert.Contains("@page \"/admin/system-health\"", page, StringComparison.Ordinal);
         Assert.Contains("DomainGroup", page, StringComparison.Ordinal);
         Assert.Contains("LivenessPath", page, StringComparison.Ordinal);
         Assert.Contains("ReadinessPath", page, StringComparison.Ordinal);
         Assert.Contains("ErrorBody", page, StringComparison.Ordinal);
+        Assert.Contains("api/v1/system-health/history?days=7", page, StringComparison.Ordinal);
+        Assert.Contains("health-strip", page, StringComparison.Ordinal);
+        Assert.Contains("7 days ago", page, StringComparison.Ordinal);
+        Assert.Contains("% uptime", page, StringComparison.Ordinal);
+        Assert.Contains("no data", page, StringComparison.Ordinal);
         Assert.Contains("table-layout: fixed", styles, StringComparison.Ordinal);
+        Assert.Contains("health-bucket-healthy", styles, StringComparison.Ordinal);
+        Assert.Contains("health-bucket-unhealthy", styles, StringComparison.Ordinal);
+        Assert.Contains("health-bucket-unreachable", styles, StringComparison.Ordinal);
+        Assert.Contains("health-bucket-nodata", styles, StringComparison.Ordinal);
         Assert.Contains("system-health-service-col", page, StringComparison.Ordinal);
-        Assert.Contains("FacilityService", controller, StringComparison.Ordinal);
-        Assert.Contains("InventoryService", controller, StringComparison.Ordinal);
-        Assert.Contains("DeliveryService", controller, StringComparison.Ordinal);
-        Assert.Contains("ChatbotService", controller, StringComparison.Ordinal);
-        Assert.Contains("LivenessPath", controller, StringComparison.Ordinal);
-        Assert.Contains("ReadinessPath", controller, StringComparison.Ordinal);
-        Assert.Contains("TimeSpan.FromSeconds(5)", controller, StringComparison.Ordinal);
-        Assert.Contains("TimeSpan.FromSeconds(10)", controller, StringComparison.Ordinal);
-        Assert.Contains("Task.WhenAny", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("aspire-liveness", controller, StringComparison.Ordinal);
+        Assert.Contains("GetSystemHealthHistory", controller, StringComparison.Ordinal);
+        Assert.Contains("FacilityService", probeService, StringComparison.Ordinal);
+        Assert.Contains("InventoryService", probeService, StringComparison.Ordinal);
+        Assert.Contains("DeliveryService", probeService, StringComparison.Ordinal);
+        Assert.Contains("ChatbotService", probeService, StringComparison.Ordinal);
+        Assert.Contains("\"prediction\"", probeService, StringComparison.Ordinal);
+        Assert.Contains("LivenessPath", probeService, StringComparison.Ordinal);
+        Assert.Contains("ReadinessPath", probeService, StringComparison.Ordinal);
+        Assert.Contains("TimeSpan.FromSeconds(5)", probeService, StringComparison.Ordinal);
+        Assert.Contains("TimeSpan.FromSeconds(10)", probeService, StringComparison.Ordinal);
+        Assert.Contains("Task.WhenAny", probeService, StringComparison.Ordinal);
+        Assert.DoesNotContain("aspire-liveness", probeService, StringComparison.Ordinal);
     }
 
     [Fact]

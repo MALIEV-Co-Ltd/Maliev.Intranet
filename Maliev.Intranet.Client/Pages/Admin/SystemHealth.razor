@@ -23,72 +23,119 @@
         {
             <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
         }
-        else if (_health is null)
+        else if (_health is null && _history is null)
         {
             <div class="mlv-empty">System health data is not available.</div>
         }
         else
         {
             <StatBar Class="mb-4">
-                <StatTile Label="Services" Value="@_health.Services.Count.ToString("N0")" />
-                <StatTile Label="Healthy" Value="@_health.Services.Count(s => s.Status == "Healthy").ToString("N0")" Trend="true" />
-                <StatTile Label="Issues" Value="@_health.Services.Count(s => s.Status != "Healthy").ToString("N0")" Trend="@(!_health.Services.Any(s => s.Status != "Healthy"))" />
-                <StatTile Label="Critical issues" Value="@_health.Services.Count(s => s.IsCritical && s.Status != "Healthy").ToString("N0")" />
+                <StatTile Label="Services" Value="@CurrentServices.Count.ToString("N0")" />
+                <StatTile Label="Healthy" Value="@CurrentServices.Count(s => s.Status == "Healthy").ToString("N0")" Trend="true" />
+                <StatTile Label="Issues" Value="@CurrentServices.Count(s => s.Status != "Healthy").ToString("N0")" Trend="@(!CurrentServices.Any(s => s.Status != "Healthy"))" />
+                <StatTile Label="Critical issues" Value="@CurrentServices.Count(s => s.IsCritical && s.Status != "Healthy").ToString("N0")" />
             </StatBar>
 
-            @foreach (var group in _health.Services.GroupBy(s => s.DomainGroup).OrderBy(g => g.Key))
+            @if (_history is not null)
             {
-                <PanelCard Title="@group.Key" Class="mb-4">
-                    <table class="mlv-table system-health-table">
-                        <colgroup>
-                            <col class="system-health-service-col" />
-                            <col class="system-health-status-col" />
-                            <col class="system-health-critical-col" />
-                            <col class="system-health-path-col" />
-                            <col class="system-health-path-col" />
-                            <col class="system-health-response-col" />
-                            <col class="system-health-checked-col" />
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th>Service</th>
-                                <th>Status</th>
-                                <th>Critical</th>
-                                <th>Liveness</th>
-                                <th>Readiness</th>
-                                <th>Response</th>
-                                <th>Last checked</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                @foreach (var group in _history.Services.GroupBy(s => s.DomainGroup).OrderBy(g => g.Key))
+                {
+                    <PanelCard Title="@group.Key" Class="mb-4">
+                        <div class="health-history-list">
                             @foreach (var service in group.OrderBy(s => s.ServiceName))
                             {
-                                <tr>
-                                    <td>
-                                        <div class="mlv-row-main">@service.ServiceName</div>
-                                        <div class="mlv-row-sub">@service.RoutePrefix</div>
-                                        @if (!string.IsNullOrWhiteSpace(service.ErrorMessage))
+                                <div class="health-history-row">
+                                    <div class="health-history-header">
+                                        <div>
+                                            <div class="mlv-row-main">@service.ServiceName</div>
+                                            <div class="mlv-row-sub">@service.RoutePrefix</div>
+                                        </div>
+                                        <StatusBadge Status="@service.CurrentStatus" />
+                                    </div>
+                                    <div class="health-strip" style="@($"--bucket-count:{service.Buckets.Count}")" aria-label="@($"{service.ServiceName} seven day health history")">
+                                        @foreach (var bucket in service.Buckets)
                                         {
-                                            <div class="mlv-row-sub">@service.ErrorMessage</div>
+                                            <span class="@GetBucketClass(bucket)" title="@GetBucketTitle(bucket)"></span>
                                         }
-                                        @if (!string.IsNullOrWhiteSpace(service.ErrorBody))
-                                        {
-                                            <pre class="mlv-error mt-2">@service.ErrorBody</pre>
-                                        }
-                                    </td>
-                                    <td><StatusBadge Status="@service.Status" /></td>
-                                    <td>@(service.IsCritical ? "Critical" : "Standard")</td>
-                                    <td class="mlv-mono">@service.LivenessPath</td>
-                                    <td class="mlv-mono">@service.ReadinessPath</td>
-                                    <td class="mlv-mono">
-                                        <div>@service.LivenessResponseTimeMs.ToString("N0") ms live</div>
-                                        <div class="mlv-row-sub">@service.ReadinessResponseTimeMs.ToString("N0") ms ready</div>
-                                    </td>
-                                    <td>@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</td>
-                                </tr>
+                                    </div>
+                                    <div class="health-strip-axis">
+                                        <span>7 days ago</span>
+                                        <span>@service.UptimePercentage.ToString("N2") % uptime</span>
+                                        <span>Now</span>
+                                    </div>
+                                </div>
                             }
-                        </tbody>
-                    </table>
+                        </div>
+                    </PanelCard>
+                }
+            }
+
+            @if (_health is not null)
+            {
+                <PanelCard Title="Current Probe Details" Class="mb-4">
+                    <div class="system-health-details-toggle">
+                        <SecondaryButton Icon="@Icons.Material.Outlined.TableRows" OnClick="@ToggleDetails">
+                            @(_showDetails ? "Hide details" : "Show details")
+                        </SecondaryButton>
+                    </div>
+
+                    @if (_showDetails)
+                    {
+                        @foreach (var group in _health.Services.GroupBy(s => s.DomainGroup).OrderBy(g => g.Key))
+                        {
+                            <h3 class="system-health-detail-heading">@group.Key</h3>
+                            <table class="mlv-table system-health-table">
+                                <colgroup>
+                                    <col class="system-health-service-col" />
+                                    <col class="system-health-status-col" />
+                                    <col class="system-health-critical-col" />
+                                    <col class="system-health-path-col" />
+                                    <col class="system-health-path-col" />
+                                    <col class="system-health-response-col" />
+                                    <col class="system-health-checked-col" />
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Service</th>
+                                        <th>Status</th>
+                                        <th>Critical</th>
+                                        <th>Liveness</th>
+                                        <th>Readiness</th>
+                                        <th>Response</th>
+                                        <th>Last checked</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var service in group.OrderBy(s => s.ServiceName))
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="mlv-row-main">@service.ServiceName</div>
+                                                <div class="mlv-row-sub">@service.RoutePrefix</div>
+                                                @if (!string.IsNullOrWhiteSpace(service.ErrorMessage))
+                                                {
+                                                    <div class="mlv-row-sub">@service.ErrorMessage</div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(service.ErrorBody))
+                                                {
+                                                    <pre class="mlv-error mt-2">@service.ErrorBody</pre>
+                                                }
+                                            </td>
+                                            <td><StatusBadge Status="@service.Status" /></td>
+                                            <td>@(service.IsCritical ? "Critical" : "Standard")</td>
+                                            <td class="mlv-mono">@service.LivenessPath</td>
+                                            <td class="mlv-mono">@service.ReadinessPath</td>
+                                            <td class="mlv-mono">
+                                                <div>@service.LivenessResponseTimeMs.ToString("N0") ms live</div>
+                                                <div class="mlv-row-sub">@service.ReadinessResponseTimeMs.ToString("N0") ms ready</div>
+                                            </td>
+                                            <td>@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    }
                 </PanelCard>
             }
         }
@@ -97,18 +144,28 @@
 
 @code {
     private SystemHealthDto? _health;
+    private SystemHealthHistoryDto? _history;
     private bool _loading = true;
+    private bool _showDetails;
+
+    private IReadOnlyList<ServiceHealthStatus> CurrentServices => _health?.Services ?? [];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private void ToggleDetails(MouseEventArgs _) => _showDetails = !_showDetails;
 
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
-            _health = await Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
+            var liveTask = Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
+            var historyTask = Http.GetFromJsonAsync<SystemHealthHistoryDto>("api/v1/system-health/history?days=7");
+            await Task.WhenAll(liveTask, historyTask);
+            _health = await liveTask;
+            _history = await historyTask;
         }
         catch (Exception ex)
         {
@@ -119,5 +176,16 @@
         {
             _loading = false;
         }
+    }
+
+    private static string GetBucketClass(SystemHealthHistoryBucketDto bucket) =>
+        $"health-bucket health-bucket-{bucket.Status.Trim().ToLowerInvariant()}";
+
+    private static string GetBucketTitle(SystemHealthHistoryBucketDto bucket)
+    {
+        var time = $"{bucket.StartedAtUtc.ToLocalTime():dd MMM HH:mm} - {bucket.EndedAtUtc.ToLocalTime():HH:mm}";
+        return bucket.HasSample
+            ? $"{time}: {bucket.Status}"
+            : $"{time}: no data";
     }
 }

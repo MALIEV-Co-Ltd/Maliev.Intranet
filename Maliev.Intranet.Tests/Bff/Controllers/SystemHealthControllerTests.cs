@@ -1,5 +1,7 @@
 using System.Net;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Controllers;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Mvc;
@@ -10,20 +12,27 @@ namespace Maliev.Intranet.Tests.Bff.Controllers;
 public class SystemHealthControllerTests
 {
     [Fact]
+    public void Controller_RequiresSystemHealthReadPermission()
+    {
+        var attribute = Assert.Single(typeof(SystemHealthController).GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false));
+        var permission = Assert.IsType<RequirePermissionAttribute>(attribute);
+
+        Assert.Equal(MalievPermissions.System.HealthRead, permission.Permission);
+    }
+
+    [Fact]
     public async Task GetSystemHealth_UsesServiceLivenessAndReadinessEndpoints()
     {
         var requestedPaths = new List<string>();
-        var controller = CreateController(request =>
+        var probeService = CreateProbeService(request =>
         {
             requestedPaths.Add(request.RequestUri?.AbsolutePath ?? string.Empty);
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var result = await controller.GetSystemHealth(CancellationToken.None);
+        var services = await probeService.CheckAllAsync(CancellationToken.None);
 
-        var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var health = Assert.IsType<SystemHealthDto>(okResult.Value);
-        Assert.All(health.Services, service =>
+        Assert.All(services, service =>
         {
             Assert.Equal($"/{service.RoutePrefix}/readiness", service.HealthPath);
             Assert.Equal($"/{service.RoutePrefix}/liveness", service.LivenessPath);
@@ -34,14 +43,14 @@ public class SystemHealthControllerTests
         Assert.Contains("/contact/readiness", requestedPaths);
         Assert.Contains("/inventory/liveness", requestedPaths);
         Assert.Contains("/inventory/readiness", requestedPaths);
-        Assert.Contains("/predictionservice/liveness", requestedPaths);
-        Assert.Contains("/predictionservice/readiness", requestedPaths);
+        Assert.Contains("/prediction/liveness", requestedPaths);
+        Assert.Contains("/prediction/readiness", requestedPaths);
     }
 
     [Fact]
     public async Task GetSystemHealth_WhenReadinessFails_MarksServiceUnhealthyNotUnreachable()
     {
-        var controller = CreateController(request =>
+        var probeService = CreateProbeService(request =>
         {
             if (request.RequestUri?.AbsolutePath.EndsWith("/readiness", StringComparison.Ordinal) == true)
             {
@@ -55,12 +64,9 @@ public class SystemHealthControllerTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var result = await controller.GetSystemHealth(CancellationToken.None);
+        var services = await probeService.CheckAllAsync(CancellationToken.None);
 
-        var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var health = Assert.IsType<SystemHealthDto>(okResult.Value);
-        Assert.Equal("Unhealthy", health.OverallStatus);
-        Assert.All(health.Services, service =>
+        Assert.All(services, service =>
         {
             Assert.Equal("Unhealthy", service.Status);
             Assert.Contains(service.ReadinessPath, service.ErrorMessage, StringComparison.Ordinal);
@@ -68,7 +74,73 @@ public class SystemHealthControllerTests
         });
     }
 
-    private static SystemHealthController CreateController(Func<HttpRequestMessage, HttpResponseMessage> handler)
+    [Fact]
+    public async Task GetSystemHealth_UsesProbeServiceAndPreservesLiveResponseShape()
+    {
+        var probeService = new Mock<ISystemHealthProbeService>();
+        probeService
+            .Setup(x => x.CheckAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new ServiceHealthStatus
+                {
+                    ServiceName = "AuthService",
+                    DomainGroup = "Platform",
+                    RoutePrefix = "auth",
+                    Status = "Healthy",
+                    IsCritical = true
+                },
+                new ServiceHealthStatus
+                {
+                    ServiceName = "InventoryService",
+                    DomainGroup = "Operations",
+                    RoutePrefix = "inventory",
+                    Status = "Unhealthy",
+                    IsCritical = false
+                }
+            ]);
+        var historyService = new Mock<ISystemHealthHistoryService>();
+        var controller = new SystemHealthController(probeService.Object, historyService.Object);
+
+        var result = await controller.GetSystemHealth(CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var health = Assert.IsType<SystemHealthDto>(okResult.Value);
+        Assert.Equal("Degraded", health.OverallStatus);
+        Assert.Equal(2, health.Services.Count);
+    }
+
+    [Fact]
+    public async Task GetSystemHealthHistory_ReturnsHistoryFromHistoryService()
+    {
+        var probeService = new Mock<ISystemHealthProbeService>();
+        var expected = new SystemHealthHistoryDto
+        {
+            BucketMinutes = 5,
+            Services =
+            [
+                new SystemHealthHistoryServiceDto
+                {
+                    ServiceName = "AuthService",
+                    DomainGroup = "Platform",
+                    RoutePrefix = "auth",
+                    CurrentStatus = "Healthy",
+                    UptimePercentage = 100m
+                }
+            ]
+        };
+        var historyService = new Mock<ISystemHealthHistoryService>();
+        historyService
+            .Setup(x => x.GetHistoryAsync(7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+        var controller = new SystemHealthController(probeService.Object, historyService.Object);
+
+        var result = await controller.GetSystemHealthHistory(7, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Same(expected, okResult.Value);
+    }
+
+    private static SystemHealthProbeService CreateProbeService(Func<HttpRequestMessage, HttpResponseMessage> handler)
     {
         var factory = new Mock<IHttpClientFactory>();
         factory
@@ -77,6 +149,6 @@ public class SystemHealthControllerTests
                 Task.FromResult(handler(request)))));
 
         var configuration = new ConfigurationBuilder().Build();
-        return new SystemHealthController(factory.Object, configuration);
+        return new SystemHealthProbeService(factory.Object, configuration);
     }
 }
