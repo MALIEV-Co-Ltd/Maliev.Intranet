@@ -39,7 +39,7 @@
                             {
                                 <div class="mlv-list-row">
                                     <div>
-                                        <div class="mlv-row-main">@role.RoleName</div>
+                                        <div class="mlv-row-main">@RoleDisplayName(role.RoleName, role.RoleId)</div>
                                         <div class="mlv-row-sub">@role.ResourcePath</div>
                                     </div>
                                     <StatusBadge Status="@role.RoleId" />
@@ -67,10 +67,10 @@
     {
         try
         {
-            var usersTask = Http.GetFromJsonAsync<List<PrincipalSummaryDto>>("api/v1/iam/users");
+            var userTask = Http.GetFromJsonAsync<PrincipalSummaryDto>($"api/v1/iam/users/{Id}");
             var rolesTask = Http.GetFromJsonAsync<List<RoleBindingDto>>($"api/v1/iam/users/{Id}/roles");
-            await Task.WhenAll(usersTask, rolesTask);
-            _user = (await usersTask)?.FirstOrDefault(u => u.PrincipalId == Id || u.Id == Id);
+            await Task.WhenAll(userTask, rolesTask);
+            _user = await userTask;
             _roles = await rolesTask ?? [];
         }
         catch (Exception ex)
@@ -82,5 +82,28 @@
         {
             _loading = false;
         }
+    }
+
+    private static string RoleDisplayName(string? roleName, string roleId)
+    {
+        if (!string.IsNullOrWhiteSpace(roleName))
+        {
+            return roleName;
+        }
+
+        var normalized = roleId.StartsWith("roles.", StringComparison.OrdinalIgnoreCase)
+            ? roleId["roles.".Length..]
+            : roleId;
+
+        var words = normalized
+            .Replace('-', '.')
+            .Replace('_', '.')
+            .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(word => word.Equals("iam", StringComparison.OrdinalIgnoreCase)
+                ? "IAM"
+                : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(word.ToLowerInvariant()));
+
+        var label = string.Join(" ", words);
+        return string.IsNullOrWhiteSpace(label) ? roleId : label;
     }
 }

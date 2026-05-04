@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Maliev.Intranet.Shared;
 
 namespace Maliev.Intranet.Bff.Clients;
@@ -26,8 +28,8 @@ public class IAMServiceClient(HttpClient httpClient)
     /// <returns>A list of roles.</returns>
     public virtual async Task<List<RoleDto>> GetRolesAsync(CancellationToken ct = default)
     {
-        var response = await httpClient.GetFromJsonAsync<List<RoleDto>>("/iam/v1/roles", ct);
-        return response ?? new();
+        var response = await httpClient.GetFromJsonAsync<List<IamRoleResponse>>("/iam/v1/roles", ct);
+        return response?.Select(MapRole).ToList() ?? new();
     }
 
     /// <summary>
@@ -37,6 +39,22 @@ public class IAMServiceClient(HttpClient httpClient)
     {
         var response = await httpClient.GetFromJsonAsync<List<IamPrincipalResponse>>("/iam/v1/principals", ct);
         return response?.Select(MapPrincipal).ToList() ?? new();
+    }
+
+    /// <summary>
+    /// Retrieves a single principal by identifier.
+    /// </summary>
+    public virtual async Task<PrincipalSummaryDto?> GetPrincipalAsync(Guid principalId, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync($"/iam/v1/principals/{principalId}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        var principal = await response.Content.ReadFromJsonAsync<IamPrincipalResponse>(cancellationToken: ct);
+        return principal is null ? null : MapPrincipal(principal);
     }
 
     /// <summary>
@@ -109,6 +127,15 @@ public class IAMServiceClient(HttpClient httpClient)
         DateTime CreatedAt,
         DateTime UpdatedAt);
 
+    private sealed record IamRoleResponse(
+        string RoleId,
+        string? ServiceName,
+        string? Name,
+        string? RoleName,
+        string? Description,
+        List<string>? Permissions,
+        List<string>? PermissionIds);
+
     private static PrincipalSummaryDto MapPrincipal(IamPrincipalResponse principal) => new()
     {
         Id = principal.PrincipalId,
@@ -122,6 +149,38 @@ public class IAMServiceClient(HttpClient httpClient)
         CreatedAt = principal.CreatedAt
     };
 
+    private static RoleDto MapRole(IamRoleResponse role) => new()
+    {
+        RoleId = role.RoleId,
+        Name = FirstNonBlank(role.Name, role.RoleName, HumanizeRoleId(role.RoleId)),
+        Description = role.Description ?? string.Empty,
+        Permissions = role.Permissions ?? [],
+        PermissionIds = role.PermissionIds ?? role.Permissions ?? []
+    };
+
+    private static string FirstNonBlank(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+    /// <summary>
+    /// Converts canonical IAM role identifiers such as roles.contact.viewer into display labels.
+    /// </summary>
+    public static string HumanizeRoleId(string roleId)
+    {
+        var normalized = roleId.StartsWith("roles.", StringComparison.OrdinalIgnoreCase)
+            ? roleId["roles.".Length..]
+            : roleId;
+
+        var words = normalized
+            .Replace('-', '.')
+            .Replace('_', '.')
+            .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(word => word.Equals("iam", StringComparison.OrdinalIgnoreCase)
+                ? "IAM"
+                : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(word.ToLowerInvariant()));
+
+        var label = string.Join(" ", words);
+        return string.IsNullOrWhiteSpace(label) ? roleId : label;
+    }
 
     /// <summary>
     /// Retrieves role bindings for a principal.
@@ -129,7 +188,13 @@ public class IAMServiceClient(HttpClient httpClient)
     public virtual async Task<List<RoleBindingDto>> GetPrincipalRolesAsync(Guid principalId, CancellationToken ct = default)
     {
         var response = await httpClient.GetFromJsonAsync<List<RoleBindingDto>>($"/iam/v1/principals/{principalId}/roles", ct);
-        return response ?? new();
+        return response?
+            .Select(binding =>
+            {
+                binding.RoleName = FirstNonBlank(binding.RoleName, HumanizeRoleId(binding.RoleId));
+                return binding;
+            })
+            .ToList() ?? new();
     }
 
     /// <summary>

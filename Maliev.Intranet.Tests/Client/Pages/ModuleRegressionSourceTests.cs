@@ -166,6 +166,31 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void IamUserDetail_UsesSinglePrincipalEndpoint()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserDetail.razor");
+        var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "IamController.cs");
+
+        Assert.Contains("GetFromJsonAsync<PrincipalSummaryDto>($\"api/v1/iam/users/{Id}\")", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetFromJsonAsync<List<PrincipalSummaryDto>>(\"api/v1/iam/users\")", source, StringComparison.Ordinal);
+        Assert.Contains("Task<ActionResult<PrincipalSummaryDto>> GetUser", controller, StringComparison.Ordinal);
+        Assert.Contains("GetPrincipalAsync(principalId", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IamRoles_RenderDisplayNameWithRoleIdFallback()
+    {
+        var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserList.razor");
+        var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserDetail.razor");
+        var client = ReadRepoFile("Maliev.Intranet.Bff", "Clients", "IAMServiceClient.cs");
+
+        Assert.Contains("RoleDisplayName(role)", list, StringComparison.Ordinal);
+        Assert.Contains("RoleSubtitle(role)", list, StringComparison.Ordinal);
+        Assert.Contains("HumanizeRoleId(role.RoleId)", client, StringComparison.Ordinal);
+        Assert.Contains("RoleDisplayName(role.RoleName, role.RoleId)", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_CurrencySelectorTrigger_RemainsCompact()
     {
         var razor = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");

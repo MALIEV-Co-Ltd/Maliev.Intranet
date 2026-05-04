@@ -96,6 +96,21 @@ public class IamController(
     }
 
     /// <summary>
+    /// Retrieves a single IAM principal for the IAM user detail page.
+    /// </summary>
+    /// <param name="principalId">The principal identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching principal, or 404 when it does not exist.</returns>
+    [RequirePermission(MalievPermissions.IAM.Principals.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("users/{principalId:guid}")]
+    public async Task<ActionResult<PrincipalSummaryDto>> GetUser(Guid principalId, CancellationToken ct)
+    {
+        if (!await IsAuthorizedAsync(MalievPermissions.IAM.Principals.Read, MalievPermissions.IAM.Principals.List)) return Forbid();
+        var principal = await client.GetPrincipalAsync(principalId, ct);
+        return principal is null ? NotFound() : Ok(principal);
+    }
+
+    /// <summary>
     /// Retrieves all roles for the IAM console.
     /// </summary>
     /// <returns>A list of roles.</returns>

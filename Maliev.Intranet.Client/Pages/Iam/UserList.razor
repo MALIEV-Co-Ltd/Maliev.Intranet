@@ -81,8 +81,8 @@
                     {
                         <div class="mlv-list-row" @onclick="@(() => Navigation.NavigateTo($"/iam/roles/{Uri.EscapeDataString(role.RoleId)}"))">
                             <div>
-                                <div class="mlv-row-main">@role.Name</div>
-                                <div class="mlv-row-sub">@role.Description</div>
+                                <div class="mlv-row-main">@RoleDisplayName(role)</div>
+                                <div class="mlv-row-sub">@RoleSubtitle(role)</div>
                             </div>
                             <StatusBadge Status="@role.RoleId" Text="@($"{role.PermissionIds.Count} permissions")" />
                         </div>
@@ -204,5 +204,38 @@
         var query = new List<string> { $"page={_userPage}", $"pageSize={_pageSize}" };
         if (!string.IsNullOrWhiteSpace(_search)) query.Add($"search={Uri.EscapeDataString(_search)}");
         return $"api/v1/iam/users?{string.Join("&", query)}";
+    }
+
+    private static string RoleDisplayName(RoleDto role)
+    {
+        if (!string.IsNullOrWhiteSpace(role.Name))
+        {
+            return role.Name;
+        }
+
+        var normalized = role.RoleId.StartsWith("roles.", StringComparison.OrdinalIgnoreCase)
+            ? role.RoleId["roles.".Length..]
+            : role.RoleId;
+
+        var words = normalized
+            .Replace('-', '.')
+            .Replace('_', '.')
+            .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(word => word.Equals("iam", StringComparison.OrdinalIgnoreCase)
+                ? "IAM"
+                : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(word.ToLowerInvariant()));
+
+        var label = string.Join(" ", words);
+        return string.IsNullOrWhiteSpace(label) ? role.RoleId : label;
+    }
+
+    private static string RoleSubtitle(RoleDto role)
+    {
+        if (!string.IsNullOrWhiteSpace(role.Description))
+        {
+            return role.Description;
+        }
+
+        return role.RoleId;
     }
 }
