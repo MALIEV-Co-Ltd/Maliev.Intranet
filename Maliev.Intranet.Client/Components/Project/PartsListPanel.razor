@@ -57,7 +57,7 @@
                         }
                         else if (part.AwaitingPreview)
                         {
-                            <PartProcessingLoader Class="part-processing-loader--thumb" />
+                            <MudProgressCircular Color="Color.Default" Indeterminate="true" />
                         }
                         else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
                         {
