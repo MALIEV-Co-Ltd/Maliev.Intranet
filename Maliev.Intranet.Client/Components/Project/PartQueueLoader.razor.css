@@ -1,5 +1,7 @@
 .part-queue-loader {
     --queue-size: 32px;
+    --queue-source-size: 80px;
+    --queue-scale: calc(var(--queue-size) / var(--queue-source-size));
     width: var(--queue-size);
     height: var(--queue-size);
     display: grid;
@@ -11,23 +13,22 @@
 
 .part-queue-loader::before {
     content: "";
-    width: 100%;
-    height: 100%;
-    background: currentColor;
-    mask:
-        radial-gradient(circle at 50% 18%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
-        radial-gradient(circle at 82% 50%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
-        radial-gradient(circle at 50% 82%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
-        radial-gradient(circle at 18% 50%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
-        radial-gradient(circle at 50% 50%, currentColor 0 26%, transparent 27%) 0 0 / 100% 100% no-repeat;
-    -webkit-mask:
-        radial-gradient(circle at 50% 18%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
-        radial-gradient(circle at 82% 50%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
-        radial-gradient(circle at 50% 82%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
-        radial-gradient(circle at 18% 50%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
-        radial-gradient(circle at 50% 50%, currentColor 0 26%, transparent 27%) 0 0 / 100% 100% no-repeat;
-    animation: part-queue-loader 0.9s steps(4, end) infinite;
+    width: var(--queue-source-size);
+    aspect-ratio: 1;
+    box-sizing: border-box;
+    background:
+        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
+        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
+        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
+        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
+        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
+        linear-gradient(currentColor 0 0) 50% / 100% 10px,
+        linear-gradient(currentColor 0 0) 50% / 10px 100%;
+    background-repeat: no-repeat;
+    filter: blur(4px) contrast(10);
+    animation: part-queue-loader 0.8s infinite;
     transform-origin: center;
+    transform: scale(var(--queue-scale));
 }
 
 .part-queue-loader--thumb {
@@ -39,20 +40,8 @@
 }
 
 @keyframes part-queue-loader {
-    25% {
-        transform: rotate(90deg);
-    }
-
-    50% {
-        transform: rotate(180deg);
-    }
-
-    75% {
-        transform: rotate(270deg);
-    }
-
     100% {
-        transform: rotate(360deg);
+        background-position: 50% -20px, -20px 50%, 60px 50%, 50% 60px, 50%, 50%, 50%;
     }
 }
 
