@@ -51,7 +51,7 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void PartsListPanel_QueuedUploadBeforeProgress_ShowsQueueLoaderInsteadOfSpinnerOrFallbackIcon()
+    public void PartsListPanel_QueuedUploadBeforeProgress_ShowsDefaultIndeterminateProgressInsteadOfCustomLoaderOrFallbackIcon()
     {
         var parts = new List<PartViewModel>
         {
@@ -66,9 +66,12 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
             .Add(p => p.Title, "Test quote")
             .Add(p => p.Parts, parts));
 
-        Assert.NotEmpty(cut.FindAll(".plp-thumb .part-queue-loader"));
+        var progress = cut.Find(".plp-thumb .mud-progress-circular");
+
+        Assert.Contains("mud-progress-indeterminate", progress.ClassList);
+        Assert.Contains("mud-default-text", progress.ClassList);
+        Assert.Empty(cut.FindAll(".plp-thumb .part-queue-loader"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-skeleton"));
-        Assert.Empty(cut.FindAll(".plp-thumb .mud-progress-circular"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
     }
 

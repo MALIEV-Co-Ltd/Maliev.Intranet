@@ -48,7 +48,7 @@
                     <div class="plp-thumb">
                         @if (part.QueuedUpload)
                         {
-                            <PartQueueLoader Class="part-queue-loader--thumb" />
+                            <MudProgressCircular Color="Color.Default" Indeterminate="true" />
                         }
                         else if (part.Uploading)
                         {
