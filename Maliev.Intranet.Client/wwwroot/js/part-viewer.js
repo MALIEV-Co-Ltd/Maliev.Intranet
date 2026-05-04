@@ -4609,46 +4609,62 @@ function withBackFaceCullingDisabled(scene, action) {
     }
 }
 
+function vectorFromFeatureValue(value) {
+    if (!value) return null;
+    if (value instanceof BABYLON.Vector3) return value.clone();
+    const x = Number(value.x ?? value.X);
+    const y = Number(value.y ?? value.Y);
+    const z = Number(value.z ?? value.Z);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+    return new BABYLON.Vector3(x, y, z);
+}
+
+function getExplicitRoundFeature(pickResult) {
+    const metadata = pickResult?.pickedMesh?.metadata ?? {};
+    const candidates = [
+        metadata.malievRoundFeature,
+        metadata.roundFeature,
+        metadata.malievFeature,
+        metadata.feature,
+    ].filter(Boolean);
+
+    if (Array.isArray(metadata.malievFeatures)) candidates.push(...metadata.malievFeatures);
+    if (Array.isArray(metadata.features)) candidates.push(...metadata.features);
+
+    return candidates.find(feature => {
+        const type = String(feature.kind ?? feature.type ?? feature.featureType ?? '').toLowerCase();
+        return type === 'round' || type === 'cylinder' || type === 'cylindrical' || type === 'bore' || type === 'diameter';
+    }) ?? null;
+}
+
 function inferRoundFeatureFromPick(pickResult) {
     const mesh = pickResult?.pickedMesh;
     if (!mesh) return null;
 
-    const bb = mesh.getBoundingInfo()?.boundingBox;
-    if (!bb) return null;
+    const feature = getExplicitRoundFeature(pickResult);
+    if (!feature) return null;
 
-    const min = bb.minimumWorld;
-    const max = bb.maximumWorld;
-    const dims = [
-        { axis: 'x', size: Math.abs(max.x - min.x) },
-        { axis: 'y', size: Math.abs(max.y - min.y) },
-        { axis: 'z', size: Math.abs(max.z - min.z) },
-    ].sort((a, b) => b.size - a.size);
+    const center = vectorFromFeatureValue(feature.center ?? feature.anchor ?? feature.axisPoint ?? feature.point)
+        ?? pickResult.pickedPoint?.clone();
+    const axisVector = vectorFromFeatureValue(feature.axis ?? feature.axisVector ?? feature.normal)
+        ?? new BABYLON.Vector3(0, 0, 1);
+    const diameter = Number(feature.diameter ?? feature.Diameter);
+    const radius = Number(feature.radius ?? feature.Radius);
+    const resolvedRadius = Number.isFinite(radius) && radius > 0
+        ? radius
+        : Number.isFinite(diameter) && diameter > 0
+            ? diameter / 2
+            : null;
 
-    const longAxis = dims[0];
-    const radialA = dims[1];
-    const radialB = dims[2];
-    if (radialA.size <= 1e-6 || radialB.size <= 1e-6) return null;
-    const radialMismatch = Math.abs(radialA.size - radialB.size) / Math.max(radialA.size, radialB.size);
-    if (radialMismatch > 0.12 || longAxis.size < radialA.size * 1.2) return null;
-
-    const center = new BABYLON.Vector3(
-        (min.x + max.x) / 2,
-        (min.y + max.y) / 2,
-        (min.z + max.z) / 2
-    );
-    const axisVector = longAxis.axis === 'x'
-        ? new BABYLON.Vector3(1, 0, 0)
-        : longAxis.axis === 'y'
-            ? new BABYLON.Vector3(0, 1, 0)
-            : new BABYLON.Vector3(0, 0, 1);
+    if (!center || !resolvedRadius) return null;
 
     return {
         kind: 'round',
         point: pickResult.pickedPoint?.clone() ?? center.clone(),
         anchor: center,
         axis: axisVector,
-        radius: (radialA.size + radialB.size) / 4,
-        diameter: (radialA.size + radialB.size) / 2,
+        radius: resolvedRadius,
+        diameter: resolvedRadius * 2,
         label: 'Diameter',
     };
 }

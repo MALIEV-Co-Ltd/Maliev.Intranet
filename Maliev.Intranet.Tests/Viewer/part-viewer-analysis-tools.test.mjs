@@ -405,6 +405,165 @@ test('section plane opts grid floor and shadow catcher out of visual clipping', 
     assert.equal(result.shadowClipped, false);
 });
 
+test('cad feature picker keeps flat mesh picks anchored to picked surface point', () => {
+    const context = loadViewerContext();
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+        boundingInfo: {
+            boundingBox: {
+                minimumWorld: new Vector3(-50, -10, -10),
+                maximumWorld: new Vector3(50, 10, 10),
+            },
+        },
+    });
+    context.scene = {
+        meshes: [model],
+        pick: () => ({
+            hit: true,
+            pickedMesh: model,
+            pickedPoint: new Vector3(22, 5, 3),
+            getNormal: () => new Vector3(0, 0, 1),
+        }),
+    };
+
+    const feature = vm.runInContext(`
+        tagModelMeshesForAnalysis('viewer', scene);
+        pickCadFeature(scene, 50, 30);
+    `, context);
+
+    assert.equal(feature.kind, 'face');
+    assert.deepEqual(
+        { x: feature.anchor.x, y: feature.anchor.y, z: feature.anchor.z },
+        { x: 22, y: 5, z: 3 });
+});
+
+test('cad feature picker reports explicit round metadata without using mesh bounding center', () => {
+    const context = loadViewerContext();
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+        metadata: {
+            malievRoundFeature: {
+                kind: 'bore',
+                center: { x: 12, y: 4, z: 2 },
+                axis: { x: 0, y: 0, z: 1 },
+                diameter: 6,
+            },
+        },
+        boundingInfo: {
+            boundingBox: {
+                minimumWorld: new Vector3(-50, -10, -10),
+                maximumWorld: new Vector3(50, 10, 10),
+            },
+        },
+    });
+    context.scene = {
+        meshes: [model],
+        pick: () => ({
+            hit: true,
+            pickedMesh: model,
+            pickedPoint: new Vector3(13, 4, 2),
+            getNormal: () => new Vector3(0, 0, 1),
+        }),
+    };
+
+    const feature = vm.runInContext(`
+        tagModelMeshesForAnalysis('viewer', scene);
+        pickCadFeature(scene, 50, 30);
+    `, context);
+
+    assert.equal(feature.kind, 'round');
+    assert.equal(feature.diameter, 6);
+    assert.deepEqual(
+        { x: feature.anchor.x, y: feature.anchor.y, z: feature.anchor.z },
+        { x: 12, y: 4, z: 2 });
+});
+
+test('measure preview uses surface hit points instead of whole-mesh center anchors', () => {
+    const context = loadViewerContext();
+    const createdLines = [];
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+        boundingInfo: {
+            boundingBox: {
+                minimumWorld: new Vector3(-50, -10, -10),
+                maximumWorld: new Vector3(50, 10, 10),
+            },
+        },
+    });
+    const canvas = {
+        style: {},
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 500 }),
+    };
+    context.canvas = canvas;
+    context.BABYLON.MeshBuilder.CreateLines = (name, options) => {
+        const line = {
+            name,
+            points: options.points,
+            isPickable: true,
+            metadata: {},
+            dispose: () => {},
+        };
+        createdLines.push(line);
+        return line;
+    };
+
+    let pickPoint = new Vector3(22, 5, 3);
+    context.scene = {
+        meshes: [model],
+        onBeforeRenderObservable: { add: () => ({}) },
+        onPointerObservable: {
+            add(callback) {
+                this.callback = callback;
+                return callback;
+            },
+            remove: () => {},
+        },
+        pick: () => ({
+            hit: true,
+            pickedMesh: model,
+            pickedPoint: pickPoint.clone(),
+            getNormal: () => new Vector3(0, 0, 1),
+        }),
+    };
+    vm.runInContext(`
+        scenes.viewer = scene;
+        engines.viewer = {
+            getRenderWidth: () => 1000,
+            getRenderHeight: () => 500,
+            getRenderingCanvas: () => canvas
+        };
+    `, context);
+    context.document.getElementById = () => canvas;
+
+    vm.runInContext("enableMeasureTool('viewer', null)", context);
+    context.scene.onPointerObservable.callback({
+        type: context.BABYLON.PointerEventTypes.POINTERDOWN,
+        event: { clientX: 100, clientY: 100 },
+    });
+    context.scene.onPointerObservable.callback({
+        type: context.BABYLON.PointerEventTypes.POINTERUP,
+        event: { clientX: 100, clientY: 100 },
+    });
+
+    pickPoint = new Vector3(35, 7, 4);
+    context.scene.onPointerObservable.callback({
+        type: context.BABYLON.PointerEventTypes.POINTERMOVE,
+        event: { clientX: 700, clientY: 220 },
+    });
+
+    const preview = createdLines.find(line => line.name === 'measure_preview');
+    assert.ok(preview, 'expected live preview line after first point selection');
+    assert.deepEqual(
+        { x: preview.points[0].x, y: preview.points[0].y, z: preview.points[0].z },
+        { x: 22, y: 5, z: 3 });
+    assert.deepEqual(
+        { x: preview.points[1].x, y: preview.points[1].y, z: preview.points[1].z },
+        { x: 35, y: 7, z: 4 });
+});
+
 test('measure hover uses PointerEvent coordinates instead of stale scene pointer coordinates', () => {
     const context = loadViewerContext();
     const picks = [];
