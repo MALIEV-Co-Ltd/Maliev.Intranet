@@ -41,8 +41,7 @@
     {
         if (firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("eval",
-                "window.malievWasmLoader?.markReady ? window.malievWasmLoader.markReady() : document.documentElement.classList.add('maliev-wasm-ready');");
+            await JSRuntime.InvokeVoidAsync("malievMarkWasmReady");
         }
     }
 }

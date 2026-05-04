@@ -25,6 +25,9 @@ public class AppWasmRenderModeTests
         Assert.Contains("maliev_theme", source);
         Assert.Contains("--maliev-logo-loader-fill: #000000", source);
         Assert.Contains("--maliev-logo-loader-fill: #ffffff", source);
+        Assert.Contains("--maliev-logo-loader-shadow", source);
+        Assert.Contains("drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))", source);
+        Assert.Contains("drop-shadow(0 0 46px rgba(255, 255, 255, 0.22))", source);
         Assert.DoesNotContain("Loading workspace", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Starting the employee intranet locally.", source, StringComparison.Ordinal);
         Assert.DoesNotContain("wasm-loading-card", source, StringComparison.Ordinal);
@@ -52,7 +55,8 @@ public class AppWasmRenderModeTests
         Assert.Contains("autostart=\"false\"", source);
         Assert.Contains("Blazor.start", source);
         Assert.Contains("loadBootResource", source);
-        Assert.Contains("malievWasmLoader.markRuntimeReady", source);
+        Assert.Contains("window.malievWasmLoader.markReady", source);
+        Assert.Contains("window.malievMarkWasmReady = window.malievWasmLoader.markReady", source);
         Assert.DoesNotContain("conic-gradient", source, StringComparison.Ordinal);
         Assert.DoesNotContain("html.maliev-wasm-runtime-ready .wasm-loading .maliev-logo-loader", source, StringComparison.Ordinal);
         Assert.DoesNotContain("animation: maliev-logo-load", source, StringComparison.Ordinal);
@@ -79,8 +83,8 @@ public class AppWasmRenderModeTests
 
         Assert.Contains("@inject IJSRuntime", source);
         Assert.Contains("OnAfterRenderAsync", source);
-        Assert.Contains("malievWasmLoader.markReady", source);
-        Assert.Contains("maliev-wasm-ready", source);
+        Assert.Contains("malievMarkWasmReady", source);
+        Assert.DoesNotContain("eval", source, StringComparison.Ordinal);
     }
 
     [Fact]

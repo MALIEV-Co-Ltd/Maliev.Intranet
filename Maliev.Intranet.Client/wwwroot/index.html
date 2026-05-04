@@ -42,6 +42,11 @@
     </style>
     <link href="Maliev.Intranet.Client.styles.css" rel="stylesheet" />
     <script type="importmap"></script>
+    <script>
+        window.malievMarkWasmReady = function () {
+            document.documentElement.classList.add('maliev-wasm-ready');
+        };
+    </script>
 </head>
 
 <body>
