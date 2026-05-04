@@ -2860,9 +2860,18 @@ function getPointerRenderCoordinates(canvasId, pointerEvent) {
     const y = event.clientY - rect.top;
     if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
 
+    const renderWidth = Number(engine?.getRenderWidth?.());
+    const renderHeight = Number(engine?.getRenderHeight?.());
+    const scaleX = Number.isFinite(renderWidth) && renderWidth > 0
+        ? renderWidth / rect.width
+        : 1;
+    const scaleY = Number.isFinite(renderHeight) && renderHeight > 0
+        ? renderHeight / rect.height
+        : 1;
+
     return {
-        x,
-        y,
+        x: x * scaleX,
+        y: y * scaleY,
     };
 }
 

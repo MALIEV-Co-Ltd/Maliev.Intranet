@@ -243,7 +243,7 @@ function cubeSectionMesh(onRead, zOffset = 0) {
     });
 }
 
-test('pointer render coordinates use canvas-local CSS coordinates for Babylon scene picks', () => {
+test('pointer render coordinates scale canvas-local CSS positions into Babylon render pixels', () => {
     const context = loadViewerContext();
     const canvas = {
         getBoundingClientRect: () => ({ left: 100, top: 50, width: 200, height: 100 }),
@@ -261,8 +261,8 @@ test('pointer render coordinates use canvas-local CSS coordinates for Babylon sc
         "getPointerRenderCoordinates('viewer', { clientX: 150, clientY: 80 })",
         context);
 
-    assert.equal(coords.x, 50);
-    assert.equal(coords.y, 30);
+    assert.equal(coords.x, 250);
+    assert.equal(coords.y, 150);
 });
 
 test('model mesh registry marks only real model geometry pickable for analysis', () => {
@@ -573,7 +573,7 @@ test('measure preview uses surface hit points instead of whole-mesh center ancho
         { x: 35, y: 7, z: 4 });
 });
 
-test('measure hover uses PointerEvent coordinates instead of stale scene pointer coordinates', () => {
+test('measure hover uses scaled PointerEvent coordinates instead of stale scene pointer coordinates', () => {
     const context = loadViewerContext();
     const picks = [];
     const model = makeMesh('model', {
@@ -623,10 +623,10 @@ test('measure hover uses PointerEvent coordinates instead of stale scene pointer
         event: { clientX: 150, clientY: 80 },
     });
 
-    assert.deepEqual(picks.at(-1), [50, 30]);
+    assert.deepEqual(picks.at(-1), [250, 150]);
 });
 
-test('thickness hover uses PointerEvent coordinates instead of stale scene pointer coordinates', () => {
+test('thickness hover uses scaled PointerEvent coordinates instead of stale scene pointer coordinates', () => {
     const context = loadViewerContext();
     const picks = [];
     const model = makeMesh('model', {
@@ -679,10 +679,10 @@ test('thickness hover uses PointerEvent coordinates instead of stale scene point
         event: { clientX: 150, clientY: 80 },
     });
 
-    assert.deepEqual(picks.at(-1), [50, 30]);
+    assert.deepEqual(picks.at(-1), [250, 150]);
 });
 
-test('thickness hover ignores empty canvas positions instead of scaled false model hits', () => {
+test('thickness hover uses render-buffer coordinates so empty canvas positions do not hit the central model ray', () => {
     const context = loadViewerContext();
     const picks = [];
     const createdSpheres = [];
@@ -734,7 +734,7 @@ test('thickness hover ignores empty canvas positions instead of scaled false mod
         },
         pick(x, y) {
             picks.push([x, y]);
-            if (x === 1800 && y === 360) {
+            if (x === 900 && y === 180) {
                 return {
                     faceId: 7,
                     hit: true,
@@ -763,7 +763,7 @@ test('thickness hover ignores empty canvas positions instead of scaled false mod
         event: { clientX: 900, clientY: 180 },
     });
 
-    assert.deepEqual(picks.at(-1), [900, 180]);
+    assert.deepEqual(picks.at(-1), [1800, 360]);
     assert.equal(createdSpheres.length, 0);
     assert.equal(labels.at(0).style.display, 'none');
 });
