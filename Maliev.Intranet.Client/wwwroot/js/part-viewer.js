@@ -264,6 +264,7 @@ const CONFIG = {
         fillColor: { r: 1.0, g: 0.78, b: 0.88 },
         fillAlpha: 1.0,
         hatchSpacingMm: 3.0,
+        hatchWidthMm: 0.28,
         minHatchSpacing: 0.5,
         planeLiftMm: 0.08,
         renderingGroupId: 0,
@@ -4228,11 +4229,62 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
 
     if (hatchLines.length === 0) return;
 
-    const hatchMesh = BABYLON.MeshBuilder.CreateLineSystem(
-        `__section_hatch_${canvasId}__`,
-        { lines: hatchLines, updatable: false },
-        scene
-    );
+    const hatchWidth = Math.max(
+        CONFIG.SECTION.hatchWidthMm * (modelScaleFactors[canvasId] ?? 1),
+        0.02);
+    const doubleSidedLift = planeNormal.scale(CONFIG.SECTION.planeLiftMm * 0.8 * (modelScaleFactors[canvasId] ?? 1));
+    const stripPaths = [];
+    const positions = [];
+    const indices = [];
+
+    for (const [baseStart, baseEnd] of hatchLines) {
+        const direction = baseEnd.subtract(baseStart);
+        if (direction.length() <= 1e-6) continue;
+        direction.normalize();
+
+        const widthAxis = BABYLON.Vector3.Cross(planeNormal, direction);
+        if (widthAxis.length() <= 1e-6) continue;
+        widthAxis.normalize();
+        const halfWidth = widthAxis.scale(hatchWidth / 2);
+
+        for (const sideLift of [doubleSidedLift, doubleSidedLift.scale(-1)]) {
+            const start = baseStart.add(sideLift);
+            const end = baseEnd.add(sideLift);
+            const p0 = start.add(halfWidth);
+            const p1 = start.subtract(halfWidth);
+            const p2 = end.subtract(halfWidth);
+            const p3 = end.add(halfWidth);
+            const vertexOffset = positions.length / 3;
+            positions.push(
+                p0.x, p0.y, p0.z,
+                p1.x, p1.y, p1.z,
+                p2.x, p2.y, p2.z,
+                p3.x, p3.y, p3.z);
+            indices.push(
+                vertexOffset, vertexOffset + 1, vertexOffset + 2,
+                vertexOffset, vertexOffset + 2, vertexOffset + 3);
+            stripPaths.push([p0, p1, p2, p3]);
+        }
+    }
+
+    if (positions.length === 0) return;
+
+    const hatchMesh = new BABYLON.Mesh(`__section_hatch_${canvasId}__`, scene);
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    vertexData.applyToMesh(hatchMesh);
+    hatchMesh.pathArray = stripPaths;
+
+    const hatchMat = new BABYLON.StandardMaterial(`__section_hatch_mat_${canvasId}__`, scene);
+    hatchMat.diffuseColor = toColor3(CONFIG.SECTION.hatchColor);
+    hatchMat.emissiveColor = toColor3(CONFIG.SECTION.hatchColor);
+    hatchMat.ambientColor = toColor3(CONFIG.SECTION.hatchColor);
+    hatchMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    hatchMat.backFaceCulling = false;
+    hatchMat.disableLighting = true;
+    hatchMesh.material = hatchMat;
+
     configureSectionLineMesh(hatchMesh, CONFIG.SECTION.hatchColor);
     sectionHatchMeshes[canvasId] = hatchMesh;
 }

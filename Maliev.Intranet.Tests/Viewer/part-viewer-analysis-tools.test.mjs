@@ -165,6 +165,13 @@ function loadViewerContext() {
                     material: {},
                     dispose: () => {},
                 }),
+                CreateRibbon: (name, options) => ({
+                    name,
+                    pathArray: options.pathArray,
+                    isPickable: true,
+                    material: {},
+                    dispose: () => {},
+                }),
                 CreateSphere: (name) => ({
                     name,
                     isPickable: true,
@@ -323,13 +330,13 @@ test('section hatch generation uses model meshes and excludes section ghost mesh
     };
     context.scene.meshes[1].name = '__section_ghost_1';
 
-    const hatchLineCount = vm.runInContext(`
+    const hatchStripCount = vm.runInContext(`
         tagModelMeshesForAnalysis('viewer', scene);
         _rebuildSectionHatch('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
-        sectionHatchMeshes.viewer?.lines?.length ?? 0;
+        sectionHatchMeshes.viewer?.pathArray?.length ?? 0;
     `, context);
 
-    assert.ok(hatchLineCount > 0, 'expected visible cross hatch lines');
+    assert.ok(hatchStripCount > 0, 'expected visible cross hatch strips');
     assert.ok(modelReads > 0, 'expected section to read model geometry');
     assert.equal(ghostReads, 0, 'section ghosts must not feed future hatch rebuilds');
 });
@@ -347,20 +354,24 @@ test('section hatch generation follows translated cut contours and stays visible
         tagModelMeshesForAnalysis('viewer', scene);
         _rebuildSectionHatch('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
         ({
-            lineCount: sectionHatchMeshes.viewer?.lines?.length ?? 0,
-            color: sectionHatchMeshes.viewer?.color,
+            stripCount: sectionHatchMeshes.viewer?.pathArray?.length ?? 0,
+            color: sectionHatchMeshes.viewer?.material?.diffuseColor,
+            backFaceCulling: sectionHatchMeshes.viewer?.material?.backFaceCulling,
             disableClipPlanes: sectionHatchMeshes.viewer?.material?.disableClipPlanes,
             disableDepthWrite: sectionHatchMeshes.viewer?.material?.disableDepthWrite,
+            forceDepthWrite: sectionHatchMeshes.viewer?.material?.forceDepthWrite,
             alwaysActive: sectionHatchMeshes.viewer?.alwaysSelectAsActiveMesh
         });
     `, context);
 
-    assert.ok(result.lineCount > 0, 'expected cross hatch lines even when the contour is far from the world origin');
+    assert.ok(result.stripCount > 0, 'expected cross hatch strips even when the contour is far from the world origin');
     assert.deepEqual(
         { r: result.color.r, g: result.color.g, b: result.color.b },
         { r: 0, g: 0, b: 0 });
+    assert.equal(result.backFaceCulling, false);
     assert.equal(result.disableClipPlanes, true);
     assert.equal(result.disableDepthWrite, false);
+    assert.equal(result.forceDepthWrite, true);
     assert.equal(result.alwaysActive, true);
 });
 
@@ -388,7 +399,7 @@ test('section fill creates a light pink cap below the diagonal hatch lines', () 
             fillForceDepthWrite: sectionFillMeshes.viewer?.material?.forceDepthWrite,
             fillDisableLighting: sectionFillMeshes.viewer?.material?.disableLighting,
             fillNoClip: sectionFillMeshes.viewer?.material?.disableClipPlanes,
-            hatchLineCount: sectionHatchMeshes.viewer?.lines?.length ?? 0
+            hatchStripCount: sectionHatchMeshes.viewer?.pathArray?.length ?? 0
         });
     `, context);
 
@@ -406,7 +417,34 @@ test('section fill creates a light pink cap below the diagonal hatch lines', () 
     assert.equal(result.fillForceDepthWrite, true);
     assert.equal(result.fillDisableLighting, true);
     assert.equal(result.fillNoClip, true);
-    assert.ok(result.hatchLineCount > 0, 'expected diagonal hatch lines above the fill');
+    assert.ok(result.hatchStripCount > 0, 'expected diagonal hatch strips above the fill');
+});
+
+test('section hatch strips have visible width on both sides of the section face', () => {
+    const context = loadViewerContext();
+    context.scene = {
+        clipPlane: {},
+        meshes: [
+            cubeSectionMesh(() => {}),
+        ],
+    };
+
+    const result = vm.runInContext(`
+        tagModelMeshesForAnalysis('viewer', scene);
+        _rebuildSectionHatch('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
+        const firstStrip = sectionHatchMeshes.viewer?.pathArray?.[0];
+        ({
+            stripCount: sectionHatchMeshes.viewer?.pathArray?.length ?? 0,
+            stripWidth: firstStrip && BABYLON.Vector3.Distance(firstStrip[0], firstStrip[1]),
+            materialBackFaceCulling: sectionHatchMeshes.viewer?.material?.backFaceCulling,
+            meshAlwaysActive: sectionHatchMeshes.viewer?.alwaysSelectAsActiveMesh
+        });
+    `, context);
+
+    assert.ok(result.stripCount > 0, 'expected hatch strips');
+    assert.ok(result.stripWidth > 0.02, 'expected hatch strip to have real geometric width');
+    assert.equal(result.materialBackFaceCulling, false);
+    assert.equal(result.meshAlwaysActive, true);
 });
 
 test('section cut edge and hatch lines are dark and depth-aware', () => {
@@ -424,7 +462,7 @@ test('section cut edge and hatch lines are dark and depth-aware', () => {
         _rebuildSectionHatch('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
         ({
             edgeColor: sectionEdgeMeshes.viewer?.color,
-            hatchColor: sectionHatchMeshes.viewer?.color,
+            hatchColor: sectionHatchMeshes.viewer?.material?.diffuseColor,
             edgeDepthWrite: sectionEdgeMeshes.viewer?.material?.disableDepthWrite,
             hatchDepthWrite: sectionHatchMeshes.viewer?.material?.disableDepthWrite
         });
