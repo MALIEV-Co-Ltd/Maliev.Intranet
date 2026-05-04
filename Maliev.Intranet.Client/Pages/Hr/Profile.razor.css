@@ -1,0 +1,50 @@
+.profile-form {
+    margin-bottom: 1rem;
+}
+
+.mlv-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.mlv-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
+    background: var(--maliev-panel-2);
+}
+
+.mlv-form-grid label {
+    display: grid;
+    gap: 0.35rem;
+    color: var(--maliev-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.mlv-input {
+    min-height: 2.5rem;
+    border: 1px solid var(--maliev-border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    color: var(--maliev-ink);
+    background: var(--maliev-panel);
+    font: inherit;
+}
+
+.mlv-input:focus {
+    outline: 2px solid color-mix(in srgb, var(--mud-palette-primary) 35%, transparent);
+    outline-offset: 1px;
+    border-color: var(--mud-palette-primary);
+}
+
+@media (max-width: 900px) {
+    .mlv-form-grid {
+        grid-template-columns: 1fr;
+    }
+}

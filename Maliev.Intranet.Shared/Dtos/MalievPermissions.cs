@@ -266,6 +266,10 @@ public static class MalievPermissions
         public const string Read = "employee.employees.read";
         /// <summary>Permission to manage employee data and assignments.</summary>
         public const string Write = "employee.employees.write";
+        /// <summary>Permission to view employee self-service profile records.</summary>
+        public const string ProfileRead = "employee.profiles.read";
+        /// <summary>Permission to update employee self-service profile fields.</summary>
+        public const string ProfileUpdate = "employee.profiles.update";
     }
 
     /// <summary>

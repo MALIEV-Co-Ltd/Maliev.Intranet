@@ -79,6 +79,65 @@ public class EmployeeDetailDto
 }
 
 /// <summary>
+/// Self-service employee profile data exposed to the signed-in employee.
+/// </summary>
+public sealed class EmployeeSelfProfileDto
+{
+    /// <summary>The employee record identifier.</summary>
+    public Guid Id { get; set; }
+    /// <summary>The internal employee number.</summary>
+    public string EmployeeNumber { get; set; } = string.Empty;
+    /// <summary>The employee's legal first name.</summary>
+    public string FirstName { get; set; } = string.Empty;
+    /// <summary>The employee's legal last name.</summary>
+    public string LastName { get; set; } = string.Empty;
+    /// <summary>The employee's full display name.</summary>
+    public string FullName { get; set; } = string.Empty;
+    /// <summary>The employee's preferred name or nickname.</summary>
+    public string? PreferredName { get; set; }
+    /// <summary>The employee's work email address.</summary>
+    public string WorkEmail { get; set; } = string.Empty;
+    /// <summary>The employee's personal email address.</summary>
+    public string? PersonalEmail { get; set; }
+    /// <summary>The employee's mobile phone number.</summary>
+    public string? MobilePhone { get; set; }
+    /// <summary>The employee's job title.</summary>
+    public string? JobTitle { get; set; }
+    /// <summary>The employee's work location.</summary>
+    public string? WorkLocation { get; set; }
+    /// <summary>The employee's employment type.</summary>
+    public string EmploymentType { get; set; } = string.Empty;
+    /// <summary>The employee's employment status.</summary>
+    public string EmploymentStatus { get; set; } = string.Empty;
+    /// <summary>The employee's department name.</summary>
+    public string? DepartmentName { get; set; }
+    /// <summary>The employee's manager display name.</summary>
+    public string? ManagerName { get; set; }
+    /// <summary>The employee's emergency contact list.</summary>
+    public List<EmergencyContactDto> EmergencyContacts { get; set; } = [];
+}
+
+/// <summary>
+/// Self-service profile update request for fields employees may edit themselves.
+/// </summary>
+public sealed class UpdateEmployeeSelfProfileRequest
+{
+    /// <summary>The employee's personal email address.</summary>
+    [EmailAddress]
+    [StringLength(255)]
+    public string? PersonalEmail { get; set; }
+
+    /// <summary>The employee's mobile phone number.</summary>
+    [Phone]
+    [StringLength(20)]
+    public string? MobilePhone { get; set; }
+
+    /// <summary>The employee's preferred name or nickname.</summary>
+    [StringLength(100)]
+    public string? PreferredName { get; set; }
+}
+
+/// <summary>
 /// Represents an internal note or observation recorded on an employee profile.
 /// </summary>
 public class EmployeeNoteDto

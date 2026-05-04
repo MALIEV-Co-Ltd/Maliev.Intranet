@@ -36,11 +36,49 @@
             <div class="mlv-grid">
                 <div class="mlv-span-7">
                     <PanelCard Title="Employee details">
+                        <div class="mlv-actions mb-3">
+                            @if (_editing)
+                            {
+                                <SecondaryButton Icon="@Icons.Material.Outlined.Close" OnClick="@CancelEditAsync">Cancel</SecondaryButton>
+                                <PrimaryButton Icon="@Icons.Material.Outlined.Save" OnClick="@SaveProfileAsync" Disabled="@_saving">Save changes</PrimaryButton>
+                            }
+                            else
+                            {
+                                <PrimaryButton Icon="@Icons.Material.Outlined.Edit" OnClick="@StartEditAsync">Edit profile</PrimaryButton>
+                            }
+                        </div>
+
+                        @if (_editing)
+                        {
+                            <EditForm Model="@_editModel" class="profile-form">
+                                <DataAnnotationsValidator />
+                                <div class="mlv-form-grid">
+                                    <label>
+                                        <span>Preferred name</span>
+                                        <InputText class="mlv-input" @bind-Value="_editModel.PreferredName" />
+                                        <ValidationMessage For="@(() => _editModel.PreferredName)" />
+                                    </label>
+                                    <label>
+                                        <span>Personal email</span>
+                                        <InputText class="mlv-input" type="email" @bind-Value="_editModel.PersonalEmail" />
+                                        <ValidationMessage For="@(() => _editModel.PersonalEmail)" />
+                                    </label>
+                                    <label>
+                                        <span>Mobile phone</span>
+                                        <InputText class="mlv-input" type="tel" @bind-Value="_editModel.MobilePhone" />
+                                        <ValidationMessage For="@(() => _editModel.MobilePhone)" />
+                                    </label>
+                                </div>
+                            </EditForm>
+                        }
+
                         <table class="mlv-table profile-table">
                             <tbody>
                                 <tr><th>Name</th><td>@_profile.Name</td></tr>
+                                <tr><th>Preferred name</th><td>@Display(_selfProfile?.PreferredName)</td></tr>
                                 <tr><th>Email</th><td>@_profile.Email</td></tr>
-                                <tr><th>Phone</th><td>@Display(_profile.Phone)</td></tr>
+                                <tr><th>Personal email</th><td>@Display(_selfProfile?.PersonalEmail)</td></tr>
+                                <tr><th>Phone</th><td>@Display(_selfProfile?.MobilePhone ?? _profile.Phone)</td></tr>
                                 <tr><th>Location</th><td>@Display(_profile.WorkLocation)</td></tr>
                                 <tr><th>Employee type</th><td>@Display(_profile.EmployeeType)</td></tr>
                                 <tr><th>Hire date</th><td>@(_profile.HireDate?.ToString("dd MMM yyyy") ?? "-")</td></tr>
@@ -128,8 +166,12 @@
     [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
 
     private EmployeeDetailDto? _profile;
+    private EmployeeSelfProfileDto? _selfProfile;
     private UserPreferenceDto? _preferences;
+    private UpdateEmployeeSelfProfileRequest _editModel = new();
     private bool _loading = true;
+    private bool _editing;
+    private bool _saving;
     private string? _error;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -143,10 +185,13 @@
         try
         {
             var profileTask = Http.GetFromJsonAsync<EmployeeDetailDto>("api/v1/employees/me");
+            var selfProfileTask = Http.GetFromJsonAsync<EmployeeSelfProfileDto>("api/v1/employees/me/profile");
             var preferencesTask = Http.GetFromJsonAsync<UserPreferenceDto>("api/v1/preferences/intranet-profile");
-            await Task.WhenAll(profileTask, preferencesTask);
+            await Task.WhenAll(profileTask, selfProfileTask, preferencesTask);
             _profile = await profileTask;
+            _selfProfile = await selfProfileTask;
             _preferences = await preferencesTask;
+            ResetEditModel();
         }
         catch (Exception ex)
         {
@@ -158,6 +203,57 @@
         {
             _loading = false;
         }
+    }
+
+    private Task StartEditAsync(MouseEventArgs _)
+    {
+        ResetEditModel();
+        _editing = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelEditAsync(MouseEventArgs _)
+    {
+        ResetEditModel();
+        _editing = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveProfileAsync(MouseEventArgs _)
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync("api/v1/employees/me/profile", _editModel);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Profile changes could not be saved.", Severity.Error);
+                return;
+            }
+
+            _selfProfile = await response.Content.ReadFromJsonAsync<EmployeeSelfProfileDto>() ?? _selfProfile;
+            _editing = false;
+            Snackbar.Add("Profile updated.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Profile changes could not be saved.", Severity.Error);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void ResetEditModel()
+    {
+        _editModel = new UpdateEmployeeSelfProfileRequest
+        {
+            PreferredName = _selfProfile?.PreferredName,
+            PersonalEmail = _selfProfile?.PersonalEmail,
+            MobilePhone = _selfProfile?.MobilePhone ?? _profile?.Phone
+        };
     }
 
     private async Task LoadPreferencesAsync(MouseEventArgs _)

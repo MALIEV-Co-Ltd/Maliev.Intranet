@@ -59,6 +59,28 @@ public class EmployeeServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Retrieves the EmployeeService self-service profile for an employee.
+    /// </summary>
+    public virtual async Task<EmployeeSelfProfileDto?> GetSelfServiceProfileAsync(Guid employeeId, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync($"/employee/v1/profile/{employeeId}/profile", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<EmployeeSelfProfileDto>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Updates EmployeeService self-service profile fields for an employee.
+    /// </summary>
+    public virtual async Task<bool> UpdateSelfServiceProfileAsync(Guid employeeId, UpdateEmployeeSelfProfileRequest request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/employee/v1/profile/{employeeId}/profile", request, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
+    /// <summary>
     /// Terminates an employee.
     /// </summary>
     public virtual async Task<bool> TerminateEmployeeAsync(Guid id, TerminateEmployeeRequest request, CancellationToken ct = default)

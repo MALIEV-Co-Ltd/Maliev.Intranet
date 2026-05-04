@@ -63,4 +63,85 @@ public class EmployeeServiceClientTests
         Assert.Equal(100, result.Meta.PageSize);
         Assert.Equal(301, result.Meta.TotalCount);
     }
+
+    [Fact]
+    public async Task GetSelfServiceProfileAsync_UsesEmployeeServiceProfileContract()
+    {
+        var employeeId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(request =>
+                    request.Method == HttpMethod.Get &&
+                    request.RequestUri!.PathAndQuery == $"/employee/v1/profile/{employeeId}/profile"),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    id = employeeId,
+                    employeeNumber = "EMP-001",
+                    firstName = "Mia",
+                    lastName = "Wong",
+                    fullName = "Mia Wong",
+                    preferredName = "Mia",
+                    workEmail = "mia.wong@maliev.com",
+                    personalEmail = "mia.personal@example.com",
+                    mobilePhone = "+66810000000",
+                    employmentType = "FullTime",
+                    employmentStatus = "Active"
+                })
+            });
+
+        var client = new EmployeeServiceClient(new HttpClient(handler.Object)
+        {
+            BaseAddress = new Uri("http://employee")
+        });
+
+        var result = await client.GetSelfServiceProfileAsync(employeeId);
+
+        Assert.NotNull(result);
+        Assert.Equal(employeeId, result.Id);
+        Assert.Equal("EMP-001", result.EmployeeNumber);
+        Assert.Equal("mia.personal@example.com", result.PersonalEmail);
+        Assert.Equal("+66810000000", result.MobilePhone);
+    }
+
+    [Fact]
+    public async Task UpdateSelfServiceProfileAsync_UsesEmployeeServiceProfileContract()
+    {
+        var employeeId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        string? json = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(request =>
+                    request.Method == HttpMethod.Put &&
+                    request.RequestUri!.PathAndQuery == $"/employee/v1/profile/{employeeId}/profile"),
+                ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((request, _) =>
+            {
+                json = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            })
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK));
+
+        var client = new EmployeeServiceClient(new HttpClient(handler.Object)
+        {
+            BaseAddress = new Uri("http://employee")
+        });
+
+        var result = await client.UpdateSelfServiceProfileAsync(employeeId, new UpdateEmployeeSelfProfileRequest
+        {
+            PreferredName = "M",
+            PersonalEmail = "mia.personal@example.com",
+            MobilePhone = "+66810000000"
+        });
+
+        Assert.True(result);
+        Assert.Contains("\"preferredName\":\"M\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"personalEmail\":\"mia.personal@example.com\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"mobilePhone\":\"\\u002B66810000000\"", json, StringComparison.Ordinal);
+    }
 }
