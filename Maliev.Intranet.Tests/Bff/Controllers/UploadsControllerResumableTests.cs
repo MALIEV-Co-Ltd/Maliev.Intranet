@@ -248,6 +248,9 @@ public class UploadsControllerResumableTests
         };
 
         _statusServiceMock
+            .Setup(service => service.RegisterStoragePathAliasAsync(OldPath, NewPath, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _statusServiceMock
             .Setup(service => service.GetStatusAsync(OldPath, It.IsAny<CancellationToken>()))
             .ReturnsAsync(oldStatus);
         _statusServiceMock

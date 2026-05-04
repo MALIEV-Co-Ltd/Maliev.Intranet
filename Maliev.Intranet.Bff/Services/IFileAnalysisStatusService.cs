@@ -24,6 +24,11 @@ public interface IFileAnalysisStatusService
     Task SetPreviewUrlsAsync(string uploadId, FileAnalysisPreviewUrlsDto previewUrls, string? thumbnailUrl, string? hiResThumbnailUrl = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sets the small isometric thumbnail URL and storage path without replacing other preview URLs.
+    /// </summary>
+    Task SetThumbnailAsync(string uploadId, string? thumbnailUrl, string? thumbnailStoragePath = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Marks the geometry analysis as completed and stores the optional GLB storage path, signed URL, and DFM report.
     /// Preview URLs may still be pending.
     /// </summary>
@@ -57,6 +62,11 @@ public interface IFileAnalysisStatusService
     /// Gets the current analysis status for a file.
     /// </summary>
     Task<FileAnalysisStatusDto?> GetStatusAsync(string uploadId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Registers a storage-path alias so status written under the source path is mirrored to the destination path.
+    /// </summary>
+    Task RegisterStoragePathAliasAsync(string sourceStoragePath, string destinationStoragePath, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Migrates all cached file-analysis entries from a temp-bucket storage path prefix

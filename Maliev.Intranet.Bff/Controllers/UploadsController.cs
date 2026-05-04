@@ -445,6 +445,7 @@ public class UploadsController(
         {
             foreach (var file in result.MigratedFiles)
             {
+                await analysisStatusService.RegisterStoragePathAliasAsync(file.OldPath, file.NewPath, ct);
                 var status = await ReconcileMigratedAnalysisStatusAsync(file, ct);
                 response.MigratedFiles.Add(new BffMigratedProjectFileDto
                 {

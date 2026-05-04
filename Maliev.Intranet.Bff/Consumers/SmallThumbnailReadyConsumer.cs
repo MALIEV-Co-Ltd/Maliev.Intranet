@@ -1,5 +1,6 @@
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.MessagingContracts.Contracts.Geometry;
 using MassTransit;
@@ -15,6 +16,7 @@ public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
 {
     private readonly IHubContext<NotificationHub> _hub;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IFileAnalysisStatusService _analysisStatusService;
     private readonly ILogger<SmallThumbnailReadyConsumer> _logger;
 
     /// <summary>
@@ -23,10 +25,12 @@ public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
     public SmallThumbnailReadyConsumer(
         IHubContext<NotificationHub> hub,
         IHttpClientFactory httpClientFactory,
+        IFileAnalysisStatusService analysisStatusService,
         ILogger<SmallThumbnailReadyConsumer> logger)
     {
         _hub = hub;
         _httpClientFactory = httpClientFactory;
+        _analysisStatusService = analysisStatusService;
         _logger = logger;
     }
 
@@ -60,6 +64,14 @@ public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
             .GetDownloadUrlByPathAsync(payload.ThumbnailStoragePath, context.CancellationToken);
 
         bool failed = string.IsNullOrEmpty(thumbnailUrl);
+        if (!failed)
+        {
+            await _analysisStatusService.SetThumbnailAsync(
+                storagePath,
+                thumbnailUrl,
+                payload.ThumbnailStoragePath,
+                context.CancellationToken);
+        }
 
         var signalRPayload = new FileAnalysisCompletedPayload(
             StoragePath: storagePath,

@@ -10,6 +10,7 @@ namespace Maliev.Intranet.Bff.Services;
 public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
 {
     private const string CacheKeyPrefix = "file-analysis:";
+    private const string AliasKeyPrefix = "file-analysis-alias:";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
 
     private readonly IMemoryCache _cache;
@@ -78,6 +79,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     public Task SetPreviewUrlsAsync(string uploadId, FileAnalysisPreviewUrlsDto previewUrls, string? thumbnailUrl, string? hiResThumbnailUrl = null, CancellationToken cancellationToken = default)
     {
         var existing = Get(uploadId);
+        var mergedPreviewUrls = MergePreviewUrls(existing?.PreviewUrls, previewUrls);
         var status = new FileAnalysisStatusDto
         {
             UploadId = uploadId,
@@ -88,12 +90,49 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             NonManifoldFaceCount = existing?.NonManifoldFaceCount,
             ThumbnailUrl = thumbnailUrl ?? existing?.ThumbnailUrl,
             HiResThumbnailUrl = hiResThumbnailUrl ?? existing?.HiResThumbnailUrl,
-            PreviewUrls = previewUrls,
+            PreviewUrls = mergedPreviewUrls,
             PreviewProcessingStatus = PreviewProcessingStatus.Processing,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
             DfmReport = existing?.DfmReport,
         };
+        Set(uploadId, status);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task SetThumbnailAsync(string uploadId, string? thumbnailUrl, string? thumbnailStoragePath = null, CancellationToken cancellationToken = default)
+    {
+        var existing = Get(uploadId);
+        var previewUrls = existing?.PreviewUrls is null
+            ? new FileAnalysisPreviewUrlsDto()
+            : existing.PreviewUrls;
+
+        previewUrls = previewUrls with
+        {
+            ThumbnailSmall = thumbnailUrl ?? previewUrls.ThumbnailSmall,
+            ThumbnailSmallGcsPath = thumbnailStoragePath ?? previewUrls.ThumbnailSmallGcsPath
+        };
+
+        var status = new FileAnalysisStatusDto
+        {
+            UploadId = uploadId,
+            Status = existing?.Status ?? FileAnalysisStatus.Processing,
+            Dimensions = existing?.Dimensions,
+            IsManifold = existing?.IsManifold,
+            NonManifoldReason = existing?.NonManifoldReason,
+            NonManifoldFaceCount = existing?.NonManifoldFaceCount,
+            ThumbnailUrl = thumbnailUrl ?? existing?.ThumbnailUrl,
+            HiResThumbnailUrl = existing?.HiResThumbnailUrl,
+            PreviewUrls = previewUrls,
+            GlbStoragePath = existing?.GlbStoragePath,
+            GlbSignedUrl = existing?.GlbSignedUrl,
+            PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
+            ErrorCode = existing?.ErrorCode,
+            ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
+            DfmReport = existing?.DfmReport,
+        };
+
         Set(uploadId, status);
         return Task.CompletedTask;
     }
@@ -232,6 +271,11 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     public Task<FileAnalysisStatusDto?> GetStatusAsync(string uploadId, CancellationToken cancellationToken = default)
     {
         var status = Get(uploadId);
+        if (status == null && TryGetAlias(uploadId, out var destinationStoragePath))
+        {
+            status = Get(destinationStoragePath);
+        }
+
         if (status == null)
         {
             _logger.LogDebug("GetStatusAsync: no entry found for key={Key}", uploadId);
@@ -239,7 +283,45 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
         return Task.FromResult(status);
     }
 
+    /// <inheritdoc />
+    public Task RegisterStoragePathAliasAsync(string sourceStoragePath, string destinationStoragePath, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sourceStoragePath) || string.IsNullOrWhiteSpace(destinationStoragePath) ||
+            string.Equals(sourceStoragePath, destinationStoragePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.CompletedTask;
+        }
+
+        _cache.Set(GetAliasKey(sourceStoragePath), destinationStoragePath, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = CacheTtl,
+            Size = 1
+        });
+
+        var existing = Get(sourceStoragePath);
+        if (existing != null)
+        {
+            SetDirect(destinationStoragePath, RewriteStatusForAlias(existing, sourceStoragePath, destinationStoragePath));
+        }
+
+        _logger.LogInformation(
+            "Registered file analysis storage-path alias {SourceStoragePath} -> {DestinationStoragePath}",
+            sourceStoragePath,
+            destinationStoragePath);
+
+        return Task.CompletedTask;
+    }
+
     private void Set(string uploadId, FileAnalysisStatusDto status)
+    {
+        SetDirect(uploadId, status);
+        if (TryGetAlias(uploadId, out var destinationStoragePath))
+        {
+            SetDirect(destinationStoragePath, RewriteStatusForAlias(status, uploadId, destinationStoragePath));
+        }
+    }
+
+    private void SetDirect(string uploadId, FileAnalysisStatusDto status)
     {
         var key = $"{CacheKeyPrefix}{uploadId}";
         _cache.Set(key, status, new MemoryCacheEntryOptions
@@ -253,6 +335,68 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     {
         _cache.TryGetValue($"{CacheKeyPrefix}{uploadId}", out FileAnalysisStatusDto? status);
         return status;
+    }
+
+    private bool TryGetAlias(string sourceStoragePath, out string destinationStoragePath)
+    {
+        return _cache.TryGetValue(GetAliasKey(sourceStoragePath), out destinationStoragePath!);
+    }
+
+    private static string GetAliasKey(string sourceStoragePath) => $"{AliasKeyPrefix}{sourceStoragePath}";
+
+    private static FileAnalysisStatusDto RewriteStatusForAlias(
+        FileAnalysisStatusDto status,
+        string sourceStoragePath,
+        string destinationStoragePath)
+    {
+        var previewUrls = status.PreviewUrls is null
+            ? null
+            : status.PreviewUrls with
+            {
+                ThumbnailSmallGcsPath = RewriteStoragePath(status.PreviewUrls.ThumbnailSmallGcsPath, sourceStoragePath, destinationStoragePath),
+                ThumbnailLargeGcsPath = RewriteStoragePath(status.PreviewUrls.ThumbnailLargeGcsPath, sourceStoragePath, destinationStoragePath)
+            };
+
+        return status with
+        {
+            UploadId = destinationStoragePath,
+            PreviewUrls = previewUrls,
+            GlbStoragePath = RewriteStoragePath(status.GlbStoragePath, sourceStoragePath, destinationStoragePath)
+        };
+    }
+
+    private static FileAnalysisPreviewUrlsDto MergePreviewUrls(FileAnalysisPreviewUrlsDto? existing, FileAnalysisPreviewUrlsDto incoming)
+    {
+        if (existing is null)
+            return incoming;
+
+        return incoming with
+        {
+            FrontSmall = incoming.FrontSmall ?? existing.FrontSmall,
+            BackSmall = incoming.BackSmall ?? existing.BackSmall,
+            LeftSmall = incoming.LeftSmall ?? existing.LeftSmall,
+            RightSmall = incoming.RightSmall ?? existing.RightSmall,
+            TopSmall = incoming.TopSmall ?? existing.TopSmall,
+            BottomSmall = incoming.BottomSmall ?? existing.BottomSmall,
+            ThumbnailSmall = incoming.ThumbnailSmall ?? existing.ThumbnailSmall,
+            ThumbnailLargeUrl = incoming.ThumbnailLargeUrl ?? existing.ThumbnailLargeUrl,
+            ThumbnailSmallGcsPath = incoming.ThumbnailSmallGcsPath ?? existing.ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = incoming.ThumbnailLargeGcsPath ?? existing.ThumbnailLargeGcsPath
+        };
+    }
+
+    private static string? RewriteStoragePath(string? storagePath, string sourceStoragePath, string destinationStoragePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return storagePath;
+
+        if (string.Equals(storagePath, sourceStoragePath, StringComparison.OrdinalIgnoreCase))
+            return destinationStoragePath;
+
+        if (!storagePath.StartsWith(sourceStoragePath, StringComparison.OrdinalIgnoreCase))
+            return storagePath;
+
+        return destinationStoragePath + storagePath[sourceStoragePath.Length..];
     }
 
     /// <inheritdoc />
