@@ -1,5 +1,6 @@
 @namespace Maliev.Intranet.Client.Components.Project
 @using Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Client.Pages
 @using Maliev.Intranet.Client.Services
 @using Maliev.Intranet.Shared.Dtos
 @inject CurrencyService CurrencyService
@@ -655,8 +656,9 @@
 
     private decimal ComputeQuoteTotal()
     {
-        var lineSubtotal = Parts.Sum(p => (p.EstimatedTotalAmount ?? 0) * CurrencyService.ExchangeRate);
-        var discount = Math.Min(Math.Max(0m, ManualDiscountAmount), lineSubtotal);
+        var lineSubtotal = Parts.Sum(p => ProjectQuotationPdfMapper.ResolveBaseLineTotal(p) * CurrencyService.ExchangeRate);
+        var bulkDiscount = Parts.Sum(p => ProjectQuotationPdfMapper.ResolveBulkDiscount(p) * CurrencyService.ExchangeRate);
+        var discount = Math.Min(bulkDiscount + Math.Max(0m, ManualDiscountAmount), lineSubtotal);
         var taxableSubtotal = lineSubtotal - discount + Math.Max(0m, ShippingCost);
         var vat = Math.Round(taxableSubtotal * 0.07m, 2, MidpointRounding.AwayFromZero);
         return taxableSubtotal + vat;

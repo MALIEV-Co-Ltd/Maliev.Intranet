@@ -656,6 +656,10 @@ public class GenerateQuotationRequest
     /// <summary>Gets or sets delivery expectations or lead-time notes shown on the quotation.</summary>
     [MaxLength(1000)]
     public string? DeliveryExpectations { get; set; }
+
+    /// <summary>Gets or sets the automatic bulk-order discount shown on the quotation.</summary>
+    [Range(0, (double)decimal.MaxValue)]
+    public decimal BulkDiscountAmount { get; set; }
 }
 
 /// <summary>

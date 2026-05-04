@@ -241,6 +241,9 @@ public class PartViewModel
     /// <summary>Estimated total amount (unit price × quantity) from the last pricing calculation.</summary>
     public decimal? EstimatedTotalAmount { get; set; }
 
+    /// <summary>Original one-piece unit price before volume pricing is applied.</summary>
+    public decimal? EstimatedBaseUnitPrice { get; set; }
+
     /// <summary>Queue-aware lead time from last pricing result. Drives lead time panel day calculations.</summary>
     public int EstimatedLeadTimeDays { get; set; }
 
@@ -478,6 +481,7 @@ public class PartViewModel
         // Persist pricing snapshot so the panel shows instantly on restore
         EstimatedUnitPrice = EstimatedUnitPrice,
         EstimatedTotalAmount = EstimatedTotalAmount,
+        EstimatedBaseUnitPrice = EstimatedBaseUnitPrice,
         ProcessConfig = ProcessOptionValues
             .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
             .ToDictionary(pair => pair.Key, pair => pair.Value!),
@@ -546,6 +550,7 @@ public class PartViewModel
             // Restore pricing snapshot for instant display while background recalculation runs
             EstimatedUnitPrice = s.EstimatedUnitPrice,
             EstimatedTotalAmount = s.EstimatedTotalAmount,
+            EstimatedBaseUnitPrice = s.EstimatedBaseUnitPrice,
             ProcessOptionValues = s.ProcessConfig.ToDictionary(
                 pair => pair.Key,
                 pair => (string?)pair.Value),

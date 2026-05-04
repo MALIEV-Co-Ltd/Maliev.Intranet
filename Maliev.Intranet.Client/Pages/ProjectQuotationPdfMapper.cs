@@ -31,8 +31,9 @@ public static class ProjectQuotationPdfMapper
         decimal currencyExchangeRate = 1m)
     {
         var exchangeRate = currencyExchangeRate <= 0m ? 1m : currencyExchangeRate;
-        var itemSubtotal = parts.Sum(part => ConvertCurrency(part.EstimatedTotalAmount ?? 0m, exchangeRate));
-        var discount = Math.Min(Math.Max(0m, manualDiscountAmount), itemSubtotal);
+        var itemSubtotal = parts.Sum(part => ConvertCurrency(ResolveBaseLineTotal(part), exchangeRate));
+        var bulkDiscount = parts.Sum(part => ConvertCurrency(ResolveBulkDiscount(part), exchangeRate));
+        var discount = Math.Min(bulkDiscount + Math.Max(0m, manualDiscountAmount), itemSubtotal);
         var normalizedShippingCost = Math.Max(0m, shippingCost);
         var subtotal = itemSubtotal - discount + normalizedShippingCost;
         var taxAmount = Math.Round(subtotal * ThailandVatRate, 2, MidpointRounding.AwayFromZero);
@@ -86,8 +87,8 @@ public static class ProjectQuotationPdfMapper
                 DetailLines = BuildLineItemDetailLines(part),
                 Quantity = part.Quantity,
                 QuantityUnit = "pcs",
-                UnitPrice = ConvertCurrency(part.EstimatedUnitPrice ?? 0m, exchangeRate),
-                LineTotal = ConvertCurrency(part.EstimatedTotalAmount ?? 0m, exchangeRate),
+                UnitPrice = ConvertCurrency(ResolveBaseUnitPrice(part), exchangeRate),
+                LineTotal = ConvertCurrency(ResolveBaseLineTotal(part), exchangeRate),
                 Notes = BuildLineItemNotes(part),
                 ThumbnailUrl = FirstNonEmpty(part.ThumbnailSmallUrl, part.ThumbnailLargeUrl),
             }).ToList(),
@@ -177,6 +178,34 @@ public static class ProjectQuotationPdfMapper
 
     private static decimal ConvertCurrency(decimal amount, decimal exchangeRate) =>
         Math.Round(amount * exchangeRate, 2, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// Calculates the automatic bulk-order discount for a part.
+    /// </summary>
+    public static decimal ResolveBulkDiscount(PartViewModel part)
+    {
+        var baseLineTotal = ResolveBaseLineTotal(part);
+        var discountedLineTotal = part.EstimatedTotalAmount ?? ((part.EstimatedUnitPrice ?? 0m) * Math.Max(part.Quantity, 0));
+
+        return Math.Max(0m, baseLineTotal - discountedLineTotal);
+    }
+
+    /// <summary>
+    /// Calculates the line total before volume pricing is applied.
+    /// </summary>
+    public static decimal ResolveBaseLineTotal(PartViewModel part) =>
+        ResolveBaseUnitPrice(part) * Math.Max(part.Quantity, 0);
+
+    /// <summary>
+    /// Returns the original one-piece unit price when it is higher than the active quoted unit price.
+    /// </summary>
+    public static decimal ResolveBaseUnitPrice(PartViewModel part)
+    {
+        var quotedUnitPrice = part.EstimatedUnitPrice ?? 0m;
+        var baseUnitPrice = part.EstimatedBaseUnitPrice ?? quotedUnitPrice;
+
+        return Math.Max(baseUnitPrice, quotedUnitPrice);
+    }
 
     private static string ResolveCustomerName(CustomerSummaryDto? selectedCustomer, CustomerDetailDto? customerDetail)
     {

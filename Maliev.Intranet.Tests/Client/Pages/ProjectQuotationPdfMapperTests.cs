@@ -325,6 +325,39 @@ public class ProjectQuotationPdfMapperTests
     }
 
     /// <summary>
+    /// Verifies bulk pricing is shown as an explicit quotation discount instead of hiding it in the line total.
+    /// </summary>
+    [Fact]
+    public void BuildDraftPdfData_WithBulkPricing_ShowsOriginalSubtotalAndBulkDiscount()
+    {
+        var data = ProjectQuotationPdfMapper.BuildDraftPdfData(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            null,
+            null,
+            "THB",
+            DateTime.SpecifyKind(new DateTime(2026, 5, 2), DateTimeKind.Utc),
+            "Standard: 5 business days after order confirmation",
+            [
+                new PartViewModel
+                {
+                    Name = "bulk-part.step",
+                    Quantity = 10,
+                    EstimatedBaseUnitPrice = 100,
+                    EstimatedUnitPrice = 85,
+                    EstimatedTotalAmount = 850,
+                },
+            ],
+            []);
+
+        Assert.Equal(1000, data.SubtotalBeforeDiscount);
+        Assert.Equal(150, data.TotalDiscount);
+        Assert.Equal(150, data.ManualDiscountAmount);
+        Assert.Equal(850, data.Subtotal);
+        Assert.Equal(100, data.Items[0].UnitPrice);
+        Assert.Equal(1000, data.Items[0].LineTotal);
+    }
+
+    /// <summary>
     /// Verifies PDF lead time uses the same selected range shown on ProjectNew.
     /// </summary>
     [Fact]

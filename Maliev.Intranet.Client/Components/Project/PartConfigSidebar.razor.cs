@@ -244,6 +244,7 @@ public partial class PartConfigSidebar : ComponentBase
             {
                 _basePricesByPart[fileId] = currentPrice;
                 _lastSeenPricesByPart[fileId] = currentPrice;
+                Part.EstimatedBaseUnitPrice = currentPrice;
                 await FetchBulkTiersAsync();
                 _ = RefreshFinishPricesAsync();
             }
@@ -257,6 +258,7 @@ public partial class PartConfigSidebar : ComponentBase
             _lastSeenPricesByPart.Remove(fileId);
             _basePricesByPart.Remove(fileId);
             _bulkTiersByPart.Remove(fileId);
+            Part.EstimatedBaseUnitPrice = null;
             _bulkTiers = [];
         }
     }
@@ -304,6 +306,9 @@ public partial class PartConfigSidebar : ComponentBase
         {
             Part.EstimatedUnitPrice = activeTier.UnitPrice;
             Part.EstimatedTotalAmount = activeTier.UnitPrice * Part.Quantity;
+
+            if (_basePricesByPart.TryGetValue(Part.FileId, out var basePrice))
+                Part.EstimatedBaseUnitPrice = basePrice;
 
             if (Part.FileId != Guid.Empty)
                 _lastSeenPricesByPart[Part.FileId] = activeTier.UnitPrice;

@@ -2415,6 +2415,7 @@ public partial class ProjectNew : IAsyncDisposable
                 {
                     ValidityDays = 30,
                     DeliveryExpectations = ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
+                    BulkDiscountAmount = CalculateBulkDiscountAmount(),
                 });
             if (!quoteResponse.IsSuccessStatusCode)
             {
@@ -2526,6 +2527,9 @@ public partial class ProjectNew : IAsyncDisposable
 
     private static decimal? ResolvePartUnitPriceForConfirmation(PartViewModel part)
     {
+        if (part.EstimatedBaseUnitPrice.HasValue && part.EstimatedUnitPrice.HasValue && part.EstimatedBaseUnitPrice.Value > part.EstimatedUnitPrice.Value)
+            return part.EstimatedBaseUnitPrice.Value;
+
         if (part.EstimatedUnitPrice.HasValue)
             return part.EstimatedUnitPrice.Value;
 
@@ -2533,6 +2537,9 @@ public partial class ProjectNew : IAsyncDisposable
             ? part.EstimatedTotalAmount.Value / part.Quantity
             : null;
     }
+
+    private decimal CalculateBulkDiscountAmount() =>
+        _parts.Sum(ProjectQuotationPdfMapper.ResolveBulkDiscount);
 
     // ── Task 15: Duplicate project ─────────────────────────────────────
 
