@@ -176,6 +176,17 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("min-width: 120px;", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TopBar_QuoteNavigationAction_UsesAccentColor()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var quoteBlock = ExtractCssBlock(source, ".topbar-nav ::deep .mud-nav-link.topbar-nav-quote");
+
+        Assert.Contains("border: 1px solid var(--maliev-accent);", quoteBlock, StringComparison.Ordinal);
+        Assert.Contains("background: var(--maliev-accent);", quoteBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("--mud-palette-primary", quoteBlock, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -191,5 +202,19 @@ public class ModuleRegressionSourceTests
         }
 
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
+    }
+
+    private static string ExtractCssBlock(string source, string selector)
+    {
+        var selectorIndex = source.IndexOf(selector, StringComparison.Ordinal);
+        Assert.True(selectorIndex >= 0, $"Expected selector '{selector}' to exist.");
+
+        var blockStart = source.IndexOf('{', selectorIndex);
+        Assert.True(blockStart >= 0, $"Expected selector '{selector}' to have a declaration block.");
+
+        var blockEnd = source.IndexOf('}', blockStart);
+        Assert.True(blockEnd >= 0, $"Expected selector '{selector}' declaration block to close.");
+
+        return source.Substring(blockStart + 1, blockEnd - blockStart - 1);
     }
 }
