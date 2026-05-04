@@ -82,6 +82,8 @@ public partial class ProjectNew : IAsyncDisposable
     private const int AutoSaveDebounceMs = 1000;
     private string DraftStorageKey => $"project-draft-{_sessionId}";
     private Timer? _autoSaveDebounceTimer;
+    private bool _serverSavePending;
+    private bool _storageMigrationInProgress;
 
     // ── SignalR ────────────────────────────────────────────────────────
     private HubConnection? _hubConnection;
@@ -1761,9 +1763,16 @@ public partial class ProjectNew : IAsyncDisposable
             await JS.InvokeVoidAsync("sessionStorage.setItem", DraftStorageKey, json);
             _lastSavedAt = DateTimeOffset.UtcNow;
 
-            if (_selectedCustomerId.HasValue && !_serverSaveInProgress)
+            if (_selectedCustomerId.HasValue)
             {
-                _ = SaveDraftToServerAsync();
+                if (_serverSaveInProgress || _storageMigrationInProgress)
+                {
+                    _serverSavePending = true;
+                }
+                else
+                {
+                    _ = SaveDraftToServerAsync();
+                }
             }
         }
         catch (Exception)
@@ -1772,7 +1781,7 @@ public partial class ProjectNew : IAsyncDisposable
         }
         finally
         {
-            if (!_serverSaveInProgress)
+            if (!_serverSaveInProgress && !_serverSavePending)
             {
                 _autoSaving = false;
                 StateHasChanged();
@@ -1945,7 +1954,16 @@ public partial class ProjectNew : IAsyncDisposable
         {
             _serverSaveInProgress = false;
             _autoSaving = false;
-            _ = InvokeAsync(StateHasChanged);
+
+            if (_serverSavePending && _selectedCustomerId.HasValue && !_storageMigrationInProgress)
+            {
+                _serverSavePending = false;
+                _ = InvokeAsync(SaveDraftAsync);
+            }
+            else
+            {
+                _ = InvokeAsync(StateHasChanged);
+            }
         }
 
         return saved;
@@ -2692,6 +2710,7 @@ public partial class ProjectNew : IAsyncDisposable
         await _storageMigrationSemaphore.WaitAsync();
         try
         {
+            _storageMigrationInProgress = true;
             var partsInTemp = _parts
                 .Where(p => !string.IsNullOrEmpty(p.StoragePath) &&
                             p.StoragePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase))
@@ -2768,7 +2787,10 @@ public partial class ProjectNew : IAsyncDisposable
         }
         finally
         {
+            _storageMigrationInProgress = false;
             _storageMigrationSemaphore.Release();
+            if (_serverSavePending)
+                TriggerAutoSave();
         }
     }
 

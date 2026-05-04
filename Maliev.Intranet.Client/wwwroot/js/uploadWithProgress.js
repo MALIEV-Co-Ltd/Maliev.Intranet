@@ -155,15 +155,12 @@ window.projectNewUploads = (function () {
         const resolvedContentType = contentType || file.type || 'application/octet-stream';
 
         try {
-            const directResult = await sendXhr(sessionUri, file, resolvedContentType, false, dotNetHelper);
-            if (directResult.status >= 200 && directResult.status < 300) {
-                return directResult;
-            }
+            return await sendXhr(fallbackUrl, file, resolvedContentType, true, dotNetHelper);
         } catch {
-            // Retry once through the BFF raw-stream proxy below.
+            // Fall back to the direct GCS session only if the same-origin stream proxy is unavailable.
         }
 
-        return await sendXhr(fallbackUrl, file, resolvedContentType, true, dotNetHelper);
+        return await sendXhr(sessionUri, file, resolvedContentType, false, dotNetHelper);
     }
 
     function clearFile(clientUploadId) {
