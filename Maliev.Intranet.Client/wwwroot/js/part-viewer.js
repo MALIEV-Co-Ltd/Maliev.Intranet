@@ -543,9 +543,7 @@ function normalizeAxisVector(axisVector) {
         return null;
     }
 
-    const worldDirection = BABYLON.Vector3.TransformNormal(direction, BABYLON.Matrix.RotationX(Math.PI / 2));
-    if (worldDirection.length() < 1e-6) return null;
-    return worldDirection.normalize();
+    return direction.normalize();
 }
 
 function transformBackendAxisPoint(canvasId, axisPoint) {
@@ -574,8 +572,8 @@ function transformBackendAxisPoint(canvasId, axisPoint) {
 function directionFromPrimaryAxis(primaryAxis) {
     const axis = String(primaryAxis || '').toUpperCase();
     if (axis === 'X') return new BABYLON.Vector3(1, 0, 0);
-    if (axis === 'Y') return BABYLON.Vector3.TransformNormal(new BABYLON.Vector3(0, 1, 0), BABYLON.Matrix.RotationX(Math.PI / 2)).normalize();
-    if (axis === 'Z') return BABYLON.Vector3.TransformNormal(new BABYLON.Vector3(0, 0, 1), BABYLON.Matrix.RotationX(Math.PI / 2)).normalize();
+    if (axis === 'Y') return new BABYLON.Vector3(0, 1, 0);
+    if (axis === 'Z') return new BABYLON.Vector3(0, 0, 1);
     return null;
 }
 
@@ -990,21 +988,19 @@ function resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, axisPoint,
         || directionFromPrimaryAxis(primaryAxis)
         || detectTurningAxisDirectionFromBounds(bb);
     const backendCenter = transformBackendAxisPoint(canvasId, axisPoint);
-    if (backendCenter) {
+    const evaluated = evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter);
+    if (evaluated.score >= TURNING_AXIS_MIN_CENTER_SCORE && evaluated.ringCount > 0) {
         return {
             direction,
-            center: backendCenter,
-            score: Number.POSITIVE_INFINITY,
-            ringCount: 0,
+            center: evaluated.center,
+            score: evaluated.score,
+            ringCount: evaluated.ringCount,
         };
     }
 
-    const evaluated = evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter);
     return {
         direction,
-        center: evaluated.score >= TURNING_AXIS_MIN_CENTER_SCORE && evaluated.ringCount > 0
-            ? evaluated.center
-            : fallbackCenter,
+        center: backendCenter ?? fallbackCenter,
         score: evaluated.score,
         ringCount: evaluated.ringCount,
     };

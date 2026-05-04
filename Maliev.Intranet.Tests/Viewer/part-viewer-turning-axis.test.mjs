@@ -52,12 +52,21 @@ class Vector3 {
             a.x * b.y - a.y * b.x);
     }
 
-    static TransformCoordinates(point) {
+    static TransformCoordinates(point, matrix) {
+        if (matrix?.type === 'rotationX') {
+            const cos = Math.cos(matrix.angle);
+            const sin = Math.sin(matrix.angle);
+            return new Vector3(
+                point.x,
+                point.y * cos - point.z * sin,
+                point.y * sin + point.z * cos);
+        }
+
         return new Vector3(point.x, point.y, point.z);
     }
 
-    static TransformNormal(point) {
-        return new Vector3(point.x, point.y, point.z);
+    static TransformNormal(point, matrix) {
+        return Vector3.TransformCoordinates(point, matrix);
     }
 }
 
@@ -74,7 +83,7 @@ function loadViewerContext() {
                 Z: new Vector3(0, 0, 1),
             },
             Matrix: {
-                RotationX: () => ({}),
+                RotationX: angle => ({ type: 'rotationX', angle }),
             },
             VertexBuffer: {
                 PositionKind: 'position',
@@ -149,6 +158,51 @@ test('turning axis resolver uses concentric bore instead of larger exterior ring
     assert.ok(Math.abs(result.direction.x) > 0.98);
     assert.ok(Math.abs(result.center.y) < 0.15, `expected bore center y=0, got ${result.center.y}`);
     assert.ok(Math.abs(result.center.z) < 0.15, `expected bore center z=0, got ${result.center.z}`);
+});
+
+test('Z-up backend turning axis remains vertical in viewer Z-up coordinates', () => {
+    const context = loadViewerContext();
+    const positions = [];
+
+    addRing(positions, -1, 0, 0, 7.5, 96);
+    addRing(positions, 1, 0, 0, 7.5, 96);
+
+    context.scene = buildScene(positions);
+    context.bb = {
+        min: { x: -7.5, y: -7.5, z: 0 },
+        max: { x: 7.5, y: 7.5, z: 7 },
+    };
+    context.fallbackCenter = new Vector3(0, 0, 3.5);
+
+    const result = vm.runInContext(
+        "resolveTurningAxis(scene, 'viewer', 'Z', [0, 0, 1], null, bb, fallbackCenter)",
+        context);
+
+    assert.ok(Math.abs(result.direction.x) < 0.02, `expected direction x=0, got ${result.direction.x}`);
+    assert.ok(Math.abs(result.direction.y) < 0.02, `expected direction y=0, got ${result.direction.y}`);
+    assert.ok(Math.abs(result.direction.z) > 0.98, `expected direction z=1, got ${result.direction.z}`);
+});
+
+test('visible ring center wins over uncentered backend turning axis point', () => {
+    const context = loadViewerContext();
+    const positions = [];
+
+    addRing(positions, -6, 0, 0, 1.4, 48);
+    addRing(positions, 6, 0, 0, 1.4, 48);
+
+    context.scene = buildScene(positions);
+    context.bb = {
+        min: { x: -6, y: -2, z: -2 },
+        max: { x: 6, y: 2, z: 2 },
+    };
+    context.fallbackCenter = new Vector3(0, 0, 0);
+
+    const result = vm.runInContext(
+        "resolveTurningAxis(scene, 'viewer', 'X', [1, 0, 0], [10, -6, 0], bb, fallbackCenter)",
+        context);
+
+    assert.ok(Math.abs(result.center.y) < 0.15, `expected visible center y=0, got ${result.center.y}`);
+    assert.ok(Math.abs(result.center.z) < 0.15, `expected visible center z=0, got ${result.center.z}`);
 });
 
 test('explicit turning axis uses low-resolution bore center instead of bounding-box center', () => {
