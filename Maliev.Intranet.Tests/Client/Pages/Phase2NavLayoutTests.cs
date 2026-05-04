@@ -142,7 +142,7 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void TopBar_ProfileRole_DisplaysPlatformOwnerRoleClaim()
+    public void TopBar_ProfileSubtitle_DoesNotDisplayPlatformOwnerRoleClaim()
     {
         _authMock.Setup(x => x.GetAuthenticationStateAsync())
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(
@@ -153,7 +153,9 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
 
         var cut = Render<TopBar>();
 
-        Assert.Contains("Platform Owner", cut.Markup, StringComparison.Ordinal);
+        var subtitle = cut.Find(".topbar-profile-role").TextContent;
+        Assert.Equal("Employee", subtitle);
+        Assert.DoesNotContain("Platform Owner", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -167,7 +169,7 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     [Fact]
     public void TopBar_ProfileInfo_IsLeftAligned()
     {
-        var css = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "Maliev.Intranet.Client", "Layout", "TopBar.razor.css"));
+        var css = File.ReadAllText(FindSourceFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css"));
 
         Assert.Contains("align-items: flex-start", css, StringComparison.Ordinal);
         Assert.Contains("text-align: left", css, StringComparison.Ordinal);
@@ -212,5 +214,22 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
         svc.OnChanged += () => fired = true;
         svc.SetPageLabel("Test");
         Assert.True(fired);
+    }
+
+    private static string FindSourceFile(params string[] segments)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine([current.FullName, .. segments]);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException("Could not locate source file.", Path.Combine(segments));
     }
 }

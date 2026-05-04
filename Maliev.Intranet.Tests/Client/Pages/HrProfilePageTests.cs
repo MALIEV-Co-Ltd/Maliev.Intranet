@@ -57,8 +57,10 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
         {
             Assert.Contains("test@test.com", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("Active", cut.Markup, StringComparison.Ordinal);
-            Assert.Contains("Platform Owner", cut.Markup, StringComparison.Ordinal);
-            Assert.Contains("FullTime", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Job Title", cut.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("Platform Owner", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Full Time", cut.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("FullTime", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("2026", cut.Markup, StringComparison.Ordinal);
         });
     }
@@ -102,7 +104,7 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
                     Email = "",
                     Department = "Sales",
                     Title = "",
-                    Role = "Platform Owner",
+                    Role = "",
                     Status = "",
                     Phone = "+66810000000",
                     EmployeeType = "",

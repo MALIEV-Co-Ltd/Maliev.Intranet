@@ -188,48 +188,6 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
         profile.EmployeeType = FirstNonBlank(profile.EmployeeType, "FullTime");
         profile.HireDate ??= profile.CreatedAt == DateTime.MinValue ? null : profile.CreatedAt;
         profile.HireDate ??= await ResolvePrincipalCreatedAtAsync(principalId, ct);
-        profile.Role = await ResolveRoleDisplayNameAsync(principalId, ct);
-        if (string.IsNullOrWhiteSpace(profile.Title))
-        {
-            profile.Title = profile.Role;
-        }
-    }
-
-    private async Task<string> ResolveRoleDisplayNameAsync(Guid principalId, CancellationToken ct)
-    {
-        var claimRoles = User.FindAll("role")
-            .Concat(User.FindAll(System.Security.Claims.ClaimTypes.Role))
-            .Select(c => c.Value)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .ToList();
-
-        if (claimRoles.Any(role => string.Equals(role, "roles.platform.owner", StringComparison.OrdinalIgnoreCase)))
-        {
-            return "Platform Owner";
-        }
-
-        try
-        {
-            var bindings = await iamClient.GetPrincipalRolesAsync(principalId, ct);
-            var owner = bindings.FirstOrDefault(binding =>
-                string.Equals(binding.RoleId, "roles.platform.owner", StringComparison.OrdinalIgnoreCase));
-            if (owner is not null)
-            {
-                return "Platform Owner";
-            }
-
-            var firstRole = bindings.FirstOrDefault(binding => !string.IsNullOrWhiteSpace(binding.RoleId) || !string.IsNullOrWhiteSpace(binding.RoleName));
-            if (firstRole is not null)
-            {
-                return FirstNonBlank(firstRole.RoleName, FormatRoleId(firstRole.RoleId));
-            }
-        }
-        catch (Exception)
-        {
-            // Role display is non-critical for profile rendering; fall back to JWT claims/default.
-        }
-
-        return claimRoles.Select(FormatRoleId).FirstOrDefault(role => !string.IsNullOrWhiteSpace(role)) ?? "Employee";
     }
 
     private async Task<DateTime?> ResolvePrincipalCreatedAtAsync(Guid principalId, CancellationToken ct)
@@ -244,22 +202,6 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
         {
             return null;
         }
-    }
-
-    private static string FormatRoleId(string? roleId)
-    {
-        if (string.IsNullOrWhiteSpace(roleId))
-        {
-            return string.Empty;
-        }
-
-        var value = roleId.StartsWith("roles.", StringComparison.OrdinalIgnoreCase)
-            ? roleId["roles.".Length..]
-            : roleId;
-        var segments = value.Split('.', StringSplitOptions.RemoveEmptyEntries);
-        var labelSegment = segments.LastOrDefault() ?? value;
-        return string.Join(' ', labelSegment.Split('-', StringSplitOptions.RemoveEmptyEntries)
-            .Select(word => char.ToUpperInvariant(word[0]) + word[1..]));
     }
 
     private static string FirstNonBlank(params string?[] values)

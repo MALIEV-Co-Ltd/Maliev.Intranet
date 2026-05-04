@@ -11,7 +11,7 @@ namespace Maliev.Intranet.Tests.Bff.Controllers;
 public sealed class EmployeesControllerProfileTests
 {
     [Fact]
-    public async Task GetMe_FillsGoogleEmailDefaultsAndPlatformOwnerRole()
+    public async Task GetMe_FillsGoogleEmailDefaultsWithoutUsingIamRolesAsJobTitle()
     {
         var principalId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var createdAt = new DateTime(2026, 5, 4, 0, 0, 0, DateTimeKind.Utc);
@@ -37,6 +37,13 @@ public sealed class EmployeesControllerProfileTests
                     PrincipalId = principalId,
                     RoleId = "roles.platform.owner",
                     RoleName = ""
+                },
+                new RoleBindingDto
+                {
+                    BindingId = Guid.NewGuid().ToString(),
+                    PrincipalId = principalId,
+                    RoleId = "roles.customer.admin",
+                    RoleName = "Customer Admin"
                 }
             ]);
 
@@ -62,8 +69,9 @@ public sealed class EmployeesControllerProfileTests
         Assert.Equal("Active", profile.Status);
         Assert.Equal("FullTime", profile.EmployeeType);
         Assert.Equal(createdAt, profile.HireDate);
-        Assert.Equal("Platform Owner", profile.Role);
-        Assert.Equal("Platform Owner", profile.Title);
+        Assert.Equal(string.Empty, profile.Role);
+        Assert.Equal(string.Empty, profile.Title);
+        iamClient.Verify(client => client.GetPrincipalRolesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -81,8 +89,6 @@ public sealed class EmployeesControllerProfileTests
             });
 
         var iamClient = new Mock<IAMServiceClient>(new HttpClient { BaseAddress = new Uri("http://iam") });
-        iamClient.Setup(client => client.GetPrincipalRolesAsync(principalId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
         iamClient.Setup(client => client.GetPrincipalsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new PrincipalSummaryDto
@@ -114,6 +120,7 @@ public sealed class EmployeesControllerProfileTests
         var profile = Assert.IsType<EmployeeDetailDto>(ok.Value);
 
         Assert.Equal(principalCreatedAt, profile.HireDate);
-        Assert.Equal("Employee", profile.Role);
+        Assert.Equal(string.Empty, profile.Role);
+        iamClient.Verify(client => client.GetPrincipalRolesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

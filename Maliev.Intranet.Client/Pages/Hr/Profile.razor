@@ -29,7 +29,7 @@
             <StatBar Class="mb-4">
                 <StatTile Label="Status" Value="@DisplayStatus" />
                 <StatTile Label="Department" Value="@Display(_profile.Department)" />
-                <StatTile Label="Role" Value="@DisplayRole" />
+                <StatTile Label="Job Title" Value="@DisplayJobTitle" />
                 <StatTile Label="Manager" Value="@Display(_profile.ManagerName)" />
             </StatBar>
 
@@ -175,9 +175,9 @@
     private string? _error;
 
     private string DisplayEmail => Display(FirstNonBlank(_profile?.Email, _selfProfile?.WorkEmail));
-    private string DisplayRole => Display(FirstNonBlank(_profile?.Role, _profile?.Title, "Employee"));
+    private string DisplayJobTitle => Display(FirstNonBlank(_profile?.Title, _selfProfile?.JobTitle));
     private string DisplayStatus => Display(FirstNonBlank(_profile?.Status, _selfProfile?.EmploymentStatus, "Active"));
-    private string DisplayEmployeeType => Display(FirstNonBlank(_profile?.EmployeeType, _selfProfile?.EmploymentType, "FullTime"));
+    private string DisplayEmployeeType => FormatEmployeeType(FirstNonBlank(_profile?.EmployeeType, _selfProfile?.EmploymentType, "FullTime"));
     private string DisplayHireDate => (_profile?.HireDate ?? _selfProfile?.StartDate ?? _selfProfile?.CreatedAt)?.ToString("dd MMM yyyy") ?? "-";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -276,6 +276,17 @@
     }
 
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatEmployeeType(string? value)
+    {
+        var display = FirstNonBlank(value, "FullTime");
+        return display switch
+        {
+            "FullTime" => "Full Time",
+            "PartTime" => "Part Time",
+            _ => Display(display)
+        };
+    }
 
     private static string FirstNonBlank(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;

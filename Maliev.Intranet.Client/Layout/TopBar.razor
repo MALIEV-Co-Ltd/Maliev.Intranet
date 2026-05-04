@@ -58,6 +58,7 @@
                          Disabled="@(CurrencyService.Currencies.Count == 0)"
                          Placeholder="@(CurrencyService.Currencies.Count == 0 ? "…" : CurrencyService.Code)"
                          Class="topbar-currency-autocomplete"
+                         Style="width: 80px; min-width: 80px; max-width: 80px; flex: 0 0 80px;"
                          PopoverClass="topbar-currency-popover"
                          AdornmentIcon="@Icons.Material.Filled.KeyboardArrowDown"
                          Adornment="Adornment.End"
@@ -110,7 +111,7 @@
                         </span>
                         <span class="topbar-profile-info">
                             <span class="topbar-profile-name">@(auth.User.Identity?.Name ?? "User")</span>
-                            <span class="topbar-profile-role">@(GetProfileRole(auth.User))</span>
+                            <span class="topbar-profile-role">@(GetProfileSubtitle(auth.User))</span>
                         </span>
                         <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" Color="Color.Default" />
                     </button>
@@ -148,7 +149,7 @@
     [Parameter] public EventCallback OnToggleTheme { get; set; }
 
     private bool _profileMenuOpen;
-    private string? _profileRole;
+    private string? _profileJobTitle;
 
     private record NavItem(string Label, string Href, NavLinkMatch Match = NavLinkMatch.Prefix, string? Class = null);
 
@@ -250,11 +251,11 @@
         try
         {
             var profile = await Http.GetFromJsonAsync<EmployeeDetailDto>("api/v1/employees/me");
-            _profileRole = FirstNonBlank(profile?.Role, profile?.Title);
+            _profileJobTitle = FirstNonBlank(profile?.Title);
         }
         catch
         {
-            _profileRole = null;
+            _profileJobTitle = null;
         }
     }
 
@@ -279,43 +280,17 @@
             : parts[0][0].ToString().ToUpperInvariant();
     }
 
-    private string GetProfileRole(System.Security.Claims.ClaimsPrincipal user)
+    private string GetProfileSubtitle(System.Security.Claims.ClaimsPrincipal user)
     {
-        return FirstNonBlank(_profileRole, GetJobTitle(user), "Employee");
+        return FirstNonBlank(_profileJobTitle, GetJobTitle(user), "Employee");
     }
 
     private static string GetJobTitle(System.Security.Claims.ClaimsPrincipal user)
     {
-        var role = user.FindAll("role")
-            .Concat(user.FindAll(System.Security.Claims.ClaimTypes.Role))
-            .Select(c => c.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-
         return FirstNonBlank(
-            FormatRoleId(role),
             user.FindFirst("job_title")?.Value,
             user.FindFirst("title")?.Value,
             user.FindFirst("position")?.Value);
-    }
-
-    private static string FormatRoleId(string? roleId)
-    {
-        if (string.IsNullOrWhiteSpace(roleId))
-        {
-            return string.Empty;
-        }
-
-        if (string.Equals(roleId, "roles.platform.owner", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Platform Owner";
-        }
-
-        var value = roleId.StartsWith("roles.", StringComparison.OrdinalIgnoreCase)
-            ? roleId["roles.".Length..]
-            : roleId;
-        var labelSegment = value.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? value;
-        return string.Join(' ', labelSegment.Split('-', StringSplitOptions.RemoveEmptyEntries)
-            .Select(word => char.ToUpperInvariant(word[0]) + word[1..]));
     }
 
     private static string FirstNonBlank(params string?[] values)
