@@ -127,6 +127,35 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void TopBar_ProfileButton_Click_ShowsEmployeeActions()
+    {
+        var cut = Render<TopBar>();
+
+        cut.Find("button.topbar-profile").Click();
+
+        var menu = cut.Find(".topbar-profile-popover");
+        Assert.Equal("true", cut.Find("button.topbar-profile").GetAttribute("aria-expanded"));
+        Assert.Contains("My Profile", menu.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Preferences", menu.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Sign out", menu.TextContent, StringComparison.Ordinal);
+        Assert.Contains("/hr/profile", menu.QuerySelector("a")?.GetAttribute("href"), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TopBar_ProfileMenu_SignOut_NavigatesToLogout()
+    {
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        var cut = Render<TopBar>();
+
+        cut.Find("button.topbar-profile").Click();
+        cut.FindAll("button.topbar-profile-action")
+            .Single(button => button.TextContent.Contains("Sign out", StringComparison.Ordinal))
+            .Click();
+
+        Assert.EndsWith("/api/v1/auth/logout", navigation.Uri, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void BreadcrumbService_SetPageLabel_UpdatesCurrentLabel()
     {
         var svc = new BreadcrumbService();

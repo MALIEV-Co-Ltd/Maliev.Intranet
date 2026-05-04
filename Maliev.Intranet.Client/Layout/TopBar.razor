@@ -90,33 +90,49 @@
         @* Profile ── *@
         <AuthorizeView Context="auth">
             <Authorized>
-                <MudMenu AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" LockScroll="true">
-                    <ActivatorContent>
-                        <div class="topbar-profile">
-                            <div class="topbar-avatar">
-                                @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
-                                {
-                                    <MudImage Src="@auth.User.FindFirst("picture")?.Value" Alt="Avatar" />
-                                }
-                                else
-                                {
-                                    @GetInitials(auth.User.Identity?.Name)
-                                }
-                            </div>
-                            <div class="topbar-profile-info">
-                                <span class="topbar-profile-name">@(auth.User.Identity?.Name ?? "User")</span>
-                                <span class="topbar-profile-role">@(GetJobTitle(auth.User))</span>
-                            </div>
-                            <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" Color="Color.Default" />
+                <div class="topbar-profile-menu">
+                    <button type="button"
+                            class="topbar-profile"
+                            aria-haspopup="menu"
+                            aria-expanded="@_profileMenuOpen.ToString().ToLowerInvariant()"
+                            aria-label="Employee menu"
+                            @onclick="ToggleProfileMenu">
+                        <span class="topbar-avatar">
+                            @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
+                            {
+                                <MudImage Src="@auth.User.FindFirst("picture")?.Value" Alt="Avatar" />
+                            }
+                            else
+                            {
+                                @GetInitials(auth.User.Identity?.Name)
+                            }
+                        </span>
+                        <span class="topbar-profile-info">
+                            <span class="topbar-profile-name">@(auth.User.Identity?.Name ?? "User")</span>
+                            <span class="topbar-profile-role">@(GetJobTitle(auth.User))</span>
+                        </span>
+                        <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" Color="Color.Default" />
+                    </button>
+
+                    @if (_profileMenuOpen)
+                    {
+                        <div class="topbar-profile-popover" role="menu">
+                            <a class="topbar-profile-action" role="menuitem" href="/hr/profile" @onclick="CloseProfileMenu">
+                                <MudIcon Icon="@Icons.Material.Outlined.AccountCircle" Size="Size.Small" />
+                                <span>My Profile</span>
+                            </a>
+                            <a class="topbar-profile-action" role="menuitem" href="/hr/profile?tab=preferences" @onclick="CloseProfileMenu">
+                                <MudIcon Icon="@Icons.Material.Outlined.Tune" Size="Size.Small" />
+                                <span>Preferences</span>
+                            </a>
+                            <div class="topbar-profile-menu-divider" />
+                            <button type="button" class="topbar-profile-action" role="menuitem" @onclick="HandleLogout">
+                                <MudIcon Icon="@Icons.Material.Outlined.Logout" Size="Size.Small" />
+                                <span>Sign out</span>
+                            </button>
                         </div>
-                    </ActivatorContent>
-                    <ChildContent>
-                        <MudMenuItem Icon="@Icons.Material.Outlined.AccountCircle" Href="/hr/profile">My Profile</MudMenuItem>
-                        <MudMenuItem Icon="@Icons.Material.Outlined.Tune" Href="/hr/profile?tab=preferences">Preferences</MudMenuItem>
-                        <MudDivider />
-                        <MudMenuItem Icon="@Icons.Material.Outlined.Logout" OnClick="@HandleLogout">Sign out</MudMenuItem>
-                    </ChildContent>
-                </MudMenu>
+                    }
+                </div>
             </Authorized>
         </AuthorizeView>
     </div>
@@ -129,6 +145,8 @@
     [Parameter] public bool ChatDrawerOpen { get; set; }
     [Parameter] public EventCallback<bool> ChatDrawerOpenChanged { get; set; }
     [Parameter] public EventCallback OnToggleTheme { get; set; }
+
+    private bool _profileMenuOpen;
 
     private record NavItem(string Label, string Href, NavLinkMatch Match = NavLinkMatch.Prefix, string? Class = null);
 
@@ -224,7 +242,15 @@
 
     private async Task ToggleChat() => await ChatDrawerOpenChanged.InvokeAsync(!ChatDrawerOpen);
 
-    private void HandleLogout() => Navigation.NavigateTo("/api/v1/auth/logout", forceLoad: true);
+    private void ToggleProfileMenu() => _profileMenuOpen = !_profileMenuOpen;
+
+    private void CloseProfileMenu() => _profileMenuOpen = false;
+
+    private void HandleLogout()
+    {
+        _profileMenuOpen = false;
+        Navigation.NavigateTo("/api/v1/auth/logout", forceLoad: true);
+    }
 
     private static string GetInitials(string? name)
     {

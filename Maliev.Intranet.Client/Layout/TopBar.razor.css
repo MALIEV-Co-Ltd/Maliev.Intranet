@@ -191,18 +191,31 @@
     margin: 0 4px;
 }
 
+.topbar-profile-menu {
+    position: relative;
+    flex-shrink: 0;
+}
+
 .topbar-profile {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 4px 10px 4px 4px;
+    border: 0;
     border-radius: var(--maliev-radius-pill);
     background: var(--maliev-panel-3);
+    color: inherit;
+    font: inherit;
     cursor: pointer;
     transition: background 0.15s;
 }
 
 .topbar-profile:hover { background: var(--maliev-panel-2); }
+
+.topbar-profile:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 35%);
+    outline-offset: 2px;
+}
 
 .topbar-avatar {
     width: 28px;
@@ -239,6 +252,51 @@
 .topbar-profile-role {
     font-size: var(--maliev-font-nano);
     color: var(--maliev-muted-2);
+}
+
+.topbar-profile-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 2600;
+    width: 210px;
+    padding: 6px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-lg);
+}
+
+.topbar-profile-action {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 34px;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: var(--maliev-radius-xs);
+    background: transparent;
+    color: var(--maliev-ink);
+    font: inherit;
+    font-size: var(--maliev-font-small);
+    font-weight: 600;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.topbar-profile-action:hover,
+.topbar-profile-action:focus-visible {
+    background: var(--maliev-panel-3);
+    color: var(--maliev-ink);
+    outline: none;
+}
+
+.topbar-profile-menu-divider {
+    height: 1px;
+    margin: 5px 2px;
+    background: var(--maliev-border);
 }
 
 @media (max-width: 960px) {
