@@ -259,8 +259,8 @@ public partial class ProjectNew : IAsyncDisposable
                         part.ThumbnailLargeUrl = payload.PreviewUrls.ThumbnailLarge;
                     else if (!string.IsNullOrEmpty(payload.HiResThumbnailUrl))
                         part.ThumbnailLargeUrl = payload.HiResThumbnailUrl;
-                    part.ThumbnailSmallGcsPath = payload.PreviewUrls.ThumbnailSmallGcsPath;
-                    part.ThumbnailLargeGcsPath = payload.PreviewUrls.ThumbnailLargeGcsPath;
+                    part.ThumbnailSmallGcsPath = NormalizeMigratedArtifactPath(part, payload.PreviewUrls.ThumbnailSmallGcsPath);
+                    part.ThumbnailLargeGcsPath = NormalizeMigratedArtifactPath(part, payload.PreviewUrls.ThumbnailLargeGcsPath);
                     part.AwaitingPreview = false;
                     part.StatusText = "Ready";
                 }
@@ -279,8 +279,8 @@ public partial class ProjectNew : IAsyncDisposable
                 foreach (var part in parts)
                 {
                     part.GlbSignedUrl = payload.GlbUrl;
-                    part.GlbStoragePath ??= payload.StoragePath;
-                    part.ViewerUrl ??= payload.GlbUrl;
+                    part.GlbStoragePath = BuildViewerGlbStoragePath(NormalizeMigratedArtifactPath(part, payload.StoragePath));
+                    part.ViewerUrl = payload.GlbUrl;
 
                     if (payload.BodyCount.HasValue)
                     {
@@ -316,7 +316,8 @@ public partial class ProjectNew : IAsyncDisposable
                 if (payload.SlaReport != null) part.SlaDfmReport = payload.SlaReport;
                 if (payload.CncReport != null) part.CncDfmReport = payload.CncReport;
                 if (payload.OverlayUrls != null) part.OverlayUrls = payload.OverlayUrls;
-                if (payload.OverlayPaths != null) part.OverlayPaths = payload.OverlayPaths;
+                if (payload.OverlayPaths != null)
+                    part.OverlayPaths = NormalizeMigratedArtifactPaths(part, payload.OverlayPaths);
                 // Stamp body count unconditionally so single-body files also resolve Pending state.
                 if (payload.BodyCount.HasValue)
                     part.BodyCount = payload.BodyCount.Value;
@@ -788,7 +789,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.IsManifold = status.IsManifold;
             part.NonManifoldReason = status.NonManifoldReason;
             part.NonManifoldFaceCount = status.NonManifoldFaceCount;
-            part.GlbStoragePath = status.GlbStoragePath;
+            part.GlbStoragePath = NormalizeMigratedArtifactPath(part, status.GlbStoragePath);
             part.GlbSignedUrl = status.GlbSignedUrl;  // Option B: use cached signed URL directly
 
             if (status.DfmReport is JsonElement je && je.ValueKind == JsonValueKind.Object
@@ -814,8 +815,8 @@ public partial class ProjectNew : IAsyncDisposable
                     part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl;
                 else if (!string.IsNullOrEmpty(status.HiResThumbnailUrl))
                     part.ThumbnailLargeUrl = status.HiResThumbnailUrl;
-                part.ThumbnailSmallGcsPath = status.PreviewUrls.ThumbnailSmallGcsPath;
-                part.ThumbnailLargeGcsPath = status.PreviewUrls.ThumbnailLargeGcsPath;
+                part.ThumbnailSmallGcsPath = NormalizeMigratedArtifactPath(part, status.PreviewUrls.ThumbnailSmallGcsPath);
+                part.ThumbnailLargeGcsPath = NormalizeMigratedArtifactPath(part, status.PreviewUrls.ThumbnailLargeGcsPath);
             }
             else if (!string.IsNullOrEmpty(status.ThumbnailUrl))
             {
@@ -875,7 +876,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         // Fallback: Call viewer-url API for backward compatibility (drafts created before this fix)
         // Prefer GlbStoragePath (already has _viewer.glb suffix) over StoragePath to avoid double-suffix bug
-        var storagePath = part.GlbStoragePath ?? part.StoragePath;
+        var storagePath = part.GlbStoragePath ?? BuildViewerGlbStoragePath(part.StoragePath);
         if (string.IsNullOrEmpty(storagePath)) return;
 
         try
@@ -927,6 +928,82 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
+    private static string? NormalizeMigratedArtifactPath(PartViewModel part, string? storagePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath) || string.IsNullOrWhiteSpace(part.StoragePath))
+            return storagePath;
+
+        foreach (var alias in part.StoragePathAliases.Where(alias => !string.IsNullOrWhiteSpace(alias)))
+        {
+            var rewritten = RewriteMigratedStoragePath(storagePath, alias, part.StoragePath);
+            if (!string.Equals(rewritten, storagePath, StringComparison.OrdinalIgnoreCase))
+                return rewritten;
+        }
+
+        return storagePath;
+    }
+
+    private static Dictionary<string, string> NormalizeMigratedArtifactPaths(
+        PartViewModel part,
+        Dictionary<string, string> storagePaths) =>
+        storagePaths.ToDictionary(
+            item => item.Key,
+            item => NormalizeMigratedArtifactPath(part, item.Value) ?? item.Value,
+            StringComparer.OrdinalIgnoreCase);
+
+    private static string? RewriteMigratedStoragePath(string? storagePath, string oldBasePath, string newBasePath)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return storagePath;
+
+        if (string.Equals(storagePath, oldBasePath, StringComparison.OrdinalIgnoreCase))
+            return newBasePath;
+
+        if (!storagePath.StartsWith(oldBasePath, StringComparison.OrdinalIgnoreCase))
+            return storagePath;
+
+        return newBasePath + storagePath[oldBasePath.Length..];
+    }
+
+    private static string? BuildViewerGlbStoragePath(string? sourceStoragePath)
+    {
+        if (string.IsNullOrWhiteSpace(sourceStoragePath))
+            return null;
+
+        return sourceStoragePath.EndsWith("_viewer.glb", StringComparison.OrdinalIgnoreCase)
+            ? sourceStoragePath
+            : sourceStoragePath + "_viewer.glb";
+    }
+
+    private static void ApplyMigratedStoragePaths(PartViewModel part, string oldBasePath, string newBasePath)
+    {
+        part.ThumbnailSmallGcsPath = RewriteMigratedStoragePath(part.ThumbnailSmallGcsPath, oldBasePath, newBasePath);
+        part.ThumbnailLargeGcsPath = RewriteMigratedStoragePath(part.ThumbnailLargeGcsPath, oldBasePath, newBasePath);
+
+        var rewrittenGlbStoragePath = RewriteMigratedStoragePath(part.GlbStoragePath, oldBasePath, newBasePath);
+        if (string.IsNullOrWhiteSpace(rewrittenGlbStoragePath)
+            && (!string.IsNullOrWhiteSpace(part.GlbSignedUrl) || !string.IsNullOrWhiteSpace(part.ViewerUrl)))
+        {
+            rewrittenGlbStoragePath = BuildViewerGlbStoragePath(newBasePath);
+        }
+
+        if (!string.Equals(part.GlbStoragePath, rewrittenGlbStoragePath, StringComparison.OrdinalIgnoreCase))
+        {
+            part.GlbStoragePath = rewrittenGlbStoragePath;
+            part.GlbSignedUrl = null;
+            part.ViewerUrl = null;
+        }
+
+        if (part.OverlayPaths is { Count: > 0 })
+        {
+            part.OverlayPaths = part.OverlayPaths.ToDictionary(
+                item => item.Key,
+                item => RewriteMigratedStoragePath(item.Value, oldBasePath, newBasePath) ?? item.Value,
+                StringComparer.OrdinalIgnoreCase);
+            part.OverlayUrls = null;
+        }
+    }
+
     /// <summary>
     /// Refreshes the 3D viewer signed URL when the current one has expired.
     /// Called by PartDetailCard when BabylonJS viewer fails to load.
@@ -944,8 +1021,11 @@ public partial class ProjectNew : IAsyncDisposable
 
         try
         {
+            var refreshStoragePath = part.GlbStoragePath
+                ?? BuildViewerGlbStoragePath(part.StoragePath)
+                ?? storagePath;
             var viewerResp = await Http.GetAsync(
-                $"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(storagePath)}");
+                $"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(refreshStoragePath)}");
             if (viewerResp.IsSuccessStatusCode)
             {
                 var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
@@ -2636,8 +2716,9 @@ public partial class ProjectNew : IAsyncDisposable
                 var part = _parts.FirstOrDefault(p => p.FileId.ToString() == fileId);
                 if (part == null) continue;
 
-                part.AddStoragePathAlias(oldBasePath);
                 part.StoragePath = newBasePath;
+                part.AddStoragePathAlias(oldBasePath);
+                ApplyMigratedStoragePaths(part, oldBasePath, newBasePath);
 
                 await JoinPartFileGroupsAsync(part);
                 StartStatusWatchdog(part, oldBasePath);

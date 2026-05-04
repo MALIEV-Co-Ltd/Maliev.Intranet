@@ -743,6 +743,84 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task MigrateTempProjectFilesAsync_WhenPartHasGeneratedArtifacts_RewritesViewerPathsAndClearsStaleSignedUrls()
+    {
+        var customerId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        const string OldBasePath = "projects/temp-project/bracket.stl";
+        const string NewBasePath = "customers/customer-1/projects/temp-project/bracket.stl";
+
+        _httpHandler.HandlerFunc = (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+
+            if (request.RequestUri?.AbsolutePath == "/api/v1/uploads/migrate-project")
+            {
+                var migrationResponse = new
+                {
+                    migrated_files = new[]
+                    {
+                        new
+                        {
+                            file_id = fileId.ToString(),
+                            old_path = OldBasePath,
+                            new_path = NewBasePath
+                        }
+                    },
+                    errors = Array.Empty<string>()
+                };
+
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(migrationResponse), Encoding.UTF8, "application/json")
+                });
+            }
+
+            return DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        SetPrivateField(cut.Instance, "_selectedCustomer", new CustomerSummaryDto
+        {
+            Id = customerId,
+            Name = "MaliEV Manufacturing",
+            Email = "orders@example.test",
+        });
+        var part = new PartViewModel
+        {
+            FileId = fileId,
+            Name = "bracket.stl",
+            StoragePath = OldBasePath,
+            ThumbnailSmallGcsPath = OldBasePath + "_thumb_256.webp",
+            ThumbnailLargeGcsPath = OldBasePath + "_thumb_1200.webp",
+            GlbStoragePath = OldBasePath + "_viewer.glb",
+            GlbSignedUrl = "https://signed.example/old-viewer.glb",
+            ViewerUrl = "https://signed.example/old-viewer.glb",
+            OverlayUrls = new Dictionary<string, string>
+            {
+                ["CNC__sharp_corner"] = "https://signed.example/old-overlay.glb"
+            },
+            OverlayPaths = new Dictionary<string, string>
+            {
+                ["CNC__sharp_corner"] = OldBasePath + "_overlays/sharp.glb"
+            }
+        };
+        GetParts(cut.Instance).Add(part);
+
+        await InvokePrivateTaskAsync(cut, "MigrateTempProjectFilesAsync");
+
+        Assert.Equal(NewBasePath, part.StoragePath);
+        Assert.Contains(OldBasePath, part.StoragePathAliases);
+        Assert.Equal(NewBasePath + "_thumb_256.webp", part.ThumbnailSmallGcsPath);
+        Assert.Equal(NewBasePath + "_thumb_1200.webp", part.ThumbnailLargeGcsPath);
+        Assert.Equal(NewBasePath + "_viewer.glb", part.GlbStoragePath);
+        Assert.Null(part.GlbSignedUrl);
+        Assert.Null(part.ViewerUrl);
+        Assert.Equal(NewBasePath + "_overlays/sharp.glb", part.OverlayPaths?["CNC__sharp_corner"]);
+        Assert.Null(part.OverlayUrls);
+    }
+
+    [Fact]
     public async Task CreateProjectAndQuoteAsync_WhenPartsHavePrices_ConfirmsPartPricesBeforeGeneratingQuotation()
     {
         var projectId = Guid.NewGuid();
