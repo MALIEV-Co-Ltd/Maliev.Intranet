@@ -63,28 +63,30 @@
 
     @if (_sectionMenuOpen)
     {
-        <MudPaper Elevation="16" Class="pa-3 vp-section-panel" @onclick:stopPropagation>
-            <MudSwitch T="bool" Value="_sectionEnabled"
-                       ValueChanged="@((bool v) => SetSectionEnabledAsync(v))"
-                       Label="Enable section view"
-                       Color="Color.Primary" Class="mb-2" />
-            <div class="d-flex gap-1 mb-2">
-                @foreach (var ax in new[] { "x", "y", "z" })
-                {
-                    <button class="@($"vp-cube-btn {(_sectionAxis == ax ? "vp-active" : "")}")"
-                            @onclick='@(() => SetSectionAxisAsync(ax))' type="button"
-                            style="width: 56px;">@ax.ToUpperInvariant()</button>
-                }
-            </div>
-            <MudSlider T="double" Min="@SectionMin" Max="@SectionMax" Step="0.5"
-                       Value="_sectionOffset"
-                       ValueChanged="@((double v) => SetSectionOffsetAsync(v))">
-                Offset: @_sectionOffset.ToString("F1") mm
-            </MudSlider>
-            <MudCheckBox T="bool" Value="_sectionInverted"
-                         ValueChanged="@((bool v) => SetSectionInvertedAsync(v))"
-                         Label="Invert" Color="Color.Primary" />
-        </MudPaper>
+        <div class="vp-section-panel" @onclick:stopPropagation>
+            <MudPaper Elevation="16" Class="pa-3">
+                <MudSwitch T="bool" Value="_sectionEnabled"
+                           ValueChanged="@((bool v) => SetSectionEnabledAsync(v))"
+                           Label="Enable section view"
+                           Color="Color.Primary" Class="mb-2" />
+                <div class="d-flex gap-1 mb-2">
+                    @foreach (var ax in new[] { "x", "y", "z" })
+                    {
+                        <button class="@($"vp-cube-btn {(_sectionAxis == ax ? "vp-active" : "")}")"
+                                @onclick='@(() => SetSectionAxisAsync(ax))' type="button"
+                                style="width: 56px;">@ax.ToUpperInvariant()</button>
+                    }
+                </div>
+                <MudSlider T="double" Min="@SectionMin" Max="@SectionMax" Step="0.5"
+                           Value="_sectionOffset"
+                           ValueChanged="@((double v) => SetSectionOffsetAsync(v))">
+                    Offset: @_sectionOffset.ToString("F1") mm
+                </MudSlider>
+                <MudCheckBox T="bool" Value="_sectionInverted"
+                             ValueChanged="@((bool v) => SetSectionInvertedAsync(v))"
+                             Label="Invert" Color="Color.Primary" />
+            </MudPaper>
+        </div>
     }
 
     @* ── CAD Toolbar — bottom-center, floating ── *@

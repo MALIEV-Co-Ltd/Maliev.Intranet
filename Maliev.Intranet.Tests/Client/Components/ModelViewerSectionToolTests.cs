@@ -43,4 +43,17 @@ public sealed class ModelViewerSectionToolTests : BunitContext, IAsyncLifetime
         Assert.Contains("Enable section view", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("Offset:", cut.Markup, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ModelViewer_WhenSectionButtonIsClicked_RendersPositionedPanelShell()
+    {
+        var cut = Render<ModelViewer>();
+
+        cut.Find(".vp-analysis-rail button").Click();
+
+        var panel = cut.Find(".vp-section-panel");
+        Assert.Equal("DIV", panel.TagName);
+        Assert.Contains("Enable section view", panel.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Offset:", panel.TextContent, StringComparison.Ordinal);
+    }
 }

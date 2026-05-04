@@ -373,15 +373,22 @@ test('section cut edge is neutral while hatch fill keeps the pink cross lines', 
         { r: 1, g: 0.22, b: 0.68 });
 });
 
-test('section plane opts grid floor and shadow catcher out of visual clipping', () => {
+test('section plane clips model materials only and leaves grid floor whole', () => {
     const context = loadViewerContext();
     const grid = makeMesh('__grid__', { material: {} });
     const shadow = makeMesh('__shadow_catcher__', { material: {} });
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+        material: {},
+    });
+    model.clone = () => null;
     context.grid = grid;
     context.shadow = shadow;
+    context.model = model;
     context.scene = {
         clipPlane: null,
-        meshes: [grid, shadow],
+        meshes: [grid, shadow, model],
         getMaterialByName: () => null,
         onBeforeRenderObservable: {
             remove: () => {},
@@ -395,12 +402,14 @@ test('section plane opts grid floor and shadow catcher out of visual clipping', 
         setSectionPlane('viewer', true, 'x', 0, false);
         ({
             sceneClipped: !!scene.clipPlane,
-            gridClipped: grid.material.disableClipPlanes !== true,
-            shadowClipped: shadow.material.disableClipPlanes !== true
+            modelClipped: !!model.material.clipPlane && model.material.disableClipPlanes === false,
+            gridClipped: !!grid.material.clipPlane || grid.material.disableClipPlanes !== true,
+            shadowClipped: !!shadow.material.clipPlane || shadow.material.disableClipPlanes !== true
         });
     `, context);
 
-    assert.equal(result.sceneClipped, true);
+    assert.equal(result.sceneClipped, false);
+    assert.equal(result.modelClipped, true);
     assert.equal(result.gridClipped, false);
     assert.equal(result.shadowClipped, false);
 });

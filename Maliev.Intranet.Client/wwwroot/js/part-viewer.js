@@ -387,6 +387,7 @@ const sectionEdgeMeshes     = {};   // canvasId → BABYLON.LinesMesh | null
 const sectionHatchMeshes    = {};   // canvasId → BABYLON.LinesMesh | null (cross-hatch fill)
 const sectionGhostMeshes    = {};   // canvasId → BABYLON.Mesh[] (xray clones of hidden half)
 const sectionObservers      = {};   // canvasId → scene.onBeforeRenderObservable handle
+const sectionClipPlanes     = {};   // canvasId → active model-material clipping plane | null
 let   _sectionRebuildPending = {};  // canvasId → boolean (debounce flag)
 
 // In-memory GLB cache: key = storage path (without signed-URL query params), value = blob URL.
@@ -2722,6 +2723,7 @@ function _createSectionGhosts(canvasId, scene, nx, ny, nz, d) {
     const ghosts = [];
     for (const mesh of scene.meshes) {
         if (!mesh.isVisible || !isModelMeshForAnalysis(mesh, canvasId)) continue;
+        if (typeof mesh.clone !== 'function') continue;
 
         const clone = mesh.clone(`__section_ghost_${mesh.uniqueId}`, null, false);
         if (!clone) continue;
@@ -3703,6 +3705,47 @@ function disableSectionClippingForMesh(mesh) {
     }
 }
 
+function forEachMeshMaterial(mesh, callback) {
+    const material = mesh?.material;
+    if (!material) return;
+
+    callback(material);
+    if (Array.isArray(material.subMaterials)) {
+        material.subMaterials.forEach(subMaterial => {
+            if (subMaterial) callback(subMaterial);
+        });
+    }
+}
+
+function clearSectionClippingForModelMeshes(canvasId, scene) {
+    if (!scene?.meshes) return;
+
+    for (const mesh of scene.meshes) {
+        if (!isModelMeshForAnalysis(mesh, canvasId)) continue;
+        forEachMeshMaterial(mesh, material => {
+            if (material._malievSectionClip === true) {
+                material.clipPlane = null;
+                material._malievSectionClip = false;
+            }
+        });
+    }
+    sectionClipPlanes[canvasId] = null;
+}
+
+function applySectionClippingToModelMeshes(canvasId, scene, plane) {
+    if (!scene?.meshes || !plane) return;
+
+    for (const mesh of scene.meshes) {
+        if (!isModelMeshForAnalysis(mesh, canvasId)) continue;
+        forEachMeshMaterial(mesh, material => {
+            material.clipPlane = plane;
+            material.disableClipPlanes = false;
+            material._malievSectionClip = true;
+        });
+    }
+    sectionClipPlanes[canvasId] = plane;
+}
+
 function disableSectionClippingForSystemMeshes(canvasId, scene) {
     if (!scene?.meshes) return;
 
@@ -3718,7 +3761,7 @@ function scheduleSectionRebuild(canvasId, scene, planeNormal, planeD) {
     _sectionRebuildPending[canvasId] = true;
     requestAnimationFrame(() => {
         _sectionRebuildPending[canvasId] = false;
-        if (scenes[canvasId] !== scene || !scene.clipPlane) return;
+        if (scenes[canvasId] !== scene || !sectionClipPlanes[canvasId]) return;
         _rebuildSectionEdges(canvasId, scene, planeNormal, planeD);
         _rebuildSectionHatch(canvasId, scene, planeNormal, planeD);
     });
@@ -3738,9 +3781,10 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     if (!scene) return;
 
     disposeSectionVisuals(canvasId, scene);
+    clearSectionClippingForModelMeshes(canvasId, scene);
+    scene.clipPlane = null;
 
     if (!enabled) {
-        scene.clipPlane = null;
         return;
     }
 
@@ -3764,7 +3808,8 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
         default:  nx = sign; break;
     }
     const d = -(nx * worldOffset + ny * worldOffset + nz * worldOffset);
-    scene.clipPlane = new BABYLON.Plane(nx, ny, nz, d);
+    const plane = new BABYLON.Plane(nx, ny, nz, d);
+    applySectionClippingToModelMeshes(canvasId, scene, plane);
     disableSectionClippingForSystemMeshes(canvasId, scene);
 
     // Create ghost clones for the hidden half (xray silhouette)
@@ -4275,6 +4320,7 @@ export function dispose(canvasId) {
     delete sectionHatchMeshes[canvasId];
     delete sectionGhostMeshes[canvasId];
     delete sectionObservers[canvasId];
+    delete sectionClipPlanes[canvasId];
     delete _sectionRebuildPending[canvasId];
 }
 
