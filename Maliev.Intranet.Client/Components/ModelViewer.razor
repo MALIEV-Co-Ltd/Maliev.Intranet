@@ -280,6 +280,7 @@
         _sectionAxis = NormalizeSectionAxis(settings.SectionAxis);
         _sectionOffset = settings.SectionOffsetMm;
         _sectionInverted = settings.SectionInverted;
+        _sectionMenuOpen = _sectionEnabled;
         _lastViewerSettingsKey = key;
     }
 
@@ -694,7 +695,7 @@
 
     private void CloseAnalysisPanels()
     {
-        _sectionMenuOpen = false;
+        _sectionMenuOpen = _sectionEnabled;
     }
 
     private async Task SetAnalysisTool(string tool)
@@ -772,6 +773,7 @@
     private async Task SetSectionEnabledAsync(bool v)
     {
         _sectionEnabled = v;
+        _sectionMenuOpen = v;
         await _SendSectionPlane();
         await NotifyViewerSettingsChangedAsync();
     }

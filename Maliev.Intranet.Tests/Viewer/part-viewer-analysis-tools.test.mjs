@@ -140,6 +140,7 @@ function loadViewerContext() {
                     name,
                     lines: options.lines,
                     isPickable: true,
+                    material: {},
                     dispose: () => {},
                 }),
                 CreateSphere: (name) => ({
@@ -212,10 +213,10 @@ function makeMesh(name, options = {}) {
     };
 }
 
-function cubeSectionMesh(onRead) {
+function cubeSectionMesh(onRead, zOffset = 0) {
     const positions = [
-        -1, -1, -1,  1, -1, -1,  1,  1, -1, -1,  1, -1,
-        -1, -1,  1,  1, -1,  1,  1,  1,  1, -1,  1,  1,
+        -1, -1, -1 + zOffset,  1, -1, -1 + zOffset,  1,  1, -1 + zOffset, -1,  1, -1 + zOffset,
+        -1, -1,  1 + zOffset,  1, -1,  1 + zOffset,  1,  1,  1 + zOffset, -1,  1,  1 + zOffset,
     ];
     const indices = [
         0, 1, 2, 0, 2, 3,
@@ -304,6 +305,64 @@ test('section hatch generation uses model meshes and excludes section ghost mesh
     assert.ok(hatchLineCount > 0, 'expected visible cross hatch lines');
     assert.ok(modelReads > 0, 'expected section to read model geometry');
     assert.equal(ghostReads, 0, 'section ghosts must not feed future hatch rebuilds');
+});
+
+test('section hatch generation follows translated cut contours and stays visible above the cut', () => {
+    const context = loadViewerContext();
+    context.scene = {
+        clipPlane: {},
+        meshes: [
+            cubeSectionMesh(() => {}, 1000),
+        ],
+    };
+
+    const result = vm.runInContext(`
+        tagModelMeshesForAnalysis('viewer', scene);
+        _rebuildSectionHatch('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
+        ({
+            lineCount: sectionHatchMeshes.viewer?.lines?.length ?? 0,
+            color: sectionHatchMeshes.viewer?.color,
+            disableClipPlanes: sectionHatchMeshes.viewer?.material?.disableClipPlanes,
+            disableDepthWrite: sectionHatchMeshes.viewer?.material?.disableDepthWrite,
+            alwaysActive: sectionHatchMeshes.viewer?.alwaysSelectAsActiveMesh
+        });
+    `, context);
+
+    assert.ok(result.lineCount > 0, 'expected cross hatch lines even when the contour is far from the world origin');
+    assert.deepEqual(
+        { r: result.color.r, g: result.color.g, b: result.color.b },
+        { r: 1, g: 0.22, b: 0.68 });
+    assert.equal(result.disableClipPlanes, true);
+    assert.equal(result.disableDepthWrite, true);
+    assert.equal(result.alwaysActive, true);
+});
+
+test('section cut edge is neutral while hatch fill keeps the pink cross lines', () => {
+    const context = loadViewerContext();
+    context.scene = {
+        clipPlane: {},
+        meshes: [
+            cubeSectionMesh(() => {}),
+        ],
+    };
+
+    const result = vm.runInContext(`
+        tagModelMeshesForAnalysis('viewer', scene);
+        _rebuildSectionEdges('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
+        _rebuildSectionHatch('viewer', scene, new BABYLON.Vector3(1, 0, 0), 0);
+        ({
+            edgeColor: sectionEdgeMeshes.viewer?.color,
+            hatchColor: sectionHatchMeshes.viewer?.color
+        });
+    `, context);
+
+    assert.notDeepEqual(
+        { r: result.edgeColor.r, g: result.edgeColor.g, b: result.edgeColor.b },
+        { r: result.hatchColor.r, g: result.hatchColor.g, b: result.hatchColor.b },
+        'the cut border must not be the same pink color as the hatch fill');
+    assert.deepEqual(
+        { r: result.hatchColor.r, g: result.hatchColor.g, b: result.hatchColor.b },
+        { r: 1, g: 0.22, b: 0.68 });
 });
 
 test('measure hover uses PointerEvent coordinates instead of stale scene pointer coordinates', () => {

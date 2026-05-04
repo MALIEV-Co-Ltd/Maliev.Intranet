@@ -256,6 +256,17 @@ const CONFIG = {
         maxRayDistance: 100,         // Maximum ray length (mm)
     },
 
+    /** Section view configuration */
+    SECTION: {
+        cutEdgeColor: { r: 0.10, g: 0.18, b: 0.28 },
+        hatchColor: { r: 1.0, g: 0.22, b: 0.68 },
+        hatchSpacingMm: 3.0,
+        minHatchSpacing: 0.5,
+        planeLiftMm: 0.08,
+        renderingGroupId: 3,
+        zOffset: -8,
+    },
+
     // =========================================================================
     // OTHER SETTINGS
     // =========================================================================
@@ -3668,6 +3679,22 @@ function disposeSectionVisuals(canvasId, scene = scenes[canvasId]) {
     _sectionRebuildPending[canvasId] = false;
 }
 
+function configureSectionLineMesh(mesh, color) {
+    if (!mesh) return mesh;
+    mesh.color = toColor3(color);
+    mesh.renderingGroupId = CONFIG.SECTION.renderingGroupId;
+    mesh.alwaysSelectAsActiveMesh = true;
+
+    if (mesh.material) {
+        mesh.material.disableClipPlanes = true;
+        mesh.material.disableDepthWrite = true;
+        mesh.material.needDepthPrePass = false;
+        mesh.material.zOffset = CONFIG.SECTION.zOffset;
+    }
+
+    return markAnalysisHelperMesh(mesh);
+}
+
 function scheduleSectionRebuild(canvasId, scene, planeNormal, planeD) {
     if (_sectionRebuildPending[canvasId]) return;
     _sectionRebuildPending[canvasId] = true;
@@ -3794,9 +3821,7 @@ function _rebuildSectionEdges(canvasId, scene, planeNormal, planeD) {
         { lines, updatable: false },
         scene
     );
-    linesMesh.color = new BABYLON.Color3(1.0, 0.22, 0.68);
-    linesMesh.renderingGroupId = 2;
-    markAnalysisHelperMesh(linesMesh);
+    configureSectionLineMesh(linesMesh, CONFIG.SECTION.cutEdgeColor);
     sectionEdgeMeshes[canvasId] = linesMesh;
 }
 
@@ -3878,16 +3903,20 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
             maxU = Math.max(maxU, pu);
             minV = Math.min(minV, pv);
             maxV = Math.max(maxV, pv);
+            points2D.push({ u: pu, v: pv });
         }
     }
 
-    // Generate diagonal cross-hatch lines across the bounding box.
-    const hatchSpacing = Math.max(3.0 * (modelScaleFactors[canvasId] ?? 1), 0.5);
+    // Generate diagonal cross-hatch lines across the actual projected contour,
+    // not around world zero. Model Z is intentionally lifted above the floor.
+    const hatchSpacing = Math.max(
+        CONFIG.SECTION.hatchSpacingMm * (modelScaleFactors[canvasId] ?? 1),
+        CONFIG.SECTION.minHatchSpacing);
     const hatchAngles = [Math.PI / 4, -Math.PI / 4];
     const hatchLines = [];
 
-    const hatchExtent = Math.max(maxU - minU, maxV - minV) * 1.5;
-    const planeLift = planeNormal.scale(0.02);
+    const planeLift = planeNormal.scale(CONFIG.SECTION.planeLiftMm * (modelScaleFactors[canvasId] ?? 1));
+    const hatchEpsilon = 1e-5;
 
     for (const hatchAngle of hatchAngles) {
         const cosA = Math.cos(hatchAngle);
@@ -3895,7 +3924,18 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
         const perpU = -sinA;
         const perpV = cosA;
 
-        for (let offset = -hatchExtent; offset <= hatchExtent; offset += hatchSpacing) {
+        let minOffset = Infinity;
+        let maxOffset = -Infinity;
+        for (const point of points2D) {
+            const value = perpU * point.u + perpV * point.v;
+            minOffset = Math.min(minOffset, value);
+            maxOffset = Math.max(maxOffset, value);
+        }
+
+        const startOffset = Math.floor((minOffset - hatchSpacing) / hatchSpacing) * hatchSpacing;
+        const endOffset = Math.ceil((maxOffset + hatchSpacing) / hatchSpacing) * hatchSpacing;
+
+        for (let offset = startOffset; offset <= endOffset; offset += hatchSpacing) {
             const intersectPts = [];
             for (const seg of allSegments) {
                 const u0 = BABYLON.Vector3.Dot(seg[0], uAxis);
@@ -3905,20 +3945,33 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
 
                 const d0 = perpU * u0 + perpV * v0 - offset;
                 const d1 = perpU * u1 + perpV * v1 - offset;
+                if (Math.abs(d0) <= hatchEpsilon && Math.abs(d1) <= hatchEpsilon) continue;
 
-                if (d0 * d1 < 0) {
-                    const t = -d0 / (d1 - d0);
+                if ((d0 < -hatchEpsilon && d1 > hatchEpsilon)
+                    || (d0 > hatchEpsilon && d1 < -hatchEpsilon)
+                    || Math.abs(d0) <= hatchEpsilon
+                    || Math.abs(d1) <= hatchEpsilon) {
+                    const denominator = d1 - d0;
+                    if (Math.abs(denominator) <= hatchEpsilon) continue;
+                    const t = Math.max(0, Math.min(1, -d0 / denominator));
                     const hu = u0 + t * (u1 - u0);
                     const hv = v0 + t * (v1 - v0);
-                    intersectPts.push({ u: hu, v: hv });
+                    intersectPts.push({ u: hu, v: hv, s: cosA * hu + sinA * hv });
                 }
             }
 
             if (intersectPts.length >= 2) {
-                intersectPts.sort((a, b) => cosA * (a.u - b.u) + sinA * (a.v - b.v));
-                for (let i = 0; i < intersectPts.length - 1; i += 2) {
-                    const p1 = intersectPts[i];
-                    const p2 = intersectPts[i + 1];
+                intersectPts.sort((a, b) => a.s - b.s);
+                const uniquePts = [];
+                for (const point of intersectPts) {
+                    if (uniquePts.length === 0 || Math.abs(point.s - uniquePts[uniquePts.length - 1].s) > hatchEpsilon * 10) {
+                        uniquePts.push(point);
+                    }
+                }
+
+                for (let i = 0; i < uniquePts.length - 1; i += 2) {
+                    const p1 = uniquePts[i];
+                    const p2 = uniquePts[i + 1];
                     const pt1 = new BABYLON.Vector3(
                         p1.u * uAxis.x + p1.v * vAxis.x - planeD * planeNormal.x,
                         p1.u * uAxis.y + p1.v * vAxis.y - planeD * planeNormal.y,
@@ -3942,9 +3995,7 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
         { lines: hatchLines, updatable: false },
         scene
     );
-    hatchMesh.color = new BABYLON.Color3(1.0, 0.22, 0.68);
-    hatchMesh.renderingGroupId = 2;
-    markAnalysisHelperMesh(hatchMesh);
+    configureSectionLineMesh(hatchMesh, CONFIG.SECTION.hatchColor);
     sectionHatchMeshes[canvasId] = hatchMesh;
 }
 
