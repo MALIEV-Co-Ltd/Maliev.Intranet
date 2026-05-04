@@ -168,11 +168,14 @@ public class ModuleRegressionSourceTests
     [Fact]
     public void TopBar_CurrencySelectorTrigger_RemainsCompact()
     {
+        var razor = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var mudOverrides = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
 
-        Assert.Contains("flex: 0 0 86px;", source, StringComparison.Ordinal);
-        Assert.Contains("width: 86px;", source, StringComparison.Ordinal);
-        Assert.Contains("min-width: 220px;", source, StringComparison.Ordinal);
+        Assert.Contains("Style=\"width: 80px; min-width: 80px; max-width: 80px; flex: 0 0 80px;\"", razor, StringComparison.Ordinal);
+        Assert.Contains(".topbar-root ::deep .topbar-currency-autocomplete", source, StringComparison.Ordinal);
+        Assert.Contains(".topbar-currency-popover", mudOverrides, StringComparison.Ordinal);
+        Assert.Contains("min-width: 220px;", mudOverrides, StringComparison.Ordinal);
         Assert.DoesNotContain("min-width: 120px;", source, StringComparison.Ordinal);
     }
 

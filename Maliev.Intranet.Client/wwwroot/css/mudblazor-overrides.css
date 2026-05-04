@@ -88,6 +88,23 @@
     font-size: var(--mud-typography-default-size);
 }
 
+.topbar-currency-popover {
+    min-width: 220px;
+    z-index: 2000 !important;
+    border-radius: var(--maliev-radius-sm) !important;
+    overflow: hidden;
+}
+
+.topbar-currency-popover .mud-list,
+.topbar-currency-popover .mud-list-item {
+    border-radius: 0 !important;
+}
+
+.topbar-currency-popover .mud-list-item-text {
+    white-space: normal;
+    line-height: 1.3;
+}
+
 /* ── BUTTONS ──────────────────────────────────────────────────────
    MudButton, MudIconButton
    ──────────────────────────────────────────────────────────────── */
