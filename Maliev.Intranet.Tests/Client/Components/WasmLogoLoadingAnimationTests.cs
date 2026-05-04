@@ -28,11 +28,12 @@ public sealed class WasmLogoLoadingAnimationTests : BunitContext, IAsyncLifetime
         Assert.Contains("url('/images/logo.svg')", source);
         Assert.Contains("--maliev-logo-loader-fill, #000000", source);
         Assert.Contains("--maliev-logo-loader-fill, #ffffff", source);
-        Assert.Contains("--logo-progress: var(--blazor-load-percentage, 0%)", source);
+        Assert.Contains("--logo-progress: var(--wasm-logo-progress, 0%)", source);
         Assert.Contains("linear-gradient(", source);
         Assert.Contains("90deg", source);
         Assert.DoesNotContain("conic-gradient", source, StringComparison.Ordinal);
         Assert.DoesNotContain("background-size: var(--blazor-load-percentage, 0%) 100%", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("--logo-progress: var(--blazor-load-percentage", source, StringComparison.Ordinal);
         Assert.DoesNotContain(".loader::after", source, StringComparison.Ordinal);
         Assert.DoesNotContain("@keyframes maliev-logo-load", source, StringComparison.Ordinal);
         Assert.DoesNotContain("animation:", source, StringComparison.Ordinal);

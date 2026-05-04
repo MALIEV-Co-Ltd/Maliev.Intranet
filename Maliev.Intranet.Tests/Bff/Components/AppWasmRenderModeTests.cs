@@ -41,7 +41,11 @@ public class AppWasmRenderModeTests
         Assert.Contains("--blazor-load-percentage", source);
         Assert.Contains("--blazor-load-percentage: 0%", source);
         Assert.Contains("root.style.setProperty('--blazor-load-percentage', '0%')", source);
-        Assert.Contains("--wasm-logo-progress: var(--blazor-load-percentage, 0%)", source);
+        Assert.Contains("--wasm-logo-progress: 0%", source);
+        Assert.Contains("root.style.setProperty('--wasm-logo-progress', '0%')", source);
+        Assert.Contains("root.style.setProperty('--wasm-logo-progress', progressText)", source);
+        Assert.Contains("document.querySelectorAll('.maliev-logo-loader')", source);
+        Assert.Contains("loader.style.setProperty('--wasm-logo-progress', progressText)", source);
         Assert.Contains("linear-gradient(", source);
         Assert.Contains("90deg", source);
         Assert.DoesNotContain("wasm-loading-progress", source, StringComparison.Ordinal);

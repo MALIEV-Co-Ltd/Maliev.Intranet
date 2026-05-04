@@ -14,6 +14,7 @@
         :root {
             --blazor-load-percentage: 0%;
             --blazor-load-percentage-text: "0%";
+            --wasm-logo-progress: 0%;
         }
 
         :root[data-maliev-theme="dark"] {
@@ -86,7 +87,7 @@
 
         .wasm-loading .maliev-logo-loader {
             --logo-width: clamp(150px, 38vw, 236px);
-            --wasm-logo-progress: var(--blazor-load-percentage, 0%);
+            --wasm-logo-progress: 0%;
             width: var(--logo-width);
             aspect-ratio: 449.33078 / 103.18751;
             position: relative;
@@ -130,6 +131,7 @@
             root.classList.remove('maliev-wasm-runtime-ready', 'maliev-wasm-ready', 'maliev-wasm-failed');
             root.style.setProperty('--blazor-load-percentage', '0%');
             root.style.setProperty('--blazor-load-percentage-text', '"0%"');
+            root.style.setProperty('--wasm-logo-progress', '0%');
 
             function getCookie(name) {
                 const value = `; ${document.cookie}`;
@@ -213,8 +215,14 @@
 
             function setProgress(value) {
                 const progress = clamp(Number.isFinite(value) ? value : 0);
+                const progressText = `${progress}%`;
                 root.style.setProperty('--blazor-load-percentage', `${progress}%`);
                 root.style.setProperty('--blazor-load-percentage-text', `"${Math.floor(progress)}%"`);
+                root.style.setProperty('--wasm-logo-progress', progressText);
+
+                document.querySelectorAll('.maliev-logo-loader').forEach(function (loader) {
+                    loader.style.setProperty('--wasm-logo-progress', progressText);
+                });
             }
 
             function markRuntimeReady() {

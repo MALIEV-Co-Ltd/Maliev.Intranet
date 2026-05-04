@@ -2,7 +2,7 @@
     --logo-width: clamp(150px, 38vw, 236px);
     --logo-outline: var(--maliev-logo-loader-outline, color-mix(in oklch, #000000 24%, transparent));
     --logo-fill: var(--maliev-logo-loader-fill, #000000);
-    --logo-progress: var(--blazor-load-percentage, 0%);
+    --logo-progress: var(--wasm-logo-progress, 0%);
     width: var(--logo-width);
     aspect-ratio: 449.33078 / 103.18751;
     position: relative;
