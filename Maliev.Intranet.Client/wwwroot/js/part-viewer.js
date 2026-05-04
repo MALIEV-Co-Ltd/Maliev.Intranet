@@ -441,6 +441,8 @@ const perCanvasBodyMap      = {};   // canvasId → Map<bodyIndex, {rootNode, me
 const selectedBodyIndices   = {};   // canvasId → currently selected body index (null = none selected)
 const loadGenerations       = {};   // canvasId → number (incremented on each initialize, checked in retry callbacks to cancel stale loads)
 const shadowGenerators      = {};   // canvasId → BABYLON.ShadowGenerator
+const analysisModelMeshIds  = {};   // canvasId → Set<mesh.uniqueId> for real model geometry
+const analysisCameraButtons = {};   // canvasId → previous ArcRotate pointer buttons while analysis tools are active
 
 // ── Auto-rotation animation state ────────────────────────────────────────────
 const edgesEnabled          = {};  // canvasId → boolean
@@ -2025,6 +2027,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                         if (!isMultiBody) m.material = cadGray;
                     }
                 });
+                tagModelMeshesForAnalysis(canvasId, _scene);
 
                 // Position directional light to correctly cast shadows from the top, front-left
                 const dist = Math.max(
@@ -2329,7 +2332,10 @@ function attachMiddleMouseZoom(canvasId, canvas) { return; // DISABLED - feature
 
         // Pick point under cursor for zoom-target
         const scene = scenes[canvasId];
-        const pickResult = scene.pick(e.offsetX, e.offsetY);
+        const coords = getPointerRenderCoordinates(canvasId, e);
+        const pickResult = coords
+            ? scene.pick(coords.x, coords.y, mesh => isModelMeshForAnalysis(mesh, canvasId))
+            : { hit: false };
         if (pickResult.hit && !isSystemMesh(pickResult.pickedMesh)) {
             state.targetPoint = pickResult.pickedPoint.clone();
         } else {
@@ -2702,20 +2708,9 @@ function _createSectionGhosts(canvasId, scene, nx, ny, nz, d) {
     // (but we reuse the same ghost mat with a per-mesh override via material.clipPlane)
     const invertedPlane = new BABYLON.Plane(-nx, -ny, -nz, -d);
 
-    const overlayMeshIds = new Set();
-    const overlayMap = overlayMeshes[canvasId];
-    if (overlayMap) {
-        for (const [, meshArr] of overlayMap) {
-            for (const m of meshArr) overlayMeshIds.add(m.uniqueId);
-        }
-    }
-
     const ghosts = [];
     for (const mesh of scene.meshes) {
-        if (!mesh.isVisible || mesh.getTotalVertices() === 0) continue;
-        if (isSystemMesh(mesh)) continue;
-        if (overlayMeshIds.has(mesh.uniqueId)) continue;
-        if (mesh.name.startsWith('__section_ghost')) continue;
+        if (!mesh.isVisible || !isModelMeshForAnalysis(mesh, canvasId)) continue;
 
         const clone = mesh.clone(`__section_ghost_${mesh.uniqueId}`, null, false);
         if (!clone) continue;
@@ -2724,7 +2719,8 @@ function _createSectionGhosts(canvasId, scene, nx, ny, nz, d) {
         const cloneMat = ghostMat.clone(`__section_ghost_mat_${mesh.uniqueId}`);
         cloneMat.clipPlane = invertedPlane;
         clone.material = cloneMat;
-        clone.isPickable = false;
+        clone.receiveShadows = false;
+        markAnalysisHelperMesh(clone);
         ghosts.push(clone);
     }
     sectionGhostMeshes[canvasId] = ghosts;
@@ -2744,16 +2740,142 @@ function _disposeSectionGhosts(canvasId) {
     sectionGhostMeshes[canvasId] = null;
 }
 
+function isAnalysisHelperMesh(mesh) {
+    const name = mesh?.name ?? '';
+    return !!mesh?.metadata?.malievAnalysisHelper
+        || name === '__grid__'
+        || name === '__shadow_catcher__'
+        || name === '__root__'
+        || name.startsWith('__axis')
+        || name.startsWith('bbox_')
+        || name.startsWith('__section_ghost')
+        || name.startsWith('__section_edges_')
+        || name.startsWith('__section_hatch_')
+        || name.startsWith('__flipped_overlay__')
+        || name.startsWith('measure_')
+        || name.startsWith('thickness_');
+}
+
+function markAnalysisHelperMesh(mesh) {
+    if (!mesh) return mesh;
+    mesh.metadata = { ...(mesh.metadata ?? {}), malievAnalysisHelper: true, malievModelMesh: false };
+    mesh.isPickable = false;
+    return mesh;
+}
+
+function isOverlayMeshForCanvas(canvasId, mesh) {
+    if (!mesh) return false;
+    const direct = overlayMeshes[canvasId];
+    if (direct instanceof Map) {
+        for (const [, meshes] of direct) {
+            if (meshes?.some(m => m === mesh || m?.uniqueId === mesh.uniqueId)) return true;
+        }
+    }
+
+    const prefix = `${canvasId}::`;
+    for (const [key, value] of Object.entries(overlayMeshes)) {
+        if (!key.startsWith(prefix) || !(value instanceof Map)) continue;
+        for (const [, meshes] of value) {
+            if (meshes?.some(m => m === mesh || m?.uniqueId === mesh.uniqueId)) return true;
+        }
+    }
+
+    return false;
+}
+
+function isModelMeshCandidate(mesh, canvasId) {
+    return !!mesh
+        && !isAnalysisHelperMesh(mesh)
+        && !isOverlayMeshForCanvas(canvasId, mesh)
+        && typeof mesh.getTotalVertices === 'function'
+        && mesh.getTotalVertices() > 0
+        && (typeof mesh.isEnabled !== 'function' || mesh.isEnabled());
+}
+
+function tagModelMeshesForAnalysis(canvasId, scene = scenes[canvasId]) {
+    if (!scene) return;
+
+    const ids = new Set();
+    scene.meshes.forEach(mesh => {
+        if (isModelMeshCandidate(mesh, canvasId)) {
+            mesh.metadata = { ...(mesh.metadata ?? {}), malievModelMesh: true, malievAnalysisHelper: false };
+            mesh.isPickable = true;
+            ids.add(mesh.uniqueId);
+        } else if (isAnalysisHelperMesh(mesh) || isOverlayMeshForCanvas(canvasId, mesh)) {
+            if (mesh.metadata?.malievModelMesh) {
+                mesh.metadata = { ...mesh.metadata, malievModelMesh: false };
+            }
+            if (isAnalysisHelperMesh(mesh)) mesh.isPickable = false;
+        }
+    });
+    analysisModelMeshIds[canvasId] = ids;
+}
+
+function ensureModelMeshesTagged(canvasId, scene = scenes[canvasId]) {
+    if (!analysisModelMeshIds[canvasId] || analysisModelMeshIds[canvasId].size === 0) {
+        tagModelMeshesForAnalysis(canvasId, scene);
+    }
+}
+
+function isModelMeshForAnalysis(mesh, canvasId = null) {
+    if (!mesh || isAnalysisHelperMesh(mesh)) return false;
+    if (canvasId && analysisModelMeshIds[canvasId]?.has(mesh.uniqueId)) return true;
+    return mesh.metadata?.malievModelMesh === true;
+}
+
 /**
- * Checks if a mesh is a system mesh (grid, axis gizmo, bounding box) that should be skipped.
+ * Checks if a mesh is a system mesh (grid, axis gizmo, bounding box, analysis helpers) that should be skipped.
  * @param {BABYLON.AbstractMesh} mesh
  * @returns {boolean}
  */
 function isSystemMesh(mesh) {
-    return mesh.name === '__grid__' ||
-           mesh.name === '__shadow_catcher__' ||
-           mesh.name.startsWith('__axis') ||
-           mesh.name.startsWith('bbox_');
+    return isAnalysisHelperMesh(mesh);
+}
+
+function getPointerRenderCoordinates(canvasId, pointerEvent) {
+    const engine = engines[canvasId];
+    const canvas = engine?.getRenderingCanvas?.() ?? document.getElementById(canvasId);
+    const event = pointerEvent?.touches?.[0]
+        ?? pointerEvent?.changedTouches?.[0]
+        ?? pointerEvent;
+
+    if (!canvas || !event || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+
+    const renderWidth = engine?.getRenderWidth?.() ?? canvas.width ?? rect.width;
+    const renderHeight = engine?.getRenderHeight?.() ?? canvas.height ?? rect.height;
+    return {
+        x: ((event.clientX - rect.left) / rect.width) * renderWidth,
+        y: ((event.clientY - rect.top) / rect.height) * renderHeight,
+    };
+}
+
+function getPointerInfoRenderCoordinates(canvasId, scene, pointerInfo) {
+    return getPointerRenderCoordinates(canvasId, pointerInfo?.event)
+        ?? (Number.isFinite(scene?.pointerX) && Number.isFinite(scene?.pointerY)
+            ? { x: scene.pointerX, y: scene.pointerY }
+            : null);
+}
+
+function setAnalysisNavigationLock(canvasId, locked) {
+    const pointers = mainCameras[canvasId]?.inputs?.attached?.pointers;
+    if (!pointers) return;
+
+    if (locked) {
+        if (!analysisCameraButtons[canvasId]) {
+            analysisCameraButtons[canvasId] = Array.isArray(pointers.buttons)
+                ? [...pointers.buttons]
+                : [0];
+        }
+        pointers.buttons = [];
+        return;
+    }
+
+    if (measureStates[canvasId]?.active || thicknessStates[canvasId]?.active) return;
+    const previous = analysisCameraButtons[canvasId] ?? [0];
+    pointers.buttons = [...previous];
+    delete analysisCameraButtons[canvasId];
 }
 
 /**
@@ -3574,6 +3696,8 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
         return;
     }
 
+    ensureModelMeshesTagged(canvasId, scene);
+
     // World coordinate of the clipping plane along the chosen axis.
     // Model centre along each axis (from meshCenters, which stores the post-centering centre):
     //   X, Y ≈ 0 (model is centred at world origin in X/Y)
@@ -3614,21 +3738,10 @@ function _rebuildSectionEdges(canvasId, scene, planeNormal, planeD) {
         sectionEdgeMeshes[canvasId] = null;
     }
 
-    // Collect overlay mesh IDs so we can exclude them from the section
-    const overlayMeshIds = new Set();
-    const overlayMap = overlayMeshes[canvasId];
-    if (overlayMap) {
-        for (const [, meshArr] of overlayMap) {
-            for (const m of meshArr) overlayMeshIds.add(m.uniqueId);
-        }
-    }
-
     const lines = [];
 
     for (const mesh of scene.meshes) {
-        if (!mesh.isVisible || mesh.getTotalVertices() === 0) continue;
-        if (isSystemMesh(mesh)) continue;
-        if (overlayMeshIds.has(mesh.uniqueId)) continue;
+        if (!mesh.isVisible || !isModelMeshForAnalysis(mesh, canvasId)) continue;
 
         const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
         const indices = mesh.getIndices();
@@ -3673,14 +3786,14 @@ function _rebuildSectionEdges(canvasId, scene, planeNormal, planeD) {
 
     if (lines.length === 0) return;
 
-    const c4 = getEdgeColorFromCss(isDarkMode(canvasId));
     const linesMesh = BABYLON.MeshBuilder.CreateLineSystem(
         `__section_edges_${canvasId}__`,
         { lines, updatable: false },
         scene
     );
-    linesMesh.color = new BABYLON.Color3(c4.r, c4.g, c4.b);
-    linesMesh.isPickable = false;
+    linesMesh.color = new BABYLON.Color3(1.0, 0.22, 0.68);
+    linesMesh.renderingGroupId = 2;
+    markAnalysisHelperMesh(linesMesh);
     sectionEdgeMeshes[canvasId] = linesMesh;
 }
 
@@ -3694,21 +3807,10 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
         sectionHatchMeshes[canvasId] = null;
     }
 
-    // Collect intersection segments from all meshes (same logic as _rebuildSectionEdges)
-    const overlayMeshIds = new Set();
-    const overlayMap = overlayMeshes[canvasId];
-    if (overlayMap) {
-        for (const [, meshArr] of overlayMap) {
-            for (const m of meshArr) overlayMeshIds.add(m.uniqueId);
-        }
-    }
-
     // Collect all intersection points as line segments
     const allSegments = [];
     for (const mesh of scene.meshes) {
-        if (!mesh.isVisible || mesh.getTotalVertices() === 0) continue;
-        if (isSystemMesh(mesh)) continue;
-        if (overlayMeshIds.has(mesh.uniqueId)) continue;
+        if (!mesh.isVisible || !isModelMeshForAnalysis(mesh, canvasId)) continue;
 
         const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
         const indices = mesh.getIndices();
@@ -3838,8 +3940,8 @@ function _rebuildSectionHatch(canvasId, scene, planeNormal, planeD) {
         scene
     );
     hatchMesh.color = new BABYLON.Color3(1.0, 0.22, 0.68);
-    hatchMesh.isPickable = false;
     hatchMesh.renderingGroupId = 2;
+    markAnalysisHelperMesh(hatchMesh);
     sectionHatchMeshes[canvasId] = hatchMesh;
 }
 
@@ -4059,6 +4161,8 @@ export function dispose(canvasId) {
         delete shadowGenerators[canvasId];
     }
 
+    disposeSectionVisuals(canvasId, scenes[canvasId]);
+
     scenes[canvasId]?.dispose();
     engine?.dispose();
 
@@ -4076,6 +4180,8 @@ export function dispose(canvasId) {
     delete animStates[canvasId];
     delete autoSpeedCurrent[canvasId];
     delete autoSpeedTarget[canvasId];
+    delete analysisModelMeshIds[canvasId];
+    delete analysisCameraButtons[canvasId];
 
     // Clean up all per-part overlay slots for this canvas.
     const prefix = `${canvasId}::`;
@@ -4092,7 +4198,6 @@ export function dispose(canvasId) {
     delete modelScaleFactors[canvasId];
     delete modelCenterOffsets[canvasId];
 
-    disposeSectionVisuals(canvasId, scenes[canvasId]);
     delete sectionEdgeMeshes[canvasId];
     delete sectionHatchMeshes[canvasId];
     delete sectionGhostMeshes[canvasId];
@@ -4389,13 +4494,10 @@ export function enableFlippedTriangleView(canvasId, enabled) {
  */
 function isMeasurablePredicate(mesh) {
     return mesh
+        && isModelMeshForAnalysis(mesh)
         && mesh.isPickable
-        && mesh.isEnabled()
-        && mesh.name !== '__root__'
-        && !isSystemMesh(mesh)
-        && !mesh.name.startsWith('measure_')
-        && !mesh.name.startsWith('thickness_')
-        && !mesh.name.startsWith('__flipped_overlay__')
+        && (typeof mesh.isEnabled !== 'function' || mesh.isEnabled())
+        && typeof mesh.getTotalVertices === 'function'
         && mesh.getTotalVertices() > 0;
 }
 
@@ -4513,8 +4615,7 @@ function createRoundFeatureHighlight(scene, feature) {
 
     const line = BABYLON.MeshBuilder.CreateLines('measure_round_highlight', { points }, scene);
     line.color = new BABYLON.Color3(1, 0.22, 0.68);
-    line.isPickable = false;
-    return line;
+    return markAnalysisHelperMesh(line);
 }
 
 function pickOppositeThicknessHit(scene, entryPoint, normal, entryMesh, entryFaceId) {
@@ -4595,9 +4696,11 @@ export function enableMeasureTool(canvasId, dotNetRef) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
+    ensureModelMeshesTagged(canvasId, scene);
+    setAnalysisNavigationLock(canvasId, true);
     canvas.style.cursor = 'crosshair';
 
-    function makeUnpickable(mesh) { mesh.isPickable = false; }
+    function makeUnpickable(mesh) { markAnalysisHelperMesh(mesh); }
 
     function createHoverDot(point) {
         if (state.hoverDot) { try { state.hoverDot.dispose(); } catch (_) {} }
@@ -4653,23 +4756,26 @@ export function enableMeasureTool(canvasId, dotNetRef) {
 
     state.observer = scene.onPointerObservable.add((pointerInfo) => {
         if (!measureStates[canvasId]?.active) return;
+        const coords = getPointerInfoRenderCoordinates(canvasId, scene, pointerInfo);
 
         switch (pointerInfo.type) {
             case BABYLON.PointerEventTypes.POINTERDOWN: {
-                state._downX = scene.pointerX;
-                state._downY = scene.pointerY;
+                if (!coords) break;
+                state._downX = coords.x;
+                state._downY = coords.y;
                 break;
             }
 
             case BABYLON.PointerEventTypes.POINTERUP: {
+                if (!coords) break;
                 // Only count as a click if pointer didn't move much (< 5px = camera drag)
-                const dx = scene.pointerX - (state._downX ?? scene.pointerX);
-                const dy = scene.pointerY - (state._downY ?? scene.pointerY);
+                const dx = coords.x - (state._downX ?? coords.x);
+                const dy = coords.y - (state._downY ?? coords.y);
                 if (dx * dx + dy * dy > 25) { state._downX = null; state._downY = null; break; }
                 state._downX = null; state._downY = null;
 
-                const pickResult = pickMeshPoint(scene, scene.pointerX, scene.pointerY);
-                const feature = pickCadFeature(scene, scene.pointerX, scene.pointerY);
+                const pickResult = pickMeshPoint(scene, coords.x, coords.y);
+                const feature = pickCadFeature(scene, coords.x, coords.y);
                 if (!pickResult?.hit || !pickResult.pickedMesh || !feature) return;
 
                 const pickedPoint = feature.anchor ?? pickResult.pickedPoint;
@@ -4805,7 +4911,8 @@ export function enableMeasureTool(canvasId, dotNetRef) {
             }
 
             case BABYLON.PointerEventTypes.POINTERMOVE: {
-                const hoverFeature = pickCadFeature(scene, scene.pointerX, scene.pointerY);
+                if (!coords) break;
+                const hoverFeature = pickCadFeature(scene, coords.x, coords.y);
 
                 // Update hover dot position (face-precise feedback)
                 if (hoverFeature) {
@@ -4883,6 +4990,7 @@ export function disableMeasureTool(canvasId) {
     if (canvas) canvas.style.cursor = 'default';
 
     delete measureStates[canvasId];
+    setAnalysisNavigationLock(canvasId, false);
     debugLog(`[BabylonViewer] Measure tool disabled for canvas ${canvasId}`);
 }
 
@@ -4913,6 +5021,9 @@ export function enableThicknessAnalysis(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
+    ensureModelMeshesTagged(canvasId, scene);
+    setAnalysisNavigationLock(canvasId, true);
+
     // Set cursor to crosshair
     canvas.style.cursor = 'crosshair';
 
@@ -4939,6 +5050,7 @@ export function enableThicknessAnalysis(canvasId) {
 
     state.observer = scene.onPointerObservable.add((pointerInfo) => {
         if (!thicknessStates[canvasId]?.active) return;
+        const coords = getPointerInfoRenderCoordinates(canvasId, scene, pointerInfo);
 
         if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
             // Pin the current thickness measurement
@@ -4967,7 +5079,8 @@ export function enableThicknessAnalysis(canvasId) {
         }
 
         if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
-            const pickResult = pickMeshPoint(scene, scene.pointerX, scene.pointerY);
+            if (!coords) return;
+            const pickResult = pickMeshPoint(scene, coords.x, coords.y);
 
             // Clear previous hover dot
             if (state.hoverDot) { try { state.hoverDot.dispose(); } catch (_) {} state.hoverDot = null; }
@@ -5007,7 +5120,7 @@ export function enableThicknessAnalysis(canvasId) {
                 dotMat.emissiveColor = new BABYLON.Color3(1, 0.3, 0.3);
                 dotMat.disableLighting = true;
                 dot.material = dotMat;
-                dot.isPickable = false;
+                markAnalysisHelperMesh(dot);
                 state.hoverDot = dot;
 
                 const entryPoint = pickResult.pickedPoint;
@@ -5037,7 +5150,7 @@ export function enableThicknessAnalysis(canvasId) {
                         points: [entryPoint, hit.pickedPoint]
                     }, scene);
                     state.line.color = toColor3(color);
-                    state.line.isPickable = false;
+                    markAnalysisHelperMesh(state.line);
 
                     state.sphere = BABYLON.MeshBuilder.CreateSphere('thickness_exit', { diameter: 1.0 }, scene);
                     state.sphere.position = hit.pickedPoint.clone();
@@ -5046,10 +5159,10 @@ export function enableThicknessAnalysis(canvasId) {
                     sphereMat.emissiveColor = toColor3(color);
                     sphereMat.alpha = 0.8;
                     state.sphere.material = sphereMat;
-                    state.sphere.isPickable = false;
+                    markAnalysisHelperMesh(state.sphere);
 
                     state.lastThickness = thickness;
-                    state.lastPickPoint = entryPoint;
+                    state.lastPickPoint = entryPoint.clone();
                     state.lastBorderColor = `rgb(${color.r * 255}, ${color.g * 255}, ${color.b * 255})`;
 
                     state.label.innerHTML = `${thickness.toFixed(2)} mm`;
@@ -5119,6 +5232,7 @@ export function disableThicknessAnalysis(canvasId) {
     }
 
     delete thicknessStates[canvasId];
+    setAnalysisNavigationLock(canvasId, false);
     debugLog(`[BabylonViewer] Thickness analysis disabled for canvas ${canvasId}`);
 }
 

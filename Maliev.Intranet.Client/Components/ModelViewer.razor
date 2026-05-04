@@ -38,7 +38,7 @@
     <div class="vp-analysis-rail" @onclick:stopPropagation>
         <MudTooltip Text="Section View" Placement="Placement.Left" Arrow="false">
             <button class="@($"vp-cube-btn {(_sectionEnabled ? "vp-active" : "")}")"
-                    @onclick="ToggleSectionMenu" type="button">
+                    @onclick="ToggleSectionAsync" type="button">
                 <MudIcon Icon="@Icons.Material.Filled.ContentCut" Size="Size.Small" />
             </button>
         </MudTooltip>
@@ -761,9 +761,12 @@
 
     // ── Section view ─────────────────────────────────────────────────────────
 
-    private void ToggleSectionMenu()
+    private async Task ToggleSectionAsync()
     {
-        _sectionMenuOpen = !_sectionMenuOpen;
+        _sectionEnabled = !_sectionEnabled;
+        _sectionMenuOpen = _sectionEnabled;
+        await _SendSectionPlane();
+        await NotifyViewerSettingsChangedAsync();
     }
 
     private async Task SetSectionEnabledAsync(bool v)
