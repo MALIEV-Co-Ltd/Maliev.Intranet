@@ -288,10 +288,17 @@ public partial class ProjectNew : IAsyncDisposable
             await InvokeAsync(StateHasChanged);
         });
 
-        await _hubConnection.StartAsync();
+        try
+        {
+            await _hubConnection.StartAsync();
 
-        foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
-            await JoinPartFileGroupsAsync(part);
+            foreach (var part in _parts.Where(p => !string.IsNullOrEmpty(p.StoragePath)))
+                await JoinPartFileGroupsAsync(part);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "ProjectNew notifications hub is unavailable during initialization.");
+        }
     }
 
     // ── Task 4: Customer search ────────────────────────────────────────
