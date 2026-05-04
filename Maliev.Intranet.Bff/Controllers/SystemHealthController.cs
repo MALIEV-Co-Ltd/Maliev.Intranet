@@ -104,7 +104,7 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
             var client = httpClientFactory.CreateClient("ServiceHealthCheck");
             client.BaseAddress = new Uri(baseUrl);
 
-            var liveness = await ProbeAsync(client, target.LivenessPath, TimeSpan.FromSeconds(2), ct);
+            var liveness = await ProbeAsync(client, target.LivenessPath, TimeSpan.FromSeconds(5), ct);
             status.LivenessResponseTimeMs = liveness.ResponseTimeMs;
             if (!liveness.IsSuccess)
             {
@@ -142,8 +142,33 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         try
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(timeout);
-            using var response = await client.GetAsync(path, timeoutCts.Token);
+            var responseTask = client.GetAsync(path, timeoutCts.Token);
+            var completedTask = await Task.WhenAny(responseTask, Task.Delay(timeout, ct));
+            if (completedTask != responseTask)
+            {
+                sw.Stop();
+                await timeoutCts.CancelAsync();
+                _ = responseTask.ContinueWith(
+                    task =>
+                    {
+                        if (task.Status == TaskStatus.RanToCompletion)
+                        {
+                            task.Result.Dispose();
+                        }
+
+                        _ = task.Exception;
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+
+                return new ProbeResult(
+                    false,
+                    sw.Elapsed.TotalMilliseconds,
+                    $"Health probe {path} timed out after {timeout.TotalSeconds:N0} seconds.");
+            }
+
+            using var response = await responseTask;
             sw.Stop();
 
             if (response.IsSuccessStatusCode)

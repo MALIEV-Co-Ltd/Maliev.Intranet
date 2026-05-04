@@ -154,7 +154,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ChatbotService", controller, StringComparison.Ordinal);
         Assert.Contains("LivenessPath", controller, StringComparison.Ordinal);
         Assert.Contains("ReadinessPath", controller, StringComparison.Ordinal);
+        Assert.Contains("TimeSpan.FromSeconds(5)", controller, StringComparison.Ordinal);
         Assert.Contains("TimeSpan.FromSeconds(10)", controller, StringComparison.Ordinal);
+        Assert.Contains("Task.WhenAny", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("aspire-liveness", controller, StringComparison.Ordinal);
     }
 

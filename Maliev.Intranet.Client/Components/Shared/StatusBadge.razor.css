@@ -12,6 +12,9 @@
 }
 
 .status-active,
+.status-healthy,
+.status-ready,
+.status-succeeded,
 .status-paid,
 .status-received,
 .status-completed,
@@ -22,6 +25,8 @@
 }
 
 .status-warning,
+.status-degraded,
+.status-unknown,
 .status-sent,
 .status-in-transit,
 .status-pending,
@@ -33,6 +38,8 @@
 }
 
 .status-overdue,
+.status-unreachable,
+.status-unhealthy,
 .status-cancelled,
 .status-blocked,
 .status-error,

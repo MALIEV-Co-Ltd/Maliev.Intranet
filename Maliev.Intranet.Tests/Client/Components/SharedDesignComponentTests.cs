@@ -26,6 +26,20 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void StatusBadge_DefinesSystemHealthStateColors()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "StatusBadge.razor.css");
+
+        Assert.Contains(".status-healthy", styles, StringComparison.Ordinal);
+        Assert.Contains("var(--maliev-ok-bg)", styles, StringComparison.Ordinal);
+        Assert.Contains(".status-unreachable", styles, StringComparison.Ordinal);
+        Assert.Contains(".status-unhealthy", styles, StringComparison.Ordinal);
+        Assert.Contains("var(--maliev-danger-bg)", styles, StringComparison.Ordinal);
+        Assert.Contains(".status-degraded", styles, StringComparison.Ordinal);
+        Assert.Contains("var(--maliev-warn-bg)", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Avatar_RendersInitials_FromEmployeeName()
     {
         var cut = Render<Avatar>(parameters => parameters.Add(p => p.Name, "Nattapol Thanakit"));
@@ -58,5 +72,22 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
 
         Assert.Equal("acme", value);
         Assert.Contains("Search customers", cut.Markup);
+    }
+
+    private static string ReadRepoFile(params string[] relativeParts)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
     }
 }
