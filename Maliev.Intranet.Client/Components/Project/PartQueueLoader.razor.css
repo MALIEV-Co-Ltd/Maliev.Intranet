@@ -1,7 +1,8 @@
 .part-queue-loader {
-    --queue-size: 32px;
-    --queue-source-size: 80px;
-    --queue-scale: calc(var(--queue-size) / var(--queue-source-size));
+    --queue-size: 55px;
+    --queue-tile-size: 25px;
+    --queue-corner-start: 3px;
+    --queue-corner-end: 22px;
     width: var(--queue-size);
     height: var(--queue-size);
     display: grid;
@@ -13,35 +14,53 @@
 
 .part-queue-loader::before {
     content: "";
-    width: var(--queue-source-size);
+    width: 100%;
     aspect-ratio: 1;
     box-sizing: border-box;
+    --g1: conic-gradient(from 90deg at var(--queue-corner-start) var(--queue-corner-start), #0000 90deg, currentColor 0);
+    --g2: conic-gradient(from -90deg at var(--queue-corner-end) var(--queue-corner-end), #0000 90deg, currentColor 0);
     background:
-        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
-        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
-        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
-        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
-        radial-gradient(farthest-side, currentColor 98%, #0000) 50% / 20px 20px,
-        linear-gradient(currentColor 0 0) 50% / 100% 10px,
-        linear-gradient(currentColor 0 0) 50% / 10px 100%;
+        var(--g1),
+        var(--g1),
+        var(--g1),
+        var(--g2),
+        var(--g2),
+        var(--g2);
+    background-size: var(--queue-tile-size) var(--queue-tile-size);
     background-repeat: no-repeat;
-    filter: blur(4px) contrast(10);
-    animation: part-queue-loader 0.8s infinite;
-    transform-origin: center;
-    transform: scale(var(--queue-scale));
+    animation: part-queue-loader 1.5s infinite;
 }
 
 .part-queue-loader--thumb {
-    --queue-size: 24px;
+    --queue-size: 22px;
+    --queue-tile-size: 10px;
+    --queue-corner-start: 1.2px;
+    --queue-corner-end: 8.8px;
 }
 
 .part-queue-loader--canvas {
-    --queue-size: clamp(56px, 7vmin, 80px);
+    --queue-size: 55px;
 }
 
 @keyframes part-queue-loader {
+    0% {
+        background-position: 0 0, 0 100%, 100% 100%;
+    }
+
+    25% {
+        background-position: 100% 0, 0 100%, 100% 100%;
+    }
+
+    50% {
+        background-position: 100% 0, 0 0, 100% 100%;
+    }
+
+    75% {
+        background-position: 100% 0, 0 0, 0 100%;
+    }
+
     100% {
-        background-position: 50% -20px, -20px 50%, 60px 50%, 50% 60px, 50%, 50%, 50%;
+        background-position: 100% 100%, 0 0, 0 100%;
     }
 }
 

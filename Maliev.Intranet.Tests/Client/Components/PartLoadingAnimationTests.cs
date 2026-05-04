@@ -60,19 +60,23 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("background: transparent", source);
         Assert.Contains("color: var(--maliev-ink)", source);
-        Assert.Contains("--queue-size: 32px", source);
+        Assert.Contains("--queue-size: 55px", source);
+        Assert.Contains("--queue-tile-size: 25px", source);
         Assert.Contains("width: var(--queue-size)", source);
         Assert.Contains("height: var(--queue-size)", source);
         Assert.Contains(".part-queue-loader::before", source);
-        Assert.Contains("radial-gradient(farthest-side, currentColor 98%, #0000)", source);
-        Assert.Contains("linear-gradient(currentColor 0 0)", source);
-        Assert.Contains("filter: blur(4px) contrast(10)", source);
-        Assert.Contains("animation: part-queue-loader 0.8s infinite", source);
+        Assert.Contains("conic-gradient(from 90deg", source);
+        Assert.Contains("conic-gradient(from -90deg", source);
+        Assert.Contains("currentColor 0", source);
+        Assert.Contains("background-size: var(--queue-tile-size) var(--queue-tile-size)", source);
+        Assert.Contains("animation: part-queue-loader 1.5s infinite", source);
         Assert.Contains("@keyframes part-queue-loader", source);
-        Assert.Contains("50% -20px", source);
-        Assert.Contains("-20px 50%", source);
-        Assert.Contains("60px 50%", source);
-        Assert.Contains("50% 60px", source);
+        Assert.Contains("background-position: 0 0, 0 100%, 100% 100%", source);
+        Assert.Contains("background-position: 100% 0, 0 100%, 100% 100%", source);
+        Assert.Contains("background-position: 100% 0, 0 0, 100% 100%", source);
+        Assert.Contains("background-position: 100% 0, 0 0, 0 100%", source);
+        Assert.Contains("background-position: 100% 100%, 0 0, 0 100%", source);
+        Assert.DoesNotContain("filter: blur", source, StringComparison.Ordinal);
         Assert.DoesNotContain("rotate(", source, StringComparison.Ordinal);
     }
 
