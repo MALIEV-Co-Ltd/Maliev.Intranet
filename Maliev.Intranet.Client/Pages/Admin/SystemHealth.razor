@@ -44,6 +44,7 @@
                         <div class="health-history-list">
                             @foreach (var service in group.OrderBy(s => s.ServiceName))
                             {
+                                var displayBuckets = GetDisplayBuckets(service, _history.BucketMinutes);
                                 <div class="health-history-row">
                                     <div class="health-history-header">
                                         <div>
@@ -52,8 +53,8 @@
                                         </div>
                                         <StatusBadge Status="@service.CurrentStatus" />
                                     </div>
-                                    <div class="health-strip" style="@($"--bucket-count:{service.Buckets.Count}")" aria-label="@($"{service.ServiceName} seven day health history")">
-                                        @foreach (var bucket in service.Buckets)
+                                    <div class="health-strip" aria-label="@($"{service.ServiceName} seven day health history")">
+                                        @foreach (var bucket in displayBuckets)
                                         {
                                             <span class="@GetBucketClass(bucket)" title="@GetBucketTitle(bucket)"></span>
                                         }
@@ -148,6 +149,8 @@
     private bool _loading = true;
     private bool _showDetails;
 
+    private const int DisplayBucketMinutes = 30;
+
     private IReadOnlyList<ServiceHealthStatus> CurrentServices => _health?.Services ?? [];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -178,14 +181,67 @@
         }
     }
 
-    private static string GetBucketClass(SystemHealthHistoryBucketDto bucket) =>
+    private static IReadOnlyList<DisplayHealthBucket> GetDisplayBuckets(SystemHealthHistoryServiceDto service, int sourceBucketMinutes)
+    {
+        if (service.Buckets.Count == 0)
+        {
+            return [];
+        }
+
+        var sourceMinutes = Math.Max(1, sourceBucketMinutes);
+        var groupSize = Math.Max(1, DisplayBucketMinutes / sourceMinutes);
+        var buckets = new List<DisplayHealthBucket>((int)Math.Ceiling(service.Buckets.Count / (double)groupSize));
+
+        for (var index = 0; index < service.Buckets.Count; index += groupSize)
+        {
+            var group = service.Buckets.Skip(index).Take(groupSize).ToList();
+            buckets.Add(new DisplayHealthBucket(
+                group[0].StartedAtUtc,
+                group[^1].EndedAtUtc,
+                ResolveDisplayStatus(group),
+                group.Any(bucket => bucket.HasSample)));
+        }
+
+        return buckets;
+    }
+
+    private static string ResolveDisplayStatus(IReadOnlyList<SystemHealthHistoryBucketDto> buckets)
+    {
+        var sampled = buckets.Where(bucket => bucket.HasSample).ToList();
+        if (sampled.Count == 0)
+        {
+            return "NoData";
+        }
+
+        if (sampled.Any(bucket => bucket.Status == "Unreachable"))
+        {
+            return "Unreachable";
+        }
+
+        if (sampled.Any(bucket => bucket.Status == "Unhealthy"))
+        {
+            return "Unhealthy";
+        }
+
+        return sampled.Any(bucket => bucket.Status == "Healthy")
+            ? "Healthy"
+            : sampled[^1].Status;
+    }
+
+    private static string GetBucketClass(DisplayHealthBucket bucket) =>
         $"health-bucket health-bucket-{bucket.Status.Trim().ToLowerInvariant()}";
 
-    private static string GetBucketTitle(SystemHealthHistoryBucketDto bucket)
+    private static string GetBucketTitle(DisplayHealthBucket bucket)
     {
         var time = $"{bucket.StartedAtUtc.ToLocalTime():dd MMM HH:mm} - {bucket.EndedAtUtc.ToLocalTime():HH:mm}";
         return bucket.HasSample
             ? $"{time}: {bucket.Status}"
             : $"{time}: no data";
     }
+
+    private sealed record DisplayHealthBucket(
+        DateTime StartedAtUtc,
+        DateTime EndedAtUtc,
+        string Status,
+        bool HasSample);
 }

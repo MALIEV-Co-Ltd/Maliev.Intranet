@@ -149,10 +149,16 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ErrorBody", page, StringComparison.Ordinal);
         Assert.Contains("api/v1/system-health/history?days=7", page, StringComparison.Ordinal);
         Assert.Contains("health-strip", page, StringComparison.Ordinal);
+        Assert.Contains("DisplayBucketMinutes = 30", page, StringComparison.Ordinal);
+        Assert.Contains("GetDisplayBuckets", page, StringComparison.Ordinal);
         Assert.Contains("7 days ago", page, StringComparison.Ordinal);
         Assert.Contains("% uptime", page, StringComparison.Ordinal);
         Assert.Contains("no data", page, StringComparison.Ordinal);
         Assert.Contains("table-layout: fixed", styles, StringComparison.Ordinal);
+        Assert.Contains("display: flex", styles, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 0", styles, StringComparison.Ordinal);
+        Assert.Contains("overflow: hidden", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 480px)", styles, StringComparison.Ordinal);
         Assert.Contains("health-bucket-healthy", styles, StringComparison.Ordinal);
         Assert.Contains("health-bucket-unhealthy", styles, StringComparison.Ordinal);
         Assert.Contains("health-bucket-unreachable", styles, StringComparison.Ordinal);

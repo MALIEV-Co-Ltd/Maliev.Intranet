@@ -33,12 +33,14 @@
 
 .health-history-list {
     display: grid;
-    gap: 28px;
+    gap: 10px;
+    min-width: 0;
 }
 
 .health-history-row {
     display: grid;
-    gap: 10px;
+    gap: 4px;
+    min-width: 0;
 }
 
 .health-history-header {
@@ -49,16 +51,20 @@
 }
 
 .health-strip {
-    display: grid;
-    grid-template-columns: repeat(var(--bucket-count), minmax(2px, 1fr));
-    gap: 3px;
-    min-height: 44px;
+    display: flex;
+    gap: clamp(0px, 0.06vw, 1px);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 24px;
+    overflow: hidden;
 }
 
 .health-bucket {
-    min-width: 2px;
-    height: 44px;
-    border-radius: 1px;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 24px;
+    border-radius: 0;
     background: var(--maliev-border);
 }
 
@@ -80,22 +86,12 @@
 
 .health-strip-axis {
     display: grid;
-    grid-template-columns: minmax(90px, 1fr) auto minmax(90px, 1fr);
+    grid-template-columns: minmax(72px, 1fr) auto minmax(42px, 1fr);
     align-items: center;
-    gap: 28px;
+    gap: 8px;
     color: var(--maliev-muted);
-    font-size: var(--maliev-font-sm);
-}
-
-.health-strip-axis::before,
-.health-strip-axis::after {
-    content: "";
-    height: 1px;
-    background: var(--maliev-border-strong);
-}
-
-.health-strip-axis span:first-child {
-    order: -1;
+    font-size: var(--maliev-font-xs);
+    line-height: 1.15;
 }
 
 .health-strip-axis span:nth-child(2) {
@@ -119,12 +115,44 @@
 }
 
 @media (max-width: 768px) {
+    .health-history-list {
+        gap: 9px;
+    }
+
+    .health-history-header {
+        gap: 10px;
+    }
+
     .health-strip {
-        gap: 1px;
+        min-height: 20px;
+        gap: 0;
+    }
+
+    .health-bucket {
+        height: 20px;
     }
 
     .health-strip-axis {
-        gap: 12px;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 8px;
         font-size: var(--maliev-font-xs);
+    }
+}
+
+@media (max-width: 480px) {
+    .health-history-header {
+        align-items: flex-start;
+    }
+
+    .health-strip {
+        min-height: 18px;
+    }
+
+    .health-bucket {
+        height: 18px;
+    }
+
+    .health-strip-axis span:nth-child(2) {
+        display: none;
     }
 }
