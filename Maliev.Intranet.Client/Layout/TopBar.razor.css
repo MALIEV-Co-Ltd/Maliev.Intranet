@@ -159,6 +159,16 @@
     padding: 0 4px 0 8px;
 }
 
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-underline::before,
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-underline::after,
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-underline:hover::before,
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-underline:hover::after,
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-underline.mud-input-focused::before,
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-underline.mud-input-focused::after {
+    border-bottom: 0 !important;
+    transform: none !important;
+}
+
 .topbar-root ::deep .topbar-currency-autocomplete .mud-input:hover {
     background: var(--maliev-panel-3);
 }

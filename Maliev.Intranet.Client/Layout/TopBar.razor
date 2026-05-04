@@ -58,7 +58,7 @@
                          Disabled="@(CurrencyService.Currencies.Count == 0)"
                          Placeholder="@(CurrencyService.Currencies.Count == 0 ? "…" : CurrencyService.Code)"
                          Class="topbar-currency-autocomplete"
-                         Style="width: 80px; min-width: 80px; max-width: 80px; flex: 0 0 80px;"
+                         Style="width: fit-content; min-width: max-content; max-width: max-content; flex: 0 0 auto;"
                          PopoverClass="topbar-currency-popover"
                          AdornmentIcon="@Icons.Material.Filled.KeyboardArrowDown"
                          Adornment="Adornment.End"
