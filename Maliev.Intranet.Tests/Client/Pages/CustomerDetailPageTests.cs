@@ -184,6 +184,30 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CustomerDetail_InternalNoteComposer_EnablesImmediatelyAndShowsDatabaseLimit()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='notes']").Click();
+
+        var noteInput = cut.Find("textarea.customer-internal-note-input");
+        var postButton = cut.Find("button.customer-post-note");
+
+        Assert.True(postButton.HasAttribute("disabled"));
+        Assert.Contains("0 / 5,000 characters", cut.Markup);
+        Assert.Equal("5000", noteInput.GetAttribute("maxlength"));
+
+        noteInput.Input("Call customer before releasing drawings.");
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.False(cut.Find("button.customer-post-note").HasAttribute("disabled"));
+            Assert.Contains("40 / 5,000 characters", cut.Markup);
+        });
+    }
+
+    [Fact]
     public void CustomerDetail_SendEmail_OpensComposeDialogWithoutPosting()
     {
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));

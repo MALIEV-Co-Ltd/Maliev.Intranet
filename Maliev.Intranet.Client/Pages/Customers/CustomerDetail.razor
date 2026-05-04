@@ -393,9 +393,15 @@
             <div class="customer-notes-layout" data-section="notes">
                 <section class="customer-panel customer-note-composer">
                     <SectionTitle Text="Add internal note" />
-                    <textarea class="customer-textarea" rows="4" placeholder="Write a note visible only to your team..." @bind="_newNoteText"></textarea>
-                    <div class="customer-panel-actions">
-                        <PrimaryButton OnClick="PostNoteAsync" Disabled="@string.IsNullOrWhiteSpace(_newNoteText)">Post note</PrimaryButton>
+                    <textarea class="customer-textarea customer-internal-note-input"
+                              rows="4"
+                              maxlength="@InternalNoteMaxLength"
+                              placeholder="Write a note visible only to your team..."
+                              @bind="_newNoteText"
+                              @bind:event="oninput"></textarea>
+                    <div class="customer-note-composer-footer">
+                        <span class="@NoteCounterClass">@NoteCharacterCount.ToString("N0") / @InternalNoteMaxLength.ToString("N0") characters</span>
+                        <PrimaryButton Class="customer-post-note" OnClick="PostNoteAsync" Disabled="@(!CanPostInternalNote)">Post note</PrimaryButton>
                     </div>
                 </section>
 
@@ -646,6 +652,7 @@
     private string _emailBody = string.Empty;
     private string? _emailError;
     private string _newNoteText = string.Empty;
+    private const int InternalNoteMaxLength = 5000;
     private string _addressLookupQuery = string.Empty;
     private string _companyLookupQuery = string.Empty;
     private int _projectTotalCount;
@@ -670,6 +677,9 @@
     private string CompanyConfirmLabel => _companyEdit?.ExistingCompanyId is Guid ? "Link company" : "Create and link";
     private string EmailConfirmLabel => _sendingEmail ? "Sending..." : _emailQueued ? "Queued" : "Send email";
     private bool EmailConfirmDisabled => _sendingEmail || _emailQueued;
+    private int NoteCharacterCount => _newNoteText.Length;
+    private bool CanPostInternalNote => !string.IsNullOrWhiteSpace(_newNoteText) && NoteCharacterCount <= InternalNoteMaxLength;
+    private string NoteCounterClass => NoteCharacterCount > InternalNoteMaxLength ? "customer-note-counter over-limit" : "customer-note-counter";
     private string AccountManagerSelectValue
     {
         get => _edit?.AccountManagerEmployeeId?.ToString() ?? string.Empty;
@@ -1131,7 +1141,7 @@
 
     private async Task PostNoteAsync(MouseEventArgs _)
     {
-        if (_customer is null || string.IsNullOrWhiteSpace(_newNoteText))
+        if (_customer is null || !CanPostInternalNote)
         {
             return;
         }

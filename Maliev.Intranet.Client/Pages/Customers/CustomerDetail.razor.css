@@ -396,9 +396,26 @@
     gap: 14px;
 }
 
-.customer-panel-actions {
+.customer-panel-actions,
+.customer-note-composer-footer {
     display: flex;
+    align-items: center;
+    gap: 12px;
     justify-content: flex-end;
+}
+
+.customer-note-composer-footer {
+    justify-content: space-between;
+}
+
+.customer-note-counter {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+}
+
+.customer-note-counter.over-limit {
+    color: var(--maliev-danger);
 }
 
 .customer-note-list {
