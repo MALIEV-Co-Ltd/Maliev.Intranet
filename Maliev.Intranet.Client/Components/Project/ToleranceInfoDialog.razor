@@ -4,34 +4,157 @@
 
 <MudDialog>
     <DialogContent>
-        <div class="tid-table-wrap">
-            <table class="tid-table">
-                <thead>
-                    <tr>
-                        <th>Class</th>
-                        <th>Standard</th>
-                        <th>Grade</th>
-                        <th>Range</th>
-                        <th>Cost Impact</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var tolerance in Tolerances)
-                    {
-                        <tr>
-                            <td>
-                                <strong>@tolerance.Name</strong>
-                                <span>@tolerance.Code</span>
-                            </td>
-                            <td>@tolerance.IsoStandard</td>
-                            <td>@tolerance.Grade</td>
-                            <td class="tid-range">@GetRange(tolerance)</td>
-                            <td>@FormatCostImpact(tolerance.AdditionalCostPercent)</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="tid-intro">
+            <div>
+                <div class="tid-kicker">ISO 2768-1:1989</div>
+                <MudText Typo="Typo.h6">General tolerances without individual tolerance indications</MudText>
+            </div>
+            <div class="tid-note">Drawing indication example: <strong>ISO 2768-m</strong></div>
         </div>
+
+        @if (Tolerances.Count > 0)
+        {
+            <section class="tid-section">
+                <div class="tid-section-head">
+                    <MudText Typo="Typo.subtitle2">Available tolerance selections</MudText>
+                </div>
+                <div class="tid-table-wrap">
+                    <table class="tid-table tid-table--compact">
+                        <thead>
+                            <tr>
+                                <th>Class</th>
+                                <th>Standard</th>
+                                <th>Grade</th>
+                                <th>Range</th>
+                                <th>Cost Impact</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var tolerance in Tolerances)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@tolerance.Name</strong>
+                                        <span>@tolerance.Code</span>
+                                    </td>
+                                    <td>@tolerance.IsoStandard</td>
+                                    <td>@tolerance.Grade</td>
+                                    <td class="tid-range">@GetRange(tolerance)</td>
+                                    <td>@FormatCostImpact(tolerance.AdditionalCostPercent)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
+
+        <section class="tid-section">
+            <div class="tid-section-head">
+                <MudText Typo="Typo.subtitle2">Table 1 - Linear dimensions, except broken edges</MudText>
+                <span>Values in millimetres</span>
+            </div>
+            <div class="tid-table-wrap">
+                <table class="tid-table">
+                    <thead>
+                        <tr>
+                            <th>Class</th>
+                            @foreach (var heading in LinearDimensionHeadings)
+                            {
+                                <th>@heading</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in LinearDimensionRows)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@row.Designation</strong>
+                                    <span>@row.Description</span>
+                                </td>
+                                @foreach (var value in row.Values)
+                                {
+                                    <td class="tid-range">@((MarkupString)value)</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="tid-footnote">For nominal sizes below 0.5 mm, indicate deviations next to the relevant nominal size.</p>
+        </section>
+
+        <section class="tid-section">
+            <div class="tid-section-head">
+                <MudText Typo="Typo.subtitle2">Table 2 - Broken edges: external radii and chamfer heights</MudText>
+                <span>Values in millimetres</span>
+            </div>
+            <div class="tid-table-wrap">
+                <table class="tid-table">
+                    <thead>
+                        <tr>
+                            <th>Class</th>
+                            @foreach (var heading in BrokenEdgeHeadings)
+                            {
+                                <th>@heading</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in BrokenEdgeRows)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@row.Designation</strong>
+                                    <span>@row.Description</span>
+                                </td>
+                                @foreach (var value in row.Values)
+                                {
+                                    <td class="tid-range">@((MarkupString)value)</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="tid-footnote">For nominal sizes below 0.5 mm, indicate deviations next to the relevant nominal size.</p>
+        </section>
+
+        <section class="tid-section">
+            <div class="tid-section-head">
+                <MudText Typo="Typo.subtitle2">Table 3 - Angular dimensions</MudText>
+                <span>Based on the shorter side length</span>
+            </div>
+            <div class="tid-table-wrap">
+                <table class="tid-table">
+                    <thead>
+                        <tr>
+                            <th>Class</th>
+                            @foreach (var heading in AngularDimensionHeadings)
+                            {
+                                <th>@heading</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in AngularDimensionRows)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@row.Designation</strong>
+                                    <span>@row.Description</span>
+                                </td>
+                                @foreach (var value in row.Values)
+                                {
+                                    <td class="tid-range">@((MarkupString)value)</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </DialogContent>
     <DialogActions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">Close</MudButton>
@@ -43,10 +166,64 @@
         overflow-x: auto;
     }
 
+    .tid-intro {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .tid-kicker {
+        margin-bottom: 2px;
+        color: var(--mud-palette-primary);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0;
+        text-transform: uppercase;
+    }
+
+    .tid-note {
+        padding-top: 4px;
+        color: var(--maliev-muted);
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .tid-section {
+        margin-top: 18px;
+    }
+
+    .tid-section:first-of-type {
+        margin-top: 0;
+    }
+
+    .tid-section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 8px;
+    }
+
+    .tid-section-head span,
+    .tid-footnote {
+        color: var(--maliev-muted);
+        font-size: 11px;
+    }
+
+    .tid-footnote {
+        margin: 8px 0 0;
+    }
+
     .tid-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 12px;
+    }
+
+    .tid-table--compact {
+        margin-bottom: 2px;
     }
 
     .tid-table th,
@@ -83,6 +260,20 @@
         font-family: 'JetBrains Mono', monospace;
         white-space: nowrap;
     }
+
+    @@media (max-width: 600px) {
+        .tid-intro,
+        .tid-section-head {
+            display: block;
+        }
+
+        .tid-note,
+        .tid-section-head span {
+            display: block;
+            margin-top: 6px;
+            white-space: normal;
+        }
+    }
 </style>
 
 @code {
@@ -94,8 +285,62 @@
     /// <summary>Formats the range value for a tolerance row.</summary>
     [Parameter] public Func<CatalogToleranceDto, string> GetRange { get; set; } = tolerance => tolerance.ToleranceRange ?? tolerance.Grade;
 
+    private static readonly IReadOnlyList<string> LinearDimensionHeadings =
+    [
+        "0.5 up to 3",
+        "over 3 up to 6",
+        "over 6 up to 30",
+        "over 30 up to 120",
+        "over 120 up to 400",
+        "over 400 up to 1000",
+        "over 1000 up to 2000",
+        "over 2000 up to 4000",
+    ];
+
+    private static readonly IReadOnlyList<IsoToleranceRow> LinearDimensionRows =
+    [
+        new("f", "fine", ["&plusmn; 0.05", "&plusmn; 0.05", "&plusmn; 0.1", "&plusmn; 0.15", "&plusmn; 0.2", "&plusmn; 0.3", "&plusmn; 0.5", "-"]),
+        new("m", "medium", ["&plusmn; 0.1", "&plusmn; 0.1", "&plusmn; 0.2", "&plusmn; 0.3", "&plusmn; 0.5", "&plusmn; 0.8", "&plusmn; 1.2", "&plusmn; 2"]),
+        new("c", "coarse", ["&plusmn; 0.2", "&plusmn; 0.3", "&plusmn; 0.5", "&plusmn; 0.8", "&plusmn; 1.2", "&plusmn; 2", "&plusmn; 3", "&plusmn; 4"]),
+        new("v", "very coarse", ["-", "&plusmn; 0.5", "&plusmn; 1", "&plusmn; 1.5", "&plusmn; 2.5", "&plusmn; 4", "&plusmn; 6", "&plusmn; 8"]),
+    ];
+
+    private static readonly IReadOnlyList<string> BrokenEdgeHeadings =
+    [
+        "0.5 up to 3",
+        "over 3 up to 6",
+        "over 6",
+    ];
+
+    private static readonly IReadOnlyList<IsoToleranceRow> BrokenEdgeRows =
+    [
+        new("f", "fine", ["&plusmn; 0.2", "&plusmn; 0.5", "&plusmn; 1"]),
+        new("m", "medium", ["&plusmn; 0.2", "&plusmn; 0.5", "&plusmn; 1"]),
+        new("c", "coarse", ["&plusmn; 0.4", "&plusmn; 1", "&plusmn; 2"]),
+        new("v", "very coarse", ["&plusmn; 0.4", "&plusmn; 1", "&plusmn; 2"]),
+    ];
+
+    private static readonly IReadOnlyList<string> AngularDimensionHeadings =
+    [
+        "up to 10",
+        "over 10 up to 50",
+        "over 50 up to 120",
+        "over 120 up to 400",
+        "over 400",
+    ];
+
+    private static readonly IReadOnlyList<IsoToleranceRow> AngularDimensionRows =
+    [
+        new("f", "fine", ["&plusmn; 1&deg;", "&plusmn; 0&deg;30&prime;", "&plusmn; 0&deg;20&prime;", "&plusmn; 0&deg;10&prime;", "&plusmn; 0&deg;5&prime;"]),
+        new("m", "medium", ["&plusmn; 1&deg;", "&plusmn; 0&deg;30&prime;", "&plusmn; 0&deg;20&prime;", "&plusmn; 0&deg;10&prime;", "&plusmn; 0&deg;5&prime;"]),
+        new("c", "coarse", ["&plusmn; 1&deg;30&prime;", "&plusmn; 1&deg;", "&plusmn; 0&deg;30&prime;", "&plusmn; 0&deg;15&prime;", "&plusmn; 0&deg;10&prime;"]),
+        new("v", "very coarse", ["&plusmn; 3&deg;", "&plusmn; 2&deg;", "&plusmn; 1&deg;", "&plusmn; 0&deg;30&prime;", "&plusmn; 0&deg;20&prime;"]),
+    ];
+
     private static string FormatCostImpact(decimal percent) =>
         percent == 0 ? "Included" : $"+{percent:0.##}%";
 
     private void Close() => MudDialog.Close();
+
+    private sealed record IsoToleranceRow(string Designation, string Description, IReadOnlyList<string> Values);
 }

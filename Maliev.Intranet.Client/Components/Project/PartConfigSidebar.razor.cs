@@ -1098,7 +1098,7 @@ public partial class PartConfigSidebar : ComponentBase
         DialogService.ShowAsync<ToleranceInfoDialog>(
             "Tolerance Information",
             parameters,
-            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
     }
 
     // ── Two-phase DFM analysis ─────────────────────────────────────────────
