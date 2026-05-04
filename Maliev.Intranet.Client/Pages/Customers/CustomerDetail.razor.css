@@ -480,6 +480,32 @@
     font-family: var(--maliev-font-mono);
 }
 
+.customer-email-body {
+    min-height: 180px;
+}
+
+.customer-email-state {
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: var(--maliev-radius-sm);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+}
+
+.customer-email-state.success {
+    border: 1px solid color-mix(in oklab, var(--maliev-ok), transparent 72%);
+    background: color-mix(in oklab, var(--maliev-ok), transparent 92%);
+    color: var(--maliev-ok);
+}
+
+.customer-email-state.error {
+    border: 1px solid color-mix(in oklab, var(--maliev-danger), transparent 72%);
+    background: color-mix(in oklab, var(--maliev-danger), transparent 92%);
+    color: var(--maliev-danger);
+}
+
 .customer-email-template-row {
     display: flex;
     flex-wrap: wrap;

@@ -8,6 +8,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Maliev.Intranet.Tests.Client.Pages;
 
@@ -16,6 +17,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly Guid _customerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private readonly Guid _accountManagerId = Guid.Parse("55555555-5555-5555-5555-555555555555");
     private readonly List<string> _requestedPaths = [];
+    private readonly List<CustomerEmailRequest> _emailRequests = [];
 
     public CustomerDetailPageTests()
     {
@@ -164,6 +166,48 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Recipient name", cut.Markup);
         Assert.Contains("Address lookup", cut.Markup);
         Assert.Contains("Country", cut.Markup);
+    }
+
+    [Fact]
+    public void CustomerDetail_SendEmail_OpensComposeDialogWithoutPosting()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+
+        cut.Find("button.customer-email-open").Click();
+
+        Assert.Contains("Email customer", cut.Markup);
+        Assert.Contains("sarah@axion.io", cut.Markup);
+        Assert.Contains("customer-email-subject", cut.Markup);
+        Assert.Contains("customer-email-body", cut.Markup);
+        Assert.Empty(_emailRequests);
+        Assert.DoesNotContain(_requestedPaths, path => path.Equals($"/api/v1/customers/{_customerId}/email", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CustomerDetail_SendEmailDialog_PostsTypedSubjectAndBody()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+
+        cut.Find("button.customer-email-open").Click();
+        cut.Find("input.customer-email-subject").Input("Updated production schedule");
+        cut.Find("textarea.customer-email-body").Input("Please review the attached production schedule before tomorrow.");
+        cut.Find("button.customer-email-send").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Single(_emailRequests);
+            Assert.Contains("Email queued for delivery.", cut.Markup);
+        });
+
+        var request = _emailRequests.Single();
+        Assert.Equal("Updated production schedule", request.Subject);
+        Assert.Equal("Please review the attached production schedule before tomorrow.", request.Body);
+        Assert.DoesNotContain("Message from MALIEV", request.Subject, StringComparison.Ordinal);
+        Assert.DoesNotContain("MALIEV is contacting you about your account.", request.Body, StringComparison.Ordinal);
     }
 
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
@@ -323,6 +367,21 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                         CreatedAt = new DateTime(2026, 4, 12, 9, 15, 0, DateTimeKind.Utc)
                     }
                 ]
+            });
+        }
+
+        if (pathAndQuery.Equals($"/api/v1/customers/{_customerId}/email", StringComparison.Ordinal))
+        {
+            var payload = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? "{}";
+            var emailRequest = JsonSerializer.Deserialize<CustomerEmailRequest>(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (emailRequest is not null)
+            {
+                _emailRequests.Add(emailRequest);
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Accepted)
+            {
+                Content = JsonContent.Create(new { messageId = Guid.Parse("77777777-7777-7777-7777-777777777777") })
             });
         }
 

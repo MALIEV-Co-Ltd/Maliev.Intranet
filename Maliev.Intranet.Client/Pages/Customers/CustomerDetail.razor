@@ -9,7 +9,7 @@
     <PageHeader Title="@(_customer?.Name ?? "Customer")" Subtitle="@(_customer?.CompanyName ?? _customer?.Email)" BackLabel="Customers" BackHref="/customers">
         @if (_customer is not null)
         {
-            <SecondaryButton Icon="@Icons.Material.Outlined.Email" OnClick="SendCustomerEmailAsync" Disabled="@(_sendingEmail || string.IsNullOrWhiteSpace(_customer.Email))">Send email</SecondaryButton>
+            <SecondaryButton Class="customer-email-open" Icon="@Icons.Material.Outlined.Email" OnClick="OpenEmailComposerAsync" Disabled="@(_sendingEmail || string.IsNullOrWhiteSpace(_customer.Email))">Send email</SecondaryButton>
             <SecondaryButton OnClick="DiscardChangesAsync" Disabled="@_saving">Discard</SecondaryButton>
             <PrimaryButton Icon="@Icons.Material.Outlined.Check" OnClick="SaveCustomerAsync" Disabled="@_saving">Save</PrimaryButton>
         }
@@ -451,6 +451,38 @@
     </PageBody>
 </div>
 
+<ConfirmModal Open="@_emailComposerOpen"
+              Title="Email customer"
+              ConfirmLabel="@EmailConfirmLabel"
+              ConfirmDisabled="@EmailConfirmDisabled"
+              ConfirmButtonClass="customer-email-send"
+              Class="customer-modal-wide"
+              OnCancel="CloseEmailComposerAsync"
+              OnConfirm="SendCustomerEmailAsync">
+    @if (_customer is not null)
+    {
+        <div class="customer-email-modal">
+            <p class="customer-email-recipient">To <span>@_customer.Email</span></p>
+            <label class="customer-field">
+                <span>Subject</span>
+                <input class="customer-input customer-email-subject" @bind="_emailSubject" @bind:event="oninput" disabled="@_emailQueued" />
+            </label>
+            <label class="customer-field">
+                <span>Message</span>
+                <textarea class="customer-textarea customer-email-body" @bind="_emailBody" @bind:event="oninput" disabled="@_emailQueued"></textarea>
+            </label>
+            @if (!string.IsNullOrWhiteSpace(_emailError))
+            {
+                <div class="customer-email-state error">@_emailError</div>
+            }
+            else if (_emailQueued)
+            {
+                <div class="customer-email-state success">Email queued for delivery.</div>
+            }
+        </div>
+    }
+</ConfirmModal>
+
 <ConfirmModal Open="@(_addressEdit is not null)"
               Title="@AddressModalTitle"
               ConfirmLabel="Save"
@@ -607,7 +639,12 @@
     private bool _loading = true;
     private bool _saving;
     private bool _sendingEmail;
+    private bool _emailComposerOpen;
+    private bool _emailQueued;
     private string? _error;
+    private string _emailSubject = string.Empty;
+    private string _emailBody = string.Empty;
+    private string? _emailError;
     private string _newNoteText = string.Empty;
     private string _addressLookupQuery = string.Empty;
     private string _companyLookupQuery = string.Empty;
@@ -631,6 +668,8 @@
     private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
     private string AddressModalTitle => _addressEdit?.Id is null ? "Add address" : "Edit address";
     private string CompanyConfirmLabel => _companyEdit?.ExistingCompanyId is Guid ? "Link company" : "Create and link";
+    private string EmailConfirmLabel => _sendingEmail ? "Sending..." : _emailQueued ? "Queued" : "Send email";
+    private bool EmailConfirmDisabled => _sendingEmail || _emailQueued;
     private string AccountManagerSelectValue
     {
         get => _edit?.AccountManagerEmployeeId?.ToString() ?? string.Empty;
@@ -801,34 +840,66 @@
         await SaveCustomerCoreAsync();
     }
 
-    private async Task SendCustomerEmailAsync(MouseEventArgs _)
+    private Task OpenEmailComposerAsync(MouseEventArgs _)
+    {
+        if (_customer is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _emailSubject = string.Empty;
+        _emailBody = $"Hello {_customer.Name},\n\n";
+        _emailError = null;
+        _emailQueued = false;
+        _emailComposerOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseEmailComposerAsync()
+    {
+        _emailComposerOpen = false;
+        _emailError = null;
+        _emailQueued = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task SendCustomerEmailAsync()
     {
         if (_customer is null)
         {
             return;
         }
 
+        var subject = _emailSubject.Trim();
+        var body = _emailBody.Trim();
+        if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(body))
+        {
+            _emailError = "Enter a subject and message before sending.";
+            return;
+        }
+
         _sendingEmail = true;
+        _emailError = null;
         try
         {
             var response = await Http.PostAsJsonAsync($"api/v1/customers/{_customer.Id}/email", new CustomerEmailRequest
             {
-                Subject = "Message from MALIEV",
-                Body = $"Hello {_customer.Name},\n\nMALIEV is contacting you about your account."
+                Subject = subject,
+                Body = body
             });
 
             if (response.IsSuccessStatusCode)
             {
-                Snackbar.Add("Customer email was queued.", Severity.Success);
+                _emailQueued = true;
                 return;
             }
 
             var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-            Snackbar.Add(error?.Message ?? "Customer email could not be queued.", Severity.Warning);
+            _emailError = error?.Message ?? "Customer email could not be queued.";
         }
         catch (Exception ex)
         {
-            Snackbar.Add("Customer email could not be queued.", Severity.Warning);
+            _emailError = "Customer email could not be queued.";
             Console.WriteLine(ex.Message);
         }
         finally

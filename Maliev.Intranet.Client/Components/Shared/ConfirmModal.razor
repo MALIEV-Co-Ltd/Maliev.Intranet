@@ -13,7 +13,7 @@
             </div>
             <div class="mlv-modal-actions">
                 <SecondaryButton OnClick="@CancelAsync">Cancel</SecondaryButton>
-                <PrimaryButton Class="@ConfirmButtonClassValue" OnClick="@ConfirmAsync">@ConfirmLabel</PrimaryButton>
+                <PrimaryButton Class="@ConfirmButtonClassValue" Disabled="@ConfirmDisabled" OnClick="@ConfirmAsync">@ConfirmLabel</PrimaryButton>
             </div>
         </div>
     </div>
@@ -23,6 +23,7 @@
     [Parameter] public bool Open { get; set; }
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
     [Parameter] public string ConfirmLabel { get; set; } = "Confirm";
+    [Parameter] public bool ConfirmDisabled { get; set; }
     [Parameter] public bool Danger { get; set; }
     [Parameter] public string? Class { get; set; }
     [Parameter] public string? ConfirmButtonClass { get; set; }
