@@ -91,6 +91,60 @@ public class QuickControllerTests
     }
 
     [Fact]
+    public async Task Quotations_GeneratePdf_UsesCurrentQuotationVersionForPdfItems()
+    {
+        JsonDocument? capturedRequest = null;
+        var pdfHandler = new MockHttpMessageHandler(async (req, ct) =>
+        {
+            capturedRequest = JsonDocument.Parse(await req.Content!.ReadAsStringAsync(ct));
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { storageUrl = "http://test.pdf" })
+            };
+        });
+
+        var quotationId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        var quotation = new QuotationDetailDto
+        {
+            Id = quotationId,
+            QuotationNumber = "Q-100",
+            CustomerName = "Axion Robotics",
+            CurrencyCode = "THB",
+            CurrentVersionNumber = 2,
+            CreatedAt = new DateTime(2026, 4, 18, 8, 0, 0, DateTimeKind.Utc),
+            ValidityPeriodStart = new DateTime(2026, 4, 18, 0, 0, 0, DateTimeKind.Utc),
+            ValidityPeriodEnd = new DateTime(2026, 5, 18, 0, 0, 0, DateTimeKind.Utc),
+            Versions =
+            [
+                new QuotationVersionDto
+                {
+                    VersionNumber = 1,
+                    LineItems = [new QuotationItemDto { Description = "Old line", Quantity = 1, UnitPrice = 10m }]
+                },
+                new QuotationVersionDto
+                {
+                    VersionNumber = 2,
+                    LineItems = [new QuotationItemDto { Description = "Current line", Quantity = 2, UnitPrice = 25m }]
+                }
+            ]
+        };
+
+        var controller = new QuotationsController(
+            new QuotationServiceClient(CreateClient(quotation)),
+            new PdfServiceClient(new HttpClient(pdfHandler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.GeneratePdf(quotationId, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.NotNull(capturedRequest);
+        var data = capturedRequest.RootElement.GetProperty("data");
+        Assert.Equal(2, data.GetProperty("VersionNumber").GetInt32());
+        var item = data.GetProperty("Items")[0];
+        Assert.Equal("Current line", item.GetProperty("MaterialName").GetString());
+        Assert.Equal(50m, item.GetProperty("LineTotal").GetDecimal());
+    }
+
+    [Fact]
     public async Task Dashboard_Get_ReturnsOk()
     {
         var client = CreateClient(new { count = 10 });

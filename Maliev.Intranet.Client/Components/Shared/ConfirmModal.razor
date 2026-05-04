@@ -13,7 +13,7 @@
             </div>
             <div class="mlv-modal-actions">
                 <SecondaryButton OnClick="@CancelAsync">Cancel</SecondaryButton>
-                <PrimaryButton Class="@(Danger ? "danger" : null)" OnClick="@ConfirmAsync">@ConfirmLabel</PrimaryButton>
+                <PrimaryButton Class="@ConfirmButtonClassValue" OnClick="@ConfirmAsync">@ConfirmLabel</PrimaryButton>
             </div>
         </div>
     </div>
@@ -25,9 +25,14 @@
     [Parameter] public string ConfirmLabel { get; set; } = "Confirm";
     [Parameter] public bool Danger { get; set; }
     [Parameter] public string? Class { get; set; }
+    [Parameter] public string? ConfirmButtonClass { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback OnConfirm { get; set; }
+
+    private string? ConfirmButtonClassValue => string.Join(
+        " ",
+        new[] { Danger ? "danger" : null, ConfirmButtonClass }.Where(value => !string.IsNullOrWhiteSpace(value)));
 
     private Task CancelAsync() => OnCancel.InvokeAsync();
     private Task ConfirmAsync() => OnConfirm.InvokeAsync();

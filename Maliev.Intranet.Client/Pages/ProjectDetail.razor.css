@@ -116,7 +116,7 @@
 }
 
 .project-record-shell ::deep .project-parts-table {
-    min-width: 860px;
+    min-width: 1080px;
     width: 100%;
     border-collapse: collapse;
     font-size: var(--maliev-font-base);
@@ -133,7 +133,7 @@
 
 .project-record-shell ::deep .project-parts-table th:nth-child(1),
 .project-record-shell ::deep .project-parts-table td:nth-child(1) {
-    width: 22%;
+    width: 24%;
 }
 
 .project-record-shell ::deep .project-parts-table th:nth-child(2),
@@ -142,23 +142,25 @@
 .project-record-shell ::deep .project-parts-table td:nth-child(3),
 .project-record-shell ::deep .project-parts-table th:nth-child(4),
 .project-record-shell ::deep .project-parts-table td:nth-child(4) {
-    width: 14%;
+    width: 12%;
 }
 
 .project-record-shell ::deep .project-parts-table th:nth-child(5),
 .project-record-shell ::deep .project-parts-table td:nth-child(5) {
-    width: 7%;
+    width: 12%;
 }
 
 .project-record-shell ::deep .project-parts-table th:nth-child(6),
 .project-record-shell ::deep .project-parts-table td:nth-child(6),
 .project-record-shell ::deep .project-parts-table th:nth-child(7),
-.project-record-shell ::deep .project-parts-table td:nth-child(7) {
-    width: 10%;
-}
-
+.project-record-shell ::deep .project-parts-table td:nth-child(7),
 .project-record-shell ::deep .project-parts-table th:nth-child(8),
 .project-record-shell ::deep .project-parts-table td:nth-child(8) {
+    width: 8%;
+}
+
+.project-record-shell ::deep .project-parts-table th:nth-child(9),
+.project-record-shell ::deep .project-parts-table td:nth-child(9) {
     width: 9%;
 }
 
@@ -171,12 +173,6 @@
     white-space: nowrap;
 }
 
-.project-record-shell ::deep .project-parts-table td:first-child {
-    color: var(--maliev-info);
-    font-family: var(--maliev-font-mono);
-    font-weight: 700;
-}
-
 .project-record-shell ::deep .project-parts-table tr:last-child td {
     border-bottom: 0;
 }
@@ -184,6 +180,87 @@
 .project-record-shell ::deep .project-parts-table .numeric {
     text-align: right;
     white-space: nowrap;
+}
+
+.project-record-shell ::deep .project-part-summary {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+}
+
+.project-record-shell ::deep .project-part-thumb {
+    width: 58px;
+    height: 44px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+    object-fit: cover;
+}
+
+.project-record-shell ::deep .project-part-thumb.placeholder {
+    display: inline-grid;
+    place-items: center;
+    color: var(--maliev-muted);
+}
+
+.project-record-shell ::deep .project-part-meta {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.project-record-shell ::deep .project-part-meta strong {
+    overflow: hidden;
+    color: var(--maliev-info);
+    font-family: var(--maliev-font-mono);
+    font-size: var(--maliev-font-small);
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-record-shell ::deep .project-part-meta > span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.project-record-shell ::deep .project-part-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    font-size: var(--maliev-font-small);
+}
+
+.project-record-shell ::deep .project-part-attachments span:first-child {
+    color: var(--maliev-muted);
+    font-weight: 700;
+}
+
+.project-record-shell ::deep .project-part-attachments a {
+    color: var(--maliev-info);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.project-record-shell ::deep .project-dfm-gate {
+    display: grid;
+    gap: 2px;
+}
+
+.project-record-shell ::deep .project-dfm-gate strong {
+    color: var(--maliev-success);
+    font-size: var(--maliev-font-small);
+}
+
+.project-record-shell ::deep .project-dfm-gate.warning strong {
+    color: var(--maliev-warning);
+}
+
+.project-record-shell ::deep .project-dfm-gate span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
 }
 
 .project-record-shell ::deep .project-snapshot {
@@ -323,6 +400,30 @@
     gap: 10px;
 }
 
+.project-record-shell ::deep .project-note-compose {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.project-record-shell ::deep .project-note-input {
+    min-height: 96px;
+    width: 100%;
+    resize: vertical;
+    padding: 10px 12px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+    font: inherit;
+    line-height: 1.45;
+}
+
+.project-record-shell ::deep .project-note-input:focus {
+    border-color: var(--maliev-info);
+    outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 75%);
+}
+
 .project-record-shell ::deep .project-note-card {
     display: grid;
     gap: 4px;
@@ -392,6 +493,6 @@
     }
 
     .project-record-shell ::deep .project-parts-table {
-        min-width: 760px;
+        min-width: 980px;
     }
 }

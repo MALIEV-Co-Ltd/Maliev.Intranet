@@ -65,6 +65,9 @@ public class ProjectsController(
     public async Task<ActionResult<ProjectDetailDto>> GetById(Guid id, CancellationToken ct)
     {
         var result = await client.GetProjectByIdAsync(id, ct);
+        if (result is not null && uploadClient is not null)
+            await EnrichProjectDetailArtifactsAsync(result, uploadClient, analysisStatusService, ct);
+
         return result != null ? Ok(result) : NotFound();
     }
 
@@ -109,6 +112,29 @@ public class ProjectsController(
         };
 
         return StatusCode(502, userMessage);
+    }
+
+    /// <summary>
+    /// Adds an internal note to a project.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/notes")]
+    public async Task<ActionResult<ProjectNoteDto>> AddNote(
+        Guid id,
+        [FromBody] AddProjectNoteRequest request,
+        CancellationToken ct)
+    {
+        var (result, errorContent, statusCode) = await client.AddNoteAsync(id, request, ct);
+        if (result is not null)
+            return Ok(result);
+
+        _logger.LogWarning(
+            "ProjectService returned HTTP {StatusCode} for POST /project/v1/projects/{ProjectId}/notes. ErrorContent={ErrorContent}",
+            statusCode,
+            id,
+            errorContent);
+
+        return StatusCode(502, string.IsNullOrWhiteSpace(errorContent) ? "Project note could not be saved." : errorContent);
     }
 
     /// <summary>
@@ -699,8 +725,77 @@ public class ProjectsController(
         UploadServiceClient upload,
         CancellationToken ct)
     {
-        part.ThumbnailUrl = await GetSignedUrlIfPresentAsync(upload, part.ThumbnailSmallGcsPath, ct) ?? part.ThumbnailUrl;
-        part.ModelPreviewUrl = await GetSignedUrlIfPresentAsync(upload, part.GlbStoragePath, ct) ?? part.ModelPreviewUrl;
+        await EnrichPartArtifactsAsync(part, upload, analysisStatusService: null, ct);
+    }
+
+    private static async Task EnrichProjectDetailArtifactsAsync(
+        ProjectDetailDto project,
+        UploadServiceClient upload,
+        IFileAnalysisStatusService? analysisStatusService,
+        CancellationToken ct)
+    {
+        foreach (var part in project.Parts)
+        {
+            await EnrichPartArtifactsAsync(part, upload, analysisStatusService, ct);
+        }
+    }
+
+    private static async Task EnrichPartArtifactsAsync(
+        ProjectPartDto part,
+        UploadServiceClient upload,
+        IFileAnalysisStatusService? analysisStatusService,
+        CancellationToken ct)
+    {
+        if (analysisStatusService is not null && !string.IsNullOrWhiteSpace(part.FileReference))
+        {
+            var status = await analysisStatusService.GetStatusAsync(part.FileReference, ct);
+            if (status is not null)
+            {
+                part.ThumbnailUrl = FirstNonEmpty(
+                    part.ThumbnailUrl,
+                    status.PreviewUrls?.ThumbnailSmall,
+                    status.ThumbnailUrl,
+                    status.HiResThumbnailUrl);
+                part.ThumbnailSmallGcsPath = FirstNonEmpty(part.ThumbnailSmallGcsPath, status.PreviewUrls?.ThumbnailSmallGcsPath);
+                part.ThumbnailLargeGcsPath = FirstNonEmpty(part.ThumbnailLargeGcsPath, status.PreviewUrls?.ThumbnailLargeGcsPath);
+                part.GlbStoragePath = FirstNonEmpty(part.GlbStoragePath, status.GlbStoragePath);
+                part.ModelPreviewUrl = FirstNonEmpty(part.ModelPreviewUrl, status.GlbSignedUrl);
+
+                if (part.Dimensions is null && status.Dimensions is not null)
+                {
+                    part.Dimensions = new ModelDimensionsDto
+                    {
+                        X = status.Dimensions.X,
+                        Y = status.Dimensions.Y,
+                        Z = status.Dimensions.Z
+                    };
+                }
+
+                part.IsManifold ??= status.IsManifold;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(part.ThumbnailUrl))
+            part.ThumbnailUrl = await GetSignedUrlIfPresentAsync(upload, part.ThumbnailSmallGcsPath, ct)
+                ?? await GetSignedUrlIfPresentAsync(upload, part.ThumbnailLargeGcsPath, ct);
+
+        if (string.IsNullOrWhiteSpace(part.ModelPreviewUrl))
+            part.ModelPreviewUrl = await GetSignedUrlIfPresentAsync(upload, part.GlbStoragePath, ct);
+
+        await EnrichAttachmentUrlsAsync(part.DrawingFiles, upload, ct);
+        await EnrichAttachmentUrlsAsync(part.SupplementaryFiles, upload, ct);
+    }
+
+    private static async Task EnrichAttachmentUrlsAsync(
+        IEnumerable<ProjectPartAttachmentDto> attachments,
+        UploadServiceClient upload,
+        CancellationToken ct)
+    {
+        foreach (var attachment in attachments)
+        {
+            if (string.IsNullOrWhiteSpace(attachment.SignedUrl))
+                attachment.SignedUrl = await GetSignedUrlIfPresentAsync(upload, attachment.StoragePath, ct);
+        }
     }
 
     private static async Task<string?> GetSignedUrlIfPresentAsync(
@@ -712,6 +807,9 @@ public class ProjectsController(
             ? null
             : await upload.GetDownloadUrlByPathAsync(storagePath, ct);
     }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private async Task CleanupDuplicateAsync(
         Guid duplicateProjectId,

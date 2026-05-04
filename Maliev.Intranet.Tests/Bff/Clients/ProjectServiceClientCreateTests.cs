@@ -161,6 +161,41 @@ public class ProjectServiceClientCreateTests
     }
 
     [Fact]
+    public async Task AddNoteAsync_PostsToProjectServiceNotesEndpoint()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        string? body = null;
+        var projectId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var handler = new MockHttpMessageHandler(async (request, ct) =>
+        {
+            capturedRequest = request;
+            body = await request.Content!.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new ProjectNoteDto
+                {
+                    Id = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                    ProjectId = projectId,
+                    AuthorName = "Alex Kim",
+                    Content = "Review customer drawing.",
+                    CreatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc)
+                })
+            };
+        });
+        var client = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+
+        var (result, error, statusCode) = await client.AddNoteAsync(projectId, new AddProjectNoteRequest { Content = "Review customer drawing." });
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Post, capturedRequest.Method);
+        Assert.Equal("/project/v1/projects/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/notes", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.Contains("\"content\":\"Review customer drawing.\"", body);
+        Assert.NotNull(result);
+        Assert.Null(error);
+        Assert.Equal(200, statusCode);
+    }
+
+    [Fact]
     public async Task GenerateQuotationAsync_PostsValidityAndDeliveryExpectations()
     {
         string? body = null;

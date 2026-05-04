@@ -77,8 +77,56 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         cut.WaitForAssertion(() =>
         {
             Assert.Contains(_requestedPaths, path => path == $"/api/v1/quotations/{_quotationId}/pdf");
-            Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation");
+            Assert.DoesNotContain(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation");
         });
+
+        cut.Find("button.project-accept-confirm").Click();
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation"));
+    }
+
+    [Fact]
+    public void ProjectDetail_RendersHumanReadableManufacturingLanguage()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Quotation Generated", cut.Markup));
+
+        Assert.Contains("CNC Milling", cut.Markup);
+        Assert.Contains("3D Printing (FDM)", cut.Markup);
+        Assert.Contains("As printed", cut.Markup);
+        Assert.Contains("Standard FDM settings", cut.Markup);
+        Assert.DoesNotContain("AS_PRINTED", cut.Markup);
+        Assert.DoesNotContain("FDM_STD", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectDetail_RendersThumbnailsAttachmentsAndDfmGate()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("project-part-thumb", cut.Markup));
+
+        Assert.Contains("https://storage.example/bracket-thumb.webp", cut.Markup);
+        Assert.Contains("bracket-left-drawing.pdf", cut.Markup);
+        Assert.Contains("customer-po.pdf", cut.Markup);
+        Assert.Contains("DFM warnings", cut.Markup);
+        Assert.Contains("Requires acknowledgement", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectDetail_AddInternalNote_PostsToProjectNotesEndpoint()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Notes (0)", cut.Markup));
+        cut.Find("button[data-tab='notes']").Click();
+        cut.Find("textarea.project-note-input").Change("Check customer's drawing revision before release.");
+        cut.Find("button.project-note-add").Click();
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/notes"));
     }
 
     [Fact]
@@ -132,6 +180,28 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         Quantity = 4,
                         ConfirmedPrice = 2500m,
                         Status = "Confirmed",
+                        ThumbnailUrl = "https://storage.example/bracket-thumb.webp",
+                        DfmAcknowledged = false,
+                        OverlayPaths =
+                        {
+                            ["overhang"] = "customers/axion/projects/prj/bracket-left_overhang_overlay.glb"
+                        },
+                        DrawingFiles =
+                        [
+                            new ProjectPartAttachmentDto
+                            {
+                                FileName = "bracket-left-drawing.pdf",
+                                SignedUrl = "https://storage.example/bracket-left-drawing.pdf"
+                            }
+                        ],
+                        SupplementaryFiles =
+                        [
+                            new ProjectPartAttachmentDto
+                            {
+                                FileName = "customer-po.pdf",
+                                SignedUrl = "https://storage.example/customer-po.pdf"
+                            }
+                        ],
                         Dimensions = new ModelDimensionsDto { X = 120, Y = 64, Z = 18 }
                     },
                     new ProjectPartDto
@@ -139,10 +209,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
                         FileId = Guid.Parse("55555555-5555-5555-5555-555555555555"),
                         FileName = "sensor-cover.3mf",
-                        ProcessType = "SLS",
+                        ProcessType = "FDM",
                         MaterialName = "PA12 Nylon",
-                        Finish = "Dyed",
-                        Color = "Graphite",
+                        Finish = "AS_PRINTED",
+                        Color = "FDM_STD",
                         Quantity = 15,
                         ConfirmedPrice = 550m,
                         Status = "Confirmed"
@@ -176,6 +246,18 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
         }
 
+        if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}/notes", StringComparison.Ordinal))
+        {
+            return Json(new ProjectNoteDto
+            {
+                Id = Guid.Parse("77777777-7777-7777-7777-777777777777"),
+                ProjectId = _projectId,
+                AuthorName = "Alex Kim",
+                Content = "Check customer's drawing revision before release.",
+                CreatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc)
+            });
+        }
+
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
     }
 
@@ -187,17 +269,45 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
     private static string FindProjectDetailCssPath()
     {
+        var workingDirectoryCandidate = Path.Combine(
+            Environment.CurrentDirectory,
+            "Maliev.Intranet.Client",
+            "Pages",
+            "ProjectDetail.razor.css");
+
+        if (File.Exists(workingDirectoryCandidate))
+            return workingDirectoryCandidate;
+
+        var workspaceCandidate = @"B:\maliev\Maliev.Intranet\Maliev.Intranet.Client\Pages\ProjectDetail.razor.css";
+        if (File.Exists(workspaceCandidate))
+            return workspaceCandidate;
+
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            var candidate = Path.Combine(
+            var sourceCandidate = Path.Combine(
                 directory.FullName,
                 "Maliev.Intranet.Client",
                 "Pages",
                 "ProjectDetail.razor.css");
 
-            if (File.Exists(candidate))
-                return candidate;
+            if (File.Exists(sourceCandidate))
+                return sourceCandidate;
+
+            var repoCandidate = Path.GetFullPath(Path.Combine(
+                directory.FullName,
+                "..",
+                "..",
+                "..",
+                "..",
+                "..",
+                "Maliev.Intranet",
+                "Maliev.Intranet.Client",
+                "Pages",
+                "ProjectDetail.razor.css"));
+
+            if (File.Exists(repoCandidate))
+                return repoCandidate;
 
             directory = directory.Parent;
         }

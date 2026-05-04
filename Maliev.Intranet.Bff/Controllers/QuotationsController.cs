@@ -133,10 +133,15 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
         var quotation = await client.GetQuotationByIdAsync(id);
         if (quotation == null) return NotFound();
 
+        var currentVersion = quotation.Versions?
+            .OrderByDescending(version => version.VersionNumber == quotation.CurrentVersionNumber)
+            .ThenByDescending(version => version.VersionNumber)
+            .FirstOrDefault();
+
         var pdfData = new QuotationPdfData
         {
             QuotationNumber = quotation.QuotationNumber,
-            VersionNumber = quotation.CurrentVersionNumber,
+            VersionNumber = currentVersion?.VersionNumber ?? quotation.CurrentVersionNumber,
             CustomerName = quotation.CustomerName,
             CustomerType = "Corporate",
             QuotationDate = quotation.CreatedAt,
@@ -148,8 +153,8 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             TotalAmount = quotation.Total,
             Currency = !string.IsNullOrEmpty(quotation.CurrencyCode) ? quotation.CurrencyCode : "THB",
             DeliveryExpectations = quotation.DeliveryExpectations,
-            ChangeSummary = quotation.Versions?.OrderByDescending(version => version.VersionNumber).FirstOrDefault()?.ChangeSummary,
-            Items = quotation.Versions?.FirstOrDefault()?.LineItems?.Select((item, index) => new QuotationPdfItem
+            ChangeSummary = currentVersion?.ChangeSummary,
+            Items = currentVersion?.LineItems?.Select((item, index) => new QuotationPdfItem
             {
                 Index = index + 1,
                 MaterialName = item.Description,
@@ -192,17 +197,19 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
 
     private void ApplyQuotedByMetadata(QuotationPdfData pdfData)
     {
+        var user = HttpContext?.User;
+
         pdfData.QuotedByName = FirstNonEmpty(
-            User.Identity?.Name,
-            User.FindFirst("name")?.Value,
-            User.FindFirst("preferred_username")?.Value,
-            User.FindFirst("email")?.Value,
-            User.FindFirst(ClaimTypes.Email)?.Value,
+            user?.Identity?.Name,
+            user?.FindFirst("name")?.Value,
+            user?.FindFirst("preferred_username")?.Value,
+            user?.FindFirst("email")?.Value,
+            user?.FindFirst(ClaimTypes.Email)?.Value,
             pdfData.QuotedByName);
 
         pdfData.QuotedByEmail = FirstNonEmpty(
-            User.FindFirst("email")?.Value,
-            User.FindFirst(ClaimTypes.Email)?.Value,
+            user?.FindFirst("email")?.Value,
+            user?.FindFirst(ClaimTypes.Email)?.Value,
             pdfData.QuotedByEmail);
 
         pdfData.QuotedAt = DateTime.UtcNow;

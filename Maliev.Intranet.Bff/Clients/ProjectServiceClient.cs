@@ -98,6 +98,25 @@ public class ProjectServiceClient(HttpClient httpClient)
     public async Task<HttpResponseMessage> DeleteProjectAsync(Guid id, CancellationToken ct = default)
         => await httpClient.DeleteAsync($"/project/v1/projects/{id}", ct);
 
+    /// <summary>
+    /// Adds an internal note to a project.
+    /// </summary>
+    public async Task<(ProjectNoteDto? Result, string? ErrorContent, int StatusCode)> AddNoteAsync(
+        Guid projectId,
+        AddProjectNoteRequest request,
+        CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/project/v1/projects/{projectId}/notes", request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(ct);
+            return (null, errorContent, (int)response.StatusCode);
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<ProjectNoteDto>(cancellationToken: ct);
+        return (result, null, (int)response.StatusCode);
+    }
+
     // ── Part endpoints ───────────────────────────────────────────────────────
 
     /// <summary>

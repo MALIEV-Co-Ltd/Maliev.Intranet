@@ -44,7 +44,7 @@
             <SecondaryButton Class="project-action-download" Icon="@Icons.Material.Outlined.Download" Disabled="@(!HasQuotation || _pdfLoading)" OnClick="@DownloadQuoteAsync">
                 @(_pdfLoading ? "Preparing" : "Download quote")
             </SecondaryButton>
-            <PrimaryButton Class="project-action-accept" Icon="@Icons.Material.Outlined.Check" Disabled="@(!CanAcceptQuote || _accepting)" OnClick="@AcceptQuoteAsync">
+            <PrimaryButton Class="project-action-accept" Icon="@Icons.Material.Outlined.Check" Disabled="@(!CanAcceptQuote || _accepting)" OnClick="@(_ => OpenAcceptQuoteConfirmation())">
                 @(_accepting ? "Accepting" : "Accept quote")
             </PrimaryButton>
         </PageHeader>
@@ -86,6 +86,13 @@
     }
 </div>
 
+<ConfirmModal Open="@_acceptConfirmOpen" Title="Accept quote" ConfirmLabel="Accept quote" Class="project-accept-dialog" ConfirmButtonClass="project-accept-confirm" Danger="true" OnCancel="@CloseAcceptQuoteConfirmation" OnConfirm="@ConfirmAcceptQuoteAsync">
+    <p>
+        Accepting this quote will mark the commercial offer as accepted and move the project into the downstream order workflow.
+        Confirm only after the customer has approved the quotation PDF and all DFM issues are acknowledged.
+    </p>
+</ConfirmModal>
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -93,6 +100,9 @@
     private bool _loading = true;
     private bool _pdfLoading;
     private bool _accepting;
+    private bool _acceptConfirmOpen;
+    private bool _addingNote;
+    private string _newNoteContent = string.Empty;
     private string _activeTab = "overview";
 
     private IReadOnlyList<(string Key, string Label)> Tabs =>
@@ -172,7 +182,7 @@
             AddReadOnlyField(content, 5, "Project #", ProjectTitle);
             AddReadOnlyField(content, 9, "Title", _project?.Title);
             AddReadOnlyField(content, 13, "Customer", _project?.CustomerName);
-            AddReadOnlyField(content, 17, "Status", _project?.Status);
+            AddReadOnlyField(content, 17, "Status", FormatStatus(_project?.Status));
             AddReadOnlyField(content, 21, "Created", FormatDateTime(_project?.CreatedAt));
             AddReadOnlyField(content, 25, "Updated", FormatDateTime(_project?.UpdatedAt));
             content.CloseElement();
@@ -201,7 +211,7 @@
             content.OpenComponent<StatTile>(13);
             content.AddAttribute(14, "Label", "Quotation");
             content.AddAttribute(15, "Value", QuotationLabel);
-            content.AddAttribute(16, "Subtext", _project?.QuotationStatus ?? "Not generated");
+            content.AddAttribute(16, "Subtext", FormatStatus(_project?.QuotationStatus));
             content.CloseComponent();
             content.CloseElement();
 
@@ -221,11 +231,11 @@
             AddSnapshot(content, 5, "Project status", builder2 =>
             {
                 builder2.OpenComponent<StatusBadge>(6);
-                builder2.AddAttribute(7, "Status", _project?.Status);
+                builder2.AddAttribute(7, "Status", FormatStatus(_project?.Status));
                 builder2.CloseComponent();
             });
             AddSnapshot(content, 8, "Quote #", QuotationLabel);
-            AddSnapshot(content, 12, "Quote status", _project?.QuotationStatus ?? "Not generated");
+            AddSnapshot(content, 12, "Quote status", FormatStatus(_project?.QuotationStatus));
             AddSnapshot(content, 16, "Valid until", FormatDate(_project?.ValidUntil));
             AddSnapshot(content, 20, "Subtotal", FormatMoney(PartsSubtotal));
             AddSnapshot(content, 24, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
@@ -289,7 +299,7 @@
             content.OpenComponent<PrimaryButton>(21);
             content.AddAttribute(22, "Icon", Icons.Material.Outlined.Check);
             content.AddAttribute(23, "Disabled", !CanAcceptQuote || _accepting);
-            content.AddAttribute(24, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, AcceptQuoteAsync));
+            content.AddAttribute(24, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => OpenAcceptQuoteConfirmation()));
             content.AddContent(25, _accepting ? "Accepting" : "Accept quote");
             content.CloseComponent();
             content.CloseElement();
@@ -326,7 +336,7 @@
         builder.AddAttribute(6, "class", "project-parts-table");
         builder.OpenElement(7, "thead");
         builder.OpenElement(8, "tr");
-        foreach (var heading in new[] { "File", "Process", "Material", "Configuration", "Qty", "Unit", "Total", "Status" })
+        foreach (var heading in new[] { "Part", "Process", "Material", "Configuration", "DFM", "Qty", "Unit", "Total", "Status" })
         {
             builder.OpenElement(9, "th");
             builder.AddContent(10, heading);
@@ -339,16 +349,17 @@
         foreach (var part in parts)
         {
             builder.OpenElement(sequence++, "tr");
-            AddCell(builder, ref sequence, part.FileName);
+            AddPartCell(builder, ref sequence, part);
             AddCell(builder, ref sequence, FormatProcess(part.ProcessType));
             AddCell(builder, ref sequence, part.MaterialName ?? "-");
             AddCell(builder, ref sequence, FormatPartConfiguration(part));
+            AddDfmCell(builder, ref sequence, part);
             AddCell(builder, ref sequence, part.Quantity.ToString(), "numeric");
             AddCell(builder, ref sequence, FormatMoney(GetPartUnitPrice(part)), "numeric");
             AddCell(builder, ref sequence, FormatMoney(GetPartLineTotal(part)), "numeric");
             builder.OpenElement(sequence++, "td");
             builder.OpenComponent<StatusBadge>(sequence++);
-            builder.AddAttribute(sequence++, "Status", part.Status);
+            builder.AddAttribute(sequence++, "Status", FormatStatus(part.Status));
             builder.CloseComponent();
             builder.CloseElement();
             builder.CloseElement();
@@ -406,18 +417,36 @@
         builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
         {
             var notes = _project?.Notes?.OrderByDescending(note => note.CreatedAt).ToList() ?? [];
+
+            content.OpenElement(3, "div");
+            content.AddAttribute(4, "class", "project-note-compose");
+            content.OpenElement(5, "textarea");
+            content.AddAttribute(6, "class", "project-note-input");
+            content.AddAttribute(7, "placeholder", "Add an internal note for production, commercial follow-up, or customer context.");
+            content.AddAttribute(8, "value", BindConverter.FormatValue(_newNoteContent));
+            content.AddAttribute(9, "onchange", EventCallback.Factory.CreateBinder<string>(this, value => _newNoteContent = value, _newNoteContent));
+            content.CloseElement();
+            content.OpenComponent<PrimaryButton>(10);
+            content.AddAttribute(11, "Class", "project-note-add");
+            content.AddAttribute(12, "Icon", Icons.Material.Outlined.NoteAdd);
+            content.AddAttribute(13, "Disabled", _addingNote || string.IsNullOrWhiteSpace(_newNoteContent));
+            content.AddAttribute(14, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, AddNoteAsync));
+            content.AddContent(15, _addingNote ? "Saving" : "Add note");
+            content.CloseComponent();
+            content.CloseElement();
+
             if (notes.Count == 0)
             {
-                content.OpenElement(3, "div");
-                content.AddAttribute(4, "class", "project-muted-box");
-                content.AddContent(5, "No internal notes have been added.");
+                content.OpenElement(16, "div");
+                content.AddAttribute(17, "class", "project-muted-box");
+                content.AddContent(18, "No internal notes have been added.");
                 content.CloseElement();
                 return;
             }
 
-            content.OpenElement(6, "div");
-            content.AddAttribute(7, "class", "project-note-list");
-            var sequence = 8;
+            content.OpenElement(19, "div");
+            content.AddAttribute(20, "class", "project-note-list");
+            var sequence = 21;
             foreach (var note in notes)
             {
                 content.OpenElement(sequence++, "article");
@@ -474,7 +503,23 @@
         }
     }
 
-    private async Task AcceptQuoteAsync()
+    private Task OpenAcceptQuoteConfirmation()
+    {
+        if (CanAcceptQuote)
+            _acceptConfirmOpen = true;
+
+        return Task.CompletedTask;
+    }
+
+    private Task OpenAcceptQuoteConfirmation(MouseEventArgs _) => OpenAcceptQuoteConfirmation();
+
+    private Task CloseAcceptQuoteConfirmation()
+    {
+        _acceptConfirmOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmAcceptQuoteAsync()
     {
         if (!CanAcceptQuote)
             return;
@@ -490,6 +535,7 @@
             }
 
             Snackbar.Add("Quotation accepted.", Severity.Success);
+            _acceptConfirmOpen = false;
             await OnParametersSetAsync();
         }
         catch (Exception ex)
@@ -499,6 +545,41 @@
         finally
         {
             _accepting = false;
+        }
+    }
+
+    private async Task AddNoteAsync(MouseEventArgs _)
+    {
+        var content = _newNoteContent.Trim();
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            Snackbar.Add("Enter a note before saving.", Severity.Warning);
+            return;
+        }
+
+        _addingNote = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/projects/{Id}/notes", new AddProjectNoteRequest { Content = content });
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Internal note could not be saved.", Severity.Error);
+                return;
+            }
+
+            _newNoteContent = string.Empty;
+            _activeTab = "notes";
+            Snackbar.Add("Internal note added.", Severity.Success);
+            await OnParametersSetAsync();
+            _activeTab = "notes";
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Internal note error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _addingNote = false;
         }
     }
 
@@ -543,6 +624,116 @@
         builder.CloseElement();
     }
 
+    private static void AddPartCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
+    {
+        builder.OpenElement(sequence++, "td");
+        builder.AddAttribute(sequence++, "class", "project-part-cell");
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-part-summary");
+
+        if (!string.IsNullOrWhiteSpace(part.ThumbnailUrl))
+        {
+            builder.OpenElement(sequence++, "img");
+            builder.AddAttribute(sequence++, "class", "project-part-thumb");
+            builder.AddAttribute(sequence++, "src", part.ThumbnailUrl);
+            builder.AddAttribute(sequence++, "alt", $"{part.FileName} thumbnail");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "project-part-thumb placeholder");
+            builder.OpenComponent<MudIcon>(sequence++);
+            builder.AddAttribute(sequence++, "Icon", Icons.Material.Outlined.ViewInAr);
+            builder.AddAttribute(sequence++, "Size", Size.Small);
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-part-meta");
+        builder.OpenElement(sequence++, "strong");
+        builder.AddContent(sequence++, part.FileName);
+        builder.CloseElement();
+
+        var dimensions = FormatDimensions(part.Dimensions);
+        if (!string.IsNullOrWhiteSpace(dimensions))
+        {
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, dimensions);
+            builder.CloseElement();
+        }
+
+        AddAttachmentLinks(builder, ref sequence, "Drawings", part.DrawingFiles);
+        AddAttachmentLinks(builder, ref sequence, "Documents", part.SupplementaryFiles);
+
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private static void AddAttachmentLinks(
+        RenderTreeBuilder builder,
+        ref int sequence,
+        string label,
+        IReadOnlyCollection<ProjectPartAttachmentDto> attachments)
+    {
+        if (attachments.Count == 0)
+            return;
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-part-attachments");
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, label);
+        builder.CloseElement();
+
+        foreach (var attachment in attachments)
+        {
+            var href = string.IsNullOrWhiteSpace(attachment.SignedUrl) ? attachment.StoragePath : attachment.SignedUrl;
+            if (string.IsNullOrWhiteSpace(href))
+            {
+                builder.OpenElement(sequence++, "span");
+                builder.AddContent(sequence++, attachment.FileName);
+                builder.CloseElement();
+                continue;
+            }
+
+            builder.OpenElement(sequence++, "a");
+            builder.AddAttribute(sequence++, "href", href);
+            builder.AddAttribute(sequence++, "target", "_blank");
+            builder.AddAttribute(sequence++, "rel", "noopener noreferrer");
+            builder.AddContent(sequence++, attachment.FileName);
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    }
+
+    private static void AddDfmCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
+    {
+        var hasDfmWarnings = part.OverlayPaths.Count > 0 || part.IsManifold == false;
+        var label = hasDfmWarnings
+            ? "DFM warnings"
+            : part.DfmAcknowledged ? "DFM cleared" : "DFM pending";
+        var subtext = hasDfmWarnings
+            ? part.DfmAcknowledged ? "Acknowledged" : "Requires acknowledgement"
+            : part.DfmAcknowledged ? "Acknowledged" : "Awaiting review";
+
+        builder.OpenElement(sequence++, "td");
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", hasDfmWarnings && !part.DfmAcknowledged
+            ? "project-dfm-gate warning"
+            : "project-dfm-gate");
+        builder.OpenElement(sequence++, "strong");
+        builder.AddContent(sequence++, label);
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, subtext);
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
     private string FormatMoney(decimal value) => CurrencyFormatter.Format(value, ProjectCurrency, 2);
 
     private static bool IsAcceptableQuoteStatus(string? status) =>
@@ -562,15 +753,92 @@
 
     private static string FormatDateTime(DateTime? value) => value.HasValue ? value.Value.ToString("MMM d, yyyy HH:mm") : "-";
 
-    private static string FormatProcess(string? process) => string.IsNullOrWhiteSpace(process)
-        ? "-"
-        : process.Replace("_", " ", StringComparison.Ordinal).Replace("-", " ", StringComparison.Ordinal);
+    private static string FormatStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return "-";
+
+        return NormalizeStatus(status) switch
+        {
+            "quotationgenerated" => "Quotation Generated",
+            "quotationsent" => "Quotation Sent",
+            "quotationaccepted" => "Quotation Accepted",
+            "quoted" => "Quoted",
+            "configuring" => "Configuring",
+            "confirmed" => "Confirmed",
+            "generated" => "Generated",
+            "accepted" => "Accepted",
+            _ => HumanizeToken(status)
+        };
+    }
+
+    private static string FormatProcess(string? process)
+    {
+        if (string.IsNullOrWhiteSpace(process))
+            return "-";
+
+        var normalized = process.Trim()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", "_", StringComparison.Ordinal)
+            .ToUpperInvariant();
+
+        return normalized switch
+        {
+            "FDM" => "3D Printing (FDM)",
+            "SLA" or "DLP" or "SLA_DLP" => "Resin Printing (SLA/DLP)",
+            "SLS" => "Powder Bed Fusion (SLS)",
+            "MJF" => "Multi Jet Fusion (MJF)",
+            "CNC" or "CNC_MILL" or "CNC_MILLING" => "CNC Milling",
+            "CNC_TURN" or "CNC_TURNING" => "CNC Turning",
+            "CNC_5AXIS" or "CNC_5_AXIS" => "5-Axis CNC Machining",
+            "SHEET_METAL" => "Sheet Metal",
+            "INJECTION" or "INJECTION_MOLDING" => "Injection Molding",
+            _ => HumanizeToken(process)
+        };
+    }
 
     private static string FormatPartConfiguration(ProjectPartDto part)
     {
         var values = new[] { part.Finish, part.Color, part.Tolerance }
             .Where(value => !string.IsNullOrWhiteSpace(value));
-        var label = string.Join(" - ", values);
+        var label = string.Join(" - ", values.Select(FormatConfigValue));
         return string.IsNullOrWhiteSpace(label) ? "-" : label;
+    }
+
+    private static string FormatConfigValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "-";
+
+        var normalized = value.Trim()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", "_", StringComparison.Ordinal)
+            .ToUpperInvariant();
+
+        return normalized switch
+        {
+            "AS_PRINTED" => "As printed",
+            "FDM_STD" => "Standard FDM settings",
+            "STANDARD" => "Standard",
+            "NONE" => "None",
+            _ => HumanizeToken(value)
+        };
+    }
+
+    private static string HumanizeToken(string value)
+    {
+        var spaced = value.Trim()
+            .Replace("_", " ", StringComparison.Ordinal)
+            .Replace("-", " ", StringComparison.Ordinal);
+        spaced = System.Text.RegularExpressions.Regex.Replace(spaced, "([a-z])([A-Z])", "$1 $2");
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(spaced.ToLowerInvariant());
+    }
+
+    private static string FormatDimensions(ModelDimensionsDto? dimensions)
+    {
+        if (dimensions is null)
+            return string.Empty;
+
+        return $"{dimensions.X:0.#} x {dimensions.Y:0.#} x {dimensions.Z:0.#} mm";
     }
 }

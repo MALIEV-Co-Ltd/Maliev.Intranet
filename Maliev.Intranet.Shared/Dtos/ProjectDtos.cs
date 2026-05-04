@@ -127,6 +127,17 @@ public class ProjectNoteDto
 }
 
 /// <summary>
+/// Request to add an internal note to a project.
+/// </summary>
+public class AddProjectNoteRequest
+{
+    /// <summary>Gets or sets the note content.</summary>
+    [Required]
+    [MaxLength(5000)]
+    public string Content { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Represents a single manufacturable part within a project.
 /// </summary>
 public class ProjectPartDto
