@@ -1,45 +1,58 @@
 .part-queue-loader {
-    --queue-scale: 0.4;
-    width: calc(80px * var(--queue-scale));
-    aspect-ratio: 1;
+    --queue-size: 32px;
+    width: var(--queue-size);
+    height: var(--queue-size);
     display: grid;
     place-items: center;
+    color: var(--maliev-ink);
     background: transparent;
     overflow: visible;
 }
 
 .part-queue-loader::before {
     content: "";
-    width: 80px;
-    aspect-ratio: 1;
-    border: 10px solid #000;
-    box-sizing: border-box;
-    background:
-        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
-        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
-        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
-        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
-        radial-gradient(farthest-side, #fff 98%, #0000) 50% / 20px 20px,
-        linear-gradient(#fff 0 0) 50% / 100% 10px,
-        linear-gradient(#fff 0 0) 50% / 10px 100%,
-        #000;
-    background-repeat: no-repeat;
-    filter: blur(4px) contrast(10);
-    animation: part-queue-loader 0.8s infinite;
-    transform: scale(var(--queue-scale));
+    width: 100%;
+    height: 100%;
+    background: currentColor;
+    mask:
+        radial-gradient(circle at 50% 18%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
+        radial-gradient(circle at 82% 50%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
+        radial-gradient(circle at 50% 82%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
+        radial-gradient(circle at 18% 50%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
+        radial-gradient(circle at 50% 50%, currentColor 0 26%, transparent 27%) 0 0 / 100% 100% no-repeat;
+    -webkit-mask:
+        radial-gradient(circle at 50% 18%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
+        radial-gradient(circle at 82% 50%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
+        radial-gradient(circle at 50% 82%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
+        radial-gradient(circle at 18% 50%, currentColor 0 18%, transparent 19%) 0 0 / 100% 100% no-repeat,
+        radial-gradient(circle at 50% 50%, currentColor 0 26%, transparent 27%) 0 0 / 100% 100% no-repeat;
+    animation: part-queue-loader 0.9s steps(4, end) infinite;
+    transform-origin: center;
 }
 
 .part-queue-loader--thumb {
-    --queue-scale: 0.4;
+    --queue-size: 24px;
 }
 
 .part-queue-loader--canvas {
-    --queue-scale: 1;
+    --queue-size: clamp(56px, 7vmin, 80px);
 }
 
 @keyframes part-queue-loader {
+    25% {
+        transform: rotate(90deg);
+    }
+
+    50% {
+        transform: rotate(180deg);
+    }
+
+    75% {
+        transform: rotate(270deg);
+    }
+
     100% {
-        background-position: 50% -20px, -20px 50%, 60px 50%, 50% 60px, 50%, 50%, 50%;
+        transform: rotate(360deg);
     }
 }
 

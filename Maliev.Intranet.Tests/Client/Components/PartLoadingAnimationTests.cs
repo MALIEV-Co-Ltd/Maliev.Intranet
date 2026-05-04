@@ -59,17 +59,21 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartQueueLoader.razor.css");
 
         Assert.Contains("background: transparent", source);
+        Assert.Contains("color: var(--maliev-ink)", source);
+        Assert.Contains("--queue-size: 32px", source);
+        Assert.Contains("width: var(--queue-size)", source);
+        Assert.Contains("height: var(--queue-size)", source);
         Assert.Contains(".part-queue-loader::before", source);
-        Assert.Contains("width: 80px", source);
-        Assert.Contains("border: 10px solid #000", source);
-        Assert.Contains("radial-gradient(farthest-side, #fff 98%, #0000)", source);
-        Assert.Contains("#000;", source);
-        Assert.Contains("filter: blur(4px) contrast(10)", source);
+        Assert.Contains("background: currentColor", source);
+        Assert.Contains("mask:", source);
+        Assert.Contains("-webkit-mask:", source);
+        Assert.DoesNotContain("#000", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("#fff", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("filter:", source, StringComparison.Ordinal);
         Assert.Contains("@keyframes part-queue-loader", source);
-        Assert.Contains("50% -20px", source);
-        Assert.Contains("-20px 50%", source);
-        Assert.Contains("60px 50%", source);
-        Assert.Contains("50% 60px", source);
+        Assert.Contains("transform: rotate(90deg)", source);
+        Assert.Contains("transform: rotate(180deg)", source);
+        Assert.Contains("transform: rotate(270deg)", source);
     }
 
     [Fact]
