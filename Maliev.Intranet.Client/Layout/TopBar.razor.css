@@ -82,19 +82,21 @@
 }
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote {
-    border: 1px solid var(--maliev-accent);
-    background: var(--maliev-accent);
-    color: #fff;
+    --topbar-quote-accent: #f97316;
+    --topbar-quote-accent-hover: #ea580c;
+    border: 1px solid var(--topbar-quote-accent) !important;
+    background: var(--topbar-quote-accent) !important;
+    color: #fff !important;
     font-weight: 800;
     padding-inline: 14px;
-    box-shadow: 0 1px 2px color-mix(in oklch, var(--maliev-accent) 28%, transparent);
+    box-shadow: 0 2px 6px rgba(249, 115, 22, 0.32);
 }
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote:hover,
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote.active {
-    border-color: color-mix(in oklch, var(--maliev-accent) 86%, black);
-    background: color-mix(in oklch, var(--maliev-accent) 86%, black);
-    color: #fff;
+    border-color: var(--topbar-quote-accent-hover) !important;
+    background: var(--topbar-quote-accent-hover) !important;
+    color: #fff !important;
 }
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote .mud-nav-link-text,

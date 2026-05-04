@@ -185,8 +185,10 @@ public class ModuleRegressionSourceTests
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
         var quoteBlock = ExtractCssBlock(source, ".topbar-nav ::deep .mud-nav-link.topbar-nav-quote");
 
-        Assert.Contains("border: 1px solid var(--maliev-accent);", quoteBlock, StringComparison.Ordinal);
-        Assert.Contains("background: var(--maliev-accent);", quoteBlock, StringComparison.Ordinal);
+        Assert.Contains("--topbar-quote-accent: #f97316;", quoteBlock, StringComparison.Ordinal);
+        Assert.Contains("border: 1px solid var(--topbar-quote-accent) !important;", quoteBlock, StringComparison.Ordinal);
+        Assert.Contains("background: var(--topbar-quote-accent) !important;", quoteBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("--maliev-accent", quoteBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("--mud-palette-primary", quoteBlock, StringComparison.Ordinal);
     }
 
