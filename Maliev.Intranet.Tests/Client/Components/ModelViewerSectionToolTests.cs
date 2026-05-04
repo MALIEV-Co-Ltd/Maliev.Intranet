@@ -53,6 +53,8 @@ public sealed class ModelViewerSectionToolTests : BunitContext, IAsyncLifetime
 
         var panel = cut.Find(".vp-section-panel");
         Assert.Equal("DIV", panel.TagName);
+        Assert.False(string.IsNullOrWhiteSpace(panel.GetAttribute("id")));
+        Assert.NotNull(panel.QuerySelector("[data-section-drag-handle]"));
         Assert.Contains("Enable section view", panel.TextContent, StringComparison.Ordinal);
         Assert.Contains("Offset:", panel.TextContent, StringComparison.Ordinal);
     }

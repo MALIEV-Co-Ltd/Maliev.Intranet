@@ -81,6 +81,10 @@ class Vector3 {
     static TransformNormal(point) {
         return new Vector3(point.x, point.y, point.z);
     }
+
+    static Project(point) {
+        return new Vector3(point.x, point.y, point.z);
+    }
 }
 
 class Ray {
@@ -127,6 +131,7 @@ function loadViewerContext() {
                 }
             },
             Matrix: {
+                Identity: () => ({}),
                 RotationX: () => ({}),
             },
             Mesh: class Mesh {
@@ -377,6 +382,7 @@ test('section fill creates a light pink cap below the diagonal hatch lines', () 
             fillPositions: sectionFillMeshes.viewer?.vertexData?.positions?.length ?? 0,
             fillIndices: sectionFillMeshes.viewer?.vertexData?.indices?.length ?? 0,
             fillColor: sectionFillMeshes.viewer?.material?.diffuseColor,
+            fillEmissiveColor: sectionFillMeshes.viewer?.material?.emissiveColor,
             fillAlpha: sectionFillMeshes.viewer?.material?.alpha,
             fillDisableLighting: sectionFillMeshes.viewer?.material?.disableLighting,
             fillNoClip: sectionFillMeshes.viewer?.material?.disableClipPlanes,
@@ -390,7 +396,10 @@ test('section fill creates a light pink cap below the diagonal hatch lines', () 
     assert.deepEqual(
         { r: result.fillColor.r, g: result.fillColor.g, b: result.fillColor.b },
         { r: 1, g: 0.78, b: 0.88 });
-    assert.equal(result.fillAlpha, 0.78);
+    assert.deepEqual(
+        { r: result.fillEmissiveColor.r, g: result.fillEmissiveColor.g, b: result.fillEmissiveColor.b },
+        { r: 1, g: 0.78, b: 0.88 });
+    assert.equal(result.fillAlpha, 0.96);
     assert.equal(result.fillDisableLighting, true);
     assert.equal(result.fillNoClip, true);
     assert.ok(result.hatchLineCount > 0, 'expected diagonal hatch lines above the fill');
@@ -817,4 +826,198 @@ test('thickness hover uses render-buffer coordinates so empty canvas positions d
     assert.deepEqual(picks.at(-1), [1800, 360]);
     assert.equal(createdSpheres.length, 0);
     assert.equal(labels.at(0).style.display, 'none');
+});
+
+test('measure hover rejects mesh hits that project away from the actual pointer', () => {
+    const context = loadViewerContext();
+    const createdSpheres = [];
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+    });
+    const canvas = {
+        style: {},
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 500 }),
+    };
+    context.canvas = canvas;
+    context.BABYLON.MeshBuilder.CreateSphere = (name) => {
+        const sphere = {
+            name,
+            isPickable: true,
+            metadata: {},
+            position: null,
+            dispose: () => {},
+        };
+        createdSpheres.push(sphere);
+        return sphere;
+    };
+    context.BABYLON.Vector3.Project = () => new Vector3(460, 260, 0.5);
+    context.scene = {
+        activeCamera: {
+            getViewMatrix: () => ({
+                multiply: () => ({}),
+            }),
+            getProjectionMatrix: () => ({}),
+            viewport: {
+                toGlobal: () => ({}),
+            },
+        },
+        meshes: [model],
+        onBeforeRenderObservable: { add: () => ({}) },
+        onPointerObservable: {
+            add(callback) {
+                this.callback = callback;
+                return callback;
+            },
+            remove: () => {},
+        },
+        pick: () => ({
+            hit: true,
+            pickedMesh: model,
+            pickedPoint: new Vector3(1, 2, 3),
+            getNormal: () => new Vector3(0, 0, 1),
+        }),
+    };
+    vm.runInContext(`
+        scenes.viewer = scene;
+        mainCameras.viewer = scene.activeCamera;
+        engines.viewer = {
+            getRenderWidth: () => 1000,
+            getRenderHeight: () => 500,
+            getRenderingCanvas: () => canvas
+        };
+    `, context);
+    context.document.getElementById = () => canvas;
+
+    vm.runInContext("enableMeasureTool('viewer', null)", context);
+    context.scene.onPointerObservable.callback({
+        type: context.BABYLON.PointerEventTypes.POINTERMOVE,
+        event: { clientX: 40, clientY: 80 },
+    });
+
+    assert.equal(createdSpheres.length, 0);
+});
+
+test('thickness hover rejects mesh hits that project away from the actual pointer', () => {
+    const context = loadViewerContext();
+    const createdSpheres = [];
+    const labels = [];
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+    });
+    const canvas = {
+        style: {},
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 500 }),
+    };
+    context.canvas = canvas;
+    context.BABYLON.MeshBuilder.CreateSphere = (name) => {
+        const sphere = {
+            name,
+            isPickable: true,
+            metadata: {},
+            position: null,
+            dispose: () => {},
+        };
+        createdSpheres.push(sphere);
+        return sphere;
+    };
+    context.document.createElement = () => {
+        const element = createElement();
+        labels.push(element);
+        return element;
+    };
+    context.BABYLON.Vector3.Project = () => new Vector3(520, 220, 0.5);
+    context.scene = {
+        activeCamera: {
+            position: new Vector3(0, 0, 10),
+            getViewMatrix: () => ({
+                multiply: () => ({}),
+            }),
+            getProjectionMatrix: () => ({}),
+            viewport: {
+                toGlobal: () => ({}),
+            },
+        },
+        meshes: [model],
+        multiPickWithRay: () => [{
+            hit: true,
+            pickedMesh: model,
+            pickedPoint: new Vector3(0, 0, -2),
+            getNormal: () => new Vector3(0, 0, -1),
+        }],
+        onBeforeRenderObservable: { add: () => ({}) },
+        onPointerObservable: {
+            add(callback) {
+                this.callback = callback;
+                return callback;
+            },
+            remove: () => {},
+        },
+        pick: () => ({
+            faceId: 7,
+            hit: true,
+            pickedMesh: model,
+            pickedPoint: new Vector3(1, 2, 3),
+            getNormal: () => new Vector3(0, 0, 1),
+        }),
+    };
+    vm.runInContext(`
+        scenes.viewer = scene;
+        mainCameras.viewer = scene.activeCamera;
+        engines.viewer = {
+            getRenderWidth: () => 1000,
+            getRenderHeight: () => 500,
+            getRenderingCanvas: () => canvas
+        };
+    `, context);
+    context.document.getElementById = () => canvas;
+
+    vm.runInContext("enableThicknessAnalysis('viewer')", context);
+    context.scene.onPointerObservable.callback({
+        type: context.BABYLON.PointerEventTypes.POINTERMOVE,
+        event: { clientX: 50, clientY: 90 },
+    });
+
+    assert.equal(createdSpheres.length, 0);
+    assert.equal(labels.at(0).style.display, 'none');
+});
+
+test('section panel drag clamps the panel inside the viewer container', () => {
+    const context = loadViewerContext();
+    const handleListeners = {};
+    const documentListeners = {};
+    const container = {
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+    };
+    const handle = {
+        addEventListener: (type, callback) => { handleListeners[type] = callback; },
+        removeEventListener: () => {},
+    };
+    const panel = {
+        style: {},
+        closest: () => container,
+        querySelector: () => handle,
+        getBoundingClientRect: () => ({ left: 700, top: 50, width: 260, height: 180 }),
+    };
+    context.document.getElementById = id => id === 'section-panel' ? panel : null;
+    context.document.addEventListener = (type, callback) => { documentListeners[type] = callback; };
+    context.document.removeEventListener = () => {};
+
+    vm.runInContext("enableSectionPanelDrag('section-panel')", context);
+    handleListeners.pointerdown({
+        button: 0,
+        clientX: 710,
+        clientY: 60,
+        preventDefault: () => {},
+    });
+    documentListeners.pointermove({
+        clientX: 1200,
+        clientY: 700,
+        preventDefault: () => {},
+    });
+
+    assert.equal(panel.style.left, '540px');
+    assert.equal(panel.style.top, '420px');
+    assert.equal(panel.style.right, 'auto');
 });

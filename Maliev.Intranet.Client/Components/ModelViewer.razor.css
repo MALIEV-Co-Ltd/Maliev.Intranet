@@ -103,6 +103,18 @@
     right: 62px;
     z-index: 12;
     width: min(260px, calc(100% - 84px));
+    touch-action: none;
+}
+
+.model-viewer-container ::deep .vp-section-panel-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    margin: -4px -4px 4px;
+    color: var(--mud-palette-text-secondary);
+    cursor: move;
+    user-select: none;
 }
 
 @media (max-width: 768px) {

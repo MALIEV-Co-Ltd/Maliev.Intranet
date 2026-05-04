@@ -247,6 +247,7 @@ const CONFIG = {
         lineColor: { r: 1.0, g: 0.85, b: 0.0 },         // Yellow measurement line
         endpointSize: 0.5,                               // Endpoint sphere radius (relative to mesh)
         snapDistance: 2.0,                               // Snap-to-vertex/edge threshold (mm)
+        maxPickScreenDistancePx: 36,                     // Reject stale/central hits farther than this from the pointer
     },
 
     /** Thickness analysis configuration */
@@ -261,7 +262,7 @@ const CONFIG = {
         cutEdgeColor: { r: 0.10, g: 0.18, b: 0.28 },
         hatchColor: { r: 1.0, g: 0.22, b: 0.68 },
         fillColor: { r: 1.0, g: 0.78, b: 0.88 },
-        fillAlpha: 0.78,
+        fillAlpha: 0.96,
         hatchSpacingMm: 3.0,
         minHatchSpacing: 0.5,
         planeLiftMm: 0.08,
@@ -2886,6 +2887,47 @@ function getPointerInfoRenderCoordinates(canvasId, scene, pointerInfo) {
         : null;
 }
 
+function projectWorldToRenderCoordinates(canvasId, scene, worldPos) {
+    const engine = engines[canvasId];
+    const cam = mainCameras[canvasId] ?? scene?.activeCamera;
+    if (!engine || !cam || !worldPos) return null;
+    if (typeof BABYLON.Vector3?.Project !== 'function' || typeof BABYLON.Matrix?.Identity !== 'function') return null;
+    if (typeof cam.getViewMatrix !== 'function' || typeof cam.getProjectionMatrix !== 'function' || !cam.viewport) return null;
+
+    const renderWidth = Number(engine.getRenderWidth?.());
+    const renderHeight = Number(engine.getRenderHeight?.());
+    if (!Number.isFinite(renderWidth) || !Number.isFinite(renderHeight) || renderWidth <= 0 || renderHeight <= 0) return null;
+
+    try {
+        const viewProjection = cam.getViewMatrix().multiply(cam.getProjectionMatrix());
+        return BABYLON.Vector3.Project(
+            worldPos,
+            BABYLON.Matrix.Identity(),
+            viewProjection,
+            cam.viewport.toGlobal(renderWidth, renderHeight));
+    } catch (_) {
+        return null;
+    }
+}
+
+function isPickProjectedNearPointer(canvasId, scene, pickResult, x, y) {
+    if (!canvasId || !pickResult?.hit || !pickResult.pickedPoint) return true;
+
+    const projected = projectWorldToRenderCoordinates(canvasId, scene, pickResult.pickedPoint);
+    if (!projected || projected.z < 0 || projected.z > 1) return true;
+
+    const engine = engines[canvasId];
+    const canvas = engine?.getRenderingCanvas?.();
+    const rect = canvas?.getBoundingClientRect?.();
+    const renderWidth = Number(engine?.getRenderWidth?.());
+    const renderHeight = Number(engine?.getRenderHeight?.());
+    const scaleX = rect?.width > 0 && Number.isFinite(renderWidth) ? renderWidth / rect.width : 1;
+    const scaleY = rect?.height > 0 && Number.isFinite(renderHeight) ? renderHeight / rect.height : 1;
+    const tolerance = CONFIG.MEASURE.maxPickScreenDistancePx * Math.max(scaleX, scaleY, 1);
+
+    return Math.hypot(projected.x - x, projected.y - y) <= tolerance;
+}
+
 function setAnalysisNavigationLock(canvasId, locked) {
     const pointers = mainCameras[canvasId]?.inputs?.attached?.pointers;
     if (!pointers) return;
@@ -4019,7 +4061,9 @@ function _rebuildSectionFill(canvasId, scene, planeNormal, planeD) {
 
     const fillMat = new BABYLON.StandardMaterial(`__section_fill_mat_${canvasId}__`, scene);
     fillMat.diffuseColor = toColor3(CONFIG.SECTION.fillColor);
-    fillMat.emissiveColor = toColor3({ r: 0.10, g: 0.03, b: 0.06 });
+    fillMat.emissiveColor = toColor3(CONFIG.SECTION.fillColor);
+    fillMat.ambientColor = toColor3(CONFIG.SECTION.fillColor);
+    fillMat.specularColor = new BABYLON.Color3(0, 0, 0);
     fillMat.alpha = CONFIG.SECTION.fillAlpha;
     fillMat.backFaceCulling = false;
     fillMat.disableLighting = true;
@@ -4755,7 +4799,7 @@ function isMeasurablePredicate(mesh) {
  * (front and back facing). Temporarily disables backFaceCulling on model meshes
  * so inside-out or mixed-winding geometry is still pickable.
  */
-function pickMeshPoint(scene, x, y) {
+function pickMeshPoint(scene, x, y, canvasId = null) {
     // Temporarily disable backFaceCulling on all model meshes
     const restore = [];
     scene.meshes.forEach(m => {
@@ -4767,7 +4811,7 @@ function pickMeshPoint(scene, x, y) {
     const result = scene.pick(x, y, isMeasurablePredicate);
     // Restore original setting
     restore.forEach(m => { m.material.backFaceCulling = true; });
-    return result;
+    return isPickProjectedNearPointer(canvasId, scene, result, x, y) ? result : { hit: false };
 }
 
 function withBackFaceCullingDisabled(scene, action) {
@@ -4845,8 +4889,8 @@ function inferRoundFeatureFromPick(pickResult) {
     };
 }
 
-function pickCadFeature(scene, x, y) {
-    const pickResult = pickMeshPoint(scene, x, y);
+function pickCadFeature(scene, x, y, canvasId = null) {
+    const pickResult = pickMeshPoint(scene, x, y, canvasId);
     if (!pickResult?.hit || !pickResult.pickedPoint || !pickResult.pickedMesh) return null;
 
     const normal = pickResult.getNormal(true, false) || new BABYLON.Vector3(0, 0, 1);
@@ -5039,8 +5083,8 @@ export function enableMeasureTool(canvasId, dotNetRef) {
                 if (dx * dx + dy * dy > 25) { state._downX = null; state._downY = null; break; }
                 state._downX = null; state._downY = null;
 
-                const pickResult = pickMeshPoint(scene, coords.x, coords.y);
-                const feature = pickCadFeature(scene, coords.x, coords.y);
+                const pickResult = pickMeshPoint(scene, coords.x, coords.y, canvasId);
+                const feature = pickCadFeature(scene, coords.x, coords.y, canvasId);
                 if (!pickResult?.hit || !pickResult.pickedMesh || !feature) return;
 
                 const pickedPoint = feature.anchor ?? pickResult.pickedPoint;
@@ -5177,7 +5221,7 @@ export function enableMeasureTool(canvasId, dotNetRef) {
 
             case BABYLON.PointerEventTypes.POINTERMOVE: {
                 if (!coords) break;
-                const hoverFeature = pickCadFeature(scene, coords.x, coords.y);
+                const hoverFeature = pickCadFeature(scene, coords.x, coords.y, canvasId);
 
                 // Update hover dot position (face-precise feedback)
                 if (hoverFeature) {
@@ -5345,7 +5389,7 @@ export function enableThicknessAnalysis(canvasId) {
 
         if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
             if (!coords) return;
-            const pickResult = pickMeshPoint(scene, coords.x, coords.y);
+            const pickResult = pickMeshPoint(scene, coords.x, coords.y, canvasId);
 
             // Clear previous hover dot
             if (state.hoverDot) { try { state.hoverDot.dispose(); } catch (_) {} state.hoverDot = null; }
@@ -5511,6 +5555,70 @@ export function notifyViewerVisible(canvasId) {
     if (engine) {
         requestAnimationFrame(() => engine.resize());
     }
+}
+
+const draggablePanelCleanups = {};
+
+export function enableSectionPanelDrag(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+
+    const container = panel.closest?.('.model-viewer-container');
+    const handle = panel.querySelector?.('[data-section-drag-handle]');
+    if (!container || !handle) return;
+
+    if (draggablePanelCleanups[panelId]) draggablePanelCleanups[panelId]();
+
+    let dragging = false;
+    let pointerOffsetX = 0;
+    let pointerOffsetY = 0;
+
+    const clampPanel = (event) => {
+        const containerRect = container.getBoundingClientRect();
+        const panelRect = panel.getBoundingClientRect();
+        const maxLeft = Math.max(0, containerRect.width - panelRect.width);
+        const maxTop = Math.max(0, containerRect.height - panelRect.height);
+        const left = Math.min(Math.max(0, event.clientX - containerRect.left - pointerOffsetX), maxLeft);
+        const top = Math.min(Math.max(0, event.clientY - containerRect.top - pointerOffsetY), maxTop);
+
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+    };
+
+    const onPointerMove = (event) => {
+        if (!dragging) return;
+        event.preventDefault?.();
+        clampPanel(event);
+    };
+
+    const onPointerUp = () => {
+        dragging = false;
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('pointercancel', onPointerUp);
+    };
+
+    const onPointerDown = (event) => {
+        if (event.button !== undefined && event.button !== 0) return;
+        const panelRect = panel.getBoundingClientRect();
+        pointerOffsetX = event.clientX - panelRect.left;
+        pointerOffsetY = event.clientY - panelRect.top;
+        dragging = true;
+        event.preventDefault?.();
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+        document.addEventListener('pointercancel', onPointerUp);
+    };
+
+    handle.addEventListener('pointerdown', onPointerDown);
+    draggablePanelCleanups[panelId] = () => {
+        handle.removeEventListener('pointerdown', onPointerDown);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('pointercancel', onPointerUp);
+    };
 }
 
 // Debug handle

@@ -63,8 +63,11 @@
 
     @if (_sectionMenuOpen)
     {
-        <div class="vp-section-panel" @onclick:stopPropagation>
+        <div id="@_sectionPanelId" class="vp-section-panel" @onclick:stopPropagation>
             <MudPaper Elevation="16" Class="pa-3">
+                <div class="vp-section-panel-handle" data-section-drag-handle>
+                    <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" />
+                </div>
                 <MudSwitch T="bool" Value="_sectionEnabled"
                            ValueChanged="@((bool v) => SetSectionEnabledAsync(v))"
                            Label="Enable section view"
@@ -208,6 +211,7 @@
     public record TurningAxisViewModel(string PrimaryAxis, IReadOnlyList<double> AxisVector, IReadOnlyList<double> AxisPoint);
 
     private string _canvasId    = $"babylon-canvas-{Guid.NewGuid()}";
+    private string _sectionPanelId = $"section-panel-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
     private DotNetObjectReference<ModelViewer>? _dotNetRef;
     private string _renderMode        = "solid";
@@ -532,6 +536,11 @@
         else if (_module != null && _lastTurningAxisKey != turningAxisKey)
         {
             await ApplyTurningAxisAsync();
+        }
+
+        if (_module != null && _sectionMenuOpen)
+        {
+            await _module.InvokeVoidAsync("enableSectionPanelDrag", _sectionPanelId);
         }
     }
 
