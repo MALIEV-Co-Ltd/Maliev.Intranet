@@ -45,7 +45,7 @@
                 @(_pdfLoading ? "Preparing" : "Download quote")
             </SecondaryButton>
             <PrimaryButton Class="project-action-accept" Icon="@Icons.Material.Outlined.Check" Disabled="@(!CanAcceptQuote || _accepting)" OnClick="@(_ => OpenAcceptQuoteConfirmation())">
-                @(_accepting ? "Accepting" : "Accept quote")
+                @AcceptQuoteButtonLabel
             </PrimaryButton>
         </PageHeader>
 
@@ -101,7 +101,9 @@
     private bool _pdfLoading;
     private bool _accepting;
     private bool _acceptConfirmOpen;
+    private bool _quoteAccepted;
     private bool _addingNote;
+    private bool _noteSaved;
     private string _newNoteContent = string.Empty;
     private string _activeTab = "overview";
 
@@ -129,6 +131,10 @@
     private bool HasQuotation => _project?.QuotationId is not null;
 
     private bool CanAcceptQuote => HasQuotation && IsAcceptableQuoteStatus(_project?.Status);
+
+    private string AcceptQuoteButtonLabel => _accepting
+        ? "Accepting..."
+        : _quoteAccepted ? "Accepted" : "Accept quote";
 
     private decimal PartsSubtotal => _project?.Parts.Sum(part => GetPartLineTotal(part)) ?? 0m;
 
@@ -300,7 +306,7 @@
             content.AddAttribute(22, "Icon", Icons.Material.Outlined.Check);
             content.AddAttribute(23, "Disabled", !CanAcceptQuote || _accepting);
             content.AddAttribute(24, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => OpenAcceptQuoteConfirmation()));
-            content.AddContent(25, _accepting ? "Accepting" : "Accept quote");
+            content.AddContent(25, AcceptQuoteButtonLabel);
             content.CloseComponent();
             content.CloseElement();
             content.CloseElement();
@@ -424,29 +430,36 @@
             content.AddAttribute(6, "class", "project-note-input");
             content.AddAttribute(7, "placeholder", "Add an internal note for production, commercial follow-up, or customer context.");
             content.AddAttribute(8, "value", BindConverter.FormatValue(_newNoteContent));
-            content.AddAttribute(9, "onchange", EventCallback.Factory.CreateBinder<string>(this, value => _newNoteContent = value, _newNoteContent));
+            content.AddAttribute(9, "onchange", EventCallback.Factory.CreateBinder<string>(this, UpdateNoteDraft, _newNoteContent));
             content.CloseElement();
             content.OpenComponent<PrimaryButton>(10);
             content.AddAttribute(11, "Class", "project-note-add");
             content.AddAttribute(12, "Icon", Icons.Material.Outlined.NoteAdd);
             content.AddAttribute(13, "Disabled", _addingNote || string.IsNullOrWhiteSpace(_newNoteContent));
             content.AddAttribute(14, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, AddNoteAsync));
-            content.AddContent(15, _addingNote ? "Saving" : "Add note");
+            content.AddContent(15, _addingNote ? "Saving..." : _noteSaved ? "Saved" : "Add note");
             content.CloseComponent();
+            if (_noteSaved)
+            {
+                content.OpenElement(16, "span");
+                content.AddAttribute(17, "class", "project-note-status");
+                content.AddContent(18, "Saved");
+                content.CloseElement();
+            }
             content.CloseElement();
 
             if (notes.Count == 0)
             {
-                content.OpenElement(16, "div");
-                content.AddAttribute(17, "class", "project-muted-box");
-                content.AddContent(18, "No internal notes have been added.");
+                content.OpenElement(19, "div");
+                content.AddAttribute(20, "class", "project-muted-box");
+                content.AddContent(21, "No internal notes have been added.");
                 content.CloseElement();
                 return;
             }
 
-            content.OpenElement(19, "div");
-            content.AddAttribute(20, "class", "project-note-list");
-            var sequence = 21;
+            content.OpenElement(22, "div");
+            content.AddAttribute(23, "class", "project-note-list");
+            var sequence = 24;
             foreach (var note in notes)
             {
                 content.OpenElement(sequence++, "article");
@@ -534,7 +547,7 @@
                 return;
             }
 
-            Snackbar.Add("Quotation accepted.", Severity.Success);
+            _quoteAccepted = true;
             _acceptConfirmOpen = false;
             await OnParametersSetAsync();
         }
@@ -552,12 +565,10 @@
     {
         var content = _newNoteContent.Trim();
         if (string.IsNullOrWhiteSpace(content))
-        {
-            Snackbar.Add("Enter a note before saving.", Severity.Warning);
             return;
-        }
 
         _addingNote = true;
+        _noteSaved = false;
         try
         {
             var response = await Http.PostAsJsonAsync($"api/v1/projects/{Id}/notes", new AddProjectNoteRequest { Content = content });
@@ -568,8 +579,8 @@
             }
 
             _newNoteContent = string.Empty;
+            _noteSaved = true;
             _activeTab = "notes";
-            Snackbar.Add("Internal note added.", Severity.Success);
             await OnParametersSetAsync();
             _activeTab = "notes";
         }
@@ -581,6 +592,12 @@
         {
             _addingNote = false;
         }
+    }
+
+    private void UpdateNoteDraft(string value)
+    {
+        _newNoteContent = value;
+        _noteSaved = false;
     }
 
     private static void AddReadOnlyField(RenderTreeBuilder builder, int sequence, string label, string? value)

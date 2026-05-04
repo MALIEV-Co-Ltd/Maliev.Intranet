@@ -83,7 +83,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         cut.Find("button.project-accept-confirm").Click();
 
         cut.WaitForAssertion(() =>
-            Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation"));
+        {
+            Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation");
+            Assert.Contains("Accepted", cut.Markup);
+        });
     }
 
     [Fact]
@@ -126,7 +129,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         cut.Find("button.project-note-add").Click();
 
         cut.WaitForAssertion(() =>
-            Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/notes"));
+        {
+            Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/notes");
+            Assert.Contains("Saved", cut.Markup);
+        });
     }
 
     [Fact]

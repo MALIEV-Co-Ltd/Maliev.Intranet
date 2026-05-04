@@ -424,6 +424,12 @@
     outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 75%);
 }
 
+.project-record-shell ::deep .project-note-status {
+    color: var(--maliev-success);
+    font-size: var(--maliev-font-small);
+    font-weight: 800;
+}
+
 .project-record-shell ::deep .project-note-card {
     display: grid;
     gap: 4px;
