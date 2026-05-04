@@ -17,6 +17,8 @@ public class EmployeeSummaryDto
     public string Department { get; set; } = string.Empty;
     /// <summary>The employee's official job title.</summary>
     public string Title { get; set; } = string.Empty;
+    /// <summary>The user's primary IAM/business role display name.</summary>
+    public string Role { get; set; } = string.Empty;
     /// <summary>The primary contact phone number.</summary>
     public string? Phone { get; set; }
     /// <summary>The current employment status (e.g., Active, OnLeave, Terminated).</summary>
@@ -48,6 +50,8 @@ public class EmployeeDetailDto
     public string Department { get; set; } = string.Empty;
     /// <summary>The employee's official job title.</summary>
     public string Title { get; set; } = string.Empty;
+    /// <summary>The user's primary IAM/business role display name.</summary>
+    public string Role { get; set; } = string.Empty;
     /// <summary>The current employment status.</summary>
     public string Status { get; set; } = string.Empty;
     /// <summary>The unique identifier of the employee's direct manager.</summary>
@@ -109,6 +113,10 @@ public sealed class EmployeeSelfProfileDto
     public string EmploymentType { get; set; } = string.Empty;
     /// <summary>The employee's employment status.</summary>
     public string EmploymentStatus { get; set; } = string.Empty;
+    /// <summary>The employee's start or hire date.</summary>
+    public DateTime? StartDate { get; set; }
+    /// <summary>The date and time when the employee/profile record was created.</summary>
+    public DateTime? CreatedAt { get; set; }
     /// <summary>The employee's department name.</summary>
     public string? DepartmentName { get; set; }
     /// <summary>The employee's manager display name.</summary>

@@ -169,6 +169,29 @@ public class EmployeeServiceClient(HttpClient httpClient)
         var response = await httpClient.GetAsync($"/employee/v1/employees/by-principal/{principalId}", ct);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<EmployeeDetailDto>(cancellationToken: ct);
+        var profile = await response.Content.ReadFromJsonAsync<EmployeeSelfProfileDto>(cancellationToken: ct);
+        return profile is null ? null : MapSelfProfile(profile);
+    }
+
+    private static EmployeeDetailDto MapSelfProfile(EmployeeSelfProfileDto profile)
+    {
+        return new EmployeeDetailDto
+        {
+            Id = profile.Id,
+            FirstName = profile.FirstName,
+            LastName = profile.LastName,
+            Email = profile.WorkEmail,
+            Phone = profile.MobilePhone,
+            Department = profile.DepartmentName ?? string.Empty,
+            Title = profile.JobTitle ?? string.Empty,
+            Status = profile.EmploymentStatus,
+            ManagerName = profile.ManagerName,
+            HireDate = profile.StartDate ?? profile.CreatedAt,
+            WorkLocation = profile.WorkLocation,
+            EmployeeType = profile.EmploymentType,
+            EmergencyContacts = profile.EmergencyContacts,
+            CreatedAt = profile.CreatedAt ?? DateTime.MinValue,
+            UpdatedAt = profile.CreatedAt ?? DateTime.MinValue
+        };
     }
 }

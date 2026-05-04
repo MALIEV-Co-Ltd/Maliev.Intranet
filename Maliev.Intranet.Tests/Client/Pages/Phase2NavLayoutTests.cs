@@ -142,6 +142,38 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void TopBar_ProfileRole_DisplaysPlatformOwnerRoleClaim()
+    {
+        _authMock.Setup(x => x.GetAuthenticationStateAsync())
+            .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(
+                new ClaimsIdentity([
+                    new Claim(ClaimTypes.Name, "Natthapol Vanasrivilai"),
+                    new Claim(ClaimTypes.Role, "roles.platform.owner")
+                ], "Test"))));
+
+        var cut = Render<TopBar>();
+
+        Assert.Contains("Platform Owner", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TopBar_ProfileRole_FallsBackToEmployee()
+    {
+        var cut = Render<TopBar>();
+
+        Assert.Contains("Employee", cut.Find(".topbar-profile-role").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TopBar_ProfileInfo_IsLeftAligned()
+    {
+        var css = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "Maliev.Intranet.Client", "Layout", "TopBar.razor.css"));
+
+        Assert.Contains("align-items: flex-start", css, StringComparison.Ordinal);
+        Assert.Contains("text-align: left", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_ProfileMenu_SignOut_NavigatesToLogout()
     {
         var navigation = Services.GetRequiredService<NavigationManager>();

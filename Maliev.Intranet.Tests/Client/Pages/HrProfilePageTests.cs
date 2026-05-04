@@ -42,7 +42,25 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Preferred name", cut.Markup);
         Assert.Contains("Personal email", cut.Markup);
         Assert.Contains("Mobile phone", cut.Markup);
+        Assert.Contains("profile-edit-grid", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("profile-input", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("mlv-input", cut.Markup, StringComparison.Ordinal);
         Assert.Contains(_requestedPaths, path => path.Equals("/api/v1/employees/me/profile", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Profile_RendersProfileDefaultsFromSelfServiceAndBffFallbacks()
+    {
+        var cut = Render<Profile>();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("test@test.com", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Active", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Platform Owner", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("FullTime", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("2026", cut.Markup, StringComparison.Ordinal);
+        });
     }
 
     [Fact]
@@ -81,11 +99,14 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
                     Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                     FirstName = "Mia",
                     LastName = "Wong",
-                    Email = "mia.wong@maliev.com",
+                    Email = "",
                     Department = "Sales",
-                    Title = "Sales Manager",
-                    Status = "Active",
-                    Phone = "+66810000000"
+                    Title = "",
+                    Role = "Platform Owner",
+                    Status = "",
+                    Phone = "+66810000000",
+                    EmployeeType = "",
+                    HireDate = new DateTime(2026, 5, 4, 0, 0, 0, DateTimeKind.Utc)
                 })
             };
         }
@@ -102,11 +123,12 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
                     LastName = "Wong",
                     FullName = "Mia Wong",
                     PreferredName = "Mia",
-                    WorkEmail = "mia.wong@maliev.com",
+                    WorkEmail = "test@test.com",
                     PersonalEmail = "mia.personal@example.com",
                     MobilePhone = "+66810000000",
                     EmploymentType = "FullTime",
-                    EmploymentStatus = "Active"
+                    EmploymentStatus = "Active",
+                    StartDate = new DateTime(2026, 5, 4, 0, 0, 0, DateTimeKind.Utc)
                 })
             };
         }

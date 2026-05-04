@@ -241,6 +241,9 @@
     display: flex;
     flex-direction: column;
     line-height: 1.1;
+    align-items: flex-start;
+    text-align: left;
+    min-width: 0;
 }
 
 .topbar-profile-name {

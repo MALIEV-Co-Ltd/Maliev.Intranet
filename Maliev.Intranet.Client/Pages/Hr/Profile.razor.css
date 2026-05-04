@@ -9,7 +9,7 @@
     flex-wrap: wrap;
 }
 
-.mlv-form-grid {
+.profile-edit-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem;
@@ -19,7 +19,7 @@
     background: var(--maliev-panel-2);
 }
 
-.mlv-form-grid label {
+.profile-field {
     display: grid;
     gap: 0.35rem;
     color: var(--maliev-muted);
@@ -27,8 +27,10 @@
     font-weight: 600;
 }
 
-.mlv-input {
+.profile-input {
+    width: 100%;
     min-height: 2.5rem;
+    box-sizing: border-box;
     border: 1px solid var(--maliev-border);
     border-radius: 6px;
     padding: 0.5rem 0.75rem;
@@ -37,14 +39,24 @@
     font: inherit;
 }
 
-.mlv-input:focus {
+.profile-input:focus {
     outline: 2px solid color-mix(in srgb, var(--mud-palette-primary) 35%, transparent);
     outline-offset: 1px;
     border-color: var(--mud-palette-primary);
 }
 
+.profile-input.invalid {
+    border-color: var(--mud-palette-error);
+}
+
+.profile-input:disabled {
+    color: var(--maliev-muted);
+    background: var(--maliev-panel-3);
+    cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
-    .mlv-form-grid {
+    .profile-edit-grid {
         grid-template-columns: 1fr;
     }
 }

@@ -144,4 +144,50 @@ public class EmployeeServiceClientTests
         Assert.Contains("\"personalEmail\":\"mia.personal@example.com\"", json, StringComparison.Ordinal);
         Assert.Contains("\"mobilePhone\":\"\\u002B66810000000\"", json, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task GetByPrincipalIdAsync_MapsEmployeeProfileContractToIntranetDetail()
+    {
+        var principalId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var employeeId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        var startDate = new DateTime(2026, 5, 4, 0, 0, 0, DateTimeKind.Utc);
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(request =>
+                    request.Method == HttpMethod.Get &&
+                    request.RequestUri!.PathAndQuery == $"/employee/v1/employees/by-principal/{principalId}"),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    id = employeeId,
+                    firstName = "Natthapol",
+                    lastName = "Vanasrivilai",
+                    fullName = "Natthapol Vanasrivilai",
+                    workEmail = "test@test.com",
+                    mobilePhone = "",
+                    jobTitle = "",
+                    employmentType = "FullTime",
+                    employmentStatus = "Active",
+                    startDate
+                })
+            });
+
+        var client = new EmployeeServiceClient(new HttpClient(handler.Object)
+        {
+            BaseAddress = new Uri("http://employee")
+        });
+
+        var result = await client.GetByPrincipalIdAsync(principalId);
+
+        Assert.NotNull(result);
+        Assert.Equal(employeeId, result.Id);
+        Assert.Equal("test@test.com", result.Email);
+        Assert.Equal("Active", result.Status);
+        Assert.Equal("FullTime", result.EmployeeType);
+        Assert.Equal(startDate, result.HireDate);
+    }
 }

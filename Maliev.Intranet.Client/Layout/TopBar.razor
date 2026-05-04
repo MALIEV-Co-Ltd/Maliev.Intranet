@@ -6,6 +6,7 @@
 @inject NavigationManager Navigation
 @inject LayoutService LayoutService
 @inject CurrencyService CurrencyService
+@inject HttpClient Http
 @implements IDisposable
 
 <header class="topbar-root">
@@ -109,7 +110,7 @@
                         </span>
                         <span class="topbar-profile-info">
                             <span class="topbar-profile-name">@(auth.User.Identity?.Name ?? "User")</span>
-                            <span class="topbar-profile-role">@(GetJobTitle(auth.User))</span>
+                            <span class="topbar-profile-role">@(GetProfileRole(auth.User))</span>
                         </span>
                         <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" Color="Color.Default" />
                     </button>
@@ -147,6 +148,7 @@
     [Parameter] public EventCallback OnToggleTheme { get; set; }
 
     private bool _profileMenuOpen;
+    private string? _profileRole;
 
     private record NavItem(string Label, string Href, NavLinkMatch Match = NavLinkMatch.Prefix, string? Class = null);
 
@@ -182,10 +184,11 @@
 
     private static readonly string[] PriorityCodes = ["THB", "USD", "EUR", "GBP", "JPY"];
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         LayoutService.MajorUpdateOccurred += OnLayoutUpdate;
         CurrencyService.Changed += OnCurrencyChanged;
+        await LoadProfileSummaryAsync();
     }
 
     public void Dispose()
@@ -242,6 +245,19 @@
 
     private async Task ToggleChat() => await ChatDrawerOpenChanged.InvokeAsync(!ChatDrawerOpen);
 
+    private async Task LoadProfileSummaryAsync()
+    {
+        try
+        {
+            var profile = await Http.GetFromJsonAsync<EmployeeDetailDto>("api/v1/employees/me");
+            _profileRole = FirstNonBlank(profile?.Role, profile?.Title);
+        }
+        catch
+        {
+            _profileRole = null;
+        }
+    }
+
     private void ToggleProfileMenu() => _profileMenuOpen = !_profileMenuOpen;
 
     private void CloseProfileMenu() => _profileMenuOpen = false;
@@ -263,11 +279,47 @@
             : parts[0][0].ToString().ToUpperInvariant();
     }
 
+    private string GetProfileRole(System.Security.Claims.ClaimsPrincipal user)
+    {
+        return FirstNonBlank(_profileRole, GetJobTitle(user), "Employee");
+    }
+
     private static string GetJobTitle(System.Security.Claims.ClaimsPrincipal user)
     {
-        return user.FindFirst("job_title")?.Value
-            ?? user.FindFirst("title")?.Value
-            ?? user.FindFirst("position")?.Value
-            ?? "Employee";
+        var role = user.FindAll("role")
+            .Concat(user.FindAll(System.Security.Claims.ClaimTypes.Role))
+            .Select(c => c.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        return FirstNonBlank(
+            FormatRoleId(role),
+            user.FindFirst("job_title")?.Value,
+            user.FindFirst("title")?.Value,
+            user.FindFirst("position")?.Value);
+    }
+
+    private static string FormatRoleId(string? roleId)
+    {
+        if (string.IsNullOrWhiteSpace(roleId))
+        {
+            return string.Empty;
+        }
+
+        if (string.Equals(roleId, "roles.platform.owner", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Platform Owner";
+        }
+
+        var value = roleId.StartsWith("roles.", StringComparison.OrdinalIgnoreCase)
+            ? roleId["roles.".Length..]
+            : roleId;
+        var labelSegment = value.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? value;
+        return string.Join(' ', labelSegment.Split('-', StringSplitOptions.RemoveEmptyEntries)
+            .Select(word => char.ToUpperInvariant(word[0]) + word[1..]));
+    }
+
+    private static string FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
     }
 }
