@@ -458,7 +458,10 @@ try
     })
     .AddStandardResilienceHandler();
 
-    builder.Services.AddHttpClient("ServiceHealthCheck")
+    builder.Services.AddHttpClient("ServiceHealthCheck", client =>
+    {
+        client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+    })
     .AddServiceDiscovery();
 
     builder.Services.AddHttpClient("BffInternal")

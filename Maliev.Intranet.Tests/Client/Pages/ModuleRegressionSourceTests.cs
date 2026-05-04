@@ -148,8 +148,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("InventoryService", controller, StringComparison.Ordinal);
         Assert.Contains("DeliveryService", controller, StringComparison.Ordinal);
         Assert.Contains("ChatbotService", controller, StringComparison.Ordinal);
-        Assert.Contains("CancelAfter(TimeSpan.FromSeconds(5))", controller, StringComparison.Ordinal);
-        Assert.Contains("Health probe timed out after 5 seconds.", controller, StringComparison.Ordinal);
+        Assert.Contains("CancelAfter(TimeSpan.FromSeconds(2))", controller, StringComparison.Ordinal);
+        Assert.Contains("Health probe timed out after 2 seconds.", controller, StringComparison.Ordinal);
     }
 
     [Fact]
