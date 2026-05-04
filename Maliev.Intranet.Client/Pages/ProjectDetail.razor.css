@@ -113,6 +113,7 @@
 
 .project-record-shell ::deep .project-table-wrap.compact {
     max-height: 380px;
+    overflow: auto;
 }
 
 .project-record-shell ::deep .project-parts-table {
@@ -165,6 +166,10 @@
 }
 
 .project-record-shell ::deep .project-parts-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--maliev-panel);
     color: var(--maliev-muted);
     font-size: var(--maliev-font-nano);
     font-weight: 800;
@@ -184,15 +189,16 @@
 
 .project-record-shell ::deep .project-part-summary {
     display: grid;
-    grid-template-columns: 58px minmax(0, 1fr);
+    grid-template-columns: 52px minmax(0, 1fr);
     gap: 10px;
     align-items: center;
     min-width: 0;
 }
 
 .project-record-shell ::deep .project-part-thumb {
-    width: 58px;
-    height: 44px;
+    width: 52px;
+    height: 52px;
+    aspect-ratio: 1;
     border: 1px solid var(--maliev-border);
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel-2);
@@ -401,12 +407,15 @@
 }
 
 .project-record-shell ::deep .project-note-compose {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 10px;
     margin-bottom: 14px;
 }
 
 .project-record-shell ::deep .project-note-input {
+    flex: 1 1 520px;
     min-height: 96px;
     width: 100%;
     resize: vertical;
@@ -417,6 +426,12 @@
     color: var(--maliev-ink);
     font: inherit;
     line-height: 1.45;
+}
+
+.project-record-shell ::deep .project-note-add {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 108px;
 }
 
 .project-record-shell ::deep .project-note-input:focus {

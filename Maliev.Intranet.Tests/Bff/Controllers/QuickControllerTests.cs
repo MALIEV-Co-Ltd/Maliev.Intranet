@@ -25,6 +25,15 @@ public class QuickControllerTests
         return new HttpClient(handler) { BaseAddress = new Uri("http://test") };
     }
 
+    private static HttpClient CreateRawJsonClient(string json)
+    {
+        var handler = new MockHttpMessageHandler((req, ct) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+        }));
+        return new HttpClient(handler) { BaseAddress = new Uri("http://test") };
+    }
+
     private static PdfServiceClient CreatePdfClient()
     {
         var handler = new MockHttpMessageHandler((req, ct) =>
@@ -142,6 +151,38 @@ public class QuickControllerTests
         var item = data.GetProperty("Items")[0];
         Assert.Equal("Current line", item.GetProperty("MaterialName").GetString());
         Assert.Equal(50m, item.GetProperty("LineTotal").GetDecimal());
+    }
+
+    [Fact]
+    public async Task QuotationServiceClient_GetQuotationById_AcceptsNumericStatusFromQuotationService()
+    {
+        var quotationId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        var client = new QuotationServiceClient(CreateRawJsonClient($$"""
+        {
+          "id": "{{quotationId}}",
+          "quotationNumber": "Q-100",
+          "customerId": "11111111-1111-1111-1111-111111111111",
+          "customerName": "Axion Robotics",
+          "currentVersionNumber": 1,
+          "status": 5,
+          "validityPeriodStart": "2026-04-18T00:00:00Z",
+          "validityPeriodEnd": "2026-05-18T00:00:00Z",
+          "subTotal": 100,
+          "tax": 7,
+          "total": 107,
+          "currencyCode": "THB",
+          "versions": [],
+          "internalNotes": [],
+          "attachments": [],
+          "createdAt": "2026-04-18T08:00:00Z",
+          "updatedAt": "2026-04-18T08:00:00Z"
+        }
+        """));
+
+        var quotation = await client.GetQuotationByIdAsync(quotationId);
+
+        Assert.NotNull(quotation);
+        Assert.Equal("Accepted", quotation.Status);
     }
 
     [Fact]

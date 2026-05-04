@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Maliev.Intranet.Shared;
@@ -85,6 +86,7 @@ public class QuotationDetailDto
     public int CurrentVersionNumber { get; set; }
 
     /// <summary>The current status of the quotation (e.g., Draft, Sent, Accepted, Rejected).</summary>
+    [JsonConverter(typeof(QuotationStatusStringJsonConverter))]
     public string Status { get; set; } = string.Empty;
 
     /// <summary>The start date of the quotation's validity period.</summary>
@@ -173,6 +175,37 @@ public class InternalNoteDto
 
     /// <summary>The date and time when the note was created.</summary>
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Converts QuotationService numeric enum status values into stable UI status names.
+/// </summary>
+public sealed class QuotationStatusStringJsonConverter : JsonConverter<string>
+{
+    /// <inheritdoc />
+    public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType switch
+        {
+            JsonTokenType.String => reader.GetString() ?? string.Empty,
+            JsonTokenType.Number when reader.TryGetInt32(out var value) => value switch
+            {
+                1 => "Draft",
+                2 => "PendingApproval",
+                3 => "Approved",
+                4 => "CustomerReview",
+                5 => "Accepted",
+                6 => "Expired",
+                7 => "Cancelled",
+                _ => value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            },
+            _ => throw new JsonException($"Cannot convert JSON token {reader.TokenType} to quotation status string.")
+        };
+    }
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value);
 }
 
 /// <summary>

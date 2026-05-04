@@ -459,7 +459,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void ResumeFromServerAsync_WhenProjectStatusIsQuoted_LoadsProjectForEditing()
+    public void ResumeFromServerAsync_WhenProjectStatusIsQuotationGenerated_LoadsProjectForEditing()
     {
         var projectId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
@@ -479,7 +479,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
                     CustomerId = Guid.NewGuid(),
                     CustomerName = "Axion Robotics",
                     Title = "Generated Quote Project",
-                    Status = "Quoted",
+                    Status = "QuotationGenerated",
                     Currency = "THB",
                     Parts =
                     [

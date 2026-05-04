@@ -16,7 +16,9 @@
             return "Active";
         }
 
-        return string.Join(" ", value.Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries)
+        var spacedValue = System.Text.RegularExpressions.Regex.Replace(value.Trim(), "([a-z])([A-Z])", "$1 $2");
+
+        return string.Join(" ", spacedValue.Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries)
             .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
     }
 }

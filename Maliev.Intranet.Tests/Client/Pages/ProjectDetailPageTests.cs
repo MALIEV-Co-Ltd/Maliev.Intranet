@@ -15,6 +15,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     private readonly Guid _projectId = Guid.Parse("5daabfe7-7b4a-43fe-9287-b596eb75ece8");
     private readonly Guid _quotationId = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private readonly List<string> _requestedPaths = [];
+    private bool _notePosted;
 
     public ProjectDetailPageTests()
     {
@@ -116,6 +117,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("customer-po.pdf", cut.Markup);
         Assert.Contains("DFM warnings", cut.Markup);
         Assert.Contains("Requires acknowledgement", cut.Markup);
+        Assert.Contains("DFM passed", cut.Markup);
+        Assert.Contains("No reported issues", cut.Markup);
+        Assert.DoesNotContain("DFM pending", cut.Markup);
+        Assert.DoesNotContain("Awaiting review", cut.Markup);
     }
 
     [Fact]
@@ -125,7 +130,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         cut.WaitForAssertion(() => Assert.Contains("Notes (0)", cut.Markup));
         cut.Find("button[data-tab='notes']").Click();
-        cut.Find("textarea.project-note-input").Change("Check customer's drawing revision before release.");
+        cut.Find("textarea.project-note-input").Input("Check customer's drawing revision before release.");
         cut.Find("button.project-note-add").Click();
 
         cut.WaitForAssertion(() =>
@@ -133,6 +138,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/notes");
             Assert.Contains("Saved", cut.Markup);
         });
+
+        cut.Find("button[data-tab='timeline']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Internal note added by Alex Kim", cut.Markup));
     }
 
     [Fact]
@@ -145,6 +153,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-field-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-metric-row", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
+        Assert.Contains("position: sticky", css, StringComparison.Ordinal);
+        Assert.Contains("height: 52px", css, StringComparison.Ordinal);
     }
 
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
@@ -221,7 +231,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         Color = "FDM_STD",
                         Quantity = 15,
                         ConfirmedPrice = 550m,
-                        Status = "Confirmed"
+                        Status = "Confirmed",
+                        DfmAcknowledged = false,
                     }
                 ],
                 Timeline =
@@ -238,7 +249,19 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         Timestamp = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc),
                         Completed = true
                     }
-                ]
+                ],
+                Notes = _notePosted
+                    ? [
+                        new ProjectNoteDto
+                        {
+                            Id = Guid.Parse("77777777-7777-7777-7777-777777777777"),
+                            ProjectId = _projectId,
+                            AuthorName = "Alex Kim",
+                            Content = "Check customer's drawing revision before release.",
+                            CreatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc)
+                        }
+                    ]
+                    : []
             });
         }
 
@@ -254,6 +277,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}/notes", StringComparison.Ordinal))
         {
+            _notePosted = true;
             return Json(new ProjectNoteDto
             {
                 Id = Guid.Parse("77777777-7777-7777-7777-777777777777"),

@@ -381,7 +381,7 @@
         builder.AddAttribute(1, "Title", full ? "Timeline" : "Recent activity");
         builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
         {
-            var events = _project?.Timeline?.OrderByDescending(item => item.Timestamp).ToList() ?? [];
+            var events = GetTimelineEvents().ToList();
             if (events.Count == 0)
             {
                 content.OpenElement(3, "div");
@@ -430,11 +430,11 @@
             content.AddAttribute(6, "class", "project-note-input");
             content.AddAttribute(7, "placeholder", "Add an internal note for production, commercial follow-up, or customer context.");
             content.AddAttribute(8, "value", BindConverter.FormatValue(_newNoteContent));
-            content.AddAttribute(9, "onchange", EventCallback.Factory.CreateBinder<string>(this, UpdateNoteDraft, _newNoteContent));
+            content.AddAttribute(9, "oninput", EventCallback.Factory.CreateBinder<string>(this, UpdateNoteDraft, _newNoteContent));
             content.CloseElement();
             content.OpenComponent<PrimaryButton>(10);
             content.AddAttribute(11, "Class", "project-note-add");
-            content.AddAttribute(12, "Icon", Icons.Material.Outlined.NoteAdd);
+            content.AddAttribute(12, "Icon", Icons.Material.Outlined.Add);
             content.AddAttribute(13, "Disabled", _addingNote || string.IsNullOrWhiteSpace(_newNoteContent));
             content.AddAttribute(14, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, AddNoteAsync));
             content.AddContent(15, _addingNote ? "Saving..." : _noteSaved ? "Saved" : "Add note");
@@ -731,10 +731,10 @@
         var hasDfmWarnings = part.OverlayPaths.Count > 0 || part.IsManifold == false;
         var label = hasDfmWarnings
             ? "DFM warnings"
-            : part.DfmAcknowledged ? "DFM cleared" : "DFM pending";
+            : "DFM passed";
         var subtext = hasDfmWarnings
             ? part.DfmAcknowledged ? "Acknowledged" : "Requires acknowledgement"
-            : part.DfmAcknowledged ? "Acknowledged" : "Awaiting review";
+            : "No reported issues";
 
         builder.OpenElement(sequence++, "td");
         builder.OpenElement(sequence++, "div");
@@ -858,4 +858,22 @@
 
         return $"{dimensions.X:0.#} x {dimensions.Y:0.#} x {dimensions.Z:0.#} mm";
     }
+
+    private IEnumerable<ProjectTimelineEventDto> GetTimelineEvents()
+    {
+        var events = _project?.Timeline ?? [];
+        var notes = _project?.Notes ?? [];
+
+        return events
+            .Concat(notes.Select(note => new ProjectTimelineEventDto
+            {
+                Label = $"Internal note added by {FirstNonEmpty(note.AuthorName, "System")}",
+                Timestamp = note.CreatedAt,
+                Completed = true
+            }))
+            .OrderByDescending(item => item.Timestamp);
+    }
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
 }

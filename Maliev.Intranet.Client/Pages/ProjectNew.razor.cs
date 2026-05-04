@@ -2219,7 +2219,7 @@ public partial class ProjectNew : IAsyncDisposable
     {
         return status?.Trim().ToLowerInvariant() switch
         {
-            "draft" or "configuring" or "priced" or "quoted" => true,
+            "draft" or "configuring" or "priced" or "quoted" or "quotationgenerated" or "quotationsent" => true,
             _ => false,
         };
     }
