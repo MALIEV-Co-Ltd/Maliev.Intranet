@@ -358,6 +358,40 @@ public class ProjectQuotationPdfMapperTests
     }
 
     /// <summary>
+    /// Verifies finish surcharge is not subtracted from the bulk order discount.
+    /// </summary>
+    [Fact]
+    public void BuildDraftPdfData_WithBulkPricingAndFinish_DiscountsOnlyVolumePriceDifference()
+    {
+        var data = ProjectQuotationPdfMapper.BuildDraftPdfData(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            null,
+            null,
+            "THB",
+            DateTime.SpecifyKind(new DateTime(2026, 5, 2), DateTimeKind.Utc),
+            "Standard: 5 business days after order confirmation",
+            [
+                new PartViewModel
+                {
+                    Name = "sanded-part.step",
+                    Quantity = 28,
+                    EstimatedBaseUnitPrice = 355.45m,
+                    EstimatedDiscountedUnitPriceBeforeFinish = 291.44m,
+                    FinishAdditionalUnitCost = 29.14m,
+                    EstimatedUnitPrice = 320.58m,
+                    EstimatedTotalAmount = 8976.24m,
+                },
+            ],
+            []);
+
+        Assert.Equal(10768.52m, data.SubtotalBeforeDiscount);
+        Assert.Equal(1792.28m, data.TotalDiscount);
+        Assert.Equal(8976.24m, data.Subtotal);
+        Assert.Equal(384.59m, data.Items[0].UnitPrice);
+        Assert.Equal(10768.52m, data.Items[0].LineTotal);
+    }
+
+    /// <summary>
     /// Verifies PDF lead time uses the same selected range shown on ProjectNew.
     /// </summary>
     [Fact]

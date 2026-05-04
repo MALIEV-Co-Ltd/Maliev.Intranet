@@ -133,6 +133,12 @@ public class QuickControllerTests
                 new QuotationVersionDto
                 {
                     VersionNumber = 2,
+                    DiscountStructure = new SalesDiscountStructureDto
+                    {
+                        DiscountType = SalesDiscountType.FixedAmount,
+                        DiscountValue = 15m,
+                        Conditions = "Automatic bulk order discount",
+                    },
                     LineItems = [new QuotationItemDto { Description = "Current line", Quantity = 2, UnitPrice = 25m }]
                 }
             ]
@@ -151,6 +157,10 @@ public class QuickControllerTests
         var item = data.GetProperty("Items")[0];
         Assert.Equal("Current line", item.GetProperty("MaterialName").GetString());
         Assert.Equal(50m, item.GetProperty("LineTotal").GetDecimal());
+        Assert.Equal(50m, data.GetProperty("SubtotalBeforeDiscount").GetDecimal());
+        Assert.Equal(15m, data.GetProperty("TotalDiscount").GetDecimal());
+        Assert.Equal(35m, data.GetProperty("Subtotal").GetDecimal());
+        Assert.Equal("FixedAmount", data.GetProperty("Discounts")[0].GetProperty("DiscountType").GetString());
     }
 
     [Fact]

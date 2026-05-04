@@ -184,8 +184,12 @@ public static class ProjectQuotationPdfMapper
     /// </summary>
     public static decimal ResolveBulkDiscount(PartViewModel part)
     {
+        var quantity = Math.Max(part.Quantity, 0);
+        if (part.EstimatedBaseUnitPrice.HasValue && part.EstimatedDiscountedUnitPriceBeforeFinish.HasValue)
+            return Math.Max(0m, (part.EstimatedBaseUnitPrice.Value - part.EstimatedDiscountedUnitPriceBeforeFinish.Value) * quantity);
+
         var baseLineTotal = ResolveBaseLineTotal(part);
-        var discountedLineTotal = part.EstimatedTotalAmount ?? ((part.EstimatedUnitPrice ?? 0m) * Math.Max(part.Quantity, 0));
+        var discountedLineTotal = part.EstimatedTotalAmount ?? ((part.EstimatedUnitPrice ?? 0m) * quantity);
 
         return Math.Max(0m, baseLineTotal - discountedLineTotal);
     }
@@ -203,8 +207,9 @@ public static class ProjectQuotationPdfMapper
     {
         var quotedUnitPrice = part.EstimatedUnitPrice ?? 0m;
         var baseUnitPrice = part.EstimatedBaseUnitPrice ?? quotedUnitPrice;
+        var finishAdditionalUnitCost = Math.Max(0m, part.FinishAdditionalUnitCost ?? 0m);
 
-        return Math.Max(baseUnitPrice, quotedUnitPrice);
+        return Math.Max(baseUnitPrice + finishAdditionalUnitCost, quotedUnitPrice);
     }
 
     private static string ResolveCustomerName(CustomerSummaryDto? selectedCustomer, CustomerDetailDto? customerDetail)

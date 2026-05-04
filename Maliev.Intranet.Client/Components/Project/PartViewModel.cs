@@ -244,6 +244,15 @@ public class PartViewModel
     /// <summary>Original one-piece unit price before volume pricing is applied.</summary>
     public decimal? EstimatedBaseUnitPrice { get; set; }
 
+    /// <summary>Discounted unit price before surface finish surcharge is applied.</summary>
+    public decimal? EstimatedDiscountedUnitPriceBeforeFinish { get; set; }
+
+    /// <summary>Unit price used for surface finish option cost display.</summary>
+    public decimal? FinishPricingBaseUnitPrice { get; set; }
+
+    /// <summary>Per-unit surface finish surcharge applied to the quoted price.</summary>
+    public decimal? FinishAdditionalUnitCost { get; set; }
+
     /// <summary>Queue-aware lead time from last pricing result. Drives lead time panel day calculations.</summary>
     public int EstimatedLeadTimeDays { get; set; }
 
@@ -482,6 +491,9 @@ public class PartViewModel
         EstimatedUnitPrice = EstimatedUnitPrice,
         EstimatedTotalAmount = EstimatedTotalAmount,
         EstimatedBaseUnitPrice = EstimatedBaseUnitPrice,
+        EstimatedDiscountedUnitPriceBeforeFinish = EstimatedDiscountedUnitPriceBeforeFinish,
+        FinishPricingBaseUnitPrice = FinishPricingBaseUnitPrice,
+        FinishAdditionalUnitCost = FinishAdditionalUnitCost,
         ProcessConfig = ProcessOptionValues
             .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
             .ToDictionary(pair => pair.Key, pair => pair.Value!),
@@ -551,6 +563,9 @@ public class PartViewModel
             EstimatedUnitPrice = s.EstimatedUnitPrice,
             EstimatedTotalAmount = s.EstimatedTotalAmount,
             EstimatedBaseUnitPrice = s.EstimatedBaseUnitPrice,
+            EstimatedDiscountedUnitPriceBeforeFinish = s.EstimatedDiscountedUnitPriceBeforeFinish,
+            FinishPricingBaseUnitPrice = s.FinishPricingBaseUnitPrice,
+            FinishAdditionalUnitCost = s.FinishAdditionalUnitCost,
             ProcessOptionValues = s.ProcessConfig.ToDictionary(
                 pair => pair.Key,
                 pair => (string?)pair.Value),

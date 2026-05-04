@@ -297,6 +297,21 @@ public record PricingResultDto
     /// <summary>The final calculated price for a single unit.</summary>
     public required decimal TotalUnitPrice { get; init; }
 
+    /// <summary>The calculated unit price before surface finish surcharge is applied.</summary>
+    public decimal? UnitPriceBeforeFinish { get; init; }
+
+    /// <summary>The per-unit surface finish surcharge applied by the BFF.</summary>
+    public decimal FinishAdditionalUnitCost { get; init; }
+
+    /// <summary>The calculated unit price before volume discount is applied.</summary>
+    public decimal? UnitPriceBeforeVolumeDiscount { get; init; }
+
+    /// <summary>The per-unit amount removed by volume pricing.</summary>
+    public decimal VolumeDiscountUnitAmount { get; init; }
+
+    /// <summary>The volume discount percentage applied by PricingService.</summary>
+    public decimal VolumeDiscountPercent { get; init; }
+
     /// <summary>The total price for the requested quantity, including all line items.</summary>
     public required decimal TotalPrice { get; init; }
 
@@ -324,6 +339,15 @@ public record PricingServiceCalculateResponse
 
     /// <summary>The total amount for the requested quantity.</summary>
     public decimal TotalAmount { get; init; }
+
+    /// <summary>The calculated unit price before volume discount is applied.</summary>
+    public decimal UnitPriceBeforeVolumeDiscount { get; init; }
+
+    /// <summary>The per-unit amount removed by volume pricing.</summary>
+    public decimal VolumeDiscountUnitAmount { get; init; }
+
+    /// <summary>The volume discount percentage applied by PricingService.</summary>
+    public decimal VolumeDiscountPercent { get; init; }
 
     /// <summary>The confidence score of the pricing calculation.</summary>
     public decimal ConfidenceScore { get; init; }

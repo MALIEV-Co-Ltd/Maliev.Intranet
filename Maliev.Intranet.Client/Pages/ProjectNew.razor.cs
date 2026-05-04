@@ -1478,6 +1478,12 @@ public partial class ProjectNew : IAsyncDisposable
                 {
                     part.EstimatedUnitPrice = result.TotalUnitPrice;
                     part.EstimatedTotalAmount = result.TotalPrice;
+                    part.EstimatedBaseUnitPrice = result.UnitPriceBeforeVolumeDiscount is > 0m
+                        ? result.UnitPriceBeforeVolumeDiscount
+                        : result.TotalUnitPrice;
+                    part.EstimatedDiscountedUnitPriceBeforeFinish = result.UnitPriceBeforeFinish ?? result.TotalUnitPrice;
+                    part.FinishPricingBaseUnitPrice = result.UnitPriceBeforeFinish ?? result.TotalUnitPrice;
+                    part.FinishAdditionalUnitCost = result.FinishAdditionalUnitCost;
                     part.EstimatedLeadTimeDays = result.EstimatedLeadTimeDays ?? 0;
                     part.PricingFailed = false;
                 }
@@ -1487,6 +1493,10 @@ public partial class ProjectNew : IAsyncDisposable
                 part.PricingFailed = true;
                 part.EstimatedUnitPrice = null;
                 part.EstimatedTotalAmount = null;
+                part.EstimatedBaseUnitPrice = null;
+                part.EstimatedDiscountedUnitPriceBeforeFinish = null;
+                part.FinishPricingBaseUnitPrice = null;
+                part.FinishAdditionalUnitCost = null;
                 part.EstimatedLeadTimeDays = 0;
             }
         }
@@ -2090,16 +2100,20 @@ public partial class ProjectNew : IAsyncDisposable
             Name = project.CustomerName,
         };
 
+        var catalogReloadTasks = new List<Task>();
         foreach (var part in project.Parts.Where(part => !string.IsNullOrEmpty(part.FileName)))
         {
             var partVm = CreatePartViewModelFromProjectPart(part);
             _parts.Add(partVm);
 
             if (partVm.ProcessId.HasValue && !string.IsNullOrEmpty(partVm.ProcessCode))
-                _ = ReloadPartCatalogAsync(partVm);
+                catalogReloadTasks.Add(ReloadPartCatalogAsync(partVm));
 
             ScheduleStatusCatchUp(partVm);
         }
+
+        if (catalogReloadTasks.Count > 0)
+            await Task.WhenAll(catalogReloadTasks);
 
         _selectedPartIndex = 0;
         await SaveDraftAsync();
@@ -2129,6 +2143,8 @@ public partial class ProjectNew : IAsyncDisposable
             ToleranceCode = part.Tolerance,
             EstimatedUnitPrice = unitPrice,
             EstimatedTotalAmount = unitPrice * Math.Max(part.Quantity, 1),
+            EstimatedDiscountedUnitPriceBeforeFinish = unitPrice,
+            FinishPricingBaseUnitPrice = unitPrice,
             Dimensions = part.Dimensions is null
                 ? null
                 : new FileAnalysisDimensionsDto

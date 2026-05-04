@@ -137,6 +137,8 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             .OrderByDescending(version => version.VersionNumber == quotation.CurrentVersionNumber)
             .ThenByDescending(version => version.VersionNumber)
             .FirstOrDefault();
+        var lineSubtotal = currentVersion?.LineItems?.Sum(item => item.Quantity * item.UnitPrice) ?? quotation.SubTotal;
+        var versionDiscount = ResolveDiscountAmount(currentVersion?.DiscountStructure, lineSubtotal);
 
         var pdfData = new QuotationPdfData
         {
@@ -147,8 +149,11 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             QuotationDate = quotation.CreatedAt,
             ValidityStart = quotation.ValidityPeriodStart,
             ValidityEnd = quotation.ValidityPeriodEnd,
-            SubtotalBeforeDiscount = quotation.SubTotal,
-            Subtotal = quotation.SubTotal,
+            SubtotalBeforeDiscount = lineSubtotal,
+            TotalDiscount = versionDiscount,
+            ManualDiscountAmount = versionDiscount,
+            Discounts = BuildDiscounts(currentVersion?.DiscountStructure, versionDiscount),
+            Subtotal = Math.Max(0m, lineSubtotal - versionDiscount),
             TaxAmount = quotation.Tax,
             TotalAmount = quotation.Total,
             Currency = !string.IsNullOrEmpty(quotation.CurrencyCode) ? quotation.CurrencyCode : "THB",
@@ -173,6 +178,37 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             ct: ct);
 
         return pdfUrl != null ? Ok(pdfUrl) : BadRequest("Failed to generate PDF");
+    }
+
+    private static decimal ResolveDiscountAmount(SalesDiscountStructureDto? discount, decimal lineSubtotal)
+    {
+        if (discount == null || discount.DiscountValue <= 0m || lineSubtotal <= 0m)
+            return 0m;
+
+        var amount = discount.DiscountType switch
+        {
+            SalesDiscountType.FixedAmount => discount.DiscountValue,
+            SalesDiscountType.Percentage or SalesDiscountType.VolumeBased => lineSubtotal * discount.DiscountValue / 100m,
+            _ => 0m,
+        };
+
+        return Math.Min(lineSubtotal, Math.Max(0m, amount));
+    }
+
+    private static List<QuotationPdfDiscount> BuildDiscounts(SalesDiscountStructureDto? discount, decimal amount)
+    {
+        if (discount == null || amount <= 0m)
+            return [];
+
+        return
+        [
+            new()
+            {
+                DiscountType = discount.DiscountType.ToString(),
+                DiscountValue = discount.DiscountValue,
+                Conditions = discount.Conditions ?? discount.AuthorizationReason,
+            }
+        ];
     }
 
     /// <summary>

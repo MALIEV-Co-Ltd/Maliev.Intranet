@@ -69,9 +69,14 @@ public class PricingController(IPricingServiceClient pricingClient, MaterialServ
     public async Task<ActionResult<PricingResultDto>> CalculatePrice(PricingRequestDto request, CancellationToken ct)
     {
         var result = await pricingClient.CalculatePriceAsync(request, ct);
+        if (result == null)
+            return Ok(result);
+
+        var unitPriceBeforeFinish = result.TotalUnitPrice;
+        var finishAdditionalUnitCost = 0m;
 
         // Apply surface finish surcharge when a finish is selected.
-        if (request.FinishId.HasValue && result != null)
+        if (request.FinishId.HasValue)
         {
             var processCode = request.ManufacturingProcessCode;
             if (!string.IsNullOrEmpty(processCode))
@@ -80,15 +85,22 @@ public class PricingController(IPricingServiceClient pricingClient, MaterialServ
                 var finish = finishes?.FirstOrDefault(f => f.Id == request.FinishId.Value);
                 if (finish != null)
                 {
-                    var surcharge = CalculateAdditionalCost(result.TotalUnitPrice, finish.AdditionalCostPercent);
+                    var surcharge = CalculateAdditionalCost(unitPriceBeforeFinish, finish.AdditionalCostPercent);
+                    finishAdditionalUnitCost = surcharge;
                     result = result with
                     {
-                        TotalUnitPrice = result.TotalUnitPrice + surcharge,
-                        TotalPrice = (result.TotalUnitPrice + surcharge) * request.Quantity,
+                        TotalUnitPrice = unitPriceBeforeFinish + surcharge,
+                        TotalPrice = (unitPriceBeforeFinish + surcharge) * request.Quantity,
                     };
                 }
             }
         }
+
+        result = result with
+        {
+            UnitPriceBeforeFinish = unitPriceBeforeFinish,
+            FinishAdditionalUnitCost = finishAdditionalUnitCost,
+        };
 
         return Ok(result);
     }

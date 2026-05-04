@@ -234,9 +234,10 @@ public partial class PartConfigSidebar : ComponentBase
         if (_bulkTiersByPart.TryGetValue(fileId, out var storedTiers))
             _bulkTiers = storedTiers;
 
-        if (Part.EstimatedUnitPrice.HasValue)
+        var baseUnitPrice = Part.EstimatedBaseUnitPrice ?? Part.EstimatedUnitPrice;
+        if (baseUnitPrice.HasValue)
         {
-            var currentPrice = Part.EstimatedUnitPrice.Value;
+            var currentPrice = baseUnitPrice.Value;
             var isNewPrice = !_lastSeenPricesByPart.TryGetValue(fileId, out var lastSeen)
                              || currentPrice != lastSeen;
 
@@ -247,10 +248,6 @@ public partial class PartConfigSidebar : ComponentBase
                 Part.EstimatedBaseUnitPrice = currentPrice;
                 await FetchBulkTiersAsync();
                 _ = RefreshFinishPricesAsync();
-            }
-            else if (_bulkTiers.Count > 0)
-            {
-                ApplyBulkPricingToTotal();
             }
         }
         else if (_lastSeenPricesByPart.ContainsKey(fileId))
@@ -278,40 +275,12 @@ public partial class PartConfigSidebar : ComponentBase
                 {
                     _bulkTiers = tiers.Select(t => new BulkPricingTable.BulkTier(t.Quantity, t.UnitPrice)).ToList();
                     _bulkTiersByPart[fileId] = _bulkTiers;
-                    ApplyBulkPricingToTotal();
                 }
             }
         }
         catch
         {
             // Non-fatal — bulk pricing table stays empty
-        }
-    }
-
-    /// <summary>
-    /// Finds the active bulk tier for the current quantity and sets
-    /// <see cref="PartViewModel.EstimatedUnitPrice"/> and <see cref="PartViewModel.EstimatedTotalAmount"/>
-    /// to reflect the bulk-discounted pricing.
-    /// </summary>
-    private void ApplyBulkPricingToTotal()
-    {
-        if (Part == null || _bulkTiers.Count == 0) return;
-
-        var activeTier = _bulkTiers
-            .Where(t => t.Quantity <= Part.Quantity)
-            .OrderByDescending(t => t.Quantity)
-            .FirstOrDefault();
-
-        if (activeTier != null)
-        {
-            Part.EstimatedUnitPrice = activeTier.UnitPrice;
-            Part.EstimatedTotalAmount = activeTier.UnitPrice * Part.Quantity;
-
-            if (_basePricesByPart.TryGetValue(Part.FileId, out var basePrice))
-                Part.EstimatedBaseUnitPrice = basePrice;
-
-            if (Part.FileId != Guid.Empty)
-                _lastSeenPricesByPart[Part.FileId] = activeTier.UnitPrice;
         }
     }
 
@@ -512,7 +481,7 @@ public partial class PartConfigSidebar : ComponentBase
             || string.IsNullOrEmpty(Part.ProcessCode)
             || !Part.MaterialId.HasValue
             || !Part.ToleranceId.HasValue
-            || !Part.EstimatedUnitPrice.HasValue
+            || !(Part.FinishPricingBaseUnitPrice ?? Part.EstimatedUnitPrice).HasValue
             || Part.AvailableFinishes.Count == 0)
             return;
 
@@ -523,7 +492,7 @@ public partial class PartConfigSidebar : ComponentBase
                 ProcessCode = Part.ProcessCode,
                 MaterialId = Part.MaterialId.Value,
                 ToleranceId = Part.ToleranceId.Value,
-                BaseUnitPrice = Part.EstimatedUnitPrice.Value,
+                BaseUnitPrice = (Part.FinishPricingBaseUnitPrice ?? Part.EstimatedUnitPrice)!.Value,
                 FinishIds = Part.AvailableFinishes.Select(f => f.Id).ToList(),
             };
             var response = await Http.PostAsJsonAsync("api/v1/pricing/finish-options", request);
@@ -610,7 +579,6 @@ public partial class PartConfigSidebar : ComponentBase
     {
         if (Part == null) return;
         Part.Quantity = qty;
-        ApplyBulkPricingToTotal();
         _lastQuantity = qty;
         await OnPartChanged.InvokeAsync(Part);
     }

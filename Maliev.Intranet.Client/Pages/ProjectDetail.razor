@@ -137,6 +137,7 @@
         : _quoteAccepted ? "Accepted" : "Accept quote";
 
     private decimal PartsSubtotal => _project?.Parts.Sum(part => GetPartLineTotal(part)) ?? 0m;
+    private decimal QuoteDiscount => Math.Max(0m, PartsSubtotal - (_project?.TotalPrice ?? PartsSubtotal));
 
     protected override async Task OnParametersSetAsync()
     {
@@ -244,7 +245,8 @@
             AddSnapshot(content, 12, "Quote status", FormatStatus(_project?.QuotationStatus));
             AddSnapshot(content, 16, "Valid until", FormatDate(_project?.ValidUntil));
             AddSnapshot(content, 20, "Subtotal", FormatMoney(PartsSubtotal));
-            AddSnapshot(content, 24, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
+            AddSnapshot(content, 24, "Discount", QuoteDiscount > 0m ? $"-{FormatMoney(QuoteDiscount)}" : FormatMoney(0m));
+            AddSnapshot(content, 28, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
             content.CloseElement();
         }));
         builder.CloseComponent();

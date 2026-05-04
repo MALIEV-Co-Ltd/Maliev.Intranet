@@ -89,6 +89,12 @@ public class PricingServiceClient(HttpClient httpClient) : IPricingServiceClient
                 SubtotalBeforeMargin = serviceResult.UnitPrice,
                 MarginAmount = 0,
                 TotalUnitPrice = serviceResult.UnitPrice,
+                UnitPriceBeforeFinish = serviceResult.UnitPrice,
+                UnitPriceBeforeVolumeDiscount = serviceResult.UnitPriceBeforeVolumeDiscount > 0m
+                    ? serviceResult.UnitPriceBeforeVolumeDiscount
+                    : serviceResult.UnitPrice,
+                VolumeDiscountUnitAmount = serviceResult.VolumeDiscountUnitAmount,
+                VolumeDiscountPercent = serviceResult.VolumeDiscountPercent,
                 TotalPrice = serviceResult.TotalAmount,
                 ConfidenceLevel = serviceResult.ConfidenceScore,
                 ValidUntil = DateTime.UtcNow.AddHours(24),

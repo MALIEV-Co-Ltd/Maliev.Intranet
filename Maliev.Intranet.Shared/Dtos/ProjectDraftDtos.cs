@@ -153,6 +153,15 @@ public sealed class DraftPartState
     /// <summary>Last computed one-piece unit price before volume pricing. Shown immediately on restore.</summary>
     public decimal? EstimatedBaseUnitPrice { get; set; }
 
+    /// <summary>Last computed discounted unit price before surface finish surcharge. Shown immediately on restore.</summary>
+    public decimal? EstimatedDiscountedUnitPriceBeforeFinish { get; set; }
+
+    /// <summary>Last computed unit price used to show surface finish option surcharges.</summary>
+    public decimal? FinishPricingBaseUnitPrice { get; set; }
+
+    /// <summary>Last computed per-unit surface finish surcharge.</summary>
+    public decimal? FinishAdditionalUnitCost { get; set; }
+
     /// <summary>Additional process-specific configuration key-value pairs.</summary>
     public Dictionary<string, string> ProcessConfig { get; set; } = new();
 

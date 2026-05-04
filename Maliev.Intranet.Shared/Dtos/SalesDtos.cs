@@ -143,6 +143,9 @@ public class QuotationVersionDto
     /// <summary>The total calculated price for this specific version.</summary>
     public decimal TotalPrice { get; set; }
 
+    /// <summary>The discount structure applied to this quotation version, if any.</summary>
+    public SalesDiscountStructureDto? DiscountStructure { get; set; }
+
     /// <summary>The ISO 4217 currency code used for this version.</summary>
     public string CurrencyCode { get; set; } = string.Empty;
 
@@ -354,6 +357,63 @@ public class OrderTimelineDto
 
     /// <summary>The date and time when the status update occurred.</summary>
     public DateTime Timestamp { get; set; }
+}
+
+/// <summary>
+/// Discount structure returned by QuotationService for a quotation version.
+/// </summary>
+public sealed record SalesDiscountStructureDto
+{
+    /// <summary>The discount type, for example Percentage, FixedAmount, or VolumeBased.</summary>
+    [JsonConverter(typeof(SalesDiscountTypeJsonConverter))]
+    public SalesDiscountType DiscountType { get; set; }
+
+    /// <summary>The discount value as an amount or percentage depending on <see cref="DiscountType"/>.</summary>
+    public decimal DiscountValue { get; set; }
+
+    /// <summary>Optional conditions that explain why the discount applies.</summary>
+    public string? Conditions { get; set; }
+
+    /// <summary>Optional authorization reason recorded by QuotationService.</summary>
+    public string? AuthorizationReason { get; set; }
+}
+
+/// <summary>
+/// Discount types returned by QuotationService.
+/// </summary>
+public enum SalesDiscountType
+{
+    /// <summary>Percentage discount.</summary>
+    Percentage = 1,
+
+    /// <summary>Fixed amount discount.</summary>
+    FixedAmount = 2,
+
+    /// <summary>Volume-based discount.</summary>
+    VolumeBased = 3,
+}
+
+/// <summary>
+/// Converts QuotationService discount type values from either numeric enum values or names.
+/// </summary>
+public sealed class SalesDiscountTypeJsonConverter : JsonConverter<SalesDiscountType>
+{
+    /// <inheritdoc />
+    public override SalesDiscountType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType switch
+        {
+            JsonTokenType.Number when reader.TryGetInt32(out var value) && Enum.IsDefined(typeof(SalesDiscountType), value) => (SalesDiscountType)value,
+            JsonTokenType.String when Enum.TryParse<SalesDiscountType>(reader.GetString(), ignoreCase: true, out var value) => value,
+            _ => SalesDiscountType.FixedAmount,
+        };
+    }
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, SalesDiscountType value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString());
+    }
 }
 
 /// <summary>
