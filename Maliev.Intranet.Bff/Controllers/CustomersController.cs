@@ -4,6 +4,8 @@ using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
+using Maliev.MessagingContracts.Contracts.Shared;
+using MassTransit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -21,6 +23,7 @@ public class CustomersController(
     RegistryServiceClient registryClient,
     IReferenceDataService referenceDataService,
     IAMServiceClient iamClient,
+    IPublishEndpoint publishEndpoint,
     IHubContext<NotificationHub> hubContext,
     ILogger<CustomersController> logger) : ControllerBase
 {
@@ -49,6 +52,55 @@ public class CustomersController(
     {
         var result = await client.GetCustomerByIdAsync(id, ct);
         return result != null ? Ok(result) : NotFound();
+    }
+
+    /// <summary>Sends an email notification to a customer through NotificationService.</summary>
+    [RequirePermission(MalievPermissions.Customer.Read)]
+    [HttpPost("{id:guid}/email")]
+    public async Task<IActionResult> SendEmail(Guid id, [FromBody] CustomerEmailRequest request, CancellationToken ct)
+    {
+        var customer = await client.GetCustomerByIdAsync(id, ct);
+        if (customer is null)
+        {
+            return NotFound();
+        }
+
+        if (customer.PrincipalId is null || customer.PrincipalId == Guid.Empty)
+        {
+            return BadRequest(new ApiErrorResponse { Message = "Customer does not have an IAM principal for notification delivery." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Subject) || string.IsNullOrWhiteSpace(request.Body))
+        {
+            return BadRequest(new ApiErrorResponse { Message = "Subject and body are required." });
+        }
+
+        var messageId = Guid.NewGuid();
+        var notification = new NotificationEvent(
+            MessageId: messageId,
+            MessageName: nameof(NotificationEvent),
+            MessageType: Maliev.MessagingContracts.Contracts.Shared.MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "Maliev.IntranetBff",
+            ConsumedBy: ["Maliev.NotificationService"],
+            CorrelationId: messageId,
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new NotificationEventPayload(
+                NotificationType: request.Subject.Trim(),
+                Priority: "normal",
+                TargetUsers: [new NotificationEventPayloadTargetUsersItem(customer.PrincipalId.Value.ToString(), "customer")],
+                TemplateId: string.Empty,
+                Parameters: new Dictionary<string, string>
+                {
+                    ["subject"] = request.Subject.Trim(),
+                    ["message"] = request.Body.Trim()
+                },
+                Metadata: new NotificationEventPayloadMetadata(customer.PreferredLanguage, "intranet-customer-detail")));
+
+        await publishEndpoint.Publish(notification, ct);
+        return Accepted(new { messageId });
     }
 
     /// <summary>Gets customer history</summary>

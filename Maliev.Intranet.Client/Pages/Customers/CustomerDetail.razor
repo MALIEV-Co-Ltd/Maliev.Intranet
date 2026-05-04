@@ -9,6 +9,7 @@
     <PageHeader Title="@(_customer?.Name ?? "Customer")" Subtitle="@(_customer?.CompanyName ?? _customer?.Email)" BackLabel="Customers" BackHref="/customers">
         @if (_customer is not null)
         {
+            <SecondaryButton Icon="@Icons.Material.Outlined.Email" OnClick="SendCustomerEmailAsync" Disabled="@(_sendingEmail || string.IsNullOrWhiteSpace(_customer.Email))">Send email</SecondaryButton>
             <SecondaryButton OnClick="DiscardChangesAsync" Disabled="@_saving">Discard</SecondaryButton>
             <PrimaryButton Icon="@Icons.Material.Outlined.Check" OnClick="SaveCustomerAsync" Disabled="@_saving">Save</PrimaryButton>
         }
@@ -605,6 +606,7 @@
     private CompanyEditModel? _companyEdit;
     private bool _loading = true;
     private bool _saving;
+    private bool _sendingEmail;
     private string? _error;
     private string _newNoteText = string.Empty;
     private string _addressLookupQuery = string.Empty;
@@ -797,6 +799,42 @@
     private async Task SaveCustomerAsync(MouseEventArgs _)
     {
         await SaveCustomerCoreAsync();
+    }
+
+    private async Task SendCustomerEmailAsync(MouseEventArgs _)
+    {
+        if (_customer is null)
+        {
+            return;
+        }
+
+        _sendingEmail = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/customers/{_customer.Id}/email", new CustomerEmailRequest
+            {
+                Subject = "Message from MALIEV",
+                Body = $"Hello {_customer.Name},\n\nMALIEV is contacting you about your account."
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Customer email was queued.", Severity.Success);
+                return;
+            }
+
+            var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+            Snackbar.Add(error?.Message ?? "Customer email could not be queued.", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Customer email could not be queued.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _sendingEmail = false;
+        }
     }
 
     private async Task<bool> SaveCustomerCoreAsync()

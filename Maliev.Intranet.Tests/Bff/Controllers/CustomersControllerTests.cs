@@ -3,6 +3,7 @@ using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
+using MassTransit;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ public class CustomersControllerTests
     private readonly Mock<RegistryServiceClient> _registryClientMock;
     private readonly Mock<IReferenceDataService> _refDataServiceMock;
     private readonly Mock<IAMServiceClient> _iamClientMock;
+    private readonly Mock<IPublishEndpoint> _publishEndpointMock;
     private readonly Mock<IHubContext<NotificationHub>> _hubContextMock;
     private readonly Mock<ILogger<CustomersController>> _loggerMock;
     private readonly CustomersController _controller;
@@ -30,6 +32,7 @@ public class CustomersControllerTests
         _registryClientMock = new Mock<RegistryServiceClient>(httpClient);
         _refDataServiceMock = new Mock<IReferenceDataService>();
         _iamClientMock = new Mock<IAMServiceClient>(httpClient);
+        _publishEndpointMock = new Mock<IPublishEndpoint>();
         _hubContextMock = new Mock<IHubContext<NotificationHub>>();
         _loggerMock = new Mock<ILogger<CustomersController>>();
 
@@ -38,6 +41,7 @@ public class CustomersControllerTests
             _registryClientMock.Object,
             _refDataServiceMock.Object,
             _iamClientMock.Object,
+            _publishEndpointMock.Object,
             _hubContextMock.Object,
             _loggerMock.Object);
     }
@@ -71,6 +75,55 @@ public class CustomersControllerTests
         var result = await _controller.GetById(Guid.NewGuid(), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task SendEmail_ShouldPublishNotification_WhenCustomerHasPrincipal()
+    {
+        var customerId = Guid.NewGuid();
+        var principalId = Guid.NewGuid();
+        _customerClientMock.Setup(x => x.GetCustomerByIdAsync(customerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CustomerDetailDto
+            {
+                Id = customerId,
+                PrincipalId = principalId,
+                Name = "Test Customer",
+                Email = "customer@example.com",
+                PreferredLanguage = "en"
+            });
+
+        var result = await _controller.SendEmail(customerId, new CustomerEmailRequest
+        {
+            Subject = "Quote update",
+            Body = "Your quote is ready."
+        }, CancellationToken.None);
+
+        Assert.IsType<AcceptedResult>(result);
+        _publishEndpointMock.Verify(x => x.Publish(
+            It.Is<Maliev.MessagingContracts.Contracts.Shared.NotificationEvent>(notification =>
+                notification.Payload.TargetUsers.Single().UserId == principalId.ToString()
+                && notification.Payload.NotificationType == "Quote update"
+                && notification.Payload.TemplateId == string.Empty),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendEmail_ShouldReturnBadRequest_WhenCustomerHasNoPrincipal()
+    {
+        var customerId = Guid.NewGuid();
+        _customerClientMock.Setup(x => x.GetCustomerByIdAsync(customerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CustomerDetailDto { Id = customerId, Name = "Test Customer" });
+
+        var result = await _controller.SendEmail(customerId, new CustomerEmailRequest
+        {
+            Subject = "Quote update",
+            Body = "Your quote is ready."
+        }, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        _publishEndpointMock.Verify(x => x.Publish(
+            It.IsAny<Maliev.MessagingContracts.Contracts.Shared.NotificationEvent>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

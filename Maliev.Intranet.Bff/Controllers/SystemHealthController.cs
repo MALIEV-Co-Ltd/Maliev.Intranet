@@ -101,10 +101,11 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         {
             var client = httpClientFactory.CreateClient("ServiceHealthCheck");
             client.BaseAddress = new Uri(baseUrl);
-            client.Timeout = TimeSpan.FromSeconds(5);
 
             var sw = Stopwatch.StartNew();
-            using var response = await client.GetAsync(target.HealthPath, ct);
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+            using var response = await client.GetAsync(target.HealthPath, timeoutCts.Token);
             sw.Stop();
 
             status.ResponseTimeMs = sw.Elapsed.TotalMilliseconds;
@@ -117,6 +118,11 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
             status.Status = "Unhealthy";
             status.ErrorMessage = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
             status.ErrorBody = TrimErrorBody(await response.Content.ReadAsStringAsync(ct));
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            status.Status = "Unreachable";
+            status.ErrorMessage = "Health probe timed out after 5 seconds.";
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

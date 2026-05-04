@@ -77,6 +77,8 @@ public class CustomerDetailDto
 {
     /// <summary>The unique identifier for the customer record.</summary>
     public Guid Id { get; set; }
+    /// <summary>The IAM principal identifier linked to this customer account.</summary>
+    public Guid? PrincipalId { get; set; }
     /// <summary>The full display name of the customer.</summary>
     public string Name { get; set; } = string.Empty;
     /// <summary>The first name of the customer.</summary>
@@ -154,6 +156,20 @@ public class CustomerDetailDto
     /// <summary>The PostgreSQL xmin concurrency token returned by CustomerService.</summary>
     [JsonPropertyName("xmin")]
     public uint Xmin { get; set; }
+}
+
+/// <summary>
+/// Request model for sending a customer email from the intranet.
+/// </summary>
+public class CustomerEmailRequest
+{
+    /// <summary>The email subject line.</summary>
+    [Required]
+    public string Subject { get; set; } = string.Empty;
+
+    /// <summary>The email body content.</summary>
+    [Required]
+    public string Body { get; set; } = string.Empty;
 }
 
 /// <summary>
