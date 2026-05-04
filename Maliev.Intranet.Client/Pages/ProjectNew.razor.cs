@@ -1819,7 +1819,6 @@ public partial class ProjectNew : IAsyncDisposable
                     if (project != null)
                     {
                         _serverProjectId = project.Id;
-                        _tempProjectId = project.Id;
 
                         foreach (var part in _parts.Where(p => p.IsFullyConfigured && !string.IsNullOrEmpty(p.StoragePath)))
                         {
@@ -2073,7 +2072,7 @@ public partial class ProjectNew : IAsyncDisposable
     private async Task ApplyProjectDetailAsync(ProjectDetailDto project)
     {
         _serverProjectId = project.Id;
-        _tempProjectId = project.Id;
+        _tempProjectId = ResolveStorageProjectId(project.Parts.Select(p => p.FileReference), project.Id);
         _title = project.Title;
         _parts.Clear();
 
@@ -2730,16 +2729,18 @@ public partial class ProjectNew : IAsyncDisposable
                 .ToList();
             if (processingParts.Count > 0)
             {
+                var storageProjectId = ResolveStorageProjectId(partsInTemp.Select(p => p.StoragePath), _tempProjectId);
                 Logger.LogInformation(
                     "Deferring storage migration for temp project {ProjectId}; {ProcessingPartCount} of {PartCount} temp part(s) are still processing",
-                    _tempProjectId,
+                    storageProjectId,
                     processingParts.Count,
                     partsInTemp.Count);
                 return;
             }
 
+            var migrationProjectId = ResolveStorageProjectId(partsInTemp.Select(p => p.StoragePath), _tempProjectId);
             var migrationResult = await Http.PostAsJsonAsync(
-                $"api/v1/uploads/migrate-project?projectId={_tempProjectId}&customerId={_selectedCustomerId}",
+                $"api/v1/uploads/migrate-project?projectId={migrationProjectId}&customerId={_selectedCustomerId}",
                 (object?)null);
 
             if (!migrationResult.IsSuccessStatusCode)
@@ -2862,6 +2863,40 @@ public partial class ProjectNew : IAsyncDisposable
         !string.IsNullOrWhiteSpace(part.GlbStoragePath) ||
         !string.IsNullOrWhiteSpace(part.GlbSignedUrl) ||
         !string.IsNullOrWhiteSpace(part.ViewerUrl);
+
+    private static Guid ResolveStorageProjectId(IEnumerable<string?> storagePaths, Guid fallbackProjectId)
+    {
+        foreach (var storagePath in storagePaths)
+        {
+            if (TryGetProjectIdFromStoragePath(storagePath, out var projectId))
+                return projectId;
+        }
+
+        return fallbackProjectId;
+    }
+
+    private static bool TryGetProjectIdFromStoragePath(string? storagePath, out Guid projectId)
+    {
+        projectId = Guid.Empty;
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return false;
+
+        var segments = storagePath.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length >= 2 &&
+            segments[0].Equals("projects", StringComparison.OrdinalIgnoreCase))
+        {
+            return Guid.TryParse(segments[1], out projectId);
+        }
+
+        if (segments.Length >= 4 &&
+            segments[0].Equals("customers", StringComparison.OrdinalIgnoreCase) &&
+            segments[2].Equals("projects", StringComparison.OrdinalIgnoreCase))
+        {
+            return Guid.TryParse(segments[3], out projectId);
+        }
+
+        return false;
+    }
 
     private async Task OpenBabylonViewer(PartViewModel part)
     {

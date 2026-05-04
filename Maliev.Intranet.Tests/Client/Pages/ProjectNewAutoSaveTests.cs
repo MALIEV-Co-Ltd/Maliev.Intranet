@@ -788,6 +788,76 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task MigrateTempProjectFilesAsync_WhenServerProjectIdDiffersFromStorageProjectId_UsesStorageProjectId()
+    {
+        var customerId = Guid.NewGuid();
+        var serverProjectId = Guid.NewGuid();
+        var storageProjectId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var requestedProjectId = Guid.Empty;
+        var oldBasePath = $"projects/{storageProjectId}/ready.stl";
+        var newBasePath = $"customers/customer-1/projects/{storageProjectId}/ready.stl";
+
+        _httpHandler.HandlerFunc = (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+
+            if (request.RequestUri?.AbsolutePath == "/api/v1/uploads/migrate-project")
+            {
+                var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query);
+                requestedProjectId = Guid.Parse(query["projectId"]!);
+                var migrationResponse = new BffMigrateProjectResponseDto
+                {
+                    DryRun = false,
+                    TotalEvaluated = 1,
+                    TotalMigrated = 1,
+                    MigratedFiles =
+                    [
+                        new BffMigratedProjectFileDto
+                        {
+                            FileId = fileId.ToString(),
+                            OldPath = oldBasePath,
+                            NewPath = newBasePath
+                        }
+                    ],
+                    Errors = []
+                };
+
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(migrationResponse), Encoding.UTF8, "application/json")
+                });
+            }
+
+            return DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        SetPrivateField(cut.Instance, "_serverProjectId", (Guid?)serverProjectId);
+        SetPrivateField(cut.Instance, "_tempProjectId", serverProjectId);
+        SetPrivateField(cut.Instance, "_selectedCustomer", new CustomerSummaryDto
+        {
+            Id = customerId,
+            Name = "MaliEV Manufacturing",
+            Email = "orders@example.test",
+        });
+        GetParts(cut.Instance).Add(new PartViewModel
+        {
+            FileId = fileId,
+            Name = "ready.stl",
+            StoragePath = oldBasePath,
+            GlbStoragePath = oldBasePath + "_viewer.glb",
+            AwaitingPreview = false,
+            StatusText = "Ready"
+        });
+
+        await InvokePrivateTaskAsync(cut, "MigrateTempProjectFilesAsync");
+
+        Assert.Equal(storageProjectId, requestedProjectId);
+        Assert.Equal(newBasePath, GetParts(cut.Instance).Single().StoragePath);
+    }
+
+    [Fact]
     public async Task MigrateTempProjectFilesAsync_WhenPartHasGeneratedArtifacts_RewritesViewerPathsAndClearsStaleSignedUrls()
     {
         var customerId = Guid.NewGuid();
