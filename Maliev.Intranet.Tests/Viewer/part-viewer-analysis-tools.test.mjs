@@ -129,6 +129,14 @@ function loadViewerContext() {
             Matrix: {
                 RotationX: () => ({}),
             },
+            Plane: class Plane {
+                constructor(a, b, c, d) {
+                    this.a = a;
+                    this.b = b;
+                    this.c = c;
+                    this.d = d;
+                }
+            },
             MeshBuilder: {
                 CreateLines: (name, options) => ({
                     name,
@@ -363,6 +371,38 @@ test('section cut edge is neutral while hatch fill keeps the pink cross lines', 
     assert.deepEqual(
         { r: result.hatchColor.r, g: result.hatchColor.g, b: result.hatchColor.b },
         { r: 1, g: 0.22, b: 0.68 });
+});
+
+test('section plane opts grid floor and shadow catcher out of visual clipping', () => {
+    const context = loadViewerContext();
+    const grid = makeMesh('__grid__', { material: {} });
+    const shadow = makeMesh('__shadow_catcher__', { material: {} });
+    context.grid = grid;
+    context.shadow = shadow;
+    context.scene = {
+        clipPlane: null,
+        meshes: [grid, shadow],
+        getMaterialByName: () => null,
+        onBeforeRenderObservable: {
+            remove: () => {},
+        },
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        meshCenters.viewer = { x: 0, y: 0, z: 0 };
+        modelScaleFactors.viewer = 1;
+        setSectionPlane('viewer', true, 'x', 0, false);
+        ({
+            sceneClipped: !!scene.clipPlane,
+            gridClipped: grid.material.disableClipPlanes !== true,
+            shadowClipped: shadow.material.disableClipPlanes !== true
+        });
+    `, context);
+
+    assert.equal(result.sceneClipped, true);
+    assert.equal(result.gridClipped, false);
+    assert.equal(result.shadowClipped, false);
 });
 
 test('measure hover uses PointerEvent coordinates instead of stale scene pointer coordinates', () => {

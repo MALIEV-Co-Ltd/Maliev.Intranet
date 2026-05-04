@@ -3406,6 +3406,7 @@ export function showGrid(canvasId) {
         mat.lineColor   = toColor3(CONFIG.GRID.lineColor);
         mat.opacity     = CONFIG.GRID.opacity;
         ground.material = mat;
+        disableSectionClippingForMesh(ground);
     } else {
         // GridMaterial CDN not yet loaded — use a plain transparent material as fallback
         const mat = new BABYLON.StandardMaterial('__grid_mat__', scene);
@@ -3413,6 +3414,7 @@ export function showGrid(canvasId) {
         mat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
         mat.backFaceCulling = false;
         ground.material = mat;
+        disableSectionClippingForMesh(ground);
     }
 }
 
@@ -3695,6 +3697,22 @@ function configureSectionLineMesh(mesh, color) {
     return markAnalysisHelperMesh(mesh);
 }
 
+function disableSectionClippingForMesh(mesh) {
+    if (mesh?.material) {
+        mesh.material.disableClipPlanes = true;
+    }
+}
+
+function disableSectionClippingForSystemMeshes(canvasId, scene) {
+    if (!scene?.meshes) return;
+
+    for (const mesh of scene.meshes) {
+        if (!mesh?.material) continue;
+        if (isModelMeshForAnalysis(mesh, canvasId)) continue;
+        disableSectionClippingForMesh(mesh);
+    }
+}
+
 function scheduleSectionRebuild(canvasId, scene, planeNormal, planeD) {
     if (_sectionRebuildPending[canvasId]) return;
     _sectionRebuildPending[canvasId] = true;
@@ -3747,6 +3765,7 @@ export function setSectionPlane(canvasId, enabled, axis, offsetMm, inverted) {
     }
     const d = -(nx * worldOffset + ny * worldOffset + nz * worldOffset);
     scene.clipPlane = new BABYLON.Plane(nx, ny, nz, d);
+    disableSectionClippingForSystemMeshes(canvasId, scene);
 
     // Create ghost clones for the hidden half (xray silhouette)
     _createSectionGhosts(canvasId, scene, nx, ny, nz, d);
