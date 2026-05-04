@@ -110,6 +110,21 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CustomerDetail_ActivityTrail_DoesNotRenderRawCompanyIds()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Customer profile update: changed company assignment to Axion Robotics.", cut.Markup));
+        cut.Find("button[data-tab='activity']").Click();
+
+        Assert.Contains("Customer profile update: changed company assignment to Axion Robotics.", cut.Markup);
+        Assert.DoesNotContain("companyid", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("db741b8f", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("efdd1db7", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("**", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerDetail_TabsRenderConsistentDetailSections()
     {
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
@@ -227,9 +242,17 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                         Description = "Order Q-2026-098 paid",
                         ActorName = "System",
                         Timestamp = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
+                    },
+                    new CustomerActivityResponse
+                    {
+                        Action = "Update",
+                        Description = "Customer profile update: changed companyid from '**db741b8f-67cf-40ba-8db8-5b899ad80001**' to '**efdd1db7-7225-4c40-914f-83dc3af80002**'",
+                        ActorName = "Natthapol Vanasrivilai",
+                        Timestamp = new DateTime(2026, 5, 4, 5, 48, 0, DateTimeKind.Utc),
+                        Details = "{\"CompanyId\":\"efdd1db7-7225-4c40-914f-83dc3af80002\"}"
                     }
                 ],
-                Meta = new PaginationMeta { CurrentPage = 1, PageSize = 8, TotalCount = 1, TotalItems = 1, TotalPages = 1 }
+                Meta = new PaginationMeta { CurrentPage = 1, PageSize = 8, TotalCount = 2, TotalItems = 2, TotalPages = 1 }
             });
         }
 

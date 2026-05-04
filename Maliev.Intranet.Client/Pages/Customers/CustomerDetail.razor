@@ -241,7 +241,7 @@
                                     <div class="customer-activity-item">
                                         <MudIcon Icon="@ActivityIcon(activity.Action)" Size="Size.Small" />
                                         <div>
-                                            <strong>@activity.Description</strong>
+                                            <strong>@ActivityDescription(activity)</strong>
                                             <span>@(activity.ActorName ?? "System") - @FormatDateTime(activity.Timestamp)</span>
                                         </div>
                                     </div>
@@ -435,7 +435,7 @@
                             <div class="customer-activity-item">
                                 <MudIcon Icon="@ActivityIcon(activity.Action)" Size="Size.Small" />
                                 <div>
-                                    <strong>@activity.Description</strong>
+                                    <strong>@ActivityDescription(activity)</strong>
                                     <span>@(activity.ActorName ?? "System") - @FormatDateTime(activity.Timestamp)</span>
                                 </div>
                             </div>
@@ -1414,6 +1414,19 @@
     private static string FormatMonthYear(DateTime value) => value == default ? "-" : value.ToString("MMM yyyy");
 
     private static string FormatDateTime(DateTime value) => value == default ? "-" : value.ToString("MMM dd, yyyy HH:mm");
+
+    private string ActivityDescription(CustomerActivityResponse activity)
+    {
+        var description = activity.Description.Replace("**", string.Empty, StringComparison.Ordinal);
+        if (!description.Contains("companyid", StringComparison.OrdinalIgnoreCase))
+        {
+            return description;
+        }
+
+        return !string.IsNullOrWhiteSpace(_customer?.CompanyName)
+            ? $"Customer profile update: changed company assignment to {_customer.CompanyName}."
+            : "Customer profile update: changed company assignment.";
+    }
 
     private static string ActivityIcon(string action)
     {
