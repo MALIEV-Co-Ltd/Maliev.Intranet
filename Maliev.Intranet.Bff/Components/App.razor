@@ -11,6 +11,11 @@
     
     <!-- Critical CSS: Apply background immediately to prevent flash -->
     <style>
+        :root {
+            --blazor-load-percentage: 0%;
+            --blazor-load-percentage-text: "0%";
+        }
+
         :root[data-maliev-theme="dark"] {
             color-scheme: dark;
             --wasm-loader-bg: #0d1117;
@@ -55,10 +60,6 @@
                 opacity 300ms ease,
                 transform 300ms ease;
             will-change: opacity, transform;
-        }
-
-        html.maliev-wasm-runtime-ready .wasm-loading .maliev-logo-loader {
-            --wasm-logo-progress: 100%;
         }
 
         html.maliev-wasm-ready .wasm-app-host {
@@ -124,6 +125,12 @@
     <!-- CRITICAL: Blocking script BEFORE any CSS loads -->
     <script>
         (function() {
+            const root = document.documentElement;
+
+            root.classList.remove('maliev-wasm-runtime-ready', 'maliev-wasm-ready', 'maliev-wasm-failed');
+            root.style.setProperty('--blazor-load-percentage', '0%');
+            root.style.setProperty('--blazor-load-percentage-text', '"0%"');
+
             function getCookie(name) {
                 const value = `; ${document.cookie}`;
                 const parts = value.split(`; ${name}=`);
@@ -160,7 +167,7 @@
                 }
 
                 // Apply theme SYNCHRONOUSLY (blocks rendering)
-                document.documentElement.setAttribute('data-maliev-theme', effectiveTheme);
+                root.setAttribute('data-maliev-theme', effectiveTheme);
 
                 // Set a short-lived hint cookie for the server to avoid flicker on refresh
                 document.cookie = `maliev_system_dark=${systemDark}; path=/; max-age=31536000; SameSite=Lax`;
