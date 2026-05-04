@@ -405,7 +405,9 @@ public partial class ProjectNew : IAsyncDisposable
         var mappings = items.Select(item => new
         {
             clientUploadId = item.ClientUploadId,
-            index = item.InputIndex
+            index = item.InputIndex,
+            fileName = item.File.Name,
+            fileSize = item.File.Size
         });
 
         await JS.InvokeVoidAsync("window.projectNewUploads.captureFiles", ProjectUploadContainerId, mappings);

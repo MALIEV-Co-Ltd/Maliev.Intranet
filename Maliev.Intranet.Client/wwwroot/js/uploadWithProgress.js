@@ -107,12 +107,31 @@ window.projectNewUploads = (function () {
         return container.querySelector('input[type=file]');
     }
 
+    function findMatchingFile(files, expectedName, expectedSize) {
+        if (!files) return null;
+
+        for (const file of files) {
+            if (file.name === expectedName && file.size === expectedSize) {
+                return file;
+            }
+        }
+
+        return null;
+    }
+
     function captureFiles(containerId, mappings) {
         const input = findUploadInput(containerId);
         if (!input || !input.files) return;
 
         for (const mapping of mappings || []) {
-            const file = input.files[mapping.index];
+            const expectedName = mapping.fileName || '';
+            const expectedSize = Number(mapping.fileSize || 0);
+            let file = input.files[mapping.index];
+
+            if (!file || file.name !== expectedName || file.size !== expectedSize) {
+                file = findMatchingFile(input.files, expectedName, expectedSize);
+            }
+
             if (file) {
                 filesByClientId.set(mapping.clientUploadId, file);
             }
@@ -150,6 +169,14 @@ window.projectNewUploads = (function () {
         const file = filesByClientId.get(clientUploadId);
         if (!file) {
             return { status: 0, body: 'Selected browser file was not found.' };
+        }
+
+        const expectedFileSize = Number(fileSize || 0);
+        if (expectedFileSize > 0 && file.size !== expectedFileSize) {
+            return {
+                status: 0,
+                body: `Selected browser file size (${file.size}) does not match the initiated upload size (${expectedFileSize}).`
+            };
         }
 
         const resolvedContentType = contentType || file.type || 'application/octet-stream';

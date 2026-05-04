@@ -13,6 +13,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// BFF controller for proxying file uploads to the UploadService.
 /// </summary>
 /// <param name="uploadClient">The typed UploadService HTTP client.</param>
+/// <param name="httpClientFactory">Factory used for the non-retry streaming upload proxy client.</param>
 /// <param name="analysisStatusService">Service for file analysis status.</param>
 /// <param name="fileTypes">File type configuration from appsettings.</param>
 /// <param name="logger">Logger for diagnostic events.</param>
@@ -21,10 +22,13 @@ namespace Maliev.Intranet.Bff.Controllers;
 [Route("api/v{version:apiVersion}/uploads")]
 public class UploadsController(
     UploadServiceClient uploadClient,
+    IHttpClientFactory httpClientFactory,
     IFileAnalysisStatusService analysisStatusService,
     Maliev.Intranet.Client.Services.FileTypesSettings fileTypes,
     ILogger<UploadsController> logger) : ControllerBase
 {
+    private const string StreamingUploadClientName = "UploadServiceClient.StreamingProxy";
+
     /// <summary>
     /// Uploads a single project file to GCS via UploadService.
     /// If <paramref name="customerId"/> is provided, the file is stored at
@@ -204,7 +208,8 @@ public class UploadsController(
         if (!ContentRangeHeaderValue.TryParse(contentRange, out _))
             return BadRequest("Content-Range header is invalid.");
 
-        using var response = await uploadClient.ResumeResumableUploadAsync(
+        var streamingUploadClient = new UploadServiceClient(StreamingUploadClientName, httpClientFactory);
+        using var response = await streamingUploadClient.ResumeResumableUploadAsync(
             uploadId,
             Request.Body,
             Request.ContentType,

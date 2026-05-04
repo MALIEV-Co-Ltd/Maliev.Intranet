@@ -114,7 +114,7 @@ public class UploadsControllerResumableTests
     {
         HttpRequestMessage? downstreamRequest = null;
         string? downstreamBody = null;
-        var uploadClient = MakeUploadClient(async (request, _) =>
+        var streamingHttpClient = MakeHttpClient(async (request, _) =>
         {
             downstreamRequest = request;
             downstreamBody = await request.Content!.ReadAsStringAsync();
@@ -123,8 +123,9 @@ public class UploadsControllerResumableTests
                 Content = JsonContent.Create(new { uploadId = "upload-123", isComplete = true })
             };
         });
+        var uploadClient = new UploadServiceClient(streamingHttpClient);
 
-        var controller = CreateController(uploadClient);
+        var controller = CreateController(uploadClient, streamingHttpClient);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
@@ -332,17 +333,45 @@ public class UploadsControllerResumableTests
         Assert.Equal("customers/customer-1/projects/project-1/part.stl", file.NewPath);
     }
 
-    private UploadsController CreateController(UploadServiceClient uploadClient)
+    private UploadsController CreateController(UploadServiceClient uploadClient, HttpClient? streamingHttpClient = null)
     {
-        return new UploadsController(uploadClient, _statusServiceMock.Object, CreateFileTypes(), _loggerMock.Object);
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        if (streamingHttpClient is not null)
+        {
+            httpClientFactoryMock
+                .Setup(factory => factory.CreateClient("UploadServiceClient.StreamingProxy"))
+                .Returns(streamingHttpClient);
+        }
+        else
+        {
+            httpClientFactoryMock
+                .Setup(factory => factory.CreateClient("UploadServiceClient.StreamingProxy"))
+                .Returns(new HttpClient(new MockHttpMessageHandler((_, _) =>
+                    Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound))))
+                {
+                    BaseAddress = new Uri("http://upload-service")
+                });
+        }
+
+        return new UploadsController(
+            uploadClient,
+            httpClientFactoryMock.Object,
+            _statusServiceMock.Object,
+            CreateFileTypes(),
+            _loggerMock.Object);
     }
 
     private static UploadServiceClient MakeUploadClient(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
     {
-        return new UploadServiceClient(new HttpClient(new MockHttpMessageHandler(handler))
+        return new UploadServiceClient(MakeHttpClient(handler));
+    }
+
+    private static HttpClient MakeHttpClient(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
+    {
+        return new HttpClient(new MockHttpMessageHandler(handler))
         {
             BaseAddress = new Uri("http://upload-service")
-        });
+        };
     }
 
     private static FileTypesSettings CreateFileTypes()

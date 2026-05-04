@@ -36,7 +36,13 @@ public class UploadAnalysisStatusTests
             ArchiveExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             SupplementaryExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         };
-        return new UploadsController(uploadClient, _statusServiceMock.Object, fileTypesSettings, _loggerMock.Object);
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        return new UploadsController(
+            uploadClient,
+            httpClientFactoryMock.Object,
+            _statusServiceMock.Object,
+            fileTypesSettings,
+            _loggerMock.Object);
     }
 
     /// <summary>

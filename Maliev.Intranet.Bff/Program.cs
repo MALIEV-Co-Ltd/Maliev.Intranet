@@ -375,6 +375,21 @@ try
     builder.AddBffServiceClient<CompensationServiceClient>("CompensationService");
     builder.AddBffServiceClient<DeliveryServiceClient>("DeliveryService");
     builder.AddBffServiceClient<IAccountingServiceClient, AccountingServiceClient>("AccountingService");
+
+    // Raw resumable upload proxy requests stream the browser request body to UploadService.
+    // These bodies are not rewindable, so this client intentionally has no retry handler.
+    builder.Services.AddHttpClient("UploadServiceClient.StreamingProxy", (sp, client) =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var explicitUrl = config["Services:UploadService:BaseUrl"];
+        client.BaseAddress = !string.IsNullOrEmpty(explicitUrl)
+            ? new Uri(explicitUrl)
+            : new Uri("http://UploadService");
+        client.Timeout = Timeout.InfiniteTimeSpan;
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { MaxConnectionsPerServer = 20 })
+    .AddHttpMessageHandler<UserContextHandler>()
+    .AddServiceDiscovery();
     builder.AddBffServiceClient<IReceiptServiceClient, ReceiptServiceClient>("ReceiptService");
     builder.AddBffServiceClient<ILifecycleServiceClient, LifecycleServiceClient>("LifecycleService");
     builder.AddBffServiceClient<IPurchaseOrderServiceClient, PurchaseOrderServiceClient>("PurchaseOrderService");
