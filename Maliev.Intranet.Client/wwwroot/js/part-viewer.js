@@ -2843,19 +2843,22 @@ function getPointerRenderCoordinates(canvasId, pointerEvent) {
     const rect = canvas.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return null;
 
-    const renderWidth = engine?.getRenderWidth?.() ?? canvas.width ?? rect.width;
-    const renderHeight = engine?.getRenderHeight?.() ?? canvas.height ?? rect.height;
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
+
     return {
-        x: ((event.clientX - rect.left) / rect.width) * renderWidth,
-        y: ((event.clientY - rect.top) / rect.height) * renderHeight,
+        x,
+        y,
     };
 }
 
 function getPointerInfoRenderCoordinates(canvasId, scene, pointerInfo) {
-    return getPointerRenderCoordinates(canvasId, pointerInfo?.event)
-        ?? (Number.isFinite(scene?.pointerX) && Number.isFinite(scene?.pointerY)
-            ? { x: scene.pointerX, y: scene.pointerY }
-            : null);
+    if (pointerInfo?.event) return getPointerRenderCoordinates(canvasId, pointerInfo.event);
+
+    return Number.isFinite(scene?.pointerX) && Number.isFinite(scene?.pointerY)
+        ? { x: scene.pointerX, y: scene.pointerY }
+        : null;
 }
 
 function setAnalysisNavigationLock(canvasId, locked) {

@@ -234,7 +234,7 @@ function cubeSectionMesh(onRead) {
     });
 }
 
-test('pointer render coordinates use the actual PointerEvent client position', () => {
+test('pointer render coordinates use canvas-local CSS coordinates for Babylon scene picks', () => {
     const context = loadViewerContext();
     const canvas = {
         getBoundingClientRect: () => ({ left: 100, top: 50, width: 200, height: 100 }),
@@ -252,8 +252,8 @@ test('pointer render coordinates use the actual PointerEvent client position', (
         "getPointerRenderCoordinates('viewer', { clientX: 150, clientY: 80 })",
         context);
 
-    assert.equal(coords.x, 250);
-    assert.equal(coords.y, 150);
+    assert.equal(coords.x, 50);
+    assert.equal(coords.y, 30);
 });
 
 test('model mesh registry marks only real model geometry pickable for analysis', () => {
@@ -356,7 +356,7 @@ test('measure hover uses PointerEvent coordinates instead of stale scene pointer
         event: { clientX: 150, clientY: 80 },
     });
 
-    assert.deepEqual(picks.at(-1), [250, 150]);
+    assert.deepEqual(picks.at(-1), [50, 30]);
 });
 
 test('thickness hover uses PointerEvent coordinates instead of stale scene pointer coordinates', () => {
@@ -412,5 +412,91 @@ test('thickness hover uses PointerEvent coordinates instead of stale scene point
         event: { clientX: 150, clientY: 80 },
     });
 
-    assert.deepEqual(picks.at(-1), [250, 150]);
+    assert.deepEqual(picks.at(-1), [50, 30]);
+});
+
+test('thickness hover ignores empty canvas positions instead of scaled false model hits', () => {
+    const context = loadViewerContext();
+    const picks = [];
+    const createdSpheres = [];
+    const labels = [];
+    const model = makeMesh('model', {
+        isPickable: true,
+        totalVertices: 24,
+    });
+    const canvas = {
+        style: {},
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 500 }),
+    };
+
+    context.canvas = canvas;
+    context.BABYLON.MeshBuilder.CreateSphere = (name) => {
+        const sphere = {
+            name,
+            isPickable: true,
+            metadata: {},
+            position: null,
+            dispose: () => {},
+        };
+        createdSpheres.push(sphere);
+        return sphere;
+    };
+    context.document.createElement = () => {
+        const element = createElement();
+        labels.push(element);
+        return element;
+    };
+    context.scene = {
+        activeCamera: { position: new Vector3(0, 0, 10) },
+        meshes: [model],
+        pointerX: 12,
+        pointerY: 12,
+        multiPickWithRay: () => [{
+            hit: true,
+            pickedMesh: model,
+            pickedPoint: new Vector3(0, 0, -2),
+            getNormal: () => new Vector3(0, 0, -1),
+        }],
+        onBeforeRenderObservable: { add: () => ({}) },
+        onPointerObservable: {
+            add(callback) {
+                this.callback = callback;
+                return callback;
+            },
+            remove: () => {},
+        },
+        pick(x, y) {
+            picks.push([x, y]);
+            if (x === 1800 && y === 360) {
+                return {
+                    faceId: 7,
+                    hit: true,
+                    pickedMesh: model,
+                    pickedPoint: new Vector3(1, 2, 3),
+                    getNormal: () => new Vector3(0, 0, 1),
+                };
+            }
+
+            return { hit: false };
+        },
+    };
+    vm.runInContext(`
+        scenes.viewer = scene;
+        engines.viewer = {
+            getRenderWidth: () => 2000,
+            getRenderHeight: () => 1000,
+            getRenderingCanvas: () => canvas
+        };
+    `, context);
+    context.document.getElementById = () => canvas;
+
+    vm.runInContext("enableThicknessAnalysis('viewer')", context);
+    context.scene.onPointerObservable.callback({
+        type: context.BABYLON.PointerEventTypes.POINTERMOVE,
+        event: { clientX: 900, clientY: 180 },
+    });
+
+    assert.deepEqual(picks.at(-1), [900, 180]);
+    assert.equal(createdSpheres.length, 0);
+    assert.equal(labels.at(0).style.display, 'none');
 });
