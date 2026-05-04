@@ -138,18 +138,24 @@ public class ModuleRegressionSourceTests
     public void SystemHealthPage_RendersAllServiceHealthFields()
     {
         var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "SystemHealth.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "SystemHealth.razor.css");
         var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "SystemHealthController.cs");
 
         Assert.Contains("@page \"/admin/system-health\"", page, StringComparison.Ordinal);
         Assert.Contains("DomainGroup", page, StringComparison.Ordinal);
-        Assert.Contains("HealthPath", page, StringComparison.Ordinal);
+        Assert.Contains("LivenessPath", page, StringComparison.Ordinal);
+        Assert.Contains("ReadinessPath", page, StringComparison.Ordinal);
         Assert.Contains("ErrorBody", page, StringComparison.Ordinal);
+        Assert.Contains("table-layout: fixed", styles, StringComparison.Ordinal);
+        Assert.Contains("system-health-service-col", page, StringComparison.Ordinal);
         Assert.Contains("FacilityService", controller, StringComparison.Ordinal);
         Assert.Contains("InventoryService", controller, StringComparison.Ordinal);
         Assert.Contains("DeliveryService", controller, StringComparison.Ordinal);
         Assert.Contains("ChatbotService", controller, StringComparison.Ordinal);
-        Assert.Contains("CancelAfter(TimeSpan.FromSeconds(2))", controller, StringComparison.Ordinal);
-        Assert.Contains("Health probe timed out after 2 seconds.", controller, StringComparison.Ordinal);
+        Assert.Contains("LivenessPath", controller, StringComparison.Ordinal);
+        Assert.Contains("ReadinessPath", controller, StringComparison.Ordinal);
+        Assert.Contains("TimeSpan.FromSeconds(10)", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("aspire-liveness", controller, StringComparison.Ordinal);
     }
 
     [Fact]

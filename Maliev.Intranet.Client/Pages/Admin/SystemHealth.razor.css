@@ -1,0 +1,32 @@
+.system-health-table {
+    table-layout: fixed;
+}
+
+.system-health-service-col {
+    width: 28%;
+}
+
+.system-health-status-col {
+    width: 12%;
+}
+
+.system-health-critical-col {
+    width: 10%;
+}
+
+.system-health-path-col {
+    width: 17%;
+}
+
+.system-health-response-col {
+    width: 11%;
+}
+
+.system-health-checked-col {
+    width: 5%;
+}
+
+.system-health-table td,
+.system-health-table th {
+    overflow-wrap: anywhere;
+}

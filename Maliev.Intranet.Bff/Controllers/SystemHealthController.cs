@@ -85,7 +85,9 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
             ServiceName = target.ServiceName,
             DomainGroup = target.DomainGroup,
             RoutePrefix = target.RoutePrefix,
-            HealthPath = target.HealthPath,
+            HealthPath = target.ReadinessPath,
+            LivenessPath = target.LivenessPath,
+            ReadinessPath = target.ReadinessPath,
             IsCritical = target.IsCritical,
             LastCheck = DateTime.UtcNow,
             Status = "Unknown"
@@ -102,27 +104,28 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
             var client = httpClientFactory.CreateClient("ServiceHealthCheck");
             client.BaseAddress = new Uri(baseUrl);
 
-            var sw = Stopwatch.StartNew();
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(2));
-            using var response = await client.GetAsync(target.HealthPath, timeoutCts.Token);
-            sw.Stop();
+            var liveness = await ProbeAsync(client, target.LivenessPath, TimeSpan.FromSeconds(2), ct);
+            status.LivenessResponseTimeMs = liveness.ResponseTimeMs;
+            if (!liveness.IsSuccess)
+            {
+                status.Status = "Unreachable";
+                status.ErrorMessage = liveness.ErrorMessage;
+                status.ErrorBody = liveness.ErrorBody;
+                return status;
+            }
 
-            status.ResponseTimeMs = sw.Elapsed.TotalMilliseconds;
-            if (response.IsSuccessStatusCode)
+            var readiness = await ProbeAsync(client, target.ReadinessPath, TimeSpan.FromSeconds(10), ct);
+            status.ReadinessResponseTimeMs = readiness.ResponseTimeMs;
+            status.ResponseTimeMs = readiness.ResponseTimeMs;
+            if (readiness.IsSuccess)
             {
                 status.Status = "Healthy";
                 return status;
             }
 
             status.Status = "Unhealthy";
-            status.ErrorMessage = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
-            status.ErrorBody = TrimErrorBody(await response.Content.ReadAsStringAsync(ct));
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            status.Status = "Unreachable";
-            status.ErrorMessage = "Health probe timed out after 2 seconds.";
+            status.ErrorMessage = readiness.ErrorMessage;
+            status.ErrorBody = readiness.ErrorBody;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -131,6 +134,37 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         }
 
         return status;
+    }
+
+    private static async Task<ProbeResult> ProbeAsync(HttpClient client, string path, TimeSpan timeout, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(timeout);
+            using var response = await client.GetAsync(path, timeoutCts.Token);
+            sw.Stop();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return new ProbeResult(true, sw.Elapsed.TotalMilliseconds);
+            }
+
+            return new ProbeResult(
+                false,
+                sw.Elapsed.TotalMilliseconds,
+                $"Health probe {path} returned HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
+                TrimErrorBody(await response.Content.ReadAsStringAsync(ct)));
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            sw.Stop();
+            return new ProbeResult(
+                false,
+                sw.Elapsed.TotalMilliseconds,
+                $"Health probe {path} timed out after {timeout.TotalSeconds:N0} seconds.");
+        }
     }
 
     private static string ResolveOverallStatus(IReadOnlyList<ServiceHealthStatus> services)
@@ -161,6 +195,14 @@ public class SystemHealthController(IHttpClientFactory httpClientFactory, IConfi
         string RoutePrefix,
         bool IsCritical)
     {
-        public string HealthPath { get; } = $"/{RoutePrefix}/aspire-liveness";
+        public string LivenessPath { get; } = $"/{RoutePrefix}/liveness";
+
+        public string ReadinessPath { get; } = $"/{RoutePrefix}/readiness";
     }
+
+    private sealed record ProbeResult(
+        bool IsSuccess,
+        double ResponseTimeMs,
+        string? ErrorMessage = null,
+        string? ErrorBody = null);
 }

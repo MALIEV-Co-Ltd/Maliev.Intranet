@@ -39,13 +39,23 @@
             @foreach (var group in _health.Services.GroupBy(s => s.DomainGroup).OrderBy(g => g.Key))
             {
                 <PanelCard Title="@group.Key" Class="mb-4">
-                    <table class="mlv-table">
+                    <table class="mlv-table system-health-table">
+                        <colgroup>
+                            <col class="system-health-service-col" />
+                            <col class="system-health-status-col" />
+                            <col class="system-health-critical-col" />
+                            <col class="system-health-path-col" />
+                            <col class="system-health-path-col" />
+                            <col class="system-health-response-col" />
+                            <col class="system-health-checked-col" />
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>Service</th>
                                 <th>Status</th>
                                 <th>Critical</th>
-                                <th>Health path</th>
+                                <th>Liveness</th>
+                                <th>Readiness</th>
                                 <th>Response</th>
                                 <th>Last checked</th>
                             </tr>
@@ -68,8 +78,12 @@
                                     </td>
                                     <td><StatusBadge Status="@service.Status" /></td>
                                     <td>@(service.IsCritical ? "Critical" : "Standard")</td>
-                                    <td class="mlv-mono">@service.HealthPath</td>
-                                    <td class="mlv-mono">@service.ResponseTimeMs.ToString("N0") ms</td>
+                                    <td class="mlv-mono">@service.LivenessPath</td>
+                                    <td class="mlv-mono">@service.ReadinessPath</td>
+                                    <td class="mlv-mono">
+                                        <div>@service.LivenessResponseTimeMs.ToString("N0") ms live</div>
+                                        <div class="mlv-row-sub">@service.ReadinessResponseTimeMs.ToString("N0") ms ready</div>
+                                    </td>
                                     <td>@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</td>
                                 </tr>
                             }

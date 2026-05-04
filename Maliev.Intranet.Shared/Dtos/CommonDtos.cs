@@ -130,6 +130,16 @@ public class ServiceHealthStatus
     public string HealthPath { get; set; } = string.Empty;
 
     /// <summary>
+    /// The endpoint path used to verify the service process is reachable.
+    /// </summary>
+    public string LivenessPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The endpoint path used to verify service dependencies are ready.
+    /// </summary>
+    public string ReadinessPath { get; set; } = string.Empty;
+
+    /// <summary>
     /// Indicates whether the service is critical for core business operations.
     /// </summary>
     public bool IsCritical { get; set; }
@@ -153,6 +163,16 @@ public class ServiceHealthStatus
     /// The response time of the health check in milliseconds.
     /// </summary>
     public double ResponseTimeMs { get; set; }
+
+    /// <summary>
+    /// The response time of the liveness check in milliseconds.
+    /// </summary>
+    public double LivenessResponseTimeMs { get; set; }
+
+    /// <summary>
+    /// The response time of the readiness check in milliseconds.
+    /// </summary>
+    public double ReadinessResponseTimeMs { get; set; }
 
     /// <summary>
     /// The timestamp of the last health check.
