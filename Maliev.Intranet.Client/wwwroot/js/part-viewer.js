@@ -3625,9 +3625,12 @@ export async function toggleDfmOverlay(canvasId, partKey, overlayKey, glbUrl, vi
         const offset = modelCenterOffsets[canvasId] ?? { cx: 0, cy: 0, zLift: 0 };
         const zUpQuat = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.X, Math.PI / 2);
 
+        if (scaleFactor !== 1) {
+            meshes.forEach(m => m.scaling?.setAll?.(scaleFactor));
+        }
+
         const overlayRoots = result.meshes.filter(m => !m.parent);
         overlayRoots.forEach(n => {
-            if (scaleFactor !== 1) n.scaling.setAll(scaleFactor);
             if (n.rotationQuaternion == null) {
                 n.rotationQuaternion = (n.rotation && n.rotation.length)
                     ? BABYLON.Quaternion.FromEulerVector(n.rotation)

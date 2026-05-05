@@ -190,8 +190,17 @@ function loadViewerContext() {
                 POINTERUP: 2,
                 POINTERMOVE: 3,
             },
+            PBRMaterial: class PBRMaterial {
+                constructor(name) {
+                    this.name = name;
+                }
+            },
             Quaternion: {
+                Identity: () => ({ identity: true }),
                 RotationAxis: () => ({}),
+            },
+            SceneLoader: {
+                ImportMeshAsync: async () => ({ meshes: [] }),
             },
             Ray,
             StandardMaterial: class StandardMaterial {
@@ -267,6 +276,26 @@ function cubeSectionMesh(onRead, zOffset = 0) {
         totalVertices: positions.length / 3,
         onRead,
     });
+}
+
+function makeOverlayNode(name, options = {}) {
+    return {
+        name,
+        parent: options.parent ?? null,
+        position: options.position ?? new Vector3(0, 0, 0),
+        rotationQuaternion: options.rotationQuaternion ?? null,
+        rotation: options.rotation ?? null,
+        scaling: {
+            value: 1,
+            setAll(value) {
+                this.value = value;
+            },
+        },
+        isPickable: true,
+        isVisible: true,
+        getTotalVertices: () => options.totalVertices ?? 24,
+        computeWorldMatrix: () => {},
+    };
 }
 
 test('pointer render coordinates scale canvas-local CSS positions into Babylon render pixels', () => {
@@ -454,6 +483,46 @@ test('section hatch spacing is dense enough for Fusion-style section lines', () 
     const context = loadViewerContext();
     const spacing = vm.runInContext('CONFIG.SECTION.hatchSpacingMm;', context);
     assert.ok(spacing <= 1.4);
+});
+
+test('DFM overlay transform mirrors model root scaling and centering', async () => {
+    const context = loadViewerContext();
+    const overlayRoot = makeOverlayNode('__root__', {
+        totalVertices: 0,
+        position: new Vector3(0, 0, 0),
+    });
+    const overlayMesh = makeOverlayNode('thin_wall_overlay', {
+        parent: overlayRoot,
+        position: new Vector3(0, 0, 0),
+        totalVertices: 16,
+    });
+    context.BABYLON.Quaternion.RotationAxis = () => ({
+        multiply: () => ({ rotated: true }),
+    });
+    context.BABYLON.SceneLoader.ImportMeshAsync = async () => ({
+        meshes: [overlayRoot, overlayMesh],
+    });
+    context.scene = {
+        meshes: [],
+    };
+
+    await vm.runInContext(`
+        scenes.viewer = scene;
+        modelScaleFactors.viewer = 2;
+        modelCenterOffsets.viewer = { cx: 10, cy: -4, zLift: 3 };
+        toggleDfmOverlay('viewer', 'part-a', 'FDM__thin_wall', 'thin-wall.glb', true);
+    `, context);
+
+    assert.equal(overlayMesh.scaling.value, 2);
+    assert.equal(overlayRoot.scaling.value, 1);
+    assert.deepEqual(
+        { x: overlayRoot.position.x, y: overlayRoot.position.y, z: overlayRoot.position.z },
+        { x: -10, y: 4, z: 3 });
+    assert.deepEqual(
+        { x: overlayMesh.position.x, y: overlayMesh.position.y, z: overlayMesh.position.z },
+        { x: 0, y: 0, z: 0 });
+    assert.deepEqual(overlayRoot.rotationQuaternion, { rotated: true });
+    assert.equal(overlayMesh.rotationQuaternion, null);
 });
 
 test('section cut edge and hatch lines are dark and depth-aware', () => {
