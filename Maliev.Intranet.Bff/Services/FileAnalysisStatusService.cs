@@ -257,6 +257,7 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             HiResThumbnailUrl = existing.HiResThumbnailUrl,
             PreviewUrls = existing.PreviewUrls,
             GlbStoragePath = existing.GlbStoragePath,
+            GlbSignedUrl = existing.GlbSignedUrl,
             PreviewProcessingStatus = existing.PreviewProcessingStatus,
             ErrorCode = existing.ErrorCode,
             ProcessedAt = existing.ProcessedAt,

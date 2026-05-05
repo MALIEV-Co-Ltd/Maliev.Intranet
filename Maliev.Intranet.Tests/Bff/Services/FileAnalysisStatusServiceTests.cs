@@ -87,6 +87,27 @@ public sealed class FileAnalysisStatusServiceTests
         Assert.Equal(StoragePath + "_thumb_1200.webp", status.PreviewUrls?.ThumbnailLargeGcsPath);
     }
 
+    [Fact]
+    public async Task SetDfmReportsAsync_WhenGlbSignedUrlExists_PreservesViewerUrl()
+    {
+        const string StoragePath = "projects/temp-project/part.stl";
+        var service = CreateService();
+
+        await service.SetAnalysisCompletedAsync(
+            StoragePath,
+            StoragePath + "_viewer.glb",
+            "https://signed.example/viewer.glb");
+
+        await service.SetDfmReportsAsync(StoragePath, new { FdmReport = new { ReportType = "FDM" } });
+
+        var status = await service.GetStatusAsync(StoragePath);
+
+        Assert.NotNull(status);
+        Assert.Equal(StoragePath + "_viewer.glb", status.GlbStoragePath);
+        Assert.Equal("https://signed.example/viewer.glb", status.GlbSignedUrl);
+        Assert.NotNull(status.DfmReport);
+    }
+
     private static FileAnalysisStatusService CreateService()
     {
         var cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = 1024 });

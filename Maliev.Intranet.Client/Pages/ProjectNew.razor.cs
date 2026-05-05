@@ -61,6 +61,10 @@ public partial class ProjectNew : IAsyncDisposable
     private const int StatusPollIntervalMs = 30_000; // subsequent interval
     private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _storageMigrationSemaphore = new(1, 1);
+    private static readonly JsonSerializerOptions SignalRJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     // ── Pricing debounce ───────────────────────────────────────────────
     private readonly Dictionary<Guid, CancellationTokenSource> _pricingTokens = new();
@@ -884,9 +888,11 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         if (dfmReport is JsonElement je && je.ValueKind == JsonValueKind.Object
-            && je.TryGetProperty("FdmReport", out _))
+            && ContainsDfmReportPayload(je))
         {
-            var payloadFromJson = JsonSerializer.Deserialize<SignalRDfmAnalysisPayload>(je.GetRawText());
+            var payloadFromJson = JsonSerializer.Deserialize<SignalRDfmAnalysisPayload>(
+                je.GetRawText(),
+                SignalRJsonOptions);
             if (payloadFromJson != null)
             {
                 ApplyDfmPayload(part, payloadFromJson);
@@ -895,6 +901,21 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         part.DfmReport = dfmReport;
+    }
+
+    private static bool ContainsDfmReportPayload(JsonElement element)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, nameof(SignalRDfmAnalysisPayload.FdmReport), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(property.Name, nameof(SignalRDfmAnalysisPayload.SlaReport), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(property.Name, nameof(SignalRDfmAnalysisPayload.CncReport), StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void ApplyDfmPayload(PartViewModel part, SignalRDfmAnalysisPayload payload)

@@ -1183,6 +1183,52 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task ApplyAnalysisStatusAsync_WhenPolledDfmReportUsesCamelCase_HydratesTypedReport()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "polled-dfm.stl",
+            StoragePath = "projects/polled-dfm.stl",
+            ProcessCode = "FDM",
+            AwaitingPreview = true,
+        };
+        GetParts(cut.Instance).Add(part);
+
+        var fdmReport = new FdmDfmReportPayload(
+            ReportType: "FDM",
+            ThinWallCount: 0,
+            ThinWallRegions: [],
+            OverhangFaceCount: 0,
+            OverhangAreaCm2: 0,
+            OverhangRegions: [],
+            SupportRequired: false,
+            EstimatedSupportVolumeCm3: null,
+            SmallDetailCount: 0,
+            Issues: []);
+        var status = new FileAnalysisStatusDto
+        {
+            UploadId = "projects/polled-dfm.stl",
+            Status = FileAnalysisStatus.Completed,
+            DfmReport = JsonSerializer.SerializeToElement(new
+            {
+                fdmReport,
+                slaReport = (object?)null,
+                cncReport = (object?)null,
+            }),
+            PreviewProcessingStatus = PreviewProcessingStatus.Completed,
+        };
+
+        await InvokePrivateTaskWithArgsAsync(cut, "ApplyAnalysisStatusAsync", part, status);
+
+        Assert.Same(part.FdmDfmReport, part.DfmReport);
+        Assert.IsType<FdmDfmReportPayload>(part.DfmReport);
+        Assert.False(part.AwaitingPreview);
+        Assert.Equal("Ready", part.StatusText);
+    }
+
+    [Fact]
     public void SaveDraftToServerAsync_FirstSave_PostsToProjectsEndpoint()
     {
         var createRequestId = Guid.NewGuid();
@@ -1313,6 +1359,19 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.NotNull(method);
 
         var result = cut.InvokeAsync(() => (Task)method.Invoke(cut.Instance, [])!);
+        await result;
+    }
+
+    private static async Task InvokePrivateTaskWithArgsAsync(
+        RenderedComponent<global::Maliev.Intranet.Client.Pages.ProjectNew> cut,
+        string methodName,
+        params object[] args)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        var result = cut.InvokeAsync(() => (Task)method.Invoke(cut.Instance, args)!);
         await result;
     }
 
