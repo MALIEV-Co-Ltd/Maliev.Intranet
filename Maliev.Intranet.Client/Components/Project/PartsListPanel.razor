@@ -48,7 +48,7 @@
                     <div class="plp-thumb">
                         @if (part.QueuedUpload)
                         {
-                            <MudProgressCircular Color="Color.Default" Indeterminate="true" />
+                            <MudProgressCircular Color="Color.Default" Indeterminate="true" Size="Size.Small" />
                         }
                         else if (part.Uploading)
                         {
@@ -57,7 +57,7 @@
                         }
                         else if (part.AwaitingPreview)
                         {
-                            <MudProgressCircular Color="Color.Default" Indeterminate="true" />
+                            <MudProgressCircular Color="Color.Default" Indeterminate="true" Size="Size.Small" />
                         }
                         else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
                         {

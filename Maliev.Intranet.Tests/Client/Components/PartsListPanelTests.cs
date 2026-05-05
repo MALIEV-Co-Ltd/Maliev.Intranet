@@ -48,6 +48,7 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("mud-progress-indeterminate", progress.ClassList);
         Assert.Contains("mud-default-text", progress.ClassList);
+        Assert.Contains("mud-progress-small", progress.ClassList);
         Assert.Empty(cut.FindAll(".plp-thumb .part-processing-loader"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-skeleton"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
@@ -73,6 +74,7 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("mud-progress-indeterminate", progress.ClassList);
         Assert.Contains("mud-default-text", progress.ClassList);
+        Assert.Contains("mud-progress-small", progress.ClassList);
         Assert.Empty(cut.FindAll(".plp-thumb .part-queue-loader"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-skeleton"));
         Assert.Empty(cut.FindAll(".plp-thumb .mud-icon-root"));
@@ -125,6 +127,7 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("mud-progress-indeterminate", progress.ClassList);
         Assert.Contains("mud-default-text", progress.ClassList);
+        Assert.Contains("mud-progress-small", progress.ClassList);
         Assert.Empty(cut.FindAll(".plp-thumb .part-processing-loader"));
     }
 
