@@ -47,7 +47,7 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
     /// <inheritdoc />
     public async Task<List<LeaveBalanceDto>> GetMyBalancesAsync(Guid employeeId, CancellationToken ct = default)
     {
-        var response = await httpClient.GetAsync($"/leave/v1/LeaveBalances/employee/{employeeId}", ct);
+        var response = await httpClient.GetAsync($"/leave/v1/LeaveBalances/{employeeId}", ct);
         if (!response.IsSuccessStatusCode) return [];
         return await response.Content.ReadFromJsonAsync<List<LeaveBalanceDto>>(cancellationToken: ct) ?? [];
     }

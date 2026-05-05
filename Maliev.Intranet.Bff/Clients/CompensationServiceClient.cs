@@ -28,7 +28,16 @@ public class CompensationServiceClient(HttpClient httpClient) : ICompensationSer
     /// <inheritdoc />
     public async Task<CompensationSummaryDto?> GetSummaryAsync(CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<CompensationSummaryDto>("/compensation/v1/summary", ct);
+        var response = await httpClient.GetFromJsonAsync<CompensationAnalysisResponse>("/compensation/v1/reports/compensation-analysis", ct);
+        return response is null
+            ? null
+            : new CompensationSummaryDto
+            {
+                BaseSalary = response.AverageSalary,
+                AnnualBonus = 0m,
+                TotalCompensation = response.TotalAnnualBudget,
+                PercentageChange = 0m
+            };
     }
 
     /// <inheritdoc />
@@ -36,4 +45,6 @@ public class CompensationServiceClient(HttpClient httpClient) : ICompensationSer
     {
         return await httpClient.GetFromJsonAsync<List<BenefitDto>>("/compensation/v1/benefits", ct);
     }
+
+    private sealed record CompensationAnalysisResponse(decimal TotalAnnualBudget, decimal AverageSalary);
 }

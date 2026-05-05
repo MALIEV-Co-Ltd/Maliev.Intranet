@@ -62,7 +62,12 @@ public class OrderServiceClient(HttpClient httpClient)
     /// </summary>
     public async Task<HttpResponseMessage> UpdateStatusAsync(string id, UpdateOrderStatusRequest request, CancellationToken ct = default)
     {
-        return await httpClient.PatchAsJsonAsync($"/order/v1/orders/{id}/status", request, ct);
+        return await httpClient.PostAsJsonAsync($"/order/v1/orders/{id}/statuses", new
+        {
+            request.Status,
+            InternalNotes = (string?)null,
+            CustomerNotes = (string?)null
+        }, ct);
     }
 
     /// <summary>

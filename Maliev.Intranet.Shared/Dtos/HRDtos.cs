@@ -550,4 +550,7 @@ public sealed record UpdateCandidateStatusRequest
 
     /// <summary>Optional notes or feedback regarding the status change.</summary>
     public string? Notes { get; set; }
+
+    /// <summary>Optional downstream row version for optimistic concurrency.</summary>
+    public string? RowVersion { get; set; }
 }

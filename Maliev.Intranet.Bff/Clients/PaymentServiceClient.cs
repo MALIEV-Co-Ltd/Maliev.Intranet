@@ -60,7 +60,11 @@ public class PaymentServiceClient(HttpClient httpClient)
     /// </summary>
     public async Task<HttpResponseMessage> AllocatePaymentAsync(Guid id, AllocatePaymentRequest request, CancellationToken ct = default)
     {
-        return await httpClient.PostAsJsonAsync($"/payment/v1/payments/{id}/allocate", request, ct);
+        await Task.CompletedTask;
+        return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+        {
+            ReasonPhrase = "Payment allocation is not exposed by PaymentService."
+        };
     }
 
     /// <summary>
@@ -68,6 +72,10 @@ public class PaymentServiceClient(HttpClient httpClient)
     /// </summary>
     public async Task<HttpResponseMessage> VoidPaymentAsync(Guid id, VoidPaymentRequest request, CancellationToken ct = default)
     {
-        return await httpClient.PostAsJsonAsync($"/payment/v1/payments/{id}/void", request, ct);
+        await Task.CompletedTask;
+        return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+        {
+            ReasonPhrase = "Payment voiding is not exposed by PaymentService."
+        };
     }
 }

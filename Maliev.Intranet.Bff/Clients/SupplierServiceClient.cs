@@ -64,7 +64,12 @@ public class SupplierServiceClient(HttpClient httpClient)
     /// </summary>
     public async Task<HttpResponseMessage> DeactivateSupplierAsync(Guid id, CancellationToken ct = default)
     {
-        return await httpClient.PatchAsync($"/supplier/v1/suppliers/{id}/deactivate", null, ct);
+        return await httpClient.PatchAsJsonAsync($"/supplier/v1/suppliers/{id}/status", new
+        {
+            Status = "Inactive",
+            Reason = "Deactivated from Intranet.",
+            RowVersion = string.Empty
+        }, ct);
     }
 
     private sealed record SupplierListResponse(

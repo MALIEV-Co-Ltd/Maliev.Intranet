@@ -51,11 +51,19 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
 
         var payload = context.Message.Payload;
         _logger.LogInformation(
-            "PreviewImagesGeneratedConsumer: received event for storagePath={StoragePath}, failed={Failed}",
-            payload.StoragePath, payload.Failed);
+            "PreviewImagesGeneratedConsumer: received event for fileId={FileId}, storagePath={StoragePath}, failed={Failed}",
+            payload.FileId, payload.StoragePath, payload.Failed);
 
+        var storagePath = payload.StoragePath;
         try
         {
+            var uploadClient = CreateUploadClient();
+            storagePath = await ResolveCurrentStoragePathAsync(
+                uploadClient,
+                payload.FileId,
+                payload.StoragePath,
+                context.CancellationToken);
+
             var previews = payload.PreviewImages;
 
             _logger.LogInformation(
@@ -67,7 +75,7 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                 if (string.IsNullOrEmpty(path))
                     return new ResolvedPreviewUrl(assetName, null, null, false);
 
-                var url = await CreateUploadClient().GetDownloadUrlByPathAsync(path, context.CancellationToken, expirationMinutes: 10080);
+                var url = await uploadClient.GetDownloadUrlByPathAsync(path, context.CancellationToken, expirationMinutes: 10080);
                 if (string.IsNullOrEmpty(url))
                 {
                     _logger.LogWarning(
@@ -107,7 +115,7 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
 
             _logger.LogInformation(
                 "Resolved preview URLs for storagePath={StoragePath}: resolvedCount={ResolvedCount}, anyFailed={AnyFailed}",
-                payload.StoragePath, resolvedUrls.Count(result => !string.IsNullOrEmpty(result.Url)), anyUrlFailed);
+                storagePath, resolvedUrls.Count(result => !string.IsNullOrEmpty(result.Url)), anyUrlFailed);
 
             var previewUrlsDto = new FileAnalysisPreviewUrlsDto
             {
@@ -128,22 +136,22 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
             // Pass thumbnailUrl: null so SetPreviewUrlsAsync preserves the isometric URL
             // already stored by SmallThumbnailReadyConsumer (uses existing ?? fallback internally).
             await _analysisStatusService.SetPreviewUrlsAsync(
-                payload.StoragePath, previewUrlsDto, thumbnailUrl: null, thumbnailLargeResult.Url, context.CancellationToken);
+                storagePath, previewUrlsDto, thumbnailUrl: null, thumbnailLargeResult.Url, context.CancellationToken);
 
             if (overallFailed)
             {
                 _logger.LogWarning(
                     "Preview image generation failed for {StoragePath} - transitioning to preview-failed state (payloadFailed={PayloadFailed}, urlFailed={UrlFailed})",
-                    payload.StoragePath, payload.Failed, anyUrlFailed);
-                await _analysisStatusService.SetPreviewUrlsFailedAsync(payload.StoragePath, context.CancellationToken);
+                    storagePath, payload.Failed, anyUrlFailed);
+                await _analysisStatusService.SetPreviewUrlsFailedAsync(storagePath, context.CancellationToken);
             }
             else
             {
-                await _analysisStatusService.SetPreviewUrlsCompletedAsync(payload.StoragePath, context.CancellationToken);
+                await _analysisStatusService.SetPreviewUrlsCompletedAsync(storagePath, context.CancellationToken);
             }
 
             var signalRPayload = new FileAnalysisCompletedPayload(
-                StoragePath: payload.StoragePath,
+                StoragePath: storagePath,
                 UploadId: null,
                 ThumbnailUrl: null,
                 HiResThumbnailUrl: thumbnailLargeResult.Url,
@@ -162,23 +170,67 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                 Failed: overallFailed,
                 ErrorCode: overallFailed ? (payload.Failed ? "preview-generation-failed" : "preview-url-resolution-failed") : null);
 
-            await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
-                "FileAnalysisCompleted",
-                signalRPayload,
-                context.CancellationToken);
+            await SendToFileGroupsAsync(payload.StoragePath, storagePath, signalRPayload, context.CancellationToken);
 
             _logger.LogInformation(
                 "Pushed preview URLs for {StoragePath} via SignalR (failed={Failed})",
-                payload.StoragePath, payload.Failed);
+                storagePath, payload.Failed);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "PreviewImagesGeneratedConsumer failed for {StoragePath}",
-                payload.StoragePath);
+                storagePath);
             await _analysisStatusService.SetAnalysisFailedAsync(
-                payload.StoragePath, "preview-consumer-error", context.CancellationToken);
+                storagePath, "preview-consumer-error", context.CancellationToken);
             throw;
+        }
+    }
+
+    private async Task<string> ResolveCurrentStoragePathAsync(
+        UploadServiceClient uploadClient,
+        string? fileId,
+        string eventStoragePath,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(fileId))
+        {
+            return eventStoragePath;
+        }
+
+        var currentPath = await uploadClient.GetStoragePathAsync(fileId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(currentPath) ||
+            string.Equals(currentPath, eventStoragePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return eventStoragePath;
+        }
+
+        _logger.LogInformation(
+            "PreviewImagesGeneratedConsumer: file {FileId} moved while previews were in flight; using current storage path {CurrentPath} instead of event path {EventPath}.",
+            fileId,
+            currentPath,
+            eventStoragePath);
+        return currentPath;
+    }
+
+    private async Task SendToFileGroupsAsync(
+        string eventStoragePath,
+        string currentStoragePath,
+        FileAnalysisCompletedPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            eventStoragePath,
+            currentStoragePath
+        };
+
+        foreach (var path in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            await _hub.Clients.Group($"file:{path}").SendAsync(
+                "FileAnalysisCompleted",
+                payload,
+                cancellationToken);
         }
     }
 

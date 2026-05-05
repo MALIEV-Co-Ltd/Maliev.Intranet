@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 
@@ -43,36 +44,97 @@ public class ComplianceServiceClient(HttpClient httpClient) : IComplianceService
     /// <inheritdoc />
     public async Task<PagedResponse<ComplianceRecordDto>?> GetComplianceRecordsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<ComplianceRecordDto>>($"/compliance/v1/records?page={page}&pageSize={pageSize}", ct);
+        var alerts = await httpClient.GetFromJsonAsync<List<ComplianceAlertResponse>>("/compliance/v1/compliance-alerts?isResolved=false", ct) ?? [];
+        var items = alerts.Select(ToComplianceRecord).ToList();
+        var pageItems = items.Skip(Math.Max(page - 1, 0) * pageSize).Take(pageSize).ToList();
+
+        return new PagedResponse<ComplianceRecordDto>
+        {
+            Data = pageItems,
+            Meta = new PaginationMeta
+            {
+                CurrentPage = page,
+                PageSize = pageSize,
+                TotalCount = items.Count,
+                TotalItems = items.Count,
+                TotalPages = pageSize <= 0 ? 0 : (int)Math.Ceiling(items.Count / (double)pageSize)
+            }
+        };
     }
 
     /// <inheritdoc />
     public async Task<ComplianceStatsDto?> GetComplianceStatsAsync(CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<ComplianceStatsDto>("/compliance/v1/records/stats", ct);
+        var report = await httpClient.GetFromJsonAsync<ComplianceReportResponse>("/compliance/v1/compliance-reports/compliance", ct);
+        return report is null
+            ? null
+            : new ComplianceStatsDto
+            {
+                Expiring30Days = report.ExpiringSoon,
+                Expiring60Days = report.ExpiringSoon + report.Expired,
+                TotalActive = report.RequiresAuthorization
+            };
     }
 
     /// <inheritdoc />
     public async Task<ComplianceRecordDto?> GetComplianceRecordByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<ComplianceRecordDto>($"/compliance/v1/records/{id}", ct);
+        var alerts = await httpClient.GetFromJsonAsync<List<ComplianceAlertResponse>>("/compliance/v1/compliance-alerts", ct) ?? [];
+        return alerts.Where(alert => alert.Id == id).Select(ToComplianceRecord).FirstOrDefault();
     }
 
     /// <inheritdoc />
     public async Task<ComplianceRecordDto?> CreateComplianceRecordAsync(CreateComplianceRecordRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/compliance/v1/records", request, ct);
-        if (response.IsSuccessStatusCode)
-        {
-            return await response.Content.ReadFromJsonAsync<ComplianceRecordDto>(cancellationToken: ct);
-        }
+        await Task.CompletedTask;
         return null;
     }
 
     /// <inheritdoc />
     public async Task<bool> DeleteComplianceRecordAsync(Guid id, CancellationToken ct = default)
     {
-        var response = await httpClient.DeleteAsync($"/compliance/v1/records/{id}", ct);
+        var response = await httpClient.PutAsJsonAsync($"/compliance/v1/compliance-alerts/{id}/resolve", new
+        {
+            ResolvedBy = Guid.Empty,
+            ResolutionNotes = "Resolved from the intranet compliance records view."
+        }, ct);
+
         return response.IsSuccessStatusCode;
     }
+
+    private static ComplianceRecordDto ToComplianceRecord(ComplianceAlertResponse alert)
+    {
+        return new ComplianceRecordDto
+        {
+            Id = alert.Id,
+            EmployeeId = alert.EmployeeId,
+            Type = ReadJsonValue(alert.AlertType),
+            Date = alert.CreatedDate,
+            ExpiryDate = null,
+            Status = alert.IsResolved ? "Resolved" : ReadJsonValue(alert.Severity)
+        };
+    }
+
+    private static string ReadJsonValue(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString() ?? string.Empty,
+            JsonValueKind.Number => value.GetRawText(),
+            _ => value.ToString()
+        };
+    }
+
+    private sealed record ComplianceAlertResponse(
+        Guid Id,
+        Guid EmployeeId,
+        JsonElement AlertType,
+        JsonElement Severity,
+        bool IsResolved,
+        DateTime CreatedDate);
+
+    private sealed record ComplianceReportResponse(
+        int RequiresAuthorization,
+        int ExpiringSoon,
+        int Expired);
 }

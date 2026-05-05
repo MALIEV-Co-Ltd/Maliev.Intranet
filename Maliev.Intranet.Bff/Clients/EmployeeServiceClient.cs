@@ -37,10 +37,40 @@ public class EmployeeServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<EmployeeDetailDto?> CreateEmployeeAsync(CreateEmployeeRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/employee/v1/employees", request, ct);
+        var downstreamRequest = new
+        {
+            EmployeeNumber = $"EMP-{DateTime.UtcNow:yyyyMMddHHmmss}",
+            request.FirstName,
+            request.LastName,
+            WorkEmail = request.Email,
+            DateOfBirth = DateTime.UtcNow.Date.AddYears(-18),
+            StartDate = request.StartDate == default ? DateTime.UtcNow.Date : request.StartDate,
+            EmploymentType = "FullTime",
+            JobTitle = request.Title,
+            MobilePhone = (string?)null
+        };
+
+        var response = await httpClient.PostAsJsonAsync("/employee/v1/hr/employees", downstreamRequest, ct);
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<EmployeeDetailDto>(cancellationToken: ct);
+            var created = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+            var employeeId = created.TryGetProperty("id", out var idProp) && idProp.TryGetGuid(out var id)
+                ? id
+                : Guid.Empty;
+
+            return new EmployeeDetailDto
+            {
+                Id = employeeId,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
+                Department = request.Department,
+                Title = request.Title,
+                Status = "Active",
+                HireDate = request.StartDate == default ? DateTime.UtcNow.Date : request.StartDate,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
         }
         return null;
     }
@@ -50,7 +80,12 @@ public class EmployeeServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<EmployeeDetailDto?> UpdateEmployeeAsync(Guid id, UpdateEmployeeRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PutAsJsonAsync($"/employee/v1/employees/{id}", request, ct);
+        var response = await httpClient.PutAsJsonAsync($"/employee/v1/profile/{id}/profile", new
+        {
+            PersonalEmail = (string?)null,
+            MobilePhone = request.Phone,
+            PreferredName = (string?)null
+        }, ct);
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<EmployeeDetailDto>(cancellationToken: ct);
@@ -85,8 +120,8 @@ public class EmployeeServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<bool> TerminateEmployeeAsync(Guid id, TerminateEmployeeRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync($"/employee/v1/employees/{id}/terminate", request, ct);
-        return response.IsSuccessStatusCode;
+        await Task.CompletedTask;
+        return false;
     }
 
     /// <summary>
@@ -138,7 +173,7 @@ public class EmployeeServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<List<OrgNodeDto>?> GetOrgChartAsync(CancellationToken ct = default)
     {
-        var response = await httpClient.GetAsync("/employee/v1/employees/org-chart", ct);
+        var response = await httpClient.GetAsync("/employee/v1/reports/org-chart", ct);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return [];
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<List<OrgNodeDto>>(cancellationToken: ct);
@@ -158,7 +193,11 @@ public class EmployeeServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<HttpResponseMessage> AddNoteAsync(Guid id, AddEmployeeNoteRequest request, CancellationToken ct = default)
     {
-        return await httpClient.PostAsJsonAsync($"/employee/v1/employees/{id}/notes", request, ct);
+        await Task.CompletedTask;
+        return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+        {
+            ReasonPhrase = "Employee notes are not exposed by EmployeeService."
+        };
     }
 
     /// <summary>

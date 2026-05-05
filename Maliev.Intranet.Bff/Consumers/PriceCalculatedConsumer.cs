@@ -1,3 +1,4 @@
+using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.MessagingContracts.Contracts.Pricing;
 using MassTransit;
@@ -12,6 +13,7 @@ namespace Maliev.Intranet.Bff.Consumers;
 public class PriceCalculatedConsumer : IConsumer<PriceCalculatedEvent>
 {
     private readonly IHubContext<NotificationHub> _hub;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<PriceCalculatedConsumer> _logger;
 
     /// <summary>
@@ -19,11 +21,16 @@ public class PriceCalculatedConsumer : IConsumer<PriceCalculatedEvent>
     /// </summary>
     public PriceCalculatedConsumer(
         IHubContext<NotificationHub> hub,
+        IHttpClientFactory httpClientFactory,
         ILogger<PriceCalculatedConsumer> logger)
     {
         _hub = hub;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
+
+    private UploadServiceClient CreateUploadClient() =>
+        new("UploadServiceClient.Consumer", _httpClientFactory);
 
     /// <summary>
     /// Processes an incoming <see cref="PriceCalculatedEvent"/> and pushes results via SignalR.
@@ -40,25 +47,81 @@ public class PriceCalculatedConsumer : IConsumer<PriceCalculatedEvent>
 
         var payload = context.Message.Payload;
         _logger.LogInformation(
-            "PriceCalculatedConsumer: received event for storagePath={StoragePath}, unitPrice={UnitPrice}",
-            payload.StoragePath, payload.TotalUnitPrice);
+            "PriceCalculatedConsumer: received event for fileId={FileId}, storagePath={StoragePath}, unitPrice={UnitPrice}",
+            payload.FileId, payload.StoragePath, payload.TotalUnitPrice);
 
-        if (string.IsNullOrEmpty(payload.StoragePath))
+        var storagePath = await ResolveCurrentStoragePathAsync(
+            CreateUploadClient(),
+            payload.FileId,
+            payload.StoragePath,
+            context.CancellationToken);
+
+        if (string.IsNullOrEmpty(storagePath))
         {
             _logger.LogInformation(
-                "PriceCalculatedConsumer: no StoragePath on event — skipping SignalR push (non-file flow)");
+                "PriceCalculatedConsumer: no StoragePath or resolvable FileId on event — skipping SignalR push (non-file flow)");
             return;
         }
 
-        await _hub.Clients.Group($"file:{payload.StoragePath}").SendAsync(
-            "PriceCalculated",
-            new PriceCalculatedPayload(
-                StoragePath: payload.StoragePath!,
-                UnitPrice: payload.TotalUnitPrice,
-                TotalPrice: payload.TotalPrice,
-                Currency: payload.Currency,
-                EstimatedLeadTimeDays: payload.EstimatedLeadTimeDays,
-                ValidUntil: payload.ValidUntil),
-            context.CancellationToken);
+        var signalRPayload = new PriceCalculatedPayload(
+            StoragePath: storagePath,
+            UnitPrice: payload.TotalUnitPrice,
+            TotalPrice: payload.TotalPrice,
+            Currency: payload.Currency,
+            EstimatedLeadTimeDays: payload.EstimatedLeadTimeDays,
+            ValidUntil: payload.ValidUntil);
+
+        await SendToFileGroupsAsync(payload.StoragePath, storagePath, signalRPayload, context.CancellationToken);
+    }
+
+    private async Task<string?> ResolveCurrentStoragePathAsync(
+        UploadServiceClient uploadClient,
+        Guid fileId,
+        string? eventStoragePath,
+        CancellationToken cancellationToken)
+    {
+        if (fileId == Guid.Empty)
+        {
+            return eventStoragePath;
+        }
+
+        var currentPath = await uploadClient.GetStoragePathAsync(fileId.ToString(), cancellationToken);
+        if (string.IsNullOrWhiteSpace(currentPath) ||
+            string.Equals(currentPath, eventStoragePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return eventStoragePath ?? currentPath;
+        }
+
+        _logger.LogInformation(
+            "PriceCalculatedConsumer: file {FileId} moved while pricing was in flight; using current storage path {CurrentPath} instead of event path {EventPath}.",
+            fileId,
+            currentPath,
+            eventStoragePath);
+        return currentPath;
+    }
+
+    private async Task SendToFileGroupsAsync(
+        string? eventStoragePath,
+        string currentStoragePath,
+        PriceCalculatedPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            currentStoragePath
+        };
+
+        if (!string.IsNullOrWhiteSpace(eventStoragePath))
+        {
+            groupPaths.Add(eventStoragePath);
+        }
+
+        foreach (var path in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            await _hub.Clients.Group($"file:{path}").SendAsync(
+                "PriceCalculated",
+                payload,
+                cancellationToken);
+        }
     }
 }
