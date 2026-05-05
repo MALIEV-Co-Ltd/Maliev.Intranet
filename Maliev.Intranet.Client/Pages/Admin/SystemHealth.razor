@@ -1,5 +1,6 @@
 @page "/admin/system-health"
 @using Maliev.Intranet.Shared
+@implements IAsyncDisposable
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
@@ -16,10 +17,11 @@
     <PageBody>
         <div class="mlv-toolbar">
             <div class="mlv-row-sub">Last checked @(_health?.CheckedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss") ?? "-")</div>
-            <PrimaryButton Icon="@Icons.Material.Outlined.Refresh" Disabled="@_loading" OnClick="@ReloadAsync">Refresh</PrimaryButton>
+            <div class="mlv-row-sub">Auto-refresh every @AutoRefreshInterval.TotalSeconds.ToString("N0")s</div>
+            <PrimaryButton Icon="@Icons.Material.Outlined.Refresh" Disabled="@_manualRefreshInProgress" OnClick="@ReloadAsync">Refresh</PrimaryButton>
         </div>
 
-        @if (_loading)
+        @if (_manualRefreshInProgress)
         {
             <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
         }
@@ -99,35 +101,86 @@
 @code {
     private SystemHealthDto? _health;
     private SystemHealthHistoryDto? _history;
-    private bool _loading = true;
+    private bool _manualRefreshInProgress = true;
+    private bool _disposed;
+    private CancellationTokenSource? _autoRefreshCts;
+    private Task? _autoRefreshTask;
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
 
     private const int DisplayBucketMinutes = 240;
+    private static readonly TimeSpan AutoRefreshInterval = TimeSpan.FromSeconds(60);
 
     private IReadOnlyList<ServiceHealthStatus> CurrentServices => _health?.Services ?? [];
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
-
-    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
-
-    private async Task LoadAsync()
+    protected override async Task OnInitializedAsync()
     {
-        _loading = true;
+        _autoRefreshCts = new CancellationTokenSource();
+        await LoadAsync(showError: true, showProgress: true, _autoRefreshCts.Token);
+        _autoRefreshTask = RunAutoRefreshAsync(_autoRefreshCts.Token);
+    }
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync(showError: true, showProgress: true, CancellationToken.None);
+
+    private async Task LoadAsync(bool showError, bool showProgress, CancellationToken cancellationToken)
+    {
+        if (!await _loadGate.WaitAsync(0, cancellationToken))
+        {
+            return;
+        }
+
         try
         {
-            var liveTask = Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health");
-            var historyTask = Http.GetFromJsonAsync<SystemHealthHistoryDto>("api/v1/system-health/history?days=7");
+            if (showProgress)
+            {
+                _manualRefreshInProgress = true;
+                await InvokeAsync(StateHasChanged);
+            }
+
+            var liveTask = Http.GetFromJsonAsync<SystemHealthDto>("api/v1/system-health", cancellationToken);
+            var historyTask = Http.GetFromJsonAsync<SystemHealthHistoryDto>("api/v1/system-health/history?days=7", cancellationToken);
             await Task.WhenAll(liveTask, historyTask);
             _health = await liveTask;
             _history = await historyTask;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
         catch (Exception ex)
         {
-            Snackbar.Add("System health could not be loaded.", Severity.Warning);
+            if (showError)
+            {
+                Snackbar.Add("System health could not be loaded.", Severity.Warning);
+            }
+
             Console.WriteLine(ex.Message);
         }
         finally
         {
-            _loading = false;
+            if (showProgress)
+            {
+                _manualRefreshInProgress = false;
+            }
+
+            _loadGate.Release();
+            if (!_disposed)
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task RunAutoRefreshAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(AutoRefreshInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await LoadAsync(showError: false, showProgress: false, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
     }
 
@@ -207,4 +260,27 @@
         DateTime EndedAtUtc,
         string Status,
         bool HasSample);
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_autoRefreshCts is not null)
+        {
+            await _autoRefreshCts.CancelAsync();
+        }
+
+        if (_autoRefreshTask is not null)
+        {
+            try
+            {
+                await _autoRefreshTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _autoRefreshCts?.Dispose();
+        _loadGate.Dispose();
+    }
 }
