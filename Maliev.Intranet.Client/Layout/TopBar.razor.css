@@ -27,10 +27,6 @@
     cursor: pointer;
 }
 
-.topbar-logo-button:hover {
-    background: var(--maliev-panel-3);
-}
-
 .topbar-logo-button:focus-visible {
     outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 35%);
     outline-offset: 2px;
@@ -82,14 +78,14 @@
 }
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote {
-    --topbar-quote-accent: #f97316;
-    --topbar-quote-accent-hover: #ea580c;
-    border: 1px solid var(--topbar-quote-accent) !important;
-    background: var(--topbar-quote-accent) !important;
+    --topbar-quote-accent: var(--mud-palette-primary);
+    --topbar-quote-accent-hover: color-mix(in oklab, var(--mud-palette-primary), #000 12%);
+    border: 1px solid var(--mud-palette-primary) !important;
+    background: var(--mud-palette-primary) !important;
     color: #fff !important;
     font-weight: 800;
     padding-inline: 14px;
-    box-shadow: 0 2px 6px rgba(249, 115, 22, 0.32);
+    box-shadow: 0 2px 6px color-mix(in oklab, var(--mud-palette-primary), transparent 68%);
 }
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote:hover,
