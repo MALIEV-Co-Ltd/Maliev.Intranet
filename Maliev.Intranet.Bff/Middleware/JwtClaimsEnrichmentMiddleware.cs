@@ -14,6 +14,7 @@ public class JwtClaimsEnrichmentMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<JwtClaimsEnrichmentMiddleware> _logger;
     private const string JwtClaimsCacheKey = "MalievJwtClaimsParsed";
+    private const int TokenRefreshBufferSeconds = 60;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JwtClaimsEnrichmentMiddleware"/> class.
@@ -59,15 +60,21 @@ public class JwtClaimsEnrichmentMiddleware
                         {
                             var jwtToken = handler.ReadJwtToken(accessToken);
 
-                            // Check if token is expired - log warning but do NOT force signout
-                            // The access token is for downstream service calls, not session validity
-                            if (jwtToken.ValidTo < DateTime.UtcNow)
+                            if (jwtToken.ValidTo <= DateTime.UtcNow.AddSeconds(TokenRefreshBufferSeconds))
+                            {
+                                var refreshedToken = await TryReExchangePlatformJwtAsync(context);
+                                if (!string.IsNullOrEmpty(refreshedToken))
+                                {
+                                    accessToken = refreshedToken;
+                                    jwtToken = handler.ReadJwtToken(accessToken);
+                                }
+                            }
+
+                            if (jwtToken.ValidTo <= DateTime.UtcNow)
                             {
                                 _logger.LogWarning(
-                                    "Access token expired for user {UserId}. Downstream calls will use no token. Session remains valid.",
-                                    context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
-                                // Do NOT sign out - the user's session cookie is still valid
-                                // Downstream services will receive 401 and handle accordingly
+                                    "Access token expired for user {UserId}. Authorization claims cannot be enriched.",
+                                    context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
                             }
                             else
                             {
@@ -130,10 +137,73 @@ public class JwtClaimsEnrichmentMiddleware
         await _next(context);
     }
 
-    private static bool IsApiRequest(HttpContext context)
+    private async Task<string?> TryReExchangePlatformJwtAsync(HttpContext context)
     {
-        return context.Request.Path.StartsWithSegments("/api") ||
-               context.Request.Path.StartsWithSegments("/hubs") ||
-               context.Request.Headers["X-Requested-With"] == "XMLHttpRequest";
+        var userId = context.User.FindFirst("user_id")?.Value
+            ?? context.User.FindFirst("sub")?.Value
+            ?? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        try
+        {
+            var email = context.User.FindFirst("email")?.Value ?? context.User.FindFirst(ClaimTypes.Email)?.Value;
+            var fullName = context.User.FindFirst("name")?.Value ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
+            var googleUserId = context.User.FindFirst("google_user_id")?.Value;
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(googleUserId))
+            {
+                _logger.LogWarning("Cannot refresh platform JWT for user {UserId}: email or google_user_id is missing.", userId);
+                return null;
+            }
+
+            var factory = context.RequestServices.GetRequiredService<IHttpClientFactory>();
+            using var authClient = factory.CreateClient("AuthService");
+            var exchangeResponse = await authClient.PostAsJsonAsync(
+                "/auth/v1/exchange/google",
+                new { email, full_name = fullName, google_user_id = googleUserId },
+                context.RequestAborted);
+
+            if (!exchangeResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "AuthService exchange returned {StatusCode} during platform JWT refresh for user {UserId}.",
+                    exchangeResponse.StatusCode,
+                    userId);
+                return null;
+            }
+
+            var result = await exchangeResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: context.RequestAborted);
+            var newToken = result.GetProperty("access_token").GetString();
+            if (string.IsNullOrWhiteSpace(newToken))
+            {
+                return null;
+            }
+
+            var authResult = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            if (authResult?.Properties is not null)
+            {
+                authResult.Properties.StoreTokens([new AuthenticationToken { Name = "access_token", Value = newToken }]);
+                await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, context.User, authResult.Properties);
+            }
+
+            var identity = context.User.Identity as ClaimsIdentity;
+            var oldTokenClaim = identity?.FindFirst("access_token");
+            if (oldTokenClaim is not null)
+            {
+                identity?.RemoveClaim(oldTokenClaim);
+            }
+
+            identity?.AddClaim(new Claim("access_token", newToken));
+            _logger.LogInformation("Platform JWT refreshed before authorization for user {UserId}.", userId);
+            return newToken;
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Platform JWT refresh failed before authorization for user {UserId}.", userId);
+            return null;
+        }
     }
 }
