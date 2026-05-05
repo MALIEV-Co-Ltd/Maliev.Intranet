@@ -276,6 +276,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("--topbar-quote-accent: var(--mud-palette-primary);", quoteBlock, StringComparison.Ordinal);
         Assert.Contains("border: 1px solid var(--mud-palette-primary) !important;", quoteBlock, StringComparison.Ordinal);
         Assert.Contains("background: var(--mud-palette-primary) !important;", quoteBlock, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav ::deep .topbar-nav-quote .mud-nav-link", source, StringComparison.Ordinal);
         Assert.DoesNotContain("--maliev-accent", quoteBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("#f97316", quoteBlock, StringComparison.Ordinal);
     }

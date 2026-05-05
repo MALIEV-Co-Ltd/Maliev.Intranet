@@ -77,7 +77,8 @@
     font-weight: 600;
 }
 
-.topbar-nav ::deep .mud-nav-link.topbar-nav-quote {
+.topbar-nav ::deep .mud-nav-link.topbar-nav-quote,
+.topbar-nav ::deep .topbar-nav-quote .mud-nav-link {
     --topbar-quote-accent: var(--mud-palette-primary);
     --topbar-quote-accent-hover: color-mix(in oklab, var(--mud-palette-primary), #000 12%);
     border: 1px solid var(--mud-palette-primary) !important;
@@ -89,7 +90,9 @@
 }
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote:hover,
-.topbar-nav ::deep .mud-nav-link.topbar-nav-quote.active {
+.topbar-nav ::deep .mud-nav-link.topbar-nav-quote.active,
+.topbar-nav ::deep .topbar-nav-quote .mud-nav-link:hover,
+.topbar-nav ::deep .topbar-nav-quote .mud-nav-link.active {
     border-color: var(--topbar-quote-accent-hover) !important;
     background: var(--topbar-quote-accent-hover) !important;
     color: #fff !important;
@@ -97,7 +100,10 @@
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote .mud-nav-link-text,
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote:hover .mud-nav-link-text,
-.topbar-nav ::deep .mud-nav-link.topbar-nav-quote.active .mud-nav-link-text {
+.topbar-nav ::deep .mud-nav-link.topbar-nav-quote.active .mud-nav-link-text,
+.topbar-nav ::deep .topbar-nav-quote .mud-nav-link .mud-nav-link-text,
+.topbar-nav ::deep .topbar-nav-quote .mud-nav-link:hover .mud-nav-link-text,
+.topbar-nav ::deep .topbar-nav-quote .mud-nav-link.active .mud-nav-link-text {
     color: #fff !important;
     font-weight: 800;
 }
