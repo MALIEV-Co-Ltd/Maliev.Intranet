@@ -109,6 +109,8 @@ public partial class PartConfigSidebar : ComponentBase
         "inserts",
         "heat_set_inserts",
         "heatSetInserts",
+        "uv_cure",
+        "uvCure",
     };
 
     private static readonly IReadOnlyList<RoughnessOption> RoughnessOptions =
@@ -656,6 +658,8 @@ public partial class PartConfigSidebar : ComponentBase
         || normalized.Contains("threadinsert", StringComparison.Ordinal)
         || normalized.Contains("threadedinsert", StringComparison.Ordinal)
         || normalized.Contains("heatsetinsert", StringComparison.Ordinal)
+        || normalized.Contains("uvcure", StringComparison.Ordinal)
+        || normalized.Contains("postcure", StringComparison.Ordinal)
         || normalized.Contains("groove", StringComparison.Ordinal)
         || normalized.Contains("undercut", StringComparison.Ordinal);
 

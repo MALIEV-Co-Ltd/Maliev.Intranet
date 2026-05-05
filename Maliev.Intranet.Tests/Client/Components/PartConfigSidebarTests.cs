@@ -120,6 +120,25 @@ public class PartConfigSidebarTests
         Assert.False(IsVisibleProcessOption(sidebar, option));
     }
 
+    [Fact]
+    public void IsVisibleProcessOption_WhenSlaUvPostCureCatalogOption_ReturnsFalse()
+    {
+        var sidebar = new PartConfigSidebar();
+        var option = new ProcessConfigOptionDto(
+            Guid.NewGuid(),
+            "uv_cure",
+            "UV Post-cure",
+            "toggle",
+            "true",
+            null,
+            null,
+            null,
+            false,
+            30);
+
+        Assert.False(IsVisibleProcessOption(sidebar, option));
+    }
+
     private static async Task InvokeOnParametersSetAsync(PartConfigSidebar sidebar)
     {
         await InvokePrivateTask(sidebar, "OnParametersSetAsync");
