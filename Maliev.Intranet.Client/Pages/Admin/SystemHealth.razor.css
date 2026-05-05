@@ -1,34 +1,9 @@
-.system-health-table {
-    table-layout: fixed;
-}
-
-.system-health-service-col {
-    width: 28%;
-}
-
-.system-health-status-col {
-    width: 12%;
-}
-
-.system-health-critical-col {
-    width: 10%;
-}
-
-.system-health-path-col {
-    width: 17%;
-}
-
-.system-health-response-col {
-    width: 11%;
-}
-
-.system-health-checked-col {
-    width: 5%;
-}
-
-.system-health-table td,
-.system-health-table th {
-    overflow-wrap: anywhere;
+.system-health-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.9fr);
+    align-items: start;
+    gap: 16px;
+    min-width: 0;
 }
 
 .health-history-list {
@@ -102,19 +77,63 @@
     justify-self: end;
 }
 
-.system-health-details-toggle {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 16px;
+.system-health-detail-list {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
 }
 
-.system-health-detail-heading {
-    margin: 18px 0 10px;
-    font-size: var(--maliev-font-md);
+.system-health-detail-row {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--maliev-border);
+}
+
+.system-health-detail-row:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.system-health-detail-header,
+.system-health-detail-meta {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.system-health-detail-meta {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-xs);
+}
+
+.system-health-probe-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    min-width: 0;
+}
+
+.system-health-probe-grid > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.system-health-probe-label {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-xs);
     font-weight: 700;
+    text-transform: uppercase;
 }
 
 @media (max-width: 768px) {
+    .system-health-grid {
+        grid-template-columns: 1fr;
+    }
+
     .health-history-list {
         gap: 9px;
     }
@@ -140,6 +159,10 @@
 }
 
 @media (max-width: 480px) {
+    .system-health-probe-grid {
+        grid-template-columns: 1fr;
+    }
+
     .health-history-header {
         align-items: flex-start;
     }
