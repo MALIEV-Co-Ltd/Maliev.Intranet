@@ -335,6 +335,9 @@ public class PartViewModel
     public bool HasRequiredThreadSpecificationDrawing =>
         !RequiresThreadSpecificationDrawing || DrawingFiles.Count > 0;
 
+    /// <summary>True when DFM warnings are present and still need acknowledgement.</summary>
+    public bool RequiresDfmAcknowledgement => HasProcessRelevantDfmIssues && !DfmAcknowledged;
+
     /// <summary>True when the part has required file, process, material, and drawing information with no outstanding errors.</summary>
     public bool IsFullyConfigured =>
         ProcessId.HasValue &&

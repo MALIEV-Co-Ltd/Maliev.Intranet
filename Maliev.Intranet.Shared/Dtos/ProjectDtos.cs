@@ -235,6 +235,9 @@ public class ProjectPartDto
     /// <summary>True when DFM warnings have been acknowledged.</summary>
     public bool DfmAcknowledged { get; set; }
 
+    /// <summary>True when DFM warnings were detected for this part.</summary>
+    public bool HasDfmWarnings { get; set; }
+
     /// <summary>True when the part requires threaded/tapped holes.</summary>
     public bool HasThreadedHoles { get; set; }
 
@@ -478,6 +481,9 @@ public class AddProjectPartRequest
     /// <summary>True when DFM warnings have been acknowledged.</summary>
     public bool DfmAcknowledged { get; set; }
 
+    /// <summary>True when DFM warnings were detected for this part.</summary>
+    public bool HasDfmWarnings { get; set; }
+
     /// <summary>True when the part requires threaded/tapped holes.</summary>
     public bool HasThreadedHoles { get; set; }
 
@@ -585,6 +591,9 @@ public class UpdateProjectPartRequest
 
     /// <summary>True when DFM warnings have been acknowledged.</summary>
     public bool DfmAcknowledged { get; set; }
+
+    /// <summary>True when DFM warnings were detected for this part.</summary>
+    public bool HasDfmWarnings { get; set; }
 
     /// <summary>True when the part requires threaded/tapped holes.</summary>
     public bool HasThreadedHoles { get; set; }

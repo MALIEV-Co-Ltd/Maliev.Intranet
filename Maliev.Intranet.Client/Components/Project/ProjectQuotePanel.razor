@@ -479,8 +479,8 @@
         _hasPricedParts = Parts.Any(p => p.EstimatedTotalAmount.HasValue);
         _subtotal = Parts.Sum(p => p.EstimatedTotalAmount ?? 0m);
         _quoteTotal = SelectedLeadTime == null ? _subtotal : _subtotal * SelectedLeadTime.PriceMultiplier;
-        _unacknowledgedDfmCount = Parts.Count(p => p.IsManifold == false && !p.DfmAcknowledged);
-        _dfmAcknowledgedCount = Parts.Count(p => p.IsManifold == false && p.DfmAcknowledged);
+        _unacknowledgedDfmCount = Parts.Count(p => p.RequiresDfmAcknowledgement);
+        _dfmAcknowledgedCount = Parts.Count(p => p.HasProcessRelevantDfmIssues && p.DfmAcknowledged);
     }
 
     /// <summary>

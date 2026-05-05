@@ -730,28 +730,38 @@
 
     private static void AddDfmCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
     {
-        var hasDfmWarnings = part.OverlayPaths.Count > 0 || part.IsManifold == false;
-        var label = hasDfmWarnings
-            ? "DFM warnings"
-            : "DFM passed";
-        var subtext = hasDfmWarnings
-            ? part.DfmAcknowledged ? "Acknowledged" : "Requires acknowledgement"
-            : "No reported issues";
+        var status = ResolveDfmStatus(part);
 
         builder.OpenElement(sequence++, "td");
         builder.OpenElement(sequence++, "div");
-        builder.AddAttribute(sequence++, "class", hasDfmWarnings && !part.DfmAcknowledged
-            ? "project-dfm-gate warning"
-            : "project-dfm-gate");
+        builder.AddAttribute(sequence++, "class", $"project-dfm-gate {status.CssClass}");
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", "project-dfm-icon");
+        builder.AddContent(sequence++, status.Icon);
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "div");
         builder.OpenElement(sequence++, "strong");
-        builder.AddContent(sequence++, label);
+        builder.AddContent(sequence++, status.Label);
         builder.CloseElement();
         builder.OpenElement(sequence++, "span");
-        builder.AddContent(sequence++, subtext);
+        builder.AddContent(sequence++, status.Subtext);
+        builder.CloseElement();
         builder.CloseElement();
         builder.CloseElement();
         builder.CloseElement();
     }
+
+    private static DfmDisplayStatus ResolveDfmStatus(ProjectPartDto part)
+    {
+        if (!part.HasDfmWarnings)
+            return new("DFM passed", "No reported issues", "dfm-ok", "OK");
+
+        return part.DfmAcknowledged
+            ? new("DFM acknowledged", "Warnings reviewed", "dfm-ack", "OK")
+            : new("DFM warnings", "Requires acknowledgement", "dfm-warning", "!");
+    }
+
+    private sealed record DfmDisplayStatus(string Label, string Subtext, string CssClass, string Icon);
 
     private string FormatMoney(decimal value) => CurrencyFormatter.Format(value, ProjectCurrency, 2);
 

@@ -4,6 +4,7 @@ using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
+using Maliev.MessagingContracts.Contracts.Geometry;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -1126,6 +1127,59 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             Assert.Contains("Standard", json.RootElement.GetProperty("deliveryExpectations").GetString(), StringComparison.Ordinal);
         }
         Assert.EndsWith($"/sales/projects/{projectId}", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CanSubmit_WhenConfiguredPartHasUnacknowledgedDfmIssue_IsFalse()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        cut.WaitForAssertion(() =>
+            Assert.Contains(_sentRequests, request => request.RequestUri?.AbsolutePath == "/api/v1/pricing/lead-times"));
+
+        SetPrivateField(cut.Instance, "_title", "DFM gate quote");
+        SetPrivateField(cut.Instance, "_selectedCustomer", new CustomerSummaryDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "Wanasrivwilai Engineering",
+            Email = "quote@example.test",
+        });
+        SetPrivateField(cut.Instance, "_selectedLeadTime", new LeadTimeOptionDto("STANDARD", "Standard", 7, 10, 1m, true));
+        var report = new FdmDfmReportPayload(
+            ReportType: "FDM",
+            ThinWallCount: 1,
+            ThinWallRegions: [],
+            OverhangFaceCount: 0,
+            OverhangAreaCm2: 0,
+            OverhangRegions: [],
+            SupportRequired: false,
+            EstimatedSupportVolumeCm3: null,
+            SmallDetailCount: 0,
+            Issues: []);
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "thin-wall-part.stl",
+            StoragePath = "projects/thin-wall-part.stl",
+            ProcessId = Guid.NewGuid(),
+            ProcessCode = "FDM",
+            MaterialId = Guid.NewGuid(),
+            MaterialCode = "PLA",
+            Quantity = 2,
+            EstimatedUnitPrice = 1250m,
+            EstimatedTotalAmount = 2500m,
+            IsManifold = true,
+            BodyCount = 1,
+            FdmDfmReport = report,
+        };
+        part.ResolveDfmReport();
+        GetParts(cut.Instance).Add(part);
+
+        Assert.True(part.HasProcessRelevantDfmIssues);
+        Assert.False(GetPrivateProperty<bool>(cut.Instance, "CanSubmit"));
+
+        part.DfmAcknowledged = true;
+
+        Assert.True(GetPrivateProperty<bool>(cut.Instance, "CanSubmit"));
     }
 
     [Fact]

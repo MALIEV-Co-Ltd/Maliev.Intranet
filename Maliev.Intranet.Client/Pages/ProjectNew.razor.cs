@@ -106,7 +106,7 @@ public partial class ProjectNew : IAsyncDisposable
         !_parts.Any(p => p.QueuedUpload || p.Uploading || p.PricingLoading) &&
         _parts.All(p => p.IsFullyConfigured && !p.PricingFailed) &&
         _parts.All(p => ResolvePartUnitPriceForConfirmation(p).GetValueOrDefault() > 0m) &&
-        _parts.All(p => p.IsManifold != false || p.DfmAcknowledged);
+        _parts.All(p => !p.RequiresDfmAcknowledgement);
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
@@ -1625,6 +1625,7 @@ public partial class ProjectNew : IAsyncDisposable
             RoughnessCode = part.RoughnessCode,
             MarkingType = part.MarkingType,
             MarkingText = part.MarkingText,
+            HasDfmWarnings = part.HasProcessRelevantDfmIssues,
             DfmAcknowledged = part.DfmAcknowledged,
             HasThreadedHoles = part.HasThreadedHoles,
             ThreadedHoleSpec = part.ThreadedHoleSpec,
@@ -1674,6 +1675,7 @@ public partial class ProjectNew : IAsyncDisposable
             RoughnessCode = part.RoughnessCode,
             MarkingType = part.MarkingType,
             MarkingText = part.MarkingText,
+            HasDfmWarnings = part.HasProcessRelevantDfmIssues,
             DfmAcknowledged = part.DfmAcknowledged,
             HasThreadedHoles = part.HasThreadedHoles,
             ThreadedHoleSpec = part.ThreadedHoleSpec,

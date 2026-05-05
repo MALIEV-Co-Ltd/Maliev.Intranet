@@ -31,12 +31,20 @@
                      Color="Color.Tertiary" />
         }
         @* DFM status indicator overlay *@
-        @if (Part.HasProcessRelevantDfmIssues && !Part.DfmAcknowledged)
+        @if (Part.RequiresDfmAcknowledgement)
         {
             <div class="mc-indicator warn">
                 <MudIcon Icon="@Icons.Material.Filled.WarningAmber"
                          Size="Size.Small"
                          Color="Color.Warning" />
+            </div>
+        }
+        else if (Part.HasProcessRelevantDfmIssues && Part.DfmAcknowledged)
+        {
+            <div class="mc-indicator ack">
+                <MudIcon Icon="@Icons.Material.Outlined.TaskAlt"
+                         Size="Size.Small"
+                         Color="Color.Info" />
             </div>
         }
         else if (!Part.IsFullyConfigured && Part.FileId != Guid.Empty)
@@ -149,6 +157,7 @@
         font-size: 10px;
     }
     .mc-indicator.warn { background: var(--mud-palette-warning-bg); color: var(--mud-palette-warning); }
+    .mc-indicator.ack  { background: var(--mud-palette-info-lighten); color: var(--mud-palette-info); }
     .mc-indicator.ok   { background: var(--mud-palette-success-bg); color: var(--mud-palette-success); }
     .mc-indicator.cfg  { background: var(--mud-palette-info-lighten); color: var(--mud-palette-info); }
     .pmc-info {

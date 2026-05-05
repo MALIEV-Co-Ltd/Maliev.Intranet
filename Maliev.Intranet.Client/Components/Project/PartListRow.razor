@@ -58,7 +58,7 @@
             </div>
             @* DFM status badge *@
             <div class="plr-badge-row">
-                @if (Part.DfmReport != null && !Part.DfmAcknowledged)
+                @if (Part.RequiresDfmAcknowledgement)
                 {
                     <MudChip T="string"
                              Label="true"
@@ -69,6 +69,19 @@
                                  Size="Size.Small"
                                  Class="mr-1" />
                         DFM Warnings
+                    </MudChip>
+                }
+                else if (Part.HasProcessRelevantDfmIssues && Part.DfmAcknowledged)
+                {
+                    <MudChip T="string"
+                             Label="true"
+                             Color="Color.Info"
+                             Size="Size.Small"
+                             Class="plr-dfm-badge">
+                        <MudIcon Icon="@Icons.Material.Outlined.TaskAlt"
+                                 Size="Size.Small"
+                                 Class="mr-1" />
+                        DFM Acknowledged
                     </MudChip>
                 }
                 else if (Part.IsFullyConfigured)

@@ -41,7 +41,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("project-record-tabs", cut.Markup);
         Assert.Contains("Overview", cut.Markup);
         Assert.Contains("Quote", cut.Markup);
-        Assert.Contains("Parts (2)", cut.Markup);
+        Assert.Contains("Parts (3)", cut.Markup);
         Assert.Contains("Timeline", cut.Markup);
         Assert.Contains("Customer", cut.Markup);
         Assert.Contains("Axion Robotics", cut.Markup);
@@ -117,6 +117,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("customer-po.pdf", cut.Markup);
         Assert.Contains("DFM warnings", cut.Markup);
         Assert.Contains("Requires acknowledgement", cut.Markup);
+        Assert.Contains("DFM acknowledged", cut.Markup);
+        Assert.Contains("Warnings reviewed", cut.Markup);
         Assert.Contains("DFM passed", cut.Markup);
         Assert.Contains("No reported issues", cut.Markup);
         Assert.DoesNotContain("DFM pending", cut.Markup);
@@ -197,6 +199,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         ConfirmedPrice = 2500m,
                         Status = "Confirmed",
                         ThumbnailUrl = "https://storage.example/bracket-thumb.webp",
+                        HasDfmWarnings = true,
                         DfmAcknowledged = false,
                         OverlayPaths =
                         {
@@ -232,7 +235,25 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         Quantity = 15,
                         ConfirmedPrice = 550m,
                         Status = "Confirmed",
+                        HasDfmWarnings = false,
                         DfmAcknowledged = false,
+                        OverlayPaths =
+                        {
+                            ["preview"] = "customers/axion/projects/prj/sensor-cover_preview_overlay.glb"
+                        },
+                    },
+                    new ProjectPartDto
+                    {
+                        Id = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                        FileId = Guid.Parse("88888888-8888-8888-8888-888888888888"),
+                        FileName = "fixture-base.step",
+                        ProcessType = "CNC_MILL",
+                        MaterialName = "Aluminium 6061-T6",
+                        Quantity = 2,
+                        ConfirmedPrice = 1200m,
+                        Status = "Confirmed",
+                        HasDfmWarnings = true,
+                        DfmAcknowledged = true,
                     }
                 ],
                 Timeline =

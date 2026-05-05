@@ -84,10 +84,15 @@
                                 <span class="plp-process-badge">@part.ProcessCode.ToUpperInvariant()</span>
                             }
                             <span class="plp-qty">× @part.Quantity</span>
-                            @if (part.HasProcessRelevantDfmIssues && !part.DfmAcknowledged)
+                            @if (part.RequiresDfmAcknowledgement)
                             {
                                 <MudIcon Icon="@Icons.Material.Filled.WarningAmber" Size="Size.Small" Color="Color.Warning"
                                          Class="plp-warn" />
+                            }
+                            else if (part.HasProcessRelevantDfmIssues && part.DfmAcknowledged)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.TaskAlt" Size="Size.Small" Color="Color.Info"
+                                         Class="plp-ack" />
                             }
                         </div>
                     </div>

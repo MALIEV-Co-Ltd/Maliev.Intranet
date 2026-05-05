@@ -251,22 +251,66 @@
 }
 
 .project-record-shell ::deep .project-dfm-gate {
-    display: grid;
-    gap: 2px;
+    display: inline-grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 7px;
+    min-width: 148px;
+    padding: 5px 7px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 6px;
+    background: var(--mud-palette-surface);
 }
 
 .project-record-shell ::deep .project-dfm-gate strong {
     color: var(--maliev-success);
     font-size: var(--maliev-font-small);
+    line-height: 1.1;
 }
 
-.project-record-shell ::deep .project-dfm-gate.warning strong {
+.project-record-shell ::deep .project-dfm-gate.dfm-warning {
+    border-color: var(--maliev-warning);
+    background: color-mix(in srgb, var(--maliev-warning) 10%, var(--mud-palette-surface));
+}
+
+.project-record-shell ::deep .project-dfm-gate.dfm-warning strong {
     color: var(--maliev-warning);
+}
+
+.project-record-shell ::deep .project-dfm-gate.dfm-ack {
+    border-color: var(--mud-palette-info);
+    background: color-mix(in srgb, var(--mud-palette-info) 10%, var(--mud-palette-surface));
+}
+
+.project-record-shell ::deep .project-dfm-gate.dfm-ack strong {
+    color: var(--mud-palette-info);
 }
 
 .project-record-shell ::deep .project-dfm-gate span {
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
+    line-height: 1.15;
+}
+
+.project-record-shell ::deep .project-dfm-gate .project-dfm-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--maliev-success);
+    color: var(--mud-palette-white);
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.project-record-shell ::deep .project-dfm-gate.dfm-warning .project-dfm-icon {
+    background: var(--maliev-warning);
+}
+
+.project-record-shell ::deep .project-dfm-gate.dfm-ack .project-dfm-icon {
+    background: var(--mud-palette-info);
 }
 
 .project-record-shell ::deep .project-snapshot {
