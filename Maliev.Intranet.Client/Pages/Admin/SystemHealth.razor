@@ -77,13 +77,6 @@
                                             <div class="mlv-mono">@currentProbe.ReadinessPath</div>
                                             <div class="mlv-row-sub">@currentProbe.ReadinessResponseTimeMs.ToString("N0") ms</div>
                                         </div>
-                                        <div>
-                                            <div class="system-health-probe-label">Impact</div>
-                                            <span class="@GetImpactBadgeClass(currentProbe.IsCritical)">
-                                                @(currentProbe.IsCritical ? "Critical" : "Standard")
-                                            </span>
-                                            <div class="mlv-row-sub">@currentProbe.LastCheck.ToLocalTime().ToString("HH:mm:ss")</div>
-                                        </div>
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(currentProbe.ErrorMessage))
                                     {
@@ -200,11 +193,6 @@
 
     private static string GetBucketClass(DisplayHealthBucket bucket) =>
         $"health-bucket health-bucket-{bucket.Status.Trim().ToLowerInvariant()}";
-
-    private static string GetImpactBadgeClass(bool isCritical) =>
-        isCritical
-            ? "system-health-impact-badge system-health-impact-critical"
-            : "system-health-impact-badge system-health-impact-standard";
 
     private static string GetBucketTitle(DisplayHealthBucket bucket)
     {

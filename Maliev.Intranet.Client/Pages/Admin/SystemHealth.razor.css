@@ -78,7 +78,7 @@
 
 .system-health-probe-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(120px, 0.45fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px;
     min-width: 0;
 }
@@ -93,31 +93,6 @@
     font-size: var(--maliev-font-xs);
     font-weight: 700;
     text-transform: uppercase;
-}
-
-.system-health-impact-badge {
-    display: inline-flex;
-    align-items: center;
-    width: fit-content;
-    min-height: 22px;
-    padding: 2px 8px;
-    border: 1px solid;
-    border-radius: 999px;
-    font-size: var(--maliev-font-xs);
-    font-weight: 700;
-    line-height: 1.2;
-}
-
-.system-health-impact-critical {
-    border-color: color-mix(in srgb, var(--maliev-danger) 45%, transparent);
-    background: color-mix(in srgb, var(--maliev-danger) 12%, transparent);
-    color: var(--maliev-danger);
-}
-
-.system-health-impact-standard {
-    border-color: var(--maliev-border);
-    background: var(--maliev-panel-3);
-    color: var(--maliev-muted);
 }
 
 @media (max-width: 768px) {
