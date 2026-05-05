@@ -84,10 +84,31 @@ public class GlobalSearchBoxTests
         cut.Find("input").Input("acme");
 
         cut.WaitForAssertion(() => Assert.Contains("Acme Corp", cut.Markup));
+        Assert.NotNull(cut.Find(".global-search-result-subtitle"));
         await cut.InvokeAsync(() => cut.Find(".global-search-result").Click());
 
         var navigation = context.Services.GetRequiredService<NavigationManager>();
         Assert.EndsWith($"/customers/{customerId}", navigation.Uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GlobalSearchBoxCss_ConstrainsResultRows()
+    {
+        var cssPath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Maliev.Intranet.Client",
+            "Components",
+            "Shared",
+            "GlobalSearchBox.razor.css"));
+        var css = File.ReadAllText(cssPath);
+
+        Assert.Contains("overflow-x: hidden;", css, StringComparison.Ordinal);
+        Assert.Contains(".global-search-result-subtitle", css, StringComparison.Ordinal);
+        Assert.Contains("text-overflow: ellipsis;", css, StringComparison.Ordinal);
     }
 
     [Fact]
