@@ -164,7 +164,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ErrorBody", page, StringComparison.Ordinal);
         Assert.Contains("api/v1/system-health/history?days=7", page, StringComparison.Ordinal);
         Assert.Contains("health-strip", page, StringComparison.Ordinal);
-        Assert.Contains("DisplayBucketMinutes = 30", page, StringComparison.Ordinal);
+        Assert.Contains("DisplayBucketMinutes = 240", page, StringComparison.Ordinal);
         Assert.Contains("GetDisplayBuckets", page, StringComparison.Ordinal);
         Assert.Contains("7 days ago", page, StringComparison.Ordinal);
         Assert.Contains("% uptime", page, StringComparison.Ordinal);
