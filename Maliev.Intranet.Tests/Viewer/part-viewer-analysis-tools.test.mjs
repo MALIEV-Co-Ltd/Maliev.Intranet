@@ -485,7 +485,7 @@ test('section hatch spacing is dense enough for Fusion-style section lines', () 
     assert.ok(spacing <= 1.4);
 });
 
-test('DFM overlay transform mirrors model root scaling and centering', async () => {
+test('DFM overlay transform keeps imported overlay geometry in its authored root space', async () => {
     const context = loadViewerContext();
     const overlayRoot = makeOverlayNode('__root__', {
         totalVertices: 0,
@@ -513,8 +513,8 @@ test('DFM overlay transform mirrors model root scaling and centering', async () 
         toggleDfmOverlay('viewer', 'part-a', 'FDM__thin_wall', 'thin-wall.glb', true);
     `, context);
 
-    assert.equal(overlayMesh.scaling.value, 2);
-    assert.equal(overlayRoot.scaling.value, 1);
+    assert.equal(overlayMesh.scaling.value, 1);
+    assert.equal(overlayRoot.scaling.value, 2);
     assert.deepEqual(
         { x: overlayRoot.position.x, y: overlayRoot.position.y, z: overlayRoot.position.z },
         { x: -10, y: 4, z: 3 });
