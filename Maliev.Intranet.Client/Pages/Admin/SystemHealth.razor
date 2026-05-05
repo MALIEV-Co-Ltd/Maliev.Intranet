@@ -42,9 +42,9 @@
                     <div class="health-history-list">
                         @foreach (var service in _history.Services.OrderBy(s => s.ServiceName))
                         {
-                            var displayBuckets = GetDisplayBuckets(service, _history.BucketMinutes);
                             var currentProbe = CurrentServices.FirstOrDefault(s => s.ServiceName == service.ServiceName);
                             var currentStatus = currentProbe?.Status ?? service.CurrentStatus;
+                            var displayBuckets = GetDisplayBuckets(service, _history.BucketMinutes, currentProbe);
                             <div class="health-history-row">
                                 <div class="health-history-header">
                                     <div>
@@ -136,7 +136,10 @@
         }
     }
 
-    private static IReadOnlyList<DisplayHealthBucket> GetDisplayBuckets(SystemHealthHistoryServiceDto service, int sourceBucketMinutes)
+    private static IReadOnlyList<DisplayHealthBucket> GetDisplayBuckets(
+        SystemHealthHistoryServiceDto service,
+        int sourceBucketMinutes,
+        ServiceHealthStatus? currentProbe)
     {
         if (service.Buckets.Count == 0)
         {
@@ -155,6 +158,16 @@
                 group[^1].EndedAtUtc,
                 ResolveDisplayStatus(group),
                 group.Any(bucket => bucket.HasSample)));
+        }
+
+        if (currentProbe is not null && buckets.Count > 0)
+        {
+            var lastBucket = buckets[^1];
+            buckets[^1] = lastBucket with
+            {
+                Status = currentProbe.Status,
+                HasSample = true
+            };
         }
 
         return buckets;
