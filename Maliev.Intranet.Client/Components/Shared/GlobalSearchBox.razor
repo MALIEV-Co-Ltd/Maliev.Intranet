@@ -25,6 +25,10 @@
 
     @if (_open)
     {
+        <button type="button"
+                class="global-search-backdrop"
+                aria-label="Close search results"
+                @onclick="CloseResults"></button>
         <div class="global-search-panel">
             @if (_query.Trim().Length < 2)
             {
@@ -187,6 +191,11 @@
                 await InvokeAsync(StateHasChanged);
             }
         }
+    }
+
+    private void CloseResults()
+    {
+        _open = false;
     }
 
     private void NavigateTo(string href)

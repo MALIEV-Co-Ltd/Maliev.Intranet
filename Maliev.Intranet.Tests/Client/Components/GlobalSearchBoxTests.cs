@@ -84,6 +84,7 @@ public class GlobalSearchBoxTests
         cut.Find("input").Input("acme");
 
         cut.WaitForAssertion(() => Assert.Contains("Acme Corp", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".global-search-spinner")));
         Assert.NotNull(cut.Find(".global-search-result-subtitle"));
         await cut.InvokeAsync(() => cut.Find(".global-search-result").Click());
 
@@ -109,6 +110,33 @@ public class GlobalSearchBoxTests
         Assert.Contains("overflow-x: hidden;", css, StringComparison.Ordinal);
         Assert.Contains(".global-search-result-subtitle", css, StringComparison.Ordinal);
         Assert.Contains("text-overflow: ellipsis;", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GlobalSearchBox_ClickAway_ClosesResults()
+    {
+        using var context = CreateContext(_ => JsonContent.Create(new GlobalSearchResponseDto(
+            "acme",
+            1,
+            [
+                new GlobalSearchResultDto(
+                    "Acme Corp",
+                    "Customer",
+                    "Sales & CRM",
+                    "customer",
+                    "Active",
+                    "/customers/1",
+                    1.0d)
+            ])));
+
+        var cut = context.Render<GlobalSearchBox>();
+        cut.Find("input").Input("acme");
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find(".global-search-panel")));
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".global-search-spinner")));
+        await cut.InvokeAsync(() => cut.Find(".global-search-backdrop").Click());
+
+        Assert.Empty(cut.FindAll(".global-search-panel"));
     }
 
     [Fact]
