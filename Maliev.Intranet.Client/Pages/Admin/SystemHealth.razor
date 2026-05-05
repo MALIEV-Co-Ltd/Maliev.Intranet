@@ -36,83 +36,67 @@
                 <StatTile Label="Critical issues" Value="@CurrentServices.Count(s => s.IsCritical && s.Status != "Healthy").ToString("N0")" />
             </StatBar>
 
-            <div class="system-health-grid">
-                @if (_history is not null)
-                {
-                    <PanelCard Title="Services">
-                        <div class="health-history-list">
-                            @foreach (var service in _history.Services.OrderBy(s => s.ServiceName))
-                            {
-                                var displayBuckets = GetDisplayBuckets(service, _history.BucketMinutes);
-                                <div class="health-history-row">
-                                    <div class="health-history-header">
-                                        <div>
-                                            <div class="mlv-row-main">@service.ServiceName</div>
-                                            <div class="mlv-row-sub">@service.DomainGroup · @service.RoutePrefix</div>
-                                        </div>
-                                        <StatusBadge Status="@service.CurrentStatus" />
+            @if (_history is not null)
+            {
+                <PanelCard Title="Services">
+                    <div class="health-history-list">
+                        @foreach (var service in _history.Services.OrderBy(s => s.ServiceName))
+                        {
+                            var displayBuckets = GetDisplayBuckets(service, _history.BucketMinutes);
+                            var currentProbe = CurrentServices.FirstOrDefault(s => s.ServiceName == service.ServiceName);
+                            var currentStatus = currentProbe?.Status ?? service.CurrentStatus;
+                            <div class="health-history-row">
+                                <div class="health-history-header">
+                                    <div>
+                                        <div class="mlv-row-main">@service.ServiceName</div>
+                                        <div class="mlv-row-sub">@service.DomainGroup · @service.RoutePrefix</div>
                                     </div>
-                                    <div class="health-strip" aria-label="@($"{service.ServiceName} seven day health history")">
-                                        @foreach (var bucket in displayBuckets)
-                                        {
-                                            <span class="@GetBucketClass(bucket)" title="@GetBucketTitle(bucket)"></span>
-                                        }
-                                    </div>
-                                    <div class="health-strip-axis">
-                                        <span>7 days ago</span>
-                                        <span>@service.UptimePercentage.ToString("N2") % uptime</span>
-                                        <span>Now</span>
-                                    </div>
+                                    <StatusBadge Status="@currentStatus" />
                                 </div>
-                            }
-                        </div>
-                    </PanelCard>
-                }
-
-                @if (_health is not null)
-                {
-                    <PanelCard Title="Current Probe Details">
-                        <div class="system-health-detail-list">
-                            @foreach (var service in _health.Services.OrderBy(s => s.ServiceName))
-                            {
-                                <div class="system-health-detail-row">
-                                    <div class="system-health-detail-header">
-                                        <div>
-                                            <div class="mlv-row-main">@service.ServiceName</div>
-                                            <div class="mlv-row-sub">@service.DomainGroup · @service.RoutePrefix</div>
-                                        </div>
-                                        <StatusBadge Status="@service.Status" />
-                                    </div>
-                                    <div class="system-health-detail-meta">
-                                        <span>@(service.IsCritical ? "Critical" : "Standard")</span>
-                                        <span>@service.LastCheck.ToLocalTime().ToString("HH:mm:ss")</span>
-                                    </div>
+                                <div class="health-strip" aria-label="@($"{service.ServiceName} seven day health history")">
+                                    @foreach (var bucket in displayBuckets)
+                                    {
+                                        <span class="@GetBucketClass(bucket)" title="@GetBucketTitle(bucket)"></span>
+                                    }
+                                </div>
+                                <div class="health-strip-axis">
+                                    <span>7 days ago</span>
+                                    <span>@service.UptimePercentage.ToString("N2") % uptime</span>
+                                    <span>Now</span>
+                                </div>
+                                @if (currentProbe is not null)
+                                {
                                     <div class="system-health-probe-grid">
                                         <div>
                                             <div class="system-health-probe-label">Live</div>
-                                            <div class="mlv-mono">@service.LivenessPath</div>
-                                            <div class="mlv-row-sub">@service.LivenessResponseTimeMs.ToString("N0") ms</div>
+                                            <div class="mlv-mono">@currentProbe.LivenessPath</div>
+                                            <div class="mlv-row-sub">@currentProbe.LivenessResponseTimeMs.ToString("N0") ms</div>
                                         </div>
                                         <div>
                                             <div class="system-health-probe-label">Ready</div>
-                                            <div class="mlv-mono">@service.ReadinessPath</div>
-                                            <div class="mlv-row-sub">@service.ReadinessResponseTimeMs.ToString("N0") ms</div>
+                                            <div class="mlv-mono">@currentProbe.ReadinessPath</div>
+                                            <div class="mlv-row-sub">@currentProbe.ReadinessResponseTimeMs.ToString("N0") ms</div>
+                                        </div>
+                                        <div>
+                                            <div class="system-health-probe-label">Probe</div>
+                                            <div>@(currentProbe.IsCritical ? "Critical" : "Standard")</div>
+                                            <div class="mlv-row-sub">@currentProbe.LastCheck.ToLocalTime().ToString("HH:mm:ss")</div>
                                         </div>
                                     </div>
-                                    @if (!string.IsNullOrWhiteSpace(service.ErrorMessage))
+                                    @if (!string.IsNullOrWhiteSpace(currentProbe.ErrorMessage))
                                     {
-                                        <div class="mlv-row-sub">@service.ErrorMessage</div>
+                                        <div class="mlv-row-sub">@currentProbe.ErrorMessage</div>
                                     }
-                                    @if (!string.IsNullOrWhiteSpace(service.ErrorBody))
+                                    @if (!string.IsNullOrWhiteSpace(currentProbe.ErrorBody))
                                     {
-                                        <pre class="mlv-error mt-2">@service.ErrorBody</pre>
+                                        <pre class="mlv-error mt-2">@currentProbe.ErrorBody</pre>
                                     }
-                                </div>
-                            }
-                        </div>
-                    </PanelCard>
-                }
-            </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </PanelCard>
+            }
         }
     </PageBody>
 </div>
