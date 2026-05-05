@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared.Dtos;
@@ -119,5 +120,84 @@ public class GeometryControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var body = Assert.IsType<DfmAnalysisResponse>(okResult.Value);
         Assert.Equal("analysis_complete", body.Status);
+    }
+
+    [Fact]
+    public async Task AnalyzeForProcess_ReResolvesStoragePath_WhenSignedUrlMissesDuringMigration()
+    {
+        const string stalePath = "projects/p1/part.stl";
+        const string currentPath = "customers/c1/projects/p1/part.stl";
+        string? geometryRequestJson = null;
+        var metadataReads = 0;
+
+        var uploadClient = new UploadServiceClient(new HttpClient(new MockHttpMessageHandler((req, _) =>
+        {
+            if (req.RequestUri!.PathAndQuery.Contains($"/files/{UploadId}"))
+            {
+                metadataReads++;
+                var path = metadataReads == 1 ? stalePath : currentPath;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { storagePath = path })
+                });
+            }
+
+            if (req.RequestUri.PathAndQuery.Contains("by-path/signed-url"))
+            {
+                var requestBody = req.Content!.ReadFromJsonAsync<JsonElement>().GetAwaiter().GetResult();
+                var requestedPath = requestBody.GetProperty("storagePath").GetString();
+                if (string.Equals(requestedPath, stalePath, StringComparison.Ordinal))
+                {
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Gone)
+                    {
+                        Content = JsonContent.Create(new { error = "file_missing" })
+                    });
+                }
+
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { signedUrl = SignedUrl })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        }))
+        { BaseAddress = new Uri("http://test") });
+
+        var geometryClient = new GeometryServiceClient(new HttpClient(new MockHttpMessageHandler(async (req, _) =>
+        {
+            geometryRequestJson = await req.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new DfmAnalysisResponse
+                {
+                    UploadId = UploadId,
+                    ProcessCode = ProcessCode,
+                    Status = "analysis_complete",
+                    DfmReport = new() { ReportType = ProcessCode }
+                }, options: new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                })
+            };
+        }))
+        { BaseAddress = new Uri("http://test") });
+
+        var controller = MakeController(uploadClient, geometryClient);
+
+        var result = await controller.AnalyzeForProcess(
+            UploadId,
+            ProcessCode,
+            new GeometryAnalysisRequest { StoragePath = stalePath },
+            default);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var body = Assert.IsType<DfmAnalysisResponse>(okResult.Value);
+        Assert.Equal("analysis_complete", body.Status);
+        Assert.NotNull(geometryRequestJson);
+
+        using var document = JsonDocument.Parse(geometryRequestJson);
+        Assert.Equal(currentPath, document.RootElement.GetProperty("storage_path").GetString());
+        Assert.Equal(SignedUrl, document.RootElement.GetProperty("download_url").GetString());
     }
 }

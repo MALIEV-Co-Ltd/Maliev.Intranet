@@ -57,29 +57,18 @@ public class GeometryController(
 
         request.StoragePath = currentPath;
 
-        // Generate a fresh signed URL for the authoritative path.
-        try
+        var (resolvedPath, signedUrl) = await ResolveSignedUrlForCurrentUploadPathAsync(uploadId, currentPath, ct);
+        if (string.IsNullOrEmpty(signedUrl))
         {
-            var signedUrl = await uploadServiceClient.GetDownloadUrlByPathAsync(currentPath, ct);
-            if (!string.IsNullOrEmpty(signedUrl))
-            {
-                request.DownloadUrl = signedUrl;
-                logger.LogDebug("Generated signed URL for storage path {StoragePath}", currentPath);
-            }
-            else
-            {
-                // 410 from UploadService means the object is gone in GCS (existence check failed).
-                logger.LogWarning(
-                    "UploadService could not produce a signed URL for {StoragePath} (file likely deleted from GCS)",
-                    currentPath);
-                return StatusCode(410, BuildFileMissingResponse(uploadId, processCode));
-            }
+            logger.LogWarning(
+                "UploadService could not produce a signed URL for upload {UploadId} at path {StoragePath}",
+                uploadId,
+                resolvedPath);
+            return StatusCode(410, BuildFileMissingResponse(uploadId, processCode));
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error generating signed URL for storage path {StoragePath}", currentPath);
-            // Continue without signed URL — GeometryService will return 400 if download_url absent.
-        }
+
+        request.StoragePath = resolvedPath;
+        request.DownloadUrl = signedUrl;
 
         var result = await geometryServiceClient.AnalyzeForProcessAsync(uploadId, processCode, request, ct);
 
@@ -145,4 +134,56 @@ public class GeometryController(
                 ]
             }
         };
+
+    private async Task<(string StoragePath, string? SignedUrl)> ResolveSignedUrlForCurrentUploadPathAsync(
+        string uploadId,
+        string currentPath,
+        CancellationToken ct)
+    {
+        var signedUrl = await TryGetDownloadUrlByPathAsync(currentPath, ct);
+        if (!string.IsNullOrEmpty(signedUrl))
+        {
+            logger.LogDebug("Generated signed URL for storage path {StoragePath}", currentPath);
+            return (currentPath, signedUrl);
+        }
+
+        var refreshedPath = await uploadServiceClient.GetStoragePathAsync(uploadId, ct);
+        if (string.IsNullOrEmpty(refreshedPath))
+        {
+            return (currentPath, null);
+        }
+
+        if (!string.Equals(refreshedPath, currentPath, StringComparison.Ordinal))
+        {
+            logger.LogInformation(
+                "Upload {UploadId} storage path changed while resolving DFM signed URL: {OldPath} -> {NewPath}",
+                uploadId,
+                currentPath,
+                refreshedPath);
+            currentPath = refreshedPath;
+        }
+
+        signedUrl = await TryGetDownloadUrlByPathAsync(currentPath, ct);
+        if (!string.IsNullOrEmpty(signedUrl))
+        {
+            logger.LogDebug("Generated signed URL for refreshed storage path {StoragePath}", currentPath);
+        }
+
+        return (currentPath, signedUrl);
+    }
+
+    private async Task<string?> TryGetDownloadUrlByPathAsync(string storagePath, CancellationToken ct)
+    {
+        try
+        {
+            return await uploadServiceClient.GetDownloadUrlByPathAsync(storagePath, ct);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                "Signed URL generation timed out for storage path {StoragePath}; will retry after re-resolving upload metadata",
+                storagePath);
+            return null;
+        }
+    }
 }
