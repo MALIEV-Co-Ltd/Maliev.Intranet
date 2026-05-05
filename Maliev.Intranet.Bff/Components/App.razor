@@ -15,18 +15,16 @@
             --blazor-load-percentage: 0%;
             --blazor-load-percentage-text: "0%";
             --wasm-logo-progress: 0%;
+            --wasm-logo-empty: #ffffff;
+            --wasm-logo-fill: #000000;
         }
 
         :root[data-maliev-theme="dark"] {
             color-scheme: dark;
-            --wasm-loader-bg: #0d1117;
-            --maliev-logo-loader-outline: color-mix(in oklch, #ffffff 24%, transparent);
-            --maliev-logo-loader-fill: #ffffff;
+            --wasm-loader-bg: #ffffff;
             --maliev-logo-loader-shadow:
-                drop-shadow(0 18px 28px rgba(0, 0, 0, 0.48))
-                drop-shadow(0 0 46px rgba(255, 255, 255, 0.22));
-            --wasm-logo-outline: var(--maliev-logo-loader-outline);
-            --wasm-logo-fill: var(--maliev-logo-loader-fill);
+                drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))
+                drop-shadow(0 0 42px rgba(10, 20, 40, 0.18));
         }
         :root[data-maliev-theme="dark"] body {
             background-color: #0d1117 !important;
@@ -35,13 +33,9 @@
         :root[data-maliev-theme="light"] {
             color-scheme: light;
             --wasm-loader-bg: #ffffff;
-            --maliev-logo-loader-outline: color-mix(in oklch, #000000 24%, transparent);
-            --maliev-logo-loader-fill: #000000;
             --maliev-logo-loader-shadow:
                 drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))
                 drop-shadow(0 0 42px rgba(10, 20, 40, 0.18));
-            --wasm-logo-outline: var(--maliev-logo-loader-outline);
-            --wasm-logo-fill: var(--maliev-logo-loader-fill);
         }
         :root[data-maliev-theme="light"] body {
             background-color: #ffffff !important;
@@ -98,14 +92,20 @@
             aspect-ratio: 449.33078 / 103.18751;
             position: relative;
             color: transparent;
+            opacity: 0;
             background:
                 linear-gradient(
                     90deg,
                     var(--wasm-logo-fill, #000000) 0 var(--wasm-logo-progress),
-                    var(--wasm-logo-outline, color-mix(in oklch, #000000 24%, transparent)) var(--wasm-logo-progress) 100%);
+                    var(--wasm-logo-empty, #ffffff) var(--wasm-logo-progress) 100%);
             -webkit-mask: url('/images/logo.svg') center / contain no-repeat;
             mask: url('/images/logo.svg') center / contain no-repeat;
             filter: var(--maliev-logo-loader-shadow);
+            transition: opacity 180ms ease;
+        }
+
+        html.maliev-wasm-loader-visible .wasm-loading .maliev-logo-loader {
+            opacity: 1;
         }
 
         .wasm-loading-failure {
@@ -183,6 +183,12 @@
             }
 
             applyTheme();
+
+            window.requestAnimationFrame(function () {
+                window.requestAnimationFrame(function () {
+                    root.classList.add('maliev-wasm-loader-visible');
+                });
+            });
         })();
     </script>
 
@@ -241,7 +247,7 @@
                 markRuntimeReady();
                 window.setTimeout(function () {
                     root.classList.add('maliev-wasm-ready');
-                }, 180);
+                }, 220);
             }
 
             function markFailed(error) {
@@ -298,7 +304,7 @@
                 loadBootResource: window.malievWasmLoader.loadBootResource
             }
         }).then(function () {
-            window.malievWasmLoader.markReady();
+            window.malievWasmLoader.markRuntimeReady();
         }).catch(function (error) {
             window.malievWasmLoader.markFailed(error);
         });

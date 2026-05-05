@@ -26,12 +26,11 @@ public sealed class WasmLogoLoadingAnimationTests : BunitContext, IAsyncLifetime
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "WasmLogoLoadingAnimation.razor.css");
 
         Assert.Contains("url('/images/logo.svg')", source);
-        Assert.Contains("--maliev-logo-loader-fill, #000000", source);
-        Assert.Contains("--maliev-logo-loader-fill, #ffffff", source);
+        Assert.Contains("--logo-empty: var(--wasm-logo-empty, #ffffff)", source);
+        Assert.Contains("--logo-fill: var(--wasm-logo-fill, #000000)", source);
         Assert.Contains("--logo-progress: var(--wasm-logo-progress, 0%)", source);
         Assert.Contains("--logo-shadow: var(--maliev-logo-loader-shadow", source);
         Assert.Contains("drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))", source);
-        Assert.Contains("drop-shadow(0 18px 28px rgba(0, 0, 0, 0.48))", source);
         Assert.Contains("filter: var(--logo-shadow)", source);
         Assert.Contains("linear-gradient(", source);
         Assert.Contains("90deg", source);
