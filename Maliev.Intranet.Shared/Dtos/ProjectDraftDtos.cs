@@ -289,7 +289,7 @@ public sealed class PartViewerSettings
     public bool EdgesEnabled { get; set; }
 
     /// <summary>True when the grid floor is enabled.</summary>
-    public bool GridEnabled { get; set; }
+    public bool GridEnabled { get; set; } = true;
 
     /// <summary>True when the part bounding box is enabled.</summary>
     public bool BoundingBoxEnabled { get; set; }

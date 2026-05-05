@@ -46,6 +46,24 @@ public class PartViewModelViewerSettingsTests
 
         Assert.Equal("solid", restoredSecond.ViewerSettings.RenderMode);
         Assert.False(restoredSecond.ViewerSettings.EdgesEnabled);
-        Assert.False(restoredSecond.ViewerSettings.GridEnabled);
+        Assert.True(restoredSecond.ViewerSettings.GridEnabled);
+    }
+
+    [Fact]
+    public void ToDraftPartState_WhenGridFloorExplicitlyDisabled_PreservesDisabledSetting()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "grid-disabled-part.stl",
+            ViewerSettings = new PartViewerSettings
+            {
+                GridEnabled = false,
+            },
+        };
+
+        var restored = PartViewModel.FromDraftPartState(part.ToDraftPartState());
+
+        Assert.False(restored.ViewerSettings.GridEnabled);
     }
 }
