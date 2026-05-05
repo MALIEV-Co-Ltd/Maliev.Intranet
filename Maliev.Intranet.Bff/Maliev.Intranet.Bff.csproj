@@ -10,6 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="artifacts\**" />
+    <Content Remove="artifacts\**" />
+    <EmbeddedResource Remove="artifacts\**" />
+    <None Remove="artifacts\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Maliev.Intranet.Client\Maliev.Intranet.Client.csproj" />
     <ProjectReference Include="..\Maliev.Intranet.Shared\Maliev.Intranet.Shared.csproj" />
     
