@@ -4,6 +4,7 @@ using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
 using MudBlazor;
 using MudBlazor.Services;
@@ -20,6 +21,7 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
         Services.AddSingleton<CurrencyService>();
         Services.AddSingleton(new UploadSettings());
         Services.AddSingleton(CreateFileTypesSettings());
+        Services.AddSingleton<LayoutService>(new LayoutService(JSInterop.JSRuntime, NullLogger<LayoutService>.Instance));
         JSInterop.Mode = JSRuntimeMode.Loose;
         Render<MudPopoverProvider>();
     }
@@ -172,6 +174,22 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
 
         var previewImage = cut.Find(".pbt-preview-image");
         Assert.Equal("/thumb-bracket.png", previewImage.GetAttribute("src"));
+    }
+
+    [Fact]
+    public void ProjectPartsBulkTable_WhenPreview3dToggleClicked_ReplacesThumbnailWithViewer()
+    {
+        var parts = CreateParts();
+        parts[0].ViewerUrl = "/model-bracket.glb";
+
+        var cut = RenderTable(parts);
+
+        cut.Find(".pbt-part-thumb-button").Click();
+        cut.Find(".pbt-preview-view-toggle").Click();
+
+        Assert.Empty(cut.FindAll(".pbt-preview-image"));
+        Assert.NotEmpty(cut.FindAll(".pbt-preview-viewer-frame"));
+        Assert.NotEmpty(cut.FindAll(".model-viewer-container"));
     }
 
     [Fact]

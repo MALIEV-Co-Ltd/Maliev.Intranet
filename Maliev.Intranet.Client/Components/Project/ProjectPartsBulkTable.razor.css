@@ -373,6 +373,18 @@
     border-bottom: 1px solid var(--maliev-border);
 }
 
+.pbt-preview-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pbt-preview-view-toggle.active {
+    border-color: var(--mud-palette-primary);
+    background: color-mix(in srgb, var(--mud-palette-primary) 12%, var(--maliev-panel));
+    color: var(--mud-palette-primary);
+}
+
 .pbt-preview-title {
     overflow: hidden;
     color: var(--maliev-ink);
@@ -394,6 +406,24 @@
     max-width: 100%;
     max-height: min(74vh, 760px);
     object-fit: contain;
+}
+
+.pbt-preview-viewer-frame {
+    width: 100%;
+    height: min(74vh, 700px);
+    min-height: 420px;
+    background: var(--maliev-panel);
+}
+
+::deep .pbt-preview-viewer-frame .model-viewer-container {
+    min-height: 100% !important;
+}
+
+.pbt-preview-note {
+    margin: 0;
+    padding: 0 14px 12px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
 }
 
 .pbt-dfm {

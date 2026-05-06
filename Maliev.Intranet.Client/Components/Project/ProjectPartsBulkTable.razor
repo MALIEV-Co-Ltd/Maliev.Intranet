@@ -529,17 +529,48 @@
                         <div class="pbt-kicker">Preview</div>
                         <div class="pbt-preview-title">@_previewPart.Name</div>
                     </div>
-                    <button type="button"
-                            class="pbt-icon-button"
-                            title="Close preview"
-                            aria-label="Close preview"
-                            @onclick="CloseThumbnailPreview">
-                        <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
-                    </button>
+                    <div class="pbt-preview-actions">
+                        @if (CanPreviewPartModel(_previewPart))
+                        {
+                            <MudTooltip Text="@(_preview3dActive ? "Show thumbnail" : "Show 3D view")">
+                                <button type="button"
+                                        class="@($"pbt-icon-button pbt-preview-view-toggle{(_preview3dActive ? " active" : string.Empty)}")"
+                                        title="@(_preview3dActive ? "Show thumbnail" : "Show 3D view")"
+                                        aria-label="@(_preview3dActive ? "Show thumbnail preview" : "Show 3D preview")"
+                                        @onclick="ToggleThumbnailPreview3dAsync">
+                                    <MudIcon Icon="@(_preview3dActive ? Icons.Material.Outlined.Image : Icons.Material.Outlined.ViewInAr)" Size="Size.Small" />
+                                </button>
+                            </MudTooltip>
+                        }
+                        <button type="button"
+                                class="pbt-icon-button"
+                                title="Close preview"
+                                aria-label="Close preview"
+                                @onclick="CloseThumbnailPreview">
+                            <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                        </button>
+                    </div>
                 </div>
                 <div class="pbt-preview-frame">
-                    <img src="@previewImageUrl" alt="@_previewPart.Name" class="pbt-preview-image" />
+                    @if (_preview3dActive && ResolvePreviewViewerUrl(_previewPart) is { Length: > 0 } viewerUrl)
+                    {
+                        <div class="pbt-preview-viewer-frame">
+                            <ModelViewer ViewerUrl="@viewerUrl"
+                                         FileExtension=".glb"
+                                         KnownDimensions="@_previewPart.Dimensions"
+                                         ViewerSettings="@_previewPart.ViewerSettings"
+                                         OnLoadFailed="HandlePreviewViewerLoadFailed" />
+                        </div>
+                    }
+                    else
+                    {
+                        <img src="@previewImageUrl" alt="@_previewPart.Name" class="pbt-preview-image" />
+                    }
                 </div>
+                @if (!string.IsNullOrWhiteSpace(_previewViewerError))
+                {
+                    <p class="pbt-preview-note">@_previewViewerError</p>
+                }
             </div>
         </div>
     }
@@ -595,6 +626,8 @@
     private readonly PartConfigurationBulkPatch _bulkPatch = new();
     private PartViewModel? _lastBulkSourcePart;
     private PartViewModel? _previewPart;
+    private string? _previewViewerError;
+    private bool _preview3dActive;
 
     private int SelectedCount => SelectedParts.Count(part => Parts.Contains(part));
 
@@ -656,16 +689,68 @@
             _expandedParts.Remove(part);
     }
 
-    private void OpenThumbnailPreview(PartViewModel part) =>
+    private void OpenThumbnailPreview(PartViewModel part)
+    {
         _previewPart = part;
+        _previewViewerError = null;
+        _preview3dActive = false;
+    }
 
-    private void CloseThumbnailPreview() =>
+    private void CloseThumbnailPreview()
+    {
         _previewPart = null;
+        _previewViewerError = null;
+        _preview3dActive = false;
+    }
 
     private static string? ResolvePreviewImageUrl(PartViewModel part) =>
         !string.IsNullOrWhiteSpace(part.ThumbnailLargeUrl)
             ? part.ThumbnailLargeUrl
             : part.ThumbnailSmallUrl;
+
+    private async Task ToggleThumbnailPreview3dAsync()
+    {
+        if (_previewPart is null)
+            return;
+
+        _previewViewerError = null;
+
+        if (_preview3dActive)
+        {
+            _preview3dActive = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ResolvePreviewViewerUrl(_previewPart)) && OnOpenViewer.HasDelegate)
+            await OnOpenViewer.InvokeAsync(_previewPart);
+
+        if (string.IsNullOrWhiteSpace(ResolvePreviewViewerUrl(_previewPart)))
+        {
+            _previewViewerError = "3D view is not available yet for this part.";
+            return;
+        }
+
+        _preview3dActive = true;
+    }
+
+    private Task HandlePreviewViewerLoadFailed(string errorMessage)
+    {
+        _previewViewerError = string.IsNullOrWhiteSpace(errorMessage)
+            ? "3D view could not be loaded."
+            : $"3D view could not be loaded: {errorMessage}";
+        _preview3dActive = false;
+        return Task.CompletedTask;
+    }
+
+    private static bool CanPreviewPartModel(PartViewModel part) =>
+        !string.IsNullOrWhiteSpace(part.ViewerUrl)
+        || !string.IsNullOrWhiteSpace(part.GlbSignedUrl)
+        || !string.IsNullOrWhiteSpace(part.GlbStoragePath);
+
+    private static string? ResolvePreviewViewerUrl(PartViewModel part) =>
+        !string.IsNullOrWhiteSpace(part.ViewerUrl)
+            ? part.ViewerUrl
+            : part.GlbSignedUrl;
 
     private static bool IsCncProcessCode(string? processCode) =>
         string.Equals(processCode, "CNC", StringComparison.OrdinalIgnoreCase)
