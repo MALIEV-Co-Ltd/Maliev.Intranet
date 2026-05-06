@@ -226,16 +226,21 @@
             const seenResources = new Set();
             let loadedResources = 0;
             let totalResources = 0;
+            let displayedProgress = 0;
 
             function clamp(value) {
                 return Math.max(0, Math.min(100, value));
             }
 
-            function setProgress(value) {
+            function setProgress(value, allowDecrease) {
                 const progress = clamp(Number.isFinite(value) ? value : 0);
-                const progressText = `${progress}%`;
+                displayedProgress = allowDecrease
+                    ? progress
+                    : Math.max(displayedProgress, progress);
+
+                const progressText = `${displayedProgress}%`;
                 root.style.setProperty('--blazor-load-percentage', `${progress}%`);
-                root.style.setProperty('--blazor-load-percentage-text', `"${Math.floor(progress)}%"`);
+                root.style.setProperty('--blazor-load-percentage-text', `"${Math.floor(displayedProgress)}%"`);
                 root.style.setProperty('--wasm-logo-progress', progressText);
 
                 document.querySelectorAll('.maliev-logo-loader').forEach(function (loader) {
@@ -244,7 +249,7 @@
             }
 
             function markRuntimeReady() {
-                setProgress(100);
+                setProgress(100, true);
                 root.classList.add('maliev-wasm-runtime-ready');
             }
 
@@ -261,8 +266,8 @@
             }
 
             function updateResourceProgress() {
-                const divisor = Math.max(totalResources, loadedResources, 1);
-                setProgress((loadedResources / divisor) * 100);
+                const estimatedTotal = Math.max(totalResources + 3, loadedResources + 1);
+                setProgress(Math.min((loadedResources / estimatedTotal) * 100, 95));
             }
 
             function loadBootResource(type, name, defaultUri, integrity) {
@@ -290,7 +295,7 @@
                     });
             }
 
-            setProgress(0);
+            setProgress(0, true);
 
             return {
                 loadBootResource,

@@ -48,6 +48,12 @@ public class AppWasmRenderModeTests
         Assert.Contains("root.style.setProperty('--wasm-logo-progress', progressText)", source);
         Assert.Contains("document.querySelectorAll('.maliev-logo-loader')", source);
         Assert.Contains("loader.style.setProperty('--wasm-logo-progress', progressText)", source);
+        Assert.Contains("let displayedProgress = 0", source);
+        Assert.Contains("Math.max(displayedProgress, progress)", source);
+        Assert.Contains("const estimatedTotal = Math.max(totalResources + 3, loadedResources + 1)", source);
+        Assert.Contains("Math.min((loadedResources / estimatedTotal) * 100, 95)", source);
+        Assert.Contains("setProgress(100, true)", source);
+        Assert.Contains("setProgress(0, true)", source);
         Assert.Contains("background: var(--wasm-logo-empty, #d7dde6)", source);
         Assert.Contains(".wasm-loading .maliev-logo-loader::before", source);
         Assert.Contains("width: var(--wasm-logo-progress)", source);
