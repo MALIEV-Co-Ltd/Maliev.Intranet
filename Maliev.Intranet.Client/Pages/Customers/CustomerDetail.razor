@@ -1428,6 +1428,15 @@
     private string ActivityDescription(CustomerActivityResponse activity)
     {
         var description = activity.Description.Replace("**", string.Empty, StringComparison.Ordinal);
+        if (description.Contains("accountmanageremployeeid", StringComparison.OrdinalIgnoreCase))
+        {
+            var employeeId = ExtractAccountManagerEmployeeId(activity);
+            var employeeName = ResolveAccountManagerName(employeeId);
+            return string.IsNullOrWhiteSpace(employeeName)
+                ? "Customer profile update: changed account manager."
+                : $"Customer profile update: changed account manager to {employeeName}.";
+        }
+
         if (!description.Contains("companyid", StringComparison.OrdinalIgnoreCase))
         {
             return description;
@@ -1436,6 +1445,51 @@
         return !string.IsNullOrWhiteSpace(_customer?.CompanyName)
             ? $"Customer profile update: changed company assignment to {_customer.CompanyName}."
             : "Customer profile update: changed company assignment.";
+    }
+
+    private static Guid? ExtractAccountManagerEmployeeId(CustomerActivityResponse activity)
+    {
+        if (!string.IsNullOrWhiteSpace(activity.Details))
+        {
+            try
+            {
+                using var document = System.Text.Json.JsonDocument.Parse(activity.Details);
+                if (TryReadGuidProperty(document.RootElement, "AccountManagerEmployeeId", out var id))
+                {
+                    return id;
+                }
+            }
+            catch
+            {
+                // Old audit rows can contain partial or malformed details; fall back to the description.
+            }
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            activity.Description,
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+
+        return match.Success && Guid.TryParse(match.Value, out var parsed) ? parsed : null;
+    }
+
+    private static bool TryReadGuidProperty(System.Text.Json.JsonElement element, string propertyName, out Guid id)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!property.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (property.Value.ValueKind == System.Text.Json.JsonValueKind.String &&
+                Guid.TryParse(property.Value.GetString(), out id))
+            {
+                return true;
+            }
+        }
+
+        id = default;
+        return false;
     }
 
     private static string ActivityIcon(string action)

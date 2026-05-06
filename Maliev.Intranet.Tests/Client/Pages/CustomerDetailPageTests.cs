@@ -125,6 +125,20 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CustomerDetail_ActivityTrail_DoesNotRenderRawAccountManagerField()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Customer profile update: changed account manager to Mia Wong - Sales Manager.", cut.Markup));
+        cut.Find("button[data-tab='activity']").Click();
+
+        Assert.Contains("Customer profile update: changed account manager to Mia Wong - Sales Manager.", cut.Markup);
+        Assert.DoesNotContain("accountmanageremployeeid", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(_accountManagerId.ToString(), cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("**", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerDetail_TabsRenderConsistentDetailSections()
     {
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
@@ -274,9 +288,17 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                         ActorName = "Natthapol Vanasrivilai",
                         Timestamp = new DateTime(2026, 5, 4, 5, 48, 0, DateTimeKind.Utc),
                         Details = "{\"CompanyId\":\"efdd1db7-7225-4c40-914f-83dc3af80002\"}"
+                    },
+                    new CustomerActivityResponse
+                    {
+                        Action = "Update",
+                        Description = $"Customer profile update: set accountmanageremployeeid to '**{_accountManagerId}**'",
+                        ActorName = "Natthapol Vanasrivilai",
+                        Timestamp = new DateTime(2026, 5, 6, 3, 29, 0, DateTimeKind.Utc),
+                        Details = $"{{\"AccountManagerEmployeeId\":\"{_accountManagerId}\"}}"
                     }
                 ],
-                Meta = new PaginationMeta { CurrentPage = 1, PageSize = 8, TotalCount = 2, TotalItems = 2, TotalPages = 1 }
+                Meta = new PaginationMeta { CurrentPage = 1, PageSize = 8, TotalCount = 3, TotalItems = 3, TotalPages = 1 }
             });
         }
 
@@ -376,6 +398,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                 CompanyName = "Axion Robotics",
                 CompanyVatNumber = "EIN 87-2341098",
                 AccountManagerEmployeeId = _accountManagerId,
+                AccountManagerName = "Mia Wong",
                 CreatedByName = "Alex Kim",
                 Addresses =
                 [
