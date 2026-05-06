@@ -1,5 +1,6 @@
 using Bunit;
 using Maliev.Intranet.Client.Pages;
+using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Components;
@@ -15,7 +16,14 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 {
     private readonly Guid _projectId = Guid.Parse("5daabfe7-7b4a-43fe-9287-b596eb75ece8");
     private readonly Guid _quotationId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+    private readonly Guid _bracketPartId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private readonly Guid _sensorPartId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private readonly Guid _fixturePartId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+    private readonly Guid _planningHoldId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private readonly Guid _machineId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private readonly Guid _jobId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private readonly List<string> _requestedPaths = [];
+    private readonly List<string> _requestedRequests = [];
     private bool _notePosted;
 
     public ProjectDetailPageTests()
@@ -44,6 +52,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Overview", cut.Markup);
         Assert.Contains("Quote", cut.Markup);
         Assert.Contains("Parts (3)", cut.Markup);
+        Assert.Contains("Planning", cut.Markup);
         Assert.Contains("Timeline", cut.Markup);
         Assert.Contains("Customer", cut.Markup);
         Assert.Contains("Axion Robotics", cut.Markup);
@@ -56,16 +65,27 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Manufacturing summary", cut.Markup);
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("18,250.00", cut.Markup);
-        Assert.Contains("Edit project", cut.Markup);
-        Assert.Contains("Generate PDF", cut.Markup);
+        Assert.Contains("aria-label=\"Edit project\"", cut.Markup);
+        Assert.Contains("aria-label=\"Generate PDF\"", cut.Markup);
         Assert.Contains("project-header-icon-action", cut.Markup);
         Assert.Contains("Accept quote", cut.Markup);
+
+        var expectedLocalUpdated = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
+            .ToLocalTime()
+            .ToString("MMM d, yyyy HH:mm");
+        var headerMeta = cut.Find(".mlv-page-meta").TextContent;
+        Assert.Contains($"Robot arm calibration fixture - Axion Robotics • Last updated on {expectedLocalUpdated}", headerMeta);
+        Assert.Contains("Quotation Generated", headerMeta);
+        Assert.DoesNotContain("Created", headerMeta);
+        Assert.DoesNotContain("Updated", headerMeta);
 
         var overview = cut.Find(".project-record-grid");
         Assert.Contains("project-record-main-manufacturing", overview.InnerHtml);
         Assert.Contains("project-overview-sidebar", overview.InnerHtml);
         var quoteTerms = cut.Find(".project-information-card").TextContent;
         Assert.Contains("Quote terms", quoteTerms);
+        Assert.Contains("Lead time", quoteTerms);
+        Assert.Contains("7-10 business days", quoteTerms);
         Assert.DoesNotContain("Project #", quoteTerms);
         Assert.DoesNotContain("Title", quoteTerms);
         Assert.DoesNotContain("Project status", quoteTerms);
@@ -83,7 +103,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         var navigation = Services.GetRequiredService<NavigationManager>();
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
 
-        cut.WaitForAssertion(() => Assert.Contains("Edit project", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("project-action-edit", cut.Markup));
         cut.Find("button.project-action-edit").Click();
 
         Assert.EndsWith($"/sales/projects/new?resume={_projectId}", navigation.Uri, StringComparison.Ordinal);
@@ -94,7 +114,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
 
-        cut.WaitForAssertion(() => Assert.Contains("Generate PDF", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("project-action-download", cut.Markup));
         cut.Find("button.project-action-download").Click();
         cut.Find("button.project-action-accept").Click();
 
@@ -136,6 +156,60 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("sensor-cover.3mf", cut.Markup);
         Assert.Contains("18,250.00", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectDetail_PlanningTab_RendersRoutingQueueHoldsAndJobs()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Planning", cut.Markup));
+        cut.Find("button[data-tab='planning']").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Production planning", cut.Markup));
+
+        Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/production-plan");
+        Assert.Contains("project-planning-panel", cut.Markup);
+        Assert.Contains("project-planning-table", cut.Markup);
+        Assert.Contains("3 quoted parts", cut.Markup);
+        Assert.Contains("Manufacturing", cut.Markup);
+        Assert.Contains("Qty / DFM", cut.Markup);
+        Assert.Contains("bracket-left.stl", cut.Markup);
+        Assert.Contains("CNC Milling", cut.Markup);
+        Assert.Contains("Aluminium 6061-T6", cut.Markup);
+        Assert.Contains("Anodized - Black - ISO 2768-m", cut.Markup);
+        Assert.Contains("Requires acknowledgement", cut.Markup);
+        Assert.Contains("CNC Mill 01", cut.Markup);
+        Assert.Contains("2 queued ahead", cut.Markup);
+        Assert.Contains("Hold #3", cut.Markup);
+        Assert.Contains("CCCCCCCC", cut.Markup);
+        Assert.Contains("Preview routing", cut.Markup);
+        Assert.Contains("Create planning hold", cut.Markup);
+        Assert.Contains("Update planning hold", cut.Markup);
+        Assert.Contains("Cancel planning hold", cut.Markup);
+        Assert.Contains("Open job", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectDetail_PlanningActions_CallPlanningEndpoints()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Planning", cut.Markup));
+        cut.Find("button[data-tab='planning']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Production planning", cut.Markup));
+
+        cut.Find("button[aria-label='Create planning hold']").Click();
+        cut.WaitForAssertion(() =>
+            Assert.Contains(_requestedRequests, request => request == $"POST /api/v1/projects/{_projectId}/parts/{_bracketPartId}/planning-hold"));
+
+        cut.Find("button[aria-label='Update planning hold']").Click();
+        cut.WaitForAssertion(() =>
+            Assert.Contains(_requestedRequests, request => request == $"PATCH /api/v1/projects/{_projectId}/planning-holds/{_planningHoldId}"));
+
+        cut.Find("button[aria-label='Cancel planning hold']").Click();
+        cut.WaitForAssertion(() =>
+            Assert.Contains(_requestedRequests, request => request == $"DELETE /api/v1/projects/{_projectId}/planning-holds/{_planningHoldId}"));
     }
 
     [Fact]
@@ -227,6 +301,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         var css = File.ReadAllText(cssPath);
 
         Assert.Contains("::deep .project-record-body", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-header-subtitle", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-header-icon-action", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-field-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-metric-row", css, StringComparison.Ordinal);
@@ -236,6 +311,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-notes-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-note-audit", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-overview-sidebar", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-manufacturing-card", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-field-grid-compact", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-snapshot-compact", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-quote-terms", css, StringComparison.Ordinal);
@@ -246,7 +322,11 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-document-preview", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-commercial-breakdown", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-commercial-totals", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-panel", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-table", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-actions", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(6)", css, StringComparison.Ordinal);
+        Assert.Contains("th:nth-child(7)", css, StringComparison.Ordinal);
         Assert.Contains("text-align: right", css, StringComparison.Ordinal);
         Assert.Contains("width: 5%", css, StringComparison.Ordinal);
         Assert.Contains("width: 100%", css, StringComparison.Ordinal);
@@ -258,6 +338,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     {
         var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
         _requestedPaths.Add(pathAndQuery);
+        _requestedRequests.Add($"{request.Method.Method} {pathAndQuery}");
 
         if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}", StringComparison.Ordinal))
         {
@@ -297,7 +378,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                 [
                     new ProjectPartDto
                     {
-                        Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                        Id = _bracketPartId,
                         FileId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
                         FileName = "bracket-left.stl",
                         ProcessType = "CNC_MILL",
@@ -335,7 +416,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                     },
                     new ProjectPartDto
                     {
-                        Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                        Id = _sensorPartId,
                         FileId = Guid.Parse("55555555-5555-5555-5555-555555555555"),
                         FileName = "sensor-cover.3mf",
                         ProcessType = "FDM",
@@ -354,7 +435,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                     },
                     new ProjectPartDto
                     {
-                        Id = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                        Id = _fixturePartId,
                         FileId = Guid.Parse("88888888-8888-8888-8888-888888888888"),
                         FileName = "fixture-base.step",
                         ProcessType = "CNC_MILL",
@@ -397,6 +478,34 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             });
         }
 
+        if (pathAndQuery.Equals($"/api/v1/quotations/{_quotationId}", StringComparison.Ordinal))
+        {
+            return Json(BuildQuotationDetail());
+        }
+
+        if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}/production-plan", StringComparison.Ordinal))
+        {
+            return Json(BuildProductionPlan());
+        }
+
+        if (request.Method == HttpMethod.Post
+            && pathAndQuery.Equals($"/api/v1/projects/{_projectId}/parts/{_bracketPartId}/planning-hold", StringComparison.Ordinal))
+        {
+            return Json(BuildPlanningHold(_bracketPartId, 4));
+        }
+
+        if (request.Method == HttpMethod.Patch
+            && pathAndQuery.Equals($"/api/v1/projects/{_projectId}/planning-holds/{_planningHoldId}", StringComparison.Ordinal))
+        {
+            return Json(BuildPlanningHold(_sensorPartId, 3));
+        }
+
+        if (request.Method == HttpMethod.Delete
+            && pathAndQuery.Equals($"/api/v1/projects/{_projectId}/planning-holds/{_planningHoldId}", StringComparison.Ordinal))
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        }
+
         if (pathAndQuery.Equals($"/api/v1/quotations/{_quotationId}/pdf", StringComparison.Ordinal))
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -426,6 +535,169 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
     }
+
+    private QuotationDetailDto BuildQuotationDetail() => new()
+    {
+        Id = _quotationId,
+        QuotationNumber = "QT-2026-0098",
+        CustomerId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+        CustomerName = "Axion Robotics",
+        CurrentVersionNumber = 2,
+        Status = "Generated",
+        ValidityPeriodStart = new DateTime(2026, 4, 18, 0, 0, 0, DateTimeKind.Utc),
+        ValidityPeriodEnd = new DateTime(2026, 5, 18, 0, 0, 0, DateTimeKind.Utc),
+        SubTotal = 18250m,
+        Total = 18250m,
+        CurrencyCode = "THB",
+        DeliveryExpectations = "7-10 business days",
+        Versions =
+        [
+            new QuotationVersionDto
+            {
+                Id = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+                VersionNumber = 1,
+                TotalPrice = 19000m,
+                CurrencyCode = "THB",
+                DeliveryExpectations = "10 business days",
+                CreatedBy = "Alex Kim",
+                CreatedAt = new DateTime(2026, 4, 18, 12, 0, 0, DateTimeKind.Utc)
+            },
+            new QuotationVersionDto
+            {
+                Id = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+                VersionNumber = 2,
+                TotalPrice = 18250m,
+                CurrencyCode = "THB",
+                DeliveryExpectations = "7-10 business days",
+                CreatedBy = "Alex Kim",
+                CreatedAt = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
+            }
+        ]
+    };
+
+    private ProjectProductionPlanDto BuildProductionPlan()
+    {
+        var proposedStart = new DateTimeOffset(2026, 4, 19, 9, 0, 0, TimeSpan.Zero);
+        var proposedEnd = proposedStart.AddHours(3);
+        var schedule = new List<PlanningScheduleItemDto>
+        {
+            new(
+                proposedStart.AddHours(-5),
+                proposedStart.AddHours(-3),
+                "JOB-1001",
+                "Queued",
+                Guid.Parse("12121212-1212-1212-1212-121212121212"),
+                "CNC Mill 01",
+                60,
+                120),
+            new(
+                proposedStart.AddHours(-3),
+                proposedStart.AddHours(-1),
+                "HOLD-AAAA",
+                "ActiveHold",
+                Guid.Parse("34343434-3434-3434-3434-343434343434"),
+                "CNC Mill 01",
+                60,
+                120,
+                IsHold: true,
+                HoldId: _planningHoldId)
+        };
+
+        var cncRouting = new ProductionRoutingDto(
+            _machineId,
+            "CNC-01",
+            "CNC Mill 01",
+            2,
+            proposedStart,
+            schedule,
+            proposedStart,
+            proposedEnd);
+
+        var fdmRouting = new ProductionRoutingDto(
+            Guid.Parse("abababab-abab-abab-abab-abababababab"),
+            "FDM-01",
+            "FDM Printer 01",
+            1,
+            proposedStart.AddHours(2),
+            [],
+            proposedStart.AddHours(2),
+            proposedStart.AddHours(6));
+
+        return new ProjectProductionPlanDto
+        {
+            ProjectId = _projectId,
+            Parts =
+            [
+                new ProjectProductionPartPlanDto
+                {
+                    PartId = _bracketPartId,
+                    FileName = "bracket-left.stl",
+                    ThumbnailUrl = "https://storage.example/bracket-thumb.webp",
+                    Dimensions = "120 x 64 x 18 mm",
+                    ProcessType = "CNC_MILL",
+                    MaterialName = "Aluminium 6061-T6",
+                    Configuration = "Anodized - Black - ISO 2768-m",
+                    Quantity = 4,
+                    DfmStatus = "Requires acknowledgement",
+                    Routing = cncRouting,
+                    CanCreateHold = true
+                },
+                new ProjectProductionPartPlanDto
+                {
+                    PartId = _sensorPartId,
+                    FileName = "sensor-cover.3mf",
+                    Dimensions = "42 x 22 x 12 mm",
+                    ProcessType = "FDM",
+                    MaterialName = "PA12 Nylon",
+                    Configuration = "As printed - Standard FDM settings",
+                    Quantity = 15,
+                    DfmStatus = "DFM passed",
+                    Routing = fdmRouting,
+                    ActiveHold = BuildPlanningHold(_sensorPartId, 3),
+                    CanCreateHold = true
+                },
+                new ProjectProductionPartPlanDto
+                {
+                    PartId = _fixturePartId,
+                    FileName = "fixture-base.step",
+                    Dimensions = "80 x 48 x 12 mm",
+                    ProcessType = "CNC_MILL",
+                    MaterialName = "Aluminium 6061-T6",
+                    Configuration = "Standard settings",
+                    Quantity = 2,
+                    DfmStatus = "DFM acknowledged",
+                    Routing = cncRouting,
+                    JobId = _jobId,
+                    JobStatus = "InProduction",
+                    MachineName = "CNC Mill 01",
+                    CanCreateHold = false,
+                    HoldBlockReason = "Production job already exists."
+                }
+            ]
+        };
+    }
+
+    private ProductionPlanningHoldDto BuildPlanningHold(Guid partId, int queuePosition) => new()
+    {
+        Id = _planningHoldId,
+        ProjectId = _projectId,
+        ProjectPartId = partId,
+        Technology = "CNC_MILL",
+        MachineId = "CNC-01",
+        MachineName = "CNC Mill 01",
+        QueuePosition = queuePosition,
+        ScheduledStartTime = new DateTime(2026, 4, 19, 9, 0, 0, DateTimeKind.Utc),
+        ScheduledEndTime = new DateTime(2026, 4, 19, 12, 0, 0, DateTimeKind.Utc),
+        SetupTimeMinutes = 60,
+        ProductionTimeMinutes = 120,
+        Quantity = 4,
+        Status = "Active",
+        Notes = "Planned from project PRJ-2026-0184",
+        CreatedBy = "employee:alex.kim",
+        CreatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc),
+        UpdatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc),
+        ExpiresAt = new DateTime(2026, 4, 21, 15, 0, 0, DateTimeKind.Utc)
+    };
 
     private static Task<HttpResponseMessage> Json<T>(T body) =>
         Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)

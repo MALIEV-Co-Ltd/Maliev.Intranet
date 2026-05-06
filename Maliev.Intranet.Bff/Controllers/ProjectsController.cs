@@ -369,6 +369,130 @@ public class ProjectsController(
         return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
     }
 
+    // ── Production planning ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns project-scoped production planning data for quoted parts.
+    /// </summary>
+    /// <param name="id">The project GUID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The project production plan.</returns>
+    [HttpGet("{id:guid}/production-plan")]
+    public async Task<ActionResult<ProjectProductionPlanDto>> GetProductionPlan(Guid id, CancellationToken ct)
+    {
+        var project = await client.GetProjectByIdAsync(id, ct);
+        if (project is null)
+            return NotFound();
+
+        var holds = await jobClient.GetPlanningHoldsAsync(projectId: id, activeOnly: true, ct: ct);
+        var holdByPart = holds
+            .GroupBy(hold => hold.ProjectPartId)
+            .ToDictionary(group => group.Key, group => group.OrderBy(hold => hold.ExpiresAt).First());
+
+        var partPlans = new List<ProjectProductionPartPlanDto>();
+        foreach (var part in project.Parts.Where(part => !string.Equals(part.Status, "Removed", StringComparison.OrdinalIgnoreCase)))
+        {
+            var processType = part.ProcessType;
+            ProductionRoutingDto? routing = null;
+            if (!string.IsNullOrWhiteSpace(processType))
+            {
+                routing = await BuildPartRoutingAsync(id, part.Id, processType, ct);
+            }
+
+            holdByPart.TryGetValue(part.Id, out var activeHold);
+            var blockReason = ResolvePlanningBlockReason(part);
+
+            partPlans.Add(new ProjectProductionPartPlanDto
+            {
+                PartId = part.Id,
+                FileName = part.FileName,
+                ThumbnailUrl = part.ThumbnailUrl,
+                Dimensions = FormatDimensions(part.Dimensions),
+                ProcessType = part.ProcessType,
+                MaterialName = FirstNonEmpty(part.MaterialName, part.MaterialCode),
+                Configuration = FormatPartConfiguration(part),
+                Quantity = part.Quantity,
+                DfmStatus = part.HasDfmWarnings ? part.DfmAcknowledged ? "DFM acknowledged" : "DFM warnings" : "DFM passed",
+                Routing = routing,
+                ActiveHold = activeHold,
+                JobId = part.JobId,
+                JobStatus = part.JobStatus,
+                MachineName = FirstNonEmpty(part.MachineName, activeHold?.MachineName, routing?.MachineName),
+                CanCreateHold = blockReason is null && activeHold is null && part.JobId is null,
+                HoldBlockReason = activeHold is not null ? "A planning hold already exists." : blockReason
+            });
+        }
+
+        return Ok(new ProjectProductionPlanDto
+        {
+            ProjectId = id,
+            Parts = partPlans
+        });
+    }
+
+    /// <summary>
+    /// Creates a tentative queue hold for a project part.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/parts/{partId:guid}/planning-hold")]
+    public async Task<ActionResult<ProductionPlanningHoldDto>> CreatePlanningHold(
+        Guid id,
+        Guid partId,
+        [FromBody] CreateProductionPlanningHoldRequest request,
+        CancellationToken ct)
+    {
+        var project = await client.GetProjectByIdAsync(id, ct);
+        var part = project?.Parts.FirstOrDefault(candidate => candidate.Id == partId);
+        if (project is null || part is null)
+            return NotFound();
+
+        var blockReason = ResolvePlanningBlockReason(part);
+        if (blockReason is not null)
+            return Conflict(new { error = blockReason });
+
+        var forwarded = NormalizeCreateHoldRequest(project, part, request);
+        var response = await jobClient.CreatePlanningHoldAsync(forwarded, ct);
+        return await ForwardPlanningHoldResponseAsync(response, ct);
+    }
+
+    /// <summary>
+    /// Updates a tentative queue hold for a project part.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}/planning-holds/{holdId:guid}")]
+    public async Task<ActionResult<ProductionPlanningHoldDto>> UpdatePlanningHold(
+        Guid id,
+        Guid holdId,
+        [FromBody] UpdateProductionPlanningHoldRequest request,
+        CancellationToken ct)
+    {
+        var project = await client.GetProjectByIdAsync(id, ct);
+        if (project is null)
+            return NotFound();
+
+        var forwarded = NormalizeUpdateHoldRequest(project, request);
+        var response = await jobClient.UpdatePlanningHoldAsync(holdId, forwarded, ct);
+        return await ForwardPlanningHoldResponseAsync(response, ct);
+    }
+
+    /// <summary>
+    /// Cancels a tentative queue hold for a project part.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpDelete("{id:guid}/planning-holds/{holdId:guid}")]
+    public async Task<ActionResult<ProductionPlanningHoldDto>> CancelPlanningHold(
+        Guid id,
+        Guid holdId,
+        CancellationToken ct)
+    {
+        var project = await client.GetProjectByIdAsync(id, ct);
+        if (project is null)
+            return NotFound();
+
+        var response = await jobClient.CancelPlanningHoldAsync(holdId, ct);
+        return await ForwardPlanningHoldResponseAsync(response, ct);
+    }
+
     // ── Routing ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -389,6 +513,15 @@ public class ProjectsController(
         if (string.IsNullOrEmpty(processType))
             return BadRequest("processType query parameter is required.");
 
+        return Ok(await BuildPartRoutingAsync(id, partId, processType, ct));
+    }
+
+    private async Task<ProductionRoutingDto> BuildPartRoutingAsync(
+        Guid id,
+        Guid partId,
+        string processType,
+        CancellationToken ct)
+    {
         var queueAhead = 0;
         try
         {
@@ -446,12 +579,14 @@ public class ProjectsController(
                     scheduleItems = best.Slots.Select(s => new PlanningScheduleItemDto(
                         PlannedDate: new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
                         PlannedEndDate: new DateTimeOffset(s.ScheduledEnd, TimeSpan.Zero),
-                        JobReference: s.JobId.ToString("N")[..8].ToUpperInvariant(),
+                        JobReference: (s.IsHold ? "HOLD-" : string.Empty) + s.JobId.ToString("N")[..8].ToUpperInvariant(),
                         Status: s.Status,
                         JobId: s.JobId,
                         MachineName: best.Machine.Name,
                         SetupTimeMinutes: s.SetupMinutes,
-                        PrintTimeMinutes: s.PrintMinutes
+                        PrintTimeMinutes: s.PrintMinutes,
+                        IsHold: s.IsHold,
+                        HoldId: s.HoldId
                     )).ToList();
                 }
             }
@@ -493,7 +628,7 @@ public class ProjectsController(
             proposedSlotEnd = proposedSlotStart.Value.AddMinutes(defaultSetupMin + 30);
         }
 
-        return Ok(new ProductionRoutingDto(
+        return new ProductionRoutingDto(
             MachineId: machine?.Id ?? Guid.Empty,
             MachineCode: machine?.AssetCode ?? "TBD",
             MachineName: machine?.Name ?? "Unassigned",
@@ -501,7 +636,121 @@ public class ProjectsController(
             EstimatedStartDate: estimatedStart,
             ScheduleItems: scheduleItems,
             ProposedSlotStart: proposedSlotStart,
-            ProposedSlotEnd: proposedSlotEnd));
+            ProposedSlotEnd: proposedSlotEnd);
+    }
+
+    private static CreateProductionPlanningHoldRequest NormalizeCreateHoldRequest(
+        ProjectDetailDto project,
+        ProjectPartDto part,
+        CreateProductionPlanningHoldRequest request)
+    {
+        var expiresAt = ResolveHoldExpiration(project, request.ExpiresAt);
+        return new CreateProductionPlanningHoldRequest
+        {
+            ProjectId = project.Id,
+            ProjectPartId = part.Id,
+            Technology = FirstNonEmpty(request.Technology, part.ProcessType) ?? string.Empty,
+            MachineId = request.MachineId,
+            MachineName = request.MachineName,
+            QueuePosition = request.QueuePosition,
+            ScheduledStartTime = EnsureUtc(request.ScheduledStartTime == default ? DateTime.UtcNow.AddDays(1) : request.ScheduledStartTime),
+            ScheduledEndTime = request.ScheduledEndTime.HasValue ? EnsureUtc(request.ScheduledEndTime.Value) : null,
+            SetupTimeMinutes = request.SetupTimeMinutes,
+            ProductionTimeMinutes = request.ProductionTimeMinutes <= 0 ? 30 : request.ProductionTimeMinutes,
+            Quantity = Math.Max(1, part.Quantity),
+            Notes = request.Notes,
+            ExpiresAt = expiresAt
+        };
+    }
+
+    private static UpdateProductionPlanningHoldRequest NormalizeUpdateHoldRequest(
+        ProjectDetailDto project,
+        UpdateProductionPlanningHoldRequest request)
+    {
+        return new UpdateProductionPlanningHoldRequest
+        {
+            MachineId = request.MachineId,
+            MachineName = request.MachineName,
+            QueuePosition = request.QueuePosition,
+            ScheduledStartTime = EnsureUtc(request.ScheduledStartTime == default ? DateTime.UtcNow.AddDays(1) : request.ScheduledStartTime),
+            ScheduledEndTime = request.ScheduledEndTime.HasValue ? EnsureUtc(request.ScheduledEndTime.Value) : null,
+            SetupTimeMinutes = request.SetupTimeMinutes,
+            ProductionTimeMinutes = request.ProductionTimeMinutes <= 0 ? 30 : request.ProductionTimeMinutes,
+            Notes = request.Notes,
+            ExpiresAt = ResolveHoldExpiration(project, request.ExpiresAt)
+        };
+    }
+
+    private static DateTime ResolveHoldExpiration(ProjectDetailDto project, DateTime requestedExpiration)
+    {
+        var defaultExpiration = DateTime.UtcNow.AddHours(72);
+        var requested = requestedExpiration == default ? defaultExpiration : EnsureUtc(requestedExpiration);
+        var capped = requested > defaultExpiration ? defaultExpiration : requested;
+        if (project.ValidUntil.HasValue)
+        {
+            var quoteValidUntil = EnsureUtc(project.ValidUntil.Value);
+            if (quoteValidUntil > DateTime.UtcNow && quoteValidUntil < capped)
+                capped = quoteValidUntil;
+        }
+
+        return capped;
+    }
+
+    private static async Task<ActionResult<ProductionPlanningHoldDto>> ForwardPlanningHoldResponseAsync(
+        HttpResponseMessage response,
+        CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            var hold = await response.Content.ReadFromJsonAsync<ProductionPlanningHoldDto>(cancellationToken: ct);
+            return hold is not null ? new OkObjectResult(hold) : new StatusCodeResult(StatusCodes.Status502BadGateway);
+        }
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        return new ObjectResult(string.IsNullOrWhiteSpace(content) ? "Planning hold operation failed." : content)
+        {
+            StatusCode = (int)response.StatusCode
+        };
+    }
+
+    private static string? ResolvePlanningBlockReason(ProjectPartDto part)
+    {
+        if (part.JobId.HasValue)
+            return "A production job already exists for this part.";
+
+        if (string.IsNullOrWhiteSpace(part.ProcessType))
+            return "Process must be selected before planning.";
+
+        if (string.IsNullOrWhiteSpace(part.MaterialName) && string.IsNullOrWhiteSpace(part.MaterialCode))
+            return "Material must be selected before planning.";
+
+        if (part.HasDfmWarnings && !part.DfmAcknowledged)
+            return "DFM warnings must be acknowledged before planning.";
+
+        return null;
+    }
+
+    private static string? FormatPartConfiguration(ProjectPartDto part)
+    {
+        var values = new[] { part.Finish, part.Color, part.Tolerance }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim());
+
+        return string.Join(" / ", values);
+    }
+
+    private static string? FormatDimensions(ModelDimensionsDto? dimensions)
+    {
+        return dimensions is null
+            ? null
+            : $"{dimensions.X:0.#} x {dimensions.Y:0.#} x {dimensions.Z:0.#} mm";
+    }
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        return value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, value.Kind == DateTimeKind.Unspecified ? DateTimeKind.Utc : value.Kind).ToUniversalTime();
     }
 
     private async Task<AddProjectPartRequest> CopyPartForDuplicateAsync(

@@ -206,5 +206,145 @@ public sealed record MachineScheduleItemDto(
     int PrintMinutes,
     int QueuePosition,
     string Status,
-    Guid OrderId
+    Guid OrderId,
+    bool IsHold = false,
+    Guid? HoldId = null,
+    Guid? ProjectId = null,
+    Guid? ProjectPartId = null,
+    DateTime? ExpiresAt = null
 );
+
+/// <summary>Response DTO for a tentative production planning hold.</summary>
+public sealed class ProductionPlanningHoldDto
+{
+    /// <summary>Gets or sets the hold identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the source project identifier.</summary>
+    public Guid ProjectId { get; set; }
+
+    /// <summary>Gets or sets the source project part identifier.</summary>
+    public Guid ProjectPartId { get; set; }
+
+    /// <summary>Gets or sets the manufacturing technology or process code.</summary>
+    public string Technology { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the reserved machine identifier or asset code.</summary>
+    public string MachineId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the reserved machine display name.</summary>
+    public string? MachineName { get; set; }
+
+    /// <summary>Gets or sets the reserved queue position.</summary>
+    public int QueuePosition { get; set; }
+
+    /// <summary>Gets or sets the scheduled start time in UTC.</summary>
+    public DateTime ScheduledStartTime { get; set; }
+
+    /// <summary>Gets or sets the scheduled end time in UTC.</summary>
+    public DateTime ScheduledEndTime { get; set; }
+
+    /// <summary>Gets or sets the setup time in minutes.</summary>
+    public int SetupTimeMinutes { get; set; }
+
+    /// <summary>Gets or sets the production run time in minutes.</summary>
+    public int ProductionTimeMinutes { get; set; }
+
+    /// <summary>Gets or sets the quoted quantity covered by the hold.</summary>
+    public int Quantity { get; set; }
+
+    /// <summary>Gets or sets the lifecycle status.</summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets optional planning notes.</summary>
+    public string? Notes { get; set; }
+
+    /// <summary>Gets or sets the user that created the hold.</summary>
+    public string CreatedBy { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the creation timestamp in UTC.</summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>Gets or sets the last update timestamp in UTC.</summary>
+    public DateTime UpdatedAt { get; set; }
+
+    /// <summary>Gets or sets the automatic expiration timestamp in UTC.</summary>
+    public DateTime ExpiresAt { get; set; }
+
+    /// <summary>Gets or sets the converted job identifier, if any.</summary>
+    public Guid? ConvertedJobId { get; set; }
+}
+
+/// <summary>Request DTO for creating a tentative production planning hold.</summary>
+public sealed class CreateProductionPlanningHoldRequest
+{
+    /// <summary>Gets or sets the source project identifier.</summary>
+    public Guid ProjectId { get; set; }
+
+    /// <summary>Gets or sets the source project part identifier.</summary>
+    public Guid ProjectPartId { get; set; }
+
+    /// <summary>Gets or sets the manufacturing technology or process code.</summary>
+    public string Technology { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the target machine identifier or asset code.</summary>
+    public string MachineId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the target machine display name.</summary>
+    public string? MachineName { get; set; }
+
+    /// <summary>Gets or sets the requested queue position. Zero appends to the queue.</summary>
+    public int QueuePosition { get; set; }
+
+    /// <summary>Gets or sets the scheduled start time in UTC.</summary>
+    public DateTime ScheduledStartTime { get; set; }
+
+    /// <summary>Gets or sets the scheduled end time in UTC.</summary>
+    public DateTime? ScheduledEndTime { get; set; }
+
+    /// <summary>Gets or sets the setup time in minutes.</summary>
+    public int SetupTimeMinutes { get; set; }
+
+    /// <summary>Gets or sets the production run time in minutes.</summary>
+    public int ProductionTimeMinutes { get; set; }
+
+    /// <summary>Gets or sets the quoted quantity covered by this hold.</summary>
+    public int Quantity { get; set; }
+
+    /// <summary>Gets or sets optional planning notes.</summary>
+    public string? Notes { get; set; }
+
+    /// <summary>Gets or sets the automatic expiration timestamp in UTC.</summary>
+    public DateTime ExpiresAt { get; set; }
+}
+
+/// <summary>Request DTO for updating a tentative production planning hold.</summary>
+public sealed class UpdateProductionPlanningHoldRequest
+{
+    /// <summary>Gets or sets the target machine identifier or asset code.</summary>
+    public string MachineId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the target machine display name.</summary>
+    public string? MachineName { get; set; }
+
+    /// <summary>Gets or sets the requested queue position. Zero appends to the queue.</summary>
+    public int QueuePosition { get; set; }
+
+    /// <summary>Gets or sets the scheduled start time in UTC.</summary>
+    public DateTime ScheduledStartTime { get; set; }
+
+    /// <summary>Gets or sets the scheduled end time in UTC.</summary>
+    public DateTime? ScheduledEndTime { get; set; }
+
+    /// <summary>Gets or sets the setup time in minutes.</summary>
+    public int SetupTimeMinutes { get; set; }
+
+    /// <summary>Gets or sets the production run time in minutes.</summary>
+    public int ProductionTimeMinutes { get; set; }
+
+    /// <summary>Gets or sets optional planning notes.</summary>
+    public string? Notes { get; set; }
+
+    /// <summary>Gets or sets the automatic expiration timestamp in UTC.</summary>
+    public DateTime ExpiresAt { get; set; }
+}

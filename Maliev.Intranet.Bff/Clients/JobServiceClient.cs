@@ -122,6 +122,57 @@ public class JobServiceClient(HttpClient httpClient)
         return await response.Content.ReadFromJsonAsync<Dictionary<string, int>>(cancellationToken: ct);
     }
 
+    /// <summary>
+    /// Retrieves tentative production planning holds from JobService.
+    /// </summary>
+    /// <param name="projectId">Optional project filter.</param>
+    /// <param name="technology">Optional manufacturing technology filter.</param>
+    /// <param name="activeOnly">True to return only active non-expired holds.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching planning holds.</returns>
+    public async Task<List<ProductionPlanningHoldDto>> GetPlanningHoldsAsync(
+        Guid? projectId = null,
+        string? technology = null,
+        bool activeOnly = true,
+        CancellationToken ct = default)
+    {
+        var query = $"/job/v1/jobs/planning-holds?activeOnly={activeOnly.ToString().ToLowerInvariant()}";
+        if (projectId.HasValue) query += $"&projectId={projectId.Value}";
+        if (!string.IsNullOrWhiteSpace(technology)) query += $"&technology={Uri.EscapeDataString(technology)}";
+
+        var response = await httpClient.GetAsync(query, ct);
+        if (!response.IsSuccessStatusCode) return [];
+        return await response.Content.ReadFromJsonAsync<List<ProductionPlanningHoldDto>>(cancellationToken: ct) ?? [];
+    }
+
+    /// <summary>
+    /// Creates a tentative production planning hold.
+    /// </summary>
+    /// <param name="request">The hold request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The HTTP response from JobService.</returns>
+    public async Task<HttpResponseMessage> CreatePlanningHoldAsync(CreateProductionPlanningHoldRequest request, CancellationToken ct = default) =>
+        await httpClient.PostAsJsonAsync("/job/v1/jobs/planning-holds", request, ct);
+
+    /// <summary>
+    /// Updates a tentative production planning hold.
+    /// </summary>
+    /// <param name="holdId">The hold identifier.</param>
+    /// <param name="request">The update request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The HTTP response from JobService.</returns>
+    public async Task<HttpResponseMessage> UpdatePlanningHoldAsync(Guid holdId, UpdateProductionPlanningHoldRequest request, CancellationToken ct = default) =>
+        await httpClient.PatchAsJsonAsync($"/job/v1/jobs/planning-holds/{holdId}", request, ct);
+
+    /// <summary>
+    /// Cancels a tentative production planning hold.
+    /// </summary>
+    /// <param name="holdId">The hold identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The HTTP response from JobService.</returns>
+    public async Task<HttpResponseMessage> CancelPlanningHoldAsync(Guid holdId, CancellationToken ct = default) =>
+        await httpClient.DeleteAsync($"/job/v1/jobs/planning-holds/{holdId}", ct);
+
     // ── Stats & QR ────────────────────────────────────────────────────────────
 
     /// <summary>

@@ -3,6 +3,7 @@
 @using Maliev.Intranet.Client.Helpers
 @using Maliev.Intranet.Shared.Dtos
 @using Microsoft.AspNetCore.Components.Rendering
+@using System.Globalization
 @using System.Text.Json
 @inject HttpClient Http
 @inject IJSRuntime JS
@@ -40,10 +41,8 @@
     {
         <PageHeader Title="@ProjectTitle" Subtitle="@ProjectSubtitle" BackLabel="Projects" BackHref="/sales/projects" Class="project-detail-header">
             <HeaderMeta>
-                <span>@ProjectSubtitle</span>
+                <span class="project-header-subtitle">@ProjectSubtitle</span>
                 <StatusBadge Status="@FormatStatus(_project?.Status)" />
-                <span>Created @FormatLocalDateTime(_project?.CreatedAt)</span>
-                <span>Updated @FormatLocalDateTime(_project?.UpdatedAt)</span>
             </HeaderMeta>
             <ChildContent>
                 <MudTooltip Text="Edit project">
@@ -77,7 +76,7 @@
                 <button type="button"
                         class="@(IsActive(tab.Key) ? "active" : null)"
                         data-tab="@tab.Key"
-                        @onclick="@(() => _activeTab = tab.Key)">
+                        @onclick="@(() => SetActiveTabAsync(tab.Key))">
                     @tab.Label
                 </button>
             }
@@ -95,6 +94,10 @@
             else if (_activeTab == "parts")
             {
                 @RenderParts()
+            }
+            else if (_activeTab == "planning")
+            {
+                @RenderProductionPlanning()
             }
             else if (_activeTab == "timeline")
             {
@@ -123,7 +126,10 @@
     public string? Tab { get; set; }
 
     private ProjectDetailDto? _project;
+    private QuotationDetailDto? _quotation;
+    private ProjectProductionPlanDto? _productionPlan;
     private bool _loading = true;
+    private bool _planningLoading;
     private bool _pdfLoading;
     private bool _accepting;
     private bool _acceptConfirmOpen;
@@ -133,12 +139,14 @@
     private string? _quotePdfUrl;
     private string _newNoteContent = string.Empty;
     private string _activeTab = "overview";
+    private readonly HashSet<Guid> _holdSavingPartIds = [];
 
     private IReadOnlyList<(string Key, string Label)> Tabs =>
     [
         ("overview", "Overview"),
         ("quote", "Quote"),
         ("parts", $"Parts ({_project?.Parts.Count ?? 0})"),
+        ("planning", "Planning"),
         ("timeline", "Timeline"),
         ("notes", $"Notes ({_project?.Notes?.Count ?? 0})")
     ];
@@ -150,8 +158,8 @@
     private string ProjectSubtitle => _project is null
         ? "Loading project record"
         : string.IsNullOrWhiteSpace(_project.Title)
-            ? _project.CustomerName
-            : $"{_project.Title} - {_project.CustomerName}";
+            ? $"{_project.CustomerName} • Last updated on {FormatLocalDateTime(_project.UpdatedAt ?? _project.CreatedAt)}"
+            : $"{_project.Title} - {_project.CustomerName} • Last updated on {FormatLocalDateTime(_project.UpdatedAt ?? _project.CreatedAt)}";
 
     private string ProjectCurrency => string.IsNullOrWhiteSpace(_project?.Currency) ? "THB" : _project.Currency;
 
@@ -165,6 +173,7 @@
 
     private decimal PartsSubtotal => _project?.Parts.Sum(part => GetPartLineTotal(part)) ?? 0m;
     private decimal QuoteDiscount => Math.Max(0m, PartsSubtotal - (_project?.TotalPrice ?? PartsSubtotal));
+    private string QuoteLeadTime => ResolveQuoteLeadTime();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -173,6 +182,9 @@
         try
         {
             _project = await Http.GetFromJsonAsync<ProjectDetailDto>($"api/v1/projects/{Id}");
+            await LoadQuotationAsync();
+            if (_activeTab == "planning")
+                await LoadProductionPlanAsync();
         }
         catch (Exception ex)
         {
@@ -182,6 +194,47 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task LoadQuotationAsync()
+    {
+        _quotation = null;
+        if (_project?.QuotationId is not Guid quotationId)
+            return;
+
+        try
+        {
+            _quotation = await Http.GetFromJsonAsync<QuotationDetailDto>($"api/v1/quotations/{quotationId}");
+        }
+        catch
+        {
+            _quotation = null;
+        }
+    }
+
+    private async Task SetActiveTabAsync(string tab)
+    {
+        _activeTab = tab;
+        if (tab == "planning" && _productionPlan is null && !_planningLoading)
+            await LoadProductionPlanAsync();
+    }
+
+    private async Task LoadProductionPlanAsync()
+    {
+        _planningLoading = true;
+        try
+        {
+            _productionPlan = await Http.GetFromJsonAsync<ProjectProductionPlanDto>($"api/v1/projects/{Id}/production-plan");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Production plan could not be loaded: {ex.Message}", Severity.Error);
+            _productionPlan = null;
+        }
+        finally
+        {
+            _planningLoading = false;
         }
     }
 
@@ -225,9 +278,10 @@
             content.AddAttribute(5, "class", "project-quote-terms");
             AddSnapshot(content, 6, "Valid until", FormatDate(_project?.ValidUntil));
             AddSnapshot(content, 10, "Currency", ProjectCurrency);
-            AddSnapshot(content, 14, "Subtotal", FormatMoney(PartsSubtotal));
-            AddSnapshot(content, 18, "Discount", QuoteDiscount > 0m ? $"-{FormatMoney(QuoteDiscount)}" : FormatMoney(0m));
-            AddSnapshot(content, 22, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
+            AddSnapshot(content, 14, "Lead time", QuoteLeadTime);
+            AddSnapshot(content, 18, "Subtotal", FormatMoney(PartsSubtotal));
+            AddSnapshot(content, 22, "Discount", QuoteDiscount > 0m ? $"-{FormatMoney(QuoteDiscount)}" : FormatMoney(0m));
+            AddSnapshot(content, 26, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
             content.CloseElement();
         }));
         builder.CloseComponent();
@@ -237,28 +291,29 @@
     {
         builder.OpenComponent<PanelCard>(0);
         builder.AddAttribute(1, "Title", "Manufacturing summary");
-        builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+        builder.AddAttribute(2, "Class", "project-manufacturing-card");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(content =>
         {
-            content.OpenElement(3, "div");
-            content.AddAttribute(4, "class", "project-metric-row");
-            content.OpenComponent<StatTile>(5);
-            content.AddAttribute(6, "Label", "Parts");
-            content.AddAttribute(7, "Value", (_project?.Parts.Count ?? 0).ToString());
-            content.AddAttribute(8, "Subtext", "configured line items");
+            content.OpenElement(4, "div");
+            content.AddAttribute(5, "class", "project-metric-row");
+            content.OpenComponent<StatTile>(6);
+            content.AddAttribute(7, "Label", "Parts");
+            content.AddAttribute(8, "Value", (_project?.Parts.Count ?? 0).ToString());
+            content.AddAttribute(9, "Subtext", "configured line items");
             content.CloseComponent();
-            content.OpenComponent<StatTile>(9);
-            content.AddAttribute(10, "Label", "Confirmed total");
-            content.AddAttribute(11, "Value", FormatMoney(_project?.TotalPrice ?? 0m));
-            content.AddAttribute(12, "Subtext", ProjectCurrency);
+            content.OpenComponent<StatTile>(10);
+            content.AddAttribute(11, "Label", "Confirmed total");
+            content.AddAttribute(12, "Value", FormatMoney(_project?.TotalPrice ?? 0m));
+            content.AddAttribute(13, "Subtext", ProjectCurrency);
             content.CloseComponent();
-            content.OpenComponent<StatTile>(13);
-            content.AddAttribute(14, "Label", "Quotation");
-            content.AddAttribute(15, "Value", QuotationLabel);
-            content.AddAttribute(16, "Subtext", FormatStatus(_project?.QuotationStatus));
+            content.OpenComponent<StatTile>(14);
+            content.AddAttribute(15, "Label", "Quotation");
+            content.AddAttribute(16, "Value", QuotationLabel);
+            content.AddAttribute(17, "Subtext", FormatStatus(_project?.QuotationStatus));
             content.CloseComponent();
             content.CloseElement();
 
-            content.AddContent(17, RenderPartsTable(compact: true));
+            content.AddContent(18, RenderPartsTable(compact: true));
         }));
         builder.CloseComponent();
     };
@@ -528,6 +583,326 @@
         builder.AddAttribute(3, "ChildContent", (RenderFragment)(content => content.AddContent(4, RenderPartsTable(compact: false))));
         builder.CloseComponent();
     };
+
+    private RenderFragment RenderProductionPlanning() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", "Production planning");
+        builder.AddAttribute(2, "Class", "project-planning-panel");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(content =>
+        {
+            if (_planningLoading)
+            {
+                content.OpenElement(4, "div");
+                content.AddAttribute(5, "class", "project-muted-box compact");
+                content.AddContent(6, "Loading production plan...");
+                content.CloseElement();
+                return;
+            }
+
+            if (_productionPlan is null)
+            {
+                content.OpenElement(7, "div");
+                content.AddAttribute(8, "class", "project-muted-box");
+                content.OpenElement(9, "p");
+                content.AddContent(10, "Production planning data is not available.");
+                content.CloseElement();
+                content.OpenComponent<SecondaryButton>(11);
+                content.AddAttribute(12, "Icon", Icons.Material.Outlined.Refresh);
+                content.AddAttribute(13, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, RefreshProductionPlanAsync));
+                content.AddContent(14, "Refresh planning");
+                content.CloseComponent();
+                content.CloseElement();
+                return;
+            }
+
+            content.OpenElement(15, "div");
+            content.AddAttribute(16, "class", "project-planning-toolbar");
+            content.OpenElement(17, "span");
+            content.AddContent(18, $"{_productionPlan.Parts.Count} quoted part{(_productionPlan.Parts.Count == 1 ? string.Empty : "s")}");
+            content.CloseElement();
+            content.OpenComponent<SecondaryButton>(19);
+            content.AddAttribute(20, "Icon", Icons.Material.Outlined.Refresh);
+            content.AddAttribute(21, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, RefreshProductionPlanAsync));
+            content.AddContent(22, "Refresh routing");
+            content.CloseComponent();
+            content.CloseElement();
+
+            content.OpenElement(23, "div");
+            content.AddAttribute(24, "class", "project-planning-table-wrap");
+            content.OpenElement(25, "table");
+            content.AddAttribute(26, "class", "project-planning-table");
+            content.OpenElement(27, "thead");
+            content.OpenElement(28, "tr");
+            var headerSequence = 29;
+            foreach (var heading in new[] { "Part", "Manufacturing", "Qty / DFM", "Routing", "Hold", "Job", "Actions" })
+            {
+                content.OpenElement(headerSequence++, "th");
+                content.AddContent(headerSequence++, heading);
+                content.CloseElement();
+            }
+            content.CloseElement();
+            content.CloseElement();
+
+            content.OpenElement(headerSequence++, "tbody");
+            var sequence = headerSequence;
+            foreach (var plan in _productionPlan.Parts)
+            {
+                content.OpenElement(sequence++, "tr");
+                AddPlanningPartCell(content, ref sequence, plan);
+                AddPlanningProcessCell(content, ref sequence, plan);
+                AddPlanningStateCell(content, ref sequence, plan);
+                AddPlanningRoutingCell(content, ref sequence, plan);
+                AddPlanningHoldCell(content, ref sequence, plan);
+                AddPlanningJobCell(content, ref sequence, plan);
+                AddPlanningActionsCell(content, ref sequence, plan);
+                content.CloseElement();
+            }
+            content.CloseElement();
+            content.CloseElement();
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    private static void AddPlanningPartCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
+    {
+        builder.OpenElement(sequence++, "td");
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-planning-part");
+        if (!string.IsNullOrWhiteSpace(plan.ThumbnailUrl))
+        {
+            builder.OpenElement(sequence++, "img");
+            builder.AddAttribute(sequence++, "src", plan.ThumbnailUrl);
+            builder.AddAttribute(sequence++, "alt", $"{plan.FileName} thumbnail");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "project-planning-thumb-placeholder");
+            builder.OpenComponent<MudIcon>(sequence++);
+            builder.AddAttribute(sequence++, "Icon", Icons.Material.Outlined.ViewInAr);
+            builder.AddAttribute(sequence++, "Size", Size.Small);
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+
+        builder.OpenElement(sequence++, "div");
+        builder.OpenElement(sequence++, "strong");
+        builder.AddContent(sequence++, plan.FileName);
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, FirstNonEmpty(plan.Dimensions, $"Qty {plan.Quantity}"));
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private static void AddPlanningProcessCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
+    {
+        builder.OpenElement(sequence++, "td");
+        builder.OpenElement(sequence++, "strong");
+        builder.AddContent(sequence++, FormatProcess(plan.ProcessType));
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, FirstNonEmpty(plan.MaterialName, "-"));
+        builder.CloseElement();
+        if (!string.IsNullOrWhiteSpace(plan.Configuration))
+        {
+            builder.OpenElement(sequence++, "small");
+            builder.AddContent(sequence++, plan.Configuration);
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    }
+
+    private static void AddPlanningStateCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
+    {
+        builder.OpenElement(sequence++, "td");
+        builder.OpenElement(sequence++, "strong");
+        builder.AddContent(sequence++, plan.Quantity.ToString("N0", CultureInfo.InvariantCulture));
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, plan.DfmStatus);
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private static void AddPlanningRoutingCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
+    {
+        builder.OpenElement(sequence++, "td");
+        if (plan.Routing is null || plan.Routing.MachineId == Guid.Empty)
+        {
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "project-planning-muted");
+            builder.AddContent(sequence++, "No active route");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(sequence++, "strong");
+            builder.AddContent(sequence++, plan.Routing.MachineName);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, $"{plan.Routing.QueueAhead} queued ahead");
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "small");
+            builder.AddContent(sequence++, FormatScheduleWindow(plan.Routing.ProposedSlotStart?.LocalDateTime, plan.Routing.ProposedSlotEnd?.LocalDateTime));
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    }
+
+    private static void AddPlanningHoldCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
+    {
+        builder.OpenElement(sequence++, "td");
+        if (plan.ActiveHold is null)
+        {
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "project-planning-muted");
+            builder.AddContent(sequence++, "No hold");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(sequence++, "strong");
+            builder.AddContent(sequence++, $"Hold #{plan.ActiveHold.QueuePosition}");
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, FirstNonEmpty(plan.ActiveHold.MachineName, plan.ActiveHold.MachineId));
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "small");
+            builder.AddContent(sequence++, $"Expires {FormatLocalDateTime(plan.ActiveHold.ExpiresAt)}");
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    }
+
+    private static void AddPlanningJobCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
+    {
+        builder.OpenElement(sequence++, "td");
+        if (plan.JobId is null)
+        {
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "project-planning-muted");
+            builder.AddContent(sequence++, "No job yet");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(sequence++, "strong");
+            builder.AddContent(sequence++, plan.JobId.Value.ToString("N")[..8].ToUpperInvariant());
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, FormatStatus(plan.JobStatus));
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "small");
+            builder.AddContent(sequence++, FirstNonEmpty(plan.MachineName, "Machine not assigned"));
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    }
+
+    private void AddPlanningActionsCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
+    {
+        var saving = _holdSavingPartIds.Contains(plan.PartId);
+        var hasRoute = plan.Routing is not null && plan.Routing.MachineId != Guid.Empty;
+        builder.OpenElement(sequence++, "td");
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-planning-actions");
+
+        builder.OpenComponent<MudTooltip>(sequence++);
+        builder.AddAttribute(sequence++, "Text", hasRoute ? "Preview routing" : "No active route available");
+        builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
+        {
+            var childSequence = 0;
+            content.OpenComponent<MudIconButton>(childSequence++);
+            content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.AltRoute);
+            content.AddAttribute(childSequence++, "Size", Size.Small);
+            content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
+            content.AddAttribute(childSequence++, "Disabled", !hasRoute);
+            content.AddAttribute(childSequence++, "aria-label", "Preview routing");
+            content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => PreviewRouting(plan)));
+            content.CloseComponent();
+        }));
+        builder.CloseComponent();
+
+        if (plan.JobId is not null)
+        {
+            builder.OpenComponent<MudTooltip>(sequence++);
+            builder.AddAttribute(sequence++, "Text", "Open job");
+            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
+            {
+                var childSequence = 0;
+                content.OpenComponent<MudIconButton>(childSequence++);
+                content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.OpenInNew);
+                content.AddAttribute(childSequence++, "Size", Size.Small);
+                content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
+                content.AddAttribute(childSequence++, "aria-label", "Open job");
+                content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => OpenProductionJob(plan)));
+                content.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }
+
+        if (plan.ActiveHold is null)
+        {
+            builder.OpenComponent<MudTooltip>(sequence++);
+            builder.AddAttribute(sequence++, "Text", plan.CanCreateHold && hasRoute ? "Create 72-hour planning hold" : plan.HoldBlockReason ?? "No active route available");
+            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
+            {
+                var childSequence = 0;
+                content.OpenComponent<MudIconButton>(childSequence++);
+                content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.EventAvailable);
+                content.AddAttribute(childSequence++, "Size", Size.Small);
+                content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
+                content.AddAttribute(childSequence++, "Disabled", saving || !plan.CanCreateHold || !hasRoute);
+                content.AddAttribute(childSequence++, "aria-label", "Create planning hold");
+                content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => CreatePlanningHoldAsync(plan)));
+                content.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }
+        else
+        {
+            builder.OpenComponent<MudTooltip>(sequence++);
+            builder.AddAttribute(sequence++, "Text", "Refresh hold with current route");
+            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
+            {
+                var childSequence = 0;
+                content.OpenComponent<MudIconButton>(childSequence++);
+                content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.Update);
+                content.AddAttribute(childSequence++, "Size", Size.Small);
+                content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
+                content.AddAttribute(childSequence++, "Disabled", saving);
+                content.AddAttribute(childSequence++, "aria-label", "Update planning hold");
+                content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => UpdatePlanningHoldAsync(plan)));
+                content.CloseComponent();
+            }));
+            builder.CloseComponent();
+
+            builder.OpenComponent<MudTooltip>(sequence++);
+            builder.AddAttribute(sequence++, "Text", "Cancel planning hold");
+            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
+            {
+                var childSequence = 0;
+                content.OpenComponent<MudIconButton>(childSequence++);
+                content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.EventBusy);
+                content.AddAttribute(childSequence++, "Size", Size.Small);
+                content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
+                content.AddAttribute(childSequence++, "Disabled", saving);
+                content.AddAttribute(childSequence++, "aria-label", "Cancel planning hold");
+                content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => CancelPlanningHoldAsync(plan)));
+                content.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }
+
+        builder.CloseElement();
+        builder.CloseElement();
+    }
 
     private RenderFragment RenderPartsTable(bool compact) => builder =>
     {
@@ -868,6 +1243,165 @@
         }
     }
 
+    private async Task RefreshProductionPlanAsync(MouseEventArgs _)
+    {
+        await LoadProductionPlanAsync();
+    }
+
+    private void PreviewRouting(ProjectProductionPartPlanDto plan)
+    {
+        if (plan.Routing is null || plan.Routing.MachineId == Guid.Empty)
+        {
+            Snackbar.Add("No active route is available for this part.", Severity.Info);
+            return;
+        }
+
+        Snackbar.Add(
+            $"{plan.FileName}: {plan.Routing.MachineName}, {plan.Routing.QueueAhead} queued ahead, proposed {FormatScheduleWindow(plan.Routing.ProposedSlotStart?.LocalDateTime, plan.Routing.ProposedSlotEnd?.LocalDateTime)}.",
+            Severity.Info);
+    }
+
+    private void OpenProductionJob(ProjectProductionPartPlanDto plan)
+    {
+        if (plan.JobId is not Guid jobId)
+            return;
+
+        Navigation.NavigateTo($"/production/jobs/{jobId}");
+    }
+
+    private async Task CreatePlanningHoldAsync(ProjectProductionPartPlanDto plan)
+    {
+        if (plan.Routing is null || !plan.CanCreateHold)
+            return;
+
+        await SavePlanningHoldAsync(plan, update: false);
+    }
+
+    private async Task UpdatePlanningHoldAsync(ProjectProductionPartPlanDto plan)
+    {
+        if (plan.Routing is null || plan.ActiveHold is null)
+            return;
+
+        await SavePlanningHoldAsync(plan, update: true);
+    }
+
+    private async Task SavePlanningHoldAsync(ProjectProductionPartPlanDto plan, bool update)
+    {
+        _holdSavingPartIds.Add(plan.PartId);
+        try
+        {
+            var createRequest = BuildPlanningHoldRequest(plan);
+            HttpResponseMessage response;
+            if (update && plan.ActiveHold is not null)
+            {
+                var updateRequest = new UpdateProductionPlanningHoldRequest
+                {
+                    MachineId = createRequest.MachineId,
+                    MachineName = createRequest.MachineName,
+                    QueuePosition = createRequest.QueuePosition,
+                    ScheduledStartTime = createRequest.ScheduledStartTime,
+                    ScheduledEndTime = createRequest.ScheduledEndTime,
+                    SetupTimeMinutes = createRequest.SetupTimeMinutes,
+                    ProductionTimeMinutes = createRequest.ProductionTimeMinutes,
+                    Notes = createRequest.Notes,
+                    ExpiresAt = createRequest.ExpiresAt
+                };
+                response = await Http.PatchAsJsonAsync($"api/v1/projects/{Id}/planning-holds/{plan.ActiveHold.Id}", updateRequest);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync($"api/v1/projects/{Id}/parts/{plan.PartId}/planning-hold", createRequest);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(string.IsNullOrWhiteSpace(error) ? "Planning hold could not be saved." : error, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add(update ? "Planning hold updated." : "Planning hold created.", Severity.Success);
+            await LoadProductionPlanAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Planning hold error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _holdSavingPartIds.Remove(plan.PartId);
+        }
+    }
+
+    private async Task CancelPlanningHoldAsync(ProjectProductionPartPlanDto plan)
+    {
+        if (plan.ActiveHold is null)
+            return;
+
+        _holdSavingPartIds.Add(plan.PartId);
+        try
+        {
+            var response = await Http.DeleteAsync($"api/v1/projects/{Id}/planning-holds/{plan.ActiveHold.Id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Planning hold could not be cancelled.", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Planning hold cancelled.", Severity.Success);
+            await LoadProductionPlanAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Planning hold error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _holdSavingPartIds.Remove(plan.PartId);
+        }
+    }
+
+    private CreateProductionPlanningHoldRequest BuildPlanningHoldRequest(ProjectProductionPartPlanDto plan)
+    {
+        var routing = plan.Routing!;
+        var start = routing.ProposedSlotStart?.UtcDateTime
+            ?? routing.EstimatedStartDate.UtcDateTime;
+        if (start <= DateTime.UtcNow)
+            start = DateTime.UtcNow.AddHours(1);
+
+        var setupMinutes = DefaultSetupMinutes(plan.ProcessType);
+        var productionMinutes = Math.Max(30, plan.Quantity * 30);
+        return new CreateProductionPlanningHoldRequest
+        {
+            ProjectId = Id,
+            ProjectPartId = plan.PartId,
+            Technology = plan.ProcessType ?? string.Empty,
+            MachineId = FirstNonEmpty(routing.MachineCode, routing.MachineId == Guid.Empty ? null : routing.MachineId.ToString()),
+            MachineName = routing.MachineName,
+            QueuePosition = 0,
+            ScheduledStartTime = start,
+            ScheduledEndTime = routing.ProposedSlotEnd?.UtcDateTime ?? start.AddMinutes(setupMinutes + productionMinutes),
+            SetupTimeMinutes = setupMinutes,
+            ProductionTimeMinutes = productionMinutes,
+            Quantity = Math.Max(1, plan.Quantity),
+            Notes = $"Planned from project {ProjectTitle} / {plan.FileName}",
+            ExpiresAt = ResolveClientHoldExpiration()
+        };
+    }
+
+    private DateTime ResolveClientHoldExpiration()
+    {
+        var expires = DateTime.UtcNow.AddHours(72);
+        if (_project?.ValidUntil is DateTime validUntil)
+        {
+            var quoteExpiry = ToUtc(validUntil);
+            if (quoteExpiry > DateTime.UtcNow && quoteExpiry < expires)
+                expires = quoteExpiry;
+        }
+
+        return expires;
+    }
+
     private void UpdateNoteDraft(string value)
     {
         _newNoteContent = value;
@@ -1155,6 +1689,42 @@
             : value.Value.ToUniversalTime();
 
         return utcValue.ToLocalTime().ToString("MMM d, yyyy HH:mm");
+    }
+
+    private static DateTime ToUtc(DateTime value)
+    {
+        return value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(value, DateTimeKind.Utc)
+            : value.ToUniversalTime();
+    }
+
+    private string ResolveQuoteLeadTime()
+    {
+        var currentVersion = _quotation?.Versions?
+            .OrderByDescending(version => version.VersionNumber == _quotation.CurrentVersionNumber)
+            .ThenByDescending(version => version.VersionNumber)
+            .FirstOrDefault();
+
+        return FirstNonEmpty(_quotation?.DeliveryExpectations, currentVersion?.DeliveryExpectations, "Not specified");
+    }
+
+    private static int DefaultSetupMinutes(string? processType)
+    {
+        var normalized = processType?.Trim().ToUpperInvariant() ?? string.Empty;
+        if (normalized.StartsWith("CNC", StringComparison.OrdinalIgnoreCase))
+            return 60;
+
+        return normalized is "SLA" or "SLA_DLP" ? 30 : 15;
+    }
+
+    private static string FormatScheduleWindow(DateTime? start, DateTime? end)
+    {
+        if (!start.HasValue)
+            return "Slot not estimated";
+
+        return end.HasValue
+            ? $"{start.Value:MMM d HH:mm} - {end.Value:HH:mm}"
+            : $"{start.Value:MMM d HH:mm}";
     }
 
     private static string FormatNoteActor(ProjectNoteDto note)

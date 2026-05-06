@@ -34,6 +34,8 @@ public record ProductionRoutingDto(
 /// <param name="SetupTimeMinutes">The setup time in minutes required before production.</param>
 /// <param name="PrintTimeMinutes">The estimated print/machining time in minutes.</param>
 /// <param name="IsProposed">True when this is an estimated (not yet committed) slot for the current part.</param>
+/// <param name="IsHold">True when this item is a tentative production planning hold.</param>
+/// <param name="HoldId">The planning hold identifier, if this item represents a hold.</param>
 public record PlanningScheduleItemDto(
     DateTimeOffset PlannedDate,
     DateTimeOffset PlannedEndDate,
@@ -43,5 +45,7 @@ public record PlanningScheduleItemDto(
     string MachineName,
     int SetupTimeMinutes,
     int PrintTimeMinutes,
-    bool IsProposed = false
+    bool IsProposed = false,
+    bool IsHold = false,
+    Guid? HoldId = null
 );

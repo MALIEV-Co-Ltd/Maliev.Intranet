@@ -1,6 +1,10 @@
 .project-record-shell {
+    display: flex;
+    flex-direction: column;
     min-height: 100%;
+    height: 100%;
     background: var(--maliev-panel-2);
+    overflow: hidden;
 }
 
 .project-record-tabs {
@@ -45,6 +49,9 @@
 }
 
 .project-record-shell ::deep .project-record-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
     padding: 20px;
 }
 
@@ -73,29 +80,44 @@
     gap: 10px;
 }
 
-.project-record-shell ::deep .project-detail-header .mlv-page-meta > span:first-child {
-    flex: 1 1 auto;
-}
-
-.project-record-shell ::deep .project-detail-header .mlv-page-meta > span:not(:first-child) {
-    color: var(--maliev-muted-2);
+.project-record-shell ::deep .project-header-subtitle {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.35;
 }
 
 .project-record-shell ::deep .project-record-grid {
     display: grid;
     grid-template-columns: minmax(0, 2.2fr) minmax(340px, 520px);
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
+    min-height: 0;
+    height: 100%;
 }
 
 .project-record-shell ::deep .project-record-main,
 .project-record-shell ::deep .project-record-sidebar {
     display: grid;
     gap: 16px;
+    min-height: 0;
+}
+
+.project-record-shell ::deep .project-record-main-manufacturing {
+    grid-template-rows: minmax(0, 1fr);
+}
+
+.project-record-shell ::deep .project-record-main-manufacturing > .mlv-panel-card,
+.project-record-shell ::deep .project-manufacturing-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
 }
 
 .project-record-shell ::deep .project-overview-sidebar {
     gap: 12px;
+    max-height: 100%;
+    overflow: auto;
 }
 
 .project-record-shell ::deep .project-overview-sidebar .mlv-panel-card {
@@ -199,17 +221,21 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin-bottom: 16px;
+    flex: 0 0 auto;
 }
 
 .project-record-shell ::deep .project-table-wrap {
     width: 100%;
     overflow-x: auto;
+    min-height: 0;
 }
 
 .project-record-shell ::deep .project-table-wrap.compact {
-    max-height: 380px;
+    flex: 1 1 auto;
+    max-height: none;
     overflow: auto;
 }
+
 
 .project-record-shell ::deep .project-parts-table {
     min-width: 1080px;
@@ -982,6 +1008,159 @@
 .project-record-shell ::deep .project-note-card p {
     margin: 6px 0 0;
     color: var(--maliev-ink-2);
+}
+
+.project-record-shell ::deep .project-planning-panel {
+    display: grid;
+    gap: 14px;
+}
+
+.project-record-shell ::deep .project-planning-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.project-record-shell ::deep .project-planning-toolbar span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+}
+
+.project-record-shell ::deep .project-planning-table-wrap {
+    width: 100%;
+    overflow: auto;
+}
+
+.project-record-shell ::deep .project-planning-table {
+    min-width: 1240px;
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.project-record-shell ::deep .project-planning-table th,
+.project-record-shell ::deep .project-planning-table td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--maliev-border-subtle);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.project-record-shell ::deep .project-planning-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--maliev-panel);
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.project-record-shell ::deep .project-planning-table th:nth-child(1),
+.project-record-shell ::deep .project-planning-table td:nth-child(1) {
+    width: 22%;
+}
+
+.project-record-shell ::deep .project-planning-table th:nth-child(2),
+.project-record-shell ::deep .project-planning-table td:nth-child(2) {
+    width: 17%;
+}
+
+.project-record-shell ::deep .project-planning-table th:nth-child(3),
+.project-record-shell ::deep .project-planning-table td:nth-child(3) {
+    width: 9%;
+}
+
+.project-record-shell ::deep .project-planning-table th:nth-child(4),
+.project-record-shell ::deep .project-planning-table td:nth-child(4) {
+    width: 16%;
+}
+
+.project-record-shell ::deep .project-planning-table th:nth-child(5),
+.project-record-shell ::deep .project-planning-table td:nth-child(5) {
+    width: 13%;
+}
+
+.project-record-shell ::deep .project-planning-table th:nth-child(6),
+.project-record-shell ::deep .project-planning-table td:nth-child(6) {
+    width: 13%;
+}
+
+.project-record-shell ::deep .project-planning-table th:nth-child(7),
+.project-record-shell ::deep .project-planning-table td:nth-child(7) {
+    width: 10%;
+}
+
+.project-record-shell ::deep .project-planning-table td > strong,
+.project-record-shell ::deep .project-planning-table td > span,
+.project-record-shell ::deep .project-planning-table td > small {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.project-record-shell ::deep .project-planning-table td > strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    line-height: 1.25;
+}
+
+.project-record-shell ::deep .project-planning-table td > span,
+.project-record-shell ::deep .project-planning-table td > small {
+    margin-top: 3px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.3;
+}
+
+.project-record-shell ::deep .project-planning-part {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+}
+
+.project-record-shell ::deep .project-planning-part img,
+.project-record-shell ::deep .project-planning-thumb-placeholder {
+    width: 46px;
+    height: 46px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+    object-fit: cover;
+}
+
+.project-record-shell ::deep .project-planning-thumb-placeholder {
+    display: inline-grid;
+    place-items: center;
+    color: var(--maliev-muted);
+}
+
+.project-record-shell ::deep .project-planning-part strong {
+    color: var(--maliev-info);
+    font-family: var(--maliev-font-mono);
+    font-size: var(--maliev-font-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-record-shell ::deep .project-planning-part span,
+.project-record-shell ::deep .project-planning-muted {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.project-record-shell ::deep .project-planning-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .project-record-shell ::deep .project-muted-box,
