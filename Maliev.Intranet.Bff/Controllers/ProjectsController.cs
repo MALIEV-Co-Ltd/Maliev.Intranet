@@ -436,6 +436,7 @@ public class ProjectsController(
 
         var customerDetail = await TryGetCustomerDetailAsync(project.CustomerId, ct);
         var pdfData = ProjectQuotationPdfDataFactory.Build(project, quotation, customerDetail);
+        QuotationPdfMetadataApplicator.Apply(pdfData, HttpContext?.User);
 
         var pdfUrl = await pdfClient.GeneratePdfAsync(
             PdfDocumentType.Quotation,

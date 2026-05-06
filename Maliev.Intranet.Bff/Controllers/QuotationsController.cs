@@ -1,7 +1,7 @@
-using System.Security.Claims;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Authorization;
@@ -259,22 +259,7 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
 
     private void ApplyQuotedByMetadata(QuotationPdfData pdfData)
     {
-        var user = HttpContext?.User;
-
-        pdfData.QuotedByName = FirstNonEmpty(
-            user?.Identity?.Name,
-            user?.FindFirst("name")?.Value,
-            user?.FindFirst("preferred_username")?.Value,
-            user?.FindFirst("email")?.Value,
-            user?.FindFirst(ClaimTypes.Email)?.Value,
-            pdfData.QuotedByName);
-
-        pdfData.QuotedByEmail = FirstNonEmpty(
-            user?.FindFirst("email")?.Value,
-            user?.FindFirst(ClaimTypes.Email)?.Value,
-            pdfData.QuotedByEmail);
-
-        pdfData.QuotedAt = DateTime.UtcNow;
+        QuotationPdfMetadataApplicator.Apply(pdfData, HttpContext?.User);
     }
 
     private static string? FirstNonEmpty(params string?[] values) =>
