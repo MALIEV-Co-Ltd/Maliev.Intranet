@@ -98,27 +98,71 @@
                                     }
                                 </select>
                             </label>
-                            <label class="customer-field">
-                                <span>Payment terms</span>
-                                <select class="customer-input" @bind="_edit!.PaymentTerms">
-                                    @if (SelectedPaymentTerm is null && !string.IsNullOrWhiteSpace(_edit.PaymentTerms))
+                            <div class="customer-field customer-payment-terms-field">
+                                <span id="payment-terms-label">Payment terms</span>
+                                <div class="customer-payment-term-picker">
+                                    <button type="button"
+                                            class="customer-payment-term-trigger"
+                                            aria-haspopup="listbox"
+                                            aria-expanded="@_paymentTermsOpen"
+                                            aria-labelledby="payment-terms-label"
+                                            @onclick="TogglePaymentTerms">
+                                        <div class="customer-payment-term-card selected">
+                                            <div class="customer-payment-term-card-head">
+                                                <strong>@PaymentTermTriggerTitle</strong>
+                                                <span>@PaymentTermTriggerSummary</span>
+                                            </div>
+                                            <p>@PaymentTermTriggerDescription</p>
+                                            <p>@PaymentTermTriggerUse</p>
+                                        </div>
+                                        <MudIcon Icon="@(_paymentTermsOpen ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)" Size="Size.Small" Class="customer-payment-term-chevron" />
+                                    </button>
+
+                                    @if (_paymentTermsOpen)
                                     {
-                                        <option value="@_edit.PaymentTerms">@_edit.PaymentTerms</option>
+                                        <button type="button"
+                                                class="customer-payment-term-backdrop"
+                                                aria-label="Close payment terms"
+                                                @onclick="ClosePaymentTerms"></button>
+                                        <div class="customer-payment-term-menu" role="listbox" aria-labelledby="payment-terms-label">
+                                            @if (SelectedPaymentTerm is null && !string.IsNullOrWhiteSpace(_edit!.PaymentTerms))
+                                            {
+                                                <button type="button"
+                                                        class="customer-payment-term-option selected"
+                                                        role="option"
+                                                        aria-selected="true"
+                                                        @onclick="@(() => SelectPaymentTerm(_edit!.PaymentTerms))">
+                                                    <div class="customer-payment-term-card">
+                                                        <div class="customer-payment-term-card-head">
+                                                            <strong>@_edit.PaymentTerms</strong>
+                                                            <span>Custom term</span>
+                                                        </div>
+                                                        <p>No saved payment-term definition is available for this customer value.</p>
+                                                        <p>Keep this value when the customer uses a negotiated term that is not in the standard list.</p>
+                                                    </div>
+                                                </button>
+                                            }
+                                            @foreach (var term in _paymentTerms)
+                                            {
+                                                <button type="button"
+                                                        class="@PaymentTermItemClass(term)"
+                                                        role="option"
+                                                        aria-selected="@IsPaymentTermSelected(term.Name)"
+                                                        @onclick="@(() => SelectPaymentTerm(term.Name))">
+                                                    <div class="customer-payment-term-card">
+                                                        <div class="customer-payment-term-card-head">
+                                                            <strong>@term.Name</strong>
+                                                            <span>@PaymentTermSummary(term)</span>
+                                                        </div>
+                                                        <p>@PaymentTermDescription(term)</p>
+                                                        <p>@PaymentTermUse(term)</p>
+                                                    </div>
+                                                </button>
+                                            }
+                                        </div>
                                     }
-                                    @foreach (var term in _paymentTerms)
-                                    {
-                                        <option value="@term.Name">@PaymentTermOptionLabel(term)</option>
-                                    }
-                                </select>
-                                @if (SelectedPaymentTerm is { } paymentTerm)
-                                {
-                                    <div class="customer-payment-term-detail">
-                                        <strong>@paymentTerm.Name</strong>
-                                        <span>@paymentTerm.Description</span>
-                                        <span>@paymentTerm.TypicalUse</span>
-                                    </div>
-                                }
-                            </label>
+                                </div>
+                            </div>
                             <label class="customer-field">
                                 <span>Tax ID</span>
                                 <input class="customer-input" readonly value="@TaxId" />
@@ -660,6 +704,7 @@
     private bool _sendingEmail;
     private bool _emailComposerOpen;
     private bool _emailQueued;
+    private bool _paymentTermsOpen;
     private string? _error;
     private string _emailSubject = string.Empty;
     private string _emailBody = string.Empty;
@@ -690,6 +735,14 @@
     private PaymentTermDto? SelectedPaymentTerm => _edit is null
         ? null
         : _paymentTerms.FirstOrDefault(term => string.Equals(term.Name, _edit.PaymentTerms, StringComparison.Ordinal));
+    private string PaymentTermTriggerTitle => SelectedPaymentTerm?.Name ?? _edit?.PaymentTerms ?? "Select payment term";
+    private string PaymentTermTriggerSummary => SelectedPaymentTerm is { } term ? PaymentTermSummary(term) : "Custom term";
+    private string PaymentTermTriggerDescription => SelectedPaymentTerm is { } term
+        ? PaymentTermDescription(term)
+        : "No saved payment-term definition is available for this customer value.";
+    private string PaymentTermTriggerUse => SelectedPaymentTerm is { } term
+        ? PaymentTermUse(term)
+        : "Keep this value when the customer uses a negotiated term that is not in the standard list.";
     private string CompanyConfirmLabel => _companyEdit?.ExistingCompanyId is Guid ? "Link company" : "Create and link";
     private string EmailConfirmLabel => _sendingEmail ? "Sending..." : _emailQueued ? "Queued" : "Send email";
     private bool EmailConfirmDisabled => _sendingEmail || _emailQueued;
@@ -951,6 +1004,27 @@
             _paymentTerms.Clear();
             _paymentTerms.AddRange(DefaultPaymentTerms());
         }
+    }
+
+    private void TogglePaymentTerms()
+    {
+        _paymentTermsOpen = !_paymentTermsOpen;
+    }
+
+    private void ClosePaymentTerms()
+    {
+        _paymentTermsOpen = false;
+    }
+
+    private void SelectPaymentTerm(string name)
+    {
+        if (_edit is null)
+        {
+            return;
+        }
+
+        _edit.PaymentTerms = name;
+        _paymentTermsOpen = false;
     }
 
     private async Task<bool> SaveCustomerCoreAsync()
@@ -1455,17 +1529,33 @@
         return $"{name} - {employee.Title}";
     }
 
-    private static string PaymentTermOptionLabel(PaymentTermDto term)
+    private bool IsPaymentTermSelected(string name) =>
+        _edit is not null && string.Equals(_edit.PaymentTerms, name, StringComparison.Ordinal);
+
+    private string PaymentTermItemClass(PaymentTermDto term) =>
+        IsPaymentTermSelected(term.Name) ? "customer-payment-term-option selected" : "customer-payment-term-option";
+
+    private static string PaymentTermSummary(PaymentTermDto term)
     {
         var category = string.IsNullOrWhiteSpace(term.Category) ? "Term" : term.Category;
         var timing = term.DiscountPercent is decimal discountPercent && term.DiscountDays is int discountDays
             ? $"{discountPercent:0.##}% discount within {discountDays} days"
             : term.DueDays is int dueDays
-                ? dueDays == 0 ? "due immediately" : $"due in {dueDays} days"
-                : term.Description;
+                ? dueDays == 0 ? "Due immediately" : $"Due in {dueDays} days"
+                : "Negotiated schedule";
 
-        return $"{term.Name} - {category}, {timing}";
+        return $"{category} - {timing}";
     }
+
+    private static string PaymentTermDescription(PaymentTermDto term) =>
+        string.IsNullOrWhiteSpace(term.Description)
+            ? "No detailed payment description has been recorded for this term."
+            : term.Description;
+
+    private static string PaymentTermUse(PaymentTermDto term) =>
+        string.IsNullOrWhiteSpace(term.TypicalUse)
+            ? "Use this when the customer's invoice timing follows this payment rule."
+            : term.TypicalUse;
 
     private static List<PaymentTermDto> DefaultPaymentTerms() =>
     [

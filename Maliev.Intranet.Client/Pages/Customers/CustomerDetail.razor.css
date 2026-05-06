@@ -99,7 +99,7 @@
     min-width: 0;
 }
 
-.customer-field span {
+.customer-field > span {
     color: var(--maliev-muted);
     font-size: var(--maliev-font-nano);
     font-weight: 800;
@@ -134,21 +134,156 @@
     cursor: default;
 }
 
-.customer-payment-term-detail {
+.customer-payment-terms-field {
+    position: relative;
+}
+
+.customer-payment-term-picker {
+    position: relative;
+    min-width: 0;
+}
+
+.customer-payment-term-trigger,
+.customer-payment-term-option {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.customer-payment-term-trigger {
+    position: relative;
     display: grid;
-    gap: 4px;
-    padding: 10px 12px;
+    grid-template-columns: minmax(0, 1fr) 28px;
+    align-items: center;
+    gap: 8px;
     border: 1px solid var(--maliev-border);
-    border-radius: var(--maliev-radius-sm);
+    border-radius: 8px;
+    background: var(--maliev-panel-2);
+    cursor: pointer;
+}
+
+.customer-payment-term-trigger:hover {
+    border-color: color-mix(in oklab, var(--maliev-info), transparent 40%);
+    background: color-mix(in oklab, var(--maliev-info), var(--maliev-panel-2) 94%);
+}
+
+.customer-payment-term-trigger:focus {
+    outline: none;
+}
+
+.customer-payment-term-trigger:focus-visible,
+.customer-payment-term-option:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 35%);
+    outline-offset: 2px;
+}
+
+.customer-payment-term-chevron {
+    justify-self: center;
+    color: var(--maliev-muted);
+}
+
+.customer-payment-term-backdrop {
+    position: fixed;
+    z-index: 19;
+    inset: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: default;
+}
+
+.customer-payment-term-menu {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    display: grid;
+    gap: 8px;
+    max-height: min(420px, 55vh);
+    padding: 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
     background: var(--maliev-panel);
+    box-shadow: 0 18px 48px color-mix(in oklab, var(--maliev-ink), transparent 82%);
+    overflow-y: auto;
+}
+
+.customer-payment-term-option {
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.customer-payment-term-option:hover .customer-payment-term-card,
+.customer-payment-term-option:focus-visible .customer-payment-term-card {
+    border-color: color-mix(in oklab, var(--maliev-info), transparent 36%);
+    background: color-mix(in oklab, var(--maliev-info), var(--maliev-panel) 95%);
+}
+
+.customer-payment-term-option.selected .customer-payment-term-card,
+.customer-payment-term-card.selected {
+    border-color: color-mix(in oklab, var(--maliev-info), transparent 18%);
+    background:
+        linear-gradient(90deg, color-mix(in oklab, var(--maliev-info), transparent 88%), transparent 42%),
+        var(--maliev-panel);
+}
+
+.customer-payment-term-card {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-sm);
+    transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.customer-payment-term-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-width: 0;
+}
+
+.customer-payment-term-card strong {
+    min-width: 0;
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-base);
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.customer-payment-term-card-head span {
+    flex: 1 1 180px;
+    color: var(--maliev-info);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: right;
+    text-transform: uppercase;
+}
+
+.customer-payment-term-card p {
+    margin: 0;
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
+    font-weight: 600;
     line-height: 1.35;
 }
 
-.customer-payment-term-detail strong {
-    color: var(--maliev-ink);
-    font-size: var(--maliev-font-base);
+.customer-payment-term-card p:last-child {
+    color: var(--maliev-ink-2);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    text-transform: uppercase;
 }
 
 .customer-orders-table {
