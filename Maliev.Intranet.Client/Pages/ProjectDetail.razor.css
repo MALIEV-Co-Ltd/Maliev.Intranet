@@ -408,48 +408,36 @@
     text-decoration: none;
 }
 
+.project-record-shell ::deep .project-dfm-hover {
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+
 .project-record-shell ::deep .project-dfm-gate {
-    display: inline-grid;
-    grid-template-columns: 18px minmax(0, 1fr);
-    align-items: center;
-    column-gap: 7px;
+    display: inline-flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 5px 10px;
     width: 100%;
     min-width: 0;
-    padding: 5px 7px;
-    border: 1px solid var(--mud-palette-lines-default);
-    border-radius: 6px;
-    background: var(--mud-palette-surface);
+    padding: 0;
+    border: 0;
+    background: transparent;
 }
 
 .project-record-shell ::deep .project-dfm-copy {
     display: grid;
-    gap: 3px;
+    gap: 2px;
     min-width: 0;
 }
 
 .project-record-shell ::deep .project-dfm-gate strong {
-    color: var(--maliev-success);
+    color: var(--maliev-ink);
     font-size: var(--maliev-font-small);
+    font-weight: 800;
     line-height: 1.1;
     overflow-wrap: anywhere;
-}
-
-.project-record-shell ::deep .project-dfm-gate.dfm-warning {
-    border-color: var(--maliev-warning);
-    background: color-mix(in srgb, var(--maliev-warning) 10%, var(--mud-palette-surface));
-}
-
-.project-record-shell ::deep .project-dfm-gate.dfm-warning strong {
-    color: var(--maliev-warning);
-}
-
-.project-record-shell ::deep .project-dfm-gate.dfm-ack {
-    border-color: var(--mud-palette-info);
-    background: color-mix(in srgb, var(--mud-palette-info) 10%, var(--mud-palette-surface));
-}
-
-.project-record-shell ::deep .project-dfm-gate.dfm-ack strong {
-    color: var(--mud-palette-info);
 }
 
 .project-record-shell ::deep .project-dfm-gate span {
@@ -459,25 +447,106 @@
     overflow-wrap: anywhere;
 }
 
-.project-record-shell ::deep .project-dfm-gate .project-dfm-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: var(--maliev-success);
-    color: var(--mud-palette-white);
-    font-size: 9px;
+.project-record-shell ::deep .project-dfm-gate.dfm-warning strong,
+.project-record-shell ::deep .project-dfm-gate.dfm-ack strong {
+    color: var(--maliev-warning);
+}
+
+.project-record-shell ::deep .project-dfm-gate.dfm-warning span,
+.project-record-shell ::deep .project-dfm-gate.dfm-ack span {
+    color: color-mix(in srgb, var(--maliev-warning) 58%, var(--maliev-muted));
+}
+
+.project-record-shell ::deep .project-dfm-ack-button {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--maliev-warning);
+    cursor: pointer;
+    font-size: var(--maliev-font-small);
     font-weight: 700;
+    line-height: 1.15;
 }
 
-.project-record-shell ::deep .project-dfm-gate.dfm-warning .project-dfm-icon {
-    background: var(--maliev-warning);
+.project-record-shell ::deep .project-dfm-ack-button:hover,
+.project-record-shell ::deep .project-dfm-ack-button:focus-visible {
+    color: color-mix(in srgb, var(--maliev-warning) 82%, var(--maliev-ink));
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
-.project-record-shell ::deep .project-dfm-gate.dfm-ack .project-dfm-icon {
-    background: var(--mud-palette-info);
+.project-record-shell ::deep .project-dfm-ack-button:disabled {
+    cursor: wait;
+    opacity: 0.64;
+    text-decoration: none;
+}
+
+.project-record-shell ::deep .project-dfm-issue-card {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 8px);
+    left: 0;
+    display: grid;
+    gap: 8px;
+    min-width: 260px;
+    max-width: 320px;
+    padding: 10px 12px;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--mud-palette-surface);
+    box-shadow: var(--mud-elevation-8);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+    visibility: hidden;
+}
+
+.project-record-shell ::deep .project-dfm-hover:hover .project-dfm-issue-card,
+.project-record-shell ::deep .project-dfm-hover:focus-within .project-dfm-issue-card {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+    visibility: visible;
+}
+
+.project-record-shell ::deep .project-dfm-issue-card.dfm-warning,
+.project-record-shell ::deep .project-dfm-issue-card.dfm-ack {
+    border-color: color-mix(in srgb, var(--maliev-warning) 46%, var(--maliev-border-subtle));
+    background: color-mix(in srgb, var(--maliev-warning) 7%, var(--mud-palette-surface));
+}
+
+.project-record-shell ::deep .project-dfm-issue-title {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-base);
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.project-record-shell ::deep .project-dfm-issue-card.dfm-warning .project-dfm-issue-title,
+.project-record-shell ::deep .project-dfm-issue-card.dfm-ack .project-dfm-issue-title {
+    color: var(--maliev-warning);
+}
+
+.project-record-shell ::deep .project-dfm-issue-row {
+    display: grid;
+    gap: 2px;
+}
+
+.project-record-shell ::deep .project-dfm-issue-row span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-xsmall);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.project-record-shell ::deep .project-dfm-issue-row p {
+    margin: 0;
+    color: var(--maliev-ink-2);
+    font-size: var(--maliev-font-small);
+    line-height: 1.35;
 }
 
 .project-record-shell ::deep .project-snapshot {

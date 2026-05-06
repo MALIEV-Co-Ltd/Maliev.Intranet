@@ -140,6 +140,7 @@
     private string _newNoteContent = string.Empty;
     private string _activeTab = "overview";
     private readonly HashSet<Guid> _holdSavingPartIds = [];
+    private readonly HashSet<Guid> _acknowledgingDfmPartIds = [];
 
     private IReadOnlyList<(string Key, string Label)> Tabs =>
     [
@@ -1243,6 +1244,34 @@
         }
     }
 
+    private async Task AcknowledgeDfmAsync(ProjectPartDto part)
+    {
+        if (!part.HasDfmWarnings || part.DfmAcknowledged || !_acknowledgingDfmPartIds.Add(part.Id))
+            return;
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/v1/projects/{Id}/parts/{part.Id}", BuildDfmAcknowledgeRequest(part));
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(string.IsNullOrWhiteSpace(error) ? "DFM acknowledgement could not be saved." : error, Severity.Error);
+                return;
+            }
+
+            part.DfmAcknowledged = true;
+            Snackbar.Add("DFM warnings acknowledged.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"DFM acknowledgement error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _acknowledgingDfmPartIds.Remove(part.Id);
+        }
+    }
+
     private async Task RefreshProductionPlanAsync(MouseEventArgs _)
     {
         await LoadProductionPlanAsync();
@@ -1388,6 +1417,42 @@
             ExpiresAt = ResolveClientHoldExpiration()
         };
     }
+
+    private static UpdateProjectPartRequest BuildDfmAcknowledgeRequest(ProjectPartDto part) => new()
+    {
+        ProcessType = part.ProcessType,
+        MaterialId = part.MaterialId,
+        MaterialName = part.MaterialName,
+        MaterialCode = part.MaterialCode,
+        Quantity = Math.Max(1, part.Quantity),
+        Finish = part.Finish,
+        Color = part.Color,
+        Tolerance = part.Tolerance,
+        RoughnessCode = part.RoughnessCode,
+        MarkingType = part.MarkingType,
+        MarkingText = part.MarkingText,
+        DfmAcknowledged = true,
+        HasDfmWarnings = part.HasDfmWarnings,
+        HasThreadedHoles = part.HasThreadedHoles,
+        ThreadedHoleSpec = part.ThreadedHoleSpec,
+        ThreadedHoleCount = part.ThreadedHoleCount,
+        HasInserts = part.HasInserts,
+        InsertType = part.InsertType,
+        InsertCount = part.InsertCount,
+        BagAndTag = part.BagAndTag,
+        InspectionLevel = part.InspectionLevel,
+        Certificates = [.. part.Certificates],
+        DrawingFiles = [.. part.DrawingFiles],
+        SupplementaryFiles = [.. part.SupplementaryFiles],
+        ProcessConfig = new Dictionary<string, string>(part.ProcessConfig, StringComparer.OrdinalIgnoreCase),
+        ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
+        ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
+        GlbStoragePath = part.GlbStoragePath,
+        OverlayPaths = new Dictionary<string, string>(part.OverlayPaths, StringComparer.OrdinalIgnoreCase),
+        BodyCount = part.BodyCount,
+        BodiesJson = part.BodiesJson,
+        SelectedBodyIndex = part.SelectedBodyIndex
+    };
 
     private DateTime ResolveClientHoldExpiration()
     {
@@ -1624,17 +1689,17 @@
         builder.CloseElement();
     }
 
-    private static void AddDfmCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
+    private void AddDfmCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
     {
         var status = ResolveDfmStatus(part);
+        var canAcknowledge = part.HasDfmWarnings && !part.DfmAcknowledged;
+        var acknowledging = _acknowledgingDfmPartIds.Contains(part.Id);
 
         builder.OpenElement(sequence++, "td");
         builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-dfm-hover");
+        builder.OpenElement(sequence++, "div");
         builder.AddAttribute(sequence++, "class", $"project-dfm-gate {status.CssClass}");
-        builder.OpenElement(sequence++, "span");
-        builder.AddAttribute(sequence++, "class", "project-dfm-icon");
-        builder.AddContent(sequence++, status.Icon);
-        builder.CloseElement();
         builder.OpenElement(sequence++, "div");
         builder.AddAttribute(sequence++, "class", "project-dfm-copy");
         builder.OpenElement(sequence++, "strong");
@@ -1644,21 +1709,109 @@
         builder.AddContent(sequence++, status.Subtext);
         builder.CloseElement();
         builder.CloseElement();
+
+        if (canAcknowledge)
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", "project-dfm-ack-button");
+            builder.AddAttribute(sequence++, "disabled", acknowledging);
+            builder.AddAttribute(sequence++, "aria-label", $"Quick acknowledge DFM issues for {part.FileName}");
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => AcknowledgeDfmAsync(part)));
+            builder.AddContent(sequence++, acknowledging ? "Saving..." : "Acknowledge");
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+        AddDfmIssueCard(builder, ref sequence, part, status);
         builder.CloseElement();
         builder.CloseElement();
+    }
+
+    private static void AddDfmIssueCard(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part, DfmDisplayStatus status)
+    {
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", $"project-dfm-issue-card {status.CssClass}");
+        builder.OpenElement(sequence++, "strong");
+        builder.AddAttribute(sequence++, "class", "project-dfm-issue-title");
+        builder.AddContent(sequence++, part.HasDfmWarnings ? "DFM issue results" : "DFM result");
+        builder.CloseElement();
+
+        foreach (var item in ResolveDfmIssueSummary(part, status))
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "project-dfm-issue-row");
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, item.Label);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "p");
+            builder.AddContent(sequence++, item.Value);
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    }
+
+    private static List<DfmIssueSummary> ResolveDfmIssueSummary(ProjectPartDto part, DfmDisplayStatus status)
+    {
+        if (!part.HasDfmWarnings)
+        {
+            return
+            [
+                new("Status", status.Label),
+                new("Result", status.Subtext)
+            ];
+        }
+
+        var items = new List<DfmIssueSummary>
+        {
+            new("Status", status.Label),
+            new("Action", part.DfmAcknowledged ? "Warnings reviewed and acknowledged." : "Review and acknowledge before quote acceptance.")
+        };
+
+        var issueCategories = part.OverlayPaths.Keys
+            .Where(key => !string.Equals(key, "preview", StringComparison.OrdinalIgnoreCase))
+            .Select(HumanizeToken)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (issueCategories.Count > 0)
+        {
+            items.Add(new("Detected checks", string.Join(", ", issueCategories)));
+        }
+
+        if (part.IsManifold == false)
+        {
+            items.Add(new("Geometry", "Non-manifold geometry reported."));
+        }
+
+        if (part.BodyCount > 1 && part.SelectedBodyIndex is null)
+        {
+            items.Add(new("Body selection", $"{part.BodyCount} bodies detected; select the manufacturing body before release."));
+        }
+
+        if (items.Count == 2)
+        {
+            items.Add(new("Detected warnings", "Review the process-specific DFM checks for this part."));
+        }
+
+        return items;
     }
 
     private static DfmDisplayStatus ResolveDfmStatus(ProjectPartDto part)
     {
         if (!part.HasDfmWarnings)
-            return new("DFM passed", "No reported issues", "dfm-ok", "OK");
+            return new("DFM passed", "No reported issues", "dfm-ok");
 
         return part.DfmAcknowledged
-            ? new("DFM acknowledged", "Warnings reviewed", "dfm-ack", "OK")
-            : new("DFM warnings", "Requires acknowledgement", "dfm-warning", "!");
+            ? new("DFM acknowledged", "Warnings reviewed", "dfm-ack")
+            : new("DFM warnings", "Requires acknowledgement", "dfm-warning");
     }
 
-    private sealed record DfmDisplayStatus(string Label, string Subtext, string CssClass, string Icon);
+    private sealed record DfmDisplayStatus(string Label, string Subtext, string CssClass);
+
+    private sealed record DfmIssueSummary(string Label, string Value);
 
     private string FormatMoney(decimal value) => CurrencyFormatter.Format(value, ProjectCurrency, 2);
 

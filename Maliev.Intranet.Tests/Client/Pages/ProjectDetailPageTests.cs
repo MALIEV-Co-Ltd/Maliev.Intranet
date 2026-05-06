@@ -25,6 +25,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     private readonly List<string> _requestedPaths = [];
     private readonly List<string> _requestedRequests = [];
     private bool _notePosted;
+    private bool _bracketDfmAcknowledged;
 
     public ProjectDetailPageTests()
     {
@@ -257,12 +258,34 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("DFM warnings", cut.Markup);
         Assert.Contains("Requires acknowledgement", cut.Markup);
         Assert.Contains("project-dfm-copy", cut.Markup);
+        Assert.Contains("project-dfm-ack-button", cut.Markup);
+        Assert.Contains("Acknowledge", cut.Markup);
+        Assert.Contains("DFM issue results", cut.Markup);
+        Assert.Contains("Detected checks", cut.Markup);
+        Assert.Contains("Overhang", cut.Markup);
         Assert.Contains("DFM acknowledged", cut.Markup);
         Assert.Contains("Warnings reviewed", cut.Markup);
         Assert.Contains("DFM passed", cut.Markup);
         Assert.Contains("No reported issues", cut.Markup);
+        Assert.DoesNotContain("project-dfm-icon", cut.Markup);
         Assert.DoesNotContain("DFM pending", cut.Markup);
         Assert.DoesNotContain("Awaiting review", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectDetail_QuickAcknowledgeDfm_UpdatesPartAndRemovesAction()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("project-dfm-ack-button", cut.Markup));
+        cut.Find("button.project-dfm-ack-button").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedRequests, request => request == $"PUT /api/v1/projects/{_projectId}/parts/{_bracketPartId}");
+            Assert.Contains("DFM acknowledged", cut.Markup);
+            Assert.DoesNotContain("project-dfm-ack-button", cut.Markup);
+        });
     }
 
     [Fact]
@@ -308,6 +331,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-dfm-ack-button", css, StringComparison.Ordinal);
+        Assert.Contains(".project-dfm-issue-card", css, StringComparison.Ordinal);
+        Assert.DoesNotContain("project-dfm-icon", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-notes-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-note-audit", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-overview-sidebar", css, StringComparison.Ordinal);
@@ -391,7 +417,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         Status = "Confirmed",
                         ThumbnailUrl = "https://storage.example/bracket-thumb.webp",
                         HasDfmWarnings = true,
-                        DfmAcknowledged = false,
+                        DfmAcknowledged = _bracketDfmAcknowledged,
                         OverlayPaths =
                         {
                             ["overhang"] = "customers/axion/projects/prj/bracket-left_overhang_overlay.glb"
@@ -486,6 +512,13 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}/production-plan", StringComparison.Ordinal))
         {
             return Json(BuildProductionPlan());
+        }
+
+        if (request.Method == HttpMethod.Put
+            && pathAndQuery.Equals($"/api/v1/projects/{_projectId}/parts/{_bracketPartId}", StringComparison.Ordinal))
+        {
+            _bracketDfmAcknowledged = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
         }
 
         if (request.Method == HttpMethod.Post
