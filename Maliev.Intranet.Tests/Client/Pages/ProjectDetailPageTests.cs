@@ -101,6 +101,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("3D Printing (FDM)", cut.Markup);
         Assert.Contains("As printed", cut.Markup);
         Assert.Contains("Standard FDM settings", cut.Markup);
+        Assert.Contains("project-config-primary", cut.Markup);
+        Assert.Contains("project-config-subtitle", cut.Markup);
         Assert.DoesNotContain("AS_PRINTED", cut.Markup);
         Assert.DoesNotContain("FDM_STD", cut.Markup);
     }
@@ -117,6 +119,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("customer-po.pdf", cut.Markup);
         Assert.Contains("DFM warnings", cut.Markup);
         Assert.Contains("Requires acknowledgement", cut.Markup);
+        Assert.Contains("project-dfm-copy", cut.Markup);
         Assert.Contains("DFM acknowledged", cut.Markup);
         Assert.Contains("Warnings reviewed", cut.Markup);
         Assert.Contains("DFM passed", cut.Markup);
@@ -155,6 +158,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-field-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-metric-row", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
         Assert.Contains("position: sticky", css, StringComparison.Ordinal);
         Assert.Contains("height: 52px", css, StringComparison.Ordinal);
     }

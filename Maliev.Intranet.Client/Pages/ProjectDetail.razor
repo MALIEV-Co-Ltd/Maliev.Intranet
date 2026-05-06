@@ -360,7 +360,7 @@
             AddPartCell(builder, ref sequence, part);
             AddCell(builder, ref sequence, FormatProcess(part.ProcessType));
             AddCell(builder, ref sequence, part.MaterialName ?? "-");
-            AddCell(builder, ref sequence, FormatPartConfiguration(part));
+            AddConfigurationCell(builder, ref sequence, part);
             AddDfmCell(builder, ref sequence, part);
             AddCell(builder, ref sequence, part.Quantity.ToString(), "numeric");
             AddCell(builder, ref sequence, FormatMoney(GetPartUnitPrice(part)), "numeric");
@@ -643,6 +643,41 @@
         builder.CloseElement();
     }
 
+    private static void AddConfigurationCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
+    {
+        var configuration = ResolvePartConfiguration(part);
+
+        builder.OpenElement(sequence++, "td");
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-config-stack");
+
+        if (configuration is null)
+        {
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "project-config-empty");
+            builder.AddContent(sequence++, "-");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(sequence++, "strong");
+            builder.AddAttribute(sequence++, "class", "project-config-primary");
+            builder.AddContent(sequence++, configuration.Primary);
+            builder.CloseElement();
+
+            if (!string.IsNullOrWhiteSpace(configuration.Subtitle))
+            {
+                builder.OpenElement(sequence++, "span");
+                builder.AddAttribute(sequence++, "class", "project-config-subtitle");
+                builder.AddContent(sequence++, configuration.Subtitle);
+                builder.CloseElement();
+            }
+        }
+
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
     private static void AddPartCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
     {
         builder.OpenElement(sequence++, "td");
@@ -740,6 +775,7 @@
         builder.AddContent(sequence++, status.Icon);
         builder.CloseElement();
         builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-dfm-copy");
         builder.OpenElement(sequence++, "strong");
         builder.AddContent(sequence++, status.Label);
         builder.CloseElement();
@@ -826,12 +862,19 @@
         };
     }
 
-    private static string FormatPartConfiguration(ProjectPartDto part)
+    private static PartConfigurationDisplay? ResolvePartConfiguration(ProjectPartDto part)
     {
         var values = new[] { part.Finish, part.Color, part.Tolerance }
+            .Select(FormatConfigValue)
             .Where(value => !string.IsNullOrWhiteSpace(value));
-        var label = string.Join(" - ", values.Select(FormatConfigValue));
-        return string.IsNullOrWhiteSpace(label) ? "-" : label;
+        var formattedValues = values.ToArray();
+
+        return formattedValues.Length switch
+        {
+            0 => null,
+            1 => new PartConfigurationDisplay(formattedValues[0], null),
+            _ => new PartConfigurationDisplay(formattedValues[0], string.Join(" ", formattedValues[1..]))
+        };
     }
 
     private static string FormatConfigValue(string? value)
@@ -853,6 +896,8 @@
             _ => HumanizeToken(value)
         };
     }
+
+    private sealed record PartConfigurationDisplay(string Primary, string? Subtitle);
 
     private static string HumanizeToken(string value)
     {

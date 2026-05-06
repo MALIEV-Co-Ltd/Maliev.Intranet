@@ -187,6 +187,28 @@
     white-space: nowrap;
 }
 
+.project-record-shell ::deep .project-config-stack {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.project-record-shell ::deep .project-config-primary {
+    color: var(--maliev-text);
+    font-size: var(--maliev-font-small);
+    font-weight: 800;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+.project-record-shell ::deep .project-config-subtitle,
+.project-record-shell ::deep .project-config-empty {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
 .project-record-shell ::deep .project-part-summary {
     display: grid;
     grid-template-columns: 52px minmax(0, 1fr);
@@ -262,10 +284,17 @@
     background: var(--mud-palette-surface);
 }
 
+.project-record-shell ::deep .project-dfm-copy {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
 .project-record-shell ::deep .project-dfm-gate strong {
     color: var(--maliev-success);
     font-size: var(--maliev-font-small);
     line-height: 1.1;
+    overflow-wrap: anywhere;
 }
 
 .project-record-shell ::deep .project-dfm-gate.dfm-warning {
@@ -290,6 +319,7 @@
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
     line-height: 1.15;
+    overflow-wrap: anywhere;
 }
 
 .project-record-shell ::deep .project-dfm-gate .project-dfm-icon {
