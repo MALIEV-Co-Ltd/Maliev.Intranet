@@ -110,6 +110,9 @@ public class GlobalSearchBoxTests
         Assert.Contains("overflow-x: hidden;", css, StringComparison.Ordinal);
         Assert.Contains(".global-search-result-subtitle", css, StringComparison.Ordinal);
         Assert.Contains("text-overflow: ellipsis;", css, StringComparison.Ordinal);
+        Assert.Contains("justify-items: stretch;", css, StringComparison.Ordinal);
+        Assert.Contains("justify-self: stretch;", css, StringComparison.Ordinal);
+        Assert.Contains("justify-content: flex-start;", css, StringComparison.Ordinal);
     }
 
     [Fact]

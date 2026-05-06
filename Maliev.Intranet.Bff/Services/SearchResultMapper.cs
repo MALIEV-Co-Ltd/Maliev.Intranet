@@ -59,6 +59,9 @@ public static class SearchResultMapper
 
             "project" or "projects" when IsGuid(id) => $"/sales/projects/{id}",
             "project" or "projects" => $"/sales/projects?search={titleQuery}",
+            "project-part" or "project-parts" when TryParseProjectPartId(id, out var projectId, out var partId) =>
+                $"/sales/projects/{projectId}?tab=parts&partId={partId}",
+            "project-part" or "project-parts" => $"/sales/projects?search={titleQuery}",
             "quotation" or "quotations" => $"/sales/projects?search={titleQuery}",
             "order" or "orders" => $"/sales/projects?search={titleQuery}",
 
@@ -93,7 +96,7 @@ public static class SearchResultMapper
             service.Contains("project", StringComparison.Ordinal) ||
             service.Contains("quotation", StringComparison.Ordinal) ||
             service.Contains("order", StringComparison.Ordinal) ||
-            type is "customer" or "customers" or "company" or "companies" or "project" or "projects" or "quotation" or "quotations" or "order" or "orders")
+            type is "customer" or "customers" or "company" or "companies" or "project" or "projects" or "project-part" or "project-parts" or "quotation" or "quotations" or "order" or "orders")
         {
             return "Sales & CRM";
         }
@@ -132,6 +135,21 @@ public static class SearchResultMapper
     private static bool IsGuid(string value) => Guid.TryParse(value, out _);
 
     private static bool IsInteger(string value) => int.TryParse(value, out var parsed) && parsed > 0;
+
+    private static bool TryParseProjectPartId(string value, out Guid projectId, out Guid partId)
+    {
+        projectId = Guid.Empty;
+        partId = Guid.Empty;
+
+        var parts = value.Split(':', 2, StringSplitOptions.TrimEntries);
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        return Guid.TryParse(parts[0], out projectId) &&
+            Guid.TryParse(parts[1], out partId);
+    }
 
     private static string Normalize(string value)
     {

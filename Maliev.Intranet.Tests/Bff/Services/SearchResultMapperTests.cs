@@ -28,6 +28,18 @@ public class SearchResultMapperTests
     }
 
     [Fact]
+    public void ResolveHref_ForProjectPartResult_MapsToProjectPartsTab()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var result = Result("ProjectService", "project-part", $"{projectId}:{partId}", "d15-16.stp");
+
+        var href = SearchResultMapper.ResolveHref(result);
+
+        Assert.Equal($"/sales/projects/{projectId}?tab=parts&partId={partId}", href);
+    }
+
+    [Fact]
     public void ResolveHref_ForPurchaseOrderResult_MapsToPurchasingDetail()
     {
         const string purchaseOrderId = "1001";

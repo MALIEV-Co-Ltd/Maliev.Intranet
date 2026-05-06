@@ -109,6 +109,8 @@
     display: grid;
     grid-template-rows: auto auto;
     align-items: start;
+    justify-items: stretch;
+    justify-content: stretch;
     gap: 3px;
     width: 100%;
     min-width: 0;
@@ -132,6 +134,8 @@
 .global-search-result-sub {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
+    justify-self: stretch;
     gap: 8px;
     width: 100%;
     min-width: 0;
@@ -148,6 +152,7 @@
     white-space: nowrap;
     font-size: var(--maliev-font-base);
     font-weight: 700;
+    text-align: left;
 }
 
 .global-search-result-sub {
@@ -162,6 +167,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
 }
 
 .global-search-result-status,
