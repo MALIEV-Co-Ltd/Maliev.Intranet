@@ -566,23 +566,28 @@
                 border-top: 1px solid var(--maliev-border);
             }
             .pcs-root.pcs-root--inline .pcs-scroll {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
-                align-items: start;
-                gap: 12px;
+                display: block;
+                column-gap: 12px;
+                column-width: 360px;
                 overflow: visible;
                 min-height: 0;
                 padding: 12px;
             }
             .pcs-root.pcs-root--inline .pcs-section {
+                display: inline-block;
+                width: 100%;
                 min-width: 0;
+                margin: 0 0 12px;
                 padding: 10px;
                 border: 1px solid var(--maliev-border);
                 border-radius: var(--maliev-radius-sm);
                 background: var(--maliev-panel);
+                break-inside: avoid;
+                page-break-inside: avoid;
             }
             .pcs-root.pcs-root--inline .pcs-section:first-child {
-                grid-column: 1 / -1;
+                display: block;
+                column-span: all;
             }
             .pcs-root.pcs-root--inline .pcs-process-grid {
                 grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 320px));
@@ -1300,7 +1305,8 @@
                 }
 
                 .pcs-root.pcs-root--inline .pcs-scroll {
-                    grid-template-columns: minmax(0, 1fr);
+                    column-count: 1;
+                    column-width: auto;
                     padding: 10px;
                 }
 

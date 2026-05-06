@@ -149,6 +149,24 @@ public class PartConfigSidebarTests
     }
 
     [Fact]
+    public void InlineLayout_UsesColumnFlowToAvoidGridRowGaps()
+    {
+        var source = ReadRepoFile(
+            "Maliev.Intranet.Client",
+            "Components",
+            "Project",
+            "PartConfigSidebar.razor");
+
+        Assert.Contains("column-width: 360px", source);
+        Assert.Contains("break-inside: avoid", source);
+        Assert.Contains("column-span: all", source);
+        Assert.DoesNotContain(
+            "grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OnNotesChanged_WhenValueProvided_UpdatesPartNotes()
     {
         var sidebar = new PartConfigSidebar();
@@ -258,5 +276,22 @@ public class PartConfigSidebarTests
 
         Assert.NotNull(property);
         return Assert.IsType<string>(property.GetValue(sidebar));
+    }
+
+    private static string ReadRepoFile(params string[] relativeParts)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
     }
 }
