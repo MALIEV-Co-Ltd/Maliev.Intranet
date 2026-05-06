@@ -53,6 +53,51 @@ public class ProjectDetailDto
     /// <summary>Gets or sets the customer name.</summary>
     public string CustomerName { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the customer email address.</summary>
+    public string? CustomerEmail { get; set; }
+
+    /// <summary>Gets or sets the customer phone number.</summary>
+    public string? CustomerPhone { get; set; }
+
+    /// <summary>Gets or sets the customer lifecycle status.</summary>
+    public string? CustomerStatus { get; set; }
+
+    /// <summary>Gets or sets the customer market segment.</summary>
+    public string? CustomerSegment { get; set; }
+
+    /// <summary>Gets or sets the customer business tier.</summary>
+    public string? CustomerTier { get; set; }
+
+    /// <summary>Gets or sets the customer preferred language.</summary>
+    public string? CustomerPreferredLanguage { get; set; }
+
+    /// <summary>Gets or sets the customer's local timezone.</summary>
+    public string? CustomerTimezone { get; set; }
+
+    /// <summary>Gets or sets the associated company ID.</summary>
+    public Guid? CustomerCompanyId { get; set; }
+
+    /// <summary>Gets or sets the associated company name.</summary>
+    public string? CustomerCompanyName { get; set; }
+
+    /// <summary>Gets or sets the company's contact phone number.</summary>
+    public string? CustomerCompanyPhone { get; set; }
+
+    /// <summary>Gets or sets the company's contact email address.</summary>
+    public string? CustomerCompanyEmail { get; set; }
+
+    /// <summary>Gets or sets the formatted billing address.</summary>
+    public string? BillingAddressLine { get; set; }
+
+    /// <summary>Gets or sets the formatted shipping address.</summary>
+    public string? ShippingAddressLine { get; set; }
+
+    /// <summary>Gets or sets the shipping recipient name.</summary>
+    public string? ShippingRecipientName { get; set; }
+
+    /// <summary>Gets or sets the shipping recipient phone number.</summary>
+    public string? ShippingRecipientPhone { get; set; }
+
     /// <summary>Gets or sets the project title.</summary>
     public string Title { get; set; } = string.Empty;
 

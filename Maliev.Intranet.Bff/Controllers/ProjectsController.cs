@@ -17,6 +17,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="logger">The logger instance.</param>
 /// <param name="uploadClient">The typed UploadService HTTP client used when duplicating project file artifacts.</param>
 /// <param name="analysisStatusService">The file analysis status cache used when restoring duplicated part previews.</param>
+/// <param name="customerClient">The typed CustomerService HTTP client used to hydrate quote customer details.</param>
 [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [ApiVersion("1.0")]
@@ -27,7 +28,8 @@ public class ProjectsController(
     IFacilityServiceClient facilityClient,
     ILogger<ProjectsController> logger,
     UploadServiceClient? uploadClient = null,
-    IFileAnalysisStatusService? analysisStatusService = null) : ControllerBase
+    IFileAnalysisStatusService? analysisStatusService = null,
+    CustomerServiceClient? customerClient = null) : ControllerBase
 {
     private readonly ILogger<ProjectsController> _logger = logger;
     // ── Query endpoints ──────────────────────────────────────────────────────
@@ -67,6 +69,9 @@ public class ProjectsController(
         var result = await client.GetProjectByIdAsync(id, ct);
         if (result is not null && uploadClient is not null)
             await EnrichProjectDetailArtifactsAsync(result, uploadClient, analysisStatusService, ct);
+
+        if (result is not null && customerClient is not null)
+            await EnrichProjectCustomerAsync(result, customerClient, ct);
 
         return result != null ? Ok(result) : NotFound();
     }
@@ -740,6 +745,47 @@ public class ProjectsController(
         }
     }
 
+    private async Task EnrichProjectCustomerAsync(
+        ProjectDetailDto project,
+        CustomerServiceClient customer,
+        CancellationToken ct)
+    {
+        try
+        {
+            var detail = await customer.GetCustomerByIdAsync(project.CustomerId, ct);
+            if (detail is null)
+                return;
+
+            project.CustomerName = FirstNonEmpty(detail.Name, project.CustomerName) ?? project.CustomerName;
+            project.CustomerEmail = FirstNonEmpty(detail.Email);
+            project.CustomerPhone = FirstNonEmpty(detail.Mobile, detail.Landline, detail.CompanyPhone);
+            project.CustomerStatus = FirstNonEmpty(detail.Status);
+            project.CustomerSegment = FirstNonEmpty(detail.CompanySegment, detail.Segment);
+            project.CustomerTier = FirstNonEmpty(detail.CompanyTier, detail.Tier);
+            project.CustomerPreferredLanguage = FirstNonEmpty(detail.PreferredLanguage);
+            project.CustomerTimezone = FirstNonEmpty(detail.Timezone);
+            project.CustomerCompanyId = detail.CompanyId;
+            project.CustomerCompanyName = FirstNonEmpty(detail.CompanyName);
+            project.CustomerCompanyPhone = FirstNonEmpty(detail.CompanyPhone);
+            project.CustomerCompanyEmail = FirstNonEmpty(detail.CompanyContactEmail);
+
+            var shippingAddress = SelectAddress(detail.Addresses, "Shipping")
+                ?? SelectAddress(detail.Addresses, "Delivery")
+                ?? SelectAddress(detail.Addresses, "Billing")
+                ?? detail.Addresses.FirstOrDefault();
+            var billingAddress = SelectAddress(detail.Addresses, "Billing") ?? detail.CompanyBillingAddress;
+
+            project.ShippingAddressLine = FormatAddress(shippingAddress);
+            project.ShippingRecipientName = FirstNonEmpty(shippingAddress?.RecipientName, detail.Name);
+            project.ShippingRecipientPhone = FirstNonEmpty(shippingAddress?.RecipientPhone, detail.Mobile, detail.Landline, detail.CompanyPhone);
+            project.BillingAddressLine = FormatAddress(billingAddress);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to hydrate customer details for project {ProjectId}", project.Id);
+        }
+    }
+
     private static async Task EnrichPartArtifactsAsync(
         ProjectPartDto part,
         UploadServiceClient upload,
@@ -810,6 +856,34 @@ public class ProjectsController(
 
     private static string? FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+    private static AddressResponse? SelectAddress(IEnumerable<AddressResponse> addresses, string type) =>
+        addresses.FirstOrDefault(address => address.IsDefault && MatchesAddressType(address, type))
+            ?? addresses.FirstOrDefault(address => MatchesAddressType(address, type));
+
+    private static bool MatchesAddressType(AddressResponse address, string type) =>
+        string.Equals(address.Type, type, StringComparison.OrdinalIgnoreCase);
+
+    private static string? FormatAddress(AddressResponse? address)
+    {
+        if (address is null)
+            return null;
+
+        var parts = new[]
+        {
+            address.AddressLine1,
+            address.AddressLine2,
+            address.AddressLine3,
+            address.District,
+            address.City,
+            address.StateProvince,
+            address.PostalCode
+        }
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => value!.Trim());
+
+        return string.Join(", ", parts);
+    }
 
     private async Task CleanupDuplicateAsync(
         Guid duplicateProjectId,

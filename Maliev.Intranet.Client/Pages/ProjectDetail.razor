@@ -163,14 +163,13 @@
         builder.AddAttribute(1, "class", "project-record-grid");
 
         builder.OpenElement(2, "div");
-        builder.AddAttribute(3, "class", "project-record-main");
-        builder.AddContent(4, RenderProjectInformation());
-        builder.AddContent(5, RenderManufacturingSummary());
+        builder.AddAttribute(3, "class", "project-record-main project-record-main-manufacturing");
+        builder.AddContent(4, RenderManufacturingSummary());
         builder.CloseElement();
 
         builder.OpenElement(6, "aside");
-        builder.AddAttribute(7, "class", "project-record-sidebar");
-        builder.AddContent(8, RenderQuoteSnapshot());
+        builder.AddAttribute(7, "class", "project-record-sidebar project-overview-sidebar");
+        builder.AddContent(8, RenderProjectInformation());
         builder.AddContent(9, RenderCustomerPanel());
         builder.AddContent(10, RenderTimelinePanel(full: false));
         builder.CloseElement();
@@ -182,17 +181,24 @@
     {
         builder.OpenComponent<PanelCard>(0);
         builder.AddAttribute(1, "Title", "Project information");
-        builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+        builder.AddAttribute(2, "Class", "project-information-card");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(content =>
         {
-            content.OpenElement(3, "div");
-            content.AddAttribute(4, "class", "project-field-grid");
-            AddReadOnlyField(content, 5, "Project #", ProjectTitle);
-            AddReadOnlyField(content, 9, "Title", _project?.Title);
-            AddReadOnlyField(content, 13, "Customer", _project?.CustomerName);
-            AddReadOnlyField(content, 17, "Status", FormatStatus(_project?.Status));
-            AddReadOnlyField(content, 21, "Created", FormatDateTime(_project?.CreatedAt));
-            AddReadOnlyField(content, 25, "Updated", FormatDateTime(_project?.UpdatedAt));
+            content.OpenElement(4, "div");
+            content.AddAttribute(5, "class", "project-field-grid project-field-grid-compact");
+            AddReadOnlyField(content, 6, "Project #", ProjectTitle);
+            AddReadOnlyField(content, 14, "Title", _project?.Title);
+            AddReadOnlyField(content, 22, "Status", FormatStatus(_project?.Status));
+            AddReadOnlyField(content, 30, "Created", FormatDateTime(_project?.CreatedAt));
+            AddReadOnlyField(content, 38, "Updated", FormatDateTime(_project?.UpdatedAt));
             content.CloseElement();
+
+            content.OpenElement(46, "div");
+            content.AddAttribute(47, "class", "project-info-section-title");
+            content.AddContent(48, "Quote snapshot");
+            content.CloseElement();
+
+            AddQuoteSnapshotContent(content, 49, "project-snapshot project-snapshot-compact");
         }));
         builder.CloseComponent();
     };
@@ -233,21 +239,7 @@
         builder.AddAttribute(1, "Title", "Quote snapshot");
         builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
         {
-            content.OpenElement(3, "dl");
-            content.AddAttribute(4, "class", "project-snapshot");
-            AddSnapshot(content, 5, "Project status", builder2 =>
-            {
-                builder2.OpenComponent<StatusBadge>(6);
-                builder2.AddAttribute(7, "Status", FormatStatus(_project?.Status));
-                builder2.CloseComponent();
-            });
-            AddSnapshot(content, 8, "Quote #", QuotationLabel);
-            AddSnapshot(content, 12, "Quote status", FormatStatus(_project?.QuotationStatus));
-            AddSnapshot(content, 16, "Valid until", FormatDate(_project?.ValidUntil));
-            AddSnapshot(content, 20, "Subtotal", FormatMoney(PartsSubtotal));
-            AddSnapshot(content, 24, "Discount", QuoteDiscount > 0m ? $"-{FormatMoney(QuoteDiscount)}" : FormatMoney(0m));
-            AddSnapshot(content, 28, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
-            content.CloseElement();
+            AddQuoteSnapshotContent(content, 3, "project-snapshot");
         }));
         builder.CloseComponent();
     };
@@ -263,12 +255,58 @@
             content.OpenElement(5, "strong");
             content.AddContent(6, _project?.CustomerName ?? "Unknown customer");
             content.CloseElement();
-            content.OpenElement(7, "span");
-            content.AddContent(8, $"Customer ID {_project?.CustomerId.ToString("N")[..8].ToUpperInvariant()}");
+
+            content.OpenElement(7, "dl");
+            content.AddAttribute(8, "class", "project-customer-detail-grid");
+            AddCustomerDetail(content, 9, "Company", _project?.CustomerCompanyName);
+            AddCustomerDetail(content, 13, "Email", _project?.CustomerEmail);
+            AddCustomerDetail(content, 17, "Phone", _project?.CustomerPhone);
+            AddCustomerDetail(content, 21, "Status", FormatStatus(_project?.CustomerStatus));
+            AddCustomerDetail(content, 25, "Segment", _project?.CustomerSegment);
+            AddCustomerDetail(content, 29, "Tier", _project?.CustomerTier);
+            AddCustomerDetail(content, 33, "Language", _project?.CustomerPreferredLanguage?.ToUpperInvariant());
+            AddCustomerDetail(content, 37, "Timezone", _project?.CustomerTimezone);
             content.CloseElement();
-            content.OpenElement(9, "a");
-            content.AddAttribute(10, "href", $"/customers/{_project?.CustomerId}");
-            content.AddContent(11, "Open customer record");
+
+            content.OpenElement(41, "div");
+            content.AddAttribute(42, "class", "project-customer-address-block");
+            content.OpenElement(43, "span");
+            content.AddContent(44, "Shipping");
+            content.CloseElement();
+            content.OpenElement(45, "strong");
+            content.AddContent(46, _project?.ShippingRecipientName ?? "-");
+            content.CloseElement();
+            content.OpenElement(47, "p");
+            content.AddContent(48, _project?.ShippingAddressLine ?? "-");
+            content.CloseElement();
+            if (!string.IsNullOrWhiteSpace(_project?.ShippingRecipientPhone))
+            {
+                content.OpenElement(49, "small");
+                content.AddContent(50, _project.ShippingRecipientPhone);
+                content.CloseElement();
+            }
+            content.CloseElement();
+
+            if (!string.IsNullOrWhiteSpace(_project?.BillingAddressLine))
+            {
+                content.OpenElement(51, "div");
+                content.AddAttribute(52, "class", "project-customer-address-block");
+                content.OpenElement(53, "span");
+                content.AddContent(54, "Billing");
+                content.CloseElement();
+                content.OpenElement(55, "p");
+                content.AddContent(56, _project.BillingAddressLine);
+                content.CloseElement();
+                content.CloseElement();
+            }
+
+            content.OpenElement(57, "span");
+            content.AddAttribute(58, "class", "project-customer-id");
+            content.AddContent(59, $"Customer ID {_project?.CustomerId.ToString("N")[..8].ToUpperInvariant()}");
+            content.CloseElement();
+            content.OpenElement(60, "a");
+            content.AddAttribute(61, "href", $"/customers/{_project?.CustomerId}");
+            content.AddContent(62, "Open customer record");
             content.CloseElement();
             content.CloseElement();
         }));
@@ -503,6 +541,11 @@
     private string QuotationLabel => _project?.QuotationNumber
         ?? (_project?.QuotationId is null ? "Not generated" : _project.QuotationId.Value.ToString("N")[..8].ToUpperInvariant());
 
+    private string ShippingSummary => FirstNonEmpty(
+        _project?.ShippingAddressLine,
+        _project?.ShippingRecipientName,
+        _project?.BillingAddressLine) ?? "-";
+
     private bool IsActive(string tab) => string.Equals(_activeTab, tab, StringComparison.Ordinal);
 
     private void EditProject() => Navigation.NavigateTo($"/sales/projects/new?resume={Id}");
@@ -635,6 +678,26 @@
         builder.CloseElement();
     }
 
+    private void AddQuoteSnapshotContent(RenderTreeBuilder content, int sequence, string cssClass)
+    {
+        content.OpenElement(sequence, "dl");
+        content.AddAttribute(sequence + 1, "class", cssClass);
+        AddSnapshot(content, sequence + 2, "Project status", builder =>
+        {
+            builder.OpenComponent<StatusBadge>(sequence + 3);
+            builder.AddAttribute(sequence + 4, "Status", FormatStatus(_project?.Status));
+            builder.CloseComponent();
+        });
+        AddSnapshot(content, sequence + 6, "Quote #", QuotationLabel);
+        AddSnapshot(content, sequence + 10, "Quote status", FormatStatus(_project?.QuotationStatus));
+        AddSnapshot(content, sequence + 14, "Valid until", FormatDate(_project?.ValidUntil));
+        AddSnapshot(content, sequence + 18, "Shipping", ShippingSummary);
+        AddSnapshot(content, sequence + 22, "Subtotal", FormatMoney(PartsSubtotal));
+        AddSnapshot(content, sequence + 26, "Discount", QuoteDiscount > 0m ? $"-{FormatMoney(QuoteDiscount)}" : FormatMoney(0m));
+        AddSnapshot(content, sequence + 30, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
+        content.CloseElement();
+    }
+
     private static void AddSnapshot(RenderTreeBuilder builder, int sequence, string label, string value)
     {
         AddSnapshot(builder, sequence, label, content => content.AddContent(sequence + 1, value));
@@ -658,6 +721,18 @@
         if (!string.IsNullOrWhiteSpace(@class))
             builder.AddAttribute(sequence++, "class", @class);
         builder.AddContent(sequence++, value);
+        builder.CloseElement();
+    }
+
+    private static void AddCustomerDetail(RenderTreeBuilder builder, int sequence, string label, string? value)
+    {
+        builder.OpenElement(sequence, "div");
+        builder.OpenElement(sequence + 1, "dt");
+        builder.AddContent(sequence + 2, label);
+        builder.CloseElement();
+        builder.OpenElement(sequence + 3, "dd");
+        builder.AddContent(sequence + 4, string.IsNullOrWhiteSpace(value) ? "-" : value);
+        builder.CloseElement();
         builder.CloseElement();
     }
 

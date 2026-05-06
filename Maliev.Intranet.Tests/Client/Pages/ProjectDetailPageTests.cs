@@ -45,13 +45,24 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Timeline", cut.Markup);
         Assert.Contains("Customer", cut.Markup);
         Assert.Contains("Axion Robotics", cut.Markup);
+        Assert.Contains("Axion Robotics Co., Ltd.", cut.Markup);
         Assert.Contains("QT-2026-0098", cut.Markup);
+        Assert.Contains("Shipping", cut.Markup);
+        Assert.Contains("2200 Industrial Pkwy", cut.Markup);
         Assert.Contains("Manufacturing summary", cut.Markup);
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("18,250.00", cut.Markup);
         Assert.Contains("Edit project", cut.Markup);
         Assert.Contains("Download quote", cut.Markup);
         Assert.Contains("Accept quote", cut.Markup);
+
+        var overview = cut.Find(".project-record-grid");
+        Assert.Contains("project-record-main-manufacturing", overview.InnerHtml);
+        Assert.Contains("project-overview-sidebar", overview.InnerHtml);
+        Assert.DoesNotContain("Customer", cut.Find(".project-field-grid-compact").TextContent);
+        Assert.Contains("project-snapshot-compact", cut.Markup);
+        Assert.Contains("project-customer-detail-grid", cut.Markup);
+        Assert.Contains("project-customer-address-block", cut.Markup);
     }
 
     [Fact]
@@ -171,6 +182,11 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-notes-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-note-audit", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-overview-sidebar", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-field-grid-compact", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-snapshot-compact", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-customer-detail-grid", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-customer-address-block", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(6)", css, StringComparison.Ordinal);
         Assert.Contains("text-align: right", css, StringComparison.Ordinal);
         Assert.Contains("width: 5%", css, StringComparison.Ordinal);
@@ -192,6 +208,21 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                 ProjectNumber = "PRJ-2026-0184",
                 CustomerId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 CustomerName = "Axion Robotics",
+                CustomerEmail = "engineering@axion.example",
+                CustomerPhone = "+66 2 555 0101",
+                CustomerStatus = "Active",
+                CustomerSegment = "Manufacturing",
+                CustomerTier = "Enterprise",
+                CustomerPreferredLanguage = "en",
+                CustomerTimezone = "Asia/Bangkok",
+                CustomerCompanyId = Guid.Parse("99999999-9999-9999-9999-999999999999"),
+                CustomerCompanyName = "Axion Robotics Co., Ltd.",
+                CustomerCompanyPhone = "+66 2 555 0100",
+                CustomerCompanyEmail = "ops@axion.example",
+                ShippingRecipientName = "Manufacturing Dock",
+                ShippingRecipientPhone = "+66 2 555 0199",
+                ShippingAddressLine = "2200 Industrial Pkwy, Fremont, CA 94538",
+                BillingAddressLine = "14 Finance Tower, Bangkok 10110",
                 Title = "Robot arm calibration fixture",
                 Status = "QuotationGenerated",
                 Currency = "THB",

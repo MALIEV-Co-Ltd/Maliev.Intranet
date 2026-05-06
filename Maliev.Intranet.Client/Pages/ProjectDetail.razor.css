@@ -50,7 +50,7 @@
 
 .project-record-shell ::deep .project-record-grid {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(330px, 1fr);
+    grid-template-columns: minmax(0, 2.2fr) minmax(340px, 520px);
     gap: 16px;
     align-items: start;
 }
@@ -59,6 +59,18 @@
 .project-record-shell ::deep .project-record-sidebar {
     display: grid;
     gap: 16px;
+}
+
+.project-record-shell ::deep .project-overview-sidebar {
+    gap: 12px;
+}
+
+.project-record-shell ::deep .project-overview-sidebar .mlv-panel-card {
+    padding: 16px;
+}
+
+.project-record-shell ::deep .project-information-card {
+    gap: 14px;
 }
 
 .project-record-shell ::deep .project-loading-grid {
@@ -70,6 +82,21 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 20px;
+}
+
+.project-record-shell ::deep .project-field-grid-compact {
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.project-record-shell ::deep .project-info-section-title {
+    padding-top: 12px;
+    border-top: 1px solid var(--maliev-border-subtle);
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
 }
 
 .project-record-shell ::deep .project-field {
@@ -372,6 +399,12 @@
     border-bottom: 1px solid var(--maliev-border-subtle);
 }
 
+.project-record-shell ::deep .project-snapshot-compact div {
+    grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr);
+    gap: 10px;
+    padding: 5px 0;
+}
+
 .project-record-shell ::deep .project-snapshot div:last-child {
     border-bottom: 0;
 }
@@ -391,9 +424,14 @@
     text-align: right;
 }
 
+.project-record-shell ::deep .project-snapshot-compact dd {
+    overflow-wrap: anywhere;
+    font-size: var(--maliev-font-small);
+}
+
 .project-record-shell ::deep .project-customer-panel {
     display: grid;
-    gap: 5px;
+    gap: 12px;
 }
 
 .project-record-shell ::deep .project-customer-panel strong {
@@ -401,14 +439,71 @@
     font-size: var(--maliev-font-large);
 }
 
-.project-record-shell ::deep .project-customer-panel span {
+.project-record-shell ::deep .project-customer-panel span,
+.project-record-shell ::deep .project-customer-panel small {
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
 }
 
+.project-record-shell ::deep .project-customer-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 14px;
+    margin: 0;
+}
+
+.project-record-shell ::deep .project-customer-detail-grid div {
+    min-width: 0;
+}
+
+.project-record-shell ::deep .project-customer-detail-grid dt,
+.project-record-shell ::deep .project-customer-detail-grid dd {
+    margin: 0;
+}
+
+.project-record-shell ::deep .project-customer-detail-grid dt,
+.project-record-shell ::deep .project-customer-address-block span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.project-record-shell ::deep .project-customer-detail-grid dd {
+    margin-top: 2px;
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.project-record-shell ::deep .project-customer-address-block {
+    display: grid;
+    gap: 3px;
+    padding: 10px;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+}
+
+.project-record-shell ::deep .project-customer-address-block strong {
+    font-size: var(--maliev-font-base);
+}
+
+.project-record-shell ::deep .project-customer-address-block p {
+    margin: 0;
+    color: var(--maliev-ink-2);
+    font-size: var(--maliev-font-small);
+    line-height: 1.4;
+}
+
+.project-record-shell ::deep .project-customer-id {
+    padding-top: 2px;
+}
+
 .project-record-shell ::deep .project-customer-panel a {
     width: fit-content;
-    margin-top: 8px;
     color: var(--maliev-info);
     font-size: var(--maliev-font-small);
     font-weight: 700;
@@ -453,6 +548,12 @@
     border-bottom: 1px solid var(--maliev-border-subtle);
 }
 
+.project-record-shell ::deep .project-overview-sidebar .project-timeline-item {
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px 0;
+}
+
 .project-record-shell ::deep .project-timeline-item:first-child {
     padding-top: 0;
 }
@@ -471,6 +572,12 @@
     box-shadow: 0 0 0 4px var(--maliev-panel-3);
 }
 
+.project-record-shell ::deep .project-overview-sidebar .project-timeline-dot {
+    width: 8px;
+    height: 8px;
+    box-shadow: 0 0 0 3px var(--maliev-panel-3);
+}
+
 .project-record-shell ::deep .project-timeline-item.completed .project-timeline-dot {
     background: var(--maliev-info);
     box-shadow: 0 0 0 4px var(--maliev-info-bg);
@@ -482,6 +589,10 @@
     font-size: var(--maliev-font-base);
     font-weight: 700;
     line-height: 1.35;
+}
+
+.project-record-shell ::deep .project-overview-sidebar .project-timeline-item strong {
+    font-size: var(--maliev-font-small);
 }
 
 .project-record-shell ::deep .project-timeline-item span:not(.project-timeline-dot) {
@@ -632,6 +743,7 @@
     }
 
     .project-record-shell ::deep .project-field-grid,
+    .project-record-shell ::deep .project-customer-detail-grid,
     .project-record-shell ::deep .project-metric-row {
         grid-template-columns: 1fr;
     }
