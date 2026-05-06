@@ -148,6 +148,22 @@ public class PartConfigSidebarTests
         Assert.Equal("pcs-root pcs-root--inline", GetRootClass(sidebar));
     }
 
+    [Fact]
+    public async Task OnNotesChanged_WhenValueProvided_UpdatesPartNotes()
+    {
+        var sidebar = new PartConfigSidebar();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "noted.stl",
+        };
+        SetPartParameter(sidebar, part);
+
+        await InvokePrivateTask(sidebar, "OnNotesChanged", "Deburr all outside edges.");
+
+        Assert.Equal("Deburr all outside edges.", part.PartNotes);
+    }
+
     private static async Task InvokeOnParametersSetAsync(PartConfigSidebar sidebar)
     {
         await InvokePrivateTask(sidebar, "OnParametersSetAsync");

@@ -55,6 +55,41 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectPartsBulkTable_WhenSelectedProcessIsFdm_HidesRoughnessBulkField()
+    {
+        var parts = CreateParts();
+        parts[0].ProcessCode = "FDM";
+        var selected = new HashSet<PartViewModel>(ReferenceEqualityComparer.Instance) { parts[0] };
+
+        var cut = RenderTable(parts, selected);
+
+        Assert.DoesNotContain("Roughness", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectPartsBulkTable_WhenSelectedProcessIsCnc_ShowsRoughnessBulkField()
+    {
+        var parts = CreateParts();
+        parts[0].ProcessCode = "CNC_MILL";
+        var selected = new HashSet<PartViewModel>(ReferenceEqualityComparer.Instance) { parts[0] };
+
+        var cut = RenderTable(parts, selected);
+
+        Assert.Contains("Roughness", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectPartsBulkTable_WhenPartSelected_RendersBulkNotesTextarea()
+    {
+        var parts = CreateParts();
+        var selected = new HashSet<PartViewModel>(ReferenceEqualityComparer.Instance) { parts[0] };
+
+        var cut = RenderTable(parts, selected);
+
+        Assert.NotEmpty(cut.FindAll("textarea.pbt-input--notes"));
+    }
+
+    [Fact]
     public void ProjectPartsBulkTable_WhenBulkProcessSelected_AppliesPatchImmediately()
     {
         var parts = CreateParts();

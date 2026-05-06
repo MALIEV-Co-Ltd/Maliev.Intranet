@@ -9,8 +9,20 @@
 
 <div class="pbt-root">
     <div class="pbt-header">
-        <div>
-            <div class="pbt-kicker">Table edit</div>
+        <div class="pbt-heading">
+            <div class="pbt-title-row">
+                <div class="pbt-kicker">Table edit</div>
+                @if (OnLayoutModeChanged.HasDelegate)
+                {
+                    <button type="button"
+                            class="pbt-icon-button pbt-configurator-button"
+                            title="Configurator"
+                            aria-label="Switch to configurator"
+                            @onclick="@(() => OnLayoutModeChanged.InvokeAsync(LayoutMode.Configurator))">
+                        <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                    </button>
+                }
+            </div>
             <div class="pbt-title">@Parts.Count part@(Parts.Count == 1 ? "" : "s")</div>
         </div>
         <div class="pbt-actions">
@@ -24,16 +36,6 @@
                                     Class="pbt-upload-zone"
                                     OnClick="@OnAddPart"
                                     OnFilesDropped="@OnAddPart" />
-            }
-            @if (OnLayoutModeChanged.HasDelegate)
-            {
-                <button type="button"
-                        class="pbt-icon-button pbt-configurator-button"
-                        title="Configurator"
-                        aria-label="Switch to configurator"
-                        @onclick="@(() => OnLayoutModeChanged.InvokeAsync(LayoutMode.Configurator))">
-                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
-                </button>
             }
             <button type="button"
                     class="pbt-action-button"
@@ -49,7 +51,7 @@
         <div class="pbt-bulk-panel">
             <div class="pbt-bulk-summary">
                 <strong>@SelectedCount selected</strong>
-                <span>Changes apply to compatible selected parts immediately.</span>
+                <span class="pbt-bulk-summary-note">Auto-applies compatible fields.</span>
             </div>
 
             <div class="pbt-bulk-grid">
@@ -117,11 +119,14 @@
                     }
                 </select>
 
-                <span class="pbt-bulk-field">Roughness</span>
-                <input class="pbt-input"
-                       value="@_bulkPatch.RoughnessCode"
-                       placeholder="RA_3_2"
-                       @onchange="OnBulkRoughnessChanged" />
+                @if (BulkSourceSupportsRoughness)
+                {
+                    <span class="pbt-bulk-field">Roughness</span>
+                    <input class="pbt-input"
+                           value="@_bulkPatch.RoughnessCode"
+                           placeholder="RA_3_2"
+                           @onchange="OnBulkRoughnessChanged" />
+                }
 
                 <span class="pbt-bulk-field">Threaded holes</span>
                 <label class="pbt-inline-check">
@@ -140,10 +145,11 @@
                 </label>
 
                 <span class="pbt-bulk-field">Notes</span>
-                <input class="pbt-input"
-                       value="@_bulkPatch.PartNotes"
-                       placeholder="Part note"
-                       @onchange="OnBulkNotesChanged" />
+                <textarea class="pbt-input pbt-input--notes"
+                          value="@_bulkPatch.PartNotes"
+                          placeholder="Part note"
+                          rows="3"
+                          @onchange="OnBulkNotesChanged"></textarea>
             </div>
         </div>
     }
@@ -598,6 +604,9 @@
     private PartViewModel? BulkSourcePart =>
         SelectedParts.FirstOrDefault(part => Parts.Contains(part));
 
+    private bool BulkSourceSupportsRoughness =>
+        IsCncProcessCode(BulkSourcePart?.ProcessCode);
+
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
@@ -657,6 +666,11 @@
         !string.IsNullOrWhiteSpace(part.ThumbnailLargeUrl)
             ? part.ThumbnailLargeUrl
             : part.ThumbnailSmallUrl;
+
+    private static bool IsCncProcessCode(string? processCode) =>
+        string.Equals(processCode, "CNC", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(processCode, "CNC_MILL", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(processCode, "CNC_TURN", StringComparison.OrdinalIgnoreCase);
 
     private async Task ToggleAllAsync()
     {

@@ -485,6 +485,18 @@
                     <BulkPricingTable Tiers="@_bulkTiers" CurrentQuantity="@Part!.Quantity" />
                 }
             </section>
+
+            @* ── Part Notes ─────────────────────────────────────────────────── *@
+            <section class="pcs-section">
+                <div class="pcs-section-header">
+                    <span class="pcs-section-title">Part Notes</span>
+                </div>
+                <textarea class="pcs-notes-input"
+                          value="@Part!.PartNotes"
+                          placeholder="Manufacturing notes for this part"
+                          rows="4"
+                          @onchange="@(e => OnNotesChanged(e.Value?.ToString()))"></textarea>
+            </section>
         </div>
 
         @* ── Production Routing ───────────────────────────────────────────── *@
@@ -1189,6 +1201,26 @@
                 border-color: var(--mud-palette-primary);
                 background: color-mix(in oklch, var(--mud-palette-primary) 12%, transparent);
                 color: var(--mud-palette-primary);
+            }
+
+            .pcs-notes-input {
+                width: 100%;
+                min-height: 96px;
+                padding: 8px 10px;
+                border: 1px solid var(--maliev-border);
+                border-radius: var(--maliev-radius-sm);
+                background: var(--maliev-panel);
+                color: var(--maliev-ink);
+                font: inherit;
+                font-size: 12px;
+                line-height: 1.4;
+                resize: vertical;
+                outline: none;
+            }
+
+            .pcs-notes-input:focus {
+                border-color: var(--mud-palette-primary);
+                box-shadow: 0 0 0 2px var(--maliev-accent-soft);
             }
 
             /* ── Production Routing Footer ────────────────────────────────────── */
