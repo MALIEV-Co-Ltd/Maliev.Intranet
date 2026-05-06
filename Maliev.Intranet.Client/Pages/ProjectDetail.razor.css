@@ -69,6 +69,18 @@
     color: var(--maliev-muted-2);
 }
 
+.project-record-shell ::deep .project-detail-header .mlv-page-meta {
+    gap: 10px;
+}
+
+.project-record-shell ::deep .project-detail-header .mlv-page-meta > span:first-child {
+    flex: 1 1 auto;
+}
+
+.project-record-shell ::deep .project-detail-header .mlv-page-meta > span:not(:first-child) {
+    color: var(--maliev-muted-2);
+}
+
 .project-record-shell ::deep .project-record-grid {
     display: grid;
     grid-template-columns: minmax(0, 2.2fr) minmax(340px, 520px);
@@ -92,6 +104,41 @@
 
 .project-record-shell ::deep .project-information-card {
     gap: 14px;
+}
+
+.project-record-shell ::deep .project-quote-terms {
+    display: grid;
+    gap: 0;
+}
+
+.project-record-shell ::deep .project-quote-terms div {
+    display: grid;
+    grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--maliev-border-subtle);
+}
+
+.project-record-shell ::deep .project-quote-terms div:last-child {
+    border-bottom: 0;
+}
+
+.project-record-shell ::deep .project-quote-terms dt,
+.project-record-shell ::deep .project-quote-terms dd {
+    margin: 0;
+}
+
+.project-record-shell ::deep .project-quote-terms dt {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.project-record-shell ::deep .project-quote-terms dd {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    font-weight: 800;
+    text-align: right;
+    overflow-wrap: anywhere;
 }
 
 .project-record-shell ::deep .project-loading-grid {
@@ -455,9 +502,19 @@
     gap: 12px;
 }
 
-.project-record-shell ::deep .project-customer-panel strong {
+.project-record-shell ::deep .project-customer-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+}
+
+.project-record-shell ::deep .project-customer-heading strong {
     color: var(--maliev-ink);
     font-size: var(--maliev-font-large);
+    line-height: 1.25;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .project-record-shell ::deep .project-customer-panel span,
@@ -509,7 +566,10 @@
 }
 
 .project-record-shell ::deep .project-customer-address-block strong {
+    color: var(--maliev-ink);
     font-size: var(--maliev-font-base);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
 }
 
 .project-record-shell ::deep .project-customer-address-block p {
@@ -520,7 +580,10 @@
 }
 
 .project-record-shell ::deep .project-customer-id {
-    padding-top: 2px;
+    justify-self: end;
+    color: var(--maliev-muted);
+    text-align: right;
+    white-space: nowrap;
 }
 
 .project-record-shell ::deep .project-customer-panel a {
@@ -704,7 +767,10 @@
 
 .project-record-shell ::deep .project-commercial-totals {
     display: grid;
+    width: min(100%, 430px);
+    justify-self: end;
     margin: 0;
+    margin-left: auto;
     padding: 12px 0 0;
     border-top: 1px solid var(--maliev-border);
 }

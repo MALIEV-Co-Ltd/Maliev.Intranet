@@ -50,7 +50,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Axion Robotics Co., Ltd.", cut.Markup);
         Assert.Contains("QT-2026-0098", cut.Markup);
         Assert.Contains("Shipping", cut.Markup);
+        Assert.Contains("Customer ID 11111111", cut.Markup);
         Assert.Contains("2200 Industrial Pkwy", cut.Markup);
+        Assert.Contains("14 Finance Tower", cut.Markup);
         Assert.Contains("Manufacturing summary", cut.Markup);
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("18,250.00", cut.Markup);
@@ -62,8 +64,15 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         var overview = cut.Find(".project-record-grid");
         Assert.Contains("project-record-main-manufacturing", overview.InnerHtml);
         Assert.Contains("project-overview-sidebar", overview.InnerHtml);
-        Assert.DoesNotContain("Customer", cut.Find(".project-field-grid-compact").TextContent);
-        Assert.Contains("project-snapshot-compact", cut.Markup);
+        var quoteTerms = cut.Find(".project-information-card").TextContent;
+        Assert.Contains("Quote terms", quoteTerms);
+        Assert.DoesNotContain("Project #", quoteTerms);
+        Assert.DoesNotContain("Title", quoteTerms);
+        Assert.DoesNotContain("Project status", quoteTerms);
+        Assert.DoesNotContain("QT-2026-0098", quoteTerms);
+        Assert.DoesNotContain("Shipping", quoteTerms);
+        Assert.Contains("project-quote-terms", cut.Markup);
+        Assert.Contains("project-customer-heading", cut.Markup);
         Assert.Contains("project-customer-detail-grid", cut.Markup);
         Assert.Contains("project-customer-address-block", cut.Markup);
     }
@@ -95,6 +104,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             Assert.DoesNotContain(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation");
         });
 
+        cut.Find("button[data-tab='quote']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("https://storage.example/quote.pdf", cut.Markup));
+
         cut.Find("button.project-accept-confirm").Click();
 
         cut.WaitForAssertion(() =>
@@ -124,6 +136,21 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("sensor-cover.3mf", cut.Markup);
         Assert.Contains("18,250.00", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectDetail_WhenTabQueryRequestsParts_RendersPartsTab()
+    {
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo($"/sales/projects/{_projectId}?tab=parts");
+
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("project-parts-panel", cut.Markup));
+
+        Assert.Contains("bracket-left.stl", cut.Markup);
+        Assert.Contains("sensor-cover.3mf", cut.Markup);
+        Assert.DoesNotContain("project-record-grid", cut.Markup);
     }
 
     [Fact]
@@ -211,6 +238,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-overview-sidebar", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-field-grid-compact", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-snapshot-compact", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-quote-terms", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-customer-heading", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-customer-detail-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-customer-address-block", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-quote-workspace", css, StringComparison.Ordinal);
@@ -370,7 +399,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         if (pathAndQuery.Equals($"/api/v1/quotations/{_quotationId}/pdf", StringComparison.Ordinal))
         {
-            return Json("https://storage.example/quote.pdf");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("https://storage.example/quote.pdf")
+            });
         }
 
         if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}/accept-quotation", StringComparison.Ordinal))

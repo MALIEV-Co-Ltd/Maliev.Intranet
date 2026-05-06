@@ -3,6 +3,7 @@
 @using Maliev.Intranet.Client.Helpers
 @using Maliev.Intranet.Shared.Dtos
 @using Microsoft.AspNetCore.Components.Rendering
+@using System.Text.Json
 @inject HttpClient Http
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
@@ -37,29 +38,37 @@
     }
     else
     {
-        <PageHeader Title="@ProjectTitle" Subtitle="@ProjectSubtitle" BackLabel="Projects" BackHref="/sales/projects">
-            <MudTooltip Text="Edit project">
-                <MudIconButton Class="project-action-edit project-header-icon-action"
-                               Icon="@Icons.Material.Outlined.Edit"
-                               Size="Size.Small"
-                               Variant="Variant.Outlined"
-                               Color="Color.Default"
-                               aria-label="Edit project"
-                               OnClick="@(_ => EditProject())" />
-            </MudTooltip>
-            <MudTooltip Text="@(_pdfLoading ? "Generating PDF" : "Generate PDF")">
-                <MudIconButton Class="project-action-download project-header-icon-action"
-                               Icon="@Icons.Material.Outlined.PictureAsPdf"
-                               Size="Size.Small"
-                               Variant="Variant.Outlined"
-                               Color="Color.Default"
-                               Disabled="@(!HasQuotation || _pdfLoading)"
-                               aria-label="Generate PDF"
-                               OnClick="@DownloadQuoteAsync" />
-            </MudTooltip>
-            <PrimaryButton Class="project-action-accept" Icon="@Icons.Material.Outlined.Check" Disabled="@(!CanAcceptQuote || _accepting)" OnClick="@(_ => OpenAcceptQuoteConfirmation())">
-                @AcceptQuoteButtonLabel
-            </PrimaryButton>
+        <PageHeader Title="@ProjectTitle" Subtitle="@ProjectSubtitle" BackLabel="Projects" BackHref="/sales/projects" Class="project-detail-header">
+            <HeaderMeta>
+                <span>@ProjectSubtitle</span>
+                <StatusBadge Status="@FormatStatus(_project?.Status)" />
+                <span>Created @FormatLocalDateTime(_project?.CreatedAt)</span>
+                <span>Updated @FormatLocalDateTime(_project?.UpdatedAt)</span>
+            </HeaderMeta>
+            <ChildContent>
+                <MudTooltip Text="Edit project">
+                    <MudIconButton Class="project-action-edit project-header-icon-action"
+                                   Icon="@Icons.Material.Outlined.Edit"
+                                   Size="Size.Small"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   aria-label="Edit project"
+                                   OnClick="@(_ => EditProject())" />
+                </MudTooltip>
+                <MudTooltip Text="@(_pdfLoading ? "Generating PDF" : "Generate PDF")">
+                    <MudIconButton Class="project-action-download project-header-icon-action"
+                                   Icon="@Icons.Material.Sharp.PictureAsPdf"
+                                   Size="Size.Small"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   Disabled="@(!HasQuotation || _pdfLoading)"
+                                   aria-label="Generate PDF"
+                                   OnClick="@DownloadQuoteAsync" />
+                </MudTooltip>
+                <PrimaryButton Class="project-action-accept" Icon="@Icons.Material.Outlined.Check" Disabled="@(!CanAcceptQuote || _accepting)" OnClick="@(_ => OpenAcceptQuoteConfirmation())">
+                    @AcceptQuoteButtonLabel
+                </PrimaryButton>
+            </ChildContent>
         </PageHeader>
 
         <nav class="project-record-tabs" aria-label="Project detail sections">
@@ -109,6 +118,10 @@
 @code {
     [Parameter] public Guid Id { get; set; }
 
+    [SupplyParameterFromQuery(Name = "tab")]
+    [Parameter]
+    public string? Tab { get; set; }
+
     private ProjectDetailDto? _project;
     private bool _loading = true;
     private bool _pdfLoading;
@@ -155,6 +168,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        ApplyRequestedTab();
         _loading = true;
         try
         {
@@ -168,6 +182,15 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private void ApplyRequestedTab()
+    {
+        var requestedTab = string.IsNullOrWhiteSpace(Tab) ? null : Tab.Trim().ToLowerInvariant();
+        if (requestedTab is not null && Tabs.Any(tab => tab.Key == requestedTab))
+        {
+            _activeTab = requestedTab;
         }
     }
 
@@ -194,25 +217,18 @@
     private RenderFragment RenderProjectInformation() => builder =>
     {
         builder.OpenComponent<PanelCard>(0);
-        builder.AddAttribute(1, "Title", "Project information");
+        builder.AddAttribute(1, "Title", "Quote terms");
         builder.AddAttribute(2, "Class", "project-information-card");
         builder.AddAttribute(3, "ChildContent", (RenderFragment)(content =>
         {
             content.OpenElement(4, "div");
-            content.AddAttribute(5, "class", "project-field-grid project-field-grid-compact");
-            AddReadOnlyField(content, 6, "Project #", ProjectTitle);
-            AddReadOnlyField(content, 14, "Title", _project?.Title);
-            AddReadOnlyField(content, 22, "Status", FormatStatus(_project?.Status));
-            AddReadOnlyField(content, 30, "Created", FormatDateTime(_project?.CreatedAt));
-            AddReadOnlyField(content, 38, "Updated", FormatDateTime(_project?.UpdatedAt));
+            content.AddAttribute(5, "class", "project-quote-terms");
+            AddSnapshot(content, 6, "Valid until", FormatDate(_project?.ValidUntil));
+            AddSnapshot(content, 10, "Currency", ProjectCurrency);
+            AddSnapshot(content, 14, "Subtotal", FormatMoney(PartsSubtotal));
+            AddSnapshot(content, 18, "Discount", QuoteDiscount > 0m ? $"-{FormatMoney(QuoteDiscount)}" : FormatMoney(0m));
+            AddSnapshot(content, 22, "Total", FormatMoney(_project?.TotalPrice ?? 0m));
             content.CloseElement();
-
-            content.OpenElement(46, "div");
-            content.AddAttribute(47, "class", "project-info-section-title");
-            content.AddContent(48, "Quote snapshot");
-            content.CloseElement();
-
-            AddQuoteSnapshotContent(content, 49, "project-snapshot project-snapshot-compact");
         }));
         builder.CloseComponent();
     };
@@ -266,61 +282,68 @@
         {
             content.OpenElement(3, "div");
             content.AddAttribute(4, "class", "project-customer-panel");
-            content.OpenElement(5, "strong");
-            content.AddContent(6, _project?.CustomerName ?? "Unknown customer");
+
+            content.OpenElement(5, "div");
+            content.AddAttribute(6, "class", "project-customer-heading");
+            content.OpenElement(7, "strong");
+            content.AddContent(8, _project?.CustomerName ?? "Unknown customer");
+            content.CloseElement();
+            content.OpenElement(9, "span");
+            content.AddAttribute(10, "class", "project-customer-id");
+            content.AddContent(11, $"Customer ID {_project?.CustomerId.ToString("N")[..8].ToUpperInvariant()}");
+            content.CloseElement();
             content.CloseElement();
 
-            content.OpenElement(7, "dl");
-            content.AddAttribute(8, "class", "project-customer-detail-grid");
-            AddCustomerDetail(content, 9, "Company", _project?.CustomerCompanyName);
-            AddCustomerDetail(content, 13, "Email", _project?.CustomerEmail);
-            AddCustomerDetail(content, 17, "Phone", _project?.CustomerPhone);
-            AddCustomerDetail(content, 21, "Status", FormatStatus(_project?.CustomerStatus));
-            AddCustomerDetail(content, 25, "Segment", _project?.CustomerSegment);
-            AddCustomerDetail(content, 29, "Tier", _project?.CustomerTier);
-            AddCustomerDetail(content, 33, "Language", _project?.CustomerPreferredLanguage?.ToUpperInvariant());
-            AddCustomerDetail(content, 37, "Timezone", _project?.CustomerTimezone);
+            content.OpenElement(12, "dl");
+            content.AddAttribute(13, "class", "project-customer-detail-grid");
+            AddCustomerDetail(content, 14, "Company", _project?.CustomerCompanyName);
+            AddCustomerDetail(content, 18, "Email", _project?.CustomerEmail);
+            AddCustomerDetail(content, 22, "Phone", _project?.CustomerPhone);
+            AddCustomerDetail(content, 26, "Status", FormatStatus(_project?.CustomerStatus));
+            AddCustomerDetail(content, 30, "Segment", _project?.CustomerSegment);
+            AddCustomerDetail(content, 34, "Tier", _project?.CustomerTier);
+            AddCustomerDetail(content, 38, "Language", _project?.CustomerPreferredLanguage?.ToUpperInvariant());
+            AddCustomerDetail(content, 42, "Timezone", _project?.CustomerTimezone);
             content.CloseElement();
 
-            content.OpenElement(41, "div");
-            content.AddAttribute(42, "class", "project-customer-address-block");
-            content.OpenElement(43, "span");
-            content.AddContent(44, "Shipping");
+            content.OpenElement(46, "div");
+            content.AddAttribute(47, "class", "project-customer-address-block");
+            content.OpenElement(48, "span");
+            content.AddContent(49, "Shipping");
             content.CloseElement();
-            content.OpenElement(45, "strong");
-            content.AddContent(46, _project?.ShippingRecipientName ?? "-");
+            content.OpenElement(50, "strong");
+            content.AddContent(51, _project?.ShippingRecipientName ?? "-");
             content.CloseElement();
-            content.OpenElement(47, "p");
-            content.AddContent(48, _project?.ShippingAddressLine ?? "-");
+            content.OpenElement(52, "p");
+            content.AddContent(53, _project?.ShippingAddressLine ?? "-");
             content.CloseElement();
             if (!string.IsNullOrWhiteSpace(_project?.ShippingRecipientPhone))
             {
-                content.OpenElement(49, "small");
-                content.AddContent(50, _project.ShippingRecipientPhone);
+                content.OpenElement(54, "small");
+                content.AddContent(55, _project.ShippingRecipientPhone);
                 content.CloseElement();
             }
             content.CloseElement();
 
             if (!string.IsNullOrWhiteSpace(_project?.BillingAddressLine))
             {
-                content.OpenElement(51, "div");
-                content.AddAttribute(52, "class", "project-customer-address-block");
-                content.OpenElement(53, "span");
-                content.AddContent(54, "Billing");
+                content.OpenElement(56, "div");
+                content.AddAttribute(57, "class", "project-customer-address-block");
+                content.OpenElement(58, "span");
+                content.AddContent(59, "Billing");
                 content.CloseElement();
-                content.OpenElement(55, "p");
-                content.AddContent(56, _project.BillingAddressLine);
+                content.OpenElement(60, "strong");
+                content.AddContent(61, FirstNonEmpty(_project.CustomerCompanyName, _project.CustomerName, "-"));
+                content.CloseElement();
+                content.OpenElement(62, "p");
+                content.AddContent(63, _project.BillingAddressLine);
                 content.CloseElement();
                 content.CloseElement();
             }
 
-            content.OpenElement(57, "span");
-            content.AddAttribute(58, "class", "project-customer-id");
-            content.AddContent(59, $"Customer ID {_project?.CustomerId.ToString("N")[..8].ToUpperInvariant()}");
-            content.CloseElement();
-            content.OpenElement(60, "a");
-            content.AddAttribute(61, "href", $"/customers/{_project?.CustomerId}");
-            content.AddContent(62, "Open customer record");
+            content.OpenElement(64, "a");
+            content.AddAttribute(65, "href", $"/customers/{_project?.CustomerId}");
+            content.AddContent(66, "Open customer record");
             content.CloseElement();
             content.CloseElement();
         }));
@@ -351,7 +374,7 @@
             content.OpenElement(8, "span");
             content.AddAttribute(9, "class", "project-document-icon");
             content.OpenComponent<MudIcon>(10);
-            content.AddAttribute(11, "Icon", Icons.Material.Outlined.PictureAsPdf);
+            content.AddAttribute(11, "Icon", Icons.Material.Sharp.PictureAsPdf);
             content.AddAttribute(12, "Size", Size.Medium);
             content.CloseComponent();
             content.CloseElement();
@@ -376,7 +399,7 @@
             content.OpenElement(36, "div");
             content.AddAttribute(37, "class", "project-panel-actions");
             content.OpenComponent<SecondaryButton>(38);
-            content.AddAttribute(39, "Icon", Icons.Material.Outlined.PictureAsPdf);
+            content.AddAttribute(39, "Icon", Icons.Material.Sharp.PictureAsPdf);
             content.AddAttribute(40, "Disabled", !HasQuotation || _pdfLoading);
             content.AddAttribute(41, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, DownloadQuoteAsync));
             content.AddContent(42, _pdfLoading ? "Generating PDF" : "Generate PDF");
@@ -707,11 +730,15 @@
                 return;
             }
 
-            var url = await response.Content.ReadFromJsonAsync<string>();
+            var url = await ReadPdfUrlAsync(response);
             if (!string.IsNullOrWhiteSpace(url))
             {
                 _quotePdfUrl = url;
                 await JS.InvokeVoidAsync("window.open", url, "_blank");
+            }
+            else
+            {
+                Snackbar.Add("Quotation PDF was generated but no document URL was returned.", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -722,6 +749,39 @@
         {
             _pdfLoading = false;
         }
+    }
+
+    private static async Task<string?> ReadPdfUrlAsync(HttpResponseMessage response)
+    {
+        var raw = (await response.Content.ReadAsStringAsync()).Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        if (Uri.TryCreate(raw.Trim('"'), UriKind.Absolute, out _))
+            return raw.Trim('"');
+
+        try
+        {
+            using var document = JsonDocument.Parse(raw);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.String)
+                return root.GetString();
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var propertyName in new[] { "storageUrl", "pdfUrl", "url" })
+                {
+                    if (root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String)
+                        return value.GetString();
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return null;
     }
 
     private async Task OpenGeneratedPdfAsync(MouseEventArgs _)

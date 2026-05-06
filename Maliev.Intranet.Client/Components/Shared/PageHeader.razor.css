@@ -48,6 +48,27 @@
     font-size: var(--maliev-font-small);
 }
 
+.mlv-page-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin-top: 2px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.mlv-page-meta > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mlv-page-meta > span:not(:first-child) {
+    flex: 0 0 auto;
+}
+
 .mlv-page-actions {
     display: flex;
     align-items: center;
@@ -62,6 +83,10 @@
 
     .mlv-page-actions {
         width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .mlv-page-meta {
         flex-wrap: wrap;
     }
 }
