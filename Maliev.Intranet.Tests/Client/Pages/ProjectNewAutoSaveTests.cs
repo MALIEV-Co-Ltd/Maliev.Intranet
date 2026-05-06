@@ -1150,6 +1150,9 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             Assert.Contains("Standard", json.RootElement.GetProperty("deliveryExpectations").GetString(), StringComparison.Ordinal);
         }
         Assert.EndsWith($"/sales/projects/{projectId}", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
+        var snackbar = Services.GetRequiredService<ISnackbar>();
+        Assert.Contains(snackbar.ShownSnackbars, item => item.Message == "Project updated and quotation regenerated.");
+        Assert.DoesNotContain(snackbar.ShownSnackbars, item => item.Message == "Project and quotation created successfully!");
     }
 
     [Fact]

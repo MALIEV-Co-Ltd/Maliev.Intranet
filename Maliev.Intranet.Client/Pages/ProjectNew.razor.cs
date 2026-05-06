@@ -2445,10 +2445,11 @@ public partial class ProjectNew : IAsyncDisposable
         try
         {
             Guid projectId;
+            var isUpdatingExistingProject = _serverProjectId.HasValue;
 
-            if (_serverProjectId.HasValue)
+            if (isUpdatingExistingProject)
             {
-                projectId = _serverProjectId.Value;
+                projectId = _serverProjectId.GetValueOrDefault();
 
                 var updateResponse = await Http.PutAsJsonAsync($"api/v1/projects/{projectId}", new { Title = _title });
                 if (!updateResponse.IsSuccessStatusCode)
@@ -2505,8 +2506,8 @@ public partial class ProjectNew : IAsyncDisposable
                 var errorContent = await quoteResponse.Content.ReadAsStringAsync();
                 Snackbar.Add(
                     string.IsNullOrWhiteSpace(errorContent)
-                        ? "Project created but quotation generation failed."
-                        : $"Project created but quotation generation failed. {errorContent}",
+                        ? BuildQuotationGenerationFailureMessage(isUpdatingExistingProject)
+                        : $"{BuildQuotationGenerationFailureMessage(isUpdatingExistingProject)} {errorContent}",
                     Severity.Warning);
                 Navigation.NavigateTo($"/sales/projects/{projectId}");
                 return;
@@ -2517,7 +2518,7 @@ public partial class ProjectNew : IAsyncDisposable
 
             await JS.InvokeVoidAsync("sessionStorage.removeItem", DraftStorageKey);
 
-            Snackbar.Add("Project and quotation created successfully!", Severity.Success);
+            Snackbar.Add(BuildQuotationGenerationSuccessMessage(isUpdatingExistingProject), Severity.Success);
             Navigation.NavigateTo($"/sales/projects/{projectId}");
         }
         catch (Exception ex)
@@ -2529,6 +2530,16 @@ public partial class ProjectNew : IAsyncDisposable
             _saving = false;
         }
     }
+
+    private static string BuildQuotationGenerationSuccessMessage(bool isUpdatingExistingProject) =>
+        isUpdatingExistingProject
+            ? "Project updated and quotation regenerated."
+            : "Project created and quotation generated.";
+
+    private static string BuildQuotationGenerationFailureMessage(bool isUpdatingExistingProject) =>
+        isUpdatingExistingProject
+            ? "Project updated but quotation generation failed."
+            : "Project created but quotation generation failed.";
 
     private async Task<bool> SyncProjectPartsForQuoteAsync(Guid projectId)
     {
