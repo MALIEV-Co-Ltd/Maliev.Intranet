@@ -52,6 +52,21 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void NotFoundPage_UsesAnimatedSearchingEyes()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "NotFound.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "NotFound.razor.css");
+
+        Assert.Contains("not-found-eyes", page, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Animated eyes looking around\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Icons.Material.Outlined.SearchOff", page, StringComparison.Ordinal);
+        Assert.Contains(".not-found-eyes::before", styles, StringComparison.Ordinal);
+        Assert.Contains(".not-found-eyes::after", styles, StringComparison.Ordinal);
+        Assert.Contains("@keyframes not-found-looking-around", styles, StringComparison.Ordinal);
+        Assert.Contains("background-position: 65% 65%", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_DoesNotContainDesignIterationDisplayTweaks()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");

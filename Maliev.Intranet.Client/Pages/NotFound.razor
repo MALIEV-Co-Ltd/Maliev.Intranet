@@ -1,9 +1,13 @@
 @page "/not-found"
 @layout MainLayout
 
-<div class="d-flex flex-column align-center justify-center pa-12">
-    <MudIcon Icon="@Icons.Material.Outlined.SearchOff" Style="font-size: 64px;" Color="Color.Default" Class="mb-4 opacity-40" />
-    <MudText Typo="Typo.h5" Style="font-weight: 700;">Page Not Found</MudText>
-    <MudText Typo="Typo.body2" Color="Color.Default" Class="mt-2">The content you are looking for does not exist.</MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mt-6">Go to Dashboard</MudButton>
+<PageTitle>Page Not Found - MALIEV Intranet</PageTitle>
+
+<div class="not-found-page">
+    <div class="not-found-eyes" role="img" aria-label="Animated eyes looking around"></div>
+    <MudText Typo="Typo.h5" Class="not-found-title">Page Not Found</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Default" Class="not-found-message">
+        The content you are looking for does not exist.
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="not-found-action">Go to Dashboard</MudButton>
 </div>
