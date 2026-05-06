@@ -37,6 +37,24 @@ public class JobsControllerTests
         Stats = new() { InProgressCount = 1 }
     };
 
+    private static object SampleKanbanQueue() => new
+    {
+        Queued = new[]
+        {
+            new
+            {
+                JobId,
+                OrderId = Guid.NewGuid(),
+                Technology = "FDM",
+                MaterialId = Guid.NewGuid(),
+                AssignedMachineId = (string?)null,
+                Priority = 4,
+                EstimatedPrintTimeMinutes = 120,
+                StartedAt = (DateTime?)null
+            }
+        }
+    };
+
     private static JobServiceClient MakeClient<T>(T responseBody, HttpStatusCode code = HttpStatusCode.OK)
     {
         var handler = new MockHttpMessageHandler((_, _) =>
@@ -92,7 +110,7 @@ public class JobsControllerTests
     [Fact]
     public async Task GetQueue_WhenServiceReturnsQueue_ShouldReturnOkWithJobs()
     {
-        var controller = Make(MakeClient(SampleQueue()));
+        var controller = Make(MakeClient(SampleKanbanQueue()));
         var result = await controller.GetQueue(CancellationToken.None);
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<ProductionQueueDto>(ok.Value);
@@ -114,13 +132,12 @@ public class JobsControllerTests
     [Fact]
     public async Task GetStats_WhenServiceReturnsStats_ShouldReturnCorrectCounts()
     {
-        var stats = new JobStatsDto { QueuedCount = 5, InProgressCount = 3, OverdueCount = 1 };
-        var controller = Make(MakeClient(stats));
+        var controller = Make(MakeClient(SampleKanbanQueue()));
         var result = await controller.GetStats(CancellationToken.None);
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<JobStatsDto>(ok.Value);
-        Assert.Equal(5, dto.QueuedCount);
-        Assert.Equal(1, dto.OverdueCount);
+        Assert.Equal(1, dto.QueuedCount);
+        Assert.Equal(0, dto.OverdueCount);
     }
 
     // ── GET /{id} ─────────────────────────────────────────────────────────────
