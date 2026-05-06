@@ -109,11 +109,24 @@
     private bool _uploading;
     private Guid? _selectedFileId;
     private Guid? _hoveredFileId;
+    private Guid? _renderedPartId;
     private string? _previewUrl;
 
-    private async Task HandleFilesSelected(IReadOnlyList<IBrowserFile> files) => await UploadFilesAsync(files);
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (_renderedPartId == Part.FileId)
+            return;
 
-    private async Task UploadFilesAsync(IReadOnlyList<IBrowserFile>? files)
+        _renderedPartId = Part.FileId;
+        _selectedFileId = null;
+        _hoveredFileId = null;
+        _previewUrl = null;
+    }
+
+    private async Task HandleFilesSelected(IReadOnlyList<IBrowserFile> files) => await UploadFilesAsync(Part, files);
+
+    private async Task UploadFilesAsync(PartViewModel targetPart, IReadOnlyList<IBrowserFile>? files)
     {
         if (files == null || files.Count == 0) return;
         _uploading = true;
@@ -133,15 +146,15 @@
                 var stream = file.OpenReadStream(UploadSettings.DrawingLimit);
                 content.Add(new StreamContent(stream), "files", file.Name);
 
-                var url = $"api/v1/uploads/attachments?projectId={TempProjectId}&partId={Part.FileId}&kind=Drawing";
+                var url = $"api/v1/uploads/attachments?projectId={TempProjectId}&partId={targetPart.FileId}&kind=Drawing";
                 var resp = await Http.PostAsync(url, content);
                 if (resp.IsSuccessStatusCode)
                 {
                     var added = await resp.Content.ReadFromJsonAsync<List<DraftProjectAttachmentDto>>();
                     if (added != null)
                     {
-                        Part.DrawingFiles.AddRange(added);
-                        await OnPartChanged.InvokeAsync(Part);
+                        targetPart.DrawingFiles.AddRange(added);
+                        await OnPartChanged.InvokeAsync(targetPart);
                     }
                 }
                 else
