@@ -252,6 +252,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         cut.WaitForAssertion(() => Assert.Contains("project-parts-panel", cut.Markup));
 
+        Assert.Contains("project-record-body--parts", cut.Markup);
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("sensor-cover.3mf", cut.Markup);
         Assert.DoesNotContain("project-record-grid", cut.Markup);
@@ -378,10 +379,13 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         var css = File.ReadAllText(cssPath);
 
         Assert.Contains("::deep .project-record-body", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-record-body--parts", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-header-subtitle", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-header-icon-action", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-field-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-metric-row", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-parts-panel", css, StringComparison.Ordinal);
+        Assert.Contains(".project-parts-panel .project-table-wrap", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-material-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-material-swatch", css, StringComparison.Ordinal);

@@ -50,9 +50,15 @@
 
 .project-record-shell ::deep .project-record-body {
     flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
     overflow: hidden;
     padding: 20px;
+}
+
+.project-record-shell ::deep .project-record-body--parts {
+    align-items: stretch;
 }
 
 .project-record-shell ::deep .project-header-icon-action {
@@ -228,6 +234,19 @@
     width: 100%;
     overflow-x: auto;
     min-height: 0;
+}
+
+.project-record-shell ::deep .project-parts-panel {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.project-record-shell ::deep .project-parts-panel .project-table-wrap {
+    flex: 1 1 auto;
+    overflow: auto;
 }
 
 .project-record-shell ::deep .project-table-wrap.compact {

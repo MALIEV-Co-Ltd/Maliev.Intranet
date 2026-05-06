@@ -83,7 +83,7 @@
             }
         </nav>
 
-        <PageBody Class="project-record-body">
+        <PageBody Class="@ProjectRecordBodyClass">
             @if (_activeTab == "overview")
             {
                 @RenderOverview()
@@ -210,6 +210,8 @@
             : $"{_project.Title} - {_project.CustomerName} • Last updated on {FormatLocalDateTime(_project.UpdatedAt ?? _project.CreatedAt)}";
 
     private string ProjectCurrency => string.IsNullOrWhiteSpace(_project?.Currency) ? "THB" : _project.Currency;
+
+    private string ProjectRecordBodyClass => $"project-record-body project-record-body--{_activeTab}";
 
     private bool HasQuotation => _project?.QuotationId is not null;
 
