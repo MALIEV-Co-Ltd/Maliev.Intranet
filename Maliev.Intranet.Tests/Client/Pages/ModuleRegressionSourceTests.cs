@@ -158,12 +158,11 @@ public class ModuleRegressionSourceTests
 
         Assert.Contains("@page \"/admin/system-health\"", page, StringComparison.Ordinal);
         Assert.Contains("DomainGroup", page, StringComparison.Ordinal);
-        Assert.Contains("system-health-grid", page, StringComparison.Ordinal);
         Assert.Contains("PanelCard Title=\"Services\"", page, StringComparison.Ordinal);
-        Assert.Contains("PanelCard Title=\"Current Probe Details\"", page, StringComparison.Ordinal);
         Assert.Contains("_history.Services.OrderBy(s => s.ServiceName)", page, StringComparison.Ordinal);
-        Assert.Contains("_health.Services.OrderBy(s => s.ServiceName)", page, StringComparison.Ordinal);
+        Assert.Contains("CurrentServices.FirstOrDefault(s => s.ServiceName == service.ServiceName)", page, StringComparison.Ordinal);
         Assert.DoesNotContain("ToggleDetails", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("PanelCard Title=\"Current Probe Details\"", page, StringComparison.Ordinal);
         Assert.DoesNotContain("GroupBy(s => s.DomainGroup)", page, StringComparison.Ordinal);
         Assert.Contains("LivenessPath", page, StringComparison.Ordinal);
         Assert.Contains("ReadinessPath", page, StringComparison.Ordinal);
@@ -175,9 +174,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("7 days ago", page, StringComparison.Ordinal);
         Assert.Contains("% uptime", page, StringComparison.Ordinal);
         Assert.Contains("no data", page, StringComparison.Ordinal);
-        Assert.Contains("grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.9fr)", styles, StringComparison.Ordinal);
-        Assert.Contains("system-health-detail-list", styles, StringComparison.Ordinal);
         Assert.Contains("system-health-probe-grid", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain("system-health-detail-list", styles, StringComparison.Ordinal);
         Assert.Contains("display: flex", styles, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 0", styles, StringComparison.Ordinal);
         Assert.Contains("overflow: hidden", styles, StringComparison.Ordinal);
