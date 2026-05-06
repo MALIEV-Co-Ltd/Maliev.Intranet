@@ -441,6 +441,8 @@ public class PartViewModel
                 cnc.RequiresEdm ||
                 cnc.RequiresGrinding,
 
+            DfmReport dto => dto.Issues.Count > 0,
+
             _ => false
         };
     }

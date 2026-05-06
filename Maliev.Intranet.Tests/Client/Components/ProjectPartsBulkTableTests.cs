@@ -78,6 +78,60 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectPartsBulkTable_WhenDfmReviewBadgeClicked_RaisesReviewAction()
+    {
+        var parts = CreateParts();
+        parts[0].ProcessCode = "FDM";
+        parts[0].FdmDfmReport = new DfmReport
+        {
+            ReportType = "FDM",
+            Issues =
+            [
+                new Maliev.Intranet.Shared.Dtos.DfmIssue
+                {
+                    Category = "thin_wall",
+                    Severity = "warning",
+                    Title = "Thin wall",
+                },
+            ],
+        };
+        parts[0].ResolveDfmReport();
+        ProjectPartDfmActionRequest? request = null;
+
+        var cut = RenderTable(
+            parts,
+            dfmAction: EventCallback.Factory.Create<ProjectPartDfmActionRequest>(
+                this,
+                value => request = value));
+
+        cut.Find(".pbt-dfm--warning").Click();
+
+        Assert.NotNull(request);
+        Assert.Same(parts[0], request.Part);
+        Assert.Equal(ProjectPartDfmAction.Review, request.Action);
+    }
+
+    [Fact]
+    public void ProjectPartsBulkTable_WhenUnavailableBadgeClicked_RaisesRetryAction()
+    {
+        var parts = CreateParts();
+        parts[0].DfmAnalysisTimedOut = true;
+        ProjectPartDfmActionRequest? request = null;
+
+        var cut = RenderTable(
+            parts,
+            dfmAction: EventCallback.Factory.Create<ProjectPartDfmActionRequest>(
+                this,
+                value => request = value));
+
+        cut.Find(".pbt-dfm--error").Click();
+
+        Assert.NotNull(request);
+        Assert.Same(parts[0], request.Part);
+        Assert.Equal(ProjectPartDfmAction.Retry, request.Action);
+    }
+
+    [Fact]
     public void ProjectPartsBulkTable_WhenDuplicateFileIdsExist_SelectsByPartReference()
     {
         var sharedFileId = Guid.NewGuid();
@@ -140,13 +194,15 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
     private RenderedComponent<ProjectPartsBulkTable> RenderTable(
         List<PartViewModel> parts,
         IReadOnlyCollection<PartViewModel>? selectedParts = null,
-        EventCallback<ProjectPartsBulkApplyRequest> bulkApply = default)
+        EventCallback<ProjectPartsBulkApplyRequest> bulkApply = default,
+        EventCallback<ProjectPartDfmActionRequest> dfmAction = default)
     {
         return Render<ProjectPartsBulkTable>(parameters => parameters
             .Add(p => p.Parts, parts)
             .Add(p => p.SelectedParts, selectedParts ?? [])
             .Add(p => p.Processes, [new ProcessDto(Guid.NewGuid(), "FDM", "FDM", null, 10)])
-            .Add(p => p.OnBulkApply, bulkApply));
+            .Add(p => p.OnBulkApply, bulkApply)
+            .Add(p => p.OnDfmAction, dfmAction));
     }
 
     private static List<PartViewModel> CreateParts()

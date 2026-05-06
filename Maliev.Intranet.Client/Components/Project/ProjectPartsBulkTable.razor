@@ -282,7 +282,13 @@
                             }
                         </td>
                         <td>
-                            <span class="@ResolveDfmClass(part)">@ResolveDfmText(part)</span>
+                            <button type="button"
+                                    class="@ResolveDfmClass(part)"
+                                    disabled="@(!CanUseDfmBadge(part))"
+                                    title="@ResolveDfmTitle(part)"
+                                    @onclick="@(() => ActivateDfmBadgeAsync(part))">
+                                @ResolveDfmText(part)
+                            </button>
                         </td>
                         <td class="pbt-col-actions">
                             <div class="pbt-row-actions">
@@ -380,7 +386,13 @@
 
                 <div class="pbt-card-meta">
                     <span>@ResolvePrice(part)</span>
-                    <span class="@ResolveDfmClass(part)">@ResolveDfmText(part)</span>
+                    <button type="button"
+                            class="@ResolveDfmClass(part)"
+                            disabled="@(!CanUseDfmBadge(part))"
+                            title="@ResolveDfmTitle(part)"
+                            @onclick="@(() => ActivateDfmBadgeAsync(part))">
+                        @ResolveDfmText(part)
+                    </button>
                 </div>
 
                 <div class="pbt-card-grid">
@@ -511,6 +523,9 @@
 
     /// <summary>Callback invoked when the user opens the 3-D viewer for a part.</summary>
     [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
+
+    /// <summary>Callback invoked when the user activates a DFM status badge.</summary>
+    [Parameter] public EventCallback<ProjectPartDfmActionRequest> OnDfmAction { get; set; }
 
     /// <summary>Callback invoked when the user removes a part.</summary>
     [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
@@ -769,6 +784,21 @@
         });
     }
 
+    private async Task ActivateDfmBadgeAsync(PartViewModel part)
+    {
+        if (!CanUseDfmBadge(part))
+            return;
+
+        var action = part.DfmAnalysisTimedOut && part.DfmReport == null
+            ? ProjectPartDfmAction.Retry
+            : ProjectPartDfmAction.Review;
+
+        if (OnDfmAction.HasDelegate)
+            await OnDfmAction.InvokeAsync(new ProjectPartDfmActionRequest(part, action));
+        else if (action == ProjectPartDfmAction.Review && OnOpenViewer.HasDelegate)
+            await OnOpenViewer.InvokeAsync(part);
+    }
+
     private static bool IsChecked(ChangeEventArgs args) =>
         args.Value is bool checkedValue && checkedValue;
 
@@ -802,27 +832,44 @@
             : "Not priced";
     }
 
+    private static bool CanUseDfmBadge(PartViewModel part) =>
+        part.DfmAnalysisTimedOut ||
+        part.DfmReport != null ||
+        part.HasProcessRelevantDfmIssues;
+
     private static string ResolveDfmText(PartViewModel part)
     {
-        if (part.DfmAnalysisTimedOut)
-            return "Unavailable";
         if (part.RequiresDfmAcknowledgement)
             return "Review";
         if (part.DfmReport != null)
             return "Ready";
+        if (part.DfmAnalysisTimedOut)
+            return "Retry";
         if (part.ProcessId.HasValue)
             return "Pending";
 
         return "No process";
     }
 
+    private static string ResolveDfmTitle(PartViewModel part)
+    {
+        if (part.DfmAnalysisTimedOut)
+            return "Retry DFM analysis";
+        if (part.RequiresDfmAcknowledgement)
+            return "Open DFM review";
+        if (part.DfmReport != null)
+            return "Open DFM report";
+
+        return "DFM not ready";
+    }
+
     private static string ResolveDfmClass(PartViewModel part) =>
-        part.DfmAnalysisTimedOut
-            ? "pbt-dfm pbt-dfm--error"
-            : part.RequiresDfmAcknowledgement
-                ? "pbt-dfm pbt-dfm--warning"
-                : part.DfmReport != null
-                    ? "pbt-dfm pbt-dfm--ready"
+        part.RequiresDfmAcknowledgement
+            ? "pbt-dfm pbt-dfm--warning"
+            : part.DfmReport != null
+                ? "pbt-dfm pbt-dfm--ready"
+                : part.DfmAnalysisTimedOut
+                    ? "pbt-dfm pbt-dfm--error"
                     : "pbt-dfm";
 
     private static string ResolvePartMeta(PartViewModel part)

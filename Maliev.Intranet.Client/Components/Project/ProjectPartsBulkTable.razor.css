@@ -296,14 +296,27 @@
 .pbt-dfm {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     min-height: 22px;
     padding: 0 7px;
     border: 1px solid var(--maliev-border);
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel-3);
     color: var(--maliev-muted);
+    font: inherit;
     font-size: 11px;
     font-weight: 700;
+    cursor: pointer;
+}
+
+.pbt-dfm:disabled {
+    cursor: default;
+}
+
+.pbt-dfm:not(:disabled):hover,
+.pbt-dfm:not(:disabled):focus-visible {
+    border-color: var(--mud-palette-primary);
+    outline: none;
 }
 
 .pbt-dfm--ready {

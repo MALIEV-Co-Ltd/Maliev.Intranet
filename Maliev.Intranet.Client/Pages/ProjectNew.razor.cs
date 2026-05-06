@@ -972,6 +972,9 @@ public partial class ProjectNew : IAsyncDisposable
         var processCode = process.Code;
         try
         {
+            ResetProcessDfmStateForRetry(part, processCode);
+            await InvokeAsync(StateHasChanged);
+
             using var response = await Http.PostAsJsonAsync(
                 $"api/v1/geometry/{part.FileId}/dfm/{Uri.EscapeDataString(processCode)}",
                 new GeometryAnalysisRequest { StoragePath = part.StoragePath });
@@ -1005,8 +1008,14 @@ public partial class ProjectNew : IAsyncDisposable
             }
             else
             {
-                part.DfmAnalysisTimedOut = true;
-                part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+                var result = await response.Content.ReadFromJsonAsync<DfmAnalysisResponse>();
+                if (result?.DfmReport != null)
+                    await ApplyDfmAnalysisResultAsync(part, processCode, result);
+                else
+                {
+                    part.DfmAnalysisTimedOut = true;
+                    part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+                }
             }
         }
         catch (Exception)
@@ -1054,6 +1063,52 @@ public partial class ProjectNew : IAsyncDisposable
             await ResolveOverlayUrlsAsync(part);
         }
 
+        part.DfmAnalysisTimedOut = false;
+        part.AnalysisErrorCode = null;
+    }
+
+    private async Task HandleBulkTableDfmActionAsync(ProjectPartDfmActionRequest request)
+    {
+        if (!_parts.Contains(request.Part))
+            return;
+
+        if (request.Action == ProjectPartDfmAction.Review)
+        {
+            var index = _parts.IndexOf(request.Part);
+            if (index >= 0)
+                _selectedPartIndex = index;
+
+            _layoutMode = LayoutMode.Configurator;
+            await OpenBabylonViewer(request.Part);
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        await RetryDfmAnalysisAsync(request.Part);
+    }
+
+    private async Task RetryDfmAnalysisAsync(PartViewModel part)
+    {
+        var process = _processes.FirstOrDefault(item =>
+            string.Equals(item.Code, part.ProcessCode, StringComparison.OrdinalIgnoreCase));
+
+        if (process == null)
+            return;
+
+        await RunProcessDfmAnalysisAsync(part, process);
+    }
+
+    private static void ResetProcessDfmStateForRetry(PartViewModel part, string processCode)
+    {
+        var upperProcessCode = processCode.ToUpperInvariant();
+        if (upperProcessCode is "SLA" or "SLA_DLP" or "DLP")
+            part.SlaDfmReport = null;
+        else if (upperProcessCode is "CNC" or "CNC_MILL" or "CNC_TURN")
+            part.CncDfmReport = null;
+        else
+            part.FdmDfmReport = null;
+
+        part.DfmReport = null;
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
     }
@@ -1377,6 +1432,10 @@ public partial class ProjectNew : IAsyncDisposable
                     {
                         partApplied = true;
                         await OnPartChanged(part);
+                        _ = RunProcessDfmAnalysisAsync(part, request.Patch.Process);
+                    }
+                    else if (part.DfmAnalysisTimedOut || part.DfmReport == null)
+                    {
                         _ = RunProcessDfmAnalysisAsync(part, request.Patch.Process);
                     }
                 }
@@ -2481,11 +2540,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     private static void ClearDfmUnavailableState(PartViewModel part)
     {
-        if (!part.DfmAnalysisTimedOut
-            || !string.Equals(
-                part.AnalysisErrorCode,
-                DfmStatusMessages.PersistedDfmReportUnavailable,
-                StringComparison.Ordinal))
+        if (!part.DfmAnalysisTimedOut)
         {
             return;
         }
