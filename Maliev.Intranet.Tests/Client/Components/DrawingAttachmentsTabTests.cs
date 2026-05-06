@@ -134,6 +134,57 @@ public sealed class DrawingAttachmentsTabTests : BunitContext, IAsyncLifetime
         Assert.All(requestedPartIds, partId => Assert.Equal(firstPart.FileId.ToString(), partId));
     }
 
+    [Fact]
+    public async Task HandleFilesSelected_WhenAnotherPartIsUploading_KeepsCurrentPartUploadUiEnabled()
+    {
+        var firstPart = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "first.stp",
+        };
+        var secondPart = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "second.stp",
+        };
+        var firstRequestStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseUpload = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/api/v1/uploads/attachments")
+            {
+                firstRequestStarted.TrySetResult(null);
+                await releaseUpload.Task.WaitAsync(ct);
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("[]", Encoding.UTF8, "application/json"),
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        };
+
+        var cut = Render<DrawingAttachmentsTab>(parameters => parameters
+            .Add(p => p.Part, firstPart)
+            .Add(p => p.TempProjectId, Guid.NewGuid()));
+
+        var uploadTask = InvokeHandleFilesSelectedAsync(cut, [new TestBrowserFile("drawing-a.pdf")]);
+        await firstRequestStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        typeof(DrawingAttachmentsTab)
+            .GetProperty(nameof(DrawingAttachmentsTab.Part))!
+            .SetValue(cut.Instance, secondPart);
+        cut.Render();
+
+        Assert.DoesNotContain("dat-uploading", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("pointer-events:auto", cut.Markup, StringComparison.Ordinal);
+
+        releaseUpload.SetResult(null);
+        await uploadTask;
+    }
+
     private static async Task InvokeHandleFilesSelectedAsync(
         RenderedComponent<DrawingAttachmentsTab> cut,
         IReadOnlyList<IBrowserFile> files)

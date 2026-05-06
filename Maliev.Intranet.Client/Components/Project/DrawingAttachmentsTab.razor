@@ -18,7 +18,7 @@
                            Accept="@FileTypes.DrawingAcceptString"
                            MaximumFileCount="10">
                 <CustomContent>
-                    <div style="opacity:@(_uploading ? "0.5" : "1"); pointer-events:@(_uploading ? "none" : "auto");">
+                    <div style="opacity:@(IsCurrentPartUploading ? "0.5" : "1"); pointer-events:@(IsCurrentPartUploading ? "none" : "auto");">
                         <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
                                             MaxFileSizeLabel="@($"max {UploadSettings.DrawingLimit / 1048576} MB")"
                                             Label="Drop drawings here or click to upload"
@@ -30,7 +30,7 @@
             </MudFileUpload>
         </div>
 
-        @if (_uploading)
+        @if (IsCurrentPartUploading)
         {
             <div class="dat-uploading">
                 <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
@@ -74,7 +74,7 @@
                 }
             </div>
         }
-        else if (!_uploading)
+        else if (!IsCurrentPartUploading)
         {
             <div class="dat-empty">
                 <MudIcon Icon="@Icons.Material.Outlined.Image" Color="Color.Default" Size="Size.Large" />
@@ -105,11 +105,14 @@
     [Parameter] public Guid TempProjectId { get; set; }
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
 
-    private bool _uploading;
+    private readonly HashSet<Guid> _uploadingPartIds = [];
     private Guid? _selectedFileId;
     private Guid? _hoveredFileId;
     private Guid? _renderedPartId;
     private string? _previewUrl;
+
+    private bool IsCurrentPartUploading =>
+        Part.FileId != Guid.Empty && _uploadingPartIds.Contains(Part.FileId);
 
     /// <inheritdoc />
     protected override void OnParametersSet()
@@ -128,47 +131,53 @@
     private async Task UploadFilesAsync(PartViewModel targetPart, IReadOnlyList<IBrowserFile>? files)
     {
         if (files == null || files.Count == 0) return;
-        _uploading = true;
+        if (targetPart.FileId == Guid.Empty || !_uploadingPartIds.Add(targetPart.FileId)) return;
+
         StateHasChanged();
 
-        foreach (var file in files)
+        try
         {
-            if (file.Size > UploadSettings.DrawingLimit)
+            foreach (var file in files)
             {
-                Snackbar.Add($"{file.Name} exceeds the {UploadSettings.DrawingLimit / 1048576} MB limit", Severity.Warning);
-                continue;
-            }
-
-            try
-            {
-                using var content = new MultipartFormDataContent();
-                var stream = file.OpenReadStream(UploadSettings.DrawingLimit);
-                content.Add(new StreamContent(stream), "files", file.Name);
-
-                var url = $"api/v1/uploads/attachments?projectId={TempProjectId}&partId={targetPart.FileId}&kind=Drawing";
-                var resp = await Http.PostAsync(url, content);
-                if (resp.IsSuccessStatusCode)
+                if (file.Size > UploadSettings.DrawingLimit)
                 {
-                    var added = await resp.Content.ReadFromJsonAsync<List<DraftProjectAttachmentDto>>();
-                    if (added != null)
+                    Snackbar.Add($"{file.Name} exceeds the {UploadSettings.DrawingLimit / 1048576} MB limit", Severity.Warning);
+                    continue;
+                }
+
+                try
+                {
+                    using var content = new MultipartFormDataContent();
+                    var stream = file.OpenReadStream(UploadSettings.DrawingLimit);
+                    content.Add(new StreamContent(stream), "files", file.Name);
+
+                    var url = $"api/v1/uploads/attachments?projectId={TempProjectId}&partId={targetPart.FileId}&kind=Drawing";
+                    var resp = await Http.PostAsync(url, content);
+                    if (resp.IsSuccessStatusCode)
                     {
-                        targetPart.DrawingFiles.AddRange(added);
-                        await OnPartChanged.InvokeAsync(targetPart);
+                        var added = await resp.Content.ReadFromJsonAsync<List<DraftProjectAttachmentDto>>();
+                        if (added != null)
+                        {
+                            targetPart.DrawingFiles.AddRange(added);
+                            await OnPartChanged.InvokeAsync(targetPart);
+                        }
+                    }
+                    else
+                    {
+                        Snackbar.Add($"Failed to upload {file.Name}", Severity.Error);
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Snackbar.Add($"Failed to upload {file.Name}", Severity.Error);
+                    Snackbar.Add($"Error uploading {file.Name}: {ex.Message}", Severity.Error);
                 }
             }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Error uploading {file.Name}: {ex.Message}", Severity.Error);
-            }
         }
-
-        _uploading = false;
-        StateHasChanged();
+        finally
+        {
+            _uploadingPartIds.Remove(targetPart.FileId);
+            StateHasChanged();
+        }
     }
 
     private async Task SelectDrawingAsync(DraftProjectAttachmentDto file)
