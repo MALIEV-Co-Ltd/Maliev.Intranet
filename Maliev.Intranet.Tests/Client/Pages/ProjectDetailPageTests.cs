@@ -53,7 +53,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("18,250.00", cut.Markup);
         Assert.Contains("Edit project", cut.Markup);
-        Assert.Contains("Download quote", cut.Markup);
+        Assert.Contains("Generate PDF", cut.Markup);
+        Assert.Contains("project-header-icon-action", cut.Markup);
         Assert.Contains("Accept quote", cut.Markup);
 
         var overview = cut.Find(".project-record-grid");
@@ -82,7 +83,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
 
-        cut.WaitForAssertion(() => Assert.Contains("Download quote", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("Generate PDF", cut.Markup));
         cut.Find("button.project-action-download").Click();
         cut.Find("button.project-action-accept").Click();
 
@@ -175,6 +176,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         var css = File.ReadAllText(cssPath);
 
         Assert.Contains("::deep .project-record-body", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-header-icon-action", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-field-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-metric-row", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);

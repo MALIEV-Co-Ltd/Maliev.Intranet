@@ -48,6 +48,27 @@
     padding: 20px;
 }
 
+.project-record-shell ::deep .project-header-icon-action {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    border-color: var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    color: var(--maliev-ink-2);
+}
+
+.project-record-shell ::deep .project-header-icon-action:hover {
+    border-color: var(--maliev-info);
+    background: var(--maliev-info-bg);
+    color: var(--maliev-info);
+}
+
+.project-record-shell ::deep .project-header-icon-action:disabled {
+    border-color: var(--maliev-border-subtle);
+    background: var(--maliev-panel-2);
+    color: var(--maliev-muted-2);
+}
+
 .project-record-shell ::deep .project-record-grid {
     display: grid;
     grid-template-columns: minmax(0, 2.2fr) minmax(340px, 520px);
