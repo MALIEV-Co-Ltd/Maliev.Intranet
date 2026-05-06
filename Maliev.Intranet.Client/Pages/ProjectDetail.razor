@@ -4,6 +4,7 @@
 @using Maliev.Intranet.Shared.Dtos
 @using Microsoft.AspNetCore.Components.Rendering
 @using System.Globalization
+@using System.Net.Http.Json
 @using System.Text.Json
 @inject HttpClient Http
 @inject IJSRuntime JS
@@ -1139,13 +1140,14 @@
 
     private async Task DownloadQuoteAsync()
     {
-        if (_project?.QuotationId is null)
+        if (_project is null || !HasQuotation)
             return;
 
         _pdfLoading = true;
         try
         {
-            var response = await Http.PostAsync($"api/v1/quotations/{_project.QuotationId}/pdf", null);
+            var pdfData = BuildProjectQuotationPdfData(_project);
+            var response = await Http.PostAsJsonAsync("api/v1/quotations/draft-pdf", pdfData);
             if (!response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Failed to generate quotation PDF.", Severity.Error);
@@ -1171,6 +1173,121 @@
         {
             _pdfLoading = false;
         }
+    }
+
+    private QuotationPdfData BuildProjectQuotationPdfData(ProjectDetailDto project)
+    {
+        var subtotal = PartsSubtotal;
+        var discount = QuoteDiscount;
+        var total = project.TotalPrice;
+        var validityStart = ToUtc(project.CreatedAt);
+        var validityEnd = project.ValidUntil.HasValue
+            ? ToUtc(project.ValidUntil.Value)
+            : validityStart.AddDays(30);
+
+        return new QuotationPdfData
+        {
+            QuotationNumber = QuotationLabel,
+            CustomerName = FirstNonEmpty(project.CustomerCompanyName, project.CustomerName, "-"),
+            CustomerType = string.IsNullOrWhiteSpace(project.CustomerCompanyName) ? "Individual" : "Corporate",
+            CustomerPhone = FirstNonEmpty(project.CustomerCompanyPhone, project.CustomerPhone),
+            CustomerDisplayLines = BuildProjectCustomerDisplayLines(project),
+            CustomerAddress = FirstNonEmpty(project.BillingAddressLine, project.ShippingAddressLine),
+            BillingAddress = project.BillingAddressLine,
+            BillingAddressLines = SplitAddressLines(project.BillingAddressLine),
+            ShippingAddress = project.ShippingAddressLine,
+            ShippingAddressLines = SplitAddressLines(project.ShippingAddressLine),
+            ContactPerson = project.CustomerName,
+            QuotationDate = validityStart,
+            ValidityStart = validityStart,
+            ValidityEnd = validityEnd,
+            Currency = ProjectCurrency,
+            SubtotalBeforeDiscount = subtotal,
+            TotalDiscount = discount,
+            ManualDiscountAmount = discount,
+            ShippingCost = 0m,
+            Subtotal = total,
+            TaxAmount = 0m,
+            TotalAmount = total,
+            DeliveryExpectations = QuoteLeadTime,
+            Items = project.Parts.Select((part, index) => new QuotationPdfItem
+            {
+                Index = index + 1,
+                PartName = part.FileName,
+                MaterialName = FirstNonEmpty(part.MaterialName, part.MaterialCode, "-"),
+                ManufacturingProcess = FormatProcess(part.ProcessType),
+                DetailLines = BuildProjectPartDetailLines(part),
+                Quantity = part.Quantity,
+                QuantityUnit = "pcs",
+                UnitPrice = GetPartUnitPrice(part),
+                LineTotal = GetPartLineTotal(part),
+                Notes = BuildProjectPartNotes(part),
+                ThumbnailUrl = part.ThumbnailUrl
+            }).ToList()
+        };
+    }
+
+    private static List<string> BuildProjectCustomerDisplayLines(ProjectDetailDto project)
+    {
+        var lines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(project.CustomerCompanyName))
+        {
+            lines.Add(project.CustomerCompanyName);
+            if (!string.IsNullOrWhiteSpace(project.CustomerName))
+                lines.Add($"Attn: {project.CustomerName}");
+            if (!string.IsNullOrWhiteSpace(project.CustomerCompanyEmail ?? project.CustomerEmail))
+                lines.Add($"Email: {project.CustomerCompanyEmail ?? project.CustomerEmail}");
+        }
+        else
+        {
+            AddIfPresent(lines, project.CustomerName);
+            AddIfPresent(lines, project.CustomerEmail);
+        }
+
+        AddIfPresent(lines, project.CustomerCompanyPhone ?? project.CustomerPhone);
+        return lines;
+    }
+
+    private static List<string> BuildProjectPartDetailLines(ProjectPartDto part)
+    {
+        var lines = new List<string>();
+        AddIfPresent(lines, FormatDimensions(part.Dimensions));
+        if (ResolvePartConfiguration(part) is { } configuration)
+        {
+            AddIfPresent(lines, configuration.Primary);
+            AddIfPresent(lines, configuration.Subtitle);
+        }
+
+        AddIfPresent(lines, ResolveMaterialColor(part.Color)?.Label ?? part.Color);
+        if (part.HasThreadedHoles)
+            lines.Add(part.ThreadedHoleCount > 0 && !string.IsNullOrWhiteSpace(part.ThreadedHoleSpec)
+                ? $"Tapped holes: {part.ThreadedHoleCount:N0} x {part.ThreadedHoleSpec}"
+                : "Tapped holes: Yes");
+        if (part.HasInserts)
+            lines.Add(part.InsertCount > 0
+                ? $"Inserts: {part.InsertCount:N0} x {part.InsertType}"
+                : $"Inserts: {part.InsertType}");
+        if (part.DrawingFiles.Count > 0)
+            lines.Add($"Drawing: {string.Join(", ", part.DrawingFiles.Select(file => file.FileName).Where(name => !string.IsNullOrWhiteSpace(name)))}");
+
+        return lines;
+    }
+
+    private static string? BuildProjectPartNotes(ProjectPartDto part)
+    {
+        var lines = BuildProjectPartDetailLines(part);
+        return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
+    }
+
+    private static List<string> SplitAddressLines(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split([Environment.NewLine], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private static void AddIfPresent(List<string> values, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            values.Add(value.Trim());
     }
 
     private static async Task<string?> ReadPdfUrlAsync(HttpResponseMessage response)

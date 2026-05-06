@@ -9,6 +9,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Maliev.Intranet.Tests.Client.Pages;
 
@@ -24,6 +25,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     private readonly Guid _jobId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private readonly List<string> _requestedPaths = [];
     private readonly List<string> _requestedRequests = [];
+    private JsonDocument? _quotationPdfRequest;
     private bool _notePosted;
     private bool _bracketDfmAcknowledged;
 
@@ -111,7 +113,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void ProjectDetail_QuoteActions_CallExistingBffEndpoints()
+    public void ProjectDetail_QuoteActions_GeneratePdfFromProjectDetailAndAcceptQuote()
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
 
@@ -121,8 +123,23 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Contains(_requestedPaths, path => path == $"/api/v1/quotations/{_quotationId}/pdf");
+            Assert.Contains(_requestedPaths, path => path == "/api/v1/quotations/draft-pdf");
+            Assert.DoesNotContain(_requestedPaths, path => path == $"/api/v1/quotations/{_quotationId}/pdf");
             Assert.DoesNotContain(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation");
+            Assert.NotNull(_quotationPdfRequest);
+
+            var root = _quotationPdfRequest.RootElement;
+            Assert.Equal("QT-2026-0098", root.GetProperty("quotationNumber").GetString());
+            Assert.Equal("Axion Robotics Co., Ltd.", root.GetProperty("customerName").GetString());
+            Assert.Equal("2200 Industrial Pkwy, Fremont, CA 94538", root.GetProperty("shippingAddress").GetString());
+            Assert.Equal("7-10 business days", root.GetProperty("deliveryExpectations").GetString());
+            Assert.Equal(3, root.GetProperty("items").GetArrayLength());
+            var firstItem = root.GetProperty("items")[0];
+            Assert.Equal("bracket-left.stl", firstItem.GetProperty("partName").GetString());
+            Assert.Equal("Aluminium 6061-T6", firstItem.GetProperty("materialName").GetString());
+            Assert.Equal("CNC Milling", firstItem.GetProperty("manufacturingProcess").GetString());
+            Assert.Equal(4m, firstItem.GetProperty("quantity").GetDecimal());
+            Assert.Equal(2500m, firstItem.GetProperty("unitPrice").GetDecimal());
         });
 
         cut.Find("button[data-tab='quote']").Click();
@@ -374,6 +391,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-customer-detail-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-customer-address-block", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-quote-workspace", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-document-icon .mud-icon-root", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-panel-actions .mud-icon-root", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-document-preview", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-commercial-breakdown", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-commercial-totals", css, StringComparison.Ordinal);
@@ -576,11 +595,12 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
         }
 
-        if (pathAndQuery.Equals($"/api/v1/quotations/{_quotationId}/pdf", StringComparison.Ordinal))
+        if (pathAndQuery.Equals("/api/v1/quotations/draft-pdf", StringComparison.Ordinal))
         {
+            _quotationPdfRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("https://storage.example/quote.pdf")
+                Content = JsonContent.Create(new { storageUrl = "https://storage.example/quote.pdf" })
             });
         }
 

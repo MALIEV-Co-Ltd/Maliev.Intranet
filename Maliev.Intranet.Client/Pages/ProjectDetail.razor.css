@@ -875,6 +875,20 @@
     color: var(--maliev-info);
 }
 
+.project-record-shell ::deep .project-document-icon .mud-icon-root,
+.project-record-shell ::deep .project-panel-actions .mud-icon-root,
+.project-record-shell ::deep .project-header-icon-action .mud-icon-root {
+    display: block;
+    margin: 0;
+    line-height: 1;
+}
+
+.project-record-shell ::deep .project-panel-actions button,
+.project-record-shell ::deep .project-header-icon-action {
+    align-items: center;
+    justify-content: center;
+}
+
 .project-record-shell ::deep .project-document-hero strong {
     display: block;
     color: var(--maliev-ink);
