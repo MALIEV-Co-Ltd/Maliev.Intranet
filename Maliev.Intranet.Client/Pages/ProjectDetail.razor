@@ -215,6 +215,7 @@
     private string? _thumbnailPreviewViewerError;
     private bool _thumbnailPreviewLoading;
     private bool _thumbnailPreview3dActive;
+    private Guid? _selectedPlanningPartId;
 
     private IReadOnlyList<(string Key, string Label)> Tabs =>
     [
@@ -305,11 +306,13 @@
         try
         {
             _productionPlan = await Http.GetFromJsonAsync<ProjectProductionPlanDto>($"api/v1/projects/{Id}/production-plan");
+            EnsureSelectedPlanningPart();
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Production plan could not be loaded: {ex.Message}", Severity.Error);
             _productionPlan = null;
+            _selectedPlanningPartId = null;
         }
         finally
         {
@@ -740,8 +743,78 @@
             content.CloseElement();
             content.CloseElement();
             content.CloseElement();
+
+            content.AddContent(sequence++, RenderPlanningQueuePanel());
         }));
         builder.CloseComponent();
+    };
+
+    private RenderFragment RenderPlanningQueuePanel() => builder =>
+    {
+        var selectedPlan = ResolveSelectedPlanningPart();
+        if (selectedPlan?.Routing is not { } routing || routing.MachineId == Guid.Empty)
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "project-muted-box compact");
+            builder.AddContent(2, "Select a routed part to inspect the machine queue.");
+            builder.CloseElement();
+            return;
+        }
+
+        var queueItems = BuildPlanningQueueItems(selectedPlan);
+        builder.OpenElement(3, "section");
+        builder.AddAttribute(4, "class", "project-planning-queue-panel");
+        builder.AddAttribute(5, "aria-label", "Machine production queue");
+        builder.AddAttribute(6, "data-selected-part-id", selectedPlan.PartId.ToString());
+
+        builder.OpenElement(7, "div");
+        builder.AddAttribute(8, "class", "project-planning-queue-header");
+        builder.OpenElement(9, "div");
+        builder.OpenElement(10, "span");
+        builder.AddContent(11, "Machine queue");
+        builder.CloseElement();
+        builder.OpenElement(12, "strong");
+        builder.AddContent(13, routing.MachineName);
+        builder.CloseElement();
+        builder.OpenElement(14, "small");
+        builder.AddContent(15, $"{FirstNonEmpty(routing.MachineCode, routing.MachineId.ToString())} / {selectedPlan.FileName}");
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.OpenElement(16, "div");
+        builder.AddAttribute(17, "class", "project-planning-queue-stats");
+        AddPlanningQueueStat(builder, 18, "Queued ahead", routing.QueueAhead.ToString("N0", CultureInfo.InvariantCulture));
+        AddPlanningQueueStat(builder, 24, "Schedule items", routing.ScheduleItems.Count.ToString("N0", CultureInfo.InvariantCulture));
+        AddPlanningQueueStat(builder, 30, "Proposed slot", FormatScheduleWindow(routing.ProposedSlotStart?.LocalDateTime, routing.ProposedSlotEnd?.LocalDateTime));
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.OpenElement(36, "div");
+        builder.AddAttribute(37, "class", "project-planning-queue-timeline");
+        builder.OpenComponent<MachineTimelineView>(38);
+        builder.AddAttribute(39, "Items", routing.ScheduleItems);
+        builder.AddAttribute(40, "MachineName", routing.MachineName);
+        builder.AddAttribute(41, "ProposedSlotStart", routing.ProposedSlotStart);
+        builder.AddAttribute(42, "ProposedSlotEnd", routing.ProposedSlotEnd);
+        builder.AddAttribute(43, "RangeStart", ResolveQueueRangeStart(routing));
+        builder.CloseComponent();
+        builder.CloseElement();
+
+        builder.OpenElement(44, "div");
+        builder.AddAttribute(45, "class", "project-planning-queue-list");
+        builder.OpenElement(46, "div");
+        builder.AddAttribute(47, "class", "project-planning-queue-list-header");
+        builder.AddContent(48, "Queue details");
+        builder.CloseElement();
+
+        var sequence = 49;
+        foreach (var item in queueItems)
+        {
+            AddPlanningQueueItem(builder, ref sequence, item);
+        }
+
+        builder.CloseElement();
+        builder.CloseElement();
     };
 
     private static void AddPlanningPartCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
@@ -812,7 +885,7 @@
     private static void AddPlanningRoutingCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
     {
         builder.OpenElement(sequence++, "td");
-        if (plan.Routing is null || plan.Routing.MachineId == Guid.Empty)
+        if (plan?.Routing is null || plan.Routing.MachineId == Guid.Empty)
         {
             builder.OpenElement(sequence++, "span");
             builder.AddAttribute(sequence++, "class", "project-planning-muted");
@@ -893,7 +966,7 @@
         builder.AddAttribute(sequence++, "class", "project-planning-actions");
 
         builder.OpenComponent<MudTooltip>(sequence++);
-        builder.AddAttribute(sequence++, "Text", hasRoute ? "Preview routing" : "No active route available");
+        builder.AddAttribute(sequence++, "Text", hasRoute ? "View machine queue" : "No active route available");
         builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
         {
             var childSequence = 0;
@@ -902,8 +975,8 @@
             content.AddAttribute(childSequence++, "Size", Size.Small);
             content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
             content.AddAttribute(childSequence++, "Disabled", !hasRoute);
-            content.AddAttribute(childSequence++, "aria-label", "Preview routing");
-            content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => PreviewRouting(plan)));
+            content.AddAttribute(childSequence++, "aria-label", $"View machine queue for {plan.FileName}");
+            content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, () => SelectPlanningRoute(plan.PartId)));
             content.CloseComponent();
         }));
         builder.CloseComponent();
@@ -981,6 +1054,106 @@
 
         builder.CloseElement();
         builder.CloseElement();
+    }
+
+    private static void AddPlanningQueueStat(RenderTreeBuilder builder, int sequence, string label, string value)
+    {
+        builder.OpenElement(sequence, "div");
+        builder.AddAttribute(sequence + 1, "class", "project-planning-queue-stat");
+        builder.OpenElement(sequence + 2, "span");
+        builder.AddContent(sequence + 3, label);
+        builder.CloseElement();
+        builder.OpenElement(sequence + 4, "strong");
+        builder.AddContent(sequence + 5, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private static void AddPlanningQueueItem(RenderTreeBuilder builder, ref int sequence, PlanningQueueItem item)
+    {
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", $"project-planning-queue-item {item.CssClass}");
+        builder.OpenElement(sequence++, "div");
+        builder.OpenElement(sequence++, "strong");
+        builder.AddContent(sequence++, item.Reference);
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, FormatStatus(item.Status));
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "div");
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, FormatScheduleWindow(item.Start.LocalDateTime, item.End.LocalDateTime));
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "small");
+        builder.AddContent(sequence++, $"{item.SetupMinutes} min setup / {item.RunMinutes} min run");
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private ProjectProductionPartPlanDto? ResolveSelectedPlanningPart()
+    {
+        if (_productionPlan?.Parts is not { Count: > 0 } parts)
+            return null;
+
+        if (_selectedPlanningPartId is { } selectedPartId)
+        {
+            var selected = parts.FirstOrDefault(part => part.PartId == selectedPartId && HasActiveRoute(part));
+            if (selected is not null)
+                return selected;
+        }
+
+        return parts.FirstOrDefault(HasActiveRoute);
+    }
+
+    private void EnsureSelectedPlanningPart()
+    {
+        _selectedPlanningPartId = ResolveSelectedPlanningPart()?.PartId;
+    }
+
+    private static bool HasActiveRoute(ProjectProductionPartPlanDto plan) =>
+        plan.Routing is not null && plan.Routing.MachineId != Guid.Empty;
+
+    private static DateTime? ResolveQueueRangeStart(ProductionRoutingDto routing)
+    {
+        var anchor = routing.ProposedSlotStart ?? routing.EstimatedStartDate;
+        return anchor == default ? null : anchor.LocalDateTime.Date;
+    }
+
+    private static List<PlanningQueueItem> BuildPlanningQueueItems(ProjectProductionPartPlanDto plan)
+    {
+        if (plan.Routing is not { } routing)
+            return [];
+
+        var items = routing.ScheduleItems
+            .Select(item => new PlanningQueueItem(
+                item.JobReference,
+                item.Status,
+                item.PlannedDate,
+                item.PlannedEndDate,
+                item.SetupTimeMinutes,
+                item.PrintTimeMinutes,
+                item.IsHold ? "hold" : "job"))
+            .ToList();
+
+        if (routing.ProposedSlotStart is { } proposedStart)
+        {
+            var setupMinutes = DefaultSetupMinutes(plan.ProcessType);
+            var runMinutes = Math.Max(30, plan.Quantity * 30);
+            items.Add(new PlanningQueueItem(
+                "This part",
+                "Proposed",
+                proposedStart,
+                routing.ProposedSlotEnd ?? proposedStart.AddMinutes(setupMinutes + runMinutes),
+                setupMinutes,
+                runMinutes,
+                "proposed"));
+        }
+
+        return items
+            .OrderBy(item => item.Start)
+            .ToList();
     }
 
     private RenderFragment RenderPartsTable(bool compact) => builder =>
@@ -1626,17 +1799,16 @@
         await LoadProductionPlanAsync();
     }
 
-    private void PreviewRouting(ProjectProductionPartPlanDto plan)
+    private void SelectPlanningRoute(Guid partId)
     {
-        if (plan.Routing is null || plan.Routing.MachineId == Guid.Empty)
+        var plan = _productionPlan?.Parts.FirstOrDefault(part => part.PartId == partId);
+        if (plan?.Routing is null || plan.Routing.MachineId == Guid.Empty)
         {
             Snackbar.Add("No active route is available for this part.", Severity.Info);
             return;
         }
 
-        Snackbar.Add(
-            $"{plan.FileName}: {plan.Routing.MachineName}, {plan.Routing.QueueAhead} queued ahead, proposed {FormatScheduleWindow(plan.Routing.ProposedSlotStart?.LocalDateTime, plan.Routing.ProposedSlotEnd?.LocalDateTime)}.",
-            Severity.Info);
+        _selectedPlanningPartId = plan.PartId;
     }
 
     private void OpenProductionJob(ProjectProductionPartPlanDto plan)
@@ -2200,6 +2372,15 @@
     private sealed record DfmIssueSummary(string Label, string Value);
 
     private sealed record ThumbnailPreviewUrlResponse(string? Url);
+
+    private sealed record PlanningQueueItem(
+        string Reference,
+        string Status,
+        DateTimeOffset Start,
+        DateTimeOffset End,
+        int SetupMinutes,
+        int RunMinutes,
+        string CssClass);
 
     private static bool CanPreviewPartModel(ProjectPartDto part) =>
         !string.IsNullOrWhiteSpace(part.ModelPreviewUrl);

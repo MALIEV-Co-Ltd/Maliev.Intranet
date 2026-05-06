@@ -217,11 +217,38 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("2 queued ahead", cut.Markup);
         Assert.Contains("Hold #3", cut.Markup);
         Assert.Contains("CCCCCCCC", cut.Markup);
-        Assert.Contains("Preview routing", cut.Markup);
+        Assert.Contains("View machine queue", cut.Markup);
+        Assert.Contains("project-planning-queue-panel", cut.Markup);
+        Assert.Contains("Machine queue", cut.Markup);
+        Assert.Contains("JOB-1001", cut.Markup);
+        Assert.Contains("HOLD-AAAA", cut.Markup);
+        Assert.Contains("This part", cut.Markup);
         Assert.Contains("Create planning hold", cut.Markup);
         Assert.Contains("Update planning hold", cut.Markup);
         Assert.Contains("Cancel planning hold", cut.Markup);
         Assert.Contains("Open job", cut.Markup);
+    }
+
+    [Fact]
+    public async Task ProjectDetail_PlanningQueueButton_SwitchesMachineQueuePanel()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Planning", cut.Markup));
+        cut.Find("button[data-tab='planning']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("project-planning-queue-panel", cut.Markup));
+
+        Assert.Contains("CNC Mill 01", cut.Markup);
+        Assert.DoesNotContain("FDM Printer 01 / sensor-cover.3mf", cut.Markup);
+
+        await cut.InvokeAsync(() => cut.Find("button[aria-label='View machine queue for sensor-cover.3mf']").Click());
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains($"data-selected-part-id=\"{_sensorPartId}\"", cut.Markup);
+            Assert.Contains("FDM Printer 01", cut.Markup);
+            Assert.Contains("1 queued ahead", cut.Markup);
+        });
     }
 
     [Fact]
@@ -411,6 +438,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-parts-panel", css, StringComparison.Ordinal);
         Assert.Contains(".project-parts-panel .project-table-wrap", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
+        var partsTableRuleStart = css.IndexOf("::deep .project-parts-table th,", StringComparison.Ordinal);
+        var partsTableRuleEnd = css.IndexOf('}', partsTableRuleStart);
+        var partsTableRule = css[partsTableRuleStart..partsTableRuleEnd];
+        Assert.Contains("vertical-align: top;", partsTableRule, StringComparison.Ordinal);
         Assert.Contains("::deep .project-material-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-material-swatch", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
@@ -449,6 +480,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-planning-panel", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-planning-table", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-planning-actions", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-queue-panel", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-queue-item", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(6)", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(7)", css, StringComparison.Ordinal);
         Assert.Contains("text-align: right", css, StringComparison.Ordinal);
