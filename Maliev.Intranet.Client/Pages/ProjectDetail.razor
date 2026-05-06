@@ -472,8 +472,10 @@
                 content.OpenElement(60, "strong");
                 content.AddContent(61, FirstNonEmpty(_project.CustomerCompanyName, _project.CustomerName, "-"));
                 content.CloseElement();
-                content.OpenElement(62, "p");
-                content.AddContent(63, _project.BillingAddressLine);
+                AddBillingIdentityLine(content, 62, "Tax ID", _project.CustomerTaxId);
+                AddBillingIdentityLine(content, 65, null, _project.CustomerBranch);
+                content.OpenElement(68, "p");
+                content.AddContent(69, _project.BillingAddressLine);
                 content.CloseElement();
                 content.CloseElement();
             }
@@ -2118,6 +2120,16 @@
         builder.OpenElement(sequence + 3, "dd");
         builder.AddContent(sequence + 4, string.IsNullOrWhiteSpace(value) ? "-" : value);
         builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private static void AddBillingIdentityLine(RenderTreeBuilder builder, int sequence, string? label, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        builder.OpenElement(sequence, "small");
+        builder.AddContent(sequence + 1, string.IsNullOrWhiteSpace(label) ? value.Trim() : $"{label} {value.Trim()}");
         builder.CloseElement();
     }
 

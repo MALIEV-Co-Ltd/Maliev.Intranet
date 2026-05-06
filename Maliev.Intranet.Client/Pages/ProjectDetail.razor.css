@@ -882,6 +882,14 @@
     line-height: 1.4;
 }
 
+.project-record-shell ::deep .project-customer-address-block small {
+    color: var(--maliev-ink-2);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
 .project-record-shell ::deep .project-customer-id {
     justify-self: end;
     color: var(--maliev-muted);

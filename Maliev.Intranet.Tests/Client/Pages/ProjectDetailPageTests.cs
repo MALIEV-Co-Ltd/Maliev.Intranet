@@ -101,6 +101,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("project-customer-heading", cut.Markup);
         Assert.Contains("project-customer-detail-grid", cut.Markup);
         Assert.Contains("project-customer-address-block", cut.Markup);
+        Assert.Contains("Tax ID 0105559999999", cut.Markup);
+        Assert.Contains("Head Office", cut.Markup);
     }
 
     [Fact]
@@ -516,6 +518,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                 CustomerCompanyName = "Axion Robotics Co., Ltd.",
                 CustomerCompanyPhone = "+66 2 555 0100",
                 CustomerCompanyEmail = "ops@axion.example",
+                CustomerTaxId = "0105559999999",
+                CustomerBranch = "Head Office",
                 ShippingRecipientName = "Manufacturing Dock",
                 ShippingRecipientPhone = "+66 2 555 0199",
                 ShippingAddressLine = "2200 Industrial Pkwy, Fremont, CA 94538",

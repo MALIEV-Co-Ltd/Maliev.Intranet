@@ -86,6 +86,12 @@ public class ProjectDetailDto
     /// <summary>Gets or sets the company's contact email address.</summary>
     public string? CustomerCompanyEmail { get; set; }
 
+    /// <summary>Gets or sets the customer's company tax identification number.</summary>
+    public string? CustomerTaxId { get; set; }
+
+    /// <summary>Gets or sets the customer's billing branch label.</summary>
+    public string? CustomerBranch { get; set; }
+
     /// <summary>Gets or sets the formatted billing address.</summary>
     public string? BillingAddressLine { get; set; }
 
