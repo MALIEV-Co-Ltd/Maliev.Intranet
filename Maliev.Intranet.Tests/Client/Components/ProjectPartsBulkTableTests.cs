@@ -112,6 +112,34 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectPartsBulkTable_WhenThumbnailClicked_ShowsLargePreview()
+    {
+        var parts = CreateParts();
+
+        var cut = RenderTable(parts);
+
+        cut.Find(".pbt-part-thumb-button").Click();
+
+        var previewImage = cut.Find(".pbt-preview-image");
+        Assert.Equal("/thumb-bracket-large.png", previewImage.GetAttribute("src"));
+        Assert.Contains("Preview", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectPartsBulkTable_WhenLargeThumbnailMissing_PreviewsSmallThumbnail()
+    {
+        var parts = CreateParts();
+        parts[0].ThumbnailLargeUrl = null;
+
+        var cut = RenderTable(parts);
+
+        cut.Find(".pbt-part-thumb-button").Click();
+
+        var previewImage = cut.Find(".pbt-preview-image");
+        Assert.Equal("/thumb-bracket.png", previewImage.GetAttribute("src"));
+    }
+
+    [Fact]
     public void ProjectPartsBulkTable_WhenUnavailableBadgeClicked_RaisesRetryAction()
     {
         var parts = CreateParts();
@@ -217,6 +245,7 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
                 FileId = Guid.NewGuid(),
                 Name = "bracket.stl",
                 ThumbnailSmallUrl = "/thumb-bracket.png",
+                ThumbnailLargeUrl = "/thumb-bracket-large.png",
                 Quantity = 2,
                 MaterialId = material.Id,
                 MaterialCode = material.Code,

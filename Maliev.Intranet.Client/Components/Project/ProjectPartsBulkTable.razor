@@ -197,7 +197,13 @@
                                     }
                                     else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
                                     {
-                                        <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="pbt-part-thumb-img" onerror="this.style.display='none'" />
+                                        <button type="button"
+                                                class="pbt-part-thumb-button"
+                                                title="@($"Preview {part.Name}")"
+                                                aria-label="@($"Preview {part.Name}")"
+                                                @onclick="@(() => OpenThumbnailPreview(part))">
+                                            <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="pbt-part-thumb-img" onerror="this.style.display='none'" />
+                                        </button>
                                     }
                                     else
                                     {
@@ -346,31 +352,37 @@
             var selected = IsPartSelected(part);
             <article class="@($"pbt-part-card{(selected ? " pbt-part-card--selected" : string.Empty)}")">
                 <div class="pbt-card-head">
+                    <span class="pbt-part-thumb">
+                        @if (part.QueuedUpload || part.AwaitingPreview)
+                        {
+                            <MudProgressCircular Color="Color.Default" Indeterminate="true" Size="Size.Small" />
+                        }
+                        else if (part.Uploading)
+                        {
+                            <MudProgressCircular Size="Size.Small"
+                                                 Indeterminate="false"
+                                                 Value="@part.ProgressPercent"
+                                                 Color="Color.Primary" />
+                        }
+                        else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
+                        {
+                            <button type="button"
+                                    class="pbt-part-thumb-button"
+                                    title="@($"Preview {part.Name}")"
+                                    aria-label="@($"Preview {part.Name}")"
+                                    @onclick="@(() => OpenThumbnailPreview(part))">
+                                <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="pbt-part-thumb-img" onerror="this.style.display='none'" />
+                            </button>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Color="Color.Tertiary" />
+                        }
+                    </span>
                     <label class="pbt-card-select">
                         <input type="checkbox"
                                checked="@selected"
                                @onchange="@((ChangeEventArgs args) => TogglePartAsync(part, IsChecked(args)))" />
-                        <span class="pbt-part-thumb">
-                            @if (part.QueuedUpload || part.AwaitingPreview)
-                            {
-                                <MudProgressCircular Color="Color.Default" Indeterminate="true" Size="Size.Small" />
-                            }
-                            else if (part.Uploading)
-                            {
-                                <MudProgressCircular Size="Size.Small"
-                                                     Indeterminate="false"
-                                                     Value="@part.ProgressPercent"
-                                                     Color="Color.Primary" />
-                            }
-                            else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
-                            {
-                                <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="pbt-part-thumb-img" onerror="this.style.display='none'" />
-                            }
-                            else
-                            {
-                                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Color="Color.Tertiary" />
-                            }
-                        </span>
                         <span class="pbt-card-title-copy">
                             <span class="pbt-card-title">@part.Name</span>
                             <span class="pbt-card-subtitle">@ResolvePartMeta(part)</span>
@@ -497,6 +509,34 @@
             </article>
         }
     </div>
+
+    @if (_previewPart is not null && ResolvePreviewImageUrl(_previewPart) is { Length: > 0 } previewImageUrl)
+    {
+        <div class="pbt-preview-backdrop" @onclick="CloseThumbnailPreview">
+            <div class="pbt-preview-dialog"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="@($"Preview {_previewPart.Name}")"
+                 @onclick:stopPropagation="true">
+                <div class="pbt-preview-header">
+                    <div>
+                        <div class="pbt-kicker">Preview</div>
+                        <div class="pbt-preview-title">@_previewPart.Name</div>
+                    </div>
+                    <button type="button"
+                            class="pbt-icon-button"
+                            title="Close preview"
+                            aria-label="Close preview"
+                            @onclick="CloseThumbnailPreview">
+                        <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                    </button>
+                </div>
+                <div class="pbt-preview-frame">
+                    <img src="@previewImageUrl" alt="@_previewPart.Name" class="pbt-preview-image" />
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -548,6 +588,7 @@
     private readonly HashSet<PartViewModel> _expandedParts = new(ReferenceEqualityComparer.Instance);
     private readonly PartConfigurationBulkPatch _bulkPatch = new();
     private PartViewModel? _lastBulkSourcePart;
+    private PartViewModel? _previewPart;
 
     private int SelectedCount => SelectedParts.Count(part => Parts.Contains(part));
 
@@ -605,6 +646,17 @@
         if (!_expandedParts.Add(part))
             _expandedParts.Remove(part);
     }
+
+    private void OpenThumbnailPreview(PartViewModel part) =>
+        _previewPart = part;
+
+    private void CloseThumbnailPreview() =>
+        _previewPart = null;
+
+    private static string? ResolvePreviewImageUrl(PartViewModel part) =>
+        !string.IsNullOrWhiteSpace(part.ThumbnailLargeUrl)
+            ? part.ThumbnailLargeUrl
+            : part.ThumbnailSmallUrl;
 
     private async Task ToggleAllAsync()
     {
