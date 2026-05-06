@@ -47,9 +47,16 @@
 }
 
 .pbt-actions ::deep .pbt-upload-zone {
-    min-width: min(320px, 36vw);
-    max-width: 360px;
+    min-width: min(520px, 44vw);
+    max-width: 620px;
     padding: 8px 10px;
+}
+
+.pbt-actions ::deep .pbt-upload-zone .fud-compact-sub {
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .pbt-action-button,
@@ -381,6 +388,10 @@
     .pbt-actions ::deep .pbt-upload-zone {
         min-width: min(300px, calc(100vw - 92px));
         max-width: none;
+    }
+
+    .pbt-actions ::deep .pbt-upload-zone .fud-compact-sub {
+        white-space: normal;
     }
 
     .pbt-bulk-panel {

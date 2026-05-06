@@ -1396,8 +1396,11 @@ public partial class ProjectNew : IAsyncDisposable
                 appliedParts++;
         }
 
-        var skippedText = skippedFields == 0 ? string.Empty : $" {skippedFields} incompatible field update(s) skipped.";
-        Snackbar.Add($"Bulk edit applied to {appliedParts} of {targets.Count} part(s).{skippedText}", Severity.Info);
+        if (request.ShowSummary)
+        {
+            var skippedText = skippedFields == 0 ? string.Empty : $" {skippedFields} incompatible field update(s) skipped.";
+            Snackbar.Add($"Bulk edit applied to {appliedParts} of {targets.Count} part(s).{skippedText}", Severity.Info);
+        }
     }
 
     private static PartConfigurationBulkPatch CopyPatchWithoutProcess(PartConfigurationBulkPatch patch) => new()

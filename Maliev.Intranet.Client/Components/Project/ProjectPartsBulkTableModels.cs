@@ -10,6 +10,8 @@ public sealed record ProjectPartProcessChange(PartViewModel Part, ProcessDto? Pr
 /// <summary>Describes an explicit bulk patch request from the bulk table.</summary>
 /// <param name="Parts">The selected part instances that should receive the patch.</param>
 /// <param name="Patch">The explicit field patch to apply.</param>
+/// <param name="ShowSummary">True when the caller should show an applied/skipped summary.</param>
 public sealed record ProjectPartsBulkApplyRequest(
     IReadOnlyCollection<PartViewModel> Parts,
-    PartConfigurationBulkPatch Patch);
+    PartConfigurationBulkPatch Patch,
+    bool ShowSummary = true);

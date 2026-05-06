@@ -49,17 +49,13 @@
         <div class="pbt-bulk-panel">
             <div class="pbt-bulk-summary">
                 <strong>@SelectedCount selected</strong>
-                <span>Apply only checked fields to compatible parts.</span>
+                <span>Changes apply to compatible selected parts immediately.</span>
             </div>
 
             <div class="pbt-bulk-grid">
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeProcess" />
-                    <span>Process</span>
-                </label>
+                <span class="pbt-bulk-field">Process</span>
                 <select class="pbt-input"
                         value="@(_bulkPatch.Process?.Code ?? string.Empty)"
-                        disabled="@(!_bulkPatch.IncludeProcess)"
                         @onchange="OnBulkProcessChanged">
                     <option value="">Select process</option>
                     @foreach (var process in Processes)
@@ -68,13 +64,10 @@
                     }
                 </select>
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeMaterial" />
-                    <span>Material</span>
-                </label>
+                <span class="pbt-bulk-field">Material</span>
                 <select class="pbt-input"
                         value="@(_bulkPatch.Material?.Id.ToString() ?? string.Empty)"
-                        disabled="@(!_bulkPatch.IncludeMaterial || BulkSourcePart?.AvailableMaterials.Count == 0)"
+                        disabled="@(BulkSourcePart?.AvailableMaterials.Count == 0)"
                         @onchange="OnBulkMaterialChanged">
                     <option value="">Select material</option>
                     @foreach (var material in BulkSourcePart?.AvailableMaterials ?? [])
@@ -83,13 +76,10 @@
                     }
                 </select>
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeFinish" />
-                    <span>Finish</span>
-                </label>
+                <span class="pbt-bulk-field">Finish</span>
                 <select class="pbt-input"
                         value="@(_bulkPatch.Finish?.Id.ToString() ?? string.Empty)"
-                        disabled="@(!_bulkPatch.IncludeFinish || BulkSourcePart?.AvailableFinishes.Count == 0)"
+                        disabled="@(BulkSourcePart?.AvailableFinishes.Count == 0)"
                         @onchange="OnBulkFinishChanged">
                     <option value="">Select finish</option>
                     @foreach (var finish in BulkSourcePart?.AvailableFinishes ?? [])
@@ -98,13 +88,10 @@
                     }
                 </select>
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeTolerance" />
-                    <span>Tolerance</span>
-                </label>
+                <span class="pbt-bulk-field">Tolerance</span>
                 <select class="pbt-input"
                         value="@(_bulkPatch.Tolerance?.Id.ToString() ?? string.Empty)"
-                        disabled="@(!_bulkPatch.IncludeTolerance || BulkSourcePart?.AvailableTolerances.Count == 0)"
+                        disabled="@(BulkSourcePart?.AvailableTolerances.Count == 0)"
                         @onchange="OnBulkToleranceChanged">
                     <option value="">Select tolerance</option>
                     @foreach (var tolerance in BulkSourcePart?.AvailableTolerances ?? [])
@@ -113,24 +100,16 @@
                     }
                 </select>
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeQuantity" />
-                    <span>Quantity</span>
-                </label>
+                <span class="pbt-bulk-field">Quantity</span>
                 <input class="pbt-input"
                        type="number"
                        min="1"
                        value="@_bulkPatch.Quantity"
-                       disabled="@(!_bulkPatch.IncludeQuantity)"
                        @onchange="OnBulkQuantityChanged" />
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeInspection" />
-                    <span>Inspection</span>
-                </label>
+                <span class="pbt-bulk-field">Inspection</span>
                 <select class="pbt-input"
                         value="@_bulkPatch.InspectionLevel.ToString()"
-                        disabled="@(!_bulkPatch.IncludeInspection)"
                         @onchange="OnBulkInspectionChanged">
                     @foreach (var level in Enum.GetValues<InspectionLevel>())
                     {
@@ -138,59 +117,33 @@
                     }
                 </select>
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeRoughness" />
-                    <span>Roughness</span>
-                </label>
+                <span class="pbt-bulk-field">Roughness</span>
                 <input class="pbt-input"
                        value="@_bulkPatch.RoughnessCode"
-                       disabled="@(!_bulkPatch.IncludeRoughness)"
                        placeholder="RA_3_2"
                        @onchange="OnBulkRoughnessChanged" />
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeThreadedHoles" />
-                    <span>Threaded holes</span>
-                </label>
+                <span class="pbt-bulk-field">Threaded holes</span>
                 <label class="pbt-inline-check">
                     <input type="checkbox"
                            checked="@_bulkPatch.HasThreadedHoles"
-                           disabled="@(!_bulkPatch.IncludeThreadedHoles)"
                            @onchange="OnBulkThreadedHolesChanged" />
                     <span>Required</span>
                 </label>
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludeInserts" />
-                    <span>Inserts</span>
-                </label>
+                <span class="pbt-bulk-field">Inserts</span>
                 <label class="pbt-inline-check">
                     <input type="checkbox"
                            checked="@_bulkPatch.HasInserts"
-                           disabled="@(!_bulkPatch.IncludeInserts)"
                            @onchange="OnBulkInsertsChanged" />
                     <span>Required</span>
                 </label>
 
-                <label class="pbt-bulk-field pbt-bulk-field--toggle">
-                    <input type="checkbox" @bind="_bulkPatch.IncludePartNotes" />
-                    <span>Notes</span>
-                </label>
+                <span class="pbt-bulk-field">Notes</span>
                 <input class="pbt-input"
                        value="@_bulkPatch.PartNotes"
-                       disabled="@(!_bulkPatch.IncludePartNotes)"
                        placeholder="Part note"
                        @onchange="OnBulkNotesChanged" />
-            </div>
-
-            <div class="pbt-bulk-footer">
-                <button type="button"
-                        class="pbt-primary-button"
-                        disabled="@(!CanApplyBulkPatch)"
-                        @onclick="ApplyBulkPatchAsync">
-                    <MudIcon Icon="@Icons.Material.Outlined.DoneAll" Size="Size.Small" />
-                    <span>Apply to selected</span>
-                </button>
             </div>
         </div>
     }
@@ -589,21 +542,6 @@
     private PartViewModel? BulkSourcePart =>
         SelectedParts.FirstOrDefault(part => Parts.Contains(part));
 
-    private bool CanApplyBulkPatch =>
-        SelectedCount > 0 &&
-        (_bulkPatch.IncludeProcess ||
-         _bulkPatch.IncludeMaterial ||
-         _bulkPatch.IncludeFinish ||
-         _bulkPatch.IncludeTolerance ||
-         _bulkPatch.IncludeQuantity ||
-         _bulkPatch.IncludeInspection ||
-         _bulkPatch.IncludeRoughness ||
-         _bulkPatch.IncludeThreadedHoles ||
-         _bulkPatch.IncludeInserts ||
-         _bulkPatch.IncludeBagAndTag ||
-         _bulkPatch.IncludePartNotes ||
-         _bulkPatch.IncludeProcessOptions);
-
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
@@ -717,7 +655,7 @@
         await OnPartChanged.InvokeAsync(part);
     }
 
-    private async Task ApplyBulkPatchAsync()
+    private async Task ApplyBulkPatchAsync(PartConfigurationBulkPatch patch)
     {
         var selected = SelectedParts
             .Where(part => Parts.Contains(part))
@@ -726,69 +664,110 @@
         if (selected.Count == 0)
             return;
 
-        await OnBulkApply.InvokeAsync(new ProjectPartsBulkApplyRequest(selected, CloneBulkPatch()));
+        await OnBulkApply.InvokeAsync(new ProjectPartsBulkApplyRequest(selected, patch, ShowSummary: false));
     }
 
-    private PartConfigurationBulkPatch CloneBulkPatch() => new()
+    private async Task OnBulkProcessChanged(ChangeEventArgs args)
     {
-        IncludeProcess = _bulkPatch.IncludeProcess,
-        Process = _bulkPatch.Process,
-        IncludeMaterial = _bulkPatch.IncludeMaterial,
-        Material = _bulkPatch.Material,
-        IncludeFinish = _bulkPatch.IncludeFinish,
-        Finish = _bulkPatch.Finish,
-        IncludeTolerance = _bulkPatch.IncludeTolerance,
-        Tolerance = _bulkPatch.Tolerance,
-        IncludeQuantity = _bulkPatch.IncludeQuantity,
-        Quantity = _bulkPatch.Quantity,
-        IncludeInspection = _bulkPatch.IncludeInspection,
-        InspectionLevel = _bulkPatch.InspectionLevel,
-        IncludeRoughness = _bulkPatch.IncludeRoughness,
-        RoughnessCode = _bulkPatch.RoughnessCode,
-        IncludeThreadedHoles = _bulkPatch.IncludeThreadedHoles,
-        HasThreadedHoles = _bulkPatch.HasThreadedHoles,
-        IncludeInserts = _bulkPatch.IncludeInserts,
-        HasInserts = _bulkPatch.HasInserts,
-        IncludeBagAndTag = _bulkPatch.IncludeBagAndTag,
-        BagAndTag = _bulkPatch.BagAndTag,
-        IncludePartNotes = _bulkPatch.IncludePartNotes,
-        PartNotes = _bulkPatch.PartNotes,
-        IncludeProcessOptions = _bulkPatch.IncludeProcessOptions,
-        ProcessOptionValues = new Dictionary<string, string?>(_bulkPatch.ProcessOptionValues, StringComparer.OrdinalIgnoreCase),
-    };
-
-    private void OnBulkProcessChanged(ChangeEventArgs args) =>
         _bulkPatch.Process = Processes.FirstOrDefault(process => string.Equals(process.Code, args.Value?.ToString(), StringComparison.OrdinalIgnoreCase));
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeProcess = true,
+            Process = _bulkPatch.Process,
+        });
+    }
 
-    private void OnBulkMaterialChanged(ChangeEventArgs args) =>
+    private async Task OnBulkMaterialChanged(ChangeEventArgs args)
+    {
         _bulkPatch.Material = TryFindById(BulkSourcePart?.AvailableMaterials ?? [], args.Value?.ToString());
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeMaterial = true,
+            Material = _bulkPatch.Material,
+        });
+    }
 
-    private void OnBulkFinishChanged(ChangeEventArgs args) =>
+    private async Task OnBulkFinishChanged(ChangeEventArgs args)
+    {
         _bulkPatch.Finish = TryFindById(BulkSourcePart?.AvailableFinishes ?? [], args.Value?.ToString());
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeFinish = true,
+            Finish = _bulkPatch.Finish,
+        });
+    }
 
-    private void OnBulkToleranceChanged(ChangeEventArgs args) =>
+    private async Task OnBulkToleranceChanged(ChangeEventArgs args)
+    {
         _bulkPatch.Tolerance = TryFindById(BulkSourcePart?.AvailableTolerances ?? [], args.Value?.ToString());
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeTolerance = true,
+            Tolerance = _bulkPatch.Tolerance,
+        });
+    }
 
-    private void OnBulkQuantityChanged(ChangeEventArgs args) =>
+    private async Task OnBulkQuantityChanged(ChangeEventArgs args)
+    {
         _bulkPatch.Quantity = int.TryParse(args.Value?.ToString(), out var quantity) ? Math.Max(1, quantity) : 1;
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeQuantity = true,
+            Quantity = _bulkPatch.Quantity,
+        });
+    }
 
-    private void OnBulkInspectionChanged(ChangeEventArgs args)
+    private async Task OnBulkInspectionChanged(ChangeEventArgs args)
     {
         if (Enum.TryParse<InspectionLevel>(args.Value?.ToString(), out var inspectionLevel))
             _bulkPatch.InspectionLevel = inspectionLevel;
+
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeInspection = true,
+            InspectionLevel = _bulkPatch.InspectionLevel,
+        });
     }
 
-    private void OnBulkRoughnessChanged(ChangeEventArgs args) =>
+    private async Task OnBulkRoughnessChanged(ChangeEventArgs args)
+    {
         _bulkPatch.RoughnessCode = args.Value?.ToString();
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeRoughness = true,
+            RoughnessCode = _bulkPatch.RoughnessCode,
+        });
+    }
 
-    private void OnBulkThreadedHolesChanged(ChangeEventArgs args) =>
+    private async Task OnBulkThreadedHolesChanged(ChangeEventArgs args)
+    {
         _bulkPatch.HasThreadedHoles = IsChecked(args);
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeThreadedHoles = true,
+            HasThreadedHoles = _bulkPatch.HasThreadedHoles,
+        });
+    }
 
-    private void OnBulkInsertsChanged(ChangeEventArgs args) =>
+    private async Task OnBulkInsertsChanged(ChangeEventArgs args)
+    {
         _bulkPatch.HasInserts = IsChecked(args);
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludeInserts = true,
+            HasInserts = _bulkPatch.HasInserts,
+        });
+    }
 
-    private void OnBulkNotesChanged(ChangeEventArgs args) =>
+    private async Task OnBulkNotesChanged(ChangeEventArgs args)
+    {
         _bulkPatch.PartNotes = args.Value?.ToString();
+        await ApplyBulkPatchAsync(new PartConfigurationBulkPatch
+        {
+            IncludePartNotes = true,
+            PartNotes = _bulkPatch.PartNotes,
+        });
+    }
 
     private static bool IsChecked(ChangeEventArgs args) =>
         args.Value is bool checkedValue && checkedValue;

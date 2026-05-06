@@ -51,6 +51,30 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("1 selected", cut.Markup);
         Assert.NotEmpty(cut.FindAll(".pbt-bulk-panel"));
+        Assert.DoesNotContain("Apply to selected", cut.Markup);
+    }
+
+    [Fact]
+    public void ProjectPartsBulkTable_WhenBulkProcessSelected_AppliesPatchImmediately()
+    {
+        var parts = CreateParts();
+        var selected = new HashSet<PartViewModel>(ReferenceEqualityComparer.Instance) { parts[0], parts[1] };
+        ProjectPartsBulkApplyRequest? request = null;
+
+        var cut = RenderTable(
+            parts,
+            selected,
+            bulkApply: EventCallback.Factory.Create<ProjectPartsBulkApplyRequest>(
+                this,
+                value => request = value));
+
+        cut.Find(".pbt-bulk-grid select").Change("FDM");
+
+        Assert.NotNull(request);
+        Assert.Equal(2, request.Parts.Count);
+        Assert.True(request.Patch.IncludeProcess);
+        Assert.Equal("FDM", request.Patch.Process?.Code);
+        Assert.False(request.ShowSummary);
     }
 
     [Fact]
@@ -115,12 +139,14 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
 
     private RenderedComponent<ProjectPartsBulkTable> RenderTable(
         List<PartViewModel> parts,
-        IReadOnlyCollection<PartViewModel>? selectedParts = null)
+        IReadOnlyCollection<PartViewModel>? selectedParts = null,
+        EventCallback<ProjectPartsBulkApplyRequest> bulkApply = default)
     {
         return Render<ProjectPartsBulkTable>(parameters => parameters
             .Add(p => p.Parts, parts)
             .Add(p => p.SelectedParts, selectedParts ?? [])
-            .Add(p => p.Processes, [new ProcessDto(Guid.NewGuid(), "FDM", "FDM", null, 10)]));
+            .Add(p => p.Processes, [new ProcessDto(Guid.NewGuid(), "FDM", "FDM", null, 10)])
+            .Add(p => p.OnBulkApply, bulkApply));
     }
 
     private static List<PartViewModel> CreateParts()
