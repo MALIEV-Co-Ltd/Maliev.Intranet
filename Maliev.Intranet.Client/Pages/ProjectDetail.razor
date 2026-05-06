@@ -427,56 +427,74 @@
             var notes = _project?.Notes?.OrderByDescending(note => note.CreatedAt).ToList() ?? [];
 
             content.OpenElement(3, "div");
-            content.AddAttribute(4, "class", "project-note-compose");
-            content.OpenElement(5, "textarea");
-            content.AddAttribute(6, "class", "project-note-input");
-            content.AddAttribute(7, "placeholder", "Add an internal note for production, commercial follow-up, or customer context.");
-            content.AddAttribute(8, "value", BindConverter.FormatValue(_newNoteContent));
-            content.AddAttribute(9, "oninput", EventCallback.Factory.CreateBinder<string>(this, UpdateNoteDraft, _newNoteContent));
+            content.AddAttribute(4, "class", "project-notes-grid");
+
+            content.OpenElement(5, "section");
+            content.AddAttribute(6, "class", "project-note-list-column");
+            if (notes.Count == 0)
+            {
+                content.OpenElement(7, "div");
+                content.AddAttribute(8, "class", "project-muted-box");
+                content.AddContent(9, "No internal notes have been added.");
+                content.CloseElement();
+            }
+            else
+            {
+                content.OpenElement(10, "div");
+                content.AddAttribute(11, "class", "project-note-list");
+                var sequence = 12;
+                foreach (var note in notes)
+                {
+                    content.OpenElement(sequence++, "article");
+                    content.AddAttribute(sequence++, "class", "project-note-card");
+                    content.OpenElement(sequence++, "div");
+                    content.AddAttribute(sequence++, "class", "project-note-audit");
+                    content.OpenElement(sequence++, "strong");
+                    content.AddContent(sequence++, $"Created by {FormatNoteActor(note)}");
+                    content.CloseElement();
+                    content.OpenElement(sequence++, "span");
+                    content.AddContent(sequence++, FormatLocalDateTime(note.CreatedAt));
+                    content.CloseElement();
+                    content.CloseElement();
+                    content.OpenElement(sequence++, "p");
+                    content.AddContent(sequence++, note.Content);
+                    content.CloseElement();
+                    content.CloseElement();
+                }
+                content.CloseElement();
+            }
             content.CloseElement();
-            content.OpenComponent<PrimaryButton>(10);
-            content.AddAttribute(11, "Class", "project-note-add");
-            content.AddAttribute(12, "Icon", Icons.Material.Outlined.Add);
-            content.AddAttribute(13, "Disabled", _addingNote || string.IsNullOrWhiteSpace(_newNoteContent));
-            content.AddAttribute(14, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, AddNoteAsync));
-            content.AddContent(15, _addingNote ? "Saving..." : _noteSaved ? "Saved" : "Add note");
+
+            content.OpenElement(40, "aside");
+            content.AddAttribute(41, "class", "project-note-compose-column");
+            content.OpenElement(42, "div");
+            content.AddAttribute(43, "class", "project-note-compose");
+            content.OpenElement(44, "textarea");
+            content.AddAttribute(45, "class", "project-note-input");
+            content.AddAttribute(46, "placeholder", "Add an internal note for production, commercial follow-up, or customer context.");
+            content.AddAttribute(47, "value", BindConverter.FormatValue(_newNoteContent));
+            content.AddAttribute(48, "oninput", EventCallback.Factory.CreateBinder<string>(this, UpdateNoteDraft, _newNoteContent));
+            content.CloseElement();
+            content.OpenElement(49, "div");
+            content.AddAttribute(50, "class", "project-note-compose-actions");
+            content.OpenComponent<PrimaryButton>(51);
+            content.AddAttribute(52, "Class", "project-note-add");
+            content.AddAttribute(53, "Icon", Icons.Material.Outlined.Add);
+            content.AddAttribute(54, "Disabled", _addingNote || string.IsNullOrWhiteSpace(_newNoteContent));
+            content.AddAttribute(55, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, AddNoteAsync));
+            content.AddContent(56, _addingNote ? "Saving..." : _noteSaved ? "Saved" : "Add note");
             content.CloseComponent();
             if (_noteSaved)
             {
-                content.OpenElement(16, "span");
-                content.AddAttribute(17, "class", "project-note-status");
-                content.AddContent(18, "Saved");
+                content.OpenElement(57, "span");
+                content.AddAttribute(58, "class", "project-note-status");
+                content.AddContent(59, "Saved");
                 content.CloseElement();
             }
             content.CloseElement();
+            content.CloseElement();
+            content.CloseElement();
 
-            if (notes.Count == 0)
-            {
-                content.OpenElement(19, "div");
-                content.AddAttribute(20, "class", "project-muted-box");
-                content.AddContent(21, "No internal notes have been added.");
-                content.CloseElement();
-                return;
-            }
-
-            content.OpenElement(22, "div");
-            content.AddAttribute(23, "class", "project-note-list");
-            var sequence = 24;
-            foreach (var note in notes)
-            {
-                content.OpenElement(sequence++, "article");
-                content.AddAttribute(sequence++, "class", "project-note-card");
-                content.OpenElement(sequence++, "strong");
-                content.AddContent(sequence++, note.AuthorName);
-                content.CloseElement();
-                content.OpenElement(sequence++, "span");
-                content.AddContent(sequence++, FormatDateTime(note.CreatedAt));
-                content.CloseElement();
-                content.OpenElement(sequence++, "p");
-                content.AddContent(sequence++, note.Content);
-                content.CloseElement();
-                content.CloseElement();
-            }
             content.CloseElement();
         }));
         builder.CloseComponent();
@@ -817,6 +835,24 @@
     private static string FormatDate(DateTime? value) => value.HasValue ? value.Value.ToString("MMM d, yyyy") : "-";
 
     private static string FormatDateTime(DateTime? value) => value.HasValue ? value.Value.ToString("MMM d, yyyy HH:mm") : "-";
+
+    private static string FormatLocalDateTime(DateTime? value)
+    {
+        if (!value.HasValue)
+            return "-";
+
+        var utcValue = value.Value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+            : value.Value.ToUniversalTime();
+
+        return utcValue.ToLocalTime().ToString("MMM d, yyyy HH:mm");
+    }
+
+    private static string FormatNoteActor(ProjectNoteDto note)
+    {
+        var actor = FirstNonEmpty(note.AuthorName, note.AuthorId, "System");
+        return actor;
+    }
 
     private static string FormatStatus(string? status)
     {

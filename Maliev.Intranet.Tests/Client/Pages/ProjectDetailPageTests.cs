@@ -138,10 +138,19 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         cut.Find("textarea.project-note-input").Input("Check customer's drawing revision before release.");
         cut.Find("button.project-note-add").Click();
 
+        var expectedLocalTimestamp = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc)
+            .ToLocalTime()
+            .ToString("MMM d, yyyy HH:mm");
+
         cut.WaitForAssertion(() =>
         {
             Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/notes");
             Assert.Contains("Saved", cut.Markup);
+            Assert.Contains("project-notes-grid", cut.Markup);
+            Assert.Contains("project-note-list-column", cut.Markup);
+            Assert.Contains("project-note-compose-column", cut.Markup);
+            Assert.Contains("Created by Alex Kim", cut.Markup);
+            Assert.Contains(expectedLocalTimestamp, cut.Markup);
         });
 
         cut.Find("button[data-tab='timeline']").Click();
@@ -160,6 +169,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-notes-grid", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-note-audit", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(6)", css, StringComparison.Ordinal);
         Assert.Contains("text-align: right", css, StringComparison.Ordinal);
         Assert.Contains("width: 5%", css, StringComparison.Ordinal);
@@ -287,6 +298,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                             Id = Guid.Parse("77777777-7777-7777-7777-777777777777"),
                             ProjectId = _projectId,
                             AuthorName = "Alex Kim",
+                            AuthorId = "employee:alex.kim",
                             Content = "Check customer's drawing revision before release.",
                             CreatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc)
                         }
@@ -313,6 +325,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                 Id = Guid.Parse("77777777-7777-7777-7777-777777777777"),
                 ProjectId = _projectId,
                 AuthorName = "Alex Kim",
+                AuthorId = "employee:alex.kim",
                 Content = "Check customer's drawing revision before release.",
                 CreatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc)
             });

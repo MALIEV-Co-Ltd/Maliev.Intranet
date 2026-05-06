@@ -491,22 +491,30 @@
     font-size: var(--maliev-font-small);
 }
 
+.project-record-shell ::deep .project-notes-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+    gap: 20px;
+    align-items: start;
+}
+
+.project-record-shell ::deep .project-note-list-column,
+.project-record-shell ::deep .project-note-compose-column {
+    min-width: 0;
+}
+
 .project-record-shell ::deep .project-note-list {
     display: grid;
     gap: 10px;
 }
 
 .project-record-shell ::deep .project-note-compose {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
+    display: grid;
     gap: 10px;
-    margin-bottom: 14px;
 }
 
 .project-record-shell ::deep .project-note-input {
-    flex: 1 1 520px;
-    min-height: 96px;
+    min-height: 180px;
     width: 100%;
     resize: vertical;
     padding: 10px 12px;
@@ -516,6 +524,13 @@
     color: var(--maliev-ink);
     font: inherit;
     line-height: 1.45;
+}
+
+.project-record-shell ::deep .project-note-compose-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 .project-record-shell ::deep .project-note-add {
@@ -544,11 +559,19 @@
     background: var(--maliev-panel);
 }
 
-.project-record-shell ::deep .project-note-card strong {
-    color: var(--maliev-ink);
+.project-record-shell ::deep .project-note-audit {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
 }
 
-.project-record-shell ::deep .project-note-card span {
+.project-record-shell ::deep .project-note-audit strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+}
+
+.project-record-shell ::deep .project-note-audit span {
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
 }
@@ -576,6 +599,16 @@
 
 .project-record-shell ::deep .project-empty-panel p {
     margin: 8px 0 14px;
+}
+
+@media (max-width: 900px) {
+    .project-record-shell ::deep .project-notes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .project-record-shell ::deep .project-note-compose-column {
+        order: -1;
+    }
 }
 
 @media (max-width: 1120px) {
