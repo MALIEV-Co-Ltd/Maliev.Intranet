@@ -8,6 +8,7 @@ public class AppWasmRenderModeTests
         var source = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
 
         Assert.Contains("HeadOutlet @rendermode=\"WasmRenderMode\"", source);
+        Assert.Contains("<title>Loading MALIEV Intranet</title>", source);
         Assert.Contains("Routes @rendermode=\"WasmRenderMode\"", source);
         Assert.Contains("new InteractiveWebAssemblyRenderMode(prerender: false)", source);
         Assert.DoesNotContain("InteractiveServer", source, StringComparison.Ordinal);
