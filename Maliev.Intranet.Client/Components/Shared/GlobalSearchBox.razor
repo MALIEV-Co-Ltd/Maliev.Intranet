@@ -2,7 +2,7 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
-<div class="global-search @Class">
+<div class="global-search @(_open ? "is-open" : null) @Class">
     <div class="global-search-input-wrap">
         <span class="global-search-icon" aria-hidden="true">
             <MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" />

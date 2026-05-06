@@ -151,16 +151,7 @@ public class GlobalSearchBoxTests
     [Fact]
     public void GlobalSearchBoxCss_ConstrainsResultRows()
     {
-        var cssPath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "Maliev.Intranet.Client",
-            "Components",
-            "Shared",
-            "GlobalSearchBox.razor.css"));
+        var cssPath = FindSourceFile("Maliev.Intranet.Client", "Components", "Shared", "GlobalSearchBox.razor.css");
         var css = File.ReadAllText(cssPath);
 
         Assert.Contains("overflow-x: hidden;", css, StringComparison.Ordinal);
@@ -172,6 +163,56 @@ public class GlobalSearchBoxTests
         Assert.Contains(".global-search-result.has-media", css, StringComparison.Ordinal);
         Assert.Contains(".global-search-result-image", css, StringComparison.Ordinal);
         Assert.Contains(".global-search-result-avatar", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GlobalSearchBoxCss_LiftsInputOnlyWhenResultsAreOpen()
+    {
+        var cssPath = FindSourceFile("Maliev.Intranet.Client", "Components", "Shared", "GlobalSearchBox.razor.css");
+        var css = File.ReadAllText(cssPath);
+        var closedInputWrapBlock = ExtractCssBlock(css, ".global-search-input-wrap");
+
+        Assert.DoesNotContain("z-index: 2501;", closedInputWrapBlock, StringComparison.Ordinal);
+        Assert.Contains(".global-search.is-open .global-search-input-wrap", css, StringComparison.Ordinal);
+        Assert.Contains("z-index: 2501;", ExtractCssBlock(css, ".global-search.is-open .global-search-input-wrap"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GlobalSearchBox_DoesNotRenderOpenLayerClassByDefault()
+    {
+        using var context = CreateContext(_ => JsonContent.Create(new GlobalSearchResponseDto("acme", 0, [])));
+
+        var cut = context.Render<GlobalSearchBox>();
+
+        Assert.DoesNotContain("is-open", cut.Find(".global-search").ClassList, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public async Task GlobalSearchBox_AddsOpenLayerClassWhenResultsOpen()
+    {
+        using var context = CreateContext(_ => JsonContent.Create(new GlobalSearchResponseDto(
+            "acme",
+            1,
+            [
+                new GlobalSearchResultDto(
+                    "Acme Corp",
+                    "Customer",
+                    "Sales & CRM",
+                    "customer",
+                    "Active",
+                    "/customers/1",
+                    1.0d)
+            ])));
+
+        var cut = context.Render<GlobalSearchBox>();
+        cut.Find("input").Input("acme");
+
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find(".global-search-panel")));
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".global-search-spinner")));
+
+        Assert.Contains("is-open", cut.Find(".global-search").ClassList, StringComparer.Ordinal);
+        await cut.InvokeAsync(() => cut.Find(".global-search-backdrop").Click());
+        Assert.DoesNotContain("is-open", cut.Find(".global-search").ClassList, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -249,5 +290,41 @@ public class GlobalSearchBoxTests
         });
 
         return context;
+    }
+
+    private static string ExtractCssBlock(string source, string selector)
+    {
+        var selectorIndex = source.IndexOf(selector, StringComparison.Ordinal);
+        if (selectorIndex < 0)
+        {
+            throw new InvalidOperationException($"Expected selector '{selector}' to exist.");
+        }
+
+        var openBraceIndex = source.IndexOf('{', selectorIndex);
+        var closeBraceIndex = source.IndexOf('}', openBraceIndex + 1);
+        if (openBraceIndex < 0 || closeBraceIndex < 0)
+        {
+            throw new InvalidOperationException($"Expected selector '{selector}' to contain a CSS block.");
+        }
+
+        return source.Substring(openBraceIndex + 1, closeBraceIndex - openBraceIndex - 1);
+    }
+
+    private static string FindSourceFile(params string[] relativeParts)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException(
+            $"Could not find source file '{Path.Combine(relativeParts)}' from '{AppContext.BaseDirectory}'.");
     }
 }

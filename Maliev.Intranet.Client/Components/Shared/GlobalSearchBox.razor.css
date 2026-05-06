@@ -7,6 +7,9 @@
     position: relative;
     display: flex;
     align-items: center;
+}
+
+.global-search.is-open .global-search-input-wrap {
     z-index: 2501;
 }
 
