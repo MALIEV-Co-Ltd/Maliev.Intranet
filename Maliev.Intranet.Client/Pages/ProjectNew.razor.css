@@ -21,8 +21,14 @@
 .pn-parts-drawer {
     display: none;
 }
-.pn-mobile-toolbar {
-    display: none;
+.pn-editor-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--maliev-border);
+    background: var(--maliev-panel);
 }
 .pn-parts-toggle {
     display: inline-flex;
@@ -38,6 +44,9 @@
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
+}
+.pn-parts-toggle--mobile {
+    display: none;
 }
 .pn-parts-count {
     display: inline-flex;
@@ -58,6 +67,39 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
+}
+.pn-center--table {
+    overflow: hidden;
+}
+.pn-layout-toggle {
+    display: inline-grid;
+    grid-auto-flow: column;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-3);
+}
+.pn-layout-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: calc(var(--maliev-radius-sm) - 2px);
+    background: transparent;
+    color: var(--maliev-muted);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+}
+.pn-layout-button--active {
+    background: var(--maliev-panel);
+    color: var(--mud-palette-primary);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
 }
 .pn-empty-detail {
     flex: 1;
@@ -143,15 +185,21 @@
         overflow: visible;
         min-height: unset;
     }
-    .pn-mobile-toolbar {
+    .pn-editor-toolbar {
         position: sticky;
         top: 0;
         z-index: 12;
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: 8px;
         padding: 8px 10px;
         border-bottom: 1px solid var(--maliev-border);
         background: var(--maliev-panel);
+    }
+    .pn-parts-toggle--mobile {
+        display: inline-flex;
+        flex: 0 0 auto;
     }
     .pn-detail-row {
         flex-direction: column;
@@ -170,11 +218,21 @@
     .pn-parts-drawer ::deep .plp-root {
         width: min(270px, 100vw);
     }
-    .pn-mobile-toolbar {
+    .pn-editor-toolbar {
         padding: 8px;
+        align-items: stretch;
+        flex-direction: column;
     }
-    .pn-parts-toggle {
+    .pn-parts-toggle--mobile {
         width: 100%;
         justify-content: center;
+    }
+    .pn-layout-toggle {
+        grid-auto-flow: column;
+        width: 100%;
+    }
+    .pn-layout-button {
+        min-width: 0;
+        padding: 0 8px;
     }
 }

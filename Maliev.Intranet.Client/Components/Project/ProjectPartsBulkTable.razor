@@ -1,0 +1,782 @@
+@namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
+@inject CurrencyService CurrencyService
+
+<div class="pbt-root">
+    <div class="pbt-header">
+        <div>
+            <div class="pbt-kicker">Table edit</div>
+            <div class="pbt-title">@Parts.Count part@(Parts.Count == 1 ? "" : "s")</div>
+        </div>
+        <div class="pbt-actions">
+            <button type="button"
+                    class="pbt-action-button"
+                    @onclick="ToggleAllAsync">
+                <MudIcon Icon="@(AreAllSelected ? Icons.Material.Outlined.Deselect : Icons.Material.Outlined.SelectAll)" Size="Size.Small" />
+                <span>@(AreAllSelected ? "Clear" : "Select all")</span>
+            </button>
+        </div>
+    </div>
+
+    @if (SelectedCount > 0)
+    {
+        <div class="pbt-bulk-panel">
+            <div class="pbt-bulk-summary">
+                <strong>@SelectedCount selected</strong>
+                <span>Apply only checked fields to compatible parts.</span>
+            </div>
+
+            <div class="pbt-bulk-grid">
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeProcess" />
+                    <span>Process</span>
+                </label>
+                <select class="pbt-input"
+                        value="@(_bulkPatch.Process?.Code ?? string.Empty)"
+                        disabled="@(!_bulkPatch.IncludeProcess)"
+                        @onchange="OnBulkProcessChanged">
+                    <option value="">Select process</option>
+                    @foreach (var process in Processes)
+                    {
+                        <option value="@process.Code">@process.Name</option>
+                    }
+                </select>
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeMaterial" />
+                    <span>Material</span>
+                </label>
+                <select class="pbt-input"
+                        value="@(_bulkPatch.Material?.Id.ToString() ?? string.Empty)"
+                        disabled="@(!_bulkPatch.IncludeMaterial || BulkSourcePart?.AvailableMaterials.Count == 0)"
+                        @onchange="OnBulkMaterialChanged">
+                    <option value="">Select material</option>
+                    @foreach (var material in BulkSourcePart?.AvailableMaterials ?? [])
+                    {
+                        <option value="@material.Id">@material.Name</option>
+                    }
+                </select>
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeFinish" />
+                    <span>Finish</span>
+                </label>
+                <select class="pbt-input"
+                        value="@(_bulkPatch.Finish?.Id.ToString() ?? string.Empty)"
+                        disabled="@(!_bulkPatch.IncludeFinish || BulkSourcePart?.AvailableFinishes.Count == 0)"
+                        @onchange="OnBulkFinishChanged">
+                    <option value="">Select finish</option>
+                    @foreach (var finish in BulkSourcePart?.AvailableFinishes ?? [])
+                    {
+                        <option value="@finish.Id">@finish.Name</option>
+                    }
+                </select>
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeTolerance" />
+                    <span>Tolerance</span>
+                </label>
+                <select class="pbt-input"
+                        value="@(_bulkPatch.Tolerance?.Id.ToString() ?? string.Empty)"
+                        disabled="@(!_bulkPatch.IncludeTolerance || BulkSourcePart?.AvailableTolerances.Count == 0)"
+                        @onchange="OnBulkToleranceChanged">
+                    <option value="">Select tolerance</option>
+                    @foreach (var tolerance in BulkSourcePart?.AvailableTolerances ?? [])
+                    {
+                        <option value="@tolerance.Id">@tolerance.Name</option>
+                    }
+                </select>
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeQuantity" />
+                    <span>Quantity</span>
+                </label>
+                <input class="pbt-input"
+                       type="number"
+                       min="1"
+                       value="@_bulkPatch.Quantity"
+                       disabled="@(!_bulkPatch.IncludeQuantity)"
+                       @onchange="OnBulkQuantityChanged" />
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeInspection" />
+                    <span>Inspection</span>
+                </label>
+                <select class="pbt-input"
+                        value="@_bulkPatch.InspectionLevel.ToString()"
+                        disabled="@(!_bulkPatch.IncludeInspection)"
+                        @onchange="OnBulkInspectionChanged">
+                    @foreach (var level in Enum.GetValues<InspectionLevel>())
+                    {
+                        <option value="@level">@FormatInspection(level)</option>
+                    }
+                </select>
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeRoughness" />
+                    <span>Roughness</span>
+                </label>
+                <input class="pbt-input"
+                       value="@_bulkPatch.RoughnessCode"
+                       disabled="@(!_bulkPatch.IncludeRoughness)"
+                       placeholder="RA_3_2"
+                       @onchange="OnBulkRoughnessChanged" />
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeThreadedHoles" />
+                    <span>Threaded holes</span>
+                </label>
+                <label class="pbt-inline-check">
+                    <input type="checkbox"
+                           checked="@_bulkPatch.HasThreadedHoles"
+                           disabled="@(!_bulkPatch.IncludeThreadedHoles)"
+                           @onchange="OnBulkThreadedHolesChanged" />
+                    <span>Required</span>
+                </label>
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludeInserts" />
+                    <span>Inserts</span>
+                </label>
+                <label class="pbt-inline-check">
+                    <input type="checkbox"
+                           checked="@_bulkPatch.HasInserts"
+                           disabled="@(!_bulkPatch.IncludeInserts)"
+                           @onchange="OnBulkInsertsChanged" />
+                    <span>Required</span>
+                </label>
+
+                <label class="pbt-bulk-field pbt-bulk-field--toggle">
+                    <input type="checkbox" @bind="_bulkPatch.IncludePartNotes" />
+                    <span>Notes</span>
+                </label>
+                <input class="pbt-input"
+                       value="@_bulkPatch.PartNotes"
+                       disabled="@(!_bulkPatch.IncludePartNotes)"
+                       placeholder="Part note"
+                       @onchange="OnBulkNotesChanged" />
+            </div>
+
+            <div class="pbt-bulk-footer">
+                <button type="button"
+                        class="pbt-primary-button"
+                        disabled="@(!CanApplyBulkPatch)"
+                        @onclick="ApplyBulkPatchAsync">
+                    <MudIcon Icon="@Icons.Material.Outlined.DoneAll" Size="Size.Small" />
+                    <span>Apply to selected</span>
+                </button>
+            </div>
+        </div>
+    }
+
+    <div class="pbt-table-surface">
+        <table class="pbt-table">
+            <thead>
+                <tr>
+                    <th class="pbt-col-check">
+                        <input type="checkbox"
+                               checked="@AreAllSelected"
+                               @onchange="@((ChangeEventArgs _) => ToggleAllAsync())"
+                               aria-label="Select all parts" />
+                    </th>
+                    <th>Part</th>
+                    <th>Process</th>
+                    <th>Material</th>
+                    <th>Finish</th>
+                    <th>Tolerance</th>
+                    <th>Qty</th>
+                    <th>Inspection</th>
+                    <th>Price</th>
+                    <th>DFM</th>
+                    <th class="pbt-col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var part in Parts)
+                {
+                    var selected = IsPartSelected(part);
+                    <tr class="@($"pbt-table-row{(selected ? " pbt-table-row--selected" : string.Empty)}")">
+                        <td class="pbt-col-check">
+                            <input type="checkbox"
+                                   checked="@selected"
+                                   @onchange="@((ChangeEventArgs args) => TogglePartAsync(part, IsChecked(args)))"
+                                   aria-label="@($"Select {part.Name}")" />
+                        </td>
+                        <td>
+                            <div class="pbt-part-name">@part.Name</div>
+                            <div class="pbt-part-meta">@ResolvePartMeta(part)</div>
+                        </td>
+                        <td>
+                            <select class="pbt-input"
+                                    value="@(part.ProcessCode ?? string.Empty)"
+                                    @onchange="@((ChangeEventArgs args) => ChangeProcessAsync(part, args.Value?.ToString()))">
+                                <option value="">Process</option>
+                                @foreach (var process in Processes)
+                                {
+                                    <option value="@process.Code">@process.Name</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <select class="pbt-input"
+                                    value="@(part.MaterialId?.ToString() ?? string.Empty)"
+                                    disabled="@(part.AvailableMaterials.Count == 0)"
+                                    @onchange="@((ChangeEventArgs args) => ChangeMaterialAsync(part, args.Value?.ToString()))">
+                                <option value="">Material</option>
+                                @foreach (var material in part.AvailableMaterials)
+                                {
+                                    <option value="@material.Id">@material.Name</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <select class="pbt-input"
+                                    value="@(part.FinishId?.ToString() ?? string.Empty)"
+                                    disabled="@(part.AvailableFinishes.Count == 0)"
+                                    @onchange="@((ChangeEventArgs args) => ChangeFinishAsync(part, args.Value?.ToString()))">
+                                <option value="">Finish</option>
+                                @foreach (var finish in part.AvailableFinishes)
+                                {
+                                    <option value="@finish.Id">@finish.Name</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <select class="pbt-input"
+                                    value="@(part.ToleranceId?.ToString() ?? string.Empty)"
+                                    disabled="@(part.AvailableTolerances.Count == 0)"
+                                    @onchange="@((ChangeEventArgs args) => ChangeToleranceAsync(part, args.Value?.ToString()))">
+                                <option value="">Tolerance</option>
+                                @foreach (var tolerance in part.AvailableTolerances)
+                                {
+                                    <option value="@tolerance.Id">@tolerance.Name</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <input class="pbt-input pbt-input--qty"
+                                   type="number"
+                                   min="1"
+                                   value="@part.Quantity"
+                                   @onchange="@((ChangeEventArgs args) => ChangeQuantityAsync(part, args.Value?.ToString()))" />
+                        </td>
+                        <td>
+                            <select class="pbt-input"
+                                    value="@part.InspectionLevel.ToString()"
+                                    @onchange="@((ChangeEventArgs args) => ChangeInspectionAsync(part, args.Value?.ToString()))">
+                                @foreach (var level in Enum.GetValues<InspectionLevel>())
+                                {
+                                    <option value="@level">@FormatInspection(level)</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <div class="pbt-price">@ResolvePrice(part)</div>
+                            @if (part.EstimatedUnitPrice.HasValue)
+                            {
+                                <div class="pbt-subtext">@CurrencyService.Format(part.EstimatedUnitPrice.Value) ea</div>
+                            }
+                        </td>
+                        <td>
+                            <span class="@ResolveDfmClass(part)">@ResolveDfmText(part)</span>
+                        </td>
+                        <td class="pbt-col-actions">
+                            <button type="button"
+                                    class="pbt-icon-button pbt-expand-button"
+                                    title="Advanced configuration"
+                                    @onclick="@(() => ToggleExpanded(part))">
+                                <MudIcon Icon="@(IsExpanded(part) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)" Size="Size.Small" />
+                            </button>
+                            <button type="button"
+                                    class="pbt-icon-button"
+                                    title="Open viewer"
+                                    disabled="@(!CanOpenViewer(part))"
+                                    @onclick="@(() => OnOpenViewer.InvokeAsync(part))">
+                                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                            </button>
+                            <button type="button"
+                                    class="pbt-icon-button"
+                                    title="Duplicate part"
+                                    @onclick="@(() => OnDuplicatePart.InvokeAsync(part))">
+                                <MudIcon Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" />
+                            </button>
+                            <button type="button"
+                                    class="pbt-icon-button pbt-icon-button--danger"
+                                    title="Remove part"
+                                    @onclick="@(() => OnRemovePart.InvokeAsync(part))">
+                                <MudIcon Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" />
+                            </button>
+                        </td>
+                    </tr>
+                    @if (IsExpanded(part))
+                    {
+                        <tr class="pbt-expanded-row">
+                            <td colspan="11">
+                                <div class="pbt-advanced-panel">
+                                    <PartConfigSidebar Part="@part"
+                                                       Processes="@Processes"
+                                                       TempProjectId="@TempProjectId"
+                                                       CustomerId="@CustomerId"
+                                                       DisplayMode="@PartConfigSidebarDisplayMode.Inline"
+                                                       OnPartChanged="@OnPartChanged" />
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pbt-card-stack">
+        @foreach (var part in Parts)
+        {
+            var selected = IsPartSelected(part);
+            <article class="@($"pbt-part-card{(selected ? " pbt-part-card--selected" : string.Empty)}")">
+                <div class="pbt-card-head">
+                    <label class="pbt-card-select">
+                        <input type="checkbox"
+                               checked="@selected"
+                               @onchange="@((ChangeEventArgs args) => TogglePartAsync(part, IsChecked(args)))" />
+                        <span>@part.Name</span>
+                    </label>
+                    <button type="button"
+                            class="pbt-icon-button pbt-expand-button"
+                            title="Advanced configuration"
+                            @onclick="@(() => ToggleExpanded(part))">
+                        <MudIcon Icon="@(IsExpanded(part) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)" Size="Size.Small" />
+                    </button>
+                </div>
+
+                <div class="pbt-card-meta">
+                    <span>@ResolvePrice(part)</span>
+                    <span class="@ResolveDfmClass(part)">@ResolveDfmText(part)</span>
+                </div>
+
+                <div class="pbt-card-grid">
+                    <label>
+                        <span>Process</span>
+                        <select class="pbt-input"
+                                value="@(part.ProcessCode ?? string.Empty)"
+                                @onchange="@((ChangeEventArgs args) => ChangeProcessAsync(part, args.Value?.ToString()))">
+                            <option value="">Process</option>
+                            @foreach (var process in Processes)
+                            {
+                                <option value="@process.Code">@process.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        <span>Material</span>
+                        <select class="pbt-input"
+                                value="@(part.MaterialId?.ToString() ?? string.Empty)"
+                                disabled="@(part.AvailableMaterials.Count == 0)"
+                                @onchange="@((ChangeEventArgs args) => ChangeMaterialAsync(part, args.Value?.ToString()))">
+                            <option value="">Material</option>
+                            @foreach (var material in part.AvailableMaterials)
+                            {
+                                <option value="@material.Id">@material.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        <span>Finish</span>
+                        <select class="pbt-input"
+                                value="@(part.FinishId?.ToString() ?? string.Empty)"
+                                disabled="@(part.AvailableFinishes.Count == 0)"
+                                @onchange="@((ChangeEventArgs args) => ChangeFinishAsync(part, args.Value?.ToString()))">
+                            <option value="">Finish</option>
+                            @foreach (var finish in part.AvailableFinishes)
+                            {
+                                <option value="@finish.Id">@finish.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        <span>Tolerance</span>
+                        <select class="pbt-input"
+                                value="@(part.ToleranceId?.ToString() ?? string.Empty)"
+                                disabled="@(part.AvailableTolerances.Count == 0)"
+                                @onchange="@((ChangeEventArgs args) => ChangeToleranceAsync(part, args.Value?.ToString()))">
+                            <option value="">Tolerance</option>
+                            @foreach (var tolerance in part.AvailableTolerances)
+                            {
+                                <option value="@tolerance.Id">@tolerance.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        <span>Qty</span>
+                        <input class="pbt-input"
+                               type="number"
+                               min="1"
+                               value="@part.Quantity"
+                               @onchange="@((ChangeEventArgs args) => ChangeQuantityAsync(part, args.Value?.ToString()))" />
+                    </label>
+                    <label>
+                        <span>Inspection</span>
+                        <select class="pbt-input"
+                                value="@part.InspectionLevel.ToString()"
+                                @onchange="@((ChangeEventArgs args) => ChangeInspectionAsync(part, args.Value?.ToString()))">
+                            @foreach (var level in Enum.GetValues<InspectionLevel>())
+                            {
+                                <option value="@level">@FormatInspection(level)</option>
+                            }
+                        </select>
+                    </label>
+                </div>
+
+                <div class="pbt-card-actions">
+                    <button type="button" class="pbt-action-button" disabled="@(!CanOpenViewer(part))" @onclick="@(() => OnOpenViewer.InvokeAsync(part))">
+                        <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                        <span>View</span>
+                    </button>
+                    <button type="button" class="pbt-action-button" @onclick="@(() => OnDuplicatePart.InvokeAsync(part))">
+                        <MudIcon Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" />
+                        <span>Duplicate</span>
+                    </button>
+                    <button type="button" class="pbt-action-button pbt-action-button--danger" @onclick="@(() => OnRemovePart.InvokeAsync(part))">
+                        <MudIcon Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" />
+                        <span>Remove</span>
+                    </button>
+                </div>
+
+                @if (IsExpanded(part))
+                {
+                    <div class="pbt-advanced-panel">
+                        <PartConfigSidebar Part="@part"
+                                           Processes="@Processes"
+                                           TempProjectId="@TempProjectId"
+                                           CustomerId="@CustomerId"
+                                           DisplayMode="@PartConfigSidebarDisplayMode.Inline"
+                                           OnPartChanged="@OnPartChanged" />
+                    </div>
+                }
+            </article>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>All parts in the current draft.</summary>
+    [Parameter] public List<PartViewModel> Parts { get; set; } = [];
+
+    /// <summary>Available manufacturing processes.</summary>
+    [Parameter] public List<ProcessDto> Processes { get; set; } = [];
+
+    /// <summary>The currently selected part instances. Selection uses object references.</summary>
+    [Parameter] public IReadOnlyCollection<PartViewModel> SelectedParts { get; set; } = [];
+
+    /// <summary>Callback invoked when the selected part set changes.</summary>
+    [Parameter] public EventCallback<IReadOnlyCollection<PartViewModel>> SelectedPartsChanged { get; set; }
+
+    /// <summary>Callback invoked after a part's configuration has changed.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
+
+    /// <summary>Callback invoked when a row changes its manufacturing process.</summary>
+    [Parameter] public EventCallback<ProjectPartProcessChange> OnProcessChanged { get; set; }
+
+    /// <summary>Callback invoked when the bulk editor applies an explicit patch.</summary>
+    [Parameter] public EventCallback<ProjectPartsBulkApplyRequest> OnBulkApply { get; set; }
+
+    /// <summary>Callback invoked when the user opens the 3-D viewer for a part.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
+
+    /// <summary>Callback invoked when the user removes a part.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
+
+    /// <summary>Callback invoked when the user duplicates a part.</summary>
+    [Parameter] public EventCallback<PartViewModel> OnDuplicatePart { get; set; }
+
+    /// <summary>The temporary project identifier, forwarded to advanced configuration panels.</summary>
+    [Parameter] public Guid TempProjectId { get; set; }
+
+    /// <summary>The selected customer identifier, forwarded to advanced configuration panels.</summary>
+    [Parameter] public Guid? CustomerId { get; set; }
+
+    private readonly HashSet<PartViewModel> _expandedParts = new(ReferenceEqualityComparer.Instance);
+    private readonly PartConfigurationBulkPatch _bulkPatch = new();
+    private PartViewModel? _lastBulkSourcePart;
+
+    private int SelectedCount => SelectedParts.Count(part => Parts.Contains(part));
+
+    private bool AreAllSelected =>
+        Parts.Count > 0 && Parts.All(IsPartSelected);
+
+    private PartViewModel? BulkSourcePart =>
+        SelectedParts.FirstOrDefault(part => Parts.Contains(part));
+
+    private bool CanApplyBulkPatch =>
+        SelectedCount > 0 &&
+        (_bulkPatch.IncludeProcess ||
+         _bulkPatch.IncludeMaterial ||
+         _bulkPatch.IncludeFinish ||
+         _bulkPatch.IncludeTolerance ||
+         _bulkPatch.IncludeQuantity ||
+         _bulkPatch.IncludeInspection ||
+         _bulkPatch.IncludeRoughness ||
+         _bulkPatch.IncludeThreadedHoles ||
+         _bulkPatch.IncludeInserts ||
+         _bulkPatch.IncludeBagAndTag ||
+         _bulkPatch.IncludePartNotes ||
+         _bulkPatch.IncludeProcessOptions);
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        _expandedParts.RemoveWhere(part => !Parts.Contains(part));
+
+        var source = BulkSourcePart;
+        if (!ReferenceEquals(source, _lastBulkSourcePart))
+        {
+            _lastBulkSourcePart = source;
+            SeedBulkPatch(source);
+        }
+    }
+
+    private void SeedBulkPatch(PartViewModel? source)
+    {
+        if (source == null)
+            return;
+
+        _bulkPatch.Process = Processes.FirstOrDefault(process => process.Code == source.ProcessCode);
+        _bulkPatch.Material = source.MaterialId.HasValue
+            ? source.AvailableMaterials.FirstOrDefault(material => material.Id == source.MaterialId.Value)
+            : null;
+        _bulkPatch.Finish = source.FinishId.HasValue
+            ? source.AvailableFinishes.FirstOrDefault(finish => finish.Id == source.FinishId.Value)
+            : null;
+        _bulkPatch.Tolerance = source.ToleranceId.HasValue
+            ? source.AvailableTolerances.FirstOrDefault(tolerance => tolerance.Id == source.ToleranceId.Value)
+            : null;
+        _bulkPatch.Quantity = Math.Max(1, source.Quantity);
+        _bulkPatch.InspectionLevel = source.InspectionLevel;
+        _bulkPatch.RoughnessCode = source.RoughnessCode;
+        _bulkPatch.HasThreadedHoles = source.HasThreadedHoles;
+        _bulkPatch.HasInserts = source.HasInserts;
+        _bulkPatch.BagAndTag = source.BagAndTag;
+        _bulkPatch.PartNotes = source.PartNotes;
+    }
+
+    private bool IsPartSelected(PartViewModel part) =>
+        SelectedParts.Contains(part);
+
+    private bool IsExpanded(PartViewModel part) =>
+        _expandedParts.Contains(part);
+
+    private void ToggleExpanded(PartViewModel part)
+    {
+        if (!_expandedParts.Add(part))
+            _expandedParts.Remove(part);
+    }
+
+    private async Task ToggleAllAsync()
+    {
+        IReadOnlyCollection<PartViewModel> next = AreAllSelected
+            ? []
+            : new HashSet<PartViewModel>(Parts, ReferenceEqualityComparer.Instance);
+
+        await SelectedPartsChanged.InvokeAsync(next);
+    }
+
+    private async Task TogglePartAsync(PartViewModel part, bool selected)
+    {
+        var next = new HashSet<PartViewModel>(SelectedParts, ReferenceEqualityComparer.Instance);
+        if (selected)
+            next.Add(part);
+        else
+            next.Remove(part);
+
+        await SelectedPartsChanged.InvokeAsync(next);
+    }
+
+    private async Task ChangeProcessAsync(PartViewModel part, string? processCode)
+    {
+        var process = Processes.FirstOrDefault(item => string.Equals(item.Code, processCode, StringComparison.OrdinalIgnoreCase));
+        await OnProcessChanged.InvokeAsync(new ProjectPartProcessChange(part, process));
+    }
+
+    private async Task ChangeMaterialAsync(PartViewModel part, string? materialId)
+    {
+        var material = TryFindById(part.AvailableMaterials, materialId);
+        part.MaterialId = material?.Id;
+        part.MaterialCode = material?.Code;
+        await OnPartChanged.InvokeAsync(part);
+    }
+
+    private async Task ChangeFinishAsync(PartViewModel part, string? finishId)
+    {
+        var finish = TryFindById(part.AvailableFinishes, finishId);
+        part.FinishId = finish?.Id;
+        part.FinishCode = finish?.Code;
+        await OnPartChanged.InvokeAsync(part);
+    }
+
+    private async Task ChangeToleranceAsync(PartViewModel part, string? toleranceId)
+    {
+        var tolerance = TryFindById(part.AvailableTolerances, toleranceId);
+        part.ToleranceId = tolerance?.Id;
+        part.ToleranceCode = tolerance?.Code;
+        await OnPartChanged.InvokeAsync(part);
+    }
+
+    private async Task ChangeQuantityAsync(PartViewModel part, string? value)
+    {
+        part.Quantity = int.TryParse(value, out var quantity) ? Math.Max(1, quantity) : 1;
+        await OnPartChanged.InvokeAsync(part);
+    }
+
+    private async Task ChangeInspectionAsync(PartViewModel part, string? value)
+    {
+        if (Enum.TryParse<InspectionLevel>(value, out var inspectionLevel))
+            part.InspectionLevel = inspectionLevel;
+
+        await OnPartChanged.InvokeAsync(part);
+    }
+
+    private async Task ApplyBulkPatchAsync()
+    {
+        var selected = SelectedParts
+            .Where(part => Parts.Contains(part))
+            .ToList();
+
+        if (selected.Count == 0)
+            return;
+
+        await OnBulkApply.InvokeAsync(new ProjectPartsBulkApplyRequest(selected, CloneBulkPatch()));
+    }
+
+    private PartConfigurationBulkPatch CloneBulkPatch() => new()
+    {
+        IncludeProcess = _bulkPatch.IncludeProcess,
+        Process = _bulkPatch.Process,
+        IncludeMaterial = _bulkPatch.IncludeMaterial,
+        Material = _bulkPatch.Material,
+        IncludeFinish = _bulkPatch.IncludeFinish,
+        Finish = _bulkPatch.Finish,
+        IncludeTolerance = _bulkPatch.IncludeTolerance,
+        Tolerance = _bulkPatch.Tolerance,
+        IncludeQuantity = _bulkPatch.IncludeQuantity,
+        Quantity = _bulkPatch.Quantity,
+        IncludeInspection = _bulkPatch.IncludeInspection,
+        InspectionLevel = _bulkPatch.InspectionLevel,
+        IncludeRoughness = _bulkPatch.IncludeRoughness,
+        RoughnessCode = _bulkPatch.RoughnessCode,
+        IncludeThreadedHoles = _bulkPatch.IncludeThreadedHoles,
+        HasThreadedHoles = _bulkPatch.HasThreadedHoles,
+        IncludeInserts = _bulkPatch.IncludeInserts,
+        HasInserts = _bulkPatch.HasInserts,
+        IncludeBagAndTag = _bulkPatch.IncludeBagAndTag,
+        BagAndTag = _bulkPatch.BagAndTag,
+        IncludePartNotes = _bulkPatch.IncludePartNotes,
+        PartNotes = _bulkPatch.PartNotes,
+        IncludeProcessOptions = _bulkPatch.IncludeProcessOptions,
+        ProcessOptionValues = new Dictionary<string, string?>(_bulkPatch.ProcessOptionValues, StringComparer.OrdinalIgnoreCase),
+    };
+
+    private void OnBulkProcessChanged(ChangeEventArgs args) =>
+        _bulkPatch.Process = Processes.FirstOrDefault(process => string.Equals(process.Code, args.Value?.ToString(), StringComparison.OrdinalIgnoreCase));
+
+    private void OnBulkMaterialChanged(ChangeEventArgs args) =>
+        _bulkPatch.Material = TryFindById(BulkSourcePart?.AvailableMaterials ?? [], args.Value?.ToString());
+
+    private void OnBulkFinishChanged(ChangeEventArgs args) =>
+        _bulkPatch.Finish = TryFindById(BulkSourcePart?.AvailableFinishes ?? [], args.Value?.ToString());
+
+    private void OnBulkToleranceChanged(ChangeEventArgs args) =>
+        _bulkPatch.Tolerance = TryFindById(BulkSourcePart?.AvailableTolerances ?? [], args.Value?.ToString());
+
+    private void OnBulkQuantityChanged(ChangeEventArgs args) =>
+        _bulkPatch.Quantity = int.TryParse(args.Value?.ToString(), out var quantity) ? Math.Max(1, quantity) : 1;
+
+    private void OnBulkInspectionChanged(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<InspectionLevel>(args.Value?.ToString(), out var inspectionLevel))
+            _bulkPatch.InspectionLevel = inspectionLevel;
+    }
+
+    private void OnBulkRoughnessChanged(ChangeEventArgs args) =>
+        _bulkPatch.RoughnessCode = args.Value?.ToString();
+
+    private void OnBulkThreadedHolesChanged(ChangeEventArgs args) =>
+        _bulkPatch.HasThreadedHoles = IsChecked(args);
+
+    private void OnBulkInsertsChanged(ChangeEventArgs args) =>
+        _bulkPatch.HasInserts = IsChecked(args);
+
+    private void OnBulkNotesChanged(ChangeEventArgs args) =>
+        _bulkPatch.PartNotes = args.Value?.ToString();
+
+    private static bool IsChecked(ChangeEventArgs args) =>
+        args.Value is bool checkedValue && checkedValue;
+
+    private static bool CanOpenViewer(PartViewModel part) =>
+        !string.IsNullOrEmpty(part.GlbStoragePath) ||
+        !string.IsNullOrEmpty(part.GlbSignedUrl) ||
+        !string.IsNullOrEmpty(part.ViewerUrl);
+
+    private static T? TryFindById<T>(IReadOnlyCollection<T> items, string? id)
+        where T : class
+    {
+        if (!Guid.TryParse(id, out var parsedId))
+            return null;
+
+        return items.FirstOrDefault(item => item switch
+        {
+            CatalogMaterialDto material => material.Id == parsedId,
+            CatalogSurfaceFinishDto finish => finish.Id == parsedId,
+            CatalogToleranceDto tolerance => tolerance.Id == parsedId,
+            _ => false,
+        });
+    }
+
+    private string ResolvePrice(PartViewModel part)
+    {
+        if (part.PricingLoading)
+            return "Pricing";
+
+        return part.EstimatedTotalAmount.HasValue
+            ? CurrencyService.Format(part.EstimatedTotalAmount.Value)
+            : "Not priced";
+    }
+
+    private static string ResolveDfmText(PartViewModel part)
+    {
+        if (part.DfmAnalysisTimedOut)
+            return "Unavailable";
+        if (part.RequiresDfmAcknowledgement)
+            return "Review";
+        if (part.DfmReport != null)
+            return "Ready";
+        if (part.ProcessId.HasValue)
+            return "Pending";
+
+        return "No process";
+    }
+
+    private static string ResolveDfmClass(PartViewModel part) =>
+        part.DfmAnalysisTimedOut
+            ? "pbt-dfm pbt-dfm--error"
+            : part.RequiresDfmAcknowledgement
+                ? "pbt-dfm pbt-dfm--warning"
+                : part.DfmReport != null
+                    ? "pbt-dfm pbt-dfm--ready"
+                    : "pbt-dfm";
+
+    private static string ResolvePartMeta(PartViewModel part)
+    {
+        if (part.Dimensions == null)
+            return part.StatusText;
+
+        return $"{part.Dimensions.X:N1} x {part.Dimensions.Y:N1} x {part.Dimensions.Z:N1} mm";
+    }
+
+    private static string FormatInspection(InspectionLevel level) =>
+        level switch
+        {
+            InspectionLevel.FullCmm => "Full CMM",
+            _ => level.ToString(),
+        };
+}

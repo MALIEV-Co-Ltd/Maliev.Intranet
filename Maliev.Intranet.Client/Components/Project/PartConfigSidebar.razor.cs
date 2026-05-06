@@ -206,6 +206,11 @@ public partial class PartConfigSidebar : ComponentBase
     private IReadOnlyList<CatalogToleranceDto> VisibleToleranceList =>
         VisibleTolerances.OrderBy(t => t.SortOrder).ToList();
 
+    private string RootClass =>
+        DisplayMode == PartConfigSidebarDisplayMode.Inline
+            ? "pcs-root pcs-root--inline"
+            : "pcs-root";
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     /// <inheritdoc />
@@ -298,13 +303,7 @@ public partial class PartConfigSidebar : ComponentBase
         oldCts?.Cancel();
         oldCts?.Dispose();
 
-        Part.ProcessCode = p.Code;
-        Part.ProcessId = p.Id;
-        Part.DfmAllClearNotified = false;
-
-        // Reset stale analysis flags so prior errors don't bleed into the new process selection.
-        Part.DfmAnalysisTimedOut = false;
-        Part.AnalysisErrorCode = null;
+        ProjectPartBulkEdit.ApplyProcess(Part, p);
 
         // Check if we already have results for this process.
         if (_dfmReports.ContainsKey(p.Code))
@@ -313,22 +312,11 @@ public partial class PartConfigSidebar : ComponentBase
             // Restore the correct typed report slot from our per-process cache.
             ApplyTypedReportFromCache(p.Code);
             Part.ResolveDfmReport();
-            Part.AvailableMaterials = [];
-            Part.AvailableFinishes = [];
-            Part.AvailableTolerances = [];
-            Part.AvailableProcessOptions = [];
-            Part.ProcessOptionValues = new();
             await OnPartChanged.InvokeAsync(Part);
             return;
         }
 
-        // No cached result — clear DFM state and kick off a fresh analysis.
-        Part.DfmReport = null;
-        Part.AvailableMaterials = [];
-        Part.AvailableFinishes = [];
-        Part.AvailableTolerances = [];
-        Part.AvailableProcessOptions = [];
-        Part.ProcessOptionValues = new();
+        // No cached result: catalog reload happens first, then DFM fills in asynchronously.
         await OnPartChanged.InvokeAsync(Part);   // materials load NOW
 
         // DFM runs after materials are already loading. finally block fires OnPartChanged again with DFM state.

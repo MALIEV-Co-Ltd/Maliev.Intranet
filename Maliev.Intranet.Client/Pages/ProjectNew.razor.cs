@@ -50,8 +50,15 @@ public partial class ProjectNew : IAsyncDisposable
 
     // ── Parts ─────────────────────────────────────────────────────────
     private readonly List<PartViewModel> _parts = [];
+    private readonly HashSet<PartViewModel> _bulkSelectedParts = new(ReferenceEqualityComparer.Instance);
+    private LayoutMode _layoutMode = LayoutMode.Configurator;
     private int _selectedPartIndex;
     private bool _partsDrawerOpen;
+
+    private string CenterClass =>
+        _layoutMode == LayoutMode.SummaryTable
+            ? "pn-center pn-center--table"
+            : "pn-center";
 
     // ── Customer search ────────────────────────────────────────────────
     private CancellationTokenSource? _searchCts;
@@ -947,6 +954,100 @@ public partial class ProjectNew : IAsyncDisposable
             ClearDfmUnavailableState(part);
     }
 
+    private async Task RunProcessDfmAnalysisAsync(PartViewModel part, ProcessDto process)
+    {
+        if (!_parts.Contains(part) || part.FileId == Guid.Empty)
+            return;
+
+        var processCode = process.Code;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync(
+                $"api/v1/geometry/{part.FileId}/dfm/{Uri.EscapeDataString(processCode)}",
+                new GeometryAnalysisRequest { StoragePath = part.StoragePath });
+
+            if (!string.Equals(part.ProcessCode, processCode, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<DfmAnalysisResponse>();
+                if (result != null && string.Equals(result.Status, "analysis_complete", StringComparison.OrdinalIgnoreCase))
+                {
+                    await ApplyDfmAnalysisResultAsync(part, processCode, result);
+                }
+                else if (result != null && string.Equals(result.Status, "timeout", StringComparison.OrdinalIgnoreCase))
+                {
+                    part.DfmAnalysisTimedOut = true;
+                    part.AnalysisErrorCode = "GEOMETRY_PHASE2_TIMEOUT";
+                }
+                else
+                {
+                    part.DfmAnalysisTimedOut = true;
+                    part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Gone)
+            {
+                part.DfmAnalysisTimedOut = false;
+                part.AnalysisErrorCode = "FILE_MISSING";
+                Snackbar.Add("File expired or missing. Re-upload to run DFM analysis.", Severity.Error);
+            }
+            else
+            {
+                part.DfmAnalysisTimedOut = true;
+                part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+            }
+        }
+        catch (Exception)
+        {
+            if (string.Equals(part.ProcessCode, processCode, StringComparison.OrdinalIgnoreCase))
+            {
+                part.DfmAnalysisTimedOut = true;
+                part.AnalysisErrorCode = "DFM_ANALYZER_FAILED";
+            }
+        }
+        finally
+        {
+            if (string.Equals(part.ProcessCode, processCode, StringComparison.OrdinalIgnoreCase))
+            {
+                part.ResolveDfmReport();
+                await OnPartChanged(part);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task ApplyDfmAnalysisResultAsync(
+        PartViewModel part,
+        string processCode,
+        DfmAnalysisResponse result)
+    {
+        var upperProcessCode = processCode.ToUpperInvariant();
+        if (upperProcessCode is "SLA" or "SLA_DLP" or "DLP")
+            part.SlaDfmReport = result.DfmReport;
+        else if (upperProcessCode is "CNC" or "CNC_MILL" or "CNC_TURN")
+            part.CncDfmReport = result.DfmReport;
+        else
+            part.FdmDfmReport = result.DfmReport;
+
+        if (result.BodyCount.HasValue && !part.BodyCount.HasValue)
+            part.BodyCount = result.BodyCount.Value;
+
+        if (result.OverlayPaths.Count > 0)
+        {
+            var normalized = NormalizeMigratedArtifactPaths(part, result.OverlayPaths);
+            part.OverlayPaths ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, path) in normalized)
+                part.OverlayPaths[key] = path;
+
+            await ResolveOverlayUrlsAsync(part);
+        }
+
+        part.DfmAnalysisTimedOut = false;
+        part.AnalysisErrorCode = null;
+    }
+
     private async Task ResolveViewerUrlAsync(PartViewModel part)
     {
         if (!string.IsNullOrEmpty(part.ViewerUrl)) return;
@@ -1159,6 +1260,8 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         _parts.Remove(part);
+        _bulkSelectedParts.Remove(part);
+        PruneBulkSelection();
 
         if (_selectedPartIndex >= _parts.Count)
             _selectedPartIndex = Math.Max(0, _parts.Count - 1);
@@ -1189,6 +1292,120 @@ public partial class ProjectNew : IAsyncDisposable
         _partsDrawerOpen = false;
         StateHasChanged();
     }
+
+    private void SetLayoutMode(LayoutMode mode)
+    {
+        _layoutMode = mode;
+        _partsDrawerOpen = false;
+        PruneBulkSelection();
+    }
+
+    private Task OnBulkSelectionChanged(IReadOnlyCollection<PartViewModel> selectedParts)
+    {
+        _bulkSelectedParts.Clear();
+        foreach (var part in selectedParts.Where(_parts.Contains))
+            _bulkSelectedParts.Add(part);
+
+        return Task.CompletedTask;
+    }
+
+    private void PruneBulkSelection() =>
+        _bulkSelectedParts.RemoveWhere(part => !_parts.Contains(part));
+
+    private async Task OnBulkTableProcessChanged(ProjectPartProcessChange change)
+    {
+        if (!_parts.Contains(change.Part))
+            return;
+
+        var changed = ProjectPartBulkEdit.ApplyProcess(change.Part, change.Process);
+        if (!changed)
+            return;
+
+        await OnPartChanged(change.Part);
+
+        if (change.Process != null)
+            _ = RunProcessDfmAnalysisAsync(change.Part, change.Process);
+    }
+
+    private async Task ApplyBulkEditAsync(ProjectPartsBulkApplyRequest request)
+    {
+        var targets = new List<PartViewModel>();
+        foreach (var part in request.Parts)
+        {
+            if (_parts.Contains(part) && targets.All(existing => !ReferenceEquals(existing, part)))
+                targets.Add(part);
+        }
+        if (targets.Count == 0)
+            return;
+
+        var appliedParts = 0;
+        var skippedFields = 0;
+
+        foreach (var part in targets)
+        {
+            var partApplied = false;
+
+            if (request.Patch.IncludeProcess)
+            {
+                if (request.Patch.Process == null)
+                {
+                    skippedFields++;
+                }
+                else
+                {
+                    var processChanged = ProjectPartBulkEdit.ApplyProcess(part, request.Patch.Process);
+                    if (processChanged)
+                    {
+                        partApplied = true;
+                        await OnPartChanged(part);
+                        _ = RunProcessDfmAnalysisAsync(part, request.Patch.Process);
+                    }
+                }
+            }
+
+            var patchWithoutProcess = CopyPatchWithoutProcess(request.Patch);
+            var result = ProjectPartBulkEdit.ApplyPatch(part, patchWithoutProcess);
+            skippedFields += result.SkippedFields.Count;
+
+            if (result.AppliedFields.Count > 0)
+            {
+                partApplied = true;
+                await OnPartChanged(part);
+            }
+
+            if (partApplied)
+                appliedParts++;
+        }
+
+        var skippedText = skippedFields == 0 ? string.Empty : $" {skippedFields} incompatible field update(s) skipped.";
+        Snackbar.Add($"Bulk edit applied to {appliedParts} of {targets.Count} part(s).{skippedText}", Severity.Info);
+    }
+
+    private static PartConfigurationBulkPatch CopyPatchWithoutProcess(PartConfigurationBulkPatch patch) => new()
+    {
+        IncludeMaterial = patch.IncludeMaterial,
+        Material = patch.Material,
+        IncludeFinish = patch.IncludeFinish,
+        Finish = patch.Finish,
+        IncludeTolerance = patch.IncludeTolerance,
+        Tolerance = patch.Tolerance,
+        IncludeQuantity = patch.IncludeQuantity,
+        Quantity = patch.Quantity,
+        IncludeInspection = patch.IncludeInspection,
+        InspectionLevel = patch.InspectionLevel,
+        IncludeRoughness = patch.IncludeRoughness,
+        RoughnessCode = patch.RoughnessCode,
+        IncludeThreadedHoles = patch.IncludeThreadedHoles,
+        HasThreadedHoles = patch.HasThreadedHoles,
+        IncludeInserts = patch.IncludeInserts,
+        HasInserts = patch.HasInserts,
+        IncludeBagAndTag = patch.IncludeBagAndTag,
+        BagAndTag = patch.BagAndTag,
+        IncludePartNotes = patch.IncludePartNotes,
+        PartNotes = patch.PartNotes,
+        IncludeProcessOptions = patch.IncludeProcessOptions,
+        ProcessOptionValues = new Dictionary<string, string?>(patch.ProcessOptionValues, StringComparer.OrdinalIgnoreCase),
+    };
 
     // ── Task 12: Cascading dropdowns ──────────────────────────────────
 
@@ -2064,6 +2281,7 @@ public partial class ProjectNew : IAsyncDisposable
             }
 
             _parts.Clear();
+            _bulkSelectedParts.Clear();
             foreach (var partState in draft.Parts)
             {
                 var partVm = PartViewModel.FromDraftPartState(partState);
@@ -2121,6 +2339,7 @@ public partial class ProjectNew : IAsyncDisposable
         _tempProjectId = ResolveStorageProjectId(project.Parts.Select(p => p.FileReference), project.Id);
         _title = project.Title;
         _parts.Clear();
+        _bulkSelectedParts.Clear();
 
         if (!string.IsNullOrEmpty(project.Currency))
         {

@@ -748,6 +748,52 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void BuildUpdateProjectPartRequest_AfterBulkPatch_UsesEditedCoreConfiguration()
+    {
+        var page = new global::Maliev.Intranet.Client.Pages.ProjectNew();
+        var material = new CatalogMaterialDto(Guid.NewGuid(), "Aluminum 6061", "AL6061", "Metal", null, null, 10);
+        var finish = new CatalogSurfaceFinishDto(Guid.NewGuid(), "Bead blast", "BEAD_BLAST", 1.6m, 8m, null, 20);
+        var tolerance = new CatalogToleranceDto(Guid.NewGuid(), "ISO 2768 Fine", "ISO2768_F", "ISO 2768", "f", null, 12m, 20);
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "bulk-edited.stl",
+            ProcessCode = "CNC_MILL",
+            ProcessId = Guid.NewGuid(),
+            AvailableMaterials = [material],
+            AvailableFinishes = [finish],
+            AvailableTolerances = [tolerance],
+            Quantity = 1,
+            InspectionLevel = InspectionLevel.Standard,
+        };
+
+        ProjectPartBulkEdit.ApplyPatch(part, new PartConfigurationBulkPatch
+        {
+            IncludeMaterial = true,
+            Material = material,
+            IncludeFinish = true,
+            Finish = finish,
+            IncludeTolerance = true,
+            Tolerance = tolerance,
+            IncludeQuantity = true,
+            Quantity = 12,
+            IncludeInspection = true,
+            InspectionLevel = InspectionLevel.Dimensional,
+        });
+
+        var request = BuildUpdateProjectPartRequest(page, part);
+
+        Assert.NotNull(request);
+        Assert.Equal("CNC_MILL", request.ProcessType);
+        Assert.Equal(material.Id, request.MaterialId);
+        Assert.Equal(material.Code, request.MaterialCode);
+        Assert.Equal(finish.Code, request.Finish);
+        Assert.Equal(tolerance.Code, request.Tolerance);
+        Assert.Equal(12, request.Quantity);
+        Assert.Equal(InspectionLevel.Dimensional, request.InspectionLevel);
+    }
+
+    [Fact]
     public void ResumeFromServerAsync_WhenApiReturns404_ComponentRendersWithoutError()
     {
         _httpHandler.HandlerFunc = (request, ct) =>
@@ -1441,6 +1487,17 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.NotNull(method);
 
         return Assert.IsType<PartViewModel>(method.Invoke(cut.Instance, [part]));
+    }
+
+    private static UpdateProjectPartRequest? BuildUpdateProjectPartRequest(
+        global::Maliev.Intranet.Client.Pages.ProjectNew instance,
+        PartViewModel part)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod("BuildUpdateProjectPartRequest", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        return Assert.IsType<UpdateProjectPartRequest?>(method.Invoke(instance, [part]));
     }
 
     private static void SetPrivateField<T>(
