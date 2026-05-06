@@ -142,6 +142,7 @@ public class ProjectServiceClient(HttpClient httpClient)
             FinishType = request.Finish,
             request.Color,
             request.Tolerance,
+            CustomNotes = request.PartNotes,
             request.RoughnessCode,
             MarkingType = request.MarkingType.ToString(),
             request.MarkingText,
@@ -197,6 +198,7 @@ public class ProjectServiceClient(HttpClient httpClient)
             FinishType = request.Finish,
             request.Color,
             request.Tolerance,
+            CustomNotes = request.PartNotes,
             request.RoughnessCode,
             MarkingType = request.MarkingType.ToString(),
             request.MarkingText,
@@ -493,6 +495,8 @@ public class ProjectServiceClient(HttpClient httpClient)
 
         public string? Tolerance { get; set; }
 
+        public string? CustomNotes { get; set; }
+
         public string? RoughnessCode { get; set; }
 
         public JsonElement? MarkingType { get; set; }
@@ -583,6 +587,7 @@ public class ProjectServiceClient(HttpClient httpClient)
                 Finish = FirstNonEmpty(Finish, FinishType),
                 Color = Color,
                 Tolerance = Tolerance,
+                PartNotes = CustomNotes,
                 EstimatedPrice = estimatedPrice,
                 ConfirmedPrice = confirmedPrice,
                 AiSuggestedPrice = AiSuggestedPrice,

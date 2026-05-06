@@ -771,6 +771,90 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task ApplyProjectDetailAsync_WhenQuotedProjectRestored_RestoresCommercialTermsAndPartNotes()
+    {
+        var projectId = Guid.NewGuid();
+        var quotationId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            if (path == $"/api/v1/quotations/{quotationId}" && request.Method == HttpMethod.Get)
+            {
+                var quotation = new QuotationDetailDto
+                {
+                    Id = quotationId,
+                    QuotationNumber = "QT-RESTORE-001",
+                    CustomerId = Guid.NewGuid(),
+                    CustomerName = "MaliEV Manufacturing",
+                    CurrentVersionNumber = 2,
+                    CurrencyCode = "THB",
+                    Versions =
+                    [
+                        new QuotationVersionDto
+                        {
+                            VersionNumber = 1,
+                            ManualDiscountAmount = 10m,
+                            ShippingCost = 20m,
+                            SpecialTerms = "Old terms"
+                        },
+                        new QuotationVersionDto
+                        {
+                            VersionNumber = 2,
+                            ManualDiscountAmount = 125m,
+                            ShippingCost = 450m,
+                            SpecialTerms = "50% deposit before production."
+                        }
+                    ]
+                };
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(quotation), Encoding.UTF8, "application/json")
+                };
+            }
+
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var project = new ProjectDetailDto
+        {
+            Id = projectId,
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "MaliEV Manufacturing",
+            Title = "Repeat bracket",
+            Status = "QuotationGenerated",
+            Currency = "THB",
+            QuotationId = quotationId,
+            Parts =
+            [
+                new ProjectPartDto
+                {
+                    Id = partId,
+                    FileId = fileId,
+                    FileReference = "customers/customer-1/projects/repeat/bracket.stl",
+                    FileName = "bracket.stl",
+                    ProcessType = "CNC_MILL",
+                    Quantity = 4,
+                    PartNotes = "Deburr all edges before anodizing."
+                }
+            ]
+        };
+
+        await InvokePrivateTaskWithArgsAsync(cut, "ApplyProjectDetailAsync", project);
+
+        Assert.Equal(450m, GetPrivateField<decimal>(cut.Instance, "_shippingCost"));
+        Assert.Equal(125m, GetPrivateField<decimal>(cut.Instance, "_manualDiscountAmount"));
+        Assert.Equal("50% deposit before production.", GetPrivateField<string?>(cut.Instance, "_quotationTerms"));
+        Assert.Equal("Deburr all edges before anodizing.", Assert.Single(GetParts(cut.Instance)).PartNotes);
+    }
+
+    [Fact]
     public void BuildUpdateProjectPartRequest_AfterBulkPatch_UsesEditedCoreConfiguration()
     {
         var page = new global::Maliev.Intranet.Client.Pages.ProjectNew();

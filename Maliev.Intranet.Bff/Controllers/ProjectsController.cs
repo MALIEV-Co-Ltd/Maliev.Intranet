@@ -1029,6 +1029,7 @@ public class ProjectsController(
             Finish = sourcePart.Finish,
             Color = sourcePart.Color,
             Tolerance = sourcePart.Tolerance,
+            PartNotes = sourcePart.PartNotes,
             RoughnessCode = sourcePart.RoughnessCode,
             MarkingType = sourcePart.MarkingType,
             MarkingText = sourcePart.MarkingText,

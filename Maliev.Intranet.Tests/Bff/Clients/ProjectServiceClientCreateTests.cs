@@ -128,6 +128,7 @@ public class ProjectServiceClientCreateTests
               "materialCode": "PLA-BLK",
               "quantity": 2,
               "finishType": "FDM_STD",
+              "customNotes": "Deburr all edges before anodizing.",
               "aiSuggestedPrice": 1200,
               "confirmedUnitPrice": 1250,
               "boundingBoxX": 80,
@@ -152,6 +153,7 @@ public class ProjectServiceClientCreateTests
         Assert.Equal("PLA", part.MaterialName);
         Assert.Equal("PLA-BLK", part.MaterialCode);
         Assert.Equal("FDM_STD", part.Finish);
+        Assert.Equal("Deburr all edges before anodizing.", part.PartNotes);
         Assert.Equal(1200m, part.EstimatedPrice);
         Assert.Equal(1250m, part.ConfirmedPrice);
         Assert.Equal(1250m, part.ConfirmedUnitPrice);
@@ -258,7 +260,8 @@ public class ProjectServiceClientCreateTests
             BoundingBoxX = 80m,
             BoundingBoxY = 149m,
             BoundingBoxZ = 5m,
-            IsManifold = true
+            IsManifold = true,
+            PartNotes = "Deburr all edges before anodizing."
         });
 
         Assert.NotNull(body);
@@ -267,6 +270,7 @@ public class ProjectServiceClientCreateTests
         Assert.Equal("PLA-BLK", json.RootElement.GetProperty("materialCode").GetString());
         Assert.Equal(12.5m, json.RootElement.GetProperty("volumeCm3").GetDecimal());
         Assert.Equal(80m, json.RootElement.GetProperty("boundingBoxX").GetDecimal());
+        Assert.Equal("Deburr all edges before anodizing.", json.RootElement.GetProperty("customNotes").GetString());
         Assert.True(json.RootElement.GetProperty("isManifold").GetBoolean());
     }
 

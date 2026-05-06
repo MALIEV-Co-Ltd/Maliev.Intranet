@@ -1941,6 +1941,7 @@ public partial class ProjectNew : IAsyncDisposable
             Finish = part.FinishCode,
             Color = ResolvePartColor(part),
             Tolerance = part.ToleranceCode,
+            PartNotes = part.PartNotes,
             ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
             ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
             GlbStoragePath = part.GlbStoragePath,
@@ -1991,6 +1992,7 @@ public partial class ProjectNew : IAsyncDisposable
             Finish = part.FinishCode,
             Color = ResolvePartColor(part),
             Tolerance = part.ToleranceCode,
+            PartNotes = part.PartNotes,
             ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
             ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
             GlbStoragePath = part.GlbStoragePath,
@@ -2428,6 +2430,8 @@ public partial class ProjectNew : IAsyncDisposable
             if (c != null) await CurrencyService.SetCurrencyAsync(c);
         }
 
+        await RestoreQuotationCommercialFieldsAsync(project.QuotationId);
+
         _selectedCustomer = new CustomerSummaryDto
         {
             Id = project.CustomerId,
@@ -2475,6 +2479,7 @@ public partial class ProjectNew : IAsyncDisposable
             Quantity = part.Quantity,
             FinishCode = part.Finish,
             ToleranceCode = part.Tolerance,
+            PartNotes = part.PartNotes,
             EstimatedUnitPrice = unitPrice,
             EstimatedTotalAmount = unitPrice * Math.Max(part.Quantity, 1),
             EstimatedDiscountedUnitPriceBeforeFinish = unitPrice,
@@ -2521,6 +2526,32 @@ public partial class ProjectNew : IAsyncDisposable
         partVm.ResolveDfmReport();
         ApplyResumedDfmTerminalState(partVm);
         return partVm;
+    }
+
+    private async Task RestoreQuotationCommercialFieldsAsync(Guid? quotationId)
+    {
+        if (quotationId is not Guid id)
+            return;
+
+        try
+        {
+            var quotation = await Http.GetFromJsonAsync<QuotationDetailDto>($"api/v1/quotations/{id}");
+            var currentVersion = quotation?.Versions?
+                .OrderByDescending(version => version.VersionNumber == quotation.CurrentVersionNumber)
+                .ThenByDescending(version => version.VersionNumber)
+                .FirstOrDefault();
+
+            if (currentVersion is null)
+                return;
+
+            _shippingCost = Math.Max(0m, currentVersion.ShippingCost);
+            _manualDiscountAmount = Math.Max(0m, currentVersion.ManualDiscountAmount);
+            _quotationTerms = currentVersion.SpecialTerms;
+        }
+        catch
+        {
+            // Quotation restore is best-effort; the project draft still remains editable.
+        }
     }
 
     private static void ApplyResumedDfmTerminalState(PartViewModel partVm)

@@ -223,6 +223,9 @@ public class ProjectPartDto
     /// <summary>Gets or sets the dimensional tolerance class (e.g. ISO 286 IT7).</summary>
     public string? Tolerance { get; set; }
 
+    /// <summary>Gets or sets manufacturing notes entered for this part.</summary>
+    public string? PartNotes { get; set; }
+
     /// <summary>Gets or sets the AI-estimated price per unit before confirmation.</summary>
     public decimal? EstimatedPrice { get; set; }
 
@@ -514,6 +517,10 @@ public class AddProjectPartRequest
     /// <summary>Gets or sets optional tolerance class.</summary>
     public string? Tolerance { get; set; }
 
+    /// <summary>Gets or sets manufacturing notes entered for this part.</summary>
+    [MaxLength(2000)]
+    public string? PartNotes { get; set; }
+
     /// <summary>CNC surface roughness code (e.g. "Ra0.8").</summary>
     public string? RoughnessCode { get; set; }
 
@@ -624,6 +631,10 @@ public class UpdateProjectPartRequest
 
     /// <summary>Gets or sets the updated tolerance.</summary>
     public string? Tolerance { get; set; }
+
+    /// <summary>Gets or sets updated manufacturing notes for this part.</summary>
+    [MaxLength(2000)]
+    public string? PartNotes { get; set; }
 
     /// <summary>CNC surface roughness code.</summary>
     public string? RoughnessCode { get; set; }
