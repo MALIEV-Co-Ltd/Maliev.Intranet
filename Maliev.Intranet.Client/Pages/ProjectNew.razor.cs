@@ -2829,8 +2829,8 @@ public partial class ProjectNew : IAsyncDisposable
 
     private static string BuildQuotationGenerationSuccessMessage(bool isUpdatingExistingProject) =>
         isUpdatingExistingProject
-            ? "Project updated and quotation regenerated."
-            : "Project created and quotation generated.";
+            ? "Quotation regenerated."
+            : "Quotation generated.";
 
     private static string BuildQuotationGenerationFailureMessage(bool isUpdatingExistingProject) =>
         isUpdatingExistingProject
