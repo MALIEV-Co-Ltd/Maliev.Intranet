@@ -10,6 +10,9 @@ public sealed class ProjectProductionPlanDto
 
     /// <summary>Gets or sets the parts available for production planning.</summary>
     public List<ProjectProductionPartPlanDto> Parts { get; set; } = [];
+
+    /// <summary>Gets or sets the machine schedule board for the project planning tab.</summary>
+    public ProductionScheduleBoardDto? ScheduleBoard { get; set; }
 }
 
 /// <summary>

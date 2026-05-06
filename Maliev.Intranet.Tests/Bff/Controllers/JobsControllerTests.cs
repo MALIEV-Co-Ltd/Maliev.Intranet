@@ -223,4 +223,114 @@ public class JobsControllerTests
             It.IsAny<object?[]>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GetAllMachineSchedules_ReturnsBoardWithFacilityMetadataAndPreservedSlotIds()
+    {
+        var holdId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var start = DateTime.UtcNow.Date.AddDays(1);
+        string? capturedScheduleUrl = null;
+        var jobHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            capturedScheduleUrl = req.RequestUri!.ToString();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new[]
+                {
+                    new
+                    {
+                        MachineId = "MAL-CNC-001",
+                        Schedule = new[]
+                        {
+                            new
+                            {
+                                JobId = holdId,
+                                Technology = "CNC_MILL",
+                                ScheduledStart = start.AddHours(2),
+                                ScheduledEnd = start.AddHours(4),
+                                SetupMinutes = 60,
+                                PrintMinutes = 60,
+                                QueuePosition = 3,
+                                Status = "Planning Hold",
+                                OrderId = Guid.Empty,
+                                IsHold = true,
+                                HoldId = (Guid?)holdId,
+                                ProjectId = (Guid?)projectId,
+                                ProjectPartId = (Guid?)partId,
+                                ExpiresAt = (DateTime?)DateTime.UtcNow.AddHours(72)
+                            }
+                        }
+                    }
+                })
+            });
+        });
+        var facilityHandler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FacilityPagedResult<EquipmentSummaryDto>
+                {
+                    Items =
+                    [
+                        new EquipmentSummaryDto
+                        {
+                            Id = Guid.NewGuid(),
+                            AssetCode = "MAL-FDM-001",
+                            Name = "Bambulab X1C #1",
+                            Category = "FdmPrinter",
+                            Status = "Active"
+                        },
+                        new EquipmentSummaryDto
+                        {
+                            Id = Guid.NewGuid(),
+                            AssetCode = "MAL-CNC-001",
+                            Name = "HAAS VF2",
+                            Category = "CncMachine",
+                            Status = "Active"
+                        }
+                    ],
+                    TotalCount = 2,
+                    Page = 1,
+                    PageSize = 200
+                })
+            }));
+        var controller = Make(new JobServiceClient(new HttpClient(jobHandler) { BaseAddress = new Uri("http://test") }));
+        var facilityClient = new FacilityServiceClient(new HttpClient(facilityHandler) { BaseAddress = new Uri("http://test") });
+
+        var result = await controller.GetAllMachineSchedules(facilityClient, start, start.AddDays(7), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var board = Assert.IsType<ProductionScheduleBoardDto>(ok.Value);
+        Assert.Contains(board.Machines, machine => machine.MachineId == "MAL-FDM-001");
+        var cncMachine = Assert.Single(board.Machines, machine => machine.MachineId == "MAL-CNC-001");
+        Assert.Contains(cncMachine.Slots, slot => slot.HoldId == holdId && slot.ProjectId == projectId && slot.ProjectPartId == partId);
+        Assert.Contains("machineIds=MAL-FDM-001", capturedScheduleUrl);
+        Assert.Contains("machineIds=MAL-CNC-001", capturedScheduleUrl);
+    }
+
+    [Fact]
+    public async Task Reschedule_WhenSuccess_ShouldReturn204AndBroadcastScheduleChange()
+    {
+        var controller = Make(MakeClientEmpty(HttpStatusCode.NoContent));
+        var (hub, allProxy) = MockHub();
+
+        var result = await controller.Reschedule(
+            JobId,
+            new RescheduleJobRequest
+            {
+                MachineId = "MAL-FDM-001",
+                ScheduledStartTime = DateTime.UtcNow.AddHours(2),
+                ScheduledEndTime = DateTime.UtcNow.AddHours(4),
+                QueuePosition = 1
+            },
+            hub,
+            CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        allProxy.Verify(c => c.SendCoreAsync(
+            "ScheduleChanged",
+            It.Is<object?[]>(args => args.Length == 1),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

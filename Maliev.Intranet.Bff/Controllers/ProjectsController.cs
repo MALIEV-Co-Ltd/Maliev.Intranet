@@ -530,10 +530,13 @@ public class ProjectsController(
             });
         }
 
+        var scheduleBoard = await BuildProjectScheduleBoardAsync(id, partPlans, ct);
+
         return Ok(new ProjectProductionPlanDto
         {
             ProjectId = id,
-            Parts = partPlans
+            Parts = partPlans,
+            ScheduleBoard = scheduleBoard
         });
     }
 
@@ -745,6 +748,275 @@ public class ProjectsController(
             ScheduleItems: scheduleItems,
             ProposedSlotStart: proposedSlotStart,
             ProposedSlotEnd: proposedSlotEnd);
+    }
+
+    private async Task<ProductionScheduleBoardDto> BuildProjectScheduleBoardAsync(
+        Guid projectId,
+        IReadOnlyList<ProjectProductionPartPlanDto> partPlans,
+        CancellationToken ct)
+    {
+        var rangeFrom = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var rangeTo = rangeFrom.AddDays(7);
+        var machines = await GetProjectScheduleMachinesAsync(partPlans, ct);
+        var technologies = partPlans
+            .Select(part => NormalizeProductionTechnology(part.ProcessType ?? string.Empty))
+            .Where(technology => !string.IsNullOrWhiteSpace(technology))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var machineIds = machines
+            .Select(machine => machine.AssetCode)
+            .Where(machineId => !string.IsNullOrWhiteSpace(machineId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var scheduleGroups = machineIds.Count == 0
+            ? []
+            : await jobClient.GetScheduleAsync(rangeFrom, rangeTo, machineIds, technologies, ct);
+        var scheduleByMachine = scheduleGroups
+            .GroupBy(group => group.MachineId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.SelectMany(item => item.Schedule).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+        var partFileNames = partPlans.ToDictionary(part => part.PartId, part => part.FileName);
+
+        var boardMachines = machines
+            .OrderBy(machine => machine.Category, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(machine => machine.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(machine =>
+            {
+                scheduleByMachine.TryGetValue(machine.AssetCode, out var scheduleSlots);
+                var slots = (scheduleSlots ?? [])
+                    .OrderBy(slot => slot.ScheduledStart)
+                    .Select(slot => MapProjectScheduleSlot(projectId, machine, slot, partFileNames))
+                    .ToList();
+
+                slots.AddRange(BuildProjectProposedSlots(projectId, machine, partPlans, rangeFrom, rangeTo));
+                AddMissingActiveHoldSlots(projectId, machine, partPlans, slots, partFileNames);
+
+                return new ProductionScheduleMachineDto
+                {
+                    MachineId = machine.AssetCode,
+                    MachineName = machine.Name,
+                    Category = machine.Category,
+                    Technology = NormalizeEquipmentCategoryTechnology(machine.Category),
+                    Slots = slots.OrderBy(slot => slot.ScheduledStart).ToList()
+                };
+            })
+            .ToList();
+
+        return new ProductionScheduleBoardDto
+        {
+            RangeStart = rangeFrom,
+            RangeEnd = rangeTo,
+            Machines = boardMachines
+        };
+    }
+
+    private async Task<List<EquipmentSummaryDto>> GetProjectScheduleMachinesAsync(
+        IReadOnlyList<ProjectProductionPartPlanDto> partPlans,
+        CancellationToken ct)
+    {
+        var machinesByCode = new Dictionary<string, EquipmentSummaryDto>(StringComparer.OrdinalIgnoreCase);
+        var categories = partPlans
+            .Select(part => MapProcessToEquipmentCategory(NormalizeProductionTechnology(part.ProcessType ?? string.Empty)))
+            .Where(category => !string.IsNullOrWhiteSpace(category))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var category in categories)
+        {
+            try
+            {
+                var equipments = await facilityClient.GetEquipmentsAsync(category: category, status: "Active", page: 1, pageSize: 50, ct: ct);
+                foreach (var machine in equipments?.Items ?? [])
+                {
+                    if (!string.IsNullOrWhiteSpace(machine.AssetCode))
+                    {
+                        machinesByCode[machine.AssetCode] = machine;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to load schedule machines for category '{Category}'.", category);
+            }
+        }
+
+        foreach (var part in partPlans)
+        {
+            if (part.Routing is { MachineCode: not "TBD" } routing && !string.IsNullOrWhiteSpace(routing.MachineCode))
+            {
+                machinesByCode.TryAdd(routing.MachineCode, new EquipmentSummaryDto
+                {
+                    Id = routing.MachineId,
+                    AssetCode = routing.MachineCode,
+                    Name = routing.MachineName,
+                    Category = MapProcessToEquipmentCategory(NormalizeProductionTechnology(part.ProcessType ?? string.Empty)) ?? string.Empty,
+                    Status = "Active"
+                });
+            }
+
+            if (part.ActiveHold is { } hold && !string.IsNullOrWhiteSpace(hold.MachineId))
+            {
+                machinesByCode.TryAdd(hold.MachineId, new EquipmentSummaryDto
+                {
+                    AssetCode = hold.MachineId,
+                    Name = FirstNonEmpty(hold.MachineName, hold.MachineId) ?? hold.MachineId,
+                    Category = MapProcessToEquipmentCategory(NormalizeProductionTechnology(part.ProcessType ?? string.Empty)) ?? string.Empty,
+                    Status = "Active"
+                });
+            }
+        }
+
+        return machinesByCode.Values.ToList();
+    }
+
+    private static ProductionScheduleSlotDto MapProjectScheduleSlot(
+        Guid projectId,
+        EquipmentSummaryDto machine,
+        MachineScheduleItemDto slot,
+        IReadOnlyDictionary<Guid, string> partFileNames)
+    {
+        var isCurrentProject = slot.ProjectId == projectId;
+        return new ProductionScheduleSlotDto
+        {
+            SlotId = slot.HoldId ?? slot.JobId,
+            JobId = slot.IsHold ? null : slot.JobId,
+            HoldId = slot.HoldId,
+            ProjectId = slot.ProjectId,
+            ProjectPartId = slot.ProjectPartId,
+            FileName = slot.ProjectPartId.HasValue && partFileNames.TryGetValue(slot.ProjectPartId.Value, out var fileName) ? fileName : null,
+            MachineId = machine.AssetCode,
+            MachineName = machine.Name,
+            Technology = slot.Technology,
+            ScheduledStart = DateTime.SpecifyKind(slot.ScheduledStart, DateTimeKind.Utc),
+            ScheduledEnd = DateTime.SpecifyKind(slot.ScheduledEnd, DateTimeKind.Utc),
+            SetupMinutes = slot.SetupMinutes,
+            ProductionMinutes = slot.PrintMinutes,
+            QueuePosition = slot.QueuePosition,
+            Status = slot.Status,
+            Label = slot.IsHold ? $"Hold #{slot.QueuePosition}" : slot.JobId.ToString("N")[..8].ToUpperInvariant(),
+            ExpiresAt = slot.ExpiresAt,
+            IsHold = slot.IsHold,
+            IsCurrentProject = isCurrentProject,
+            CanMove = slot.IsHold || string.Equals(slot.Status, "Queued", StringComparison.OrdinalIgnoreCase)
+        };
+    }
+
+    private static List<ProductionScheduleSlotDto> BuildProjectProposedSlots(
+        Guid projectId,
+        EquipmentSummaryDto machine,
+        IReadOnlyList<ProjectProductionPartPlanDto> partPlans,
+        DateTime rangeFrom,
+        DateTime rangeTo)
+    {
+        var slots = new List<ProductionScheduleSlotDto>();
+        foreach (var part in partPlans)
+        {
+            if (part.ActiveHold is not null || part.JobId is not null || part.Routing is not { } routing)
+            {
+                continue;
+            }
+
+            if (!machine.AssetCode.Equals(routing.MachineCode, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var start = (routing.ProposedSlotStart ?? routing.EstimatedStartDate).UtcDateTime;
+            var setupMinutes = DefaultSetupMinutes(part.ProcessType);
+            var productionMinutes = Math.Max(30, part.Quantity * 30);
+            var end = routing.ProposedSlotEnd?.UtcDateTime ?? start.AddMinutes(setupMinutes + productionMinutes);
+            if (end <= rangeFrom || start >= rangeTo)
+            {
+                continue;
+            }
+
+            slots.Add(new ProductionScheduleSlotDto
+            {
+                SlotId = part.PartId,
+                ProjectId = projectId,
+                ProjectPartId = part.PartId,
+                FileName = part.FileName,
+                MachineId = machine.AssetCode,
+                MachineName = machine.Name,
+                Technology = NormalizeProductionTechnology(part.ProcessType ?? string.Empty),
+                ScheduledStart = DateTime.SpecifyKind(start, DateTimeKind.Utc),
+                ScheduledEnd = DateTime.SpecifyKind(end, DateTimeKind.Utc),
+                SetupMinutes = setupMinutes,
+                ProductionMinutes = productionMinutes,
+                QueuePosition = routing.QueueAhead + 1,
+                Status = "Proposed",
+                Label = "Proposed",
+                IsProposed = true,
+                IsCurrentProject = true,
+                CanMove = false
+            });
+        }
+
+        return slots;
+    }
+
+    private static void AddMissingActiveHoldSlots(
+        Guid projectId,
+        EquipmentSummaryDto machine,
+        IReadOnlyList<ProjectProductionPartPlanDto> partPlans,
+        List<ProductionScheduleSlotDto> slots,
+        IReadOnlyDictionary<Guid, string> partFileNames)
+    {
+        foreach (var part in partPlans)
+        {
+            if (part.ActiveHold is not { } hold ||
+                !machine.AssetCode.Equals(hold.MachineId, StringComparison.OrdinalIgnoreCase) ||
+                slots.Any(slot => slot.HoldId == hold.Id))
+            {
+                continue;
+            }
+
+            slots.Add(new ProductionScheduleSlotDto
+            {
+                SlotId = hold.Id,
+                HoldId = hold.Id,
+                ProjectId = projectId,
+                ProjectPartId = part.PartId,
+                FileName = partFileNames.TryGetValue(part.PartId, out var fileName) ? fileName : part.FileName,
+                MachineId = machine.AssetCode,
+                MachineName = machine.Name,
+                Technology = hold.Technology,
+                ScheduledStart = DateTime.SpecifyKind(hold.ScheduledStartTime, DateTimeKind.Utc),
+                ScheduledEnd = DateTime.SpecifyKind(hold.ScheduledEndTime, DateTimeKind.Utc),
+                SetupMinutes = hold.SetupTimeMinutes,
+                ProductionMinutes = hold.ProductionTimeMinutes,
+                QueuePosition = hold.QueuePosition,
+                Status = "Planning Hold",
+                Label = $"Hold #{hold.QueuePosition}",
+                ExpiresAt = hold.ExpiresAt,
+                IsHold = true,
+                IsCurrentProject = true,
+                CanMove = true
+            });
+        }
+    }
+
+    private static string NormalizeEquipmentCategoryTechnology(string? category) => category switch
+    {
+        "FdmPrinter" => "FDM",
+        "SlaPrinter" => "SLA",
+        "CncMachine" => "CNC_MILL",
+        "InjectionMolding" => "INJECTION_MOLDING",
+        _ => string.Empty
+    };
+
+    private static int DefaultSetupMinutes(string? processType)
+    {
+        var normalized = NormalizeProductionTechnology(processType ?? string.Empty);
+        if (normalized.StartsWith("CNC", StringComparison.OrdinalIgnoreCase))
+        {
+            return 60;
+        }
+
+        return normalized is "SLA" or "SLA_DLP" ? 30 : 15;
     }
 
     private static CreateProductionPlanningHoldRequest NormalizeCreateHoldRequest(

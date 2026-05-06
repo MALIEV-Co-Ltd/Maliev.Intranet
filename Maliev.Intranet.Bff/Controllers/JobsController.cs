@@ -235,7 +235,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="ct">Cancellation token.</param>
     /// <returns>One summary per active machine, each with its list of scheduled jobs.</returns>
     [HttpGet("schedule")]
-    public async Task<ActionResult<List<MachineScheduleSummaryDto>>> GetAllMachineSchedules(
+    public async Task<ActionResult<ProductionScheduleBoardDto>> GetAllMachineSchedules(
         [FromServices] IFacilityServiceClient facilityClient,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
@@ -246,31 +246,141 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
 
         var equipment = await facilityClient.GetEquipmentsAsync(status: "Active", pageSize: 200, ct: ct);
         var machines = equipment?.Items ?? [];
+        var machineIds = machines.Select(machine => machine.AssetCode).Where(code => !string.IsNullOrWhiteSpace(code)).ToList();
+        var technologies = machines.Select(machine => MapEquipmentCategoryToTechnology(machine.Category)).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var scheduleGroups = await client.GetScheduleAsync(rangeFrom, rangeTo, machineIds, technologies, ct);
 
-        var scheduleTasks = machines.Select(async m =>
-        {
-            try
-            {
-                var slots = await client.GetMachineScheduleAsync(m.AssetCode, rangeFrom, rangeTo, ct);
-                var items = slots.Select(s => new PlanningScheduleItemDto(
-                    PlannedDate: new DateTimeOffset(s.ScheduledStart, TimeSpan.Zero),
-                    PlannedEndDate: new DateTimeOffset(s.ScheduledEnd, TimeSpan.Zero),
-                    JobReference: s.JobId.ToString("N")[..8].ToUpperInvariant(),
-                    Status: s.Status,
-                    JobId: s.JobId,
-                    MachineName: m.Name,
-                    SetupTimeMinutes: s.SetupMinutes,
-                    PrintTimeMinutes: s.PrintMinutes
-                )).ToList();
-                return new MachineScheduleSummaryDto(m.AssetCode, m.Name, m.Category, items);
-            }
-            catch
-            {
-                return new MachineScheduleSummaryDto(m.AssetCode, m.Name, m.Category, []);
-            }
-        });
-
-        var results = await Task.WhenAll(scheduleTasks);
-        return Ok(results.ToList());
+        return Ok(BuildScheduleBoard(rangeFrom, rangeTo, machines, scheduleGroups));
     }
+
+    /// <summary>
+    /// Moves a queued job to a specific schedule slot and broadcasts the schedule change.
+    /// </summary>
+    /// <param name="id">The job GUID.</param>
+    /// <param name="request">The schedule move request.</param>
+    /// <param name="hub">The ProductionHub context for broadcasting.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>204 No Content on success.</returns>
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}/schedule")]
+    public async Task<IActionResult> Reschedule(
+        Guid id,
+        [FromBody] RescheduleJobRequest request,
+        [FromServices] Microsoft.AspNetCore.SignalR.IHubContext<Maliev.Intranet.Bff.Hubs.ProductionHub> hub,
+        CancellationToken ct)
+    {
+        var response = await client.RescheduleJobAsync(id, request, ct);
+        if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+
+        await hub.Clients.All.SendAsync("ScheduleChanged", new { MachineId = request.MachineId });
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Updates a tentative planning hold from the production scheduler.
+    /// </summary>
+    /// <param name="holdId">The planning hold identifier.</param>
+    /// <param name="request">The updated hold schedule.</param>
+    /// <param name="hub">The ProductionHub context for broadcasting.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>204 No Content on success.</returns>
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("planning-holds/{holdId:guid}")]
+    public async Task<IActionResult> UpdatePlanningHold(
+        Guid holdId,
+        [FromBody] UpdateProductionPlanningHoldRequest request,
+        [FromServices] Microsoft.AspNetCore.SignalR.IHubContext<Maliev.Intranet.Bff.Hubs.ProductionHub> hub,
+        CancellationToken ct)
+    {
+        var response = await client.UpdatePlanningHoldAsync(holdId, request, ct);
+        if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+
+        await hub.Clients.All.SendAsync("ScheduleChanged", new { MachineId = request.MachineId });
+        return NoContent();
+    }
+
+    private static ProductionScheduleBoardDto BuildScheduleBoard(
+        DateTime rangeFrom,
+        DateTime rangeTo,
+        IReadOnlyList<EquipmentSummaryDto> machines,
+        IReadOnlyList<(string MachineId, IReadOnlyList<MachineScheduleItemDto> Schedule)> scheduleGroups)
+    {
+        var scheduleByMachine = scheduleGroups
+            .GroupBy(group => group.MachineId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.SelectMany(item => item.Schedule).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+
+        return new ProductionScheduleBoardDto
+        {
+            RangeStart = rangeFrom,
+            RangeEnd = rangeTo,
+            Machines = machines
+                .OrderBy(machine => machine.Category, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(machine => machine.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(machine =>
+                {
+                    scheduleByMachine.TryGetValue(machine.AssetCode, out var slots);
+                    return new ProductionScheduleMachineDto
+                    {
+                        MachineId = machine.AssetCode,
+                        MachineName = machine.Name,
+                        Category = machine.Category,
+                        Technology = MapEquipmentCategoryToTechnology(machine.Category),
+                        Slots = (slots ?? [])
+                            .OrderBy(slot => slot.ScheduledStart)
+                            .Select(slot => MapScheduleSlot(machine, slot, currentProjectId: null, partFileNames: null))
+                            .ToList()
+                    };
+                })
+                .ToList()
+        };
+    }
+
+    private static ProductionScheduleSlotDto MapScheduleSlot(
+        EquipmentSummaryDto machine,
+        MachineScheduleItemDto slot,
+        Guid? currentProjectId,
+        IReadOnlyDictionary<Guid, string>? partFileNames)
+    {
+        var isCurrentProject = currentProjectId.HasValue && slot.ProjectId == currentProjectId.Value;
+        var slotId = slot.HoldId ?? slot.JobId;
+        var label = slot.IsHold
+            ? $"Hold #{slot.QueuePosition}"
+            : slot.JobId.ToString("N")[..8].ToUpperInvariant();
+
+        return new ProductionScheduleSlotDto
+        {
+            SlotId = slotId,
+            JobId = slot.IsHold ? null : slot.JobId,
+            HoldId = slot.HoldId,
+            ProjectId = slot.ProjectId,
+            ProjectPartId = slot.ProjectPartId,
+            FileName = slot.ProjectPartId.HasValue && partFileNames?.TryGetValue(slot.ProjectPartId.Value, out var fileName) == true ? fileName : null,
+            MachineId = machine.AssetCode,
+            MachineName = machine.Name,
+            Technology = slot.Technology,
+            ScheduledStart = DateTime.SpecifyKind(slot.ScheduledStart, DateTimeKind.Utc),
+            ScheduledEnd = DateTime.SpecifyKind(slot.ScheduledEnd, DateTimeKind.Utc),
+            SetupMinutes = slot.SetupMinutes,
+            ProductionMinutes = slot.PrintMinutes,
+            QueuePosition = slot.QueuePosition,
+            Status = slot.Status,
+            Label = label,
+            ExpiresAt = slot.ExpiresAt,
+            IsHold = slot.IsHold,
+            IsCurrentProject = isCurrentProject,
+            CanMove = slot.IsHold || string.Equals(slot.Status, "Queued", StringComparison.OrdinalIgnoreCase)
+        };
+    }
+
+    private static string MapEquipmentCategoryToTechnology(string? category) => category switch
+    {
+        "FdmPrinter" => "FDM",
+        "SlaPrinter" => "SLA",
+        "CncMachine" => "CNC_MILL",
+        "InjectionMolding" => "INJECTION_MOLDING",
+        _ => string.Empty
+    };
 }

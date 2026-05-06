@@ -219,6 +219,51 @@ public class JobServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Gets scheduled jobs and active planning holds grouped by machine.
+    /// </summary>
+    /// <param name="from">Range start in UTC.</param>
+    /// <param name="to">Range end in UTC.</param>
+    /// <param name="machineIds">Optional machine identifiers to include.</param>
+    /// <param name="technologies">Optional technologies to include.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Machine schedule groups from JobService.</returns>
+    public async Task<List<(string MachineId, IReadOnlyList<MachineScheduleItemDto> Schedule)>> GetScheduleAsync(
+        DateTime from,
+        DateTime to,
+        IEnumerable<string>? machineIds = null,
+        IEnumerable<string>? technologies = null,
+        CancellationToken ct = default)
+    {
+        var query = new List<string>
+        {
+            $"from={Uri.EscapeDataString(from.ToString("O"))}",
+            $"to={Uri.EscapeDataString(to.ToString("O"))}"
+        };
+
+        if (machineIds is not null)
+        {
+            query.AddRange(machineIds
+                .Where(machineId => !string.IsNullOrWhiteSpace(machineId))
+                .Select(machineId => $"machineIds={Uri.EscapeDataString(machineId)}"));
+        }
+
+        if (technologies is not null)
+        {
+            query.AddRange(technologies
+                .Where(technology => !string.IsNullOrWhiteSpace(technology))
+                .Select(technology => $"technologies={Uri.EscapeDataString(technology)}"));
+        }
+
+        var response = await httpClient.GetAsync($"/job/v1/jobs/schedule?{string.Join("&", query)}", ct);
+        if (!response.IsSuccessStatusCode) return [];
+
+        var result = await response.Content.ReadFromJsonAsync<List<JobServiceMachineScheduleResponse>>(cancellationToken: ct) ?? [];
+        return result
+            .Select(machine => (machine.MachineId, (IReadOnlyList<MachineScheduleItemDto>)machine.Schedule))
+            .ToList();
+    }
+
+    /// <summary>
     /// Reorders a queued job to a new position in the machine queue.
     /// </summary>
     /// <param name="id">The job GUID.</param>
@@ -227,6 +272,20 @@ public class JobServiceClient(HttpClient httpClient)
     /// <returns>The HTTP response.</returns>
     public async Task<HttpResponseMessage> ReorderJobAsync(Guid id, int newPosition, CancellationToken ct = default) =>
         await httpClient.PatchAsJsonAsync($"/job/v1/jobs/{id}/reorder", new { NewPosition = newPosition }, ct);
+
+    /// <summary>
+    /// Moves a queued job to a specific schedule slot.
+    /// </summary>
+    /// <param name="id">The job identifier.</param>
+    /// <param name="request">The schedule move request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The HTTP response.</returns>
+    public async Task<HttpResponseMessage> RescheduleJobAsync(Guid id, RescheduleJobRequest request, CancellationToken ct = default) =>
+        await httpClient.PatchAsJsonAsync($"/job/v1/jobs/{id}/schedule", request, ct);
+
+    private sealed record JobServiceMachineScheduleResponse(
+        string MachineId,
+        List<MachineScheduleItemDto> Schedule);
 
     private sealed record KanbanBoardResponse(
         List<KanbanJobResponse>? Pending,

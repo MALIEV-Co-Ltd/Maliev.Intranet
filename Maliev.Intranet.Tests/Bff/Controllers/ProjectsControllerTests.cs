@@ -1068,6 +1068,221 @@ public class ProjectsControllerTests
     }
 
     [Fact]
+    public async Task GetProductionPlan_IncludesMixedProcessScheduleBoardWithReservedSlots()
+    {
+        var projectId = Guid.NewGuid();
+        var fdmPartId = Guid.NewGuid();
+        var cncPartId = Guid.NewGuid();
+        var cncHoldId = Guid.NewGuid();
+        var fdmMachineId = Guid.NewGuid();
+        var cncMachineId = Guid.NewGuid();
+        var rangeStart = DateTime.UtcNow.Date.AddDays(1);
+
+        var project = new ProjectDetailDto
+        {
+            Id = projectId,
+            ProjectNumber = "PRJ-2026-0002",
+            Parts =
+            [
+                new ProjectPartDto
+                {
+                    Id = fdmPartId,
+                    FileName = "fdm-cover.stl",
+                    ProcessType = "FDM",
+                    MaterialName = "ABS",
+                    Quantity = 4,
+                    Status = "Quoted",
+                    Dimensions = new ModelDimensionsDto { X = 12, Y = 12, Z = 7 }
+                },
+                new ProjectPartDto
+                {
+                    Id = cncPartId,
+                    FileName = "cnc-fixture.step",
+                    ProcessType = "CNC_Milling",
+                    MaterialName = "Aluminium 6061-T6",
+                    Quantity = 1,
+                    Status = "Quoted",
+                    Dimensions = new ModelDimensionsDto { X = 80, Y = 40, Z = 12 }
+                }
+            ]
+        };
+
+        var projectClient = CreateClient(project);
+        var jobHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/job/v1/jobs/planning-holds", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new[]
+                    {
+                        new ProductionPlanningHoldDto
+                        {
+                            Id = cncHoldId,
+                            ProjectId = projectId,
+                            ProjectPartId = cncPartId,
+                            Technology = "CNC_MILL",
+                            MachineId = "MAL-CNC-001",
+                            MachineName = "HAAS VF2",
+                            QueuePosition = 2,
+                            ScheduledStartTime = rangeStart.AddHours(5),
+                            ScheduledEndTime = rangeStart.AddHours(7),
+                            SetupTimeMinutes = 60,
+                            ProductionTimeMinutes = 60,
+                            Quantity = 1,
+                            Status = "Active",
+                            ExpiresAt = DateTime.UtcNow.AddHours(72)
+                        }
+                    })
+                });
+            }
+
+            if (req.RequestUri!.AbsolutePath.EndsWith("/job/v1/jobs/queue-depth", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new Dictionary<string, int>
+                    {
+                        ["FDM"] = 3,
+                        ["CNC_MILL"] = 2
+                    })
+                });
+            }
+
+            if (req.RequestUri!.AbsolutePath.EndsWith("/job/v1/jobs/schedule", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new[]
+                    {
+                        new
+                        {
+                            MachineId = "MAL-FDM-001",
+                            Schedule = new[]
+                            {
+                                new
+                                {
+                                    JobId = Guid.NewGuid(),
+                                    Technology = "FDM",
+                                    ScheduledStart = rangeStart.AddHours(1),
+                                    ScheduledEnd = rangeStart.AddHours(3),
+                                    SetupMinutes = 15,
+                                    PrintMinutes = 105,
+                                    QueuePosition = 1,
+                                    Status = "Queued",
+                                    OrderId = Guid.NewGuid(),
+                                    IsHold = false,
+                                    HoldId = (Guid?)null,
+                                    ProjectId = (Guid?)null,
+                                    ProjectPartId = (Guid?)null,
+                                    ExpiresAt = (DateTime?)null
+                                }
+                            }
+                        },
+                        new
+                        {
+                            MachineId = "MAL-CNC-001",
+                            Schedule = new[]
+                            {
+                                new
+                                {
+                                    JobId = cncHoldId,
+                                    Technology = "CNC_MILL",
+                                    ScheduledStart = rangeStart.AddHours(5),
+                                    ScheduledEnd = rangeStart.AddHours(7),
+                                    SetupMinutes = 60,
+                                    PrintMinutes = 60,
+                                    QueuePosition = 2,
+                                    Status = "Planning Hold",
+                                    OrderId = Guid.Empty,
+                                    IsHold = true,
+                                    HoldId = (Guid?)cncHoldId,
+                                    ProjectId = (Guid?)projectId,
+                                    ProjectPartId = (Guid?)cncPartId,
+                                    ExpiresAt = (DateTime?)DateTime.UtcNow.AddHours(72)
+                                }
+                            }
+                        }
+                    })
+                });
+            }
+
+            if (req.RequestUri!.AbsolutePath.Contains("/job/v1/jobs/machine/", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(Array.Empty<MachineScheduleItemDto>())
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+        var facilityHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            var category = System.Web.HttpUtility.ParseQueryString(req.RequestUri!.Query).Get("category");
+            var items = category switch
+            {
+                "FdmPrinter" =>
+                [
+                    new EquipmentSummaryDto
+                    {
+                        Id = fdmMachineId,
+                        AssetCode = "MAL-FDM-001",
+                        Name = "Bambulab X1C #1",
+                        Category = "FdmPrinter",
+                        Status = "Active"
+                    }
+                ],
+                "CncMachine" =>
+                [
+                    new EquipmentSummaryDto
+                    {
+                        Id = cncMachineId,
+                        AssetCode = "MAL-CNC-001",
+                        Name = "HAAS VF2",
+                        Category = "CncMachine",
+                        Status = "Active"
+                    }
+                ],
+                _ => Array.Empty<EquipmentSummaryDto>()
+            };
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FacilityPagedResult<EquipmentSummaryDto>
+                {
+                    Items = items,
+                    TotalCount = items.Count(),
+                    Page = 1,
+                    PageSize = 50
+                })
+            });
+        });
+        var controller = new ProjectsController(
+            projectClient,
+            new JobServiceClient(new HttpClient(jobHandler) { BaseAddress = new Uri("http://test") }),
+            new FacilityServiceClient(new HttpClient(facilityHandler) { BaseAddress = new Uri("http://test") }),
+            Logger);
+
+        var result = await controller.GetProductionPlan(projectId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var plan = Assert.IsType<ProjectProductionPlanDto>(ok.Value);
+        Assert.NotNull(plan.ScheduleBoard);
+        Assert.Contains(plan.ScheduleBoard.Machines, machine => machine.MachineId == "MAL-FDM-001");
+        var cncMachine = Assert.Single(plan.ScheduleBoard.Machines, machine => machine.MachineId == "MAL-CNC-001");
+        Assert.Contains(cncMachine.Slots, slot =>
+            slot.HoldId == cncHoldId &&
+            slot.ProjectPartId == cncPartId &&
+            slot.IsHold &&
+            slot.IsCurrentProject);
+        Assert.Contains(plan.ScheduleBoard.Machines.SelectMany(machine => machine.Slots), slot =>
+            slot.ProjectPartId == fdmPartId &&
+            slot.IsProposed &&
+            slot.IsCurrentProject);
+    }
+
+    [Fact]
     public async Task GetPartRouting_UnknownProcessType_ReturnsOkWithFallbackMachineFields()
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);
