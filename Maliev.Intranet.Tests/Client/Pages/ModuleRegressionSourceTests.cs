@@ -288,6 +288,19 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void TopBar_GlobalSearch_UsesTopbarSurfaceColors()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var searchBlock = ExtractCssBlock(source, ".topbar-root ::deep .topbar-global-search .global-search-input");
+
+        Assert.Contains("background: var(--maliev-panel-3);", searchBlock, StringComparison.Ordinal);
+        Assert.Contains("color: var(--maliev-ink);", searchBlock, StringComparison.Ordinal);
+        Assert.Contains("border: 1px solid var(--maliev-border);", searchBlock, StringComparison.Ordinal);
+        Assert.Contains(".topbar-root ::deep .topbar-global-search .global-search-input:focus", source, StringComparison.Ordinal);
+        Assert.Contains(".topbar-root ::deep .topbar-global-search .global-search-icon", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_QuoteNavigationAction_UsesPrimaryColor()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
