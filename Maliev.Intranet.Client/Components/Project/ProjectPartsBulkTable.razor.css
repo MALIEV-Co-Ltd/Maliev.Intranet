@@ -13,7 +13,7 @@
     top: 0;
     z-index: 8;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
     padding: 12px 14px;
@@ -39,6 +39,17 @@
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.pbt-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.pbt-actions ::deep .pbt-upload-zone {
+    min-width: min(320px, 36vw);
+    max-width: 360px;
+    padding: 8px 10px;
 }
 
 .pbt-action-button,
@@ -206,7 +217,51 @@
 }
 
 .pbt-col-actions {
-    width: 140px;
+    width: 154px;
+    min-width: 154px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.pbt-row-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.pbt-part-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.pbt-part-thumb {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    overflow: hidden;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-3);
+    color: var(--maliev-muted);
+}
+
+.pbt-part-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.pbt-part-copy {
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .pbt-part-name {
@@ -319,6 +374,15 @@
         top: 51px;
     }
 
+    .pbt-actions {
+        align-items: stretch;
+    }
+
+    .pbt-actions ::deep .pbt-upload-zone {
+        min-width: min(300px, calc(100vw - 92px));
+        max-width: none;
+    }
+
     .pbt-bulk-panel {
         position: sticky;
         top: auto;
@@ -375,7 +439,35 @@
         font-weight: 750;
     }
 
-    .pbt-card-select span {
+    .pbt-card-select .pbt-part-thumb {
+        flex-basis: 40px;
+        width: 40px;
+        height: 40px;
+    }
+
+    .pbt-card-title-copy {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .pbt-card-title {
+        overflow: hidden;
+        color: var(--maliev-ink);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pbt-card-subtitle {
+        overflow: hidden;
+        color: var(--maliev-muted);
+        font-size: 11px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pbt-card-select .pbt-card-title {
         overflow-wrap: anywhere;
     }
 
@@ -409,6 +501,11 @@
     .pbt-action-button,
     .pbt-primary-button {
         width: 100%;
+    }
+
+    .pbt-actions ::deep .pbt-upload-zone {
+        width: 100%;
+        min-width: 0;
     }
 
     .pbt-card-grid {

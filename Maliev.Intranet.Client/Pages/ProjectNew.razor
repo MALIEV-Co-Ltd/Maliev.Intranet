@@ -18,110 +18,114 @@
         <ChildContent>
             <div class="pn-body">
                 @* ── Left: Parts List ─────────────────────────────────────── *@
-                <div class="pn-desktop-parts">
-                    <PartsListPanel
-                        Parts="@_parts"
-                        SelectedIndex="@_selectedPartIndex"
-                        Title="@_title"
-                        OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
-                        OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
-                        AutoSaving="@_autoSaving"
-                        LastSavedAt="@_lastSavedAt"
-                        HasCustomerSelected="@(_selectedCustomer != null)"
-                        CanDuplicateProject="@(_parts.Count > 0)"
-                        OnDuplicate="DuplicateProjectAsync"
-                        OnSelectPart="SelectPartFromPanel"
-                        OnAddPart="OpenFilePicker"
-                        OnRemovePart="RemovePart"
-                        OnDuplicatePart="DuplicateSinglePart" />
-                </div>
+                @if (_layoutMode != LayoutMode.SummaryTable)
+                {
+                    <div class="pn-desktop-parts">
+                        <PartsListPanel
+                            Parts="@_parts"
+                            SelectedIndex="@_selectedPartIndex"
+                            Title="@_title"
+                            OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
+                            OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
+                            AutoSaving="@_autoSaving"
+                            LastSavedAt="@_lastSavedAt"
+                            HasCustomerSelected="@(_selectedCustomer != null)"
+                            CanDuplicateProject="@(_parts.Count > 0)"
+                            OnDuplicate="DuplicateProjectAsync"
+                            OnSelectPart="SelectPartFromPanel"
+                            OnAddPart="OpenFilePicker"
+                            OnRemovePart="RemovePart"
+                            OnDuplicatePart="DuplicateSinglePart" />
+                    </div>
 
-                <MudDrawer @bind-Open="_partsDrawerOpen"
-                           Anchor="Anchor.Start"
-                           Variant="DrawerVariant.Temporary"
-                           Elevation="6"
-                           ClipMode="DrawerClipMode.Never"
-                           Class="pn-parts-drawer"
-                           Width="min(270px, 100vw)"
-                           Style="--mud-drawer-width: min(270px, 100vw); --mud-drawer-width-left: min(270px, 100vw);">
-                    <PartsListPanel
-                        Parts="@_parts"
-                        SelectedIndex="@_selectedPartIndex"
-                        Title="@_title"
-                        OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
-                        OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
-                        AutoSaving="@_autoSaving"
-                        LastSavedAt="@_lastSavedAt"
-                        HasCustomerSelected="@(_selectedCustomer != null)"
-                        CanDuplicateProject="@(_parts.Count > 0)"
-                        OnDuplicate="DuplicateProjectAsync"
-                        OnSelectPart="SelectPartFromDrawer"
-                        OnAddPart="OpenFilePicker"
-                        OnRemovePart="RemovePart"
-                        OnDuplicatePart="DuplicateSinglePart" />
-                </MudDrawer>
+                    <MudDrawer @bind-Open="_partsDrawerOpen"
+                               Anchor="Anchor.Start"
+                               Variant="DrawerVariant.Temporary"
+                               Elevation="6"
+                               ClipMode="DrawerClipMode.Never"
+                               Class="pn-parts-drawer"
+                               Width="min(270px, 100vw)"
+                               Style="--mud-drawer-width: min(270px, 100vw); --mud-drawer-width-left: min(270px, 100vw);">
+                        <PartsListPanel
+                            Parts="@_parts"
+                            SelectedIndex="@_selectedPartIndex"
+                            Title="@_title"
+                            OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
+                            OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
+                            AutoSaving="@_autoSaving"
+                            LastSavedAt="@_lastSavedAt"
+                            HasCustomerSelected="@(_selectedCustomer != null)"
+                            CanDuplicateProject="@(_parts.Count > 0)"
+                            OnDuplicate="DuplicateProjectAsync"
+                            OnSelectPart="SelectPartFromDrawer"
+                            OnAddPart="OpenFilePicker"
+                            OnRemovePart="RemovePart"
+                            OnDuplicatePart="DuplicateSinglePart" />
+                    </MudDrawer>
+                }
 
                 @* ── Center: Viewer + Detail ─────────────────────────────── *@
                 <div class="@CenterClass">
-                    <div class="pn-mobile-toolbar">
-                        <button class="pn-parts-toggle pn-parts-toggle--mobile" title="Open parts list" @onclick="@(() => _partsDrawerOpen = true)">
-                            <MudIcon Icon="@Icons.Material.Outlined.Menu" Size="Size.Small" />
-                            <span>Parts</span>
-                            <span class="pn-parts-count">@_parts.Count</span>
-                        </button>
-                        <button type="button"
-                                class="pn-mode-icon-button"
-                                title="@LayoutToggleTitle"
-                                aria-label="@LayoutToggleTitle"
-                                @onclick="ToggleLayoutMode">
-                            <MudIcon Icon="@LayoutToggleIcon" Size="Size.Small" />
-                        </button>
-                    </div>
-
-                    @if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)
+                    @if (_layoutMode != LayoutMode.SummaryTable)
                     {
-                        @if (_layoutMode == LayoutMode.SummaryTable)
-                        {
-                            <ProjectPartsBulkTable
-                                Parts="@_parts"
+                        <div class="pn-mobile-toolbar">
+                            <button class="pn-parts-toggle pn-parts-toggle--mobile" title="Open parts list" @onclick="@(() => _partsDrawerOpen = true)">
+                                <MudIcon Icon="@Icons.Material.Outlined.Menu" Size="Size.Small" />
+                                <span>Parts</span>
+                                <span class="pn-parts-count">@_parts.Count</span>
+                            </button>
+                            <button type="button"
+                                    class="pn-mode-icon-button"
+                                    title="@LayoutToggleTitle"
+                                    aria-label="@LayoutToggleTitle"
+                                    @onclick="ToggleLayoutMode">
+                                <MudIcon Icon="@LayoutToggleIcon" Size="Size.Small" />
+                            </button>
+                        </div>
+                    }
+
+                    @if (_layoutMode == LayoutMode.SummaryTable)
+                    {
+                        <ProjectPartsBulkTable
+                            Parts="@_parts"
+                            Processes="@_processes"
+                            SelectedParts="@_bulkSelectedParts"
+                            SelectedPartsChanged="OnBulkSelectionChanged"
+                            TempProjectId="@_tempProjectId"
+                            CustomerId="@_selectedCustomerId"
+                            OnPartChanged="OnPartChanged"
+                            OnProcessChanged="OnBulkTableProcessChanged"
+                            OnBulkApply="ApplyBulkEditAsync"
+                            OnOpenViewer="OpenBabylonViewer"
+                            OnRemovePart="RemovePart"
+                            OnDuplicatePart="DuplicateSinglePart"
+                            OnAddPart="OpenFilePicker"
+                            OnLayoutModeChanged="SetLayoutModeAsync" />
+                    }
+                    else if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)
+                    {
+                        <div class="pn-detail-row">
+                            <ErrorBoundary>
+                                <ChildContent>
+                                    <PartDetailCard
+                                        Part="@_parts[_selectedPartIndex]"
+                                        TempProjectId="@_tempProjectId"
+                                        OnPartChanged="OnPartChanged"
+                                        OnOpenViewer="OpenBabylonViewer"
+                                        OnRequestFreshViewerUrl="RequestFreshViewerUrlAsync"
+                                        OnRemovePart="RemovePart" />
+                                </ChildContent>
+                                <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Detail panel error.</MudAlert></ErrorContent>
+                            </ErrorBoundary>
+                            <PartConfigSidebar
+                                Part="@_parts[_selectedPartIndex]"
                                 Processes="@_processes"
-                                SelectedParts="@_bulkSelectedParts"
-                                SelectedPartsChanged="OnBulkSelectionChanged"
                                 TempProjectId="@_tempProjectId"
                                 CustomerId="@_selectedCustomerId"
                                 OnPartChanged="OnPartChanged"
-                                OnProcessChanged="OnBulkTableProcessChanged"
-                                OnBulkApply="ApplyBulkEditAsync"
-                                OnOpenViewer="OpenBabylonViewer"
-                                OnRemovePart="RemovePart"
-                                OnDuplicatePart="DuplicateSinglePart"
+                                LayoutMode="@_layoutMode"
                                 OnLayoutModeChanged="SetLayoutModeAsync" />
-                        }
-                        else
-                        {
-                            <div class="pn-detail-row">
-                                <ErrorBoundary>
-                                    <ChildContent>
-                                        <PartDetailCard
-                                            Part="@_parts[_selectedPartIndex]"
-                                            TempProjectId="@_tempProjectId"
-                                            OnPartChanged="OnPartChanged"
-                                            OnOpenViewer="OpenBabylonViewer"
-                                            OnRequestFreshViewerUrl="RequestFreshViewerUrlAsync"
-                                            OnRemovePart="RemovePart" />
-                                    </ChildContent>
-                                    <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Detail panel error.</MudAlert></ErrorContent>
-                                </ErrorBoundary>
-                                <PartConfigSidebar
-                                    Part="@_parts[_selectedPartIndex]"
-                                    Processes="@_processes"
-                                    TempProjectId="@_tempProjectId"
-                                    CustomerId="@_selectedCustomerId"
-                                    OnPartChanged="OnPartChanged"
-                                    LayoutMode="@_layoutMode"
-                                    OnLayoutModeChanged="SetLayoutModeAsync" />
-                            </div>
-                        }
+                        </div>
                     }
                     else
                     {

@@ -1,8 +1,11 @@
 @namespace Maliev.Intranet.Client.Components.Project
+@using Maliev.Intranet.Client.Components.Shared
 @using Maliev.Intranet.Client.Services
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @inject CurrencyService CurrencyService
+@inject FileTypesSettings FileTypes
+@inject UploadSettings UploadSettings
 
 <div class="pbt-root">
     <div class="pbt-header">
@@ -11,6 +14,17 @@
             <div class="pbt-title">@Parts.Count part@(Parts.Count == 1 ? "" : "s")</div>
         </div>
         <div class="pbt-actions">
+            @if (OnAddPart.HasDelegate)
+            {
+                <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
+                                    Icon="@Icons.Material.Outlined.CloudUpload"
+                                    Label="Add CAD files"
+                                    SubLabel="@FileTypes.ThreeDSubLabel"
+                                    MaxFileSizeLabel="@($"max {UploadSettings.ThreeDModelLimit / 1048576} MB")"
+                                    Class="pbt-upload-zone"
+                                    OnClick="@OnAddPart"
+                                    OnFilesDropped="@OnAddPart" />
+            }
             @if (OnLayoutModeChanged.HasDelegate)
             {
                 <button type="button"
@@ -215,8 +229,33 @@
                                    aria-label="@($"Select {part.Name}")" />
                         </td>
                         <td>
-                            <div class="pbt-part-name">@part.Name</div>
-                            <div class="pbt-part-meta">@ResolvePartMeta(part)</div>
+                            <div class="pbt-part-cell">
+                                <div class="pbt-part-thumb">
+                                    @if (part.QueuedUpload || part.AwaitingPreview)
+                                    {
+                                        <MudProgressCircular Color="Color.Default" Indeterminate="true" Size="Size.Small" />
+                                    }
+                                    else if (part.Uploading)
+                                    {
+                                        <MudProgressCircular Size="Size.Small"
+                                                             Indeterminate="false"
+                                                             Value="@part.ProgressPercent"
+                                                             Color="Color.Primary" />
+                                    }
+                                    else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
+                                    {
+                                        <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="pbt-part-thumb-img" onerror="this.style.display='none'" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Color="Color.Tertiary" />
+                                    }
+                                </div>
+                                <div class="pbt-part-copy">
+                                    <div class="pbt-part-name">@part.Name</div>
+                                    <div class="pbt-part-meta">@ResolvePartMeta(part)</div>
+                                </div>
+                            </div>
                         </td>
                         <td>
                             <select class="pbt-input"
@@ -293,31 +332,33 @@
                             <span class="@ResolveDfmClass(part)">@ResolveDfmText(part)</span>
                         </td>
                         <td class="pbt-col-actions">
-                            <button type="button"
-                                    class="pbt-icon-button pbt-expand-button"
-                                    title="Advanced configuration"
-                                    @onclick="@(() => ToggleExpanded(part))">
-                                <MudIcon Icon="@(IsExpanded(part) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)" Size="Size.Small" />
-                            </button>
-                            <button type="button"
-                                    class="pbt-icon-button"
-                                    title="Open viewer"
-                                    disabled="@(!CanOpenViewer(part))"
-                                    @onclick="@(() => OnOpenViewer.InvokeAsync(part))">
-                                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
-                            </button>
-                            <button type="button"
-                                    class="pbt-icon-button"
-                                    title="Duplicate part"
-                                    @onclick="@(() => OnDuplicatePart.InvokeAsync(part))">
-                                <MudIcon Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" />
-                            </button>
-                            <button type="button"
-                                    class="pbt-icon-button pbt-icon-button--danger"
-                                    title="Remove part"
-                                    @onclick="@(() => OnRemovePart.InvokeAsync(part))">
-                                <MudIcon Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" />
-                            </button>
+                            <div class="pbt-row-actions">
+                                <button type="button"
+                                        class="pbt-icon-button pbt-expand-button"
+                                        title="Advanced configuration"
+                                        @onclick="@(() => ToggleExpanded(part))">
+                                    <MudIcon Icon="@(IsExpanded(part) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)" Size="Size.Small" />
+                                </button>
+                                <button type="button"
+                                        class="pbt-icon-button"
+                                        title="Open viewer"
+                                        disabled="@(!CanOpenViewer(part))"
+                                        @onclick="@(() => OnOpenViewer.InvokeAsync(part))">
+                                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                                </button>
+                                <button type="button"
+                                        class="pbt-icon-button"
+                                        title="Duplicate part"
+                                        @onclick="@(() => OnDuplicatePart.InvokeAsync(part))">
+                                    <MudIcon Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" />
+                                </button>
+                                <button type="button"
+                                        class="pbt-icon-button pbt-icon-button--danger"
+                                        title="Remove part"
+                                        @onclick="@(() => OnRemovePart.InvokeAsync(part))">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" />
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     @if (IsExpanded(part))
@@ -350,7 +391,31 @@
                         <input type="checkbox"
                                checked="@selected"
                                @onchange="@((ChangeEventArgs args) => TogglePartAsync(part, IsChecked(args)))" />
-                        <span>@part.Name</span>
+                        <span class="pbt-part-thumb">
+                            @if (part.QueuedUpload || part.AwaitingPreview)
+                            {
+                                <MudProgressCircular Color="Color.Default" Indeterminate="true" Size="Size.Small" />
+                            }
+                            else if (part.Uploading)
+                            {
+                                <MudProgressCircular Size="Size.Small"
+                                                     Indeterminate="false"
+                                                     Value="@part.ProgressPercent"
+                                                     Color="Color.Primary" />
+                            }
+                            else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
+                            {
+                                <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="pbt-part-thumb-img" onerror="this.style.display='none'" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Color="Color.Tertiary" />
+                            }
+                        </span>
+                        <span class="pbt-card-title-copy">
+                            <span class="pbt-card-title">@part.Name</span>
+                            <span class="pbt-card-subtitle">@ResolvePartMeta(part)</span>
+                        </span>
                     </label>
                     <button type="button"
                             class="pbt-icon-button pbt-expand-button"
@@ -499,6 +564,9 @@
 
     /// <summary>Callback invoked when the user duplicates a part.</summary>
     [Parameter] public EventCallback<PartViewModel> OnDuplicatePart { get; set; }
+
+    /// <summary>Callback invoked when the user wants to upload more CAD files.</summary>
+    [Parameter] public EventCallback OnAddPart { get; set; }
 
     /// <summary>Callback invoked when the user requests a different project editor layout.</summary>
     [Parameter] public EventCallback<LayoutMode> OnLayoutModeChanged { get; set; }

@@ -37,6 +37,7 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
 
         Assert.NotEmpty(cut.FindAll(".pbt-table-row"));
         Assert.NotEmpty(cut.FindAll(".pbt-part-card"));
+        Assert.NotEmpty(cut.FindAll(".pbt-part-thumb-img"));
         Assert.Contains("Table edit", cut.Markup);
     }
 
@@ -95,6 +96,23 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
         Assert.Equal(LayoutMode.Configurator, requestedMode);
     }
 
+    [Fact]
+    public void ProjectPartsBulkTable_WhenUploadClicked_RaisesAddPart()
+    {
+        var parts = CreateParts();
+        var addRequested = false;
+
+        var cut = Render<ProjectPartsBulkTable>(parameters => parameters
+            .Add(p => p.Parts, parts)
+            .Add(p => p.SelectedParts, [])
+            .Add(p => p.Processes, [new ProcessDto(Guid.NewGuid(), "FDM", "FDM", null, 10)])
+            .Add(p => p.OnAddPart, EventCallback.Factory.Create(this, () => addRequested = true)));
+
+        cut.Find(".pbt-upload-zone").Click();
+
+        Assert.True(addRequested);
+    }
+
     private RenderedComponent<ProjectPartsBulkTable> RenderTable(
         List<PartViewModel> parts,
         IReadOnlyCollection<PartViewModel>? selectedParts = null)
@@ -116,6 +134,7 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
             {
                 FileId = Guid.NewGuid(),
                 Name = "bracket.stl",
+                ThumbnailSmallUrl = "/thumb-bracket.png",
                 Quantity = 2,
                 MaterialId = material.Id,
                 MaterialCode = material.Code,
