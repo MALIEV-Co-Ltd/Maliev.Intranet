@@ -119,7 +119,7 @@
                                         style="@SlotStyle(slot)"
                                         draggable="@CanDrag(slot)"
                                         aria-label="@SlotAriaLabel(slot)"
-                                        aria-disabled="@IsLocked(slot)"
+                                        aria-disabled="@BoolText(IsLocked(slot))"
                                         data-slot-id="@slot.SlotId"
                                         data-job-id="@slot.JobId"
                                         data-hold-id="@slot.HoldId"
@@ -127,7 +127,7 @@
                                         @onclick="@(() => SelectSlotAsync(slot))">
                                     <span class="psb-slot-label">@SlotLabel(slot)</span>
                                     <span class="psb-slot-time">@FormatSlotTime(slot)</span>
-                                    @if (CanMove(slot))
+                                    @if (MoveRequested.HasDelegate && CanMove(slot))
                                     {
                                         <span class="psb-slot-move" @onclick:stopPropagation="true" @onclick="@(() => RequestMoveAsync(slot))">Move</span>
                                     }
@@ -427,4 +427,6 @@
 
     private static string? FormatShortId(Guid? id) =>
         id is { } value ? value.ToString("N")[..8].ToUpperInvariant() : null;
+
+    private static string BoolText(bool value) => value ? "true" : "false";
 }

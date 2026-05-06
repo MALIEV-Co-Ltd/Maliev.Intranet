@@ -1,0 +1,160 @@
+.production-schedule-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.production-schedule-page ::deep .production-schedule-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.production-schedule-page ::deep .production-schedule-card {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.production-schedule-page ::deep .production-schedule-card > .production-schedule-board {
+    flex: 1 1 auto;
+}
+
+.production-schedule-error {
+    flex-shrink: 0;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--maliev-danger), transparent 60%);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklab, var(--maliev-danger), transparent 92%);
+    color: var(--maliev-danger);
+    font-size: var(--maliev-font-small);
+}
+
+.production-move-panel {
+    position: absolute;
+    right: 28px;
+    bottom: 28px;
+    z-index: 20;
+    display: grid;
+    gap: 14px;
+    width: min(520px, calc(100% - 56px));
+    padding: 16px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-md);
+    background: var(--maliev-panel);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+}
+
+.production-move-panel header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    align-items: center;
+}
+
+.production-move-panel header span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.production-move-panel header strong {
+    grid-column: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-large);
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.production-move-panel header button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink-2);
+    cursor: pointer;
+}
+
+.production-move-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.production-move-grid label,
+.production-move-checkbox {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.production-move-grid label span,
+.production-move-checkbox span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.production-move-grid input,
+.production-move-grid select {
+    width: 100%;
+    min-height: 36px;
+    min-width: 0;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+    font: inherit;
+    font-size: var(--maliev-font-small);
+    padding: 0 10px;
+}
+
+.production-move-checkbox {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+}
+
+.production-move-checkbox input {
+    width: 16px;
+    height: 16px;
+}
+
+.production-move-panel footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+@media (max-width: 720px) {
+    .production-schedule-page ::deep .production-schedule-body {
+        overflow: auto;
+    }
+
+    .production-move-panel {
+        position: fixed;
+        inset: auto 12px 12px;
+        width: auto;
+    }
+
+    .production-move-grid {
+        grid-template-columns: 1fr;
+    }
+}

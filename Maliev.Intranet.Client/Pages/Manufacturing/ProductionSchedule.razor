@@ -1,0 +1,325 @@
+@page "/mfg/production-schedule"
+@using System.Globalization
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Production schedule | MALIEV Intranet</PageTitle>
+
+<div class="production-schedule-page mlv-module-shell">
+    <ModuleHeader Title="Production schedule" Subtitle="Reserved machine slots across queued jobs and active planning holds.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" Disabled="@_loading" OnClick="@ReloadClickedAsync">Refresh</SecondaryButton>
+    </ModuleHeader>
+
+    <PageBody Class="production-schedule-body">
+        <PanelCard Class="production-schedule-card">
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="production-schedule-error">@_error</div>
+            }
+
+            <ProductionScheduleBoard Board="_board"
+                                     Title="Scheduled work centers"
+                                     Eyebrow="Machine queue"
+                                     OnRefresh="@LoadBoardAsync"
+                                     RangeStartChanged="@OnRangeStartChangedAsync"
+                                     MoveRequested="@OpenMovePanelAsync"
+                                     SlotSelected="@SelectSlotAsync" />
+        </PanelCard>
+
+        @if (_moveSlot is not null)
+        {
+            <section class="production-move-panel" aria-label="Reschedule selected slot">
+                <header>
+                    <span>Reschedule slot</span>
+                    <strong>@SlotTitle(_moveSlot)</strong>
+                    <button type="button" aria-label="Close reschedule panel" @onclick="CloseMovePanel">
+                        <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                    </button>
+                </header>
+
+                <div class="production-move-grid">
+                    <label>
+                        <span>Machine</span>
+                        <select value="@_moveMachineId" @onchange="OnMoveMachineChanged">
+                            @foreach (var machine in MoveMachines)
+                            {
+                                <option value="@machine.MachineId">@machine.MachineName</option>
+                            }
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Start</span>
+                        <input type="datetime-local" value="@FormatDateTimeLocal(_moveStartLocal)" @onchange="OnMoveStartChanged" />
+                    </label>
+
+                    <label>
+                        <span>End</span>
+                        <input type="datetime-local" value="@FormatDateTimeLocal(_moveEndLocal)" @onchange="OnMoveEndChanged" />
+                    </label>
+
+                    <label>
+                        <span>Queue position</span>
+                        <input type="number" min="0" value="@FormatQueuePosition()" @onchange="OnMoveQueuePositionChanged" />
+                    </label>
+                </div>
+
+                <label class="production-move-checkbox">
+                    <input type="checkbox" checked="@_moveCascade" @onchange="OnMoveCascadeChanged" />
+                    <span>Cascade following queued jobs</span>
+                </label>
+
+                <footer>
+                    <SecondaryButton OnClick="@CancelMoveClickedAsync">Cancel</SecondaryButton>
+                    <PrimaryButton Class="production-move-save" Icon="@Icons.Material.Outlined.Save" Disabled="@_savingMove" OnClick="@SaveMoveClickedAsync">
+                        @(_savingMove ? "Saving..." : "Save schedule")
+                    </PrimaryButton>
+                </footer>
+            </section>
+        }
+    </PageBody>
+</div>
+
+@code {
+    private ProductionScheduleBoardDto? _board;
+    private ProductionScheduleSlotDto? _moveSlot;
+    private string _moveMachineId = string.Empty;
+    private DateTime _moveStartLocal;
+    private DateTime _moveEndLocal;
+    private int? _moveQueuePosition;
+    private bool _moveCascade = true;
+    private bool _loading = true;
+    private bool _savingMove;
+    private string? _error;
+    private DateTime _rangeStartUtc = DateTime.UtcNow.Date;
+
+    private IEnumerable<ProductionScheduleMachineDto> MoveMachines => (_board?.Machines ?? Enumerable.Empty<ProductionScheduleMachineDto>())
+        .OrderBy(machine => machine.MachineName, StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBoardAsync();
+    }
+
+    private async Task LoadBoardAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var rangeEndUtc = _rangeStartUtc.AddDays(7);
+            var url = $"api/v1/jobs/schedule?from={Uri.EscapeDataString(_rangeStartUtc.ToString("O", CultureInfo.InvariantCulture))}&to={Uri.EscapeDataString(rangeEndUtc.ToString("O", CultureInfo.InvariantCulture))}";
+            _board = await Http.GetFromJsonAsync<ProductionScheduleBoardDto>(url);
+        }
+        catch (Exception ex)
+        {
+            _board = null;
+            _error = $"Production schedule could not be loaded: {ex.Message}";
+            Snackbar.Add(_error, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReloadClickedAsync(MouseEventArgs _)
+    {
+        await LoadBoardAsync();
+    }
+
+    private async Task OnRangeStartChangedAsync(DateTime rangeStart)
+    {
+        _rangeStartUtc = NormalizeUtc(rangeStart).Date;
+        await LoadBoardAsync();
+    }
+
+    private Task SelectSlotAsync(ProductionScheduleSlotDto slot)
+    {
+        if (_moveSlot?.SlotId == slot.SlotId)
+            CloseMovePanel();
+
+        return Task.CompletedTask;
+    }
+
+    private Task OpenMovePanelAsync(ProductionScheduleSlotDto slot)
+    {
+        _moveSlot = slot;
+        _moveMachineId = slot.MachineId;
+        _moveStartLocal = NormalizeUtc(slot.ScheduledStart).ToLocalTime();
+        _moveEndLocal = NormalizeUtc(slot.ScheduledEnd).ToLocalTime();
+        _moveQueuePosition = slot.QueuePosition > 0 ? slot.QueuePosition : null;
+        _moveCascade = true;
+        return Task.CompletedTask;
+    }
+
+    private void CloseMovePanel()
+    {
+        _moveSlot = null;
+        _savingMove = false;
+    }
+
+    private async Task CancelMoveClickedAsync(MouseEventArgs _)
+    {
+        CloseMovePanel();
+        await Task.CompletedTask;
+    }
+
+    private async Task SaveMoveClickedAsync(MouseEventArgs _)
+    {
+        await SaveMoveAsync();
+    }
+
+    private async Task SaveMoveAsync()
+    {
+        if (_moveSlot is null)
+            return;
+
+        var startUtc = LocalToUtc(_moveStartLocal);
+        var endUtc = LocalToUtc(_moveEndLocal);
+        if (endUtc <= startUtc)
+        {
+            Snackbar.Add("Schedule end must be after start.", Severity.Error);
+            return;
+        }
+
+        _savingMove = true;
+        try
+        {
+            var machineName = MoveMachines.FirstOrDefault(machine =>
+                string.Equals(machine.MachineId, _moveMachineId, StringComparison.OrdinalIgnoreCase))?.MachineName;
+
+            HttpResponseMessage response;
+            if (_moveSlot.JobId is Guid jobId)
+            {
+                response = await Http.PatchAsJsonAsync(
+                    $"api/v1/jobs/{jobId}/schedule",
+                    new RescheduleJobRequest
+                    {
+                        MachineId = _moveMachineId,
+                        ScheduledStartTime = startUtc,
+                        ScheduledEndTime = endUtc,
+                        QueuePosition = _moveQueuePosition,
+                        CascadeFollowingJobs = _moveCascade
+                    });
+            }
+            else if (_moveSlot.HoldId is Guid holdId)
+            {
+                response = await Http.PatchAsJsonAsync(
+                    $"api/v1/jobs/planning-holds/{holdId}",
+                    new UpdateProductionPlanningHoldRequest
+                    {
+                        MachineId = _moveMachineId,
+                        MachineName = machineName,
+                        QueuePosition = _moveQueuePosition ?? _moveSlot.QueuePosition,
+                        ScheduledStartTime = startUtc,
+                        ScheduledEndTime = endUtc,
+                        SetupTimeMinutes = _moveSlot.SetupMinutes,
+                        ProductionTimeMinutes = _moveSlot.ProductionMinutes,
+                        Notes = "Rescheduled from production schedule.",
+                        ExpiresAt = _moveSlot.ExpiresAt ?? DateTime.UtcNow.AddHours(72)
+                    });
+            }
+            else
+            {
+                Snackbar.Add("Only queued jobs and active planning holds can be moved.", Severity.Info);
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(string.IsNullOrWhiteSpace(message) ? "Schedule could not be updated." : message, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Schedule updated.", Severity.Success);
+            CloseMovePanel();
+            await LoadBoardAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Schedule update error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingMove = false;
+        }
+    }
+
+    private void OnMoveMachineChanged(ChangeEventArgs e) => _moveMachineId = e.Value?.ToString() ?? string.Empty;
+
+    private void OnMoveStartChanged(ChangeEventArgs e)
+    {
+        if (TryParseLocalDateTime(e.Value?.ToString(), out var value))
+            _moveStartLocal = value;
+    }
+
+    private void OnMoveEndChanged(ChangeEventArgs e)
+    {
+        if (TryParseLocalDateTime(e.Value?.ToString(), out var value))
+            _moveEndLocal = value;
+    }
+
+    private void OnMoveQueuePositionChanged(ChangeEventArgs e)
+    {
+        _moveQueuePosition = int.TryParse(e.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+            ? Math.Max(0, value)
+            : null;
+    }
+
+    private void OnMoveCascadeChanged(ChangeEventArgs e)
+    {
+        _moveCascade = e.Value is bool value && value;
+    }
+
+    private string FormatQueuePosition() =>
+        _moveQueuePosition?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+
+    private static string SlotTitle(ProductionScheduleSlotDto slot) =>
+        string.IsNullOrWhiteSpace(slot.Label) ? slot.FileName ?? "Selected slot" : slot.Label;
+
+    private static string FormatDateTimeLocal(DateTime value) =>
+        value.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+
+    private static bool TryParseLocalDateTime(string? value, out DateTime result)
+    {
+        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsed))
+        {
+            result = parsed.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(parsed, DateTimeKind.Local)
+                : parsed;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    private static DateTime LocalToUtc(DateTime value)
+    {
+        if (value.Kind == DateTimeKind.Utc)
+            return value;
+
+        if (value.Kind == DateTimeKind.Unspecified)
+            value = DateTime.SpecifyKind(value, DateTimeKind.Local);
+
+        return value.ToUniversalTime();
+    }
+
+    private static DateTime NormalizeUtc(DateTime value)
+    {
+        if (value.Kind == DateTimeKind.Utc)
+            return value;
+
+        if (value.Kind == DateTimeKind.Local)
+            return value.ToUniversalTime();
+
+        return DateTime.SpecifyKind(value, DateTimeKind.Utc);
+    }
+}
