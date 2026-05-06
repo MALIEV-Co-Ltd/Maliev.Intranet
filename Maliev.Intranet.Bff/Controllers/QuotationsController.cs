@@ -179,11 +179,31 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
 
         var pdfUrl = await pdfClient.GeneratePdfAsync(
             PdfDocumentType.Quotation,
-            id.ToString(),
+            quotation.QuotationNumber,
             pdfData,
             ct: ct);
 
         return pdfUrl != null ? Ok(pdfUrl) : BadRequest("Failed to generate PDF");
+    }
+
+    /// <summary>
+    /// Returns the latest generated PDF URL for a quotation.
+    /// </summary>
+    /// <param name="id">The quotation ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The latest PDF URL.</returns>
+    [RequirePermission(MalievPermissions.Quotation.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("{id:guid}/pdf/latest")]
+    public async Task<ActionResult> GetLatestPdf(Guid id, CancellationToken ct)
+    {
+        var quotation = await client.GetQuotationByIdAsync(id, ct);
+        if (quotation == null)
+            return NotFound();
+
+        var pdfUrl = await pdfClient.GetLatestPdfUrlAsync(PdfDocumentType.Quotation, quotation.QuotationNumber, ct);
+        return string.IsNullOrWhiteSpace(pdfUrl)
+            ? NotFound()
+            : Ok(new { storageUrl = pdfUrl });
     }
 
     private static decimal ResolveDiscountAmount(SalesDiscountStructureDto? discount, decimal lineSubtotal)
@@ -227,7 +247,7 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
     [HttpPost("draft-pdf")]
     public async Task<ActionResult> GenerateDraftPdf([FromBody] QuotationPdfData pdfData, CancellationToken ct)
     {
-        var referenceId = Guid.NewGuid().ToString();
+        var referenceId = FirstNonEmpty(pdfData.QuotationNumber, Guid.NewGuid().ToString())!;
         ApplyQuotedByMetadata(pdfData);
         var pdfUrl = await pdfClient.GeneratePdfAsync(
             PdfDocumentType.Quotation,

@@ -55,14 +55,14 @@
                                    aria-label="Edit project"
                                    OnClick="@(_ => EditProject())" />
                 </MudTooltip>
-                <MudTooltip Text="@(_pdfLoading ? "Generating PDF" : "Generate PDF")">
+                <MudTooltip Text="@(_pdfLoading ? "Generating PDF" : "Regenerate PDF")">
                     <MudIconButton Class="project-action-download project-header-icon-action"
                                    Icon="@Icons.Material.Sharp.PictureAsPdf"
                                    Size="Size.Small"
                                    Variant="Variant.Outlined"
                                    Color="Color.Default"
                                    Disabled="@(!HasQuotation || _pdfLoading)"
-                                   aria-label="Generate PDF"
+                                   aria-label="Regenerate PDF"
                                    OnClick="@DownloadQuoteAsync" />
                 </MudTooltip>
                 <PrimaryButton Class="project-action-accept" Icon="@Icons.Material.Outlined.Check" Disabled="@(!CanAcceptQuote || _accepting)" OnClick="@(_ => OpenAcceptQuoteConfirmation())">
@@ -250,12 +250,14 @@
     private async Task LoadQuotationAsync()
     {
         _quotation = null;
+        _quotePdfUrl = null;
         if (_project?.QuotationId is not Guid quotationId)
             return;
 
         try
         {
             _quotation = await Http.GetFromJsonAsync<QuotationDetailDto>($"api/v1/quotations/{quotationId}");
+            _quotePdfUrl = await LoadLatestQuotePdfUrlAsync(quotationId);
         }
         catch
         {
@@ -507,7 +509,7 @@
             content.AddAttribute(39, "Icon", Icons.Material.Sharp.PictureAsPdf);
             content.AddAttribute(40, "Disabled", !HasQuotation || _pdfLoading);
             content.AddAttribute(41, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, DownloadQuoteAsync));
-            content.AddContent(42, _pdfLoading ? "Generating PDF" : "Generate PDF");
+            content.AddContent(42, _pdfLoading ? "Generating PDF" : "Regenerate PDF");
             content.CloseComponent();
             if (!string.IsNullOrWhiteSpace(_quotePdfUrl))
             {
@@ -528,10 +530,10 @@
                 content.AddAttribute(51, "Size", Size.Large);
                 content.CloseComponent();
                 content.OpenElement(52, "strong");
-                content.AddContent(53, HasQuotation ? "No PDF generated in this session" : "Quotation not generated yet");
+                content.AddContent(53, HasQuotation ? "No PDF generated for this quote" : "Quotation not generated yet");
                 content.CloseElement();
                 content.OpenElement(54, "span");
-                content.AddContent(55, HasQuotation ? "Generate the PDF to preview or open the latest signed document URL." : "Create the quote from the project editor after pricing is confirmed.");
+                content.AddContent(55, HasQuotation ? "Regenerate the PDF to preview or open the latest stored document URL." : "Create the quote from the project editor after pricing is confirmed.");
                 content.CloseElement();
             }
             else
@@ -1392,6 +1394,19 @@
         }
 
         return null;
+    }
+
+    private async Task<string?> LoadLatestQuotePdfUrlAsync(Guid quotationId)
+    {
+        try
+        {
+            using var response = await Http.GetAsync($"api/v1/quotations/{quotationId}/pdf/latest");
+            return response.IsSuccessStatusCode ? await ReadPdfUrlAsync(response) : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private async Task OpenGeneratedPdfAsync(MouseEventArgs _)

@@ -69,7 +69,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("18,250.00", cut.Markup);
         Assert.Contains("aria-label=\"Edit project\"", cut.Markup);
-        Assert.Contains("aria-label=\"Generate PDF\"", cut.Markup);
+        Assert.Contains("aria-label=\"Regenerate PDF\"", cut.Markup);
         Assert.Contains("project-header-icon-action", cut.Markup);
         Assert.Contains("Accept quote", cut.Markup);
 
@@ -173,7 +173,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("project-quote-workspace", cut.Markup);
         Assert.Contains("Quote document", cut.Markup);
         Assert.Contains("Commercial breakdown", cut.Markup);
-        Assert.Contains("No PDF generated in this session", cut.Markup);
+        Assert.Contains("https://storage.example/quote-auto.pdf", cut.Markup);
+        Assert.DoesNotContain("No PDF generated", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("Line subtotal", cut.Markup);
         Assert.Contains("Parts subtotal", cut.Markup);
         Assert.Contains("Shipping", cut.Markup);
@@ -582,6 +583,11 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         if (pathAndQuery.Equals($"/api/v1/quotations/{_quotationId}", StringComparison.Ordinal))
         {
             return Json(BuildQuotationDetail());
+        }
+
+        if (pathAndQuery.Equals($"/api/v1/quotations/{_quotationId}/pdf/latest", StringComparison.Ordinal))
+        {
+            return Json(new { storageUrl = "https://storage.example/quote-auto.pdf" });
         }
 
         if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}/production-plan", StringComparison.Ordinal))

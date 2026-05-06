@@ -9,6 +9,42 @@ namespace Maliev.Intranet.Bff.Clients;
 public class PdfServiceClient(HttpClient httpClient)
 {
     /// <summary>
+    /// Gets the latest completed PDF URL for a business reference.
+    /// </summary>
+    /// <param name="documentType">The document type.</param>
+    /// <param name="referenceId">The stable business reference ID used for PDF generation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The latest generated PDF URL, if one exists.</returns>
+    public async Task<string?> GetLatestPdfUrlAsync(
+        PdfDocumentType documentType,
+        string referenceId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(referenceId))
+            return null;
+
+        var documentTypeValue = documentType switch
+        {
+            PdfDocumentType.Quotation => "Quotation",
+            PdfDocumentType.Invoice => "Invoice",
+            PdfDocumentType.Receipt => "Receipt",
+            PdfDocumentType.Report => "Report",
+            PdfDocumentType.DeliveryNote => "DeliveryNote",
+            _ => documentType.ToString()
+        };
+
+        var url = $"/pdf/v1/generations/latest?documentType={Uri.EscapeDataString(documentTypeValue)}&referenceId={Uri.EscapeDataString(referenceId)}";
+        var response = await httpClient.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+        return result.TryGetProperty("storageUrl", out var storageUrl) && storageUrl.ValueKind == JsonValueKind.String
+            ? storageUrl.GetString()
+            : null;
+    }
+
+    /// <summary>
     /// Generates a PDF document synchronously.
     /// </summary>
     /// <param name="documentType">The type of document to generate.</param>

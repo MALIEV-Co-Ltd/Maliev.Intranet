@@ -19,6 +19,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="uploadClient">The typed UploadService HTTP client used when duplicating project file artifacts.</param>
 /// <param name="analysisStatusService">The file analysis status cache used when restoring duplicated part previews.</param>
 /// <param name="customerClient">The typed CustomerService HTTP client used to hydrate quote customer details.</param>
+/// <param name="quotationClient">The typed QuotationService HTTP client used to hydrate generated quotation details.</param>
+/// <param name="pdfClient">The typed PdfService HTTP client used to generate quotation PDFs.</param>
 [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [ApiVersion("1.0")]
@@ -30,7 +32,9 @@ public class ProjectsController(
     ILogger<ProjectsController> logger,
     UploadServiceClient? uploadClient = null,
     IFileAnalysisStatusService? analysisStatusService = null,
-    CustomerServiceClient? customerClient = null) : ControllerBase
+    CustomerServiceClient? customerClient = null,
+    QuotationServiceClient? quotationClient = null,
+    PdfServiceClient? pdfClient = null) : ControllerBase
 {
     private readonly ILogger<ProjectsController> _logger = logger;
     // ── Query endpoints ──────────────────────────────────────────────────────
@@ -375,13 +379,124 @@ public class ProjectsController(
     {
         var response = await client.GenerateQuotationAsync(id, request ?? new GenerateQuotationRequest(), ct);
         if (response.IsSuccessStatusCode)
+        {
+            var pdfGenerated = await TryGenerateQuotationPdfAsync(id, ct);
+            if (!pdfGenerated)
+                return StatusCode(StatusCodes.Status502BadGateway, "Quotation generated, but automatic PDF generation failed.");
+
             return NoContent();
+        }
 
         var errorContent = await response.Content.ReadAsStringAsync(ct);
         if (string.IsNullOrWhiteSpace(errorContent))
             return StatusCode((int)response.StatusCode);
 
         return StatusCode((int)response.StatusCode, errorContent);
+    }
+
+    private async Task<bool> TryGenerateQuotationPdfAsync(Guid projectId, CancellationToken ct)
+    {
+        if (quotationClient is null || pdfClient is null)
+        {
+            _logger.LogWarning("Skipping automatic quotation PDF generation because required clients are not registered.");
+            return false;
+        }
+
+        var project = await client.GetProjectByIdAsync(projectId, ct);
+        if (project?.QuotationId is not Guid quotationId)
+        {
+            _logger.LogWarning("Skipping automatic quotation PDF generation because project {ProjectId} has no quotation ID.", projectId);
+            return false;
+        }
+
+        var quotation = await quotationClient.GetQuotationByIdAsync(quotationId, ct);
+        if (quotation is null)
+        {
+            _logger.LogWarning("Skipping automatic quotation PDF generation because quotation {QuotationId} was not found.", quotationId);
+            return false;
+        }
+
+        var currentVersion = quotation.Versions?
+            .OrderByDescending(version => version.VersionNumber == quotation.CurrentVersionNumber)
+            .ThenByDescending(version => version.VersionNumber)
+            .FirstOrDefault();
+        var lineSubtotal = currentVersion?.LineItems?.Sum(item => item.Quantity * item.UnitPrice) ?? quotation.SubTotal;
+        var versionDiscount = ResolveDiscountAmount(currentVersion?.DiscountStructure, lineSubtotal);
+        var manualDiscount = Math.Max(0m, currentVersion?.ManualDiscountAmount ?? 0m);
+        var totalDiscount = Math.Min(lineSubtotal, versionDiscount + manualDiscount);
+        var shippingCost = Math.Max(0m, currentVersion?.ShippingCost ?? 0m);
+        var taxableSubtotal = Math.Max(0m, lineSubtotal - totalDiscount + shippingCost);
+
+        var pdfData = new QuotationPdfData
+        {
+            QuotationNumber = quotation.QuotationNumber,
+            VersionNumber = currentVersion?.VersionNumber ?? quotation.CurrentVersionNumber,
+            CustomerName = quotation.CustomerName,
+            CustomerType = "Corporate",
+            QuotationDate = quotation.CreatedAt,
+            ValidityStart = quotation.ValidityPeriodStart,
+            ValidityEnd = quotation.ValidityPeriodEnd,
+            SubtotalBeforeDiscount = lineSubtotal,
+            TotalDiscount = totalDiscount,
+            ManualDiscountAmount = manualDiscount,
+            ShippingCost = shippingCost,
+            Discounts = BuildDiscounts(currentVersion?.DiscountStructure, versionDiscount),
+            Subtotal = taxableSubtotal,
+            TaxAmount = currentVersion?.TaxAmount ?? quotation.Tax,
+            TotalAmount = quotation.Total,
+            Currency = string.IsNullOrWhiteSpace(quotation.CurrencyCode) ? "THB" : quotation.CurrencyCode,
+            DeliveryExpectations = quotation.DeliveryExpectations,
+            SpecialTerms = currentVersion?.SpecialTerms,
+            ChangeSummary = currentVersion?.ChangeSummary,
+            Items = currentVersion?.LineItems?.Select((item, index) => new QuotationPdfItem
+            {
+                Index = index + 1,
+                MaterialName = item.Description,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                LineTotal = item.Quantity * item.UnitPrice
+            }).ToList() ?? []
+        };
+
+        var pdfUrl = await pdfClient.GeneratePdfAsync(
+            PdfDocumentType.Quotation,
+            quotation.QuotationNumber,
+            pdfData,
+            ct: ct);
+
+        return !string.IsNullOrWhiteSpace(pdfUrl);
+    }
+
+    private static decimal ResolveDiscountAmount(SalesDiscountStructureDto? discount, decimal lineSubtotal)
+    {
+        if (discount == null || discount.DiscountValue <= 0m || lineSubtotal <= 0m)
+            return 0m;
+
+        var amount = discount.DiscountType switch
+        {
+            SalesDiscountType.FixedAmount => discount.DiscountValue,
+            SalesDiscountType.Percentage => Math.Round(lineSubtotal * (discount.DiscountValue / 100m), 2, MidpointRounding.AwayFromZero),
+            SalesDiscountType.VolumeBased => Math.Round(lineSubtotal * (discount.DiscountValue / 100m), 2, MidpointRounding.AwayFromZero),
+            _ => 0m
+        };
+
+        return Math.Min(Math.Max(0m, amount), lineSubtotal);
+    }
+
+    private static List<QuotationPdfDiscount> BuildDiscounts(SalesDiscountStructureDto? discount, decimal amount)
+    {
+        if (discount == null || amount <= 0m)
+            return [];
+
+        return
+        [
+            new()
+            {
+                DiscountType = discount.DiscountType.ToString(),
+                DiscountValue = amount,
+                Conditions = discount.Conditions
+            }
+        ];
     }
 
     /// <summary>
