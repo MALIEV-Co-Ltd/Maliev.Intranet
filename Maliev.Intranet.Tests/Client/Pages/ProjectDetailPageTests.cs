@@ -191,7 +191,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void ProjectDetail_PlanningTab_RendersRoutingQueueHoldsAndJobs()
+    public void ProjectDetail_PlanningTab_RendersMultiMachineScheduleBoard()
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
 
@@ -220,11 +220,21 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Hold #3", cut.Markup);
         Assert.Contains("CCCCCCCC", cut.Markup);
         Assert.Contains("View machine queue", cut.Markup);
-        Assert.Contains("project-planning-queue-panel", cut.Markup);
-        Assert.Contains("Machine queue", cut.Markup);
+        Assert.Contains("production-schedule-board", cut.Markup);
+        Assert.Contains("Machine schedule", cut.Markup);
+        Assert.Contains("data-machine-id=\"CNC-01\"", cut.Markup);
+        Assert.Contains("data-machine-id=\"FDM-01\"", cut.Markup);
+        Assert.Contains("CNC Mill 01", cut.Markup);
+        Assert.Contains("FDM Printer 01", cut.Markup);
+        Assert.Contains("psb-slot-job", cut.Markup);
+        Assert.Contains("psb-slot-hold", cut.Markup);
+        Assert.Contains("psb-slot-proposed", cut.Markup);
+        Assert.Contains("psb-slot-current-project", cut.Markup);
         Assert.Contains("JOB-1001", cut.Markup);
         Assert.Contains("HOLD-AAAA", cut.Markup);
-        Assert.Contains("This part", cut.Markup);
+        Assert.Contains("bracket-left.stl", cut.Markup);
+        Assert.Contains("sensor-cover.3mf", cut.Markup);
+        Assert.DoesNotContain("project-planning-queue-panel", cut.Markup);
         Assert.Contains("Create planning hold", cut.Markup);
         Assert.Contains("Update planning hold", cut.Markup);
         Assert.Contains("Cancel planning hold", cut.Markup);
@@ -232,24 +242,25 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public async Task ProjectDetail_PlanningQueueButton_SwitchesMachineQueuePanel()
+    public async Task ProjectDetail_PlanningQueueButton_FocusesMachineRowAndSlotInBoard()
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
 
         cut.WaitForAssertion(() => Assert.Contains("Planning", cut.Markup));
         cut.Find("button[data-tab='planning']").Click();
-        cut.WaitForAssertion(() => Assert.Contains("project-planning-queue-panel", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("production-schedule-board", cut.Markup));
 
         Assert.Contains("CNC Mill 01", cut.Markup);
-        Assert.DoesNotContain("FDM Printer 01 / sensor-cover.3mf", cut.Markup);
+        Assert.Contains("data-focused-machine-id=\"CNC-01\"", cut.Markup);
 
         await cut.InvokeAsync(() => cut.Find("button[aria-label='View machine queue for sensor-cover.3mf']").Click());
 
         cut.WaitForAssertion(() =>
         {
             Assert.Contains($"data-selected-part-id=\"{_sensorPartId}\"", cut.Markup);
-            Assert.Contains("FDM Printer 01", cut.Markup);
-            Assert.Contains("1 queued ahead", cut.Markup);
+            Assert.Contains("data-focused-machine-id=\"FDM-01\"", cut.Markup);
+            Assert.Contains("class=\"psb-machine-row focused\"", cut.Markup);
+            Assert.Contains($"data-project-part-id=\"{_sensorPartId}\"", cut.Markup);
         });
     }
 
@@ -482,8 +493,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-planning-panel", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-planning-table", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-planning-actions", css, StringComparison.Ordinal);
-        Assert.Contains("::deep .project-planning-queue-panel", css, StringComparison.Ordinal);
-        Assert.Contains("::deep .project-planning-queue-item", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .production-schedule-board", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .production-schedule-board-shell", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(6)", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(7)", css, StringComparison.Ordinal);
         Assert.Contains("text-align: right", css, StringComparison.Ordinal);
@@ -841,6 +852,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         return new ProjectProductionPlanDto
         {
             ProjectId = _projectId,
+            ScheduleBoard = BuildProductionScheduleBoard(proposedStart, proposedEnd),
             Parts =
             [
                 new ProjectProductionPartPlanDto
@@ -892,27 +904,140 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         };
     }
 
-    private ProductionPlanningHoldDto BuildPlanningHold(Guid partId, int queuePosition) => new()
+    private ProductionScheduleBoardDto BuildProductionScheduleBoard(DateTimeOffset proposedStart, DateTimeOffset proposedEnd) => new()
     {
-        Id = _planningHoldId,
-        ProjectId = _projectId,
-        ProjectPartId = partId,
-        Technology = "CNC_MILL",
-        MachineId = "CNC-01",
-        MachineName = "CNC Mill 01",
-        QueuePosition = queuePosition,
-        ScheduledStartTime = new DateTime(2026, 4, 19, 9, 0, 0, DateTimeKind.Utc),
-        ScheduledEndTime = new DateTime(2026, 4, 19, 12, 0, 0, DateTimeKind.Utc),
-        SetupTimeMinutes = 60,
-        ProductionTimeMinutes = 120,
-        Quantity = 4,
-        Status = "Active",
-        Notes = "Planned from project PRJ-2026-0184",
-        CreatedBy = "employee:alex.kim",
-        CreatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc),
-        UpdatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc),
-        ExpiresAt = new DateTime(2026, 4, 21, 15, 0, 0, DateTimeKind.Utc)
+        RangeStart = proposedStart.AddDays(-1).UtcDateTime.Date,
+        RangeEnd = proposedStart.AddDays(6).UtcDateTime.Date,
+        Machines =
+        [
+            new ProductionScheduleMachineDto
+            {
+                MachineId = "CNC-01",
+                MachineName = "CNC Mill 01",
+                Category = "CncMachine",
+                Technology = "CNC_MILL",
+                Slots =
+                [
+                    new ProductionScheduleSlotDto
+                    {
+                        SlotId = Guid.Parse("12121212-1212-1212-1212-121212121212"),
+                        JobId = Guid.Parse("12121212-1212-1212-1212-121212121212"),
+                        ProjectId = Guid.Parse("99999999-9999-9999-9999-999999999999"),
+                        MachineId = "CNC-01",
+                        MachineName = "CNC Mill 01",
+                        Technology = "CNC_MILL",
+                        ScheduledStart = proposedStart.AddHours(-5).UtcDateTime,
+                        ScheduledEnd = proposedStart.AddHours(-3).UtcDateTime,
+                        SetupMinutes = 60,
+                        ProductionMinutes = 120,
+                        QueuePosition = 1,
+                        Status = "Queued",
+                        Label = "JOB-1001",
+                        CanMove = true
+                    },
+                    new ProductionScheduleSlotDto
+                    {
+                        SlotId = _planningHoldId,
+                        HoldId = _planningHoldId,
+                        ProjectId = _projectId,
+                        ProjectPartId = _bracketPartId,
+                        FileName = "bracket-left.stl",
+                        MachineId = "CNC-01",
+                        MachineName = "CNC Mill 01",
+                        Technology = "CNC_MILL",
+                        ScheduledStart = proposedStart.AddHours(-3).UtcDateTime,
+                        ScheduledEnd = proposedStart.AddHours(-1).UtcDateTime,
+                        SetupMinutes = 60,
+                        ProductionMinutes = 120,
+                        QueuePosition = 3,
+                        Status = "ActiveHold",
+                        Label = "HOLD-AAAA",
+                        ExpiresAt = proposedStart.AddDays(3).UtcDateTime,
+                        IsHold = true,
+                        IsCurrentProject = true,
+                        CanMove = true
+                    },
+                    new ProductionScheduleSlotDto
+                    {
+                        SlotId = Guid.Parse("91919191-9191-9191-9191-919191919191"),
+                        ProjectId = _projectId,
+                        ProjectPartId = _fixturePartId,
+                        FileName = "fixture-base.step",
+                        MachineId = "CNC-01",
+                        MachineName = "CNC Mill 01",
+                        Technology = "CNC_MILL",
+                        ScheduledStart = proposedStart.UtcDateTime,
+                        ScheduledEnd = proposedEnd.UtcDateTime,
+                        SetupMinutes = 60,
+                        ProductionMinutes = 120,
+                        QueuePosition = 4,
+                        Status = "Proposed",
+                        Label = "fixture-base.step",
+                        IsProposed = true,
+                        IsCurrentProject = true
+                    }
+                ]
+            },
+            new ProductionScheduleMachineDto
+            {
+                MachineId = "FDM-01",
+                MachineName = "FDM Printer 01",
+                Category = "FdmPrinter",
+                Technology = "FDM",
+                Slots =
+                [
+                    new ProductionScheduleSlotDto
+                    {
+                        SlotId = Guid.Parse("92929292-9292-9292-9292-929292929292"),
+                        HoldId = _planningHoldId,
+                        ProjectId = _projectId,
+                        ProjectPartId = _sensorPartId,
+                        FileName = "sensor-cover.3mf",
+                        MachineId = "FDM-01",
+                        MachineName = "FDM Printer 01",
+                        Technology = "FDM",
+                        ScheduledStart = proposedStart.AddHours(2).UtcDateTime,
+                        ScheduledEnd = proposedStart.AddHours(6).UtcDateTime,
+                        SetupMinutes = 30,
+                        ProductionMinutes = 210,
+                        QueuePosition = 3,
+                        Status = "ActiveHold",
+                        Label = "sensor-cover.3mf",
+                        ExpiresAt = proposedStart.AddDays(3).UtcDateTime,
+                        IsHold = true,
+                        IsCurrentProject = true,
+                        CanMove = true
+                    }
+                ]
+            }
+        ]
     };
+
+    private ProductionPlanningHoldDto BuildPlanningHold(Guid partId, int queuePosition)
+    {
+        var isFdm = partId == _sensorPartId;
+        return new ProductionPlanningHoldDto
+        {
+            Id = _planningHoldId,
+            ProjectId = _projectId,
+            ProjectPartId = partId,
+            Technology = isFdm ? "FDM" : "CNC_MILL",
+            MachineId = isFdm ? "FDM-01" : "CNC-01",
+            MachineName = isFdm ? "FDM Printer 01" : "CNC Mill 01",
+            QueuePosition = queuePosition,
+            ScheduledStartTime = new DateTime(2026, 4, 19, 9, 0, 0, DateTimeKind.Utc),
+            ScheduledEndTime = new DateTime(2026, 4, 19, 12, 0, 0, DateTimeKind.Utc),
+            SetupTimeMinutes = isFdm ? 30 : 60,
+            ProductionTimeMinutes = isFdm ? 210 : 120,
+            Quantity = isFdm ? 15 : 4,
+            Status = "Active",
+            Notes = "Planned from project PRJ-2026-0184",
+            CreatedBy = "employee:alex.kim",
+            CreatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc),
+            UpdatedAt = new DateTime(2026, 4, 18, 15, 0, 0, DateTimeKind.Utc),
+            ExpiresAt = new DateTime(2026, 4, 21, 15, 0, 0, DateTimeKind.Utc)
+        };
+    }
 
     private static Task<HttpResponseMessage> Json<T>(T body) =>
         Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)

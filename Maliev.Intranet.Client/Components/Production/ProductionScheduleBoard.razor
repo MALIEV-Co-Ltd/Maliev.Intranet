@@ -1,0 +1,430 @@
+@using System.Globalization
+@using Maliev.Intranet.Shared.Dtos
+
+<section class="@BoardClass"
+         aria-label="@AriaLabel"
+         data-selected-part-id="@SelectedPartIdText"
+         data-focused-machine-id="@ResolvedFocusMachineId"
+         data-board-range-days="@VisibleDays.Count">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2" Class="psb-toolbar">
+        <MudStack Spacing="0" Class="psb-title">
+            <span>@Eyebrow</span>
+            <strong>@Title</strong>
+            <small>@RangeLabel</small>
+        </MudStack>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="psb-controls">
+            <label class="psb-search">
+                <MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" />
+                <input value="@_search" @oninput="OnSearchChanged" placeholder="Search machines..." aria-label="Search machines" />
+            </label>
+            <label class="psb-filter">
+                <span>Process</span>
+                <select value="@_technologyFilter" @onchange="OnTechnologyChanged" aria-label="Filter machines by process">
+                    <option value="">All</option>
+                    @foreach (var technology in Technologies)
+                    {
+                        <option value="@technology">@FormatTechnology(technology)</option>
+                    }
+                </select>
+            </label>
+            <div class="psb-zoom" role="group" aria-label="Timeline zoom">
+                <button type="button" class="@ZoomButtonClass("Day")" @onclick="@(() => SetZoom("Day"))">Day</button>
+                <button type="button" class="@ZoomButtonClass("Week")" @onclick="@(() => SetZoom("Week"))">Week</button>
+            </div>
+            <MudTooltip Text="Previous range">
+                <button type="button" class="psb-icon-button" aria-label="Previous schedule range" @onclick="@(() => NavigateRange(-1))">
+                    <MudIcon Icon="@Icons.Material.Outlined.ChevronLeft" Size="Size.Small" />
+                </button>
+            </MudTooltip>
+            <MudTooltip Text="Next range">
+                <button type="button" class="psb-icon-button" aria-label="Next schedule range" @onclick="@(() => NavigateRange(1))">
+                    <MudIcon Icon="@Icons.Material.Outlined.ChevronRight" Size="Size.Small" />
+                </button>
+            </MudTooltip>
+            @if (OnRefresh.HasDelegate)
+            {
+                <MudTooltip Text="Refresh schedule">
+                    <button type="button" class="psb-icon-button" aria-label="Refresh production schedule" @onclick="OnRefreshClicked">
+                        <MudIcon Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" />
+                    </button>
+                </MudTooltip>
+            }
+        </MudStack>
+    </MudStack>
+
+    <div class="psb-legend" aria-label="Schedule legend">
+        <span><i class="job"></i> Job</span>
+        <span><i class="hold"></i> Planning hold</span>
+        <span><i class="proposed"></i> Proposed slot</span>
+        <span><i class="locked"></i> Locked</span>
+        <span><i class="current"></i> Current project</span>
+    </div>
+
+    @if (Board is null)
+    {
+        <div class="psb-empty">
+            <MudIcon Icon="@Icons.Material.Outlined.EventBusy" Size="Size.Small" />
+            <span>Schedule board is not available.</span>
+        </div>
+    }
+    else if (VisibleMachines.Count == 0)
+    {
+        <div class="psb-empty">
+            <MudIcon Icon="@Icons.Material.Outlined.PrecisionManufacturing" Size="Size.Small" />
+            <span>No machines match this view.</span>
+        </div>
+    }
+    else
+    {
+        <div class="production-schedule-board-shell" tabindex="0">
+            <div class="psb-grid-header" style="@GridStyle">
+                <div class="psb-machine-heading">Work center</div>
+                @foreach (var day in VisibleDays)
+                {
+                    <div class="psb-day-heading">
+                        <span>@day.ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant()</span>
+                        <strong>@day.Day</strong>
+                    </div>
+                }
+            </div>
+
+            @foreach (var group in MachineGroups)
+            {
+                <div class="psb-group-row" style="@GridStyle">
+                    <div class="psb-group-label">@group.Key</div>
+                    <div class="psb-group-line"></div>
+                </div>
+
+                @foreach (var machine in group)
+                {
+                    <div class="@MachineRowClass(machine)"
+                         style="@GridStyle"
+                         data-machine-id="@machine.MachineId"
+                         data-technology="@machine.Technology">
+                        <div class="psb-machine-cell">
+                            <strong>@machine.MachineName</strong>
+                            <span>@FirstNonEmpty(machine.MachineId, machine.Category)</span>
+                            <small>@FormatTechnology(machine.Technology)</small>
+                        </div>
+                        <div class="psb-track">
+                            @foreach (var day in VisibleDays)
+                            {
+                                <div class="psb-day-band" style="@DayBandStyle(day)"></div>
+                            }
+                            @foreach (var slot in VisibleSlots(machine))
+                            {
+                                <button type="button"
+                                        class="@SlotClass(slot)"
+                                        style="@SlotStyle(slot)"
+                                        draggable="@CanDrag(slot)"
+                                        aria-label="@SlotAriaLabel(slot)"
+                                        aria-disabled="@IsLocked(slot)"
+                                        data-slot-id="@slot.SlotId"
+                                        data-job-id="@slot.JobId"
+                                        data-hold-id="@slot.HoldId"
+                                        data-project-part-id="@slot.ProjectPartId"
+                                        @onclick="@(() => SelectSlotAsync(slot))">
+                                    <span class="psb-slot-label">@SlotLabel(slot)</span>
+                                    <span class="psb-slot-time">@FormatSlotTime(slot)</span>
+                                    @if (CanMove(slot))
+                                    {
+                                        <span class="psb-slot-move" @onclick:stopPropagation="true" @onclick="@(() => RequestMoveAsync(slot))">Move</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</section>
+
+@code {
+    /// <summary>Gets or sets the production schedule board payload.</summary>
+    [Parameter] public ProductionScheduleBoardDto? Board { get; set; }
+
+    /// <summary>Gets or sets the selected project part identifier.</summary>
+    [Parameter] public Guid? SelectedPartId { get; set; }
+
+    /// <summary>Gets or sets the focused machine identifier.</summary>
+    [Parameter] public string? FocusMachineId { get; set; }
+
+    /// <summary>Gets or sets the optional CSS class.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Gets or sets the board title.</summary>
+    [Parameter] public string Title { get; set; } = "Machine schedule";
+
+    /// <summary>Gets or sets the board eyebrow text.</summary>
+    [Parameter] public string Eyebrow { get; set; } = "Production routing";
+
+    /// <summary>Gets or sets the board aria label.</summary>
+    [Parameter] public string AriaLabel { get; set; } = "Production machine schedule";
+
+    /// <summary>Raised when a schedule refresh is requested.</summary>
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    /// <summary>Raised when the visible range start changes.</summary>
+    [Parameter] public EventCallback<DateTime> RangeStartChanged { get; set; }
+
+    /// <summary>Raised when a slot is selected.</summary>
+    [Parameter] public EventCallback<ProductionScheduleSlotDto> SlotSelected { get; set; }
+
+    /// <summary>Raised when a movable slot requests rescheduling.</summary>
+    [Parameter] public EventCallback<ProductionScheduleSlotDto> MoveRequested { get; set; }
+
+    private const int DayColumnMinWidth = 180;
+    private DateTime? _localRangeStart;
+    private DateTime? _lastBoardRangeStart;
+    private string _search = string.Empty;
+    private string _technologyFilter = string.Empty;
+    private string _zoom = "Week";
+    private Guid? _selectedSlotId;
+
+    private string BoardClass => string.Join(
+        ' ',
+        new[] { "production-schedule-board", Class }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+
+    private string SelectedPartIdText => SelectedPartId?.ToString() ?? string.Empty;
+
+    private DateTime VisibleRangeStart => (_localRangeStart ?? NormalizeUtc(Board?.RangeStart ?? DateTime.UtcNow)).Date;
+
+    private DateTime VisibleRangeEnd => VisibleRangeStart.AddDays(_zoom == "Day" ? 1 : 7);
+
+    private string RangeLabel => $"{VisibleRangeStart.ToLocalTime():MMM d, yyyy} - {VisibleRangeEnd.AddTicks(-1).ToLocalTime():MMM d, yyyy}";
+
+    private IReadOnlyList<DateTime> VisibleDays => Enumerable
+        .Range(0, Math.Max(1, (VisibleRangeEnd.Date - VisibleRangeStart.Date).Days))
+        .Select(offset => VisibleRangeStart.Date.AddDays(offset))
+        .ToList();
+
+    private IReadOnlyList<string> Technologies => (Board?.Machines ?? [])
+        .Select(machine => machine.Technology)
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(FormatTechnology, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    private List<ProductionScheduleMachineDto> VisibleMachines => (Board?.Machines ?? [])
+        .Where(MatchesFilters)
+        .OrderBy(machine => MachineGroupName(machine.Category))
+        .ThenBy(machine => machine.MachineName, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    private IEnumerable<IGrouping<string, ProductionScheduleMachineDto>> MachineGroups => VisibleMachines
+        .GroupBy(machine => MachineGroupName(machine.Category))
+        .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
+
+    private string GridStyle =>
+        $"grid-template-columns: minmax(176px, 220px) repeat({VisibleDays.Count}, minmax({DayColumnMinWidth}px, 1fr)); min-width: {220 + (VisibleDays.Count * DayColumnMinWidth)}px;";
+
+    private string ResolvedFocusMachineId
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(FocusMachineId))
+                return FocusMachineId;
+
+            if (SelectedPartId is { } selectedPartId)
+            {
+                var selectedMachine = Board?.Machines.FirstOrDefault(machine =>
+                    machine.Slots.Any(slot => slot.ProjectPartId == selectedPartId));
+                if (selectedMachine is not null)
+                    return selectedMachine.MachineId;
+            }
+
+            return VisibleMachines.FirstOrDefault()?.MachineId ?? string.Empty;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        var boardStart = NormalizeUtc(Board?.RangeStart ?? DateTime.UtcNow).Date;
+        if (_lastBoardRangeStart != boardStart)
+        {
+            _localRangeStart = boardStart;
+            _lastBoardRangeStart = boardStart;
+        }
+    }
+
+    private bool MatchesFilters(ProductionScheduleMachineDto machine)
+    {
+        if (!string.IsNullOrWhiteSpace(_technologyFilter)
+            && !string.Equals(machine.Technology, _technologyFilter, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(_search))
+            return true;
+
+        return Contains(machine.MachineName, _search)
+            || Contains(machine.MachineId, _search)
+            || Contains(machine.Category, _search)
+            || Contains(machine.Technology, _search);
+    }
+
+    private IEnumerable<ProductionScheduleSlotDto> VisibleSlots(ProductionScheduleMachineDto machine) =>
+        machine.Slots
+            .Where(slot => NormalizeUtc(slot.ScheduledEnd) > VisibleRangeStart && NormalizeUtc(slot.ScheduledStart) < VisibleRangeEnd)
+            .OrderBy(slot => NormalizeUtc(slot.ScheduledStart));
+
+    private string MachineRowClass(ProductionScheduleMachineDto machine) =>
+        string.Equals(machine.MachineId, ResolvedFocusMachineId, StringComparison.OrdinalIgnoreCase)
+            ? "psb-machine-row focused"
+            : "psb-machine-row";
+
+    private string SlotClass(ProductionScheduleSlotDto slot)
+    {
+        var classes = new List<string> { "psb-slot" };
+        classes.Add(slot.IsProposed ? "psb-slot-proposed" : slot.IsHold ? "psb-slot-hold" : "psb-slot-job");
+
+        if (slot.IsCurrentProject)
+            classes.Add("psb-slot-current-project");
+
+        if (slot.ProjectPartId == SelectedPartId || slot.SlotId == _selectedSlotId)
+            classes.Add("psb-slot-selected");
+
+        if (IsLocked(slot))
+            classes.Add("psb-slot-locked");
+
+        return string.Join(' ', classes);
+    }
+
+    private string SlotStyle(ProductionScheduleSlotDto slot)
+    {
+        var rangeStart = VisibleRangeStart;
+        var rangeMinutes = Math.Max(1, (VisibleRangeEnd - rangeStart).TotalMinutes);
+        var start = NormalizeUtc(slot.ScheduledStart) < rangeStart ? rangeStart : NormalizeUtc(slot.ScheduledStart);
+        var end = NormalizeUtc(slot.ScheduledEnd) > VisibleRangeEnd ? VisibleRangeEnd : NormalizeUtc(slot.ScheduledEnd);
+        var left = Math.Clamp((start - rangeStart).TotalMinutes / rangeMinutes * 100, 0, 100);
+        var width = Math.Clamp((end - start).TotalMinutes / rangeMinutes * 100, 0.7, 100 - left);
+
+        return string.Format(CultureInfo.InvariantCulture, "left: {0:0.###}%; width: {1:0.###}%;", left, width);
+    }
+
+    private string DayBandStyle(DateTime day)
+    {
+        var rangeMinutes = Math.Max(1, (VisibleRangeEnd - VisibleRangeStart).TotalMinutes);
+        var left = (day - VisibleRangeStart).TotalMinutes / rangeMinutes * 100;
+        var width = TimeSpan.FromDays(1).TotalMinutes / rangeMinutes * 100;
+        return string.Format(CultureInfo.InvariantCulture, "left: {0:0.###}%; width: {1:0.###}%;", left, width);
+    }
+
+    private async Task SelectSlotAsync(ProductionScheduleSlotDto slot)
+    {
+        _selectedSlotId = slot.SlotId;
+        if (SlotSelected.HasDelegate)
+            await SlotSelected.InvokeAsync(slot);
+    }
+
+    private async Task RequestMoveAsync(ProductionScheduleSlotDto slot)
+    {
+        _selectedSlotId = slot.SlotId;
+        if (MoveRequested.HasDelegate)
+            await MoveRequested.InvokeAsync(slot);
+    }
+
+    private async Task OnRefreshClicked()
+    {
+        if (OnRefresh.HasDelegate)
+            await OnRefresh.InvokeAsync();
+    }
+
+    private async Task NavigateRange(int direction)
+    {
+        _localRangeStart = VisibleRangeStart.AddDays(direction * (_zoom == "Day" ? 1 : 7));
+        if (RangeStartChanged.HasDelegate)
+            await RangeStartChanged.InvokeAsync(_localRangeStart.Value);
+    }
+
+    private void SetZoom(string zoom) => _zoom = zoom;
+
+    private string ZoomButtonClass(string zoom) =>
+        string.Equals(_zoom, zoom, StringComparison.OrdinalIgnoreCase)
+            ? "active"
+            : string.Empty;
+
+    private void OnSearchChanged(ChangeEventArgs e) => _search = e.Value?.ToString() ?? string.Empty;
+
+    private void OnTechnologyChanged(ChangeEventArgs e) => _technologyFilter = e.Value?.ToString() ?? string.Empty;
+
+    private static bool CanDrag(ProductionScheduleSlotDto slot) => CanMove(slot);
+
+    private static bool CanMove(ProductionScheduleSlotDto slot) => slot.CanMove && !slot.IsProposed && !IsLocked(slot);
+
+    private static bool IsLocked(ProductionScheduleSlotDto slot)
+    {
+        if (slot.IsProposed)
+            return false;
+
+        if (!slot.CanMove)
+            return true;
+
+        return slot.Status.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
+            || slot.Status.Equals("InProduction", StringComparison.OrdinalIgnoreCase)
+            || slot.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+            || slot.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+            || slot.Status.Equals("Expired", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string SlotLabel(ProductionScheduleSlotDto slot) =>
+        FirstNonEmpty(slot.Label, slot.FileName, FormatShortId(slot.JobId), FormatShortId(slot.HoldId), "Slot");
+
+    private static string SlotAriaLabel(ProductionScheduleSlotDto slot) =>
+        $"{(slot.IsProposed ? "Proposed slot" : slot.IsHold ? "Planning hold" : "Job")} {SlotLabel(slot)} on {slot.MachineName}";
+
+    private static string FormatSlotTime(ProductionScheduleSlotDto slot) =>
+        $"{NormalizeUtc(slot.ScheduledStart).ToLocalTime():MMM d HH:mm} - {NormalizeUtc(slot.ScheduledEnd).ToLocalTime():HH:mm}";
+
+    private static string FormatTechnology(string? technology)
+    {
+        if (string.IsNullOrWhiteSpace(technology))
+            return "Unmapped";
+
+        return technology.Trim().ToUpperInvariant() switch
+        {
+            "FDM" => "3D Printing (FDM)",
+            "SLA" or "SLA_DLP" => "SLA printing",
+            "CNC_MILL" => "CNC milling",
+            "CNC_TURN" => "CNC turning",
+            _ => technology.Replace('_', ' ').Trim()
+        };
+    }
+
+    private static string MachineGroupName(string? category)
+    {
+        if (string.IsNullOrWhiteSpace(category))
+            return "Other machines";
+
+        return category.Trim() switch
+        {
+            "FdmPrinter" => "FDM printers",
+            "SlaPrinter" => "SLA printers",
+            "CncMachine" => "CNC machines",
+            _ => category
+        };
+    }
+
+    private static bool Contains(string? value, string search) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Contains(search, StringComparison.OrdinalIgnoreCase);
+
+    private static DateTime NormalizeUtc(DateTime value)
+    {
+        if (value.Kind == DateTimeKind.Utc)
+            return value;
+
+        if (value.Kind == DateTimeKind.Local)
+            return value.ToUniversalTime();
+
+        return DateTime.SpecifyKind(value, DateTimeKind.Utc);
+    }
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+    private static string? FormatShortId(Guid? id) =>
+        id is { } value ? value.ToString("N")[..8].ToUpperInvariant() : null;
+}
