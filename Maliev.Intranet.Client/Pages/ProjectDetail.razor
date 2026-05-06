@@ -1,4 +1,5 @@
 @page "/sales/projects/{Id:guid}"
+@using Maliev.Intranet.Client.Components
 @using Maliev.Intranet.Client.Components.Shared
 @using Maliev.Intranet.Client.Helpers
 @using Maliev.Intranet.Shared.Dtos
@@ -124,6 +125,17 @@
     var previewPart = _thumbnailPreviewPart;
     <div class="project-thumbnail-popout-backdrop" role="presentation" @onclick="ClosePartThumbnailPreview">
         <section class="project-thumbnail-popout" role="dialog" aria-modal="true" aria-labelledby="project-thumbnail-popout-title" @onclick:stopPropagation="true">
+            @if (CanPreviewPartModel(previewPart))
+            {
+                <MudTooltip Text="@(_thumbnailPreview3dActive ? "Show thumbnail" : "Show 3D view")">
+                    <button type="button"
+                            class="@($"project-thumbnail-view-toggle{(_thumbnailPreview3dActive ? " active" : string.Empty)}")"
+                            aria-label="@(_thumbnailPreview3dActive ? "Show thumbnail preview" : "Show 3D preview")"
+                            @onclick="TogglePartThumbnail3dPreview">
+                        <MudIcon Icon="@(_thumbnailPreview3dActive ? Icons.Material.Outlined.Image : Icons.Material.Outlined.ViewInAr)" Size="Size.Small" />
+                    </button>
+                </MudTooltip>
+            }
             <button type="button" class="project-thumbnail-popout-close" aria-label="Close thumbnail preview" @onclick="ClosePartThumbnailPreview">
                 <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
             </button>
@@ -133,7 +145,16 @@
                 <small>@FormatDimensions(previewPart.Dimensions)</small>
             </header>
             <div class="project-thumbnail-popout-frame">
-                @if (_thumbnailPreviewLoading)
+                @if (_thumbnailPreview3dActive && CanPreviewPartModel(previewPart))
+                {
+                    <div class="project-thumbnail-viewer-frame">
+                        <ModelViewer ViewerUrl="@previewPart.ModelPreviewUrl"
+                                     FileExtension=".glb"
+                                     KnownDimensions="@ToFileAnalysisDimensions(previewPart.Dimensions)"
+                                     OnLoadFailed="HandleThumbnailViewerLoadFailed" />
+                    </div>
+                }
+                else if (_thumbnailPreviewLoading)
                 {
                     <div class="project-thumbnail-popout-loading">
                         <MudProgressCircular Indeterminate="true" Size="Size.Small" />
@@ -155,6 +176,10 @@
             @if (!string.IsNullOrWhiteSpace(_thumbnailPreviewError))
             {
                 <p class="project-thumbnail-popout-note">@_thumbnailPreviewError</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(_thumbnailPreviewViewerError))
+            {
+                <p class="project-thumbnail-popout-note">@_thumbnailPreviewViewerError</p>
             }
         </section>
     </div>
@@ -187,7 +212,9 @@
     private ProjectPartDto? _thumbnailPreviewPart;
     private string? _thumbnailPreviewUrl;
     private string? _thumbnailPreviewError;
+    private string? _thumbnailPreviewViewerError;
     private bool _thumbnailPreviewLoading;
+    private bool _thumbnailPreview3dActive;
 
     private IReadOnlyList<(string Key, string Label)> Tabs =>
     [
@@ -1436,7 +1463,9 @@
         _thumbnailPreviewPart = part;
         _thumbnailPreviewUrl = FirstNonEmpty(part.ThumbnailUrl);
         _thumbnailPreviewError = null;
+        _thumbnailPreviewViewerError = null;
         _thumbnailPreviewLoading = false;
+        _thumbnailPreview3dActive = false;
 
         if (_largeThumbnailUrls.TryGetValue(part.Id, out var cachedLargeUrl))
         {
@@ -1477,12 +1506,29 @@
         }
     }
 
+    private void TogglePartThumbnail3dPreview()
+    {
+        _thumbnailPreview3dActive = !_thumbnailPreview3dActive;
+        _thumbnailPreviewViewerError = null;
+    }
+
+    private Task HandleThumbnailViewerLoadFailed(string errorMessage)
+    {
+        _thumbnailPreviewViewerError = string.IsNullOrWhiteSpace(errorMessage)
+            ? "3D preview could not be loaded."
+            : errorMessage;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
     private void ClosePartThumbnailPreview()
     {
         _thumbnailPreviewPart = null;
         _thumbnailPreviewUrl = null;
         _thumbnailPreviewError = null;
+        _thumbnailPreviewViewerError = null;
         _thumbnailPreviewLoading = false;
+        _thumbnailPreview3dActive = false;
     }
 
     private async Task ConfirmAcceptQuoteAsync()
@@ -2154,6 +2200,19 @@
     private sealed record DfmIssueSummary(string Label, string Value);
 
     private sealed record ThumbnailPreviewUrlResponse(string? Url);
+
+    private static bool CanPreviewPartModel(ProjectPartDto part) =>
+        !string.IsNullOrWhiteSpace(part.ModelPreviewUrl);
+
+    private static FileAnalysisDimensionsDto? ToFileAnalysisDimensions(ModelDimensionsDto? dimensions) =>
+        dimensions is null
+            ? null
+            : new FileAnalysisDimensionsDto
+            {
+                X = dimensions.X,
+                Y = dimensions.Y,
+                Z = dimensions.Z
+            };
 
     private string FormatMoney(decimal value) => CurrencyFormatter.Format(value, ProjectCurrency, 2);
 

@@ -467,10 +467,10 @@
     box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
 }
 
-.project-thumbnail-popout-close {
+.project-thumbnail-popout-close,
+.project-thumbnail-view-toggle {
     position: absolute;
     top: 12px;
-    right: 12px;
     display: inline-grid;
     width: 32px;
     height: 32px;
@@ -483,14 +483,31 @@
     cursor: pointer;
 }
 
-.project-thumbnail-popout-close:hover {
+.project-thumbnail-popout-close {
+    right: 12px;
+}
+
+.project-thumbnail-view-toggle {
+    right: 52px;
+    color: var(--maliev-accent);
+    border-color: rgba(37, 99, 235, 0.35);
+}
+
+.project-thumbnail-popout-close:hover,
+.project-thumbnail-view-toggle:hover,
+.project-thumbnail-view-toggle.active {
     background: var(--maliev-panel-2);
+}
+
+.project-thumbnail-view-toggle.active {
+    color: var(--maliev-primary);
+    border-color: rgba(37, 99, 235, 0.55);
 }
 
 .project-thumbnail-popout-header {
     display: grid;
     gap: 4px;
-    padding-right: 42px;
+    padding-right: 82px;
 }
 
 .project-thumbnail-popout-header span {
@@ -531,6 +548,18 @@
     max-width: 100%;
     max-height: min(70vh, 720px);
     object-fit: contain;
+}
+
+.project-thumbnail-viewer-frame {
+    align-self: stretch;
+    justify-self: stretch;
+    width: 100%;
+    min-height: min(60vh, 520px);
+    height: min(70vh, 720px);
+}
+
+::deep .project-thumbnail-viewer-frame .model-viewer-container {
+    min-height: inherit;
 }
 
 .project-thumbnail-popout-loading {

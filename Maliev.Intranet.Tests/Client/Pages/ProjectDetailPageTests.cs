@@ -1,10 +1,12 @@
 using Bunit;
 using Maliev.Intranet.Client.Pages;
+using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
 using MudBlazor.Services;
 using System.Net;
@@ -33,6 +35,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     {
         Services.AddMudServices();
         JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton<LayoutService>(new LayoutService(JSInterop.JSRuntime, NullLogger<LayoutService>.Instance));
 
         var handler = new MockHttpMessageHandler(HandleRequestAsync);
         Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://test/") });
@@ -329,6 +332,26 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectDetail_ThumbnailPopout3dToggle_ReplacesImageWithModelViewer()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("project-part-thumb-button", cut.Markup));
+        cut.Find("button.project-part-thumb-button").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("project-thumbnail-view-toggle", cut.Markup));
+        cut.Find("button.project-thumbnail-view-toggle").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("project-thumbnail-viewer-frame", cut.Markup);
+            Assert.Contains("model-viewer-container", cut.Markup);
+            Assert.Contains("babylon-canvas-", cut.Markup);
+            Assert.DoesNotContain("bracket-large.webp", cut.Markup);
+        });
+    }
+
+    [Fact]
     public void ProjectDetail_QuickAcknowledgeDfm_UpdatesPartAndRemovesAction()
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
@@ -399,6 +422,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-planning-part strong", css, StringComparison.Ordinal);
         Assert.Contains("align-items: start", css, StringComparison.Ordinal);
         Assert.Contains(".project-thumbnail-popout", css, StringComparison.Ordinal);
+        Assert.Contains(".project-thumbnail-view-toggle", css, StringComparison.Ordinal);
+        Assert.Contains(".project-thumbnail-viewer-frame", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-hover", css, StringComparison.Ordinal);
         Assert.Contains("cursor: pointer", css, StringComparison.Ordinal);
@@ -489,6 +514,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         ConfirmedPrice = 2500m,
                         Status = "Confirmed",
                         ThumbnailUrl = "https://storage.example/bracket-thumb.webp",
+                        ModelPreviewUrl = "https://storage.example/bracket-left.glb",
                         ThumbnailLargeGcsPath = "customers/axion/projects/prj/bracket-left_thumb_1200.webp",
                         HasDfmWarnings = true,
                         DfmAcknowledged = _bracketDfmAcknowledged,
