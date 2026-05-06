@@ -375,8 +375,13 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-material-swatch", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-part-thumb-button", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-part-attachments", css, StringComparison.Ordinal);
+        Assert.Contains("overflow-wrap: anywhere", css, StringComparison.Ordinal);
+        Assert.Contains("word-break: break-word", css, StringComparison.Ordinal);
         Assert.Contains(".project-thumbnail-popout", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-dfm-hover", css, StringComparison.Ordinal);
+        Assert.Contains("cursor: pointer", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-ack-button", css, StringComparison.Ordinal);
         Assert.Contains(".project-dfm-issue-card", css, StringComparison.Ordinal);
         Assert.DoesNotContain("project-dfm-icon", css, StringComparison.Ordinal);

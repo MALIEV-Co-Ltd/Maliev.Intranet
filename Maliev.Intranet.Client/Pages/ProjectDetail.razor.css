@@ -545,9 +545,9 @@
 }
 
 .project-record-shell ::deep .project-part-attachments {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
+    display: grid;
+    gap: 3px;
+    min-width: 0;
     font-size: var(--maliev-font-small);
 }
 
@@ -557,15 +557,21 @@
 }
 
 .project-record-shell ::deep .project-part-attachments a {
+    display: block;
+    max-width: 100%;
     color: var(--maliev-info);
     font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
     text-decoration: none;
+    word-break: break-word;
 }
 
 .project-record-shell ::deep .project-dfm-hover {
     position: relative;
     display: block;
     min-width: 0;
+    cursor: pointer;
 }
 
 .project-record-shell ::deep .project-dfm-gate {
