@@ -4,6 +4,7 @@ using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using MudBlazor;
 using MudBlazor.Services;
 using System.Net;
 using System.Net.Http.Json;
@@ -24,6 +25,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         var handler = new MockHttpMessageHandler(HandleRequestAsync);
         Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://test/") });
+        Render<MudPopoverProvider>();
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -100,6 +102,28 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation");
             Assert.Contains("Accepted", cut.Markup);
         });
+    }
+
+    [Fact]
+    public void ProjectDetail_QuoteTab_RendersDocumentAndCommercialBreakdown()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Quote", cut.Markup));
+        cut.Find("button[data-tab='quote']").Click();
+
+        Assert.Contains("project-quote-workspace", cut.Markup);
+        Assert.Contains("Quote document", cut.Markup);
+        Assert.Contains("Commercial breakdown", cut.Markup);
+        Assert.Contains("No PDF generated in this session", cut.Markup);
+        Assert.Contains("Line subtotal", cut.Markup);
+        Assert.Contains("Parts subtotal", cut.Markup);
+        Assert.Contains("Shipping", cut.Markup);
+        Assert.Contains("Not quoted separately", cut.Markup);
+        Assert.Contains("Tax / VAT", cut.Markup);
+        Assert.Contains("bracket-left.stl", cut.Markup);
+        Assert.Contains("sensor-cover.3mf", cut.Markup);
+        Assert.Contains("18,250.00", cut.Markup);
     }
 
     [Fact]
@@ -189,6 +213,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-snapshot-compact", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-customer-detail-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-customer-address-block", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-quote-workspace", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-document-preview", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-commercial-breakdown", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-commercial-totals", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(6)", css, StringComparison.Ordinal);
         Assert.Contains("text-align: right", css, StringComparison.Ordinal);
         Assert.Contains("width: 5%", css, StringComparison.Ordinal);

@@ -117,6 +117,7 @@
     private bool _quoteAccepted;
     private bool _addingNote;
     private bool _noteSaved;
+    private string? _quotePdfUrl;
     private string _newNoteContent = string.Empty;
     private string _activeTab = "overview";
 
@@ -329,43 +330,171 @@
     private RenderFragment RenderQuote() => builder =>
     {
         builder.OpenElement(0, "div");
-        builder.AddAttribute(1, "class", "project-quote-layout");
-        builder.AddContent(2, RenderQuoteSnapshot());
-        builder.OpenComponent<PanelCard>(3);
-        builder.AddAttribute(4, "Title", "Commercial controls");
-        builder.AddAttribute(5, "ChildContent", (RenderFragment)(content =>
+        builder.AddAttribute(1, "class", "project-quote-workspace");
+        builder.AddContent(2, RenderQuoteDocumentPanel());
+        builder.AddContent(3, RenderCommercialBreakdownPanel());
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderQuoteDocumentPanel() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", "Quote document");
+        builder.AddAttribute(2, "Class", "project-quote-document-card");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(content =>
         {
+            content.OpenElement(4, "div");
+            content.AddAttribute(5, "class", "project-quote-document");
+
             content.OpenElement(6, "div");
-            content.AddAttribute(7, "class", "project-action-panel");
-            content.OpenElement(8, "p");
-            content.AddContent(9, HasQuotation
-                ? "The generated quotation is available for customer follow-up. Reopen the project when line items need revision."
-                : "Generate a quote from the editor once all parts have confirmed pricing.");
-            content.CloseElement();
-            content.OpenElement(10, "div");
-            content.AddAttribute(11, "class", "project-panel-actions");
-            content.OpenComponent<SecondaryButton>(12);
-            content.AddAttribute(13, "Icon", Icons.Material.Outlined.Edit);
-            content.AddAttribute(14, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, EditProject));
-            content.AddContent(15, "Edit project");
-            content.CloseComponent();
-            content.OpenComponent<SecondaryButton>(16);
-            content.AddAttribute(17, "Icon", Icons.Material.Outlined.PictureAsPdf);
-            content.AddAttribute(18, "Disabled", !HasQuotation || _pdfLoading);
-            content.AddAttribute(19, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, DownloadQuoteAsync));
-            content.AddContent(20, _pdfLoading ? "Generating PDF" : "Generate PDF");
-            content.CloseComponent();
-            content.OpenComponent<PrimaryButton>(21);
-            content.AddAttribute(22, "Icon", Icons.Material.Outlined.Check);
-            content.AddAttribute(23, "Disabled", !CanAcceptQuote || _accepting);
-            content.AddAttribute(24, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => OpenAcceptQuoteConfirmation()));
-            content.AddContent(25, AcceptQuoteButtonLabel);
+            content.AddAttribute(7, "class", "project-document-hero");
+            content.OpenElement(8, "span");
+            content.AddAttribute(9, "class", "project-document-icon");
+            content.OpenComponent<MudIcon>(10);
+            content.AddAttribute(11, "Icon", Icons.Material.Outlined.PictureAsPdf);
+            content.AddAttribute(12, "Size", Size.Medium);
             content.CloseComponent();
             content.CloseElement();
+            content.OpenElement(13, "div");
+            content.OpenElement(14, "strong");
+            content.AddContent(15, QuotationLabel);
+            content.CloseElement();
+            content.OpenElement(16, "span");
+            content.AddContent(17, $"{FormatStatus(_project?.QuotationStatus)} / Valid until {FormatDate(_project?.ValidUntil)}");
+            content.CloseElement();
+            content.CloseElement();
+            content.CloseElement();
+
+            content.OpenElement(18, "dl");
+            content.AddAttribute(19, "class", "project-document-meta");
+            AddSnapshot(content, 20, "Customer", _project?.CustomerName ?? "-");
+            AddSnapshot(content, 24, "Company", _project?.CustomerCompanyName ?? "-");
+            AddSnapshot(content, 28, "Currency", ProjectCurrency);
+            AddSnapshot(content, 32, "Shipping", ShippingSummary);
+            content.CloseElement();
+
+            content.OpenElement(36, "div");
+            content.AddAttribute(37, "class", "project-panel-actions");
+            content.OpenComponent<SecondaryButton>(38);
+            content.AddAttribute(39, "Icon", Icons.Material.Outlined.PictureAsPdf);
+            content.AddAttribute(40, "Disabled", !HasQuotation || _pdfLoading);
+            content.AddAttribute(41, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, DownloadQuoteAsync));
+            content.AddContent(42, _pdfLoading ? "Generating PDF" : "Generate PDF");
+            content.CloseComponent();
+            if (!string.IsNullOrWhiteSpace(_quotePdfUrl))
+            {
+                content.OpenComponent<SecondaryButton>(43);
+                content.AddAttribute(44, "Icon", Icons.Material.Outlined.OpenInNew);
+                content.AddAttribute(45, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, OpenGeneratedPdfAsync));
+                content.AddContent(46, "Open PDF");
+                content.CloseComponent();
+            }
+            content.CloseElement();
+
+            content.OpenElement(47, "div");
+            content.AddAttribute(48, "class", string.IsNullOrWhiteSpace(_quotePdfUrl) ? "project-document-preview empty" : "project-document-preview");
+            if (string.IsNullOrWhiteSpace(_quotePdfUrl))
+            {
+                content.OpenComponent<MudIcon>(49);
+                content.AddAttribute(50, "Icon", Icons.Material.Outlined.Description);
+                content.AddAttribute(51, "Size", Size.Large);
+                content.CloseComponent();
+                content.OpenElement(52, "strong");
+                content.AddContent(53, HasQuotation ? "No PDF generated in this session" : "Quotation not generated yet");
+                content.CloseElement();
+                content.OpenElement(54, "span");
+                content.AddContent(55, HasQuotation ? "Generate the PDF to preview or open the latest signed document URL." : "Create the quote from the project editor after pricing is confirmed.");
+                content.CloseElement();
+            }
+            else
+            {
+                content.OpenElement(56, "iframe");
+                content.AddAttribute(57, "title", "Quote PDF preview");
+                content.AddAttribute(58, "src", _quotePdfUrl);
+                content.CloseElement();
+            }
+            content.CloseElement();
+
             content.CloseElement();
         }));
         builder.CloseComponent();
-        builder.CloseElement();
+    };
+
+    private RenderFragment RenderCommercialBreakdownPanel() => builder =>
+    {
+        builder.OpenComponent<PanelCard>(0);
+        builder.AddAttribute(1, "Title", "Commercial breakdown");
+        builder.AddAttribute(2, "Class", "project-commercial-card");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(content =>
+        {
+            content.OpenElement(4, "div");
+            content.AddAttribute(5, "class", "project-commercial-breakdown");
+
+            content.OpenElement(6, "div");
+            content.AddAttribute(7, "class", "project-commercial-summary");
+            content.OpenComponent<StatTile>(8);
+            content.AddAttribute(9, "Label", "Line subtotal");
+            content.AddAttribute(10, "Value", FormatMoney(PartsSubtotal));
+            content.AddAttribute(11, "Subtext", ProjectCurrency);
+            content.CloseComponent();
+            content.OpenComponent<StatTile>(12);
+            content.AddAttribute(13, "Label", "Adjustments");
+            content.AddAttribute(14, "Value", QuoteDiscount > 0m ? $"-{FormatMoney(QuoteDiscount)}" : FormatMoney(0m));
+            content.AddAttribute(15, "Subtext", "Discount");
+            content.CloseComponent();
+            content.OpenComponent<StatTile>(16);
+            content.AddAttribute(17, "Label", "Quote total");
+            content.AddAttribute(18, "Value", FormatMoney(_project?.TotalPrice ?? 0m));
+            content.AddAttribute(19, "Subtext", ProjectCurrency);
+            content.CloseComponent();
+            content.CloseElement();
+
+            content.OpenElement(20, "div");
+            content.AddAttribute(21, "class", "project-commercial-lines");
+            content.OpenElement(22, "table");
+            content.OpenElement(23, "thead");
+            content.OpenElement(24, "tr");
+            var headerSequence = 25;
+            AddHeader(content, ref headerSequence, "Part");
+            AddHeader(content, ref headerSequence, "Qty", "numeric");
+            AddHeader(content, ref headerSequence, "Unit", "numeric");
+            AddHeader(content, ref headerSequence, "Line total", "numeric");
+            content.CloseElement();
+            content.CloseElement();
+            content.OpenElement(headerSequence++, "tbody");
+            var sequence = headerSequence;
+            foreach (var part in _project?.Parts ?? [])
+            {
+                content.OpenElement(sequence++, "tr");
+                content.OpenElement(sequence++, "td");
+                content.OpenElement(sequence++, "strong");
+                content.AddContent(sequence++, part.FileName);
+                content.CloseElement();
+                content.OpenElement(sequence++, "span");
+                content.AddContent(sequence++, $"{FormatProcess(part.ProcessType)} / {FirstNonEmpty(part.MaterialName, part.MaterialCode, "-")}");
+                content.CloseElement();
+                content.CloseElement();
+                AddCell(content, ref sequence, part.Quantity.ToString(), "numeric");
+                AddCell(content, ref sequence, FormatMoney(GetPartUnitPrice(part)), "numeric");
+                AddCell(content, ref sequence, FormatMoney(GetPartLineTotal(part)), "numeric");
+                content.CloseElement();
+            }
+            content.CloseElement();
+            content.CloseElement();
+            content.CloseElement();
+
+            content.OpenElement(sequence++, "dl");
+            content.AddAttribute(sequence++, "class", "project-commercial-totals");
+            AddCommercialTotal(content, sequence, "Parts subtotal", FormatMoney(PartsSubtotal));
+            AddCommercialTotal(content, sequence + 8, "Shipping", "Not quoted separately");
+            AddCommercialTotal(content, sequence + 16, "Tax / VAT", "Not quoted separately");
+            AddCommercialTotal(content, sequence + 24, "Discount", QuoteDiscount > 0m ? $"-{FormatMoney(QuoteDiscount)}" : FormatMoney(0m));
+            AddCommercialTotal(content, sequence + 32, "Total", FormatMoney(_project?.TotalPrice ?? 0m), emphasized: true);
+            content.CloseElement();
+
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
     };
 
     private RenderFragment RenderParts() => builder =>
@@ -580,7 +709,10 @@
 
             var url = await response.Content.ReadFromJsonAsync<string>();
             if (!string.IsNullOrWhiteSpace(url))
+            {
+                _quotePdfUrl = url;
                 await JS.InvokeVoidAsync("window.open", url, "_blank");
+            }
         }
         catch (Exception ex)
         {
@@ -590,6 +722,12 @@
         {
             _pdfLoading = false;
         }
+    }
+
+    private async Task OpenGeneratedPdfAsync(MouseEventArgs _)
+    {
+        if (!string.IsNullOrWhiteSpace(_quotePdfUrl))
+            await JS.InvokeVoidAsync("window.open", _quotePdfUrl, "_blank");
     }
 
     private Task OpenAcceptQuoteConfirmation()
@@ -728,9 +866,32 @@
         builder.CloseElement();
     }
 
+    private static void AddCommercialTotal(RenderTreeBuilder builder, int sequence, string label, string value, bool emphasized = false)
+    {
+        builder.OpenElement(sequence, "div");
+        if (emphasized)
+            builder.AddAttribute(sequence + 1, "class", "total");
+        builder.OpenElement(sequence + 2, "dt");
+        builder.AddContent(sequence + 3, label);
+        builder.CloseElement();
+        builder.OpenElement(sequence + 4, "dd");
+        builder.AddContent(sequence + 5, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
     private static void AddCell(RenderTreeBuilder builder, ref int sequence, string value, string? @class = null)
     {
         builder.OpenElement(sequence++, "td");
+        if (!string.IsNullOrWhiteSpace(@class))
+            builder.AddAttribute(sequence++, "class", @class);
+        builder.AddContent(sequence++, value);
+        builder.CloseElement();
+    }
+
+    private static void AddHeader(RenderTreeBuilder builder, ref int sequence, string value, string? @class = null)
+    {
+        builder.OpenElement(sequence++, "th");
         if (!string.IsNullOrWhiteSpace(@class))
             builder.AddAttribute(sequence++, "class", @class);
         builder.AddContent(sequence++, value);
