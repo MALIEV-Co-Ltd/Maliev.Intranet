@@ -550,11 +550,12 @@ public class ProjectsController(
         string processType,
         CancellationToken ct)
     {
+        var normalizedProcessType = NormalizeProductionTechnology(processType);
         var queueAhead = 0;
         try
         {
-            var queueDepths = await jobClient.GetQueueDepthAsync(processType, ct);
-            queueDepths?.TryGetValue(processType, out queueAhead);
+            var queueDepths = await jobClient.GetQueueDepthAsync(normalizedProcessType, ct);
+            queueDepths?.TryGetValue(normalizedProcessType, out queueAhead);
         }
         catch (TaskCanceledException)
         {
@@ -569,7 +570,7 @@ public class ProjectsController(
             _logger.LogError(ex, "Unexpected error fetching queue depth for '{ProcessType}'; defaulting to 0.", processType);
         }
 
-        var category = MapProcessToEquipmentCategory(processType);
+        var category = MapProcessToEquipmentCategory(normalizedProcessType);
         EquipmentSummaryDto? machine = null;
         IReadOnlyList<PlanningScheduleItemDto> scheduleItems = [];
 
@@ -637,7 +638,7 @@ public class ProjectsController(
         }
 
         // CNC requires fixture and toolpath verification; other processes need only 1 setup day.
-        var setupDays = processType.StartsWith("CNC", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
+        var setupDays = normalizedProcessType.StartsWith("CNC", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
         var estimatedStart = DateTimeOffset.UtcNow.AddDays(setupDays + queueAhead);
 
         // Compute proposed slot: starts right after the last scheduled job ends (or now if queue is empty).
@@ -650,8 +651,8 @@ public class ProjectsController(
                 ? scheduleItems.Max(s => s.PlannedEndDate)
                 : estimatedStart;
             proposedSlotStart = lastEnd;
-            var defaultSetupMin = processType.StartsWith("CNC", StringComparison.OrdinalIgnoreCase) ? 60
-                : processType is "SLA_DLP" or "SLA" ? 30
+            var defaultSetupMin = normalizedProcessType.StartsWith("CNC", StringComparison.OrdinalIgnoreCase) ? 60
+                : normalizedProcessType is "SLA_DLP" or "SLA" ? 30
                 : 15;
             proposedSlotEnd = proposedSlotStart.Value.AddMinutes(defaultSetupMin + 30);
         }
@@ -677,7 +678,7 @@ public class ProjectsController(
         {
             ProjectId = project.Id,
             ProjectPartId = part.Id,
-            Technology = FirstNonEmpty(request.Technology, part.ProcessType) ?? string.Empty,
+            Technology = NormalizeProductionTechnology(FirstNonEmpty(request.Technology, part.ProcessType) ?? string.Empty),
             MachineId = request.MachineId,
             MachineName = request.MachineName,
             QueuePosition = request.QueuePosition,
@@ -1226,6 +1227,24 @@ public class ProjectsController(
         var fileName = storagePath.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? storagePath;
         var extension = Path.GetExtension(fileName);
         return string.IsNullOrWhiteSpace(extension) ? string.Empty : extension;
+    }
+
+    private static string NormalizeProductionTechnology(string processType)
+    {
+        if (string.IsNullOrWhiteSpace(processType))
+            return string.Empty;
+
+        var normalized = processType.Trim()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", "_", StringComparison.Ordinal)
+            .ToUpperInvariant();
+
+        return normalized switch
+        {
+            "CNC" or "CNC_MILL" or "CNC_MILLING" or "MILLING" => "CNC_MILL",
+            "CNC_TURN" or "CNC_TURNING" or "TURNING" or "LATHE" => "CNC_TURN",
+            _ => normalized,
+        };
     }
 
     private static string? MapProcessToEquipmentCategory(string processType) => processType switch

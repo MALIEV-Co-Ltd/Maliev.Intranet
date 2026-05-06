@@ -781,11 +781,79 @@ public class ProjectsControllerTests
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);
         var before = DateTimeOffset.UtcNow.AddDays(2); // setup=2, queue=0
 
-        var result = await controller.GetPartRouting(Guid.NewGuid(), Guid.NewGuid(), processType: "CNC_MILL", CancellationToken.None);
+        var result = await controller.GetPartRouting(Guid.NewGuid(), Guid.NewGuid(), processType: "CNC_Milling", CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<ProductionRoutingDto>(ok.Value);
         Assert.True(dto.EstimatedStartDate >= before);
+    }
+
+    [Fact]
+    public async Task GetPartRouting_ProjectServiceCncMilling_UsesCanonicalQueueAndCncMachineCategory()
+    {
+        string? capturedQueueUrl = null;
+        string? capturedEquipmentUrl = null;
+        var machineId = Guid.NewGuid();
+        var jobHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/job/v1/jobs/queue-depth", StringComparison.Ordinal))
+            {
+                capturedQueueUrl = req.RequestUri.ToString();
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new Dictionary<string, int> { ["CNC_MILL"] = 3 })
+                });
+            }
+
+            if (req.RequestUri!.AbsolutePath.Contains("/job/v1/jobs/machine/", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(Array.Empty<MachineScheduleItemDto>())
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+        var facilityHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            capturedEquipmentUrl = req.RequestUri!.ToString();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FacilityPagedResult<EquipmentSummaryDto>
+                {
+                    Items =
+                    [
+                        new EquipmentSummaryDto
+                        {
+                            Id = machineId,
+                            AssetCode = "MAL-CNC-0001",
+                            Name = "CNC Mill 1",
+                            Category = "CncMachine",
+                            Status = "Active"
+                        }
+                    ],
+                    TotalCount = 1,
+                    Page = 1,
+                    PageSize = 50
+                })
+            });
+        });
+        var controller = new ProjectsController(
+            CreateRawClient(HttpStatusCode.OK),
+            new JobServiceClient(new HttpClient(jobHandler) { BaseAddress = new Uri("http://test") }),
+            new FacilityServiceClient(new HttpClient(facilityHandler) { BaseAddress = new Uri("http://test") }),
+            Logger);
+
+        var result = await controller.GetPartRouting(Guid.NewGuid(), Guid.NewGuid(), processType: "CNC_Milling", CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<ProductionRoutingDto>(ok.Value);
+        Assert.Equal(3, dto.QueueAhead);
+        Assert.Equal(machineId, dto.MachineId);
+        Assert.Equal("MAL-CNC-0001", dto.MachineCode);
+        Assert.Contains("technology=CNC_MILL", capturedQueueUrl);
+        Assert.Contains("category=CncMachine", capturedEquipmentUrl);
     }
 
     [Fact]
