@@ -1186,12 +1186,14 @@ public class ProjectsController(
             project.CustomerCompanyName = FirstNonEmpty(detail.CompanyName);
             project.CustomerCompanyPhone = FirstNonEmpty(detail.CompanyPhone);
             project.CustomerCompanyEmail = FirstNonEmpty(detail.CompanyContactEmail);
+            project.CustomerTaxId = FirstNonEmpty(project.CustomerTaxId, detail.CompanyVatNumber, detail.CompanyRegistrationNumber);
 
             var shippingAddress = SelectAddress(detail.Addresses, "Shipping")
                 ?? SelectAddress(detail.Addresses, "Delivery")
                 ?? SelectAddress(detail.Addresses, "Billing")
                 ?? detail.Addresses.FirstOrDefault();
             var billingAddress = SelectAddress(detail.Addresses, "Billing") ?? detail.CompanyBillingAddress;
+            project.CustomerBranch = FirstNonEmpty(project.CustomerBranch, ResolveCustomerBranch(detail, billingAddress));
 
             project.ShippingAddressLine = FormatAddress(shippingAddress);
             project.ShippingRecipientName = FirstNonEmpty(shippingAddress?.RecipientName, detail.Name);
@@ -1281,6 +1283,15 @@ public class ProjectsController(
 
     private static bool MatchesAddressType(AddressResponse address, string type) =>
         string.Equals(address.Type, type, StringComparison.OrdinalIgnoreCase);
+
+    private static string? ResolveCustomerBranch(CustomerDetailDto detail, AddressResponse? billingAddress)
+    {
+        var isCorporateBilling = detail.CompanyId.HasValue
+            || !string.IsNullOrWhiteSpace(detail.CompanyName)
+            || string.Equals(billingAddress?.OwnerType, "Company", StringComparison.OrdinalIgnoreCase);
+
+        return isCorporateBilling ? "Head Office" : null;
+    }
 
     private static string? FormatAddress(AddressResponse? address)
     {
