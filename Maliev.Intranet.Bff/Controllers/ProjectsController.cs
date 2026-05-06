@@ -76,6 +76,34 @@ public class ProjectsController(
         return result != null ? Ok(result) : NotFound();
     }
 
+    /// <summary>
+    /// Returns a signed large thumbnail URL for a part that belongs to the project.
+    /// </summary>
+    /// <param name="id">The project GUID.</param>
+    /// <param name="partId">The project part GUID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A signed large thumbnail URL, or 404 when the part or artifact is not available.</returns>
+    [HttpGet("{id:guid}/parts/{partId:guid}/thumbnail-large-url")]
+    public async Task<ActionResult> GetPartLargeThumbnailUrl(Guid id, Guid partId, CancellationToken ct)
+    {
+        if (uploadClient is null)
+            return StatusCode(StatusCodes.Status500InternalServerError, "UploadServiceClient is not configured.");
+
+        var project = await client.GetProjectByIdAsync(id, ct);
+        var part = project?.Parts.FirstOrDefault(candidate => candidate.Id == partId);
+        if (project is null || part is null)
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(part.ThumbnailLargeGcsPath))
+            return NotFound("Large thumbnail is not available.");
+
+        var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(part.ThumbnailLargeGcsPath, ct);
+        if (string.IsNullOrEmpty(signedUrl))
+            return NotFound("Download URL not available");
+
+        return Ok(new { Url = signedUrl });
+    }
+
     // ── Create / Update / Delete ─────────────────────────────────────────────
 
     /// <summary>

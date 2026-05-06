@@ -118,6 +118,47 @@
     </p>
 </ConfirmModal>
 
+@if (_thumbnailPreviewPart is not null)
+{
+    var previewPart = _thumbnailPreviewPart;
+    <div class="project-thumbnail-popout-backdrop" role="presentation" @onclick="ClosePartThumbnailPreview">
+        <section class="project-thumbnail-popout" role="dialog" aria-modal="true" aria-labelledby="project-thumbnail-popout-title" @onclick:stopPropagation="true">
+            <button type="button" class="project-thumbnail-popout-close" aria-label="Close thumbnail preview" @onclick="ClosePartThumbnailPreview">
+                <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+            </button>
+            <header class="project-thumbnail-popout-header">
+                <span>Part preview</span>
+                <strong id="project-thumbnail-popout-title">@previewPart.FileName</strong>
+                <small>@FormatDimensions(previewPart.Dimensions)</small>
+            </header>
+            <div class="project-thumbnail-popout-frame">
+                @if (_thumbnailPreviewLoading)
+                {
+                    <div class="project-thumbnail-popout-loading">
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                        <span>Loading large preview</span>
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_thumbnailPreviewUrl))
+                {
+                    <img src="@_thumbnailPreviewUrl" alt="@($"{previewPart.FileName} large thumbnail")" />
+                }
+                else
+                {
+                    <div class="project-thumbnail-popout-loading">
+                        <MudIcon Icon="@Icons.Material.Outlined.ImageNotSupported" Size="Size.Small" />
+                        <span>@FirstNonEmpty(_thumbnailPreviewError, "Preview unavailable")</span>
+                    </div>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_thumbnailPreviewError))
+            {
+                <p class="project-thumbnail-popout-note">@_thumbnailPreviewError</p>
+            }
+        </section>
+    </div>
+}
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -141,6 +182,11 @@
     private string _activeTab = "overview";
     private readonly HashSet<Guid> _holdSavingPartIds = [];
     private readonly HashSet<Guid> _acknowledgingDfmPartIds = [];
+    private readonly Dictionary<Guid, string> _largeThumbnailUrls = [];
+    private ProjectPartDto? _thumbnailPreviewPart;
+    private string? _thumbnailPreviewUrl;
+    private string? _thumbnailPreviewError;
+    private bool _thumbnailPreviewLoading;
 
     private IReadOnlyList<(string Key, string Label)> Tabs =>
     [
@@ -1182,6 +1228,60 @@
         return Task.CompletedTask;
     }
 
+    private async Task OpenPartThumbnailPreviewAsync(ProjectPartDto part)
+    {
+        _thumbnailPreviewPart = part;
+        _thumbnailPreviewUrl = FirstNonEmpty(part.ThumbnailUrl);
+        _thumbnailPreviewError = null;
+        _thumbnailPreviewLoading = false;
+
+        if (_largeThumbnailUrls.TryGetValue(part.Id, out var cachedLargeUrl))
+        {
+            _thumbnailPreviewUrl = cachedLargeUrl;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(part.ThumbnailLargeGcsPath))
+        {
+            _thumbnailPreviewError = string.IsNullOrWhiteSpace(part.ThumbnailUrl)
+                ? "Large thumbnail is not available for this part."
+                : "Large thumbnail is not available; showing the table thumbnail.";
+            return;
+        }
+
+        _thumbnailPreviewLoading = true;
+        StateHasChanged();
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ThumbnailPreviewUrlResponse>($"api/v1/projects/{Id}/parts/{part.Id}/thumbnail-large-url");
+            if (!string.IsNullOrWhiteSpace(response?.Url))
+            {
+                _thumbnailPreviewUrl = response.Url;
+                _largeThumbnailUrls[part.Id] = response.Url;
+            }
+            else
+            {
+                _thumbnailPreviewError = "Large thumbnail could not be loaded; showing the table thumbnail.";
+            }
+        }
+        catch
+        {
+            _thumbnailPreviewError = "Large thumbnail could not be loaded; showing the table thumbnail.";
+        }
+        finally
+        {
+            _thumbnailPreviewLoading = false;
+        }
+    }
+
+    private void ClosePartThumbnailPreview()
+    {
+        _thumbnailPreviewPart = null;
+        _thumbnailPreviewUrl = null;
+        _thumbnailPreviewError = null;
+        _thumbnailPreviewLoading = false;
+    }
+
     private async Task ConfirmAcceptQuoteAsync()
     {
         if (!CanAcceptQuote)
@@ -1635,7 +1735,7 @@
         builder.CloseElement();
     }
 
-    private static void AddPartCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
+    private void AddPartCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
     {
         builder.OpenElement(sequence++, "td");
         builder.AddAttribute(sequence++, "class", "project-part-cell");
@@ -1644,10 +1744,16 @@
 
         if (!string.IsNullOrWhiteSpace(part.ThumbnailUrl))
         {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", "project-part-thumb-button");
+            builder.AddAttribute(sequence++, "aria-label", $"Open large thumbnail preview for {part.FileName}");
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, () => OpenPartThumbnailPreviewAsync(part)));
             builder.OpenElement(sequence++, "img");
             builder.AddAttribute(sequence++, "class", "project-part-thumb");
             builder.AddAttribute(sequence++, "src", part.ThumbnailUrl);
             builder.AddAttribute(sequence++, "alt", $"{part.FileName} thumbnail");
+            builder.CloseElement();
             builder.CloseElement();
         }
         else
@@ -1843,6 +1949,8 @@
     private sealed record DfmDisplayStatus(string Label, string Subtext, string CssClass);
 
     private sealed record DfmIssueSummary(string Label, string Value);
+
+    private sealed record ThumbnailPreviewUrlResponse(string? Url);
 
     private string FormatMoney(decimal value) => CurrencyFormatter.Format(value, ProjectCurrency, 2);
 

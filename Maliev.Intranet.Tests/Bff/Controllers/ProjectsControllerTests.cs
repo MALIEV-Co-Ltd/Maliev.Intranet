@@ -111,6 +111,90 @@ public class ProjectsControllerTests
         Assert.IsType<NotFoundResult>(result.Result);
     }
 
+    [Fact]
+    public async Task GetPartLargeThumbnailUrl_WhenPartHasLargeThumbnail_ShouldReturnSignedUrl()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        const string StoragePath = "customers/axion/projects/prj/bracket-left_thumb_1200.webp";
+        const string SignedUrl = "https://signed.example/bracket-left_thumb_1200.webp";
+        HttpRequestMessage? downstreamRequest = null;
+        string? downstreamBody = null;
+        var project = new ProjectDetailDto
+        {
+            Id = projectId,
+            Parts =
+            [
+                new ProjectPartDto
+                {
+                    Id = partId,
+                    ThumbnailLargeGcsPath = StoragePath
+                }
+            ]
+        };
+        var uploadHandler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            downstreamRequest = request;
+            downstreamBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { signedUrl = SignedUrl })
+            };
+        });
+        var controller = new ProjectsController(
+            CreateClient(project),
+            StubJobClient(),
+            StubFacilityClient(),
+            Logger,
+            new UploadServiceClient(new HttpClient(uploadHandler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.GetPartLargeThumbnailUrl(projectId, partId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var urlProperty = ok.Value?.GetType().GetProperty("Url");
+        Assert.NotNull(urlProperty);
+        Assert.Equal(SignedUrl, urlProperty.GetValue(ok.Value));
+        Assert.NotNull(downstreamRequest);
+        Assert.Equal(HttpMethod.Post, downstreamRequest.Method);
+        Assert.Equal("/upload/v1/files/by-path/signed-url", downstreamRequest.RequestUri?.AbsolutePath);
+        Assert.NotNull(downstreamBody);
+        var payload = JsonDocument.Parse(downstreamBody).RootElement;
+        Assert.Equal(StoragePath, payload.GetProperty("storagePath").GetString());
+        Assert.Equal(60, payload.GetProperty("expirationMinutes").GetInt32());
+    }
+
+    [Fact]
+    public async Task GetPartLargeThumbnailUrl_WhenPartHasNoLargeThumbnail_ShouldReturnNotFound()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var uploadWasCalled = false;
+        var project = new ProjectDetailDto
+        {
+            Id = projectId,
+            Parts =
+            [
+                new ProjectPartDto { Id = partId }
+            ]
+        };
+        var uploadHandler = new MockHttpMessageHandler((request, _) =>
+        {
+            uploadWasCalled = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        var controller = new ProjectsController(
+            CreateClient(project),
+            StubJobClient(),
+            StubFacilityClient(),
+            Logger,
+            new UploadServiceClient(new HttpClient(uploadHandler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.GetPartLargeThumbnailUrl(projectId, partId, CancellationToken.None);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+        Assert.False(uploadWasCalled);
+    }
+
     // ── Create ────────────────────────────────────────────────────────────────
 
     [Fact]

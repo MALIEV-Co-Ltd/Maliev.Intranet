@@ -280,6 +280,24 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectDetail_ThumbnailClick_OpensLargeThumbnailPopout()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("project-part-thumb-button", cut.Markup));
+
+        cut.Find("button.project-part-thumb-button").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("project-thumbnail-popout", cut.Markup);
+            Assert.Contains("bracket-left.stl", cut.Markup);
+            Assert.Contains("https://storage.example/bracket-large.webp", cut.Markup);
+            Assert.Contains($"/api/v1/projects/{_projectId}/parts/{_bracketPartId}/thumbnail-large-url", _requestedPaths);
+        });
+    }
+
+    [Fact]
     public void ProjectDetail_QuickAcknowledgeDfm_UpdatesPartAndRemovesAction()
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
@@ -339,6 +357,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-material-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-material-swatch", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-part-thumb-button", css, StringComparison.Ordinal);
+        Assert.Contains(".project-thumbnail-popout", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-ack-button", css, StringComparison.Ordinal);
         Assert.Contains(".project-dfm-issue-card", css, StringComparison.Ordinal);
@@ -425,6 +445,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         ConfirmedPrice = 2500m,
                         Status = "Confirmed",
                         ThumbnailUrl = "https://storage.example/bracket-thumb.webp",
+                        ThumbnailLargeGcsPath = "customers/axion/projects/prj/bracket-left_thumb_1200.webp",
                         HasDfmWarnings = true,
                         DfmAcknowledged = _bracketDfmAcknowledged,
                         OverlayPaths =
@@ -523,6 +544,11 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}/production-plan", StringComparison.Ordinal))
         {
             return Json(BuildProductionPlan());
+        }
+
+        if (pathAndQuery.Equals($"/api/v1/projects/{_projectId}/parts/{_bracketPartId}/thumbnail-large-url", StringComparison.Ordinal))
+        {
+            return Json(new { Url = "https://storage.example/bracket-large.webp" });
         }
 
         if (request.Method == HttpMethod.Put

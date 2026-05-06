@@ -388,7 +388,27 @@
     min-width: 0;
 }
 
+.project-record-shell ::deep .project-part-thumb-button {
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--maliev-radius-sm);
+    background: transparent;
+    cursor: zoom-in;
+}
+
+.project-record-shell ::deep .project-part-thumb-button:focus-visible {
+    outline: 2px solid var(--maliev-info);
+    outline-offset: 2px;
+}
+
+.project-record-shell ::deep .project-part-thumb-button:hover .project-part-thumb {
+    border-color: color-mix(in srgb, var(--maliev-info), var(--maliev-border) 42%);
+}
+
 .project-record-shell ::deep .project-part-thumb {
+    display: block;
     width: 52px;
     height: 52px;
     aspect-ratio: 1;
@@ -402,6 +422,105 @@
     display: inline-grid;
     place-items: center;
     color: var(--maliev-muted);
+}
+
+.project-thumbnail-popout-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.58);
+}
+
+.project-thumbnail-popout {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    width: min(920px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    padding: 18px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius);
+    background: var(--maliev-panel);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.project-thumbnail-popout-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: inline-grid;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-text);
+    cursor: pointer;
+}
+
+.project-thumbnail-popout-close:hover {
+    background: var(--maliev-panel-2);
+}
+
+.project-thumbnail-popout-header {
+    display: grid;
+    gap: 4px;
+    padding-right: 42px;
+}
+
+.project-thumbnail-popout-header span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.project-thumbnail-popout-header strong {
+    color: var(--maliev-text);
+    font-family: var(--maliev-font-mono);
+    font-size: var(--maliev-font-large);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.project-thumbnail-popout-header small,
+.project-thumbnail-popout-note {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.35;
+}
+
+.project-thumbnail-popout-frame {
+    display: grid;
+    min-height: min(60vh, 520px);
+    overflow: auto;
+    place-items: center;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+}
+
+.project-thumbnail-popout-frame img {
+    display: block;
+    max-width: 100%;
+    max-height: min(70vh, 720px);
+    object-fit: contain;
+}
+
+.project-thumbnail-popout-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
 }
 
 .project-record-shell ::deep .project-part-meta {
