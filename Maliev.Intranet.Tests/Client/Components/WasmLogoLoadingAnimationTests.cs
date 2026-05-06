@@ -17,6 +17,7 @@ public sealed class WasmLogoLoadingAnimationTests : BunitContext, IAsyncLifetime
         var loader = cut.Find(".loader");
         Assert.Equal("img", loader.GetAttribute("role"));
         Assert.Equal("MALIEV", loader.GetAttribute("aria-label"));
+        Assert.Equal("--wasm-logo-progress: 0%", loader.GetAttribute("style"));
         Assert.Contains("maliev-logo-loader", cut.Markup);
     }
 
@@ -26,14 +27,16 @@ public sealed class WasmLogoLoadingAnimationTests : BunitContext, IAsyncLifetime
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "WasmLogoLoadingAnimation.razor.css");
 
         Assert.Contains("url('/images/logo.svg')", source);
-        Assert.Contains("--logo-empty: var(--wasm-logo-empty, #ffffff)", source);
+        Assert.Contains("--logo-empty: var(--wasm-logo-empty, #d7dde6)", source);
         Assert.Contains("--logo-fill: var(--wasm-logo-fill, #000000)", source);
         Assert.Contains("--logo-progress: var(--wasm-logo-progress, 0%)", source);
         Assert.Contains("--logo-shadow: var(--maliev-logo-loader-shadow", source);
         Assert.Contains("drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))", source);
         Assert.Contains("filter: var(--logo-shadow)", source);
-        Assert.Contains("linear-gradient(", source);
-        Assert.Contains("90deg", source);
+        Assert.Contains("background: var(--logo-empty)", source);
+        Assert.Contains(".loader::before", source);
+        Assert.Contains("width: var(--logo-progress)", source);
+        Assert.DoesNotContain("linear-gradient(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("conic-gradient", source, StringComparison.Ordinal);
         Assert.DoesNotContain("background-size: var(--blazor-load-percentage, 0%) 100%", source, StringComparison.Ordinal);
         Assert.DoesNotContain("--logo-progress: var(--blazor-load-percentage", source, StringComparison.Ordinal);

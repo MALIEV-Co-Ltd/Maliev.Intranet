@@ -23,7 +23,7 @@ public class AppWasmRenderModeTests
         Assert.Contains("<WasmLogoLoadingAnimation", source);
         Assert.Contains("data-maliev-theme", source);
         Assert.Contains("maliev_theme", source);
-        Assert.Contains("--wasm-logo-empty: #ffffff", source);
+        Assert.Contains("--wasm-logo-empty: #d7dde6", source);
         Assert.Contains("--wasm-logo-fill: #000000", source);
         Assert.Contains("--maliev-logo-loader-shadow", source);
         Assert.Contains("drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))", source);
@@ -48,11 +48,11 @@ public class AppWasmRenderModeTests
         Assert.Contains("root.style.setProperty('--wasm-logo-progress', progressText)", source);
         Assert.Contains("document.querySelectorAll('.maliev-logo-loader')", source);
         Assert.Contains("loader.style.setProperty('--wasm-logo-progress', progressText)", source);
-        Assert.Contains("var(--wasm-logo-fill, #000000) 0 var(--wasm-logo-progress)", source);
-        Assert.Contains("var(--wasm-logo-empty, #ffffff) var(--wasm-logo-progress) 100%", source);
+        Assert.Contains("background: var(--wasm-logo-empty, #d7dde6)", source);
+        Assert.Contains(".wasm-loading .maliev-logo-loader::before", source);
+        Assert.Contains("width: var(--wasm-logo-progress)", source);
         Assert.Contains("maliev-wasm-loader-visible", source);
-        Assert.Contains("linear-gradient(", source);
-        Assert.Contains("90deg", source);
+        Assert.DoesNotContain("linear-gradient(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("wasm-loading-progress", source, StringComparison.Ordinal);
         Assert.Contains("autostart=\"false\"", source);
         Assert.Contains("Blazor.start", source);

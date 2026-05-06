@@ -15,7 +15,7 @@
             --blazor-load-percentage: 0%;
             --blazor-load-percentage-text: "0%";
             --wasm-logo-progress: 0%;
-            --wasm-logo-empty: #ffffff;
+            --wasm-logo-empty: #d7dde6;
             --wasm-logo-fill: #000000;
         }
 
@@ -91,17 +91,22 @@
             width: var(--logo-width);
             aspect-ratio: 449.33078 / 103.18751;
             position: relative;
+            overflow: hidden;
             color: transparent;
             opacity: 0;
-            background:
-                linear-gradient(
-                    90deg,
-                    var(--wasm-logo-fill, #000000) 0 var(--wasm-logo-progress),
-                    var(--wasm-logo-empty, #ffffff) var(--wasm-logo-progress) 100%);
+            background: var(--wasm-logo-empty, #d7dde6);
             -webkit-mask: url('/images/logo.svg') center / contain no-repeat;
             mask: url('/images/logo.svg') center / contain no-repeat;
             filter: var(--maliev-logo-loader-shadow);
             transition: opacity 180ms ease;
+        }
+
+        .wasm-loading .maliev-logo-loader::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: var(--wasm-logo-progress);
+            background: var(--wasm-logo-fill, #000000);
         }
 
         html.maliev-wasm-loader-visible .wasm-loading .maliev-logo-loader {

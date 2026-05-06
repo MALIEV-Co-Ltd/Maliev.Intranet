@@ -1,6 +1,6 @@
 .loader {
     --logo-width: clamp(150px, 38vw, 236px);
-    --logo-empty: var(--wasm-logo-empty, #ffffff);
+    --logo-empty: var(--wasm-logo-empty, #d7dde6);
     --logo-fill: var(--wasm-logo-fill, #000000);
     --logo-progress: var(--wasm-logo-progress, 0%);
     --logo-shadow: var(--maliev-logo-loader-shadow,
@@ -9,15 +9,20 @@
     width: var(--logo-width);
     aspect-ratio: 449.33078 / 103.18751;
     position: relative;
+    overflow: hidden;
     color: transparent;
-    background:
-        linear-gradient(
-            90deg,
-            var(--logo-fill) 0 var(--logo-progress),
-            var(--logo-empty) var(--logo-progress) 100%);
+    background: var(--logo-empty);
     -webkit-mask: url('/images/logo.svg') center / contain no-repeat;
     mask: url('/images/logo.svg') center / contain no-repeat;
     filter: var(--logo-shadow);
+}
+
+.loader::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--logo-progress);
+    background: var(--logo-fill);
 }
 
 @media (prefers-color-scheme: dark) {
