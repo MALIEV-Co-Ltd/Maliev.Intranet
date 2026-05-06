@@ -418,6 +418,7 @@ try
     builder.AddBffServiceClient<JobServiceClient>("JobService");
     builder.AddBffServiceClient<CurrencyServiceClient>("CurrencyService");
     builder.AddBffServiceClient<SearchServiceClient>("SearchService");
+    builder.Services.AddScoped<GlobalSearchResultEnricher>();
     // GeometryService runs DFM analysis + overlay generation — long-running, non-retryable.
     builder.AddBffLongRunningServiceClient<GeometryServiceClient>("GeometryService",
         attemptTimeout: TimeSpan.FromSeconds(300));

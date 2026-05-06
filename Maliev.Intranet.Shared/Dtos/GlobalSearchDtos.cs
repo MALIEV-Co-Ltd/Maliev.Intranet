@@ -21,6 +21,8 @@ public record GlobalSearchResponseDto(
 /// <param name="Status">Optional business status.</param>
 /// <param name="Href">Intranet route for the result.</param>
 /// <param name="Score">Search relevance score.</param>
+/// <param name="ThumbnailUrl">Optional display image URL for the result, such as a part thumbnail or profile image.</param>
+/// <param name="AvatarText">Optional fallback avatar text when no thumbnail image is available.</param>
 public record GlobalSearchResultDto(
     string Title,
     string? Subtitle,
@@ -28,4 +30,6 @@ public record GlobalSearchResultDto(
     string ResourceType,
     string? Status,
     string Href,
-    double Score);
+    double Score,
+    string? ThumbnailUrl = null,
+    string? AvatarText = null);

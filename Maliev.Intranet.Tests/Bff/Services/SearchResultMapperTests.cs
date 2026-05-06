@@ -76,7 +76,40 @@ public class SearchResultMapperTests
         Assert.Equal("invoice", row.ResourceType);
     }
 
-    private static SearchServiceResultDto Result(string sourceService, string resourceType, string resourceId, string title)
+    [Fact]
+    public void ToGlobalSearchResponse_ForProjectGeneratedStatus_UsesCompactStatusText()
+    {
+        var response = new SearchServiceResponseDto(
+            "project",
+            1,
+            [Result("ProjectService", "project", Guid.NewGuid().ToString(), "PRJ-2026-0001", status: "QuotationGenerated")]);
+
+        var mapped = SearchResultMapper.ToGlobalSearchResponse(response, "project");
+
+        var row = Assert.Single(mapped.Results);
+        Assert.Equal("Generated", row.Status);
+    }
+
+    [Fact]
+    public void ToGlobalSearchResponse_ForCustomerResult_AddsAvatarText()
+    {
+        var response = new SearchServiceResponseDto(
+            "pim",
+            1,
+            [Result("CustomerService", "customer", Guid.NewGuid().ToString(), "Pimchanok Garcia")]);
+
+        var mapped = SearchResultMapper.ToGlobalSearchResponse(response, "pim");
+
+        var row = Assert.Single(mapped.Results);
+        Assert.Equal("PG", row.AvatarText);
+    }
+
+    private static SearchServiceResultDto Result(
+        string sourceService,
+        string resourceType,
+        string resourceId,
+        string title,
+        string? status = null)
     {
         return new SearchServiceResultDto(
             sourceService,
@@ -85,7 +118,7 @@ public class SearchResultMapperTests
             title,
             null,
             null,
-            null,
+            status,
             "search.documents.read",
             1.0d,
             DateTimeOffset.UtcNow);

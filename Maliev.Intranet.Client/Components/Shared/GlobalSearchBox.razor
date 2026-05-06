@@ -52,19 +52,42 @@
                         {
                             var index = _results.IndexOf(result);
                             <button type="button"
-                                    class="global-search-result @(index == _selectedIndex ? "is-active" : null)"
+                                    class="global-search-result @(index == _selectedIndex ? "is-active" : null) @(ShouldRenderMedia(result) ? "has-media" : null)"
                                     @onmouseenter="@(() => _selectedIndex = index)"
                                     @onclick="@(() => NavigateTo(result.Href))">
-                                <span class="global-search-result-main">
-                                    <span class="global-search-result-title">@result.Title</span>
-                                    @if (!string.IsNullOrWhiteSpace(result.Status))
-                                    {
-                                        <span class="global-search-result-status">@result.Status</span>
-                                    }
-                                </span>
-                                <span class="global-search-result-sub">
-                                    <span class="global-search-result-subtitle">@(string.IsNullOrWhiteSpace(result.Subtitle) ? result.ResourceType : result.Subtitle)</span>
-                                    <span class="global-search-result-type">@result.ResourceType</span>
+                                @if (ShouldRenderMedia(result))
+                                {
+                                    <span class="global-search-result-media">
+                                        @if (!string.IsNullOrWhiteSpace(result.ThumbnailUrl))
+                                        {
+                                            <img src="@result.ThumbnailUrl"
+                                                 alt="@($"{result.Title} thumbnail")"
+                                                 class="global-search-result-image" />
+                                        }
+                                        else if (IsCustomerResult(result))
+                                        {
+                                            <span class="global-search-result-avatar">@GetAvatarText(result)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="global-search-result-thumb-placeholder" aria-hidden="true">
+                                                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                                            </span>
+                                        }
+                                    </span>
+                                }
+                                <span class="global-search-result-copy">
+                                    <span class="global-search-result-main">
+                                        <span class="global-search-result-title">@result.Title</span>
+                                        @if (!string.IsNullOrWhiteSpace(result.Status))
+                                        {
+                                            <span class="global-search-result-status">@result.Status</span>
+                                        }
+                                    </span>
+                                    <span class="global-search-result-sub">
+                                        <span class="global-search-result-subtitle">@(string.IsNullOrWhiteSpace(result.Subtitle) ? result.ResourceType : result.Subtitle)</span>
+                                        <span class="global-search-result-type">@result.ResourceType</span>
+                                    </span>
                                 </span>
                             </button>
                         }
@@ -218,6 +241,55 @@
         }
 
         NavigateTo($"/search?query={Uri.EscapeDataString(query)}");
+    }
+
+    private static bool ShouldRenderMedia(GlobalSearchResultDto result)
+    {
+        return !string.IsNullOrWhiteSpace(result.ThumbnailUrl) ||
+            IsProjectPartResult(result) ||
+            IsCustomerResult(result);
+    }
+
+    private static bool IsProjectPartResult(GlobalSearchResultDto result)
+    {
+        var type = NormalizeResourceType(result.ResourceType);
+        return type is "project-part" or "project-parts";
+    }
+
+    private static bool IsCustomerResult(GlobalSearchResultDto result)
+    {
+        var type = NormalizeResourceType(result.ResourceType);
+        return type is "customer" or "customers";
+    }
+
+    private static string GetAvatarText(GlobalSearchResultDto result)
+    {
+        if (!string.IsNullOrWhiteSpace(result.AvatarText))
+        {
+            return result.AvatarText;
+        }
+
+        if (string.IsNullOrWhiteSpace(result.Title))
+        {
+            return "M";
+        }
+
+        var parts = result.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant();
+        }
+
+        return parts[0].Length > 1
+            ? $"{parts[0][0]}{parts[0][1]}".ToUpperInvariant()
+            : parts[0][0].ToString().ToUpperInvariant();
+    }
+
+    private static string NormalizeResourceType(string resourceType)
+    {
+        return resourceType.Trim()
+            .Replace("_", "-", StringComparison.Ordinal)
+            .ToLowerInvariant();
     }
 
     public void Dispose()

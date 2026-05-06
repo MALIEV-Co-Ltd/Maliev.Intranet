@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared.Dtos;
 
@@ -28,16 +29,23 @@ public static class SearchResultMapper
         return new GlobalSearchResponseDto(response.Query, results.Count, results);
     }
 
-    private static GlobalSearchResultDto ToGlobalSearchResult(SearchServiceResultDto result)
+    /// <summary>
+    /// Converts a single SearchService result row to the Intranet display shape.
+    /// </summary>
+    /// <param name="result">SearchService result row.</param>
+    /// <returns>A mapped global search result row.</returns>
+    public static GlobalSearchResultDto ToGlobalSearchResult(SearchServiceResultDto result)
     {
         return new GlobalSearchResultDto(
             result.Title,
             result.Subtitle,
             ResolveArea(result.SourceService, result.ResourceType),
             result.ResourceType,
-            result.Status,
+            FormatStatus(result.Status),
             ResolveHref(result),
-            result.Score);
+            result.Score,
+            ThumbnailUrl: null,
+            AvatarText: ResolveAvatarText(result));
     }
 
     /// <summary>
@@ -149,6 +157,70 @@ public static class SearchResultMapper
 
         return Guid.TryParse(parts[0], out projectId) &&
             Guid.TryParse(parts[1], out partId);
+    }
+
+    /// <summary>
+    /// Parses the composite ProjectService project-part identifier used by global search.
+    /// </summary>
+    /// <param name="value">The resource identifier to parse.</param>
+    /// <param name="projectId">Parsed parent project identifier.</param>
+    /// <param name="partId">Parsed project part identifier.</param>
+    /// <returns><c>true</c> when the identifier contains both project and part GUIDs.</returns>
+    public static bool TryResolveProjectPartId(string value, out Guid projectId, out Guid partId)
+    {
+        return TryParseProjectPartId(value, out projectId, out partId);
+    }
+
+    /// <summary>
+    /// Formats source status values into compact search result labels.
+    /// </summary>
+    /// <param name="status">Source status text.</param>
+    /// <returns>Display status text.</returns>
+    public static string? FormatStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return null;
+        }
+
+        var normalized = status.Trim();
+        return normalized switch
+        {
+            "QuotationGenerated" => "Generated",
+            "QuotationSent" => "Sent",
+            "QuotationAccepted" => "Accepted",
+            _ when normalized.Contains(' ', StringComparison.Ordinal) => normalized,
+            _ => SplitPascalCase(normalized)
+        };
+    }
+
+    private static string? ResolveAvatarText(SearchServiceResultDto result)
+    {
+        var type = Normalize(result.ResourceType);
+        return type is "customer" or "customers" ? BuildInitials(result.Title) : null;
+    }
+
+    private static string BuildInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "M";
+        }
+
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant();
+        }
+
+        return parts[0].Length > 1
+            ? $"{parts[0][0]}{parts[0][1]}".ToUpperInvariant()
+            : parts[0][0].ToString().ToUpperInvariant();
+    }
+
+    private static string SplitPascalCase(string value)
+    {
+        return Regex.Replace(value, "(?<!^)([A-Z])", " $1", RegexOptions.CultureInvariant);
     }
 
     private static string Normalize(string value)

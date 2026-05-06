@@ -93,6 +93,62 @@ public class GlobalSearchBoxTests
     }
 
     [Fact]
+    public void GlobalSearchBox_RendersProjectPartThumbnail()
+    {
+        using var context = CreateContext(_ => JsonContent.Create(new GlobalSearchResponseDto(
+            "d11",
+            1,
+            [
+                new GlobalSearchResultDto(
+                    "d11-12.stp",
+                    "PRJ-2026-0001 - FDM - PETG",
+                    "Sales & CRM",
+                    "project-part",
+                    "Quoted",
+                    "/sales/projects/11111111-1111-1111-1111-111111111111?tab=parts&partId=22222222-2222-2222-2222-222222222222",
+                    1.0d,
+                    ThumbnailUrl: "https://storage.example/d11-12.webp")
+            ])));
+
+        var cut = context.Render<GlobalSearchBox>();
+        cut.Find("input").Input("d11");
+
+        cut.WaitForAssertion(() =>
+        {
+            var image = cut.Find(".global-search-result-image");
+            Assert.Equal("https://storage.example/d11-12.webp", image.GetAttribute("src"));
+        });
+    }
+
+    [Fact]
+    public void GlobalSearchBox_RendersCustomerAvatarFallback()
+    {
+        using var context = CreateContext(_ => JsonContent.Create(new GlobalSearchResponseDto(
+            "pim",
+            1,
+            [
+                new GlobalSearchResultDto(
+                    "Pimchanok Garcia",
+                    "seed.customer46@seed.maliev.local",
+                    "Sales & CRM",
+                    "customer",
+                    "Active",
+                    "/customers/11111111-1111-1111-1111-111111111111",
+                    1.0d,
+                    AvatarText: "PG")
+            ])));
+
+        var cut = context.Render<GlobalSearchBox>();
+        cut.Find("input").Input("pim");
+
+        cut.WaitForAssertion(() =>
+        {
+            var avatar = cut.Find(".global-search-result-avatar");
+            Assert.Equal("PG", avatar.TextContent.Trim());
+        });
+    }
+
+    [Fact]
     public void GlobalSearchBoxCss_ConstrainsResultRows()
     {
         var cssPath = Path.GetFullPath(Path.Combine(
@@ -113,6 +169,9 @@ public class GlobalSearchBoxTests
         Assert.Contains("justify-items: stretch;", css, StringComparison.Ordinal);
         Assert.Contains("justify-self: stretch;", css, StringComparison.Ordinal);
         Assert.Contains("justify-content: flex-start;", css, StringComparison.Ordinal);
+        Assert.Contains(".global-search-result.has-media", css, StringComparison.Ordinal);
+        Assert.Contains(".global-search-result-image", css, StringComparison.Ordinal);
+        Assert.Contains(".global-search-result-avatar", css, StringComparison.Ordinal);
     }
 
     [Fact]

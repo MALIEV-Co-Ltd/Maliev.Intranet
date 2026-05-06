@@ -14,7 +14,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/search")]
-public class SearchController(SearchServiceClient searchServiceClient) : ControllerBase
+public class SearchController(SearchServiceClient searchServiceClient, GlobalSearchResultEnricher searchResultEnricher) : ControllerBase
 {
     /// <summary>
     /// Searches the global index and maps results to Intranet routes.
@@ -44,6 +44,6 @@ public class SearchController(SearchServiceClient searchServiceClient) : Control
         var normalizedLimit = Math.Clamp(limit, 1, 50);
         var response = await searchServiceClient.SearchAsync(normalizedQuery, normalizedLimit, ct);
 
-        return Ok(SearchResultMapper.ToGlobalSearchResponse(response, normalizedQuery));
+        return Ok(await searchResultEnricher.ToGlobalSearchResponseAsync(response, normalizedQuery, ct));
     }
 }
