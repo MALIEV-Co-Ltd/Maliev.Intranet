@@ -145,6 +145,10 @@
     font-size: var(--maliev-font-small);
     font-weight: 600;
     font-family: var(--maliev-font-mono);
+    width: max-content !important;
+    min-width: max-content !important;
+    max-width: max-content !important;
+    flex: 0 0 auto;
 }
 
 .topbar-currency-item { display: flex; flex-direction: column; gap: 1px; padding: 2px 0; }
@@ -159,6 +163,25 @@
     font-size: var(--maliev-font-small);
     font-weight: 600;
     padding: 0 4px 0 8px;
+    width: max-content !important;
+    min-width: max-content !important;
+    max-width: max-content !important;
+    flex: 0 0 auto;
+}
+
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-control,
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-control-input-container {
+    width: max-content !important;
+    min-width: max-content !important;
+    max-width: max-content !important;
+    flex: 0 0 auto;
+}
+
+.topbar-root ::deep .topbar-currency-autocomplete .mud-input-slot {
+    width: 5ch !important;
+    min-width: 5ch !important;
+    max-width: 5ch !important;
+    field-sizing: content;
 }
 
 .topbar-root ::deep .topbar-currency-autocomplete .mud-input-underline::before,
