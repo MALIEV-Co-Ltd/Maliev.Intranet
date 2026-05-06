@@ -210,6 +210,12 @@
     /// <summary>Detected CNC turning axis in model coordinates.</summary>
     public record TurningAxisViewModel(string PrimaryAxis, IReadOnlyList<double> AxisVector, IReadOnlyList<double> AxisPoint);
 
+    /// <summary>Whether the persisted user grid preference is enabled.</summary>
+    public bool UserGridEnabled => _gridEnabled;
+
+    /// <summary>Whether the grid should currently be visible in the scene.</summary>
+    public bool IsGridVisible => ShouldShowGrid;
+
     private string _canvasId    = $"babylon-canvas-{Guid.NewGuid()}";
     private string _sectionPanelId = $"section-panel-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
@@ -220,6 +226,8 @@
     private bool   _edgesEnabled;
     private bool   _bboxEnabled;
     private bool   _gridEnabled;
+    private readonly HashSet<string> _temporaryGridOwners = new(StringComparer.Ordinal);
+    private bool? _lastAppliedGridVisible;
     private string? _lastViewerUrl;
     private string? _lastTurningAxisKey;
     private string? _activeAnalysisTool;  // "flippedTriangles" | "measure" | "thickness" | null
@@ -258,6 +266,8 @@
         new("measure", "Measure", Icons.Material.Filled.Straighten),
         new("thickness", "Thickness Analysis", Icons.Material.Filled.Fullscreen),
     ];
+
+    private bool ShouldShowGrid => _gridEnabled || _temporaryGridOwners.Count > 0;
 
     /// <inheritdoc />
     protected override void OnInitialized()
@@ -506,7 +516,10 @@
             {
                 _module ??= await JSRuntime.InvokeAsync<IJSObjectReference>(identifier: "import", args: "./js/part-viewer.js");
                 if (previousUrl != null)
+                {
                     await _module.InvokeVoidAsync("dispose", _canvasId);
+                    _lastAppliedGridVisible = null;
+                }
 
                 // Pass known bounding-box dimensions (mm) so the viewer can correct the glTF meter scale.
                 // Prefer Model properties, fall back to KnownDimensions parameter.
@@ -526,6 +539,8 @@
                     dims,
                     _dotNetRef,
                     settings);
+                _lastAppliedGridVisible = _gridEnabled;
+                await ApplyGridVisibilityAsync(notifySettingsChanged: false);
                 await ApplyTurningAxisAsync();
             }
             catch (Exception ex)
@@ -692,16 +707,7 @@
     private async Task ToggleGridAsync()
     {
         _gridEnabled = !_gridEnabled;
-
-        if (_module != null)
-        {
-            if (_gridEnabled)
-                await _module.InvokeVoidAsync("showGrid", _canvasId);
-            else
-                await _module.InvokeVoidAsync("hideGrid", _canvasId);
-        }
-
-        await NotifyViewerSettingsChangedAsync();
+        await ApplyGridVisibilityAsync(notifySettingsChanged: true);
     }
 
     private void CloseAnalysisPanels()
@@ -842,27 +848,62 @@
     /// <summary>Shows a grid floor at the model base (Z=0) for overhang visualisation.</summary>
     public async Task ShowGridAsync()
     {
-        if (_module == null) return;
-        try
-        {
-            _gridEnabled = true;
-            await _module.InvokeVoidAsync("showGrid", _canvasId);
-            await NotifyViewerSettingsChangedAsync();
-        }
-        catch (Exception ex) { Console.WriteLine($"[ModelViewer] showGrid error: {ex.Message}"); }
+        _gridEnabled = true;
+        await ApplyGridVisibilityAsync(notifySettingsChanged: true);
     }
 
     /// <summary>Hides the grid floor.</summary>
     public async Task HideGridAsync()
     {
-        if (_module == null) return;
+        _gridEnabled = false;
+        await ApplyGridVisibilityAsync(notifySettingsChanged: true);
+    }
+
+    /// <summary>Requests temporary grid visibility without changing persisted settings.</summary>
+    public async Task SetTemporaryGridVisibilityAsync(string ownerKey, bool visible)
+    {
+        if (string.IsNullOrWhiteSpace(ownerKey))
+            return;
+
+        var changed = visible
+            ? _temporaryGridOwners.Add(ownerKey)
+            : _temporaryGridOwners.Remove(ownerKey);
+
+        if (changed)
+            await ApplyGridVisibilityAsync(notifySettingsChanged: false);
+    }
+
+    /// <summary>Clears all temporary grid visibility requests.</summary>
+    public async Task ClearTemporaryGridOwnersAsync()
+    {
+        if (_temporaryGridOwners.Count == 0)
+            return;
+
+        _temporaryGridOwners.Clear();
+        await ApplyGridVisibilityAsync(notifySettingsChanged: false);
+    }
+
+    private async Task ApplyGridVisibilityAsync(bool notifySettingsChanged)
+    {
+        var shouldShowGrid = ShouldShowGrid;
+
         try
         {
-            _gridEnabled = false;
-            await _module.InvokeVoidAsync("hideGrid", _canvasId);
-            await NotifyViewerSettingsChangedAsync();
+            if (_module != null && _lastAppliedGridVisible != shouldShowGrid)
+            {
+                await _module.InvokeVoidAsync(
+                    shouldShowGrid ? "showGrid" : "hideGrid",
+                    _canvasId);
+                _lastAppliedGridVisible = shouldShowGrid;
+            }
         }
-        catch (Exception ex) { Console.WriteLine($"[ModelViewer] hideGrid error: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] grid visibility error: {ex.Message}");
+        }
+
+        if (notifySettingsChanged)
+            await NotifyViewerSettingsChangedAsync();
     }
 
     /// <summary>Notifies the viewer it has become visible after being hidden. Triggers engine resize.</summary>

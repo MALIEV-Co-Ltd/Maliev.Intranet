@@ -455,7 +455,10 @@
         {
             _dfmPanel?.ResetOverlays();
             if (_modelViewer != null)
+            {
+                await _modelViewer.ClearTemporaryGridOwnersAsync();
                 await _modelViewer.ClearDfmOverlaysAsync(prevPartId.ToString());
+            }
             if (partChanged)
             {
                 _viewerLoadFailed = false;
@@ -768,11 +771,19 @@
         // Show/hide the grid floor when support-related overlays are toggled.
         if (issue.Category is "overhang" or "support_required")
         {
-            if (isActive)
-                await _modelViewer.ShowGridAsync();
-            else
-                await _modelViewer.HideGridAsync();
+            await _modelViewer.SetTemporaryGridVisibilityAsync(
+                GetDfmGridOwnerKey(fileId, issue),
+                isActive);
         }
+    }
+
+    private static string GetDfmGridOwnerKey(string fileId, DfmIssue issue)
+    {
+        var overlayKey = string.IsNullOrWhiteSpace(issue.OverlayKey)
+            ? issue.Category ?? "overlay"
+            : issue.OverlayKey;
+
+        return $"dfm:{fileId}:{overlayKey}";
     }
 
     /// <summary>
