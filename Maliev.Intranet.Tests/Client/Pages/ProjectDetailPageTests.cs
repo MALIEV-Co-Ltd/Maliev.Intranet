@@ -160,6 +160,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
+        Assert.Contains("th:nth-child(6)", css, StringComparison.Ordinal);
+        Assert.Contains("text-align: right", css, StringComparison.Ordinal);
+        Assert.Contains("width: 5%", css, StringComparison.Ordinal);
+        Assert.Contains("width: 100%", css, StringComparison.Ordinal);
         Assert.Contains("position: sticky", css, StringComparison.Ordinal);
         Assert.Contains("height: 52px", css, StringComparison.Ordinal);
     }

@@ -134,13 +134,19 @@
 
 .project-record-shell ::deep .project-parts-table th:nth-child(1),
 .project-record-shell ::deep .project-parts-table td:nth-child(1) {
-    width: 24%;
+    width: 23%;
 }
 
 .project-record-shell ::deep .project-parts-table th:nth-child(2),
-.project-record-shell ::deep .project-parts-table td:nth-child(2),
+.project-record-shell ::deep .project-parts-table td:nth-child(2) {
+    width: 12%;
+}
+
 .project-record-shell ::deep .project-parts-table th:nth-child(3),
-.project-record-shell ::deep .project-parts-table td:nth-child(3),
+.project-record-shell ::deep .project-parts-table td:nth-child(3) {
+    width: 11%;
+}
+
 .project-record-shell ::deep .project-parts-table th:nth-child(4),
 .project-record-shell ::deep .project-parts-table td:nth-child(4) {
     width: 12%;
@@ -148,11 +154,14 @@
 
 .project-record-shell ::deep .project-parts-table th:nth-child(5),
 .project-record-shell ::deep .project-parts-table td:nth-child(5) {
-    width: 12%;
+    width: 13%;
 }
 
 .project-record-shell ::deep .project-parts-table th:nth-child(6),
-.project-record-shell ::deep .project-parts-table td:nth-child(6),
+.project-record-shell ::deep .project-parts-table td:nth-child(6) {
+    width: 5%;
+}
+
 .project-record-shell ::deep .project-parts-table th:nth-child(7),
 .project-record-shell ::deep .project-parts-table td:nth-child(7),
 .project-record-shell ::deep .project-parts-table th:nth-child(8),
@@ -162,7 +171,7 @@
 
 .project-record-shell ::deep .project-parts-table th:nth-child(9),
 .project-record-shell ::deep .project-parts-table td:nth-child(9) {
-    width: 9%;
+    width: 8%;
 }
 
 .project-record-shell ::deep .project-parts-table th {
@@ -185,6 +194,12 @@
 .project-record-shell ::deep .project-parts-table .numeric {
     text-align: right;
     white-space: nowrap;
+}
+
+.project-record-shell ::deep .project-parts-table th:nth-child(6),
+.project-record-shell ::deep .project-parts-table th:nth-child(7),
+.project-record-shell ::deep .project-parts-table th:nth-child(8) {
+    text-align: right;
 }
 
 .project-record-shell ::deep .project-config-stack {
@@ -277,7 +292,8 @@
     grid-template-columns: 18px minmax(0, 1fr);
     align-items: center;
     column-gap: 7px;
-    min-width: 148px;
+    width: 100%;
+    min-width: 0;
     padding: 5px 7px;
     border: 1px solid var(--mud-palette-lines-default);
     border-radius: 6px;
