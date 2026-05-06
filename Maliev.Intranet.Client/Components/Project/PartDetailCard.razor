@@ -167,21 +167,7 @@
                 @if (Part.QueuedUpload || Part.Uploading || Part.AwaitingPreview)
                 {
                     <div class="pdc-upload-progress">
-                        @if (Part.QueuedUpload)
-                        {
-                            <PartQueueLoader Class="part-queue-loader--canvas" />
-                        }
-                        else if (Part.Uploading)
-                        {
-                            <MudProgressCircular Indeterminate="false"
-                                                 Value="@Part.ProgressPercent"
-                                                 Size="Size.Medium"
-                                                 Class="mb-2" />
-                        }
-                        else
-                        {
-                            <PartProcessingLoader Class="part-processing-loader--canvas" />
-                        }
+                        <PartQueueLoader Class="part-queue-loader--canvas" Label="@ResolveCanvasLoadingLabel()" />
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@Part.StatusText</MudText>
                     </div>
                 }
@@ -366,6 +352,13 @@
         if (Part.UploadedAt.HasValue)
             return $"Uploaded {FormatRelative(Part.UploadedAt.Value)}";
         return "Uploaded";
+    }
+
+    private string ResolveCanvasLoadingLabel()
+    {
+        if (Part.QueuedUpload) return "Part queued for upload";
+        if (Part.Uploading) return "Uploading part";
+        return "Processing part preview";
     }
 
     private static string FormatRelative(DateTimeOffset t)

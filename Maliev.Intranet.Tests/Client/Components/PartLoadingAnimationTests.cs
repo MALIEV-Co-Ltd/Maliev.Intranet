@@ -81,26 +81,30 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void PartDetailCard_UsesCanvasSizedLoadersForQueuedAndProcessingStates()
+    public void PartDetailCard_UsesCubeLoaderForEveryCanvasLoadingState()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor");
 
         Assert.Contains("<PartQueueLoader Class=\"part-queue-loader--canvas\"", source);
-        Assert.Contains("<PartProcessingLoader Class=\"part-processing-loader--canvas\"", source);
-        Assert.Contains("Indeterminate=\"false\"", source);
+        Assert.Contains("Label=\"@ResolveCanvasLoadingLabel()\"", source);
+        Assert.DoesNotContain("<PartProcessingLoader Class=\"part-processing-loader--canvas\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<MudProgressCircular Indeterminate=\"false\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Indeterminate=\"@(!Part.Uploading)\"", source, StringComparison.Ordinal);
     }
 
     private static string ReadRepoFile(params string[] relativeParts)
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
+        foreach (var root in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory }.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
-            if (File.Exists(candidate))
-                return File.ReadAllText(candidate);
+            var current = new DirectoryInfo(root);
+            while (current is not null)
+            {
+                var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
+                if (File.Exists(candidate))
+                    return File.ReadAllText(candidate);
 
-            current = current.Parent;
+                current = current.Parent;
+            }
         }
 
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
