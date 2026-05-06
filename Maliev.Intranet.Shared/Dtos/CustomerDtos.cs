@@ -151,6 +151,8 @@ public class CustomerDetailDto
     public List<InternalNoteResponse> Notes { get; set; } = [];
     /// <summary>Communication preference settings (e.g., email_opt_in).</summary>
     public Dictionary<string, bool> CommunicationPreferences { get; set; } = [];
+    /// <summary>The payment terms configured for this customer.</summary>
+    public string PaymentTerms { get; set; } = "Due on receipt";
     /// <summary>Concurrency version token for the customer record.</summary>
     public byte[] Version { get; set; } = [];
     /// <summary>The PostgreSQL xmin concurrency token returned by CustomerService.</summary>
@@ -654,6 +656,11 @@ public class CreateCustomerRequest
         { "sms_opt_in", false },
         { "marketing_opt_in", false }
     };
+
+    /// <summary>The initial payment terms for the customer.</summary>
+    [Required]
+    [StringLength(100)]
+    public string PaymentTerms { get; set; } = "Due on receipt";
 }
 
 /// <summary>
@@ -726,6 +733,11 @@ public class UpdateCustomerRequest
         { "marketing_opt_in", false }
     };
 
+    /// <summary>The updated payment terms for the customer.</summary>
+    [Required]
+    [StringLength(100)]
+    public string PaymentTerms { get; set; } = "Due on receipt";
+
     /// <summary>Concurrency version token required for updates.</summary>
     public byte[] Version { get; set; } = [];
     /// <summary>The PostgreSQL xmin concurrency token required by CustomerService.</summary>
@@ -770,6 +782,8 @@ public class CustomerResponse
     public string PreferredLanguage { get; set; } = string.Empty;
     /// <summary>The customer's local timezone.</summary>
     public string Timezone { get; set; } = string.Empty;
+    /// <summary>The payment terms configured for this customer.</summary>
+    public string PaymentTerms { get; set; } = "Due on receipt";
     /// <summary>The identifier of the associated company.</summary>
     public Guid? CompanyId { get; set; }
     /// <summary>The EmployeeService employee ID assigned as this customer's account manager.</summary>

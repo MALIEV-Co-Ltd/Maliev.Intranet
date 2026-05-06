@@ -943,6 +943,7 @@
                 preferredLanguage = _customer.PreferredLanguage,
                 timezone = _customer.Timezone,
                 communicationPreferences = _customer.CommunicationPreferences,
+                paymentTerms = _edit.PaymentTerms,
                 companyId = _edit.CompanyId,
                 accountManagerEmployeeId = _edit.AccountManagerEmployeeId,
                 clearAccountManager = _edit.AccountManagerEmployeeId is null,
@@ -1543,7 +1544,7 @@
             Phone = customer.Mobile ?? customer.CompanyPhone ?? string.Empty,
             CustomerType = customer.CompanyId is not null || !string.IsNullOrWhiteSpace(customer.CompanyName) ? "Company" : "Individual",
             Status = string.IsNullOrWhiteSpace(customer.Status) ? "Active" : customer.Status,
-            PaymentTerms = "Due on receipt",
+            PaymentTerms = string.IsNullOrWhiteSpace(customer.PaymentTerms) ? "Due on receipt" : customer.PaymentTerms,
             AccountManagerEmployeeId = customer.AccountManagerEmployeeId
         };
     }

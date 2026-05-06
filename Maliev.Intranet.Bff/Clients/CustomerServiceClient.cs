@@ -374,6 +374,7 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             preferredLanguage = request.Customer.PreferredLanguage,
             timezone = request.Customer.Timezone,
             communicationPreferences = request.Customer.CommunicationPreferences,
+            paymentTerms = request.Customer.PaymentTerms,
             companyId = request.Customer.CompanyId,
             accountManagerEmployeeId = request.Customer.AccountManagerEmployeeId,
             clearAccountManager = request.Customer.AccountManagerEmployeeId is null,

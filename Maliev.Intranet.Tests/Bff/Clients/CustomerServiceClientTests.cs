@@ -224,6 +224,7 @@ public class CustomerServiceClientTests
                 Tier = "Gold",
                 PreferredLanguage = "en",
                 Timezone = "Asia/Bangkok",
+                PaymentTerms = "Net 30",
                 AccountManagerEmployeeId = accountManagerId
             }
         });
@@ -232,6 +233,7 @@ public class CustomerServiceClientTests
         using var document = System.Text.Json.JsonDocument.Parse(capturedPayload);
         var root = document.RootElement;
         Assert.Equal(accountManagerId.ToString(), root.GetProperty("accountManagerEmployeeId").GetString());
+        Assert.Equal("Net 30", root.GetProperty("paymentTerms").GetString());
         Assert.False(root.GetProperty("clearAccountManager").GetBoolean());
         Assert.Equal(123u, root.GetProperty("xmin").GetUInt32());
     }

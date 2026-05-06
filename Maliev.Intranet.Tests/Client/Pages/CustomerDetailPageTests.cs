@@ -18,6 +18,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly Guid _accountManagerId = Guid.Parse("55555555-5555-5555-5555-555555555555");
     private readonly List<string> _requestedPaths = [];
     private readonly List<CustomerEmailRequest> _emailRequests = [];
+    private readonly List<JsonDocument> _customerUpdatePayloads = [];
 
     public CustomerDetailPageTests()
     {
@@ -75,6 +76,24 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains(_requestedPaths, path => path.Equals("/api/v1/employees?page=1&pageSize=100", StringComparison.Ordinal));
         var option = cut.Find($"option[value='{_accountManagerId}']");
         Assert.Equal("Mia Wong - Sales Manager", option.TextContent);
+    }
+
+    [Fact]
+    public void CustomerDetail_SavePostsSelectedPaymentTerms()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        var paymentTermsSelect = cut.FindAll("select.customer-input")
+            .Single(select => select.InnerHtml.Contains("Net 45", StringComparison.Ordinal));
+
+        paymentTermsSelect.Change("Net 45");
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Save", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() => Assert.Single(_customerUpdatePayloads));
+
+        var root = _customerUpdatePayloads.Single().RootElement;
+        Assert.Equal("Net 45", root.GetProperty("paymentTerms").GetString());
     }
 
     [Fact]
@@ -377,7 +396,8 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
             });
         }
 
-        if (pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
+        if (request.Method == HttpMethod.Get &&
+            pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
         {
             return Json(new CustomerDetailDto
             {
@@ -390,6 +410,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                 Status = "Active",
                 Segment = "Enterprise",
                 Tier = "Company",
+                PaymentTerms = "Net 30",
                 TotalSpent = 28400m,
                 ActiveOrdersCount = 2,
                 OpenQuotationsCount = 1,
@@ -452,6 +473,23 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Accepted)
             {
                 Content = JsonContent.Create(new { messageId = Guid.Parse("77777777-7777-7777-7777-777777777777") })
+            });
+        }
+
+        if (request.Method == HttpMethod.Patch &&
+            pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
+        {
+            var payload = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? "{}";
+            _customerUpdatePayloads.Add(JsonDocument.Parse(payload));
+
+            return Json(new CustomerResponse
+            {
+                Id = _customerId,
+                FirstName = "Sarah",
+                LastName = "Chen",
+                Email = "sarah@axion.io",
+                PaymentTerms = "Net 45",
+                Xmin = 204
             });
         }
 
