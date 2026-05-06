@@ -857,6 +857,112 @@ public class ProjectsControllerTests
     }
 
     [Fact]
+    public async Task GetProductionPlan_EnrichesThumbnailAndHumanizesConfiguration()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        const string ThumbnailPath = "customers/seed/projects/prj/part_thumb_small.webp";
+        const string SignedThumbnailUrl = "https://storage.example/part_thumb_small.webp";
+        var machineId = Guid.NewGuid();
+
+        var project = new ProjectDetailDto
+        {
+            Id = projectId,
+            ProjectNumber = "PRJ-2026-0001",
+            Parts =
+            [
+                new ProjectPartDto
+                {
+                    Id = partId,
+                    FileName = "fixture-base.step",
+                    ThumbnailSmallGcsPath = ThumbnailPath,
+                    ProcessType = "CNC_Milling",
+                    MaterialName = "Aluminium 6061-T6",
+                    Finish = "AS_MACHINED",
+                    Color = "FDM_STD",
+                    Tolerance = "ISO2768-m",
+                    Quantity = 2,
+                    Status = "Confirmed",
+                    Dimensions = new ModelDimensionsDto { X = 80, Y = 48, Z = 12 }
+                }
+            ]
+        };
+
+        var projectClient = CreateClient(project);
+        var uploadHandler = new MockHttpMessageHandler((req, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { signedUrl = SignedThumbnailUrl })
+            }));
+        var jobHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/job/v1/jobs/planning-holds", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(Array.Empty<ProductionPlanningHoldDto>())
+                });
+            }
+
+            if (req.RequestUri!.AbsolutePath.EndsWith("/job/v1/jobs/queue-depth", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new Dictionary<string, int> { ["CNC_MILL"] = 2 })
+                });
+            }
+
+            if (req.RequestUri!.AbsolutePath.Contains("/job/v1/jobs/machine/", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(Array.Empty<MachineScheduleItemDto>())
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+        var facilityHandler = new MockHttpMessageHandler((req, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new FacilityPagedResult<EquipmentSummaryDto>
+                {
+                    Items =
+                    [
+                        new EquipmentSummaryDto
+                        {
+                            Id = machineId,
+                            AssetCode = "MAL-CNC-001",
+                            Name = "HAAS VF2",
+                            Category = "CncMachine",
+                            Status = "Active"
+                        }
+                    ],
+                    TotalCount = 1,
+                    Page = 1,
+                    PageSize = 50
+                })
+            }));
+        var controller = new ProjectsController(
+            projectClient,
+            new JobServiceClient(new HttpClient(jobHandler) { BaseAddress = new Uri("http://test") }),
+            new FacilityServiceClient(new HttpClient(facilityHandler) { BaseAddress = new Uri("http://test") }),
+            Logger,
+            new UploadServiceClient(new HttpClient(uploadHandler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.GetProductionPlan(projectId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var plan = Assert.IsType<ProjectProductionPlanDto>(ok.Value);
+        var part = Assert.Single(plan.Parts);
+        Assert.Equal(SignedThumbnailUrl, part.ThumbnailUrl);
+        Assert.Equal("As Machined / Standard FDM settings / ISO 2768-m", part.Configuration);
+        Assert.Equal(machineId, part.Routing?.MachineId);
+        Assert.Equal(2, part.Routing?.QueueAhead);
+        Assert.True(part.CanCreateHold);
+    }
+
+    [Fact]
     public async Task GetPartRouting_UnknownProcessType_ReturnsOkWithFallbackMachineFields()
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -412,6 +413,9 @@ public class ProjectsController(
         if (project is null)
             return NotFound();
 
+        if (uploadClient is not null)
+            await EnrichProjectDetailArtifactsAsync(project, uploadClient, analysisStatusService, ct);
+
         var holds = await jobClient.GetPlanningHoldsAsync(projectId: id, activeOnly: true, ct: ct);
         var holdByPart = holds
             .GroupBy(hold => hold.ProjectPartId)
@@ -763,9 +767,29 @@ public class ProjectsController(
     {
         var values = new[] { part.Finish, part.Color, part.Tolerance }
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value!.Trim());
+            .Select(value => FormatConfigurationToken(value!));
 
         return string.Join(" / ", values);
+    }
+
+    private static string FormatConfigurationToken(string value)
+    {
+        var trimmed = value.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return trimmed;
+
+        return trimmed.ToUpperInvariant() switch
+        {
+            "AS_MACHINED" => "As Machined",
+            "AS_PRINTED" => "As Printed",
+            "FDM_STD" => "Standard FDM settings",
+            "ISO2768_M" or "ISO2768-M" => "ISO 2768-m",
+            _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(
+                trimmed
+                    .Replace('_', ' ')
+                    .Replace('-', ' ')
+                    .ToLowerInvariant())
+        };
     }
 
     private static string? FormatDimensions(ModelDimensionsDto? dimensions)

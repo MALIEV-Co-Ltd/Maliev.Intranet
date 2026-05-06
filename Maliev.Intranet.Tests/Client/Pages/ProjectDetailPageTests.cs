@@ -197,13 +197,17 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/production-plan");
         Assert.Contains("project-planning-panel", cut.Markup);
         Assert.Contains("project-planning-table", cut.Markup);
+        Assert.Contains("project-planning-part", cut.Markup);
+        Assert.Contains("https://storage.example/bracket-thumb.webp", cut.Markup);
         Assert.Contains("3 quoted parts", cut.Markup);
         Assert.Contains("Manufacturing", cut.Markup);
         Assert.Contains("Qty / DFM", cut.Markup);
         Assert.Contains("bracket-left.stl", cut.Markup);
+        Assert.Contains("120 x 64 x 18 mm", cut.Markup);
         Assert.Contains("CNC Milling", cut.Markup);
         Assert.Contains("Aluminium 6061-T6", cut.Markup);
         Assert.Contains("Anodized - Black - ISO 2768-m", cut.Markup);
+        Assert.DoesNotContain("AS_MACHINED", cut.Markup);
         Assert.Contains("Requires acknowledgement", cut.Markup);
         Assert.Contains("CNC Mill 01", cut.Markup);
         Assert.Contains("2 queued ahead", cut.Markup);
@@ -386,6 +390,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-part-attachments", css, StringComparison.Ordinal);
         Assert.Contains("overflow-wrap: anywhere", css, StringComparison.Ordinal);
         Assert.Contains("word-break: break-word", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-part > div", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-part strong", css, StringComparison.Ordinal);
+        Assert.Contains("align-items: start", css, StringComparison.Ordinal);
         Assert.Contains(".project-thumbnail-popout", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-hover", css, StringComparison.Ordinal);

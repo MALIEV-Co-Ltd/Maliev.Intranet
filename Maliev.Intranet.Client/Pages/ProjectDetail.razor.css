@@ -1365,8 +1365,14 @@
     display: grid;
     grid-template-columns: 46px minmax(0, 1fr);
     gap: 10px;
-    align-items: center;
+    align-items: start;
     min-width: 0;
+}
+
+.project-record-shell ::deep .project-planning-part > div {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
 }
 
 .project-record-shell ::deep .project-planning-part img,
@@ -1389,6 +1395,7 @@
     color: var(--maliev-info);
     font-family: var(--maliev-font-mono);
     font-size: var(--maliev-font-small);
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1398,6 +1405,8 @@
 .project-record-shell ::deep .project-planning-muted {
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
+    display: block;
+    min-width: 0;
 }
 
 .project-record-shell ::deep .project-planning-actions {
