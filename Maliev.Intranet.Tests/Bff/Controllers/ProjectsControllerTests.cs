@@ -652,13 +652,118 @@ public class ProjectsControllerTests
     // ── Quotation lifecycle ───────────────────────────────────────────────────
 
     [Fact]
-    public async Task GenerateQuotation_WhenSuccessful_ShouldReturnNoContent()
+    public async Task GenerateQuotation_WhenProjectResponseContainsQuotationId_GeneratesPdfWithoutReloadingProject()
     {
-        var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);
+        var projectId = Guid.NewGuid();
+        var quotationId = Guid.NewGuid();
+        const string QuotationNumber = "Q-3EF52DCB";
+        var projectReloadCount = 0;
+        JsonElement? pdfRequestPayload = null;
+        var generatedProject = new ProjectDetailDto
+        {
+            Id = projectId,
+            ProjectNumber = "PRJ-2026-0001",
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "Somchai Patel",
+            QuotationId = quotationId,
+            QuotationNumber = QuotationNumber,
+            CreatedAt = DateTime.UtcNow,
+            ValidUntil = DateTime.UtcNow.AddDays(30),
+            Currency = "THB",
+            TotalPrice = 1500m
+        };
+        var quotation = new QuotationDetailDto
+        {
+            Id = quotationId,
+            QuotationNumber = QuotationNumber,
+            CustomerId = generatedProject.CustomerId,
+            CustomerName = generatedProject.CustomerName,
+            CurrentVersionNumber = 1,
+            CurrencyCode = "THB",
+            ValidityPeriodStart = DateTime.UtcNow,
+            ValidityPeriodEnd = DateTime.UtcNow.AddDays(30),
+            SubTotal = 1500m,
+            Total = 1655m,
+            CreatedAt = DateTime.UtcNow,
+            Versions =
+            [
+                new QuotationVersionDto
+                {
+                    Id = Guid.NewGuid(),
+                    VersionNumber = 1,
+                    CurrencyCode = "THB",
+                    ShippingCost = 200m,
+                    ManualDiscountAmount = 45m,
+                    TaxAmount = 0m,
+                    TotalPrice = 1655m,
+                    SpecialTerms = "50% deposit before production.",
+                    LineItems =
+                    [
+                        new QuotationItemDto
+                        {
+                            Description = "CNC fixture",
+                            Quantity = 1m,
+                            UnitPrice = 1500m
+                        }
+                    ]
+                }
+            ]
+        };
+        var projectHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            if (req.Method == HttpMethod.Post &&
+                req.RequestUri!.AbsolutePath.EndsWith($"/project/v1/projects/{projectId}/generate-quotation", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(generatedProject)
+                });
+            }
 
-        var result = await controller.GenerateQuotation(Guid.NewGuid(), new GenerateQuotationRequest(), CancellationToken.None);
+            if (req.Method == HttpMethod.Get &&
+                req.RequestUri!.AbsolutePath.EndsWith($"/project/v1/projects/{projectId}", StringComparison.Ordinal))
+            {
+                projectReloadCount++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+        var quotationHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, req.Method);
+            Assert.EndsWith($"/quotation/v1/quotations/{quotationId}", req.RequestUri!.AbsolutePath);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(quotation)
+            });
+        });
+        var pdfHandler = new MockHttpMessageHandler(async (req, ct) =>
+        {
+            Assert.Equal(HttpMethod.Post, req.Method);
+            Assert.EndsWith("/pdf/v1/generations/generate", req.RequestUri!.AbsolutePath);
+            pdfRequestPayload = await req.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { storageUrl = "https://storage.example/quote.pdf" })
+            };
+        });
+        var controller = new ProjectsController(
+            new ProjectServiceClient(new HttpClient(projectHandler) { BaseAddress = new Uri("http://test") }),
+            StubJobClient(),
+            StubFacilityClient(),
+            Logger,
+            quotationClient: new QuotationServiceClient(new HttpClient(quotationHandler) { BaseAddress = new Uri("http://test") }),
+            pdfClient: new PdfServiceClient(new HttpClient(pdfHandler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.GenerateQuotation(projectId, new GenerateQuotationRequest(), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
+        Assert.Equal(0, projectReloadCount);
+        Assert.NotNull(pdfRequestPayload);
+        Assert.Equal("Quotation", pdfRequestPayload.Value.GetProperty("documentType").GetString());
+        Assert.Equal(QuotationNumber, pdfRequestPayload.Value.GetProperty("referenceId").GetString());
+        Assert.Equal("Quotation", pdfRequestPayload.Value.GetProperty("templateCode").GetString());
     }
 
     [Fact]

@@ -380,7 +380,8 @@ public class ProjectsController(
         var response = await client.GenerateQuotationAsync(id, request ?? new GenerateQuotationRequest(), ct);
         if (response.IsSuccessStatusCode)
         {
-            var pdfGenerated = await TryGenerateQuotationPdfAsync(id, ct);
+            var generatedProject = await ReadGeneratedProjectAsync(response, ct);
+            var pdfGenerated = await TryGenerateQuotationPdfAsync(id, generatedProject, ct);
             if (!pdfGenerated)
                 return StatusCode(StatusCodes.Status502BadGateway, "Quotation generated, but automatic PDF generation failed.");
 
@@ -394,7 +395,19 @@ public class ProjectsController(
         return StatusCode((int)response.StatusCode, errorContent);
     }
 
-    private async Task<bool> TryGenerateQuotationPdfAsync(Guid projectId, CancellationToken ct)
+    private static async Task<ProjectDetailDto?> ReadGeneratedProjectAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<ProjectDetailDto>(cancellationToken: ct);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<bool> TryGenerateQuotationPdfAsync(Guid projectId, ProjectDetailDto? generatedProject, CancellationToken ct)
     {
         if (quotationClient is null || pdfClient is null)
         {
@@ -402,7 +415,9 @@ public class ProjectsController(
             return false;
         }
 
-        var project = await client.GetProjectByIdAsync(projectId, ct);
+        var project = generatedProject?.QuotationId is Guid
+            ? generatedProject
+            : await client.GetProjectByIdAsync(projectId, ct);
         if (project?.QuotationId is not Guid quotationId)
         {
             _logger.LogWarning("Skipping automatic quotation PDF generation because project {ProjectId} has no quotation ID.", projectId);
