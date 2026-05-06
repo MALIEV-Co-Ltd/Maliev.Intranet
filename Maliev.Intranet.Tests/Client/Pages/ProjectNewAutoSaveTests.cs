@@ -511,6 +511,29 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CreatePartViewModelFromProjectPart_WhenResumedPartHasNoPersistedDfmReport_StopsDfmAnalyzingState()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = CreatePartViewModelFromProjectPart(cut, new ProjectPartDto
+        {
+            Id = Guid.NewGuid(),
+            FileId = Guid.NewGuid(),
+            FileName = "resumed-warning.stl",
+            FileReference = "customers/customer-1/projects/project-1/resumed-warning.stl",
+            ProcessType = "FDM",
+            Quantity = 1,
+            GlbStoragePath = "customers/customer-1/projects/project-1/resumed-warning_viewer.glb",
+            ModelPreviewUrl = "https://storage.example/resumed-warning.glb",
+            HasDfmWarnings = true,
+        });
+
+        Assert.Null(part.DfmReport);
+        Assert.True(part.DfmAnalysisTimedOut);
+        Assert.Equal("DFM_REPORT_UNAVAILABLE", part.AnalysisErrorCode);
+        Assert.Equal("DFM report unavailable", part.StatusText);
+    }
+
+    [Fact]
     public async Task DuplicateProjectAsync_WhenServerDraftExists_PreservesCustomerConfigSelectionsAndFiles()
     {
         var sourceProjectId = Guid.NewGuid();
@@ -1193,6 +1216,8 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             StoragePath = "projects/polled-dfm.stl",
             ProcessCode = "FDM",
             AwaitingPreview = true,
+            DfmAnalysisTimedOut = true,
+            AnalysisErrorCode = "DFM_REPORT_UNAVAILABLE",
         };
         GetParts(cut.Instance).Add(part);
 
@@ -1224,6 +1249,8 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
 
         Assert.Same(part.FdmDfmReport, part.DfmReport);
         Assert.IsType<FdmDfmReportPayload>(part.DfmReport);
+        Assert.False(part.DfmAnalysisTimedOut);
+        Assert.Null(part.AnalysisErrorCode);
         Assert.False(part.AwaitingPreview);
         Assert.Equal("Ready", part.StatusText);
     }
@@ -1400,6 +1427,17 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method.Invoke(instance, []);
+    }
+
+    private static PartViewModel CreatePartViewModelFromProjectPart(
+        RenderedComponent<global::Maliev.Intranet.Client.Pages.ProjectNew> cut,
+        ProjectPartDto part)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod("CreatePartViewModelFromProjectPart", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        return Assert.IsType<PartViewModel>(method.Invoke(cut.Instance, [part]));
     }
 
     private static void SetPrivateField<T>(

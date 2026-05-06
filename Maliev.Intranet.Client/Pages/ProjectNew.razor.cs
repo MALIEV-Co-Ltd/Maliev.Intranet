@@ -901,6 +901,8 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         part.DfmReport = dfmReport;
+        if (dfmReport != null)
+            ClearDfmUnavailableState(part);
     }
 
     private static bool ContainsDfmReportPayload(JsonElement element)
@@ -941,6 +943,8 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         part.ResolveDfmReport();
+        if (part.DfmReport != null)
+            ClearDfmUnavailableState(part);
     }
 
     private async Task ResolveViewerUrlAsync(PartViewModel part)
@@ -2215,7 +2219,38 @@ public partial class ProjectNew : IAsyncDisposable
         };
 
         partVm.ResolveDfmReport();
+        ApplyResumedDfmTerminalState(partVm);
         return partVm;
+    }
+
+    private static void ApplyResumedDfmTerminalState(PartViewModel partVm)
+    {
+        if (partVm.DfmReport != null
+            || partVm.DfmAcknowledged
+            || string.IsNullOrWhiteSpace(partVm.ProcessCode)
+            || !HasViewerArtifactForMigration(partVm))
+        {
+            return;
+        }
+
+        partVm.DfmAnalysisTimedOut = true;
+        partVm.AnalysisErrorCode = DfmStatusMessages.PersistedDfmReportUnavailable;
+        partVm.StatusText = DfmStatusMessages.GetStatusText(partVm.AnalysisErrorCode);
+    }
+
+    private static void ClearDfmUnavailableState(PartViewModel part)
+    {
+        if (!part.DfmAnalysisTimedOut
+            || !string.Equals(
+                part.AnalysisErrorCode,
+                DfmStatusMessages.PersistedDfmReportUnavailable,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        part.DfmAnalysisTimedOut = false;
+        part.AnalysisErrorCode = null;
     }
 
     private void ScheduleStatusCatchUp(PartViewModel part)

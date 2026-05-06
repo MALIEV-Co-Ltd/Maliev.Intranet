@@ -3,6 +3,8 @@ namespace Maliev.Intranet.Client.Components.Project;
 /// <summary>Maps backend geometry error codes to user-friendly status text.</summary>
 internal static class DfmStatusMessages
 {
+    internal const string PersistedDfmReportUnavailable = "DFM_REPORT_UNAVAILABLE";
+
     internal static string GetFriendlyMessage(string? errorCode) => errorCode switch
     {
         "SIZE_LIMIT_EXCEEDED" => "File too large for analysis (max 200 MB).",
@@ -12,6 +14,7 @@ internal static class DfmStatusMessages
         "GEOMETRY_PHASE2_TIMEOUT" => "Geometry too complex — analysis timed out. Try a simplified file.",
         "GEOMETRY_WORKER_CRASH" => "Analysis failed for this geometry.",
         "DFM_ANALYZER_FAILED" => "DFM analysis could not be completed for this geometry.",
+        PersistedDfmReportUnavailable => "DFM analysis completed previously, but the detailed report is no longer available.",
         "FILE_MISSING" => "File is no longer available — please re-upload.",
         "GEOMETRY_NO_RESULT" => "Analysis did not produce a result. Try re-uploading the file.",
         "CLIENT_TIMEOUT" => "Analysis is taking longer than expected. Try re-uploading the file.",
@@ -27,6 +30,7 @@ internal static class DfmStatusMessages
         "GEOMETRY_PHASE2_TIMEOUT" => "Analysis timed out",
         "GEOMETRY_WORKER_CRASH" => "Analysis failed",
         "DFM_ANALYZER_FAILED" => "DFM analysis failed",
+        PersistedDfmReportUnavailable => "DFM report unavailable",
         "FILE_MISSING" => "File missing — re-upload required",
         "GEOMETRY_NO_RESULT" => "Analysis failed",
         "CLIENT_TIMEOUT" => "Analysis timed out",
