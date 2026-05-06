@@ -60,6 +60,16 @@ public partial class ProjectNew : IAsyncDisposable
             ? "pn-center pn-center--table"
             : "pn-center";
 
+    private string LayoutToggleIcon =>
+        _layoutMode == LayoutMode.SummaryTable
+            ? Icons.Material.Outlined.ViewInAr
+            : Icons.Material.Outlined.TableRows;
+
+    private string LayoutToggleTitle =>
+        _layoutMode == LayoutMode.SummaryTable
+            ? "Configurator"
+            : "Table edit";
+
     // ── Customer search ────────────────────────────────────────────────
     private CancellationTokenSource? _searchCts;
 
@@ -1299,6 +1309,15 @@ public partial class ProjectNew : IAsyncDisposable
         _partsDrawerOpen = false;
         PruneBulkSelection();
     }
+
+    private Task SetLayoutModeAsync(LayoutMode mode)
+    {
+        SetLayoutMode(mode);
+        return Task.CompletedTask;
+    }
+
+    private void ToggleLayoutMode() =>
+        SetLayoutMode(_layoutMode == LayoutMode.SummaryTable ? LayoutMode.Configurator : LayoutMode.SummaryTable);
 
     private Task OnBulkSelectionChanged(IReadOnlyCollection<PartViewModel> selectedParts)
     {

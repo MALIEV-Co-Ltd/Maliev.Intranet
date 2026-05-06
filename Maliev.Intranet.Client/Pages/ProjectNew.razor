@@ -63,26 +63,19 @@
 
                 @* ── Center: Viewer + Detail ─────────────────────────────── *@
                 <div class="@CenterClass">
-                    <div class="pn-editor-toolbar">
+                    <div class="pn-mobile-toolbar">
                         <button class="pn-parts-toggle pn-parts-toggle--mobile" title="Open parts list" @onclick="@(() => _partsDrawerOpen = true)">
                             <MudIcon Icon="@Icons.Material.Outlined.Menu" Size="Size.Small" />
                             <span>Parts</span>
                             <span class="pn-parts-count">@_parts.Count</span>
                         </button>
-                        <div class="pn-layout-toggle" role="group" aria-label="Project editor layout">
-                            <button type="button"
-                                    class="pn-layout-button @(_layoutMode == LayoutMode.Configurator ? "pn-layout-button--active" : "")"
-                                    @onclick="@(() => SetLayoutMode(LayoutMode.Configurator))">
-                                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
-                                <span>Configurator</span>
-                            </button>
-                            <button type="button"
-                                    class="pn-layout-button @(_layoutMode == LayoutMode.SummaryTable ? "pn-layout-button--active" : "")"
-                                    @onclick="@(() => SetLayoutMode(LayoutMode.SummaryTable))">
-                                <MudIcon Icon="@Icons.Material.Outlined.TableRows" Size="Size.Small" />
-                                <span>Table edit</span>
-                            </button>
-                        </div>
+                        <button type="button"
+                                class="pn-mode-icon-button"
+                                title="@LayoutToggleTitle"
+                                aria-label="@LayoutToggleTitle"
+                                @onclick="ToggleLayoutMode">
+                            <MudIcon Icon="@LayoutToggleIcon" Size="Size.Small" />
+                        </button>
                     </div>
 
                     @if (_parts.Count > 0 && _selectedPartIndex < _parts.Count)
@@ -101,7 +94,8 @@
                                 OnBulkApply="ApplyBulkEditAsync"
                                 OnOpenViewer="OpenBabylonViewer"
                                 OnRemovePart="RemovePart"
-                                OnDuplicatePart="DuplicateSinglePart" />
+                                OnDuplicatePart="DuplicateSinglePart"
+                                OnLayoutModeChanged="SetLayoutModeAsync" />
                         }
                         else
                         {
@@ -123,7 +117,9 @@
                                     Processes="@_processes"
                                     TempProjectId="@_tempProjectId"
                                     CustomerId="@_selectedCustomerId"
-                                    OnPartChanged="OnPartChanged" />
+                                    OnPartChanged="OnPartChanged"
+                                    LayoutMode="@_layoutMode"
+                                    OnLayoutModeChanged="SetLayoutModeAsync" />
                             </div>
                         }
                     }

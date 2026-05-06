@@ -53,6 +53,12 @@ public partial class PartConfigSidebar : ComponentBase
     /// <summary>Controls the layout mode of the sidebar. Sidebar renders the full-width panel; Inline renders a compact version for use inside cards.</summary>
     [Parameter] public PartConfigSidebarDisplayMode DisplayMode { get; set; } = PartConfigSidebarDisplayMode.Sidebar;
 
+    /// <summary>The active project editor layout mode.</summary>
+    [Parameter] public LayoutMode LayoutMode { get; set; } = LayoutMode.Configurator;
+
+    /// <summary>Callback invoked when the user requests a different project editor layout.</summary>
+    [Parameter] public EventCallback<LayoutMode> OnLayoutModeChanged { get; set; }
+
     private bool _routingExpanded;
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
     private IReadOnlyCollection<string> _selectedFeatures = [];
@@ -210,6 +216,9 @@ public partial class PartConfigSidebar : ComponentBase
         DisplayMode == PartConfigSidebarDisplayMode.Inline
             ? "pcs-root pcs-root--inline"
             : "pcs-root";
+
+    private Task SwitchToTableEditAsync() =>
+        OnLayoutModeChanged.InvokeAsync(Maliev.Intranet.Client.Components.Project.LayoutMode.SummaryTable);
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 

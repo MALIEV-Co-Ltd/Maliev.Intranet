@@ -11,6 +11,16 @@
             <div class="pbt-title">@Parts.Count part@(Parts.Count == 1 ? "" : "s")</div>
         </div>
         <div class="pbt-actions">
+            @if (OnLayoutModeChanged.HasDelegate)
+            {
+                <button type="button"
+                        class="pbt-icon-button pbt-configurator-button"
+                        title="Configurator"
+                        aria-label="Switch to configurator"
+                        @onclick="@(() => OnLayoutModeChanged.InvokeAsync(LayoutMode.Configurator))">
+                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                </button>
+            }
             <button type="button"
                     class="pbt-action-button"
                     @onclick="ToggleAllAsync">
@@ -489,6 +499,9 @@
 
     /// <summary>Callback invoked when the user duplicates a part.</summary>
     [Parameter] public EventCallback<PartViewModel> OnDuplicatePart { get; set; }
+
+    /// <summary>Callback invoked when the user requests a different project editor layout.</summary>
+    [Parameter] public EventCallback<LayoutMode> OnLayoutModeChanged { get; set; }
 
     /// <summary>The temporary project identifier, forwarded to advanced configuration panels.</summary>
     [Parameter] public Guid TempProjectId { get; set; }

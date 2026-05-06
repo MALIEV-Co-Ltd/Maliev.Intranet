@@ -18,7 +18,19 @@
     <div class="pcs-header">
         <div class="pcs-header-label">Configure</div>
         <div class="pcs-header-name" title="@Part!.Name">@Part!.Name</div>
-        <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Class="pcs-header-info" />
+        <div class="pcs-header-actions">
+            @if (OnLayoutModeChanged.HasDelegate)
+            {
+                <button type="button"
+                        class="pcs-header-icon-button"
+                        title="Table edit"
+                        aria-label="Switch to table edit"
+                        @onclick="SwitchToTableEditAsync">
+                    <MudIcon Icon="@Icons.Material.Outlined.TableRows" Size="Size.Small" />
+                </button>
+            }
+            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Class="pcs-header-info" title="Configuration info" />
+        </div>
     </div>
 
     <div class="pcs-scroll">
@@ -585,9 +597,37 @@
                 white-space: nowrap;
             }
 
+            .pcs-header-actions {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                flex-shrink: 0;
+            }
+
+            .pcs-header-icon-button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 28px;
+                height: 28px;
+                padding: 0;
+                border: 1px solid var(--maliev-border);
+                border-radius: var(--maliev-radius-sm);
+                background: var(--maliev-panel);
+                color: var(--mud-palette-primary);
+                cursor: pointer;
+            }
+
+            .pcs-header-icon-button:hover,
+            .pcs-header-icon-button:focus-visible {
+                border-color: var(--mud-palette-primary);
+                background: var(--maliev-accent-soft);
+                outline: none;
+            }
+
             .pcs-header-info {
                 color: var(--maliev-muted);
-                cursor: pointer;
+                cursor: help;
             }
 
             .pcs-scroll {

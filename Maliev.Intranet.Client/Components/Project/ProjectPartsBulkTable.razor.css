@@ -88,6 +88,17 @@
     padding: 0;
 }
 
+.pbt-configurator-button {
+    color: var(--mud-palette-primary);
+}
+
+.pbt-configurator-button:hover,
+.pbt-configurator-button:focus-visible {
+    border-color: var(--mud-palette-primary);
+    background: var(--maliev-accent-soft);
+    outline: none;
+}
+
 .pbt-bulk-panel {
     position: sticky;
     top: 59px;

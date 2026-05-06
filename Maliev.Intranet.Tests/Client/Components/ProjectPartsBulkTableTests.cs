@@ -2,6 +2,7 @@ using Bunit;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using MudBlazor;
@@ -75,6 +76,23 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
         cut.Find(".pbt-expand-button").Click();
 
         Assert.NotEmpty(cut.FindAll(".pbt-advanced-panel"));
+    }
+
+    [Fact]
+    public void ProjectPartsBulkTable_WhenConfiguratorButtonClicked_RaisesLayoutModeChanged()
+    {
+        var parts = CreateParts();
+        LayoutMode? requestedMode = null;
+
+        var cut = Render<ProjectPartsBulkTable>(parameters => parameters
+            .Add(p => p.Parts, parts)
+            .Add(p => p.SelectedParts, [])
+            .Add(p => p.Processes, [new ProcessDto(Guid.NewGuid(), "FDM", "FDM", null, 10)])
+            .Add(p => p.OnLayoutModeChanged, EventCallback.Factory.Create<LayoutMode>(this, mode => requestedMode = mode)));
+
+        cut.Find(".pbt-configurator-button").Click();
+
+        Assert.Equal(LayoutMode.Configurator, requestedMode);
     }
 
     private RenderedComponent<ProjectPartsBulkTable> RenderTable(
