@@ -29,7 +29,6 @@
                     <MudIcon Icon="@Icons.Material.Outlined.TableRows" Size="Size.Small" />
                 </button>
             }
-            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Class="pcs-header-info" title="Configuration info" />
         </div>
     </div>
 
@@ -159,12 +158,6 @@
                 <div class="pcs-section-header">
                     <span class="pcs-section-title">Tolerance</span>
                     <div class="pcs-section-meta">
-                        <MudIconButton Icon="@Icons.Material.Outlined.Info"
-                                       Size="Size.Small"
-                                       Variant="Variant.Text"
-                                       Color="Color.Primary"
-                                       Class="pcs-info-button"
-                                       OnClick="OpenToleranceInfoDialog" />
                         <span class="pcs-section-count">@VisibleTolerances.Count() options</span>
                     </div>
                 </div>
@@ -679,11 +672,6 @@
                 outline: none;
             }
 
-            .pcs-header-info {
-                color: var(--maliev-muted);
-                cursor: help;
-            }
-
             .pcs-scroll {
                 flex: 1;
                 overflow-y: auto;
@@ -725,12 +713,6 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 4px;
-            }
-
-            .pcs-info-button {
-                width: 22px;
-                height: 22px;
-                padding: 0;
             }
 
             /* ── Process Grid ──────────────────────────────────────────────────── */

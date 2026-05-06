@@ -1057,24 +1057,6 @@ public partial class PartConfigSidebar : ComponentBase
             new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
     }
 
-    private void OpenToleranceInfoDialog()
-    {
-        var tolerances = VisibleToleranceList;
-        if (tolerances.Count == 0)
-            return;
-
-        var parameters = new DialogParameters<ToleranceInfoDialog>
-        {
-            { x => x.Tolerances, tolerances },
-            { x => x.GetRange, GetToleranceRange },
-        };
-
-        DialogService.ShowAsync<ToleranceInfoDialog>(
-            "Tolerance Information",
-            parameters,
-            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
-    }
-
     // ── Two-phase DFM analysis ─────────────────────────────────────────────
 
     private async Task AnalyzeProcessForDfm(ProcessDto process)
