@@ -191,6 +191,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("no data", page, StringComparison.Ordinal);
         Assert.Contains("system-health-probe-grid", styles, StringComparison.Ordinal);
         Assert.DoesNotContain("system-health-detail-list", styles, StringComparison.Ordinal);
+        Assert.Contains("gap: 20px;", styles, StringComparison.Ordinal);
+        Assert.Contains("padding-bottom: 20px;", styles, StringComparison.Ordinal);
+        Assert.Contains("gap: 16px;", styles, StringComparison.Ordinal);
         Assert.Contains("display: flex", styles, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 0", styles, StringComparison.Ordinal);
         Assert.Contains("overflow: hidden", styles, StringComparison.Ordinal);
