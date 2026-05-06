@@ -431,47 +431,8 @@ public class ProjectsController(
             return false;
         }
 
-        var currentVersion = quotation.Versions?
-            .OrderByDescending(version => version.VersionNumber == quotation.CurrentVersionNumber)
-            .ThenByDescending(version => version.VersionNumber)
-            .FirstOrDefault();
-        var lineSubtotal = currentVersion?.LineItems?.Sum(item => item.Quantity * item.UnitPrice) ?? quotation.SubTotal;
-        var versionDiscount = ResolveDiscountAmount(currentVersion?.DiscountStructure, lineSubtotal);
-        var manualDiscount = Math.Max(0m, currentVersion?.ManualDiscountAmount ?? 0m);
-        var totalDiscount = Math.Min(lineSubtotal, versionDiscount + manualDiscount);
-        var shippingCost = Math.Max(0m, currentVersion?.ShippingCost ?? 0m);
-        var taxableSubtotal = Math.Max(0m, lineSubtotal - totalDiscount + shippingCost);
-
-        var pdfData = new QuotationPdfData
-        {
-            QuotationNumber = quotation.QuotationNumber,
-            VersionNumber = currentVersion?.VersionNumber ?? quotation.CurrentVersionNumber,
-            CustomerName = quotation.CustomerName,
-            CustomerType = "Corporate",
-            QuotationDate = quotation.CreatedAt,
-            ValidityStart = quotation.ValidityPeriodStart,
-            ValidityEnd = quotation.ValidityPeriodEnd,
-            SubtotalBeforeDiscount = lineSubtotal,
-            TotalDiscount = totalDiscount,
-            ManualDiscountAmount = manualDiscount,
-            ShippingCost = shippingCost,
-            Discounts = BuildDiscounts(currentVersion?.DiscountStructure, versionDiscount),
-            Subtotal = taxableSubtotal,
-            TaxAmount = currentVersion?.TaxAmount ?? quotation.Tax,
-            TotalAmount = quotation.Total,
-            Currency = string.IsNullOrWhiteSpace(quotation.CurrencyCode) ? "THB" : quotation.CurrencyCode,
-            DeliveryExpectations = quotation.DeliveryExpectations,
-            SpecialTerms = currentVersion?.SpecialTerms,
-            ChangeSummary = currentVersion?.ChangeSummary,
-            Items = currentVersion?.LineItems?.Select((item, index) => new QuotationPdfItem
-            {
-                Index = index + 1,
-                MaterialName = item.Description,
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                LineTotal = item.Quantity * item.UnitPrice
-            }).ToList() ?? []
-        };
+        var customerDetail = await TryGetCustomerDetailAsync(project.CustomerId, ct);
+        var pdfData = ProjectQuotationPdfDataFactory.Build(project, quotation, customerDetail);
 
         var pdfUrl = await pdfClient.GeneratePdfAsync(
             PdfDocumentType.Quotation,
@@ -482,36 +443,20 @@ public class ProjectsController(
         return !string.IsNullOrWhiteSpace(pdfUrl);
     }
 
-    private static decimal ResolveDiscountAmount(SalesDiscountStructureDto? discount, decimal lineSubtotal)
+    private async Task<CustomerDetailDto?> TryGetCustomerDetailAsync(Guid customerId, CancellationToken ct)
     {
-        if (discount == null || discount.DiscountValue <= 0m || lineSubtotal <= 0m)
-            return 0m;
+        if (customerClient is null || customerId == Guid.Empty)
+            return null;
 
-        var amount = discount.DiscountType switch
+        try
         {
-            SalesDiscountType.FixedAmount => discount.DiscountValue,
-            SalesDiscountType.Percentage => Math.Round(lineSubtotal * (discount.DiscountValue / 100m), 2, MidpointRounding.AwayFromZero),
-            SalesDiscountType.VolumeBased => Math.Round(lineSubtotal * (discount.DiscountValue / 100m), 2, MidpointRounding.AwayFromZero),
-            _ => 0m
-        };
-
-        return Math.Min(Math.Max(0m, amount), lineSubtotal);
-    }
-
-    private static List<QuotationPdfDiscount> BuildDiscounts(SalesDiscountStructureDto? discount, decimal amount)
-    {
-        if (discount == null || amount <= 0m)
-            return [];
-
-        return
-        [
-            new()
-            {
-                DiscountType = discount.DiscountType.ToString(),
-                DiscountValue = amount,
-                Conditions = discount.Conditions
-            }
-        ];
+            return await customerClient.GetCustomerByIdAsync(customerId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not hydrate customer {CustomerId} for automatic quotation PDF.", customerId);
+            return null;
+        }
     }
 
     /// <summary>
