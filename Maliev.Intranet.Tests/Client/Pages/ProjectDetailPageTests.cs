@@ -238,11 +238,14 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("CNC Milling", cut.Markup);
         Assert.Contains("3D Printing (FDM)", cut.Markup);
         Assert.Contains("As printed", cut.Markup);
+        Assert.Contains("As Machined", cut.Markup);
         Assert.Contains("Standard FDM settings", cut.Markup);
+        Assert.Contains("ISO 2768-m", cut.Markup);
         Assert.Contains("project-config-primary", cut.Markup);
         Assert.Contains("project-config-subtitle", cut.Markup);
         Assert.DoesNotContain("AS_PRINTED", cut.Markup);
         Assert.DoesNotContain("FDM_STD", cut.Markup);
+        Assert.DoesNotContain("Iso2768 M", cut.Markup);
     }
 
     [Fact]
@@ -411,7 +414,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         MaterialName = "Aluminium 6061-T6",
                         Finish = "Anodized",
                         Color = "Black",
-                        Tolerance = "ISO 2768-m",
+                        Tolerance = "ISO2768-m",
                         Quantity = 4,
                         ConfirmedPrice = 2500m,
                         Status = "Confirmed",
@@ -466,6 +469,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                         FileName = "fixture-base.step",
                         ProcessType = "CNC_MILL",
                         MaterialName = "Aluminium 6061-T6",
+                        Finish = "AS_MACHINED",
+                        Tolerance = "ISO2768-m",
                         Quantity = 2,
                         ConfirmedPrice = 1200m,
                         Status = "Confirmed",

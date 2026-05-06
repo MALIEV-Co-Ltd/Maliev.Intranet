@@ -1950,6 +1950,10 @@
         if (string.IsNullOrWhiteSpace(value))
             return "-";
 
+        var tolerance = FormatIsoTolerance(value);
+        if (!string.IsNullOrWhiteSpace(tolerance))
+            return tolerance;
+
         var normalized = value.Trim()
             .Replace("-", "_", StringComparison.Ordinal)
             .Replace(" ", "_", StringComparison.Ordinal)
@@ -1963,6 +1967,23 @@
             "NONE" => "None",
             _ => HumanizeToken(value)
         };
+    }
+
+    private static string? FormatIsoTolerance(string value)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            value.Trim(),
+            @"^ISO[\s_-]*2768\s*[-_ ]?\s*([A-Za-z]{1,2})$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        if (!match.Success)
+            return null;
+
+        var toleranceClass = match.Groups[1].Value;
+        var formattedClass = toleranceClass.Length == 1
+            ? toleranceClass.ToLowerInvariant()
+            : $"{char.ToLowerInvariant(toleranceClass[0])}{toleranceClass[1..].ToUpperInvariant()}";
+
+        return $"ISO 2768-{formattedClass}";
     }
 
     private sealed record PartConfigurationDisplay(string Primary, string? Subtitle);
