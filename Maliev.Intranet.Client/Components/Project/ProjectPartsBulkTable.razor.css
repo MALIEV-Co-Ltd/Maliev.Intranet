@@ -341,6 +341,17 @@
     color: var(--mud-palette-primary);
 }
 
+.pbt-price--loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pbt-price--loading .mud-progress-circular {
+    width: 16px;
+    height: 16px;
+}
+
 .pbt-preview-backdrop {
     position: fixed;
     inset: 0;

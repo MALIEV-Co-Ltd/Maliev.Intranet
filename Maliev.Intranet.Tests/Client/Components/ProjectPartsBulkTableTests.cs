@@ -92,6 +92,22 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectPartsBulkTable_WhenPricingLoading_ShowsPriceSpinner()
+    {
+        var parts = CreateParts();
+        parts[0].PricingLoading = true;
+        parts[0].EstimatedUnitPrice = null;
+        parts[0].EstimatedTotalAmount = null;
+
+        var cut = RenderTable(parts);
+
+        var desktopPriceCell = cut.Find("tbody .pbt-price");
+        Assert.Contains("Pricing", desktopPriceCell.TextContent);
+        Assert.NotEmpty(desktopPriceCell.QuerySelectorAll(".mud-progress-circular"));
+        Assert.NotEmpty(cut.FindAll(".pbt-card-meta .mud-progress-circular"));
+    }
+
+    [Fact]
     public void ProjectPartsBulkTable_WhenBulkProcessSelected_AppliesPatchImmediately()
     {
         var parts = CreateParts();

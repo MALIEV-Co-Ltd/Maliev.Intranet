@@ -287,7 +287,13 @@
                             </select>
                         </td>
                         <td>
-                            <div class="pbt-price">@ResolvePrice(part)</div>
+                            <div class="@($"pbt-price{(part.PricingLoading ? " pbt-price--loading" : string.Empty)}")">
+                                @if (part.PricingLoading)
+                                {
+                                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                                }
+                                <span>@ResolvePrice(part)</span>
+                            </div>
                             @if (part.EstimatedUnitPrice.HasValue)
                             {
                                 <div class="pbt-subtext">@CurrencyService.Format(part.EstimatedUnitPrice.Value) ea</div>
@@ -403,7 +409,13 @@
                 </div>
 
                 <div class="pbt-card-meta">
-                    <span>@ResolvePrice(part)</span>
+                    <span class="@($"pbt-card-price{(part.PricingLoading ? " pbt-price--loading" : string.Empty)}")">
+                        @if (part.PricingLoading)
+                        {
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                        }
+                        <span>@ResolvePrice(part)</span>
+                    </span>
                     <button type="button"
                             class="@ResolveDfmClass(part)"
                             disabled="@(!CanUseDfmBadge(part))"
