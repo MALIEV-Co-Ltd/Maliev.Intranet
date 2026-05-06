@@ -139,6 +139,10 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             .FirstOrDefault();
         var lineSubtotal = currentVersion?.LineItems?.Sum(item => item.Quantity * item.UnitPrice) ?? quotation.SubTotal;
         var versionDiscount = ResolveDiscountAmount(currentVersion?.DiscountStructure, lineSubtotal);
+        var manualDiscount = Math.Max(0m, currentVersion?.ManualDiscountAmount ?? 0m);
+        var totalDiscount = Math.Min(lineSubtotal, versionDiscount + manualDiscount);
+        var shippingCost = Math.Max(0m, currentVersion?.ShippingCost ?? 0m);
+        var taxableSubtotal = Math.Max(0m, lineSubtotal - totalDiscount + shippingCost);
 
         var pdfData = new QuotationPdfData
         {
@@ -150,14 +154,16 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
             ValidityStart = quotation.ValidityPeriodStart,
             ValidityEnd = quotation.ValidityPeriodEnd,
             SubtotalBeforeDiscount = lineSubtotal,
-            TotalDiscount = versionDiscount,
-            ManualDiscountAmount = versionDiscount,
+            TotalDiscount = totalDiscount,
+            ManualDiscountAmount = manualDiscount,
+            ShippingCost = shippingCost,
             Discounts = BuildDiscounts(currentVersion?.DiscountStructure, versionDiscount),
-            Subtotal = Math.Max(0m, lineSubtotal - versionDiscount),
-            TaxAmount = quotation.Tax,
+            Subtotal = taxableSubtotal,
+            TaxAmount = currentVersion?.TaxAmount ?? quotation.Tax,
             TotalAmount = quotation.Total,
             Currency = !string.IsNullOrEmpty(quotation.CurrencyCode) ? quotation.CurrencyCode : "THB",
             DeliveryExpectations = quotation.DeliveryExpectations,
+            SpecialTerms = currentVersion?.SpecialTerms,
             ChangeSummary = currentVersion?.ChangeSummary,
             Items = currentVersion?.LineItems?.Select((item, index) => new QuotationPdfItem
             {

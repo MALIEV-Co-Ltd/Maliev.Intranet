@@ -146,6 +146,15 @@ public class QuotationVersionDto
     /// <summary>The discount structure applied to this quotation version, if any.</summary>
     public SalesDiscountStructureDto? DiscountStructure { get; set; }
 
+    /// <summary>The manual discount amount applied to this quotation version.</summary>
+    public decimal ManualDiscountAmount { get; set; }
+
+    /// <summary>The shipping or delivery cost applied to this quotation version.</summary>
+    public decimal ShippingCost { get; set; }
+
+    /// <summary>The VAT or tax amount applied to this quotation version.</summary>
+    public decimal TaxAmount { get; set; }
+
     /// <summary>The ISO 4217 currency code used for this version.</summary>
     public string CurrencyCode { get; set; } = string.Empty;
 
@@ -154,6 +163,9 @@ public class QuotationVersionDto
 
     /// <summary>A brief summary of what changed in this version compared to the previous one.</summary>
     public string? ChangeSummary { get; set; }
+
+    /// <summary>Customer-facing special terms shown on generated PDFs.</summary>
+    public string? SpecialTerms { get; set; }
 
     /// <summary>The identifier of the user who created this version.</summary>
     public string CreatedBy { get; set; } = string.Empty;

@@ -2796,6 +2796,10 @@ public partial class ProjectNew : IAsyncDisposable
                     ValidityDays = 30,
                     DeliveryExpectations = ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
                     BulkDiscountAmount = CalculateBulkDiscountAmount(),
+                    ManualDiscountAmount = Math.Max(0m, _manualDiscountAmount),
+                    ShippingCost = Math.Max(0m, _shippingCost),
+                    TaxAmount = CalculateQuotationTaxAmount(),
+                    QuotationTerms = _quotationTerms,
                 });
             if (!quoteResponse.IsSuccessStatusCode)
             {
@@ -2930,6 +2934,14 @@ public partial class ProjectNew : IAsyncDisposable
 
     private decimal CalculateBulkDiscountAmount() =>
         _parts.Sum(ProjectQuotationPdfMapper.ResolveBulkDiscount);
+
+    private decimal CalculateQuotationTaxAmount()
+    {
+        var lineSubtotal = _parts.Sum(ProjectQuotationPdfMapper.ResolveBaseLineTotal);
+        var discount = Math.Min(lineSubtotal, CalculateBulkDiscountAmount() + Math.Max(0m, _manualDiscountAmount));
+        var taxableSubtotal = lineSubtotal - discount + Math.Max(0m, _shippingCost);
+        return Math.Round(taxableSubtotal * 0.07m, 2, MidpointRounding.AwayFromZero);
+    }
 
     // ── Task 15: Duplicate project ─────────────────────────────────────
 

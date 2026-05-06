@@ -133,6 +133,14 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             Assert.Equal("Axion Robotics Co., Ltd.", root.GetProperty("customerName").GetString());
             Assert.Equal("2200 Industrial Pkwy, Fremont, CA 94538", root.GetProperty("shippingAddress").GetString());
             Assert.Equal("7-10 business days", root.GetProperty("deliveryExpectations").GetString());
+            Assert.Equal("50% deposit required before production.", root.GetProperty("specialTerms").GetString());
+            Assert.Equal(20650m, root.GetProperty("subtotalBeforeDiscount").GetDecimal());
+            Assert.Equal(2000m, root.GetProperty("totalDiscount").GetDecimal());
+            Assert.Equal(800m, root.GetProperty("manualDiscountAmount").GetDecimal());
+            Assert.Equal(500m, root.GetProperty("shippingCost").GetDecimal());
+            Assert.Equal(19150m, root.GetProperty("subtotal").GetDecimal());
+            Assert.Equal(1340.50m, root.GetProperty("taxAmount").GetDecimal());
+            Assert.Equal(20490.50m, root.GetProperty("totalAmount").GetDecimal());
             Assert.Equal(3, root.GetProperty("items").GetArrayLength());
             var firstItem = root.GetProperty("items")[0];
             Assert.Equal("bracket-left.stl", firstItem.GetProperty("partName").GetString());
@@ -641,8 +649,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Status = "Generated",
         ValidityPeriodStart = new DateTime(2026, 4, 18, 0, 0, 0, DateTimeKind.Utc),
         ValidityPeriodEnd = new DateTime(2026, 5, 18, 0, 0, 0, DateTimeKind.Utc),
-        SubTotal = 18250m,
-        Total = 18250m,
+        SubTotal = 19150m,
+        Tax = 1340.50m,
+        Total = 20490.50m,
         CurrencyCode = "THB",
         DeliveryExpectations = "7-10 business days",
         Versions =
@@ -661,9 +670,40 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             {
                 Id = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
                 VersionNumber = 2,
-                TotalPrice = 18250m,
+                LineItems =
+                [
+                    new QuotationItemDto
+                    {
+                        Description = "bracket-left.stl",
+                        Quantity = 4,
+                        UnitPrice = 2500m
+                    },
+                    new QuotationItemDto
+                    {
+                        Description = "sensor-cover.3mf",
+                        Quantity = 15,
+                        UnitPrice = 550m
+                    },
+                    new QuotationItemDto
+                    {
+                        Description = "fixture-base.step",
+                        Quantity = 2,
+                        UnitPrice = 1200m
+                    }
+                ],
+                TotalPrice = 20490.50m,
+                DiscountStructure = new SalesDiscountStructureDto
+                {
+                    DiscountType = SalesDiscountType.FixedAmount,
+                    DiscountValue = 1200m,
+                    Conditions = "Automatic bulk-order savings"
+                },
+                ManualDiscountAmount = 800m,
+                ShippingCost = 500m,
+                TaxAmount = 1340.50m,
                 CurrencyCode = "THB",
                 DeliveryExpectations = "7-10 business days",
+                SpecialTerms = "50% deposit required before production.",
                 CreatedBy = "Alex Kim",
                 CreatedAt = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
             }

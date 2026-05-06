@@ -1177,9 +1177,17 @@
 
     private QuotationPdfData BuildProjectQuotationPdfData(ProjectDetailDto project)
     {
-        var subtotal = PartsSubtotal;
-        var discount = QuoteDiscount;
-        var total = project.TotalPrice;
+        var currentVersion = ResolveCurrentQuotationVersion();
+        var subtotal = ResolveQuotationLineSubtotal(currentVersion);
+        var structuredDiscount = ResolveDiscountAmount(currentVersion?.DiscountStructure, subtotal);
+        var manualDiscount = currentVersion is not null
+            ? Math.Max(0m, currentVersion.ManualDiscountAmount)
+            : Math.Max(0m, QuoteDiscount - structuredDiscount);
+        var discount = Math.Min(subtotal, structuredDiscount + manualDiscount);
+        var shippingCost = Math.Max(0m, currentVersion?.ShippingCost ?? 0m);
+        var taxAmount = Math.Max(0m, currentVersion?.TaxAmount ?? _quotation?.Tax ?? 0m);
+        var total = currentVersion?.TotalPrice > 0m ? currentVersion.TotalPrice : project.TotalPrice;
+        var taxableSubtotal = Math.Max(0m, subtotal - discount + shippingCost);
         var validityStart = ToUtc(project.CreatedAt);
         var validityEnd = project.ValidUntil.HasValue
             ? ToUtc(project.ValidUntil.Value)
@@ -1204,12 +1212,14 @@
             Currency = ProjectCurrency,
             SubtotalBeforeDiscount = subtotal,
             TotalDiscount = discount,
-            ManualDiscountAmount = discount,
-            ShippingCost = 0m,
-            Subtotal = total,
-            TaxAmount = 0m,
+            ManualDiscountAmount = manualDiscount,
+            ShippingCost = shippingCost,
+            Subtotal = taxableSubtotal,
+            TaxAmount = taxAmount,
             TotalAmount = total,
             DeliveryExpectations = QuoteLeadTime,
+            SpecialTerms = currentVersion?.SpecialTerms,
+            Discounts = BuildProjectDiscounts(currentVersion?.DiscountStructure, structuredDiscount, manualDiscount),
             Items = project.Parts.Select((part, index) => new QuotationPdfItem
             {
                 Index = index + 1,
@@ -1225,6 +1235,65 @@
                 ThumbnailUrl = part.ThumbnailUrl
             }).ToList()
         };
+    }
+
+    private QuotationVersionDto? ResolveCurrentQuotationVersion()
+    {
+        return _quotation?.Versions?
+            .OrderByDescending(version => version.VersionNumber == _quotation.CurrentVersionNumber)
+            .ThenByDescending(version => version.VersionNumber)
+            .FirstOrDefault();
+    }
+
+    private decimal ResolveQuotationLineSubtotal(QuotationVersionDto? currentVersion)
+    {
+        var versionSubtotal = currentVersion?.LineItems?.Sum(item => item.Quantity * item.UnitPrice) ?? 0m;
+        return versionSubtotal > 0m ? versionSubtotal : PartsSubtotal;
+    }
+
+    private static List<QuotationPdfDiscount> BuildProjectDiscounts(
+        SalesDiscountStructureDto? discount,
+        decimal discountAmount,
+        decimal manualDiscountAmount)
+    {
+        var discounts = new List<QuotationPdfDiscount>();
+        if (discount is not null && discountAmount > 0m)
+        {
+            discounts.Add(new QuotationPdfDiscount
+            {
+                DiscountType = discount.DiscountType.ToString(),
+                DiscountValue = discountAmount,
+                Conditions = discount.Conditions,
+            });
+        }
+
+        if (manualDiscountAmount > 0m)
+        {
+            discounts.Add(new QuotationPdfDiscount
+            {
+                DiscountType = SalesDiscountType.FixedAmount.ToString(),
+                DiscountValue = manualDiscountAmount,
+                Conditions = "Manual discount",
+            });
+        }
+
+        return discounts;
+    }
+
+    private static decimal ResolveDiscountAmount(SalesDiscountStructureDto? discount, decimal lineSubtotal)
+    {
+        if (discount is null || discount.DiscountValue <= 0m || lineSubtotal <= 0m)
+            return 0m;
+
+        var amount = discount.DiscountType switch
+        {
+            SalesDiscountType.FixedAmount => discount.DiscountValue,
+            SalesDiscountType.Percentage => Math.Round(lineSubtotal * (discount.DiscountValue / 100m), 2, MidpointRounding.AwayFromZero),
+            SalesDiscountType.VolumeBased => Math.Round(lineSubtotal * (discount.DiscountValue / 100m), 2, MidpointRounding.AwayFromZero),
+            _ => 0m,
+        };
+
+        return Math.Min(Math.Max(0m, amount), lineSubtotal);
     }
 
     private static List<string> BuildProjectCustomerDisplayLines(ProjectDetailDto project)

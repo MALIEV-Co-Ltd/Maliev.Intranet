@@ -714,6 +714,22 @@ public class GenerateQuotationRequest
     /// <summary>Gets or sets the automatic bulk-order discount shown on the quotation.</summary>
     [Range(0, (double)decimal.MaxValue)]
     public decimal BulkDiscountAmount { get; set; }
+
+    /// <summary>Gets or sets the manual discount entered for the quotation.</summary>
+    [Range(0, (double)decimal.MaxValue)]
+    public decimal ManualDiscountAmount { get; set; }
+
+    /// <summary>Gets or sets the shipping or delivery cost entered for the quotation.</summary>
+    [Range(0, (double)decimal.MaxValue)]
+    public decimal ShippingCost { get; set; }
+
+    /// <summary>Gets or sets the VAT or tax amount calculated for the quotation.</summary>
+    [Range(0, (double)decimal.MaxValue)]
+    public decimal TaxAmount { get; set; }
+
+    /// <summary>Gets or sets customer-facing quotation terms shown on the PDF.</summary>
+    [MaxLength(2000)]
+    public string? QuotationTerms { get; set; }
 }
 
 /// <summary>
