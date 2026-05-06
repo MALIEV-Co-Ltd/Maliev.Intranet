@@ -175,6 +175,33 @@ public class CustomerEmailRequest
 }
 
 /// <summary>
+/// Payment term reference data for customer profile selection.
+/// </summary>
+public class PaymentTermDto
+{
+    /// <summary>Stable payment term code.</summary>
+    public string Code { get; set; } = string.Empty;
+    /// <summary>Human-readable payment term label.</summary>
+    public string Name { get; set; } = string.Empty;
+    /// <summary>Payment term category used for grouping and filtering.</summary>
+    public string Category { get; set; } = string.Empty;
+    /// <summary>Description of how the payment term calculates payment timing.</summary>
+    public string Description { get; set; } = string.Empty;
+    /// <summary>Guidance describing when this term is typically used.</summary>
+    public string TypicalUse { get; set; } = string.Empty;
+    /// <summary>Number of calendar days until payment is due for day-based terms.</summary>
+    public int? DueDays { get; set; }
+    /// <summary>Early payment discount percentage, when one is available.</summary>
+    public decimal? DiscountPercent { get; set; }
+    /// <summary>Number of days the early payment discount is available.</summary>
+    public int? DiscountDays { get; set; }
+    /// <summary>Whether this payment term is the default for new customers.</summary>
+    public bool IsDefault { get; set; }
+    /// <summary>Sort order for presenting payment terms.</summary>
+    public int SortOrder { get; set; }
+}
+
+/// <summary>
 /// Response model for address data, representing a physical or logical location.
 /// </summary>
 public class AddressResponse

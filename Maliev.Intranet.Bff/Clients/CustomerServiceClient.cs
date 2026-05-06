@@ -254,6 +254,15 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     }
 
     /// <summary>
+    /// Retrieves payment terms available for customer profiles.
+    /// </summary>
+    public virtual async Task<IReadOnlyList<PaymentTermDto>> GetPaymentTermsAsync(CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<List<PaymentTermDto>>("/customer/v1/customers/payment-terms", ct)
+            ?? [];
+    }
+
+    /// <summary>
     /// Gets activity history for a customer with pagination or skip/take.
     /// </summary>
     public virtual async Task<PagedResponse<CustomerActivityResponse>> GetCustomerActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken ct = default)

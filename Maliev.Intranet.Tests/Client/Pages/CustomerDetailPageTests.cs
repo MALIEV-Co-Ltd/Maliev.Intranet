@@ -396,6 +396,44 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
             });
         }
 
+        if (pathAndQuery.Equals("/api/v1/customers/payment-terms", StringComparison.Ordinal))
+        {
+            return Json(new List<PaymentTermDto>
+            {
+                new()
+                {
+                    Code = "DUE_ON_RECEIPT",
+                    Name = "Due on receipt",
+                    Category = "Immediate",
+                    Description = "Payment is due as soon as the invoice is received.",
+                    TypicalUse = "Use for one-off jobs and customers without approved credit.",
+                    DueDays = 0,
+                    IsDefault = true,
+                    SortOrder = 0
+                },
+                new()
+                {
+                    Code = "NET_30",
+                    Name = "Net 30",
+                    Category = "Net",
+                    Description = "Full invoice amount is due 30 calendar days after the invoice date.",
+                    TypicalUse = "Use as the standard B2B trade-credit term.",
+                    DueDays = 30,
+                    SortOrder = 40
+                },
+                new()
+                {
+                    Code = "NET_45",
+                    Name = "Net 45",
+                    Category = "Net",
+                    Description = "Full invoice amount is due 45 calendar days after the invoice date.",
+                    TypicalUse = "Use for larger commercial customers that require longer approval cycles.",
+                    DueDays = 45,
+                    SortOrder = 45
+                }
+            });
+        }
+
         if (request.Method == HttpMethod.Get &&
             pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
         {

@@ -134,6 +134,23 @@
     cursor: default;
 }
 
+.customer-payment-term-detail {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.35;
+}
+
+.customer-payment-term-detail strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-base);
+}
+
 .customer-orders-table {
     width: 100%;
     border-collapse: collapse;

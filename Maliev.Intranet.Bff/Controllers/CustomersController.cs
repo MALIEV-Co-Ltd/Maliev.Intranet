@@ -54,6 +54,15 @@ public class CustomersController(
         return result != null ? Ok(result) : NotFound();
     }
 
+    /// <summary>Gets payment terms available for customer profiles.</summary>
+    [RequirePermission(MalievPermissions.Customer.Read)]
+    [HttpGet("payment-terms")]
+    public async Task<ActionResult<IReadOnlyList<PaymentTermDto>>> GetPaymentTerms(CancellationToken ct)
+    {
+        var result = await client.GetPaymentTermsAsync(ct);
+        return Ok(result);
+    }
+
     /// <summary>Sends an email notification to a customer through NotificationService.</summary>
     [RequirePermission(MalievPermissions.Customer.Read)]
     [HttpPost("{id:guid}/email")]

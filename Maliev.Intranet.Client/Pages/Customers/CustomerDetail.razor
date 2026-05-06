@@ -101,11 +101,23 @@
                             <label class="customer-field">
                                 <span>Payment terms</span>
                                 <select class="customer-input" @bind="_edit!.PaymentTerms">
-                                    <option>Due on receipt</option>
-                                    <option>Net 15</option>
-                                    <option>Net 30</option>
-                                    <option>Net 45</option>
+                                    @if (SelectedPaymentTerm is null && !string.IsNullOrWhiteSpace(_edit.PaymentTerms))
+                                    {
+                                        <option value="@_edit.PaymentTerms">@_edit.PaymentTerms</option>
+                                    }
+                                    @foreach (var term in _paymentTerms)
+                                    {
+                                        <option value="@term.Name">@PaymentTermOptionLabel(term)</option>
+                                    }
                                 </select>
+                                @if (SelectedPaymentTerm is { } paymentTerm)
+                                {
+                                    <div class="customer-payment-term-detail">
+                                        <strong>@paymentTerm.Name</strong>
+                                        <span>@paymentTerm.Description</span>
+                                        <span>@paymentTerm.TypicalUse</span>
+                                    </div>
+                                }
                             </label>
                             <label class="customer-field">
                                 <span>Tax ID</span>
@@ -639,6 +651,7 @@
     private readonly List<ProjectSummaryDto> _projects = [];
     private readonly List<OrderSummaryDto> _orders = [];
     private readonly List<CustomerActivityResponse> _activity = [];
+    private readonly List<PaymentTermDto> _paymentTerms = [];
     private CustomerDetailTab _activeTab = CustomerDetailTab.Overview;
     private AddressEditModel? _addressEdit;
     private CompanyEditModel? _companyEdit;
@@ -674,6 +687,9 @@
     private decimal AverageOrderValue => LifetimeOrderCount > 0 && _customer is not null ? _customer.TotalSpent / LifetimeOrderCount : 0m;
     private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
     private string AddressModalTitle => _addressEdit?.Id is null ? "Add address" : "Edit address";
+    private PaymentTermDto? SelectedPaymentTerm => _edit is null
+        ? null
+        : _paymentTerms.FirstOrDefault(term => string.Equals(term.Name, _edit.PaymentTerms, StringComparison.Ordinal));
     private string CompanyConfirmLabel => _companyEdit?.ExistingCompanyId is Guid ? "Link company" : "Create and link";
     private string EmailConfirmLabel => _sendingEmail ? "Sending..." : _emailQueued ? "Queued" : "Send email";
     private bool EmailConfirmDisabled => _sendingEmail || _emailQueued;
@@ -738,7 +754,7 @@
             }
 
             _edit = CustomerEditModel.FromCustomer(_customer);
-            await Task.WhenAll(LoadProjectsAsync(), LoadOrdersAsync(), LoadActivityAsync(), LoadCountriesAsync(), LoadAccountManagersAsync());
+            await Task.WhenAll(LoadProjectsAsync(), LoadOrdersAsync(), LoadActivityAsync(), LoadCountriesAsync(), LoadAccountManagersAsync(), LoadPaymentTermsAsync());
         }
         catch (Exception ex)
         {
@@ -915,6 +931,25 @@
         finally
         {
             _sendingEmail = false;
+        }
+    }
+
+    private async Task LoadPaymentTermsAsync()
+    {
+        try
+        {
+            var terms = await Http.GetFromJsonAsync<List<PaymentTermDto>>("api/v1/customers/payment-terms");
+            _paymentTerms.Clear();
+            _paymentTerms.AddRange((terms ?? [])
+                .Where(term => !string.IsNullOrWhiteSpace(term.Name))
+                .OrderBy(term => term.SortOrder)
+                .ThenBy(term => term.Name));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            _paymentTerms.Clear();
+            _paymentTerms.AddRange(DefaultPaymentTerms());
         }
     }
 
@@ -1419,6 +1454,43 @@
 
         return $"{name} - {employee.Title}";
     }
+
+    private static string PaymentTermOptionLabel(PaymentTermDto term)
+    {
+        var category = string.IsNullOrWhiteSpace(term.Category) ? "Term" : term.Category;
+        var timing = term.DiscountPercent is decimal discountPercent && term.DiscountDays is int discountDays
+            ? $"{discountPercent:0.##}% discount within {discountDays} days"
+            : term.DueDays is int dueDays
+                ? dueDays == 0 ? "due immediately" : $"due in {dueDays} days"
+                : term.Description;
+
+        return $"{term.Name} - {category}, {timing}";
+    }
+
+    private static List<PaymentTermDto> DefaultPaymentTerms() =>
+    [
+        new()
+        {
+            Code = "DUE_ON_RECEIPT",
+            Name = "Due on receipt",
+            Category = "Immediate",
+            Description = "Payment is due as soon as the invoice is received.",
+            TypicalUse = "Use for one-off jobs, quick-turnaround work, or customers without approved credit.",
+            DueDays = 0,
+            IsDefault = true,
+            SortOrder = 0
+        },
+        new()
+        {
+            Code = "NET_30",
+            Name = "Net 30",
+            Category = "Net",
+            Description = "Full invoice amount is due 30 calendar days after the invoice date.",
+            TypicalUse = "Use as the standard B2B trade-credit term for approved customers with normal purchasing cycles.",
+            DueDays = 30,
+            SortOrder = 40
+        }
+    ];
 
     private static string FormatDate(DateTime value) => value == default ? "-" : value.ToString("MMM dd, yyyy");
 

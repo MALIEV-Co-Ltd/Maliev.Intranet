@@ -239,6 +239,44 @@ public class CustomerServiceClientTests
     }
 
     [Fact]
+    public async Task GetPaymentTermsAsync_ReturnsReferenceData()
+    {
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(message =>
+                    message.Method == HttpMethod.Get &&
+                    message.RequestUri!.PathAndQuery == "/customer/v1/customers/payment-terms"),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new List<PaymentTermDto>
+                {
+                    new()
+                    {
+                        Code = "TWO_TEN_NET_30",
+                        Name = "2/10 Net 30",
+                        Category = "Discount",
+                        Description = "Customer may deduct 2% if payment is received within 10 days; otherwise the full amount is due in 30 days.",
+                        TypicalUse = "Use for approved accounts where faster cash collection is worth the discount.",
+                        DueDays = 30,
+                        DiscountPercent = 2m,
+                        DiscountDays = 10,
+                        SortOrder = 85
+                    }
+                })
+            });
+
+        var result = await _client.GetPaymentTermsAsync();
+
+        var term = Assert.Single(result);
+        Assert.Equal("2/10 Net 30", term.Name);
+        Assert.Equal("Discount", term.Category);
+        Assert.Equal(2m, term.DiscountPercent);
+        Assert.Contains("faster cash collection", term.TypicalUse, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetCustomersAsync_ShouldReturnPagedData()
     {
         var response = new
