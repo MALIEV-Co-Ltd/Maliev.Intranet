@@ -157,6 +157,29 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task OpenBabylonViewer_WhenViewerUrlAlreadyExists_DoesNotRefreshOrShowError()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "review.stp",
+            GlbStoragePath = "projects/temp/review.stp_viewer.glb",
+            ViewerUrl = "https://signed.example/review.glb",
+        };
+        var snackbar = Services.GetRequiredService<ISnackbar>();
+        ClearRequests();
+
+        await InvokePrivateTaskWithArgsAsync(cut, "OpenBabylonViewer", part);
+
+        Assert.Equal("https://signed.example/review.glb", part.ViewerUrl);
+        Assert.DoesNotContain(_sentRequests, request =>
+            request.RequestUri?.AbsolutePath.Contains("viewer-url", StringComparison.OrdinalIgnoreCase) == true);
+        Assert.DoesNotContain(snackbar.ShownSnackbars, item =>
+            item.Message == "Failed to load 3D viewer URL.");
+    }
+
+    [Fact]
     public async Task HandleFileSelectedAsync_WhenTwoValidFilesSelected_StartsBothUploads()
     {
         var releaseUploads = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);

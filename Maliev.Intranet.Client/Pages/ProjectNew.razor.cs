@@ -3297,7 +3297,17 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task OpenBabylonViewer(PartViewModel part)
     {
-        if (string.IsNullOrEmpty(part.GlbStoragePath)) return;
+        if (!string.IsNullOrWhiteSpace(part.ViewerUrl))
+            return;
+
+        if (!string.IsNullOrWhiteSpace(part.GlbSignedUrl))
+        {
+            part.ViewerUrl = part.GlbSignedUrl;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(part.GlbStoragePath)) return;
 
         var resp = await Http.GetAsync($"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
         if (!resp.IsSuccessStatusCode)
@@ -3307,7 +3317,9 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
-        var url = json?.RootElement.GetProperty("url").GetString();
+        var url = json?.RootElement.TryGetProperty("url", out var urlProperty) == true
+            ? urlProperty.GetString()
+            : null;
 
         if (string.IsNullOrEmpty(url))
         {
