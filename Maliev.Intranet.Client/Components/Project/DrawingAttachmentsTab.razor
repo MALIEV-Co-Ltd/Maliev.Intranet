@@ -16,8 +16,7 @@
             <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                            FilesChanged="@HandleFilesSelected"
                            Accept="@FileTypes.DrawingAcceptString"
-                           MaximumFileCount="10"
-                           Disabled="@_uploading">
+                           MaximumFileCount="10">
                 <CustomContent>
                     <div style="opacity:@(_uploading ? "0.5" : "1"); pointer-events:@(_uploading ? "none" : "auto");">
                         <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"

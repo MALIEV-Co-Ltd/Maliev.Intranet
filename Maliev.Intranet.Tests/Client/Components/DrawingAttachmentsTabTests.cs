@@ -37,6 +37,25 @@ public sealed class DrawingAttachmentsTabTests : BunitContext, IAsyncLifetime
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    public void Markup_KeepsFileUploadEnabledWhileUploading()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            GetRepositoryRoot(),
+            "Maliev.Intranet.Client",
+            "Components",
+            "Project",
+            "DrawingAttachmentsTab.razor"));
+
+        var uploadStart = source.IndexOf("<MudFileUpload", StringComparison.Ordinal);
+        var uploadEnd = source.IndexOf("<CustomContent>", uploadStart, StringComparison.Ordinal);
+        Assert.True(uploadStart >= 0);
+        Assert.True(uploadEnd > uploadStart);
+
+        var uploadMarkup = source[uploadStart..uploadEnd];
+        Assert.DoesNotContain("Disabled", uploadMarkup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HandleFilesSelected_WhenPartChangesDuringBatch_KeepsAllDrawingsOnOriginalPart()
     {
         var firstPart = new PartViewModel
@@ -150,6 +169,20 @@ public sealed class DrawingAttachmentsTabTests : BunitContext, IAsyncLifetime
         DrawingExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".dxf", ".dwg", ".png", ".jpg" },
         SupplementaryExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".doc", ".docx", ".xls", ".xlsx", ".zip" },
     };
+
+    private static string GetRepositoryRoot()
+    {
+        var current = AppContext.BaseDirectory;
+        while (!string.IsNullOrWhiteSpace(current))
+        {
+            if (File.Exists(Path.Combine(current, "Maliev.Intranet.slnx")))
+                return current;
+
+            current = Directory.GetParent(current)?.FullName;
+        }
+
+        throw new InvalidOperationException("Could not locate Maliev.Intranet repository root.");
+    }
 
     private sealed class TestBrowserFile(string name) : IBrowserFile
     {
