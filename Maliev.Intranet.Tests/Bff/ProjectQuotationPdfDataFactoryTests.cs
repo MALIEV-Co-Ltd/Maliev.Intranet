@@ -36,6 +36,7 @@ public class ProjectQuotationPdfDataFactoryTests
                 new ProjectPartDto
                 {
                     FileName = "SYSTEMBOARD_MIDDLE.stl",
+                    ThumbnailUrl = "https://uploads.example/signed-thumbnail.png",
                     ProcessType = "CNC_MILLING",
                     MaterialName = "Aluminum 6061-T6",
                     Quantity = 12,
@@ -98,6 +99,7 @@ public class ProjectQuotationPdfDataFactoryTests
         Assert.Equal(["110 Seed Testing Road", "Chiang Mai 50000"], data.BillingAddressLines);
         Assert.Equal(["Warehouse 2", "Chiang Mai 50000"], data.ShippingAddressLines);
         Assert.Equal("SYSTEMBOARD_MIDDLE.stl", data.Items[0].PartName);
+        Assert.Equal("https://uploads.example/signed-thumbnail.png", data.Items[0].ThumbnailUrl);
         Assert.Equal("CNC Milling", data.Items[0].ManufacturingProcess);
         Assert.Equal("Aluminum 6061-T6", data.Items[0].MaterialName);
         Assert.Contains("11.7 x 11.7 x 7.2 mm", data.Items[0].DetailLines);

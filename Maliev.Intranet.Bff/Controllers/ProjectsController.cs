@@ -424,6 +424,9 @@ public class ProjectsController(
             return false;
         }
 
+        if (uploadClient is not null)
+            await EnrichProjectDetailArtifactsAsync(project, uploadClient, analysisStatusService, ct);
+
         var quotation = await quotationClient.GetQuotationByIdAsync(quotationId, ct);
         if (quotation is null)
         {
