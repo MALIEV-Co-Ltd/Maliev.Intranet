@@ -139,6 +139,15 @@ public class PartConfigSidebarTests
         Assert.False(IsVisibleProcessOption(sidebar, option));
     }
 
+    [Fact]
+    public void RootClass_WhenInlineDisplayMode_IncludesInlineModifier()
+    {
+        var sidebar = new PartConfigSidebar();
+        SetDisplayModeParameter(sidebar, PartConfigSidebarDisplayMode.Inline);
+
+        Assert.Equal("pcs-root pcs-root--inline", GetRootClass(sidebar));
+    }
+
     private static async Task InvokeOnParametersSetAsync(PartConfigSidebar sidebar)
     {
         await InvokePrivateTask(sidebar, "OnParametersSetAsync");
@@ -205,6 +214,16 @@ public class PartConfigSidebarTests
         property.SetValue(sidebar, part);
     }
 
+    private static void SetDisplayModeParameter(
+        PartConfigSidebar sidebar,
+        PartConfigSidebarDisplayMode displayMode)
+    {
+        var property = typeof(PartConfigSidebar).GetProperty(nameof(PartConfigSidebar.DisplayMode));
+
+        Assert.NotNull(property);
+        property.SetValue(sidebar, displayMode);
+    }
+
     private static T GetPrivateField<T>(object instance, string fieldName)
     {
         var field = instance.GetType().GetField(
@@ -213,5 +232,15 @@ public class PartConfigSidebarTests
 
         Assert.NotNull(field);
         return Assert.IsType<T>(field.GetValue(instance));
+    }
+
+    private static string GetRootClass(PartConfigSidebar sidebar)
+    {
+        var property = typeof(PartConfigSidebar).GetProperty(
+            "RootClass",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(property);
+        return Assert.IsType<string>(property.GetValue(sidebar));
     }
 }
