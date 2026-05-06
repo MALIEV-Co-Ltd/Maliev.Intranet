@@ -938,7 +938,7 @@
             builder.OpenElement(sequence++, "tr");
             AddPartCell(builder, ref sequence, part);
             AddCell(builder, ref sequence, FormatProcess(part.ProcessType));
-            AddCell(builder, ref sequence, part.MaterialName ?? "-");
+            AddMaterialCell(builder, ref sequence, part);
             AddConfigurationCell(builder, ref sequence, part);
             AddDfmCell(builder, ref sequence, part);
             AddCell(builder, ref sequence, part.Quantity.ToString(), "numeric");
@@ -1548,6 +1548,37 @@
         builder.CloseElement();
     }
 
+    private static void AddMaterialCell(RenderTreeBuilder builder, ref int sequence, ProjectPartDto part)
+    {
+        var materialColor = ResolveMaterialColor(part.Color);
+
+        builder.OpenElement(sequence++, "td");
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-material-stack");
+        builder.OpenElement(sequence++, "strong");
+        builder.AddAttribute(sequence++, "class", "project-material-name");
+        builder.AddContent(sequence++, string.IsNullOrWhiteSpace(part.MaterialName) ? "-" : part.MaterialName);
+        builder.CloseElement();
+
+        if (materialColor is not null)
+        {
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "project-material-color");
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "project-material-swatch");
+            builder.AddAttribute(sequence++, "style", $"--project-material-color: {materialColor.Swatch};");
+            builder.AddAttribute(sequence++, "aria-hidden", "true");
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, materialColor.Label);
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
     private static void AddHeader(RenderTreeBuilder builder, ref int sequence, string value, string? @class = null)
     {
         builder.OpenElement(sequence++, "th");
@@ -1932,9 +1963,10 @@
 
     private static PartConfigurationDisplay? ResolvePartConfiguration(ProjectPartDto part)
     {
-        var values = new[] { part.Finish, part.Color, part.Tolerance }
+        var values = new[] { part.Finish, ResolveMaterialColor(part.Color) is null ? part.Color : null, part.Tolerance }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(FormatConfigValue)
-            .Where(value => !string.IsNullOrWhiteSpace(value));
+            .Where(value => !string.IsNullOrWhiteSpace(value) && !string.Equals(value, "-", StringComparison.Ordinal));
         var formattedValues = values.ToArray();
 
         return formattedValues.Length switch
@@ -1987,6 +2019,69 @@
     }
 
     private sealed record PartConfigurationDisplay(string Primary, string? Subtitle);
+
+    private static MaterialColorDisplay? ResolveMaterialColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value.Trim();
+        if (TryNormalizeHexColor(trimmed, out var hexColor))
+            return new(trimmed.StartsWith("#", StringComparison.Ordinal) ? trimmed.ToUpperInvariant() : $"#{trimmed.ToUpperInvariant()}", hexColor);
+
+        var normalized = trimmed
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", "_", StringComparison.Ordinal)
+            .ToUpperInvariant();
+
+        if (normalized.StartsWith("RAL_", StringComparison.Ordinal) || normalized.StartsWith("RAL", StringComparison.Ordinal))
+            return new(trimmed.ToUpperInvariant(), "#111827");
+
+        return normalized switch
+        {
+            "BLACK" => new("Black", "#111827"),
+            "WHITE" => new("White", "#f8fafc"),
+            "NATURAL" => new("Natural", "#e7dcc7"),
+            "CLEAR" or "TRANSPARENT" => new(HumanizeToken(trimmed), "#dbeafe"),
+            "GRAY" or "GREY" => new(HumanizeToken(trimmed), "#94a3b8"),
+            "LIGHT_GRAY" or "LIGHT_GREY" => new(HumanizeToken(trimmed), "#cbd5e1"),
+            "DARK_GRAY" or "DARK_GREY" => new(HumanizeToken(trimmed), "#475569"),
+            "RED" => new("Red", "#dc2626"),
+            "BLUE" => new("Blue", "#2563eb"),
+            "GREEN" => new("Green", "#16a34a"),
+            "YELLOW" => new("Yellow", "#facc15"),
+            "ORANGE" => new("Orange", "#f97316"),
+            "PURPLE" or "VIOLET" => new(HumanizeToken(trimmed), "#7c3aed"),
+            "BROWN" => new("Brown", "#92400e"),
+            "SILVER" => new("Silver", "#cbd5e1"),
+            "GOLD" => new("Gold", "#d97706"),
+            _ => null
+        };
+    }
+
+    private static bool TryNormalizeHexColor(string value, out string hexColor)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            value.Trim(),
+            "^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            hexColor = string.Empty;
+            return false;
+        }
+
+        var digits = value.TrimStart('#');
+        if (digits.Length == 3)
+        {
+            digits = string.Concat(digits.Select(character => $"{character}{character}"));
+        }
+
+        hexColor = $"#{digits.ToUpperInvariant()}";
+        return true;
+    }
+
+    private sealed record MaterialColorDisplay(string Label, string Swatch);
 
     private static string HumanizeToken(string value)
     {

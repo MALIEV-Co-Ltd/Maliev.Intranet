@@ -241,6 +241,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("As Machined", cut.Markup);
         Assert.Contains("Standard FDM settings", cut.Markup);
         Assert.Contains("ISO 2768-m", cut.Markup);
+        Assert.Contains("project-material-stack", cut.Markup);
+        Assert.Contains("project-material-color", cut.Markup);
+        Assert.Contains("project-material-swatch", cut.Markup);
+        Assert.Contains("#111827", cut.Markup);
         Assert.Contains("project-config-primary", cut.Markup);
         Assert.Contains("project-config-subtitle", cut.Markup);
         Assert.DoesNotContain("AS_PRINTED", cut.Markup);
@@ -332,6 +336,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-field-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-metric-row", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-parts-table", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-material-stack", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-material-swatch", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-ack-button", css, StringComparison.Ordinal);
