@@ -747,20 +747,6 @@
         var fileId = Part.FileId.ToString();
         await _modelViewer.ToggleDfmOverlayAsync(fileId, issue.OverlayKey, issue.OverlayUrl, isActive);
 
-        // Co-toggle the support-tower overlay whenever an overhang overlay is toggled.
-        // Support key is the same key with "_support" appended to the "__overhang" suffix.
-        if (issue.Category == "overhang" && issue.OverlayKey.EndsWith("__overhang"))
-        {
-            var supportKey = issue.OverlayKey + "_support";
-            var supportUrl = Part.OverlayUrls?.GetValueOrDefault(supportKey);
-            // For hide, pass empty URL — the JS only needs the key to set isVisible=false.
-            // For show, we need the actual URL; skip if unavailable.
-            if (!isActive)
-                await _modelViewer.ToggleDfmOverlayAsync(fileId, supportKey, supportUrl ?? string.Empty, false);
-            else if (supportUrl != null)
-                await _modelViewer.ToggleDfmOverlayAsync(fileId, supportKey, supportUrl, true);
-        }
-
         // Show/hide the grid floor when support-related overlays are toggled.
         if (issue.Category is "overhang" or "support_required")
         {
