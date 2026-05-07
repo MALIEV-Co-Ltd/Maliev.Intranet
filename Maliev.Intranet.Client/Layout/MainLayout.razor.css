@@ -13,3 +13,25 @@
     flex-direction: column;
     background: var(--maliev-bg);
 }
+
+.app-shell ::deep .sidekick-chat-drawer {
+    background: transparent;
+    box-shadow: none;
+}
+
+.app-shell ::deep .sidekick-chat-drawer .mud-drawer-content {
+    background: transparent;
+    height: 100%;
+}
+
+.app-shell ::deep .mud-drawer-overlay {
+    background-color: rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(1px);
+}
+
+@media (max-width: 720px) {
+    .app-shell ::deep .sidekick-chat-drawer {
+        width: 100vw !important;
+        max-width: 100vw !important;
+    }
+}

@@ -132,6 +132,16 @@ public class ChatService : IAsyncDisposable
     }
 
     /// <summary>
+    /// Clears the active conversation and lets the next sent message create a fresh backend session.
+    /// </summary>
+    public void StartNewConversation()
+    {
+        Messages.Clear();
+        SessionId = null;
+        NotifyStateChanged();
+    }
+
+    /// <summary>
     /// Connects to the ChatHub for real-time thinking step updates.
     /// </summary>
     /// <returns>A task representing the asynchronous connection operation.</returns>

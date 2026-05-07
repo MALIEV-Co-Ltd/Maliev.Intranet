@@ -8,205 +8,269 @@
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
-<div class="d-flex flex-column" style="height: 100%; overflow: hidden;">
-    <!-- Header Area -->
-    <div class="pa-4 pb-0">
-        <div class="d-flex align-center justify-space-between">
-            <MudStack Spacing="0">
-                <MudText Typo="Typo.h6" Style="line-height: 1.1;">Assistant</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Default">Context: @ChatService.CurrentContext</MudText>
-            </MudStack>
+<section class="sidekick-root" aria-label="AI assistant conversation">
+    <header class="sidekick-header">
+        <div class="sidekick-header-title">
+            <MudMenu AnchorOrigin="Origin.BottomLeft"
+                     TransformOrigin="Origin.TopLeft"
+                     Dense="true"
+                     Class="sidekick-title-menu"
+                     PopoverClass="sidekick-title-popover">
+                <ActivatorContent>
+                    <button type="button"
+                            class="sidekick-title-button"
+                            aria-label="Conversation menu"
+                            @onclick="context.ToggleAsync">
+                        <span>@GetConversationTitle()</span>
+                        <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" />
+                    </button>
+                </ActivatorContent>
+                <ChildContent>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.AddComment" OnClick="@StartNewConversation">
+                        New conversation
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.TravelExplore" OnClick="@(() => HandleSuggestedAction(GetSummarizePrompt()))">
+                        Summarize current page
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.HealthAndSafety" OnClick="@(() => HandleSuggestedAction(GetSystemHealthPrompt()))">
+                        Check system health
+                    </MudMenuItem>
+                </ChildContent>
+            </MudMenu>
+            <span class="sidekick-context-chip">@GetPageName()</span>
+        </div>
+
+        <div class="sidekick-header-actions">
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                           Size="Size.Small"
+                           Class="sidekick-icon-button"
+                           aria-label="Start new conversation"
+                           OnClick="@StartNewConversation" />
             @if (!IsMobile)
             {
                 <MudIconButton Icon="@(IsExpanded ? Icons.Material.Filled.CloseFullscreen : Icons.Material.Filled.OpenInFull)"
                                Size="Size.Small"
-                               Color="Color.Default"
+                               Class="sidekick-icon-button"
+                               aria-label="Toggle assistant width"
                                OnClick="@(() => IsExpandedChanged.InvokeAsync(!IsExpanded))" />
             }
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           Size="Size.Small"
+                           Class="sidekick-icon-button"
+                           aria-label="Close assistant"
+                           OnClick="@(() => OnClose.InvokeAsync())" />
         </div>
-        <MudDivider Class="mt-2" />
-    </div>
+    </header>
 
     @if (_isCheckingAvailability)
     {
-        <!-- Loading while checking AI availability -->
-        <div class="flex-grow-1 d-flex align-center justify-center pa-4">
+        <div class="sidekick-state" aria-live="polite">
             <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
         </div>
     }
     else if (!_isAiAvailable)
     {
-        <!-- AI Unavailable Message -->
-        <div class="flex-grow-1 d-flex align-center justify-center pa-4">
-            <MudAlert Severity="Severity.Warning" Dense="false" Class="mt-2">
+        <div class="sidekick-state">
+            <MudAlert Severity="Severity.Warning" Dense="false" Class="sidekick-unavailable">
                 <MudText>AI Assistant is currently unavailable. Unable to establish a connection with the chatbot service.</MudText>
             </MudAlert>
         </div>
     }
     else
     {
-        <!-- Chat Messages Area -->
-    <div id="chat-container" class="flex-grow-1 px-4 py-4 scroll-container" style="overflow-y: auto; position: relative;" @onscroll="HandleScroll">
-        @foreach (var message in ChatService.Messages)
-        {
-            @* Show thinking chain above assistant messages that have thinking steps *@
-            @if (!message.IsUser && message.ThinkingSteps.Count > 0)
-            {
-                <ThinkingChain Steps="message.ThinkingSteps" IsProcessing="message.IsProcessing" />
-            }
-
-            @* Show processing placeholder with thinking chain only *@
-            @if (message.IsProcessing && string.IsNullOrEmpty(message.Text))
-            {
-                @if (message.ThinkingSteps.Count == 0)
+        <div id="chat-container" class="sidekick-stream scroll-container" @onscroll="HandleScroll">
+            <div class="sidekick-stream-inner">
+                @if (ChatService.Messages.Count == 0 && string.IsNullOrEmpty(_errorMessage))
                 {
-                    <div class="d-flex align-start gap-2 mb-3">
-                        <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px; flex-shrink: 0;">
-                            <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
-                        </MudAvatar>
-                        <MudPaper Elevation="0" Class="pa-3 rounded-xl mud-secondary-text" Style="background: var(--mud-palette-surface); max-width: 80%;">
-                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" Style="width: 120px;" />
-                        </MudPaper>
+                    <section class="sidekick-empty-state" aria-label="Assistant welcome">
+                        <div class="sidekick-mascot" aria-hidden="true">
+                            <MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" />
+                        </div>
+                        <MudText Typo="Typo.h6" Class="sidekick-empty-greeting">@GetGreeting(), @GetDisplayName()</MudText>
+                        <MudText Typo="Typo.h5" Class="sidekick-empty-title">How can I help?</MudText>
+                        <button type="button" class="sidekick-suggestion-pill" @onclick="@(() => HandleSuggestedAction(GetWhatsNewPrompt()))">
+                            <span class="sidekick-suggestion-dot" aria-hidden="true"></span>
+                            What's new?
+                        </button>
+                    </section>
+                }
+
+                @foreach (var message in ChatService.Messages)
+                {
+                    @if (!message.IsUser && message.ThinkingSteps.Count > 0)
+                    {
+                        <ThinkingChain Steps="message.ThinkingSteps" IsProcessing="message.IsProcessing" />
+                    }
+
+                    @if (message.IsProcessing && string.IsNullOrEmpty(message.Text))
+                    {
+                        @if (message.ThinkingSteps.Count == 0)
+                        {
+                            <div class="sidekick-processing-row" aria-live="polite">
+                                <MudIcon Icon="@Icons.Material.Outlined.ManageSearch" Size="Size.Small" />
+                                <span>Working on it</span>
+                                <span class="sidekick-loading-dot" aria-hidden="true"></span>
+                            </div>
+                        }
+                        continue;
+                    }
+
+                    <article class="sidekick-message-row @(message.IsUser ? "sidekick-message-row-user" : "sidekick-message-row-assistant")">
+                        @if (!message.IsUser)
+                        {
+                            <div class="sidekick-assistant-mark" aria-hidden="true">
+                                <MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" />
+                            </div>
+                        }
+
+                        <div class="sidekick-message-bubble @(message.IsUser ? "sidekick-user-bubble" : "sidekick-assistant-bubble")">
+                            @if (message.IsUser)
+                            {
+                                <div class="sidekick-user-text">@message.Text</div>
+                            }
+                            else
+                            {
+                                <MarkdownRenderer Markdown="@message.Text" />
+                            }
+
+                            @if (!message.IsUser)
+                            {
+                                <div class="sidekick-message-actions" aria-label="Assistant response actions">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+                                                   Size="Size.Small"
+                                                   Class="sidekick-inline-action"
+                                                   aria-label="Copy response"
+                                                   OnClick="@(() => CopyMessageAsync(message.Text))" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.ThumbUpOffAlt"
+                                                   Size="Size.Small"
+                                                   Class="sidekick-inline-action"
+                                                   Color="@GetFeedbackColor(message, "up")"
+                                                   aria-label="Mark response helpful"
+                                                   OnClick="@(() => SetFeedback(message, "up"))" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.ThumbDownOffAlt"
+                                                   Size="Size.Small"
+                                                   Class="sidekick-inline-action"
+                                                   Color="@GetFeedbackColor(message, "down")"
+                                                   aria-label="Mark response not helpful"
+                                                   OnClick="@(() => SetFeedback(message, "down"))" />
+                                </div>
+                            }
+                        </div>
+                    </article>
+
+                    @if (message.SuggestedActions != null && message.SuggestedActions.Count > 0)
+                    {
+                        <div class="sidekick-suggested-actions">
+                            @foreach (var action in message.SuggestedActions)
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           Class="sidekick-suggested-action"
+                                           OnClick="@(() => HandleSuggestedAction(action.Text))">
+                                    @action.Text
+                                </MudButton>
+                            }
+                        </div>
+                    }
+                }
+
+                @if (ChatService.IsLoading && !ChatService.Messages.Any(m => m.IsProcessing))
+                {
+                    <div class="sidekick-processing-row" aria-live="polite">
+                        <MudIcon Icon="@Icons.Material.Outlined.ManageSearch" Size="Size.Small" />
+                        <span>Working on it</span>
+                        <span class="sidekick-loading-dot" aria-hidden="true"></span>
                     </div>
                 }
-                continue;
-            }
 
-            <div class="d-flex @(message.IsUser ? "justify-end" : "justify-start") align-start gap-2 mb-3">
-                @if (!message.IsUser)
+                @if (!string.IsNullOrEmpty(_errorMessage))
                 {
-                    <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px; flex-shrink: 0;">
-                        <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
-                    </MudAvatar>
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="sidekick-error">@_errorMessage</MudAlert>
                 }
-                <MudPaper Elevation="0" Class="pa-3 rounded-xl" Style="@(message.IsUser ? "background: var(--mud-palette-primary); color: var(--mud-palette-primary-text); max-width: 80%;" : "background: var(--mud-palette-surface); max-width: 80%;")">
-                    @if (message.IsUser)
-                    {
-                        <div style="white-space: pre-wrap;">@message.Text</div>
-                    }
-                    else
-                    {
-                        <MarkdownRenderer Markdown="@message.Text" />
-                    }
-                </MudPaper>
-                @if (message.IsUser)
+
+                @if (_showScrollButton)
                 {
-                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Style="align-self: flex-start; margin-top: 4px; flex-shrink: 0;">
-                        @if (!string.IsNullOrEmpty(_userPicture))
-                        {
-                            <MudImage Src="@_userPicture" />
-                        }
-                        else
-                        {
-                            @(_userName?[0] ?? 'U')
-                        }
-                    </MudAvatar>
+                    <div class="sidekick-scroll-jump">
+                        <MudFab Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.ArrowDownward"
+                                Size="Size.Small"
+                                OnClick="ScrollToBottom" />
+                    </div>
                 }
             </div>
+        </div>
 
-            @if (message.SuggestedActions != null && message.SuggestedActions.Count > 0)
-            {
-                <div class="d-flex flex-wrap gap-1 mt-1 mb-2 ml-12">
-                    @foreach (var action in message.SuggestedActions)
-                    {
-                        <MudButton Variant="Variant.Outlined"
+        <footer class="sidekick-composer-shell @(IsMobile ? "sidekick-composer-mobile" : "")">
+            <MudPaper Elevation="0" Class="sidekick-composer">
+                <div class="sidekick-composer-avatar" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" />
+                </div>
+
+                <textarea @ref="_inputElement"
+                          class="sidekick-composer-input"
+                          value="@_currentInput"
+                          placeholder="Ask anything..."
+                          rows="1"
+                          autocomplete="off"
+                          disabled="@ChatService.IsLoading"
+                          @oninput="HandleComposerInput"
+                          @onkeydown="HandleKeyDown"></textarea>
+
+                <div class="sidekick-composer-actions">
+                    <MudMenu Icon="@Icons.Material.Outlined.Add"
+                             Label="Assistant actions"
+                             Size="Size.Small"
+                             Dense="true"
+                             AnchorOrigin="Origin.TopRight"
+                             TransformOrigin="Origin.BottomRight"
+                             Class="sidekick-composer-menu"
+                             PopoverClass="sidekick-composer-popover">
+                        <ChildContent>
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="UploadFiles" Hidden="true">
+                                <CustomContent>
+                                    <MudMenuItem Icon="@Icons.Material.Outlined.UploadFile" OnClick="@context.OpenFilePickerAsync">
+                                        Upload from device
+                                    </MudMenuItem>
+                                </CustomContent>
+                            </MudFileUpload>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.TravelExplore" OnClick="@(() => HandleSuggestedAction(GetSummarizePrompt()))">
+                                Summarize current page
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.AutoAwesome" OnClick="@(() => HandleSuggestedAction(GetNextStepsPrompt()))">
+                                Ask for next steps
+                            </MudMenuItem>
+                        </ChildContent>
+                    </MudMenu>
+
+                    <MudIconButton Icon="@Icons.Material.Outlined.GraphicEq"
                                    Size="Size.Small"
-                                   Color="Color.Primary"
-                                   OnClick="@(() => HandleSuggestedAction(action.Text))">
-                            @action.Text
-                        </MudButton>
-                    }
-                </div>
-            }
-        }
+                                   Class="sidekick-icon-button"
+                                   aria-label="Voice input is not available"
+                                   Disabled="true" />
 
-        @if (ChatService.IsLoading && !ChatService.Messages.Any(m => m.IsProcessing))
-        {
-            <div class="d-flex align-start gap-2 mb-3">
-                <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Style="align-self: flex-start; margin-top: 4px; flex-shrink: 0;">
-                    <MudIcon Icon="@Icons.Material.Filled.SupportAgent" />
-                </MudAvatar>
-                <MudPaper Elevation="0" Class="pa-3 rounded-xl" Style="background: var(--mud-palette-surface); max-width: 80%;">
-                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" Style="width: 120px;" />
-                </MudPaper>
-            </div>
-        }
-
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_errorMessage</MudAlert>
-        }
-
-        @if (_showScrollButton)
-        {
-            <div style="position: sticky; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 10;">
-                <MudFab Color="Color.Primary" 
-                        StartIcon="@Icons.Material.Filled.ArrowDownward" 
-                        Size="Size.Small" 
-                        OnClick="ScrollToBottom"
-                        Style="pointer-events: auto;" />
-            </div>
-        }
-    </div>
-
-    <!-- Bottom Input Area -->
-    <div class="pa-4 mt-auto @(IsMobile ? "mb-16" : "")">
-        <MudPaper Elevation="0" Class="rounded-xl pa-2 chat-input-container border border-solid mud-border-lines-default" Style="background-color: var(--mud-palette-surface);">
-            <div class="px-2 pt-1">
-                <MudTextField @ref="_inputField"
-                              @bind-Value="_currentInput"
-                              Placeholder="Ask anything"
-                              Variant="Variant.Text"
-                              Underline="false"
-                              Lines="1"
-                              MaxLines="8"
-                              OnKeyDown="@HandleKeyDown"
-                              Immediate="true"
-                              autocomplete="off"
-                              Disabled="@ChatService.IsLoading"
-                              Class="mt-0"
-                              Style="font-size: 0.95rem;" />
-            </div>
-
-            <div class="d-flex align-center justify-space-between mt-1 px-1">
-                <div class="d-flex align-center gap-1">
-                    <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="UploadFiles" Hidden="true">
-                        <CustomContent>
-                            <MudIconButton Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" Class="action-icon" OnClick="@context.OpenFilePickerAsync" />
-                        </CustomContent>
-                    </MudFileUpload>
-                    <MudIconButton Icon="@Icons.Material.Outlined.Public" Size="Size.Small" Class="action-icon" />
-                    <MudIconButton Icon="@Icons.Material.Outlined.Lightbulb" Size="Size.Small" Class="action-icon" />
-                    <MudIconButton Icon="@Icons.Material.Outlined.MoreHoriz" Size="Size.Small" Class="action-icon" />
-                </div>
-
-                <div class="send-button-wrapper">
-                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                    <MudIconButton Icon="@(ChatService.IsLoading ? Icons.Material.Filled.StopCircle : Icons.Material.Filled.ArrowUpward)"
                                    OnClick="@SendMessage"
-                                   Class="send-button-square"
+                                   Class="sidekick-send-button"
                                    Size="Size.Small"
-                                   Disabled="@ChatService.IsLoading" />
+                                   aria-label="Send message"
+                                   Disabled="@(ChatService.IsLoading || string.IsNullOrWhiteSpace(_currentInput))" />
                 </div>
-            </div>
-        </MudPaper>
-
-        <MudText Typo="Typo.caption" Color="Color.Default" Align="Align.Center" Class="d-block mt-2" Style="font-size: 0.75rem;">
-            AI can make mistakes. Please double-check responses.
-        </MudText>
-    </div>
+            </MudPaper>
+        </footer>
     }
-</div>
-
+</section>
 
 @code {
     [Parameter] public bool IsMobile { get; set; }
     [Parameter] public bool IsExpanded { get; set; }
     [Parameter] public EventCallback<bool> IsExpandedChanged { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
 
-    private MudTextField<string>? _inputField;
+    private readonly Dictionary<ChatMessage, string> _feedback = new();
+    private ElementReference _inputElement;
 
     private string _currentInput = "";
-    private string? _userPicture;
     private string? _userName;
     private string? _errorMessage;
     private bool _isAiAvailable = false;
@@ -222,14 +286,10 @@
         var user = authState.User;
         if (user.Identity?.IsAuthenticated == true)
         {
-            _userPicture = user.FindFirst("picture")?.Value;
             _userName = user.Identity.Name;
         }
 
-        // Check if AI service is available by attempting to initiate a session
         await CheckAiAvailability();
-
-        // Connect to SignalR for real-time thinking steps
         await ChatService.ConnectSignalRAsync();
     }
 
@@ -334,34 +394,93 @@
     private string GetPageName()
     {
         var path = ChatService.CurrentContext.TrimEnd('/');
-        if (string.IsNullOrEmpty(path)) path = "/";
+        if (string.IsNullOrEmpty(path))
+        {
+            path = "/";
+        }
 
-        // Exact match
         if (PageNames.TryGetValue(path, out var name))
+        {
             return name;
+        }
 
-        // Customer detail page: /sales/customers/{guid}
         if (path.StartsWith("/sales/customers/", StringComparison.OrdinalIgnoreCase) && path.Length > 18)
+        {
             return "Customer Details";
+        }
 
-        // Fallback: humanize the last segment
         var lastSegment = path.Split('/').LastOrDefault() ?? "Home";
         return char.ToUpper(lastSegment[0]) + lastSegment[1..].Replace("-", " ");
     }
 
+    private string GetConversationTitle()
+    {
+        var firstUserMessage = ChatService.Messages.FirstOrDefault(m => m.IsUser && !string.IsNullOrWhiteSpace(m.Text));
+        if (firstUserMessage is null)
+        {
+            return "New conversation";
+        }
+
+        var title = firstUserMessage.Text.Trim();
+        return title.Length > 48 ? title[..45] + "..." : title;
+    }
+
+    private string GetSummarizePrompt() => $"Summarize {GetPageName()}";
+
+    private static string GetSystemHealthPrompt() => "Check current system health";
+
+    private static string GetWhatsNewPrompt() => "What's new?";
+
+    private static string GetNextStepsPrompt() => "What should I focus on next?";
+
+    private string GetGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        if (hour < 12)
+        {
+            return "Good morning";
+        }
+
+        return hour < 18 ? "Good afternoon" : "Good evening";
+    }
+
+    private string GetDisplayName()
+    {
+        if (string.IsNullOrWhiteSpace(_userName))
+        {
+            return "there";
+        }
+
+        var name = _userName.Trim();
+        if (name.Contains('@', StringComparison.Ordinal))
+        {
+            name = name[..name.IndexOf('@', StringComparison.Ordinal)];
+        }
+
+        var firstName = name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        return string.IsNullOrWhiteSpace(firstName) ? "there" : firstName;
+    }
+
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        // Send on Enter, but allow Shift+Enter for new lines
         if (e.Key == "Enter" && !e.ShiftKey)
         {
             await SendMessage();
         }
     }
 
+    private void HandleComposerInput(ChangeEventArgs e)
+    {
+        _currentInput = e.Value?.ToString() ?? string.Empty;
+    }
+
     private async Task SendMessage()
     {
         var input = _currentInput;
-        if (string.IsNullOrWhiteSpace(input) || ChatService.IsLoading) return;
+        if (string.IsNullOrWhiteSpace(input) || ChatService.IsLoading)
+        {
+            return;
+        }
 
         _currentInput = "";
         _errorMessage = null;
@@ -372,16 +491,10 @@
             var response = await ChatService.SendMessageAsync(input);
             if (response != null)
             {
-                // When using streaming, ChatService already updates the placeholder message
-                // Only add a new message when NOT streaming (no placeholder exists)
                 var existingPlaceholder = ChatService.Messages.LastOrDefault(m => !m.IsUser && !m.IsProcessing && m.Text == response.Content);
-                if (existingPlaceholder == null)
+                if (existingPlaceholder == null && !ChatService.Messages.Any(m => !m.IsUser && m.Text == response.Content))
                 {
-                    // No streaming placeholder was used — add normally
-                    if (!ChatService.Messages.Any(m => !m.IsUser && m.Text == response.Content))
-                    {
-                        ChatService.AddMessage(response.Content, false, response.SuggestedActions);
-                    }
+                    ChatService.AddMessage(response.Content, false, response.SuggestedActions);
                 }
             }
             else
@@ -395,16 +508,57 @@
         }
 
         await InvokeAsync(StateHasChanged);
-        if (_inputField != null)
-        {
-            await _inputField.FocusAsync();
-        }
+        await _inputElement.FocusAsync();
     }
 
     private async Task HandleSuggestedAction(string actionText)
     {
         _currentInput = actionText;
         await SendMessage();
+    }
+
+    private void StartNewConversation()
+    {
+        _feedback.Clear();
+        _errorMessage = null;
+        _currentInput = "";
+        ChatService.StartNewConversation();
+    }
+
+    private async Task CopyMessageAsync(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+        }
+        catch
+        {
+            // Clipboard access can be blocked outside a user gesture.
+        }
+    }
+
+    private void SetFeedback(ChatMessage message, string value)
+    {
+        if (_feedback.TryGetValue(message, out var current) && current == value)
+        {
+            _feedback.Remove(message);
+        }
+        else
+        {
+            _feedback[message] = value;
+        }
+    }
+
+    private Color GetFeedbackColor(ChatMessage message, string value)
+    {
+        return _feedback.TryGetValue(message, out var current) && current == value
+            ? Color.Primary
+            : Color.Default;
     }
 
     private void UploadFiles(IReadOnlyList<IBrowserFile> files)

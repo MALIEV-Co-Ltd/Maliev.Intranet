@@ -26,12 +26,21 @@
 <div class="app-shell">
     @* ── Top Bar ── *@
     <TopBar ChatDrawerOpen="@_chatDrawerOpen"
-            ChatDrawerOpenChanged="@(v => { _chatDrawerOpen = v; StateHasChanged(); })" OnToggleTheme="ToggleThemeAsync" />
+            ChatDrawerOpenChanged="SetChatDrawerOpenAsync"
+            OnToggleTheme="ToggleThemeAsync" />
 
     @* ── Chat Drawer (right side) ── *@
-    <MudDrawer @bind-Open="_chatDrawerOpen" Anchor="Anchor.End" ClipMode="DrawerClipMode.Never" Elevation="3"
-               Variant="DrawerVariant.Temporary" Width="400px">
-        <ChatDrawer />
+    <MudDrawer Open="@_chatDrawerOpen"
+               OpenChanged="SetChatDrawerOpenAsync"
+               Anchor="Anchor.End"
+               ClipMode="DrawerClipMode.Never"
+               Elevation="0"
+               Variant="DrawerVariant.Temporary"
+               Width="@ChatDrawerWidth"
+               Class="@ChatDrawerClass">
+        <ChatDrawer IsExpanded="@_chatDrawerExpanded"
+                    IsExpandedChanged="SetChatDrawerExpandedAsync"
+                    OnClose="CloseChatDrawerAsync" />
     </MudDrawer>
 
     @* ── Body ── *@
@@ -45,8 +54,15 @@
     private Task<AuthenticationState> AuthStateTask { get; set; } = null!;
 
     private bool _chatDrawerOpen = false;
+    private bool _chatDrawerExpanded = false;
     private HubConnection? _hubConnection;
     private MudThemeProvider _mudThemeProvider = null!;
+    private string ChatDrawerWidth => _chatDrawerExpanded
+        ? "min(1180px, calc(100vw - 32px))"
+        : "min(640px, calc(100vw - 16px))";
+    private string ChatDrawerClass => _chatDrawerExpanded
+        ? "sidekick-chat-drawer sidekick-chat-drawer-expanded"
+        : "sidekick-chat-drawer";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -107,6 +123,27 @@
         await LayoutService.ToggleModeAsync();
         await SyncThemeAsync();
     }
+
+    private Task SetChatDrawerOpenAsync(bool open)
+    {
+        _chatDrawerOpen = open;
+        if (!open)
+        {
+            _chatDrawerExpanded = false;
+        }
+
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task SetChatDrawerExpandedAsync(bool expanded)
+    {
+        _chatDrawerExpanded = expanded;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task CloseChatDrawerAsync() => SetChatDrawerOpenAsync(false);
 
     private async Task SyncThemeAsync()
     {

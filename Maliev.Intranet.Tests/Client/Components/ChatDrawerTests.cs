@@ -37,7 +37,7 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
-    public void ShouldShowUnavailable_WhenHealthCheckFails()
+    public async Task ShouldShowUnavailable_WhenHealthCheckFails()
     {
         // Arrange: health check returns 500
         var handler = new MockHttpMessageHandler((req, ct) =>
@@ -45,12 +45,13 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
 
         // Replace services for this specific test
-        using var testContext = new BunitContext();
+        await using var testContext = new BunitContext();
         testContext.Services.AddMudServices();
         testContext.JSInterop.Mode = JSRuntimeMode.Loose;
         testContext.Services.AddSingleton(_authMock.Object);
         testContext.Services.AddSingleton(new ChatService(client, null!, new CookieProvider()));
         testContext.Services.AddSingleton(client);
+        testContext.Render<MudPopoverProvider>();
 
         // Act
         var cut = testContext.Render<ChatDrawer>();
@@ -60,7 +61,7 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void ShouldShowChat_WhenHealthCheckSucceeds()
+    public async Task ShouldShowChat_WhenHealthCheckSucceeds()
     {
         // Arrange: health check returns success
         var healthResponse = new { canInitiateSession = true };
@@ -68,18 +69,21 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(healthResponse) }));
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
 
-        using var testContext = new BunitContext();
+        await using var testContext = new BunitContext();
         testContext.Services.AddMudServices();
         testContext.JSInterop.Mode = JSRuntimeMode.Loose;
         testContext.Services.AddSingleton(_authMock.Object);
         testContext.Services.AddSingleton(new ChatService(client, null!, new CookieProvider()));
         testContext.Services.AddSingleton(client);
+        testContext.Render<MudPopoverProvider>();
 
         // Act
         var cut = testContext.Render<ChatDrawer>();
 
-        // Assert: input area is visible when AI is available
-        Assert.Contains("AI can make mistakes", cut.Markup);
-        Assert.Contains("Ask anything", cut.Markup); // Placeholder in text field
+        // Assert: Sidekick-style empty state and input area are visible when AI is available
+        Assert.Contains("How can I help?", cut.Markup);
+        Assert.Contains("What's new?", cut.Markup);
+        Assert.Contains("Ask anything...", cut.Markup);
+        Assert.Contains("sidekick-composer", cut.Markup);
     }
 }
