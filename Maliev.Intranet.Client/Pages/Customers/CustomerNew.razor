@@ -133,22 +133,11 @@
                                     <FormField Label="Last name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.LastName" /></FormField>
                                     <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Email" /></FormField>
                                     <FormField Label="Phone number"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Mobile" /></FormField>
-                                    <FormField Label="Segment">
-                                        <select class="mlv-form-input" @bind="_onboarding.Customer.Segment">
-                                            @foreach (var segment in _segments)
-                                            {
-                                                <option value="@segment">@segment</option>
-                                            }
-                                        </select>
-                                    </FormField>
-                                    <FormField Label="Tier">
-                                        <select class="mlv-form-input" @bind="_onboarding.Customer.Tier">
-                                            @foreach (var tier in _tiers)
-                                            {
-                                                <option value="@tier">@tier</option>
-                                            }
-                                        </select>
-                                    </FormField>
+                                    <div class="customer-classification-default">
+                                        <span>Initial classification</span>
+                                        <strong>@GetInitialClassificationLabel()</strong>
+                                        <small>Managed automatically from order history after the customer starts buying.</small>
+                                    </div>
                                 </FormGrid>
                             }
                             else if (_activeCreateTab == CreateTab.Company)
@@ -440,7 +429,7 @@
                             <div><span>Name</span><strong>@GetCustomerName()</strong></div>
                             <div><span>Email</span><strong>@FormatValue(_onboarding.Customer.Email)</strong></div>
                             <div><span>Phone</span><strong>@FormatPair(_onboarding.Customer.Mobile, _onboarding.Customer.Landline)</strong></div>
-                            <div><span>Segment / tier</span><strong>@($"{_onboarding.Customer.Segment} / {_onboarding.Customer.Tier}")</strong></div>
+                            <div><span>Initial class</span><strong>@GetInitialClassificationLabel()</strong></div>
                         </section>
                         <section>
                             <h4>Company</h4>
@@ -515,8 +504,6 @@
     private const string BranchModeHeadOffice = "HeadOffice";
     private const string BranchModeManual = "Manual";
 
-    private static readonly string[] _segments = ["Retail", "Wholesale", "Enterprise", "Government"];
-    private static readonly string[] _tiers = ["Bronze", "Silver", "Gold", "Platinum", "VIP"];
 
     private CustomerOnboardingRequest _onboarding = CreateDefaultRequest();
     private EditContext _customerEditContext = null!;
@@ -770,7 +757,6 @@
         SetIfPresent(value => _onboarding.Customer.Mobile = value, extracted.Mobile);
         SetIfPresent(value => _onboarding.Customer.Landline = value, extracted.Landline);
         SetIfPresent(value => _onboarding.Customer.Extension = value, extracted.Extension);
-        SetIfPresent(value => _onboarding.Customer.Segment = NormalizeSegment(value), extracted.Segment);
         SetIfPresent(value => _companyName = value, extracted.CompanyName);
 
         if (!string.IsNullOrWhiteSpace(extracted.VatNumber))
@@ -1305,6 +1291,9 @@
         return string.IsNullOrWhiteSpace(name) ? "Not named yet" : name;
     }
 
+    private string GetInitialClassificationLabel() =>
+        $"{_onboarding.Customer.Segment} / {_onboarding.Customer.Tier}";
+
     private int GetAddressIndex(string type) =>
         _addresses.FindIndex(a => string.Equals(a.Request.Type, type, StringComparison.OrdinalIgnoreCase));
 
@@ -1467,11 +1456,6 @@
             ? $"TH-{new string(trimmed[3..].Where(char.IsDigit).ToArray())}"
             : new string(trimmed.Where(char.IsDigit).ToArray());
     }
-
-    private static string NormalizeSegment(string value) =>
-        _segments.Contains(value, StringComparer.OrdinalIgnoreCase)
-            ? _segments.First(segment => segment.Equals(value, StringComparison.OrdinalIgnoreCase))
-            : "Retail";
 
     private static int GetUploadedDocumentCount(List<UploadedDocumentDraft> documents) =>
         documents.Count(document => document.IsUploaded);

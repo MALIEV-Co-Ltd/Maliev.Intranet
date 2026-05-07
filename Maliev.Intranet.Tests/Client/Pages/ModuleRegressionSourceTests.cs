@@ -484,8 +484,13 @@ public class ModuleRegressionSourceTests
         Assert.Contains("class=\"company-core-row\"", page, StringComparison.Ordinal);
         Assert.Contains("class=\"company-address-block\"", page, StringComparison.Ordinal);
         Assert.Contains("class=\"company-address-header\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"customer-classification-default\"", page, StringComparison.Ordinal);
+        Assert.Contains("Managed automatically from order history", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label=\"Segment\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label=\"Tier\"", page, StringComparison.Ordinal);
         Assert.Contains("top: 0;", ExtractCssBlock(styles, ".customer-create-side"), StringComparison.Ordinal);
         Assert.Contains("min-height: 430px;", ExtractCssBlock(styles, ".customer-create-tab-panel"), StringComparison.Ordinal);
+        Assert.Contains("grid-column: 1 / -1;", ExtractCssBlock(styles, ".customer-classification-default"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(0, 1.25fr) minmax(170px, 0.8fr) minmax(132px, 0.5fr) minmax(118px, 0.45fr);", ExtractCssBlock(styles, ".company-core-row"), StringComparison.Ordinal);
         Assert.Contains("max-width: 180px;", ExtractCssBlock(styles, ".company-branch-field"), StringComparison.Ordinal);
         Assert.Contains("height: 44px;", ExtractCssBlock(styles, "::deep .company-lookup-input .mud-input.mud-input-outlined"), StringComparison.Ordinal);

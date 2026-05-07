@@ -312,6 +312,36 @@
     border-top: 0;
 }
 
+.customer-classification-default {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 0.25rem;
+    min-height: 64px;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklch, var(--mud-palette-primary) 4%, var(--mud-palette-surface));
+}
+
+.customer-classification-default span {
+    color: var(--maliev-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.customer-classification-default strong {
+    color: var(--maliev-text);
+    font-weight: 750;
+}
+
+.customer-classification-default small {
+    color: var(--maliev-text-muted);
+    line-height: 1.35;
+}
+
 .section-divider h3 {
     margin: 0;
     font-size: 1rem;
