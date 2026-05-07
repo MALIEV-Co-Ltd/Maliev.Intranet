@@ -114,6 +114,21 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerDetail_PaymentTermOptionsStretchToMenuWidth()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor.css");
+        var normalizedStyles = styles.ReplaceLineEndings("\n");
+        var pickerBlock = ExtractCssBlock(styles, ".customer-payment-term-picker");
+        var menuBlock = ExtractCssBlock(styles, ".customer-payment-term-menu");
+
+        Assert.Contains("width: 100%;", pickerBlock, StringComparison.Ordinal);
+        Assert.Contains("justify-items: stretch;", menuBlock, StringComparison.Ordinal);
+        Assert.Contains("box-sizing: border-box;", menuBlock, StringComparison.Ordinal);
+        Assert.Contains(".customer-payment-term-option {\n    display: block;\n    box-sizing: border-box;", normalizedStyles, StringComparison.Ordinal);
+        Assert.Contains(".customer-payment-term-card {\n    display: grid;\n    gap: 8px;\n    width: 100%;\n    min-width: 0;\n    box-sizing: border-box;", normalizedStyles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PurchasingPages_UseIntIdsAndServerPagination()
     {
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor");

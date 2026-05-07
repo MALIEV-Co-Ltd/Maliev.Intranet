@@ -84,10 +84,11 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
 
         cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
-        var paymentTermsSelect = cut.FindAll("select.customer-input")
-            .Single(select => select.InnerHtml.Contains("Net 45", StringComparison.Ordinal));
 
-        paymentTermsSelect.Change("Net 45");
+        cut.Find(".customer-payment-term-trigger").Click();
+        cut.FindAll(".customer-payment-term-option")
+            .Single(option => option.TextContent.Contains("Net 45", StringComparison.Ordinal))
+            .Click();
         cut.FindAll("button").Single(button => button.TextContent.Contains("Save", StringComparison.Ordinal)).Click();
 
         cut.WaitForAssertion(() => Assert.Single(_customerUpdatePayloads));

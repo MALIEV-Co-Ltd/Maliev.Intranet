@@ -140,6 +140,7 @@
 
 .customer-payment-term-picker {
     position: relative;
+    width: 100%;
     min-width: 0;
 }
 
@@ -163,6 +164,7 @@
     border: 1px solid var(--maliev-border);
     border-radius: 8px;
     background: var(--maliev-panel-2);
+    box-sizing: border-box;
     cursor: pointer;
 }
 
@@ -204,16 +206,20 @@
     right: 0;
     display: grid;
     gap: 8px;
+    justify-items: stretch;
     max-height: min(420px, 55vh);
     padding: 10px;
     border: 1px solid var(--maliev-border);
     border-radius: 8px;
     background: var(--maliev-panel);
+    box-sizing: border-box;
     box-shadow: 0 18px 48px color-mix(in oklab, var(--maliev-ink), transparent 82%);
     overflow-y: auto;
 }
 
 .customer-payment-term-option {
+    display: block;
+    box-sizing: border-box;
     border-radius: 8px;
     cursor: pointer;
 }
@@ -235,7 +241,9 @@
 .customer-payment-term-card {
     display: grid;
     gap: 8px;
+    width: 100%;
     min-width: 0;
+    box-sizing: border-box;
     padding: 12px 14px;
     border: 1px solid var(--maliev-border);
     border-radius: 8px;
