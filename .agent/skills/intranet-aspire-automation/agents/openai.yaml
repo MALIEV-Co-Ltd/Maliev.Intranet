@@ -1,0 +1,4 @@
+interface:
+  display_name: "Intranet Aspire Automation"
+  short_description: "Login and validate Maliev.Intranet through Aspire safely."
+  default_prompt: "Use the Intranet Aspire automation skill."
