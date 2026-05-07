@@ -1,4 +1,5 @@
 @page "/customers/new"
+@using Microsoft.AspNetCore.Components.Forms
 @using System.Net.Http.Headers
 @using System.Text.Json
 @using Maliev.Intranet.Shared.Services
@@ -112,7 +113,7 @@
                 </PanelCard>
 
                 <PanelCard Title="Customer profile">
-                    <EditForm Model="@_onboarding.Customer" OnValidSubmit="SaveAsync">
+                    <EditForm EditContext="@_customerEditContext" OnValidSubmit="SaveAsync" class="customer-profile-form">
                         <DataAnnotationsValidator />
                         <ValidationSummary />
 
@@ -482,6 +483,7 @@
     private static readonly string[] _tiers = ["Bronze", "Silver", "Gold", "Platinum", "VIP"];
 
     private CustomerOnboardingRequest _onboarding = CreateDefaultRequest();
+    private EditContext _customerEditContext = null!;
     private List<AddressDraft> _addresses = CreateDefaultAddresses();
     private List<IBrowserFile> _extractionFiles = [];
     private List<UploadedDocumentDraft> _customerDocumentUploads = [];
@@ -518,6 +520,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _customerEditContext = new EditContext(_onboarding.Customer);
+
         _countries = await ReferenceData.GetCountriesAsync();
         _thailand = _countries.FirstOrDefault(c => string.Equals(c.Code, "TH", StringComparison.OrdinalIgnoreCase))
             ?? _countries.FirstOrDefault(c => c.Name.Contains("Thailand", StringComparison.OrdinalIgnoreCase));
@@ -765,7 +769,24 @@
         }
 
         EnsureDefaultAddressSet();
+        RefreshCustomerValidationState();
     }
+
+    private void RefreshCustomerValidationState()
+    {
+        NotifyCustomerFieldChanged(nameof(CreateCustomerRequest.FirstName));
+        NotifyCustomerFieldChanged(nameof(CreateCustomerRequest.LastName));
+        NotifyCustomerFieldChanged(nameof(CreateCustomerRequest.Email));
+        NotifyCustomerFieldChanged(nameof(CreateCustomerRequest.Mobile));
+        NotifyCustomerFieldChanged(nameof(CreateCustomerRequest.Landline));
+        NotifyCustomerFieldChanged(nameof(CreateCustomerRequest.Extension));
+        NotifyCustomerFieldChanged(nameof(CreateCustomerRequest.Segment));
+        NotifyCustomerFieldChanged(nameof(CreateCustomerRequest.Tier));
+        _customerEditContext.Validate();
+    }
+
+    private void NotifyCustomerFieldChanged(string fieldName) =>
+        _customerEditContext.NotifyFieldChanged(new FieldIdentifier(_onboarding.Customer, fieldName));
 
     private AddressDraft ToAddressDraft(ExtractedAddress address)
     {
