@@ -129,6 +129,24 @@ public class RegistryThaiLocation
 }
 
 /// <summary>
+/// Geocoded map position for an address lookup result.
+/// </summary>
+public class AddressGeocodeResponse
+{
+    /// <summary>The latitude returned by the geocoding provider.</summary>
+    public double Latitude { get; set; }
+
+    /// <summary>The longitude returned by the geocoding provider.</summary>
+    public double Longitude { get; set; }
+
+    /// <summary>The display label returned by the geocoding provider.</summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>The attribution text required for the geocoding and map provider.</summary>
+    public string Attribution { get; set; } = "© OpenStreetMap contributors";
+}
+
+/// <summary>
 /// Detailed company profile information retrieved from the Thailand official registry.
 /// </summary>
 public class RegistryCompanyProfile

@@ -361,6 +361,16 @@ try
         options.SessionStore = new DistributedCacheTicketStore();
     });
 
+    builder.Services.AddMemoryCache();
+
+    builder.Services.AddHttpClient("Nominatim", client =>
+    {
+        client.BaseAddress = new Uri(builder.Configuration["Services:Nominatim:BaseUrl"] ?? "https://nominatim.openstreetmap.org/");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("MALIEV-Intranet/1.0 (+https://intranet.maliev.com; contact: admin@maliev.com)");
+        client.DefaultRequestHeaders.Referrer = new Uri("https://intranet.maliev.com/");
+    });
+    builder.Services.AddSingleton<NominatimGeocodingService>();
+
     // Named client for Google OAuth callback (no UserContextHandler - pre-auth)
     builder.Services.AddHttpClient("AuthService", (sp, client) =>
     {

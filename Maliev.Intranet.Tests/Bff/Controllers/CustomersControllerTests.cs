@@ -1,9 +1,11 @@
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Bff.Hubs;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
 using MassTransit;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -21,6 +23,7 @@ public class CustomersControllerTests
     private readonly Mock<IPublishEndpoint> _publishEndpointMock;
     private readonly Mock<IHubContext<NotificationHub>> _hubContextMock;
     private readonly Mock<ILogger<CustomersController>> _loggerMock;
+    private readonly NominatimGeocodingService _geocodingService;
     private readonly CustomersController _controller;
 
     public CustomersControllerTests()
@@ -35,6 +38,13 @@ public class CustomersControllerTests
         _publishEndpointMock = new Mock<IPublishEndpoint>();
         _hubContextMock = new Mock<IHubContext<NotificationHub>>();
         _loggerMock = new Mock<ILogger<CustomersController>>();
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        httpClientFactoryMock.Setup(factory => factory.CreateClient("Nominatim"))
+            .Returns(new HttpClient(new MockHttpMessageHandler()) { BaseAddress = new Uri("https://nominatim.openstreetmap.org/") });
+        _geocodingService = new NominatimGeocodingService(
+            httpClientFactoryMock.Object,
+            new MemoryCache(new MemoryCacheOptions()),
+            new Mock<ILogger<NominatimGeocodingService>>().Object);
 
         _controller = new CustomersController(
             _customerClientMock.Object,
@@ -43,6 +53,7 @@ public class CustomersControllerTests
             _iamClientMock.Object,
             _publishEndpointMock.Object,
             _hubContextMock.Object,
+            _geocodingService,
             _loggerMock.Object);
     }
 
@@ -75,6 +86,41 @@ public class CustomersControllerTests
         var result = await _controller.GetById(Guid.NewGuid(), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetThaiLocationsMultiField_ForwardsRegistryWireShape()
+    {
+        var locations = new List<RegistryThaiLocation>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                PostalCode = "11120",
+                SubDistrictTh = "คลองข่อย",
+                DistrictTh = "ปากเกร็ด",
+                ProvinceTh = "นนทบุรี",
+                SubDistrictEn = "Khlong Khoi",
+                DistrictEn = "Pak Kret",
+                ProvinceEn = "Nonthaburi"
+            }
+        };
+        _registryClientMock.Setup(x => x.AutocompleteLocationsMultiFieldAsync(
+                "11120",
+                "คลองข่อย",
+                "ปากเกร็ด",
+                "นนทบุรี",
+                8,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(locations);
+
+        var result = await _controller.GetThaiLocationsMultiField("11120", "คลองข่อย", "ปากเกร็ด", "นนทบุรี", 8, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var value = Assert.IsType<List<RegistryThaiLocation>>(okResult.Value);
+        var location = Assert.Single(value);
+        Assert.Equal("คลองข่อย", location.SubDistrictTh);
+        Assert.Equal("Khlong Khoi", location.SubDistrictEn);
     }
 
     [Fact]

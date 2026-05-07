@@ -2,6 +2,8 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>@((_customer?.Name ?? "Customer") + " | MALIEV Intranet")</PageTitle>
 
@@ -548,81 +550,162 @@
 <ConfirmModal Open="@(_addressEdit is not null)"
               Title="@AddressModalTitle"
               ConfirmLabel="Save"
-              Class="customer-modal-wide"
+              Class="customer-modal-address"
+              CloseOnBackdropClick="false"
               OnCancel="CloseAddressModalAsync"
               OnConfirm="SaveAddressAsync">
     @if (_addressEdit is not null)
     {
         <div class="customer-address-form">
-            <div class="customer-form-grid">
-                <label class="customer-field">
-                    <span>Recipient name</span>
-                    <input class="customer-input" @bind="_addressEdit.Label" />
-                </label>
-                <label class="customer-field">
-                    <span>Type</span>
-                    <select class="customer-input" @bind="_addressEdit.Type">
-                        <option>Billing</option>
-                        <option>Shipping</option>
-                        <option>Office</option>
-                    </select>
-                </label>
-                <label class="customer-field customer-span-2">
-                    <span>Address lookup</span>
-                    <div class="customer-split-field">
-                        <input class="customer-input" placeholder="Postal code, province, district..." @bind="_addressLookupQuery" />
-                        <button type="button" class="customer-inline-action" @onclick="SearchLocationsAsync">Search</button>
+            <div class="customer-address-editor-grid">
+                <div class="customer-address-editor-fields">
+                    <div class="customer-form-grid">
+                        <label class="customer-field">
+                            <span>Recipient name</span>
+                            <input class="customer-input" @bind="_addressEdit.Label" />
+                        </label>
+                        <label class="customer-field">
+                            <span>Type</span>
+                            <select class="customer-input" @bind="_addressEdit.Type">
+                                <option>Billing</option>
+                                <option>Shipping</option>
+                                <option>Office</option>
+                            </select>
+                        </label>
+                        <label class="customer-field customer-span-2">
+                            <span>Street</span>
+                            <input class="customer-input" @bind="_addressEdit.AddressLine1" />
+                        </label>
+                        <label class="customer-field customer-span-2">
+                            <span>Street 2</span>
+                            <input class="customer-input" @bind="_addressEdit.AddressLine2" />
+                        </label>
+                        <label class="customer-field customer-suggestion-field">
+                            <span>City</span>
+                            <input class="customer-input"
+                                   value="@_addressEdit.City"
+                                   @oninput="@((ChangeEventArgs args) => OnAddressFieldInputAsync(AddressField.City, args.Value?.ToString()))"
+                                   @onfocus="@(() => ShowAddressSuggestions(AddressField.City))" />
+                            @if (ShouldShowAddressSuggestions(AddressField.City))
+                            {
+                                <div class="customer-autocomplete-list">
+                                    @foreach (var location in _fieldLocationMatches)
+                                    {
+                                        <button type="button" @onclick="@(() => ApplyLocationAsync(location, _addressSuggestionLanguage))">
+                                            <strong>@FormatLocationPrimary(location, _addressSuggestionLanguage)</strong>
+                                            <span>@FormatLocationSecondary(location, _addressSuggestionLanguage)</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </label>
+                        <label class="customer-field customer-suggestion-field">
+                            <span>District / sub-district</span>
+                            <input class="customer-input"
+                                   value="@_addressEdit.District"
+                                   @oninput="@((ChangeEventArgs args) => OnAddressFieldInputAsync(AddressField.District, args.Value?.ToString()))"
+                                   @onfocus="@(() => ShowAddressSuggestions(AddressField.District))" />
+                            @if (ShouldShowAddressSuggestions(AddressField.District))
+                            {
+                                <div class="customer-autocomplete-list">
+                                    @foreach (var location in _fieldLocationMatches)
+                                    {
+                                        <button type="button" @onclick="@(() => ApplyLocationAsync(location, _addressSuggestionLanguage))">
+                                            <strong>@FormatLocationPrimary(location, _addressSuggestionLanguage)</strong>
+                                            <span>@FormatLocationSecondary(location, _addressSuggestionLanguage)</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </label>
+                        <label class="customer-field customer-suggestion-field">
+                            <span>State / province</span>
+                            <input class="customer-input"
+                                   value="@_addressEdit.StateProvince"
+                                   @oninput="@((ChangeEventArgs args) => OnAddressFieldInputAsync(AddressField.StateProvince, args.Value?.ToString()))"
+                                   @onfocus="@(() => ShowAddressSuggestions(AddressField.StateProvince))" />
+                            @if (ShouldShowAddressSuggestions(AddressField.StateProvince))
+                            {
+                                <div class="customer-autocomplete-list">
+                                    @foreach (var location in _fieldLocationMatches)
+                                    {
+                                        <button type="button" @onclick="@(() => ApplyLocationAsync(location, _addressSuggestionLanguage))">
+                                            <strong>@FormatLocationPrimary(location, _addressSuggestionLanguage)</strong>
+                                            <span>@FormatLocationSecondary(location, _addressSuggestionLanguage)</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </label>
+                        <label class="customer-field customer-suggestion-field">
+                            <span>Postal</span>
+                            <input class="customer-input"
+                                   value="@_addressEdit.PostalCode"
+                                   @oninput="@((ChangeEventArgs args) => OnAddressFieldInputAsync(AddressField.PostalCode, args.Value?.ToString()))"
+                                   @onfocus="@(() => ShowAddressSuggestions(AddressField.PostalCode))" />
+                            @if (ShouldShowAddressSuggestions(AddressField.PostalCode))
+                            {
+                                <div class="customer-autocomplete-list">
+                                    @foreach (var location in _fieldLocationMatches)
+                                    {
+                                        <button type="button" @onclick="@(() => ApplyLocationAsync(location, _addressSuggestionLanguage))">
+                                            <strong>@FormatLocationPrimary(location, _addressSuggestionLanguage)</strong>
+                                            <span>@FormatLocationSecondary(location, _addressSuggestionLanguage)</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </label>
+                        <label class="customer-field">
+                            <span>Country</span>
+                            <select class="customer-input" @bind="_addressEdit.CountryId">
+                                <option value="@Guid.Empty">Select country</option>
+                                @foreach (var country in _countries)
+                                {
+                                    <option value="@country.Id">@country.Name</option>
+                                }
+                            </select>
+                        </label>
+                        <label class="customer-checkbox-row customer-span-2">
+                            <input type="checkbox" @bind="_addressEdit.IsDefault" />
+                            <span>Default for this address type</span>
+                        </label>
                     </div>
-                </label>
-                @if (_locationMatches.Count > 0)
-                {
-                    <div class="customer-result-list customer-span-2">
-                        @foreach (var location in _locationMatches)
-                        {
-                            <button type="button" @onclick="@(() => ApplyLocation(location))">
-                                @FormatLocation(location)
-                            </button>
-                        }
+                </div>
+                <aside class="customer-address-lookup-panel">
+                    <label class="customer-field">
+                        <span>Address lookup</span>
+                        <textarea class="customer-textarea customer-address-lookup-input"
+                                  placeholder="Paste the full customer address text..."
+                                  @bind="_addressLookupQuery"
+                                  @bind:event="oninput"></textarea>
+                    </label>
+                    <button type="button" class="customer-inline-action customer-address-search" @onclick="SearchLocationsAsync" disabled="@_addressLookupLoading">
+                        @(_addressLookupLoading ? "Searching..." : "Search")
+                    </button>
+                    @if (!string.IsNullOrWhiteSpace(_addressLookupError))
+                    {
+                        <div class="customer-address-lookup-state">@_addressLookupError</div>
+                    }
+                    @if (_locationMatches.Count > 0)
+                    {
+                        <div class="customer-result-list customer-address-result-list">
+                            @foreach (var location in _locationMatches)
+                            {
+                                <button type="button" @onclick="@(() => ApplyLocationAsync(location, _addressLookupLanguage))">
+                                    <strong>@FormatLocationPrimary(location, _addressLookupLanguage)</strong>
+                                    <span>@FormatLocationSecondary(location, _addressLookupLanguage)</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                    <div class="customer-address-map-panel">
+                        <div id="@AddressMapElementId" class="customer-address-map"></div>
+                        <div class="customer-address-map-caption">
+                            @(_addressMapLocation?.DisplayName ?? "Select an address result to show the map location.")
+                        </div>
                     </div>
-                }
-                <label class="customer-field customer-span-2">
-                    <span>Street</span>
-                    <input class="customer-input" @bind="_addressEdit.AddressLine1" />
-                </label>
-                <label class="customer-field customer-span-2">
-                    <span>Street 2</span>
-                    <input class="customer-input" @bind="_addressEdit.AddressLine2" />
-                </label>
-                <label class="customer-field">
-                    <span>City</span>
-                    <input class="customer-input" @bind="_addressEdit.City" />
-                </label>
-                <label class="customer-field">
-                    <span>District / sub-district</span>
-                    <input class="customer-input" @bind="_addressEdit.District" />
-                </label>
-                <label class="customer-field">
-                    <span>State / province</span>
-                    <input class="customer-input" @bind="_addressEdit.StateProvince" />
-                </label>
-                <label class="customer-field">
-                    <span>Postal</span>
-                    <input class="customer-input" @bind="_addressEdit.PostalCode" />
-                </label>
-                <label class="customer-field">
-                    <span>Country</span>
-                    <select class="customer-input" @bind="_addressEdit.CountryId">
-                        <option value="@Guid.Empty">Select country</option>
-                        @foreach (var country in _countries)
-                        {
-                            <option value="@country.Id">@country.Name</option>
-                        }
-                    </select>
-                </label>
-                <label class="customer-checkbox-row customer-span-2">
-                    <input type="checkbox" @bind="_addressEdit.IsDefault" />
-                    <span>Default for this address type</span>
-                </label>
+                </aside>
             </div>
         </div>
     }
@@ -712,12 +795,21 @@
     private string _newNoteText = string.Empty;
     private const int InternalNoteMaxLength = 5000;
     private string _addressLookupQuery = string.Empty;
+    private bool _addressLookupLoading;
+    private string? _addressLookupError;
+    private bool _applyingLocation;
+    private bool _addressMapInitialized;
+    private AddressField? _activeAddressSuggestionField;
+    private AddressLanguage _addressLookupLanguage = AddressLanguage.English;
+    private AddressLanguage _addressSuggestionLanguage = AddressLanguage.English;
+    private AddressGeocodeResponse? _addressMapLocation;
     private string _companyLookupQuery = string.Empty;
     private int _projectTotalCount;
     private int _orderTotalCount;
     private readonly List<CountryDto> _countries = [];
     private readonly List<EmployeeSummaryDto> _accountManagers = [];
     private readonly List<RegistryThaiLocation> _locationMatches = [];
+    private readonly List<RegistryThaiLocation> _fieldLocationMatches = [];
     private readonly List<CompanySearchResultDto> _companyMatches = [];
     private readonly List<RegistryCompanyProfile> _registryCompanyMatches = [];
 
@@ -732,6 +824,7 @@
     private decimal AverageOrderValue => LifetimeOrderCount > 0 && _customer is not null ? _customer.TotalSpent / LifetimeOrderCount : 0m;
     private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
     private string AddressModalTitle => _addressEdit?.Id is null ? "Add address" : "Edit address";
+    private string AddressMapElementId => $"customer-address-map-{Id:N}";
     private PaymentTermDto? SelectedPaymentTerm => _edit is null
         ? null
         : _paymentTerms.FirstOrDefault(term => string.Equals(term.Name, _edit.PaymentTerms, StringComparison.Ordinal));
@@ -790,6 +883,15 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_addressEdit is not null && !_addressMapInitialized)
+        {
+            _addressMapInitialized = true;
+            await JS.InvokeVoidAsync("malievAddressMap.initialize", AddressMapElementId);
+        }
     }
 
     private async Task LoadAsync()
@@ -1087,22 +1189,33 @@
     private Task OpenAddAddressAsync(MouseEventArgs _)
     {
         _addressEdit = AddressEditModel.Create(_customer?.Addresses.FirstOrDefault()?.CountryId ?? DefaultCountryId());
-        _addressLookupQuery = string.Empty;
-        _locationMatches.Clear();
+        ResetAddressLookupState();
         return Task.CompletedTask;
     }
 
     private void OpenEditAddress(AddressResponse address)
     {
         _addressEdit = AddressEditModel.FromAddress(address);
-        _addressLookupQuery = string.Empty;
-        _locationMatches.Clear();
+        ResetAddressLookupState();
     }
 
-    private Task CloseAddressModalAsync()
+    private async Task CloseAddressModalAsync()
     {
         _addressEdit = null;
-        return Task.CompletedTask;
+        ResetAddressLookupState();
+        await JS.InvokeVoidAsync("malievAddressMap.dispose", AddressMapElementId);
+    }
+
+    private void ResetAddressLookupState()
+    {
+        _addressLookupQuery = string.Empty;
+        _addressLookupLoading = false;
+        _addressLookupError = null;
+        _addressMapLocation = null;
+        _activeAddressSuggestionField = null;
+        _addressMapInitialized = false;
+        _locationMatches.Clear();
+        _fieldLocationMatches.Clear();
     }
 
     private async Task SaveAddressAsync()
@@ -1287,38 +1400,247 @@
     private async Task SearchLocationsAsync()
     {
         _locationMatches.Clear();
+        _addressLookupError = null;
         if (string.IsNullOrWhiteSpace(_addressLookupQuery) || _addressLookupQuery.Trim().Length < 2)
         {
             return;
         }
 
+        _addressLookupLoading = true;
+        _addressLookupLanguage = DetectAddressLanguage(_addressLookupQuery);
+
         try
         {
-            var query = Uri.EscapeDataString(_addressLookupQuery.Trim());
-            var matches = await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/v1/customers/locations/thai?query={query}&limit=8") ?? [];
-            _locationMatches.AddRange(matches);
+            var extracted = await ExtractAddressFromLookupTextAsync();
+            if (extracted?.Addresses?.FirstOrDefault() is { } address)
+            {
+                if (address.Location is not null)
+                {
+                    AddLocationMatch(_locationMatches, address.Location);
+                }
+
+                var multiMatches = await SearchLocationsMultiFieldAsync(
+                    address.PostalCode,
+                    address.District,
+                    address.City,
+                    address.StateProvince,
+                    8);
+                AddLocationMatches(_locationMatches, multiMatches);
+            }
+
+            if (_locationMatches.Count == 0)
+            {
+                var query = Uri.EscapeDataString(_addressLookupQuery.Trim());
+                var matches = await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/v1/customers/locations/thai?query={query}&limit=8") ?? [];
+                AddLocationMatches(_locationMatches, matches);
+            }
+
+            if (_locationMatches.Count == 0)
+            {
+                _addressLookupError = "No RegistryService address matches found.";
+            }
         }
         catch (Exception ex)
         {
+            _addressLookupError = "Address lookup could not be loaded.";
             Snackbar.Add("Address lookup could not be loaded.", Severity.Warning);
             Console.WriteLine(ex.Message);
         }
+        finally
+        {
+            _addressLookupLoading = false;
+        }
     }
 
-    private void ApplyLocation(RegistryThaiLocation location)
+    private async Task<ExtractedCustomerDataResponse?> ExtractAddressFromLookupTextAsync()
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(_addressLookupQuery.Trim()), "rawText");
+
+        var response = await Http.PostAsync("api/v1/AiProcessing/extract-customer", form);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
+    }
+
+    private async Task OnAddressFieldInputAsync(AddressField field, string? value)
     {
         if (_addressEdit is null)
         {
             return;
         }
 
+        SetAddressFieldValue(field, value ?? string.Empty);
+
+        if (_applyingLocation)
+        {
+            return;
+        }
+
+        _activeAddressSuggestionField = field;
+        _fieldLocationMatches.Clear();
+
+        if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
+        {
+            return;
+        }
+
+        _addressSuggestionLanguage = DetectAddressLanguage(value);
+
+        try
+        {
+            var matches = field switch
+            {
+                AddressField.City => await SearchLocationsMultiFieldAsync(null, null, value, null, 8),
+                AddressField.District => await SearchLocationsMultiFieldAsync(null, value, null, null, 8),
+                AddressField.StateProvince => await SearchLocationsMultiFieldAsync(null, null, null, value, 8),
+                AddressField.PostalCode => await SearchLocationsMultiFieldAsync(value, null, null, null, 8),
+                _ => []
+            };
+
+            AddLocationMatches(_fieldLocationMatches, matches);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void ShowAddressSuggestions(AddressField field)
+    {
+        if (_fieldLocationMatches.Count > 0)
+        {
+            _activeAddressSuggestionField = field;
+        }
+    }
+
+    private bool ShouldShowAddressSuggestions(AddressField field) =>
+        _activeAddressSuggestionField == field && _fieldLocationMatches.Count > 0;
+
+    private async Task<List<RegistryThaiLocation>> SearchLocationsMultiFieldAsync(
+        string? postalCode,
+        string? district,
+        string? city,
+        string? province,
+        int limit)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(postalCode))
+        {
+            parts.Add($"postalCode={Uri.EscapeDataString(postalCode.Trim())}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(district))
+        {
+            parts.Add($"district={Uri.EscapeDataString(district.Trim())}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            parts.Add($"city={Uri.EscapeDataString(city.Trim())}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(province))
+        {
+            parts.Add($"province={Uri.EscapeDataString(province.Trim())}");
+        }
+
+        parts.Add($"limit={limit}");
+        var query = string.Join("&", parts);
+        return await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/v1/customers/locations/thai/multi?{query}") ?? [];
+    }
+
+    private async Task ApplyLocationAsync(RegistryThaiLocation location, AddressLanguage language)
+    {
+        if (_addressEdit is null)
+        {
+            return;
+        }
+
+        _applyingLocation = true;
         _addressEdit.PostalCode = location.PostalCode;
-        _addressEdit.District = ChooseText(location.SubDistrictEn, location.SubDistrictTh);
-        _addressEdit.City = ChooseText(location.DistrictEn, location.DistrictTh);
-        _addressEdit.StateProvince = ChooseText(location.ProvinceEn, location.ProvinceTh);
+        _addressEdit.District = ChooseLocationText(location.SubDistrictTh, location.SubDistrictEn, language);
+        _addressEdit.City = ChooseLocationText(location.DistrictTh, location.DistrictEn, language);
+        _addressEdit.StateProvince = ChooseLocationText(location.ProvinceTh, location.ProvinceEn, language);
         _addressEdit.CountryId = DefaultCountryId();
-        _addressLookupQuery = FormatLocation(location);
+        _addressLookupQuery = FormatLocationPrimary(location, language);
         _locationMatches.Clear();
+        _fieldLocationMatches.Clear();
+        _activeAddressSuggestionField = null;
+        _applyingLocation = false;
+
+        await GeocodeLocationAsync(location, language);
+    }
+
+    private async Task GeocodeLocationAsync(RegistryThaiLocation location, AddressLanguage language)
+    {
+        var query = FormatLocationForMap(location, language);
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        try
+        {
+            _addressMapLocation = await Http.GetFromJsonAsync<AddressGeocodeResponse>(
+                $"api/v1/customers/locations/thai/geocode?query={Uri.EscapeDataString(query)}");
+            if (_addressMapLocation is not null)
+            {
+                await JS.InvokeVoidAsync(
+                    "malievAddressMap.update",
+                    AddressMapElementId,
+                    _addressMapLocation.Latitude,
+                    _addressMapLocation.Longitude,
+                    _addressMapLocation.DisplayName);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void SetAddressFieldValue(AddressField field, string value)
+    {
+        if (_addressEdit is null)
+        {
+            return;
+        }
+
+        switch (field)
+        {
+            case AddressField.City:
+                _addressEdit.City = value;
+                break;
+            case AddressField.District:
+                _addressEdit.District = value;
+                break;
+            case AddressField.StateProvince:
+                _addressEdit.StateProvince = value;
+                break;
+            case AddressField.PostalCode:
+                _addressEdit.PostalCode = value;
+                break;
+        }
+    }
+
+    private static void AddLocationMatches(List<RegistryThaiLocation> target, IEnumerable<RegistryThaiLocation> locations)
+    {
+        foreach (var location in locations)
+        {
+            AddLocationMatch(target, location);
+        }
+    }
+
+    private static void AddLocationMatch(List<RegistryThaiLocation> target, RegistryThaiLocation location)
+    {
+        if (!target.Any(existing => existing.Id == location.Id && existing.Id != Guid.Empty))
+        {
+            target.Add(location);
+        }
     }
 
     private Task OpenCompanyModalAsync()
@@ -1485,17 +1807,51 @@
         ?? _countries.FirstOrDefault()?.Id
         ?? Guid.Empty;
 
-    private static string FormatLocation(RegistryThaiLocation location) =>
+    private static string FormatLocationPrimary(RegistryThaiLocation location, AddressLanguage language) =>
         string.Join(", ", new[]
         {
-            ChooseText(location.SubDistrictEn, location.SubDistrictTh),
-            ChooseText(location.DistrictEn, location.DistrictTh),
-            ChooseText(location.ProvinceEn, location.ProvinceTh),
+            ChooseLocationText(location.SubDistrictTh, location.SubDistrictEn, language),
+            ChooseLocationText(location.DistrictTh, location.DistrictEn, language),
+            ChooseLocationText(location.ProvinceTh, location.ProvinceEn, language),
             location.PostalCode
         }.Where(part => !string.IsNullOrWhiteSpace(part)));
 
+    private static string FormatLocationSecondary(RegistryThaiLocation location, AddressLanguage language) =>
+        FormatLocationPrimary(location, language == AddressLanguage.Thai ? AddressLanguage.English : AddressLanguage.Thai);
+
+    private static string FormatLocationForMap(RegistryThaiLocation location, AddressLanguage language) =>
+        $"{FormatLocationPrimary(location, language)}, Thailand";
+
+    private static string ChooseLocationText(string? thai, string? english, AddressLanguage language) =>
+        language == AddressLanguage.Thai
+            ? ChooseText(thai, english)
+            : ChooseText(english, thai);
+
     private static string ChooseText(string? english, string? fallback) =>
         !string.IsNullOrWhiteSpace(english) ? english : fallback ?? string.Empty;
+
+    private AddressLanguage DetectAddressLanguage(string? value)
+    {
+        if (ContainsThai(value))
+        {
+            return AddressLanguage.Thai;
+        }
+
+        if (value?.Any(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z') == true)
+        {
+            return AddressLanguage.English;
+        }
+
+        return DetectAddressLanguageFromAddress();
+    }
+
+    private AddressLanguage DetectAddressLanguageFromAddress() =>
+        ContainsThai(_addressEdit?.District) || ContainsThai(_addressEdit?.City) || ContainsThai(_addressEdit?.StateProvince)
+            ? AddressLanguage.Thai
+            : AddressLanguage.English;
+
+    private static bool ContainsThai(string? value) =>
+        value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) == true;
 
     private static decimal ResolveOrderTotal(OrderSummaryDto order) =>
         order.TotalAmount > 0 ? order.TotalAmount : order.Total;
@@ -1675,6 +2031,11 @@
         return Icons.Material.Outlined.Update;
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        await JS.InvokeVoidAsync("malievAddressMap.dispose", AddressMapElementId);
+    }
+
     private enum CustomerDetailTab
     {
         Overview,
@@ -1683,6 +2044,20 @@
         Orders,
         Notes,
         Activity
+    }
+
+    private enum AddressField
+    {
+        City,
+        District,
+        StateProvince,
+        PostalCode
+    }
+
+    private enum AddressLanguage
+    {
+        English,
+        Thai
     }
 
     private sealed class CustomerEditModel

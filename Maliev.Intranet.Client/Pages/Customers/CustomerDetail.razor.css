@@ -643,10 +643,121 @@
     width: min(620px, 100%);
 }
 
+::deep .customer-modal-address {
+    width: min(980px, 100%);
+}
+
 .customer-email-modal,
 .customer-address-form {
     display: grid;
     gap: 14px;
+}
+
+.customer-address-editor-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+    gap: 18px;
+    align-items: start;
+}
+
+.customer-address-editor-fields,
+.customer-address-lookup-panel {
+    min-width: 0;
+}
+
+.customer-address-lookup-panel {
+    display: grid;
+    gap: 10px;
+}
+
+.customer-address-lookup-input {
+    min-height: 132px;
+}
+
+.customer-address-search {
+    justify-self: end;
+}
+
+.customer-address-lookup-state {
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in oklab, var(--maliev-warning), transparent 70%);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklab, var(--maliev-warning), transparent 92%);
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+}
+
+.customer-suggestion-field {
+    position: relative;
+}
+
+.customer-autocomplete-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    z-index: 2050;
+    display: grid;
+    max-height: 220px;
+    overflow: auto;
+    padding: 6px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-lg);
+}
+
+.customer-autocomplete-list button,
+.customer-address-result-list button {
+    display: grid;
+    gap: 3px;
+}
+
+.customer-autocomplete-list button {
+    width: 100%;
+    padding: 8px;
+    border: 0;
+    border-radius: var(--maliev-radius-xs);
+    background: transparent;
+    color: var(--maliev-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.customer-autocomplete-list button:hover {
+    background: var(--maliev-panel-2);
+}
+
+.customer-autocomplete-list span,
+.customer-address-result-list span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.customer-address-map-panel {
+    display: grid;
+    gap: 8px;
+    min-height: 260px;
+}
+
+.customer-address-map {
+    width: 100%;
+    min-height: 220px;
+    overflow: hidden;
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
+    background: var(--maliev-panel-2);
+}
+
+.customer-address-map-caption {
+    min-height: 32px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.35;
 }
 
 .customer-email-recipient {
@@ -786,6 +897,10 @@
     }
 
     .customer-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .customer-address-editor-grid {
         grid-template-columns: 1fr;
     }
 

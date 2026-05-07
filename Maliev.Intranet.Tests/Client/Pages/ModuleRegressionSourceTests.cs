@@ -141,6 +141,19 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerDetail_AddressDialogPreservesDraftsAndUsesLanguageAwareRegistrySuggestions()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");
+
+        Assert.Contains("CloseOnBackdropClick=\"false\"", source, StringComparison.Ordinal);
+        Assert.Contains("customer-address-lookup-input", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/customers/locations/thai/multi", source, StringComparison.Ordinal);
+        Assert.Contains("DetectAddressLanguage", source, StringComparison.Ordinal);
+        Assert.Contains("_applyingLocation", source, StringComparison.Ordinal);
+        Assert.Contains("malievAddressMap.update", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PurchasingPages_UseIntIdsAndServerPagination()
     {
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor");
@@ -402,16 +415,28 @@ public class ModuleRegressionSourceTests
         var razor = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
         var searchStyles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "GlobalSearchBox.razor.css");
+        var mobileStyles = styles[styles.IndexOf("@media (max-width: 1120px)", StringComparison.Ordinal)..];
 
         Assert.Contains("class=\"topbar-spacer\"", razor, StringComparison.Ordinal);
+        Assert.Contains("class=\"topbar-mobile-menu-button\"", razor, StringComparison.Ordinal);
+        Assert.Contains("aria-controls=\"topbar-mobile-nav\"", razor, StringComparison.Ordinal);
+        Assert.Contains("id=\"topbar-mobile-nav\"", razor, StringComparison.Ordinal);
+        Assert.Contains("GetMobileNavClass", razor, StringComparison.Ordinal);
+        Assert.Contains("CloseMobileNav", razor, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 1200px)", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-profile-info { display: none; }", styles, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 1120px)", styles, StringComparison.Ordinal);
-        Assert.Contains("flex-wrap: wrap;", styles, StringComparison.Ordinal);
-        Assert.Contains(".topbar-nav", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-mobile-menu-button", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-mobile-nav-popover", styles, StringComparison.Ordinal);
+        Assert.Contains("flex-wrap: nowrap;", styles, StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(mobileStyles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains(".topbar-search", styles, StringComparison.Ordinal);
         Assert.Contains("display: block;", styles, StringComparison.Ordinal);
-        Assert.Contains("flex: 1 1 100%;", styles, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 clamp(160px, 32vw, 260px);", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right ::deep .topbar-theme-toggle", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 420px)", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain("flex-wrap: wrap;", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain("flex: 1 1 100%;", styles, StringComparison.Ordinal);
         Assert.DoesNotContain(".topbar-search { display: none; }", styles, StringComparison.Ordinal);
         Assert.DoesNotContain("@media (max-width: 960px)", searchStyles, StringComparison.Ordinal);
         Assert.DoesNotContain("display: none", searchStyles, StringComparison.OrdinalIgnoreCase);
@@ -530,16 +555,29 @@ public class ModuleRegressionSourceTests
 
     private static string ReadRepoFile(params string[] relativeParts)
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
+        var startDirectories = new List<string>();
+        var configuredRoot = Environment.GetEnvironmentVariable("MALIEV_INTRANET_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configuredRoot))
         {
-            var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
-            if (File.Exists(candidate))
-            {
-                return File.ReadAllText(candidate);
-            }
+            startDirectories.Add(configuredRoot);
+        }
 
-            current = current.Parent;
+        startDirectories.Add(AppContext.BaseDirectory);
+        startDirectories.Add(Directory.GetCurrentDirectory());
+
+        foreach (var startDirectory in startDirectories.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var current = new DirectoryInfo(startDirectory);
+            while (current is not null)
+            {
+                var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
+                if (File.Exists(candidate))
+                {
+                    return File.ReadAllText(candidate);
+                }
+
+                current = current.Parent;
+            }
         }
 
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");

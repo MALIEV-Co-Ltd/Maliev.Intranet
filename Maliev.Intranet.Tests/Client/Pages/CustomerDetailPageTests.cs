@@ -218,6 +218,52 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CustomerDetail_AddressAutocomplete_ThaiInputShowsThaiSuggestionAndPopulatesThaiFields()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='addresses']").Click();
+        cut.Find("button.customer-address-edit").Click();
+
+        cut.FindAll(".customer-suggestion-field input").ToList()[1].Input("คลองข่อย");
+
+        cut.WaitForAssertion(() => Assert.Contains("คลองข่อย, ปากเกร็ด, นนทบุรี 11120", cut.Markup));
+        cut.Find(".customer-autocomplete-list button").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("value=\"คลองข่อย\"", cut.Markup);
+            Assert.Contains("value=\"ปากเกร็ด\"", cut.Markup);
+            Assert.Contains("value=\"นนทบุรี\"", cut.Markup);
+            Assert.Contains("value=\"11120\"", cut.Markup);
+        });
+    }
+
+    [Fact]
+    public void CustomerDetail_AddressAutocomplete_EnglishInputShowsEnglishSuggestionAndPopulatesEnglishFields()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='addresses']").Click();
+        cut.Find("button.customer-address-edit").Click();
+
+        cut.FindAll(".customer-suggestion-field input").ToList()[1].Input("Khlong Khoi");
+
+        cut.WaitForAssertion(() => Assert.Contains("Khlong Khoi, Pak Kret, Nonthaburi 11120", cut.Markup));
+        cut.Find(".customer-autocomplete-list button").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("value=\"Khlong Khoi\"", cut.Markup);
+            Assert.Contains("value=\"Pak Kret\"", cut.Markup);
+            Assert.Contains("value=\"Nonthaburi\"", cut.Markup);
+            Assert.Contains("value=\"11120\"", cut.Markup);
+        });
+    }
+
+    [Fact]
     public void CustomerDetail_InternalNoteComposer_EnablesImmediatelyAndShowsDatabaseLimit()
     {
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
@@ -385,10 +431,44 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
             {
                 new()
                 {
+                    Id = Guid.Parse("99999999-9999-9999-9999-999999999999"),
+                    Code = "TH",
+                    Name = "Thailand"
+                },
+                new()
+                {
                     Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
                     Code = "US",
                     Name = "United States"
                 }
+            });
+        }
+
+        if (pathAndQuery.StartsWith("/api/v1/customers/locations/thai/multi", StringComparison.Ordinal))
+        {
+            return Json(new List<RegistryThaiLocation>
+            {
+                new()
+                {
+                    Id = Guid.Parse("88888888-8888-8888-8888-888888888888"),
+                    PostalCode = "11120",
+                    SubDistrictTh = "คลองข่อย",
+                    DistrictTh = "ปากเกร็ด",
+                    ProvinceTh = "นนทบุรี",
+                    SubDistrictEn = "Khlong Khoi",
+                    DistrictEn = "Pak Kret",
+                    ProvinceEn = "Nonthaburi"
+                }
+            });
+        }
+
+        if (pathAndQuery.StartsWith("/api/v1/customers/locations/thai/geocode", StringComparison.Ordinal))
+        {
+            return Json(new AddressGeocodeResponse
+            {
+                Latitude = 13.912,
+                Longitude = 100.503,
+                DisplayName = "Khlong Khoi, Pak Kret, Nonthaburi, Thailand"
             });
         }
 

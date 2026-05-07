@@ -1,6 +1,6 @@
 @if (Open)
 {
-    <div class="mlv-modal-backdrop" @onclick="CancelAsync">
+    <div class="mlv-modal-backdrop" @onclick="BackdropClickAsync">
         <div class="mlv-modal @Class" @onclick:stopPropagation="true">
             <div class="mlv-modal-header">
                 <h2>@Title</h2>
@@ -27,6 +27,7 @@
     [Parameter] public bool Danger { get; set; }
     [Parameter] public string? Class { get; set; }
     [Parameter] public string? ConfirmButtonClass { get; set; }
+    [Parameter] public bool CloseOnBackdropClick { get; set; } = true;
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback OnConfirm { get; set; }
@@ -37,4 +38,5 @@
 
     private Task CancelAsync() => OnCancel.InvokeAsync();
     private Task ConfirmAsync() => OnConfirm.InvokeAsync();
+    private Task BackdropClickAsync() => CloseOnBackdropClick ? CancelAsync() : Task.CompletedTask;
 }

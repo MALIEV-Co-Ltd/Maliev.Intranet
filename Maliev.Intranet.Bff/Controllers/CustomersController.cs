@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Hubs;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
 using Maliev.MessagingContracts.Contracts.Shared;
@@ -25,6 +26,7 @@ public class CustomersController(
     IAMServiceClient iamClient,
     IPublishEndpoint publishEndpoint,
     IHubContext<NotificationHub> hubContext,
+    NominatimGeocodingService geocodingService,
     ILogger<CustomersController> logger) : ControllerBase
 {
     private readonly IHubContext<NotificationHub> _hubContext = hubContext;
@@ -384,6 +386,40 @@ public class CustomersController(
     public async Task<ActionResult<List<RegistryThaiLocation>>> GetThaiLocations([FromQuery] string query, [FromQuery] int limit = 10, CancellationToken ct = default)
     {
         var result = await registryClient.AutocompleteLocationsAsync(query, limit, ct);
+        return Ok(result);
+    }
+
+    /// <summary>Gets Thai locations using multi-field address matching.</summary>
+    [RequirePermission(MalievPermissions.Registry.LocationsRead)]
+    [HttpGet("locations/thai/multi")]
+    public async Task<ActionResult<List<RegistryThaiLocation>>> GetThaiLocationsMultiField(
+        [FromQuery] string? postalCode,
+        [FromQuery] string? district,
+        [FromQuery] string? city,
+        [FromQuery] string? province,
+        [FromQuery] int limit = 8,
+        CancellationToken ct = default)
+    {
+        var result = await registryClient.AutocompleteLocationsMultiFieldAsync(postalCode, district, city, province, limit, ct);
+        return Ok(result);
+    }
+
+    /// <summary>Geocodes an explicitly selected address for map display.</summary>
+    [RequirePermission(MalievPermissions.Registry.LocationsRead)]
+    [HttpGet("locations/thai/geocode")]
+    public async Task<ActionResult<AddressGeocodeResponse>> GeocodeThaiAddress([FromQuery] string query, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return BadRequest(new ApiErrorResponse { Message = "Address query is required." });
+        }
+
+        var result = await geocodingService.GeocodeAsync(query, ct);
+        if (result is null)
+        {
+            return NotFound(new ApiErrorResponse { Message = "Address location could not be found." });
+        }
+
         return Ok(result);
     }
 
