@@ -151,6 +151,9 @@
     /// <summary>Gets or sets the focused machine identifier.</summary>
     [Parameter] public string? FocusMachineId { get; set; }
 
+    /// <summary>Gets or sets the horizontal pixel gap applied inside each rendered schedule slot.</summary>
+    [Parameter] public int SlotGapPixels { get; set; }
+
     /// <summary>Gets or sets the optional CSS class.</summary>
     [Parameter] public string? Class { get; set; }
 
@@ -300,6 +303,19 @@
         var end = NormalizeUtc(slot.ScheduledEnd) > VisibleRangeEnd ? VisibleRangeEnd : NormalizeUtc(slot.ScheduledEnd);
         var left = Math.Clamp((start - rangeStart).TotalMinutes / rangeMinutes * 100, 0, 100);
         var width = Math.Clamp((end - start).TotalMinutes / rangeMinutes * 100, 0.7, 100 - left);
+
+        var gap = Math.Max(0, SlotGapPixels);
+        if (gap > 0)
+        {
+            var halfGap = gap / 2m;
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "--psb-slot-gap: {0}px; left: calc({1:0.###}% + {2:0.###}px); width: max(28px, calc({3:0.###}% - {0}px));",
+                gap,
+                left,
+                halfGap,
+                width);
+        }
 
         return string.Format(CultureInfo.InvariantCulture, "left: {0:0.###}%; width: {1:0.###}%;", left, width);
     }

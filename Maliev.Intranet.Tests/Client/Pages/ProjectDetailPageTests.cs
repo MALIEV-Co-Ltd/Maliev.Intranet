@@ -230,6 +230,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("psb-slot-hold", cut.Markup);
         Assert.Contains("psb-slot-proposed", cut.Markup);
         Assert.Contains("psb-slot-current-project", cut.Markup);
+        Assert.Contains("--psb-slot-gap: 6px", cut.Markup);
         Assert.Contains("JOB-1001", cut.Markup);
         Assert.Contains("HOLD-AAAA", cut.Markup);
         Assert.Contains("bracket-left.stl", cut.Markup);

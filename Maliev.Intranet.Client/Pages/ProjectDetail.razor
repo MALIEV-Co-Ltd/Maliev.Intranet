@@ -769,7 +769,8 @@
         builder.AddAttribute(6, "Board", _productionPlan.ScheduleBoard);
         builder.AddAttribute(7, "SelectedPartId", selectedPlan?.PartId);
         builder.AddAttribute(8, "FocusMachineId", ResolvePlanningFocusMachineId(selectedPlan));
-        builder.AddAttribute(9, "OnRefresh", EventCallback.Factory.Create(this, LoadProductionPlanAsync));
+        builder.AddAttribute(9, "SlotGapPixels", 6);
+        builder.AddAttribute(10, "OnRefresh", EventCallback.Factory.Create(this, LoadProductionPlanAsync));
         builder.CloseComponent();
         builder.CloseElement();
     };
