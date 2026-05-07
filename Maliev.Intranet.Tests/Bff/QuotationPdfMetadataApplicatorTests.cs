@@ -23,13 +23,15 @@ public class QuotationPdfMetadataApplicatorTests
         var user = new ClaimsPrincipal(new ClaimsIdentity(
         [
             new Claim("name", "Natthapol Vanasrivilai"),
-            new Claim(ClaimTypes.Email, "natthapol.vanasrivilai@maliev.com")
+            new Claim(ClaimTypes.Email, "natthapol.vanasrivilai@maliev.com"),
+            new Claim("phone_number", "+66810000000")
         ], "Test"));
 
         QuotationPdfMetadataApplicator.Apply(pdfData, user, quotedAt);
 
         Assert.Equal("Natthapol Vanasrivilai", pdfData.QuotedByName);
         Assert.Equal("natthapol.vanasrivilai@maliev.com", pdfData.QuotedByEmail);
+        Assert.Equal("+66810000000", pdfData.QuotedByPhone);
         Assert.Equal(quotedAt, pdfData.QuotedAt);
     }
 }

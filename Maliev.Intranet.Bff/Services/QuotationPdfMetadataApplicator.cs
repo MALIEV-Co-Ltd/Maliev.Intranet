@@ -20,6 +20,17 @@ internal static class QuotationPdfMetadataApplicator
             user?.FindFirst(ClaimTypes.Email)?.Value,
             pdfData.QuotedByEmail);
 
+        pdfData.QuotedByPhone = FirstNonEmpty(
+            user?.FindFirst("phone_number")?.Value,
+            user?.FindFirst("phone")?.Value,
+            user?.FindFirst("mobile_phone")?.Value,
+            user?.FindFirst("mobile")?.Value,
+            user?.FindFirst("telephone_number")?.Value,
+            user?.FindFirst(ClaimTypes.MobilePhone)?.Value,
+            user?.FindFirst(ClaimTypes.HomePhone)?.Value,
+            user?.FindFirst(ClaimTypes.OtherPhone)?.Value,
+            pdfData.QuotedByPhone);
+
         pdfData.QuotedAt = quotedAt ?? DateTime.UtcNow;
     }
 

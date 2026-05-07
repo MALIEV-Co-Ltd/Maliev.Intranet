@@ -128,6 +128,9 @@ public class QuotationPdfData
     /// <summary>The employee email automatically recorded as the person who generated this quotation.</summary>
     public string? QuotedByEmail { get; set; }
 
+    /// <summary>The employee phone number automatically recorded as the person who generated this quotation.</summary>
+    public string? QuotedByPhone { get; set; }
+
     /// <summary>The UTC timestamp when this quotation PDF was generated or issued.</summary>
     public DateTime? QuotedAt { get; set; }
 

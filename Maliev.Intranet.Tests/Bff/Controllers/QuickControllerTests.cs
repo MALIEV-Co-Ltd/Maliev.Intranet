@@ -83,6 +83,7 @@ public class QuickControllerTests
                     [
                         new Claim(ClaimTypes.Name, "Alex Kim"),
                         new Claim("email", "alex.kim@maliev.com"),
+                        new Claim("phone_number", "+66810000000"),
                     ], "Test"))
                 }
             }
@@ -95,6 +96,7 @@ public class QuickControllerTests
         var data = capturedRequest.RootElement.GetProperty("data");
         Assert.Equal("Alex Kim", data.GetProperty("QuotedByName").GetString());
         Assert.Equal("alex.kim@maliev.com", data.GetProperty("QuotedByEmail").GetString());
+        Assert.Equal("+66810000000", data.GetProperty("QuotedByPhone").GetString());
         Assert.True(data.TryGetProperty("QuotedAt", out var quotedAt));
         Assert.False(string.IsNullOrWhiteSpace(quotedAt.GetString()));
     }
