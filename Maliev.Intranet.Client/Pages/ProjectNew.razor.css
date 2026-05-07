@@ -5,6 +5,7 @@
     min-height: 0;
     height: 100%;
     overflow: hidden;
+    border-top: 1px solid var(--maliev-border);
     background: var(--maliev-bg);
 }
 .pn-body {
