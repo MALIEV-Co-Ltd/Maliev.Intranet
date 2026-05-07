@@ -43,7 +43,7 @@ internal static class ProjectQuotationPdfDataFactory
             ValidityEnd = quotation.ValidityPeriodEnd == default ? project.ValidUntil ?? project.CreatedAt.AddDays(30) : quotation.ValidityPeriodEnd,
             SubtotalBeforeDiscount = subtotal,
             TotalDiscount = discount,
-            ManualDiscountAmount = manualDiscount,
+            ManualDiscountAmount = discount,
             ShippingCost = shippingCost,
             Discounts = BuildDiscounts(currentVersion?.DiscountStructure, structuredDiscount, manualDiscount),
             Subtotal = taxableSubtotal,
@@ -128,11 +128,19 @@ internal static class ProjectQuotationPdfDataFactory
     private static List<string> BuildPartDetailLines(ProjectPartDto part)
     {
         var lines = new List<string>();
-        AddIfPresent(lines, FormatDimensions(part.Dimensions));
-        AddIfPresent(lines, FormatConfigValue(part.Finish));
-        AddIfPresent(lines, part.Color);
-        AddIfPresent(lines, FormatConfigValue(part.Tolerance));
-        AddIfPresent(lines, FormatRoughness(part.RoughnessCode));
+        if (FormatDimensions(part.Dimensions) is { Length: > 0 } dimensions)
+            lines.Add($"Bounding box: {dimensions}");
+
+        if (FormatFinish(part.Finish) is { Length: > 0 } finish)
+            lines.Add($"Surface finish: {finish}");
+
+        if (FormatTolerance(part.Tolerance, part.ProcessType) is { Length: > 0 } tolerance)
+            lines.Add($"Tolerance: {tolerance}");
+
+        if (FormatRoughness(part.RoughnessCode) is { Length: > 0 } roughness)
+            lines.Add($"Surface roughness: {roughness}");
+
+        AddIfPresent(lines, FormatColor(part));
 
         if (part.HasThreadedHoles)
         {
@@ -147,6 +155,8 @@ internal static class ProjectQuotationPdfDataFactory
                 ? $"Inserts: {part.InsertCount:N0} x {part.InsertType}"
                 : $"Inserts: {part.InsertType}");
         }
+
+        lines.Add($"Inspection: {part.InspectionLevel}");
 
         if (part.DrawingFiles.Count > 0)
         {
@@ -303,7 +313,10 @@ internal static class ProjectQuotationPdfDataFactory
     }
 
     private static string FormatDimensions(ModelDimensionsDto? dimensions) =>
-        dimensions is null ? string.Empty : $"{dimensions.X:0.#} x {dimensions.Y:0.#} x {dimensions.Z:0.#} mm";
+        dimensions is null ? string.Empty : $"{FormatDimension(dimensions.X)} x {FormatDimension(dimensions.Y)} x {FormatDimension(dimensions.Z)} mm";
+
+    private static string FormatDimension(double value) =>
+        value.ToString(value >= 10 ? "0.#" : "0.##", CultureInfo.InvariantCulture);
 
     private static string? FormatRoughness(string? roughnessCode) =>
         roughnessCode?.ToUpperInvariant() switch
@@ -316,14 +329,82 @@ internal static class ProjectQuotationPdfDataFactory
             _ => roughnessCode.Replace("_", " ", StringComparison.Ordinal)
         };
 
-    private static string? FormatConfigValue(string? value)
+    private static string? FormatFinish(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return null;
 
-        return value.Replace("_", " ", StringComparison.Ordinal)
-            .Replace("-", " ", StringComparison.Ordinal)
-            .Trim();
+        var normalized = NormalizeCode(value);
+        return normalized switch
+        {
+            "AS_PRNTED" or "AS_PRINTED" or "ASPRINTED" => "As-printed",
+            "AS_MACHINED" or "ASMACHINED" => "As-machined",
+            _ => FormatOptionName(value),
+        };
+    }
+
+    private static string? FormatTolerance(string? value, string? process)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var normalized = NormalizeCode(value);
+        if (process?.Contains("FDM", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return normalized switch
+            {
+                "FDM_STD" or "FDM_STANDARD" or "FDMSTANDARD" => "FDM Standard +-0.3mm",
+                "FDM_FINE" or "FDMFINE" => "FDM Fine +-0.15mm",
+                _ => FormatOptionName(value),
+            };
+        }
+
+        return normalized switch
+        {
+            "ISO2768_M" or "ISO_2768_M" or "MEDIUM" => "Medium (ISO2768-m)",
+            "ISO2768_F" or "ISO_2768_F" or "FINE" => "Fine (ISO2768-f)",
+            _ => FormatOptionName(value),
+        };
+    }
+
+    private static string? FormatColor(ProjectPartDto part)
+    {
+        if (!string.IsNullOrWhiteSpace(part.Color))
+            return $"Color: {part.Color.Trim()}";
+
+        foreach (var key in new[] { "paint_color_reference", "paint_color", "paint_colour", "material_color", "material_colour", "plastic_color", "plastic_colour", "anodize_color", "anodise_color" })
+        {
+            if (part.ProcessConfig.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                return $"Color: {value.Trim()}";
+        }
+
+        if (part.ProcessConfig.TryGetValue("paint_color_hex", out var hex) && !string.IsNullOrWhiteSpace(hex))
+            return $"Color: {hex.Trim()}";
+
+        return null;
+    }
+
+    private static string NormalizeCode(string value) =>
+        value.Trim()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", "_", StringComparison.Ordinal)
+            .ToUpperInvariant();
+
+    private static string FormatOptionName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return value;
+
+        return string.Join(
+            " ",
+            value.Replace("_", " ", StringComparison.Ordinal)
+                .Replace("-", " ", StringComparison.Ordinal)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .ToLowerInvariant() switch
+        {
+            var text when string.IsNullOrWhiteSpace(text) => value,
+            var text => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(text),
+        };
     }
 
     private static void AddIfPresent(List<string> values, string? value)

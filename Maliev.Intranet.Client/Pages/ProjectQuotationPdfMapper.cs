@@ -78,6 +78,7 @@ public static class ProjectQuotationPdfMapper
             TotalAmount = subtotal + taxAmount,
             DeliveryExpectations = deliveryExpectations,
             SpecialTerms = string.IsNullOrWhiteSpace(quotationTerms) ? null : quotationTerms.Trim(),
+            Discounts = BuildDiscounts(bulkDiscount, Math.Max(0m, manualDiscountAmount)),
             Items = parts.Select((part, index) => new QuotationPdfItem
             {
                 Index = index + 1,
@@ -207,6 +208,32 @@ public static class ProjectQuotationPdfMapper
         var finishAdditionalUnitCost = Math.Max(0m, part.FinishAdditionalUnitCost ?? 0m);
 
         return Math.Max(baseUnitPrice + finishAdditionalUnitCost, quotedUnitPrice);
+    }
+
+    private static List<QuotationPdfDiscount> BuildDiscounts(decimal bulkDiscount, decimal manualDiscountAmount)
+    {
+        var discounts = new List<QuotationPdfDiscount>();
+        if (bulkDiscount > 0m)
+        {
+            discounts.Add(new QuotationPdfDiscount
+            {
+                DiscountType = SalesDiscountType.FixedAmount.ToString(),
+                DiscountValue = bulkDiscount,
+                Conditions = "Automatic bulk-order savings",
+            });
+        }
+
+        if (manualDiscountAmount > 0m)
+        {
+            discounts.Add(new QuotationPdfDiscount
+            {
+                DiscountType = SalesDiscountType.FixedAmount.ToString(),
+                DiscountValue = manualDiscountAmount,
+                Conditions = "Manual discount",
+            });
+        }
+
+        return discounts;
     }
 
     private static string ResolveCustomerName(CustomerSummaryDto? selectedCustomer, CustomerDetailDto? customerDetail)

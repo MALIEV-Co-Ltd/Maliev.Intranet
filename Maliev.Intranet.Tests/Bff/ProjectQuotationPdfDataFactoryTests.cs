@@ -41,8 +41,10 @@ public class ProjectQuotationPdfDataFactoryTests
                     MaterialName = "Aluminum 6061-T6",
                     Quantity = 12,
                     ConfirmedUnitPrice = 2500m,
-                    Finish = "As Machined",
+                    Finish = "AS_MACHINED",
+                    Color = "Black",
                     Tolerance = "ISO 2768-m",
+                    RoughnessCode = "RA_3_2",
                     Dimensions = new ModelDimensionsDto { X = 11.7, Y = 11.7, Z = 7.2 },
                     PartNotes = "hello test 123",
                     DrawingFiles =
@@ -103,10 +105,20 @@ public class ProjectQuotationPdfDataFactoryTests
         Assert.Equal("https://uploads.example/signed-thumbnail.png", data.Items[0].ThumbnailUrl);
         Assert.Equal("CNC Milling", data.Items[0].ManufacturingProcess);
         Assert.Equal("Aluminum 6061-T6", data.Items[0].MaterialName);
-        Assert.Contains("11.7 x 11.7 x 7.2 mm", data.Items[0].DetailLines);
+        Assert.Contains("Bounding box: 11.7 x 11.7 x 7.2 mm", data.Items[0].DetailLines);
+        Assert.Contains("Surface finish: As-machined", data.Items[0].DetailLines);
+        Assert.Contains("Tolerance: Medium (ISO2768-m)", data.Items[0].DetailLines);
+        Assert.Contains("Surface roughness: Ra 3.2 um", data.Items[0].DetailLines);
+        Assert.Contains("Color: Black", data.Items[0].DetailLines);
+        Assert.Contains("Inspection: Standard", data.Items[0].DetailLines);
         Assert.Contains("Drawing: drawing.png", data.Items[0].DetailLines);
+        Assert.True(
+            data.Items[0].DetailLines.IndexOf("Inspection: Standard") <
+            data.Items[0].DetailLines.IndexOf("Drawing: drawing.png"));
         Assert.Equal("hello test 123", data.Items[0].Notes);
         Assert.DoesNotContain("Drawing:", data.Items[0].Notes, StringComparison.Ordinal);
+        Assert.Equal(5000m, data.TotalDiscount);
+        Assert.Equal(5000m, data.ManualDiscountAmount);
         Assert.Contains(data.Discounts, discount => discount.Conditions == "Automatic bulk-order savings");
         Assert.Contains(data.Discounts, discount => discount.Conditions == "Manual discount" && discount.DiscountValue == 3000m);
     }

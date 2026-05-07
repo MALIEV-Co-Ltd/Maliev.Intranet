@@ -360,6 +360,7 @@ public class ProjectQuotationPdfMapperTests
         Assert.Equal(3.15m, data.TaxAmount);
         Assert.Equal(48.15m, data.TotalAmount);
         Assert.Equal("Payment due before production.", data.SpecialTerms);
+        Assert.Contains(data.Discounts, discount => discount.Conditions == "Manual discount" && discount.DiscountValue == 5m);
     }
 
     /// <summary>
@@ -393,6 +394,7 @@ public class ProjectQuotationPdfMapperTests
         Assert.Equal(850, data.Subtotal);
         Assert.Equal(100, data.Items[0].UnitPrice);
         Assert.Equal(1000, data.Items[0].LineTotal);
+        Assert.Contains(data.Discounts, discount => discount.Conditions == "Automatic bulk-order savings" && discount.DiscountValue == 150m);
     }
 
     /// <summary>
