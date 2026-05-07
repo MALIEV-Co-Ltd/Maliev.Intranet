@@ -151,7 +151,7 @@
                                                  TextChanged="OnCompanyLookupTextChanged"
                                                  ValueChanged="ApplyCompanySuggestion"
                                                  SearchFunc="SearchCompaniesAsync"
-                                                 ToStringFunc="@(company => company == null ? _companyLookup : FormatCompanySuggestionValue(company))"
+                                                 ToStringFunc="@(company => company == null ? _companyLookup : company.Name)"
                                                  Placeholder="Search by company name or tax ID"
                                                  Variant="Variant.Outlined"
                                                  Clearable="true"
@@ -736,7 +736,7 @@
         if (!string.IsNullOrWhiteSpace(extracted.VatNumber))
         {
             _companyTaxId = NormalizeTaxId(extracted.VatNumber);
-            _companyLookup = _companyTaxId;
+            _companyLookup = extracted.CompanyName?.Trim() ?? string.Empty;
             await ApplyBestCompanyMatchAsync(_companyTaxId);
         }
         else if (!string.IsNullOrWhiteSpace(extracted.CompanyName))
@@ -1069,7 +1069,7 @@
         _selectedCompanySource = company.Source;
         _companyName = company.Name;
         _companyTaxId = NormalizeTaxId(company.VatNumber ?? company.RegistrationNumber);
-        _companyLookup = FormatCompanySuggestionValue(company);
+        _companyLookup = company.Name;
         _selectedCompanyLookupValue = _companyLookup;
         _onboarding.Customer.CompanyId = company.Id;
 
@@ -1364,12 +1364,6 @@
         return string.IsNullOrWhiteSpace(_companyName) && string.IsNullOrWhiteSpace(_companyTaxId)
             ? "Private customer"
             : "New company";
-    }
-
-    private static string FormatCompanySuggestionValue(CompanySearchResultDto company)
-    {
-        var tax = company.VatNumber ?? company.RegistrationNumber;
-        return string.IsNullOrWhiteSpace(tax) ? company.Name : $"{company.Name} ({tax})";
     }
 
     private static string FormatPair(string? first, string? second)
