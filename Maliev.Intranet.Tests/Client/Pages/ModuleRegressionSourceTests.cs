@@ -336,6 +336,8 @@ public class ModuleRegressionSourceTests
         Assert.NotEqual(-1, currencyIndex);
         Assert.True(searchIndex < currencyIndex);
         Assert.Contains("overflow: visible;", topbarRootBlock, StringComparison.Ordinal);
+        Assert.Contains("height: 32px;", ExtractCssBlock(source, ".topbar-root ::deep .topbar-global-search"), StringComparison.Ordinal);
+        Assert.Contains("height: 32px;", searchBlock, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-panel-3);", searchBlock, StringComparison.Ordinal);
         Assert.Contains("color: var(--maliev-ink);", searchBlock, StringComparison.Ordinal);
         Assert.Contains("border: 0;", searchBlock, StringComparison.Ordinal);
@@ -352,8 +354,11 @@ public class ModuleRegressionSourceTests
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
         var currencyFieldBlock = ExtractCssBlock(source, ".topbar-root ::deep .topbar-currency-autocomplete .mud-input");
+        var topbarRightBlock = ExtractCssBlock(source, ".topbar-right");
         var iconButtonBlock = ExtractCssBlock(source, ".topbar-right ::deep .mud-button-root.mud-icon-button");
 
+        Assert.Contains("gap: 0;", topbarRightBlock, StringComparison.Ordinal);
+        Assert.Contains("height: 32px;", currencyFieldBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", currencyFieldBlock, StringComparison.Ordinal);
         Assert.Contains(".topbar-root ::deep .topbar-currency-autocomplete .mud-input-adornment", source, StringComparison.Ordinal);
         Assert.Contains("border: 0 !important;", iconButtonBlock, StringComparison.Ordinal);

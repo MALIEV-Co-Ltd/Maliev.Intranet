@@ -130,9 +130,11 @@
 .topbar-root ::deep .topbar-global-search,
 .topbar-root ::deep .topbar-global-search > .global-search-input-wrap {
     width: 100%;
+    height: 32px;
 }
 
 .topbar-root ::deep .topbar-global-search .global-search-input {
+    height: 32px;
     border: 0;
     background: var(--maliev-panel-3);
     box-shadow: var(--maliev-shadow-ring);
@@ -251,7 +253,7 @@
 .topbar-right {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 0;
     flex: 0 1 auto;
     min-width: 0;
 }
