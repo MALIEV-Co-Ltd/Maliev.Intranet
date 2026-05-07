@@ -17,7 +17,7 @@ public static class ThemeConfiguration
     {
         var theme = new MudTheme();
 
-        string[] fontStack = ["Noto Sans", "Noto Sans Thai", "sans-serif"];
+        string[] fontStack = ["Geist", "Noto Sans Thai", "sans-serif"];
 
         // ═══════════════════════════════════════════════════════════════════
         //  LIGHT MODE — Palette
@@ -25,25 +25,25 @@ public static class ThemeConfiguration
         theme.PaletteLight = new PaletteLight
         {
             // ── Core palette (MudColor) ─────────────────────────────────
-            Primary = new MudColor("#2563eb"),
+            Primary = new MudColor("#171717"),
             PrimaryContrastText = new MudColor("#ffffff"),
-            PrimaryLighten = "#e0e7ff",
-            PrimaryDarken = "#1d4ed8",
+            PrimaryLighten = "#f5f5f5",
+            PrimaryDarken = "#000000",
 
-            Secondary = new MudColor("#64748b"),
+            Secondary = new MudColor("#4d4d4d"),
             SecondaryContrastText = new MudColor("#ffffff"),
-            SecondaryLighten = "#f1f5f9",
-            SecondaryDarken = "#475569",
+            SecondaryLighten = "#fafafa",
+            SecondaryDarken = "#171717",
 
-            Tertiary = new MudColor("#7c3aed"),
+            Tertiary = new MudColor("#0a72ef"),
             TertiaryContrastText = new MudColor("#ffffff"),
-            TertiaryLighten = "#ede9fe",
-            TertiaryDarken = "#6d28d9",
+            TertiaryLighten = "#ebf5ff",
+            TertiaryDarken = "#0068d6",
 
-            Info = new MudColor("#0284c7"),
+            Info = new MudColor("#0072f5"),
             InfoContrastText = new MudColor("#ffffff"),
-            InfoLighten = "#e0f2fe",
-            InfoDarken = "#0369a1",
+            InfoLighten = "#ebf5ff",
+            InfoDarken = "#0068d6",
 
             Success = new MudColor("#059669"),
             SuccessContrastText = new MudColor("#ffffff"),
@@ -69,45 +69,45 @@ public static class ThemeConfiguration
             White = new MudColor("#ffffff"),
 
             // ── Text (MudColor) ─────────────────────────────────────────
-            TextPrimary = new MudColor("#1a1a1a"),
-            TextSecondary = new MudColor("#6b7280"),
-            TextDisabled = new MudColor("#9ca3af"),
+            TextPrimary = new MudColor("#171717"),
+            TextSecondary = new MudColor("#4d4d4d"),
+            TextDisabled = new MudColor("#808080"),
 
             // ── Action / interaction (MudColor) ─────────────────────────
-            ActionDefault = new MudColor("#64748b"),
-            ActionDisabled = new MudColor("#d1d5db"),
-            ActionDisabledBackground = new MudColor("#e5e7eb"),
+            ActionDefault = new MudColor("#666666"),
+            ActionDisabled = new MudColor("#808080"),
+            ActionDisabledBackground = new MudColor("#ebebeb"),
 
             // ── Surfaces (MudColor) ─────────────────────────────────────
-            Background = new MudColor("#eef2f7"),
-            BackgroundGray = new MudColor("#f5f7fa"),
+            Background = new MudColor("#ffffff"),
+            BackgroundGray = new MudColor("#fafafa"),
             Surface = new MudColor("#ffffff"),
             DrawerBackground = new MudColor("#ffffff"),
-            DrawerText = new MudColor("#1a1a1a"),
-            DrawerIcon = new MudColor("#64748b"),
+            DrawerText = new MudColor("#171717"),
+            DrawerIcon = new MudColor("#666666"),
 
             // ── App bar (MudColor) ──────────────────────────────────────
             AppbarBackground = new MudColor("#ffffff"),
-            AppbarText = new MudColor("#1a1a1a"),
+            AppbarText = new MudColor("#171717"),
 
             // ── Lines / dividers (MudColor) ──────────────────────────────
-            LinesDefault = new MudColor("#e4e4e7"),
-            LinesInputs = new MudColor("#d4d4d8"),
-            TableLines = new MudColor("#e4e4e7"),
-            TableStriped = new MudColor("#f9fafb"),
-            TableHover = new MudColor("#f3f4f6"),
-            Divider = new MudColor("#e4e4e7"),
-            DividerLight = new MudColor("#f3f4f6"),
+            LinesDefault = new MudColor("#ebebeb"),
+            LinesInputs = new MudColor("#ebebeb"),
+            TableLines = new MudColor("#ebebeb"),
+            TableStriped = new MudColor("#fafafa"),
+            TableHover = new MudColor("#fafafa"),
+            Divider = new MudColor("#ebebeb"),
+            DividerLight = new MudColor("#f5f5f5"),
 
             // ── Misc (MudColor) ─────────────────────────────────────────
-            Skeleton = new MudColor("#e5e7eb"),
+            Skeleton = new MudColor("#ebebeb"),
 
             // ── Gray / overlay scale ───────────────────────────────────
-            GrayDefault = "#94a3b8",
-            GrayLight = "#cbd5e1",
-            GrayLighter = "#e2e8f0",
-            GrayDark = "#475569",
-            GrayDarker = "#334155",
+            GrayDefault = "#808080",
+            GrayLight = "#ebebeb",
+            GrayLighter = "#fafafa",
+            GrayDark = "#4d4d4d",
+            GrayDarker = "#171717",
             OverlayDark = "rgba(0,0,0,0.5)",
             OverlayLight = "rgba(255,255,255,0.5)",
 
@@ -136,18 +136,18 @@ public static class ThemeConfiguration
             {
                 FontFamily = fontStack,
                 FontSize = "28px",
-                FontWeight = "700",
+                FontWeight = "600",
                 LineHeight = "1.2",
-                LetterSpacing = "-0.5px",
+                LetterSpacing = "0",
                 TextTransform = "none",
             },
             H2 = new H2Typography
             {
                 FontFamily = fontStack,
                 FontSize = "22px",
-                FontWeight = "700",
+                FontWeight = "600",
                 LineHeight = "1.25",
-                LetterSpacing = "-0.25px",
+                LetterSpacing = "0",
                 TextTransform = "none",
             },
             H3 = new H3Typography
@@ -246,7 +246,7 @@ public static class ThemeConfiguration
                 FontSize = "11px",
                 FontWeight = "600",
                 LineHeight = "1.3",
-                LetterSpacing = "0.5px",
+                LetterSpacing = "0",
                 TextTransform = "none",
             },
         };
@@ -283,25 +283,25 @@ public static class ThemeConfiguration
         theme.PaletteDark = new PaletteDark
         {
             // ── Core palette (MudColor) ─────────────────────────────────
-            Primary = new MudColor("#3b82f6"),
-            PrimaryContrastText = new MudColor("#ffffff"),
-            PrimaryLighten = "#1e3a5f",
-            PrimaryDarken = "#60a5fa",
+            Primary = new MudColor("#fafafa"),
+            PrimaryContrastText = new MudColor("#171717"),
+            PrimaryLighten = "#ffffff",
+            PrimaryDarken = "#ebebeb",
 
-            Secondary = new MudColor("#94a3b8"),
-            SecondaryContrastText = new MudColor("#0f172a"),
-            SecondaryLighten = "#1e293b",
-            SecondaryDarken = "#cbd5e1",
+            Secondary = new MudColor("#a3a3a3"),
+            SecondaryContrastText = new MudColor("#171717"),
+            SecondaryLighten = "#2f2f2f",
+            SecondaryDarken = "#d4d4d4",
 
-            Tertiary = new MudColor("#a78bfa"),
-            TertiaryContrastText = new MudColor("#0f172a"),
-            TertiaryLighten = "#2e1065",
-            TertiaryDarken = "#c4b5fd",
+            Tertiary = new MudColor("#0a72ef"),
+            TertiaryContrastText = new MudColor("#ffffff"),
+            TertiaryLighten = "#0b2f62",
+            TertiaryDarken = "#60a5fa",
 
-            Info = new MudColor("#38bdf8"),
-            InfoContrastText = new MudColor("#0f172a"),
-            InfoLighten = "#0c4a6e",
-            InfoDarken = "#7dd3fc",
+            Info = new MudColor("#60a5fa"),
+            InfoContrastText = new MudColor("#171717"),
+            InfoLighten = "#0b2f62",
+            InfoDarken = "#93c5fd",
 
             Success = new MudColor("#10b981"),
             SuccessContrastText = new MudColor("#ffffff"),
@@ -318,54 +318,54 @@ public static class ThemeConfiguration
             ErrorLighten = "#450a0a",
             ErrorDarken = "#f87171",
 
-            Dark = new MudColor("#f1f5f9"),
-            DarkContrastText = new MudColor("#0f172a"),
-            DarkLighten = "#e2e8f0",
-            DarkDarken = "#cbd5e1",
+            Dark = new MudColor("#fafafa"),
+            DarkContrastText = new MudColor("#171717"),
+            DarkLighten = "#ffffff",
+            DarkDarken = "#ebebeb",
 
             Black = new MudColor("#000000"),
             White = new MudColor("#ffffff"),
 
             // ── Text (MudColor) ─────────────────────────────────────────
-            TextPrimary = new MudColor("#f1f5f9"),
-            TextSecondary = new MudColor("#94a3b8"),
-            TextDisabled = new MudColor("#475569"),
+            TextPrimary = new MudColor("#fafafa"),
+            TextSecondary = new MudColor("#a3a3a3"),
+            TextDisabled = new MudColor("#666666"),
 
             // ── Action / interaction (MudColor) ─────────────────────────
-            ActionDefault = new MudColor("#94a3b8"),
-            ActionDisabled = new MudColor("#334155"),
-            ActionDisabledBackground = new MudColor("#1e293b"),
+            ActionDefault = new MudColor("#a3a3a3"),
+            ActionDisabled = new MudColor("#666666"),
+            ActionDisabledBackground = new MudColor("#2f2f2f"),
 
             // ── Surfaces (MudColor) ─────────────────────────────────────
-            Background = new MudColor("#0b0f18"),
-            BackgroundGray = new MudColor("#10151f"),
-            Surface = new MudColor("#1e2130"),
-            DrawerBackground = new MudColor("#1e2130"),
-            DrawerText = new MudColor("#f1f5f9"),
-            DrawerIcon = new MudColor("#94a3b8"),
+            Background = new MudColor("#0a0a0a"),
+            BackgroundGray = new MudColor("#111111"),
+            Surface = new MudColor("#171717"),
+            DrawerBackground = new MudColor("#171717"),
+            DrawerText = new MudColor("#fafafa"),
+            DrawerIcon = new MudColor("#a3a3a3"),
 
             // ── App bar (MudColor) ──────────────────────────────────────
-            AppbarBackground = new MudColor("#1e2130"),
-            AppbarText = new MudColor("#f1f5f9"),
+            AppbarBackground = new MudColor("#171717"),
+            AppbarText = new MudColor("#fafafa"),
 
             // ── Lines / dividers (MudColor) ──────────────────────────────
-            LinesDefault = new MudColor("#2d3148"),
-            LinesInputs = new MudColor("#3d4160"),
-            TableLines = new MudColor("#2d3148"),
-            TableStriped = new MudColor("#252a3d"),
-            TableHover = new MudColor("#2d3148"),
-            Divider = new MudColor("#2d3148"),
-            DividerLight = new MudColor("#1e2130"),
+            LinesDefault = new MudColor("#2f2f2f"),
+            LinesInputs = new MudColor("#404040"),
+            TableLines = new MudColor("#2f2f2f"),
+            TableStriped = new MudColor("#111111"),
+            TableHover = new MudColor("#202020"),
+            Divider = new MudColor("#2f2f2f"),
+            DividerLight = new MudColor("#202020"),
 
             // ── Misc (MudColor) ─────────────────────────────────────────
-            Skeleton = new MudColor("#252a3d"),
+            Skeleton = new MudColor("#2f2f2f"),
 
             // ── Gray / overlay scale ───────────────────────────────────
-            GrayDefault = "#64748b",
-            GrayLight = "#475569",
-            GrayLighter = "#334155",
-            GrayDark = "#cbd5e1",
-            GrayDarker = "#e2e8f0",
+            GrayDefault = "#808080",
+            GrayLight = "#4d4d4d",
+            GrayLighter = "#2f2f2f",
+            GrayDark = "#d4d4d4",
+            GrayDarker = "#fafafa",
             OverlayDark = "rgba(0,0,0,0.7)",
             OverlayLight = "rgba(255,255,255,0.1)",
 
@@ -399,31 +399,31 @@ public static class ThemeConfiguration
             Elevation =
             [
                 "none",
-                "0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12)",
-                "0px 3px 1px -2px rgba(0,0,0,0.2),0px 2px 2px 0px rgba(0,0,0,0.14),0px 1px 5px 0px rgba(0,0,0,0.12)",
-                "0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12)",
-                "0px 2px 4px -1px rgba(0,0,0,0.2),0px 4px 5px 0px rgba(0,0,0,0.14),0px 1px 10px 0px rgba(0,0,0,0.12)",
-                "0px 3px 5px -1px rgba(0,0,0,0.2),0px 5px 8px 0px rgba(0,0,0,0.14),0px 1px 14px 0px rgba(0,0,0,0.12)",
-                "0px 3px 5px -1px rgba(0,0,0,0.2),0px 6px 10px 0px rgba(0,0,0,0.14),0px 1px 18px 0px rgba(0,0,0,0.12)",
-                "0px 4px 5px -2px rgba(0,0,0,0.2),0px 7px 10px 1px rgba(0,0,0,0.14),0px 2px 16px 1px rgba(0,0,0,0.12)",
-                "0px 5px 5px -3px rgba(0,0,0,0.2),0px 8px 10px 1px rgba(0,0,0,0.14),0px 3px 14px 2px rgba(0,0,0,0.12)",
-                "0px 5px 6px -3px rgba(0,0,0,0.2),0px 9px 12px 1px rgba(0,0,0,0.14),0px 3px 16px 2px rgba(0,0,0,0.12)",
-                "0px 6px 6px -3px rgba(0,0,0,0.2),0px 10px 14px 1px rgba(0,0,0,0.14),0px 4px 18px 3px rgba(0,0,0,0.12)",
-                "0px 6px 7px -4px rgba(0,0,0,0.2),0px 11px 15px 1px rgba(0,0,0,0.14),0px 4px 20px 3px rgba(0,0,0,0.12)",
-                "0px 7px 8px -4px rgba(0,0,0,0.2),0px 12px 17px 2px rgba(0,0,0,0.14),0px 5px 22px 4px rgba(0,0,0,0.12)",
-                "0px 7px 8px -4px rgba(0,0,0,0.2),0px 13px 19px 2px rgba(0,0,0,0.14),0px 5px 24px 4px rgba(0,0,0,0.12)",
-                "0px 7px 9px -4px rgba(0,0,0,0.2),0px 14px 21px 2px rgba(0,0,0,0.14),0px 5px 26px 4px rgba(0,0,0,0.12)",
-                "0px 8px 9px -5px rgba(0,0,0,0.2),0px 15px 22px 2px rgba(0,0,0,0.14),0px 6px 28px 5px rgba(0,0,0,0.12)",
-                "0px 8px 10px -5px rgba(0,0,0,0.2),0px 16px 24px 2px rgba(0,0,0,0.14),0px 6px 30px 5px rgba(0,0,0,0.12)",
-                "0px 8px 11px -5px rgba(0,0,0,0.2),0px 17px 26px 2px rgba(0,0,0,0.14),0px 6px 32px 5px rgba(0,0,0,0.12)",
-                "0px 9px 11px -5px rgba(0,0,0,0.2),0px 18px 28px 2px rgba(0,0,0,0.14),0px 7px 34px 6px rgba(0,0,0,0.12)",
-                "0px 9px 12px -6px rgba(0,0,0,0.2),0px 19px 29px 2px rgba(0,0,0,0.14),0px 7px 36px 6px rgba(0,0,0,0.12)",
-                "0px 10px 13px -6px rgba(0,0,0,0.2),0px 20px 31px 3px rgba(0,0,0,0.14),0px 8px 38px 7px rgba(0,0,0,0.12)",
-                "0px 10px 13px -6px rgba(0,0,0,0.2),0px 21px 33px 3px rgba(0,0,0,0.14),0px 8px 40px 7px rgba(0,0,0,0.12)",
-                "0px 10px 14px -6px rgba(0,0,0,0.2),0px 22px 35px 3px rgba(0,0,0,0.14),0px 8px 42px 7px rgba(0,0,0,0.12)",
-                "0px 11px 14px -7px rgba(0,0,0,0.2),0px 23px 36px 3px rgba(0,0,0,0.14),0px 9px 44px 8px rgba(0,0,0,0.12)",
-                "0px 11px 15px -7px rgba(0,0,0,0.2),0px 24px 38px 3px rgba(0,0,0,0.14),0px 9px 46px 8px rgba(0,0,0,0.12)",
-                "0 5px 5px -3px rgba(0,0,0,.06), 0 8px 10px 1px rgba(0,0,0,.042), 0 3px 14px 2px rgba(0,0,0,.036)",
+                "rgba(0,0,0,0.08) 0 0 0 1px",
+                "rgba(0,0,0,0.08) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 2px",
+                "rgba(0,0,0,0.08) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 2px, rgba(0,0,0,0.04) 0 8px 8px -8px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.05) 0 4px 10px -6px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.06) 0 8px 18px -12px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.07) 0 12px 28px -18px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.07) 0 14px 34px -20px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.08) 0 16px 40px -24px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.08) 0 18px 44px -26px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.09) 0 20px 48px -28px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.09) 0 22px 52px -30px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.10) 0 24px 56px -32px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.10) 0 26px 60px -34px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.10) 0 28px 64px -36px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.10) 0 30px 68px -38px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.11) 0 32px 72px -40px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.11) 0 34px 76px -42px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.11) 0 36px 80px -44px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.12) 0 38px 84px -46px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.12) 0 40px 88px -48px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.12) 0 42px 92px -50px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.12) 0 44px 96px -52px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.13) 0 46px 100px -54px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.13) 0 48px 104px -56px",
+                "rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.13) 0 50px 108px -58px",
             ],
         };
 

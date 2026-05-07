@@ -6,7 +6,10 @@
    ================================================================ */
 
 html, body {
-    font-family: 'Noto Sans', 'Noto Sans Thai', sans-serif;
+    background: var(--maliev-bg);
+    color: var(--maliev-ink);
+    font-family: var(--maliev-font-sans);
+    font-feature-settings: "liga" 1;
     height: 100%;
     margin: 0;
     overflow: hidden;
@@ -23,11 +26,11 @@ h1:focus {
 /* ── Blazor validation helpers ─────────────────────────────────── */
 
 .valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
+    outline: 1px solid var(--maliev-ok);
 }
 
 .invalid {
-    outline: 1px solid red;
+    outline: 1px solid var(--maliev-danger);
 }
 
 .validation-message {
@@ -80,14 +83,14 @@ h1:focus {
 
 .loading-progress circle {
     fill: none;
-    stroke: #e0e0e0;
+    stroke: var(--maliev-border);
     stroke-width: 0.6rem;
     transform-origin: 50% 50%;
     transform: rotate(-90deg);
 }
 
 .loading-progress circle:last-child {
-    stroke: #1b6ec2;
+    stroke: var(--mud-palette-primary);
     stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
     transition: stroke-dasharray 0.05s ease-in-out;
 }
@@ -104,5 +107,6 @@ h1:focus {
 }
 
 code {
-    color: #c02d76;
+    color: var(--maliev-info);
+    font-family: var(--maliev-font-mono);
 }

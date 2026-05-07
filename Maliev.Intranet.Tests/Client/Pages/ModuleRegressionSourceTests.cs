@@ -314,6 +314,27 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("#f97316", quoteBlock, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DesignFoundation_UsesGeistFontsAndOperationalAdaptation()
+    {
+        var clientHost = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "index.html");
+        var bffHost = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
+        var designBrief = ReadRepoFile("DESIGN.md");
+
+        Assert.Contains("family=Geist:wght@400..700", clientHost, StringComparison.Ordinal);
+        Assert.Contains("family=Geist+Mono:wght@400..600", clientHost, StringComparison.Ordinal);
+        Assert.Contains("Noto+Sans+Thai", clientHost, StringComparison.Ordinal);
+        Assert.Contains("--mud-typography-default-family: 'Geist', 'Noto Sans Thai', sans-serif;", clientHost, StringComparison.Ordinal);
+
+        Assert.Contains("family=Geist:wght@400..700", bffHost, StringComparison.Ordinal);
+        Assert.Contains("family=Geist+Mono:wght@400..600", bffHost, StringComparison.Ordinal);
+        Assert.Contains("Noto+Sans+Thai", bffHost, StringComparison.Ordinal);
+
+        Assert.Contains("MALIEV adaptation", designBrief, StringComparison.Ordinal);
+        Assert.Contains("letter spacing remains 0", designBrief, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("operational density", designBrief, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

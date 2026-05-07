@@ -20,10 +20,12 @@ public class ThemeServiceTests
         Assert.NotNull(theme.PaletteLight);
 
         // MudColor.ToString() returns rgba(...)
-        // PaletteDark.Primary = "#3b82f6" (blue)
-        Assert.Equal("rgba(59,130,246,1)", theme.PaletteDark.Primary.ToString());
-        // PaletteLight.Primary = "#2563eb"
-        Assert.Equal("rgba(37,99,235,1)", theme.PaletteLight.Primary.ToString());
+        Assert.Equal("rgba(23,23,23,1)", theme.PaletteLight.Primary.ToString());
+        Assert.Equal("rgba(250,250,250,1)", theme.PaletteDark.Primary.ToString());
+        Assert.Equal("rgba(23,23,23,1)", theme.PaletteDark.PrimaryContrastText.ToString());
+        var defaultFontFamily = Assert.IsType<string[]>(theme.Typography.Default.FontFamily);
+        Assert.Contains("Geist", defaultFontFamily);
+        Assert.Contains("Noto Sans Thai", defaultFontFamily);
     }
 
     [Fact]

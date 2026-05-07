@@ -5,50 +5,55 @@
 
 /* ── Light mode (default) ─────────────────────────────────────── */
 :root {
-    --maliev-accent-hue: 250;
-    --maliev-accent:        oklch(0.58 0.17 var(--maliev-accent-hue));
+    --maliev-accent-hue: 0;
+    --maliev-accent:        #171717;
 
     /* Surfaces & ink */
-    --maliev-bg:            oklch(0.965 0.004 240);
+    --maliev-bg:            #ffffff;
     --maliev-panel:         #ffffff;
-    --maliev-panel-2:       #f7f9fc;
-    --maliev-panel-3:       #eef1f6;
-    --maliev-ink:           #1a2030;
-    --maliev-ink-2:         #475067;
-    --maliev-muted:         #677088;
-    --maliev-muted-2:       #8a94a8;
-    --maliev-muted-3:       #a0a8bc;
-    --maliev-border:        #e4e7ee;
-    --maliev-border-subtle: #eef0f4;
+    --maliev-panel-2:       #fafafa;
+    --maliev-panel-3:       #f5f5f5;
+    --maliev-ink:           #171717;
+    --maliev-ink-2:         #4d4d4d;
+    --maliev-muted:         #666666;
+    --maliev-muted-2:       #808080;
+    --maliev-muted-3:       #a3a3a3;
+    --maliev-border:        #ebebeb;
+    --maliev-border-subtle: #f5f5f5;
 
     /* Accent tints */
-    --maliev-accent-soft:   oklch(0.58 0.17 var(--maliev-accent-hue) / 0.12);
-    --maliev-accent-softer: oklch(0.58 0.17 var(--maliev-accent-hue) / 0.07);
+    --maliev-accent-soft:   #f5f5f5;
+    --maliev-accent-softer: #fafafa;
 
     /* Status colours */
-    --maliev-ok:          #10a36a;
-    --maliev-ok-bg:       #10a36a1a;
-    --maliev-warn:        #d99220;
+    --maliev-ok:          #007a3d;
+    --maliev-ok-bg:       #e9f9ef;
+    --maliev-warn:        #a15c00;
     --maliev-warn-bg:     #fff6e5;
     --maliev-warn-border: #f2d28a;
-    --maliev-warn-fg:     #8a5a10;
-    --maliev-danger:      #d94860;
-    --maliev-danger-bg:   #d948601a;
-    --maliev-info:        #2563eb;
-    --maliev-info-bg:     color-mix(in oklch, #2563eb 10%, transparent);
+    --maliev-warn-fg:     #7a3f00;
+    --maliev-danger:      #c1121f;
+    --maliev-danger-bg:   #fff0f0;
+    --maliev-info:        #0072f5;
+    --maliev-info-bg:     #ebf5ff;
+    --maliev-info-fg:     #0068d6;
 
     /* Shadows */
-    --maliev-shadow-sm:   0 1px 2px rgba(10,20,40,0.04);
-    --maliev-shadow-md:   0 2px 6px rgba(10,20,40,0.08);
-    --maliev-shadow-lg:   0 12px 40px rgba(10,20,40,0.15);
-    --maliev-shadow-card: 0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+    --maliev-shadow-ring:      rgba(0,0,0,0.08) 0 0 0 1px;
+    --maliev-shadow-ring-soft: rgb(235,235,235) 0 0 0 1px;
+    --maliev-shadow-sm:        rgba(0,0,0,0.08) 0 0 0 1px, rgba(0,0,0,0.03) 0 1px 2px;
+    --maliev-shadow-md:        rgba(0,0,0,0.08) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 6px;
+    --maliev-shadow-lg:        rgba(0,0,0,0.10) 0 0 0 1px, rgba(0,0,0,0.08) 0 16px 40px -24px;
+    --maliev-shadow-card:      rgba(0,0,0,0.08) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 2px, rgba(0,0,0,0.04) 0 8px 8px -8px, #fafafa 0 0 0 1px inset;
+    --maliev-focus-color:      hsla(212, 100%, 48%, 1);
+    --maliev-focus-ring:       0 0 0 2px #ffffff, 0 0 0 4px var(--maliev-focus-color);
 
     /* Radius scale */
     --maliev-radius-xs:   3px;
     --maliev-radius-sm:   6px;
-    --maliev-radius-md:   10px;
-    --maliev-radius-lg:   14px;
-    --maliev-radius-xl:   16px;
+    --maliev-radius-md:   8px;
+    --maliev-radius-lg:   8px;
+    --maliev-radius-xl:   8px;
     --maliev-radius-pill: 99px;
 
     /* Spacing scale */
@@ -75,7 +80,8 @@
     --maliev-font-small: 12px;
     --maliev-font-base:  13px;
     --maliev-font-large: 14px;
-    --maliev-font-mono: 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+    --maliev-font-sans:  'Geist', 'Noto Sans Thai', sans-serif;
+    --maliev-font-mono:  'Geist Mono', 'Noto Sans Thai', ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
 
     /* Icon sizes */
     --maliev-icon-sm: 14px;
@@ -83,49 +89,56 @@
     --maliev-icon-lg: 20px;
 
     /* Viewer / scrollbar */
-    --maliev-viewer-bg:    linear-gradient(180deg, #fafbfd 0%, #eef1f6 100%);
-    --maliev-scroll:       #d0d5df;
-    --maliev-scroll-hover: #a8b0c0;
+    --maliev-viewer-bg:    linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+    --maliev-scroll:       #d4d4d4;
+    --maliev-scroll-hover: #a3a3a3;
 
     /* MudBlazor gap-filler (text-tertiary not in MudBlazor 9 palette) */
-    --mud-palette-text-tertiary: #71717a;
+    --mud-palette-text-tertiary: #666666;
 }
 
 /* ── Dark mode ────────────────────────────────────────────────── */
 :root[data-maliev-theme="dark"] {
-    --maliev-bg:            #0b0f18;
-    --maliev-panel:         #10151f;
-    --maliev-panel-2:       #0c1119;
-    --maliev-panel-3:       #161c28;
-    --maliev-ink:           #e6eaf2;
-    --maliev-ink-2:         #b4bcce;
-    --maliev-muted:         #8892a8;
-    --maliev-muted-2:       #6b7388;
-    --maliev-muted-3:       #535c70;
-    --maliev-border:        #1f2634;
-    --maliev-border-subtle: #181e2a;
+    --maliev-accent:        #fafafa;
+    --maliev-bg:            #0a0a0a;
+    --maliev-panel:         #171717;
+    --maliev-panel-2:       #111111;
+    --maliev-panel-3:       #202020;
+    --maliev-ink:           #fafafa;
+    --maliev-ink-2:         #a3a3a3;
+    --maliev-muted:         #808080;
+    --maliev-muted-2:       #666666;
+    --maliev-muted-3:       #4d4d4d;
+    --maliev-border:        #2f2f2f;
+    --maliev-border-subtle: #202020;
+    --maliev-accent-soft:   #202020;
+    --maliev-accent-softer: #111111;
 
-    --maliev-ok:          #2bbd82;
-    --maliev-ok-bg:       #2bbd8220;
-    --maliev-warn:        #e8a84a;
+    --maliev-ok:          #1fc16b;
+    --maliev-ok-bg:       #062d1c;
+    --maliev-warn:        #f5a524;
     --maliev-warn-bg:     #3a2a14;
     --maliev-warn-border: #6a4a1a;
     --maliev-warn-fg:     #f0c274;
-    --maliev-danger:      #e5677a;
-    --maliev-danger-bg:   #e5677a20;
-    --maliev-info:        #3b82f6;
-    --maliev-info-bg:     color-mix(in oklch, #3b82f6 15%, transparent);
+    --maliev-danger:      #ff5b5b;
+    --maliev-danger-bg:   #3a1111;
+    --maliev-info:        #60a5fa;
+    --maliev-info-bg:     #0b2f62;
+    --maliev-info-fg:     #bfdbfe;
 
-    --maliev-shadow-sm:   0 1px 2px rgba(0,0,0,0.30);
-    --maliev-shadow-md:   0 2px 8px rgba(0,0,0,0.40);
-    --maliev-shadow-lg:   0 12px 40px rgba(0,0,0,0.50);
-    --maliev-shadow-card: 0 1px 4px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.04);
+    --maliev-shadow-ring:      rgba(255,255,255,0.12) 0 0 0 1px;
+    --maliev-shadow-ring-soft: rgba(255,255,255,0.08) 0 0 0 1px;
+    --maliev-shadow-sm:        rgba(255,255,255,0.12) 0 0 0 1px, rgba(0,0,0,0.24) 0 1px 2px;
+    --maliev-shadow-md:        rgba(255,255,255,0.12) 0 0 0 1px, rgba(0,0,0,0.32) 0 2px 8px;
+    --maliev-shadow-lg:        rgba(255,255,255,0.12) 0 0 0 1px, rgba(0,0,0,0.46) 0 16px 40px -24px;
+    --maliev-shadow-card:      rgba(255,255,255,0.12) 0 0 0 1px, rgba(0,0,0,0.36) 0 2px 2px, rgba(0,0,0,0.36) 0 8px 8px -8px, rgba(255,255,255,0.06) 0 0 0 1px inset;
+    --maliev-focus-ring:       0 0 0 2px #0a0a0a, 0 0 0 4px var(--maliev-focus-color);
 
-    --maliev-viewer-bg:    linear-gradient(180deg, #0e1420 0%, #151c2a 100%);
-    --maliev-scroll:       #2a3346;
-    --maliev-scroll-hover: #3d495e;
+    --maliev-viewer-bg:    linear-gradient(180deg, #111111 0%, #171717 100%);
+    --maliev-scroll:       #404040;
+    --maliev-scroll-hover: #666666;
 
-    --mud-palette-text-tertiary: #a1a1aa;
+    --mud-palette-text-tertiary: #808080;
 }
 
 /* Scrollbar theming */
