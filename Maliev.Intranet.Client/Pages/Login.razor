@@ -10,51 +10,47 @@
 <PageTitle>MALIEV | Intranet Gateway</PageTitle>
 
 <div class="login-page @(_isDarkMode ? "dark-theme" : "")">
-    <!-- Header -->
     <header class="login-header">
         <div class="login-header-content">
             <div class="header-logo">
                 <img src="@LogoUrl" alt="MALIEV Logo" class="header-logo-img" />
             </div>
-            <nav class="header-nav">
+            <nav class="header-nav" aria-label="Gateway links">
                 <span class="header-nav-link">Support</span>
                 <span class="header-nav-link">System Status</span>
             </nav>
-            <button class="theme-toggle-btn" @onclick="ToggleThemeAsync" title="@GetThemeTooltip()">
+            <button class="theme-toggle-btn" @onclick="ToggleThemeAsync" title="@GetThemeTooltip()" aria-label="@GetThemeTooltip()">
                 <MudIcon Icon="@GetThemeIcon()" Size="Size.Small" />
             </button>
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="login-main">
         @if (_isCheckingAuth)
         {
-            <!-- Show nothing while checking authentication -->
         }
         else
         {
-            <div class="glass-card">
+            <section class="login-gateway-card" aria-labelledby="login-title">
+                <div class="login-card-heading">
+                    <p class="gateway-kicker">Employee gateway</p>
+                    <h1 id="login-title" class="form-title">Sign in to MALIEV</h1>
+                    <p class="form-subtitle">Use your employee account to continue to the intranet workspace.</p>
+                </div>
 
-                <!-- Title -->
-                <h1 class="form-title">Intranet</h1>
-                <p class="form-subtitle">Enter your corporate credentials to continue.</p>
-
-                <!-- Error message -->
                 @if (!string.IsNullOrEmpty(_errorMessage))
                 {
                     <div class="error-alert">@_errorMessage</div>
                 }
 
-                <!-- Login Form -->
                 <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin" FormName="LoginForm">
                     <DataAnnotationsValidator />
 
-                    <!-- Email field -->
                     <div class="input-group">
-                        <label class="input-label">Email Address</label>
+                        <label class="input-label" for="login-email">Email address</label>
                         <div class="input-wrapper">
-                            <input type="email" 
+                            <input id="login-email"
+                                   type="email"
                                    class="input-field"
                                    placeholder="name@maliev.com"
                                    @bind="_usernameInput"
@@ -64,14 +60,14 @@
                         </div>
                     </div>
 
-                    <!-- Password field -->
                     <div class="input-group">
                         <div class="password-label-row">
-                            <label class="input-label">Password</label>
-                            <a class="forgot-link">Forgot Password?</a>
+                            <label class="input-label" for="login-password">Password</label>
+                            <span class="password-hint">Workspace password</span>
                         </div>
                         <div class="input-wrapper">
-                            <input type="password"
+                            <input id="login-password"
+                                   type="password"
                                    class="input-field"
                                    placeholder="••••••••"
                                    @bind="_loginModel.Password"
@@ -80,27 +76,24 @@
                         </div>
                     </div>
 
-                    <!-- Submit button -->
                     <button class="btn-primary" type="submit" disabled="@_isProcessing">
                         @if (_isProcessing)
                         {
                             <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
-                            <span>Signing In...</span>
+                            <span>Signing in...</span>
                         }
                         else
                         {
-                            <span>SIGN IN</span>
+                            <span>Sign in</span>
                         }
                     </button>
 
-                    <!-- Divider -->
                     <div class="divider">
                         <div class="divider-line"></div>
-                        <span class="divider-text">OR</span>
+                        <span class="divider-text">or</span>
                         <div class="divider-line"></div>
                     </div>
 
-                    <!-- Google button -->
                     <a href="/api/v1/auth/login?returnUrl=@Uri.EscapeDataString(ReturnUrl ?? "/")" class="btn-google">
                         <svg class="google-logo" viewBox="0 0 24 24">
                             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -112,16 +105,14 @@
                     </a>
                 </EditForm>
 
-                <!-- Footer note -->
-                <div class="footer-note" style="margin-top: 2rem;">
+                <p class="footer-note">
                     Not an employee? Visit our main page at
-                    <a href="https://www.maliev.com" target="_blank" style="color: var(--mud-palette-primary); font-weight: 700;">www.maliev.com</a>
-                </div>
-            </div>
+                    <a href="https://www.maliev.com" target="_blank" class="footer-note-link">www.maliev.com</a>
+                </p>
+            </section>
         }
     </main>
 
-    <!-- Footer -->
     <footer class="login-footer">
         <div class="footer-content">
             <span class="footer-copyright">© 2024 MALIEV INC. ALL RIGHTS RESERVED.</span>

@@ -321,15 +321,37 @@ public class ModuleRegressionSourceTests
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor.css");
+        var bffLogin = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "LoginPageController.cs");
 
         Assert.Contains("/api/v1/auth/login", source, StringComparison.Ordinal);
         Assert.Contains("Sign in with Google", source, StringComparison.Ordinal);
+        Assert.Contains("class=\"login-gateway-card\"", source, StringComparison.Ordinal);
+        Assert.Contains("footer-note-link", source, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-bg);", styles, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-card);", styles, StringComparison.Ordinal);
         Assert.Contains("border-radius: var(--maliev-radius-md);", styles, StringComparison.Ordinal);
         Assert.Contains("background: var(--mud-palette-primary);", styles, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", styles, StringComparison.Ordinal);
+        Assert.Contains(".login-gateway-card", styles, StringComparison.Ordinal);
+        Assert.Contains("letter-spacing: 0;", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain("glass-card", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("style=", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("text-transform: uppercase;", styles, StringComparison.Ordinal);
         Assert.DoesNotContain("letter-spacing: -", styles, StringComparison.Ordinal);
+
+        Assert.Contains("/api/v1/auth/login-form", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("/api/v1/auth/login?returnUrl", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("family=Geist:wght@400..700", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("family=Geist+Mono:wght@400..600", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("Noto+Sans+Thai", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("login-gateway-card", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("Sign in to MALIEV", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("--maliev-shadow-card", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("background: var(--maliev-bg);", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain("JetBrains+Mono", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain("--accent-hue", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain("SIGN IN", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain("box-shadow: 0 18px", bffLogin, StringComparison.Ordinal);
     }
 
     [Fact]

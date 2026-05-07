@@ -1,6 +1,6 @@
+using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Net;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
@@ -49,7 +49,7 @@ public sealed class LoginPageController : Controller
         var encodedError = WebUtility.HtmlEncode(error ?? string.Empty);
         var errorHtml = string.IsNullOrWhiteSpace(error)
             ? string.Empty
-            : $"""<div class="error">{encodedError}</div>""";
+            : $"""<div class="error-alert">{encodedError}</div>""";
 
         return $$"""
 <!DOCTYPE html>
@@ -60,36 +60,67 @@ public sealed class LoginPageController : Controller
     <title>MALIEV | Intranet Gateway</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&family=Noto+Sans+Thai:wght@100..900&display=swap" rel="stylesheet">
     <style>
         :root {
             color-scheme: light;
-            --bg: #f5f7fa;
-            --panel: #ffffff;
-            --ink: #172033;
-            --muted: #667085;
-            --border: #e4e7ee;
-            --accent-hue: 250;
-            --accent: hsl(var(--accent-hue) 84% 56%);
+            --maliev-bg: #ffffff;
+            --maliev-panel: #ffffff;
+            --maliev-panel-3: #f5f5f5;
+            --maliev-ink: #171717;
+            --maliev-ink-2: #4d4d4d;
+            --maliev-muted: #666666;
+            --maliev-muted-2: #808080;
+            --maliev-border: #ebebeb;
+            --maliev-danger: #c1121f;
+            --maliev-danger-bg: #fff0f0;
+            --maliev-shadow-ring: rgba(0,0,0,0.08) 0 0 0 1px;
+            --maliev-shadow-md: rgba(0,0,0,0.08) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 6px;
+            --maliev-shadow-card: rgba(0,0,0,0.08) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 2px, rgba(0,0,0,0.04) 0 8px 8px -8px, #fafafa 0 0 0 1px inset;
+            --maliev-focus-color: hsla(212, 100%, 48%, 1);
+            --maliev-focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px var(--maliev-focus-color);
+            --maliev-radius-xs: 3px;
+            --maliev-radius-sm: 6px;
+            --maliev-radius-md: 8px;
+            --maliev-font-sans: 'Geist', 'Noto Sans Thai', sans-serif;
+            --maliev-font-mono: 'Geist Mono', 'Noto Sans Thai', ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+            --maliev-type-h1: 28px;
+            --maliev-type-body: 13px;
+            --maliev-type-caption: 12px;
+            --maliev-type-micro: 11px;
         }
         :root[data-maliev-theme="dark"] {
             color-scheme: dark;
-            --bg: #0d1117;
-            --panel: #151b23;
-            --ink: #e6edf3;
-            --muted: #8b949e;
-            --border: #30363d;
+            --maliev-bg: #0a0a0a;
+            --maliev-panel: #171717;
+            --maliev-panel-3: #202020;
+            --maliev-ink: #fafafa;
+            --maliev-ink-2: #a3a3a3;
+            --maliev-muted: #808080;
+            --maliev-muted-2: #666666;
+            --maliev-border: #2f2f2f;
+            --maliev-danger: #ff5b5b;
+            --maliev-danger-bg: #3a1111;
+            --maliev-shadow-ring: rgba(255,255,255,0.12) 0 0 0 1px;
+            --maliev-shadow-md: rgba(255,255,255,0.12) 0 0 0 1px, rgba(0,0,0,0.32) 0 2px 8px;
+            --maliev-shadow-card: rgba(255,255,255,0.12) 0 0 0 1px, rgba(0,0,0,0.36) 0 2px 2px, rgba(0,0,0,0.36) 0 8px 8px -8px, rgba(255,255,255,0.06) 0 0 0 1px inset;
+            --maliev-focus-ring: 0 0 0 2px #0a0a0a, 0 0 0 4px var(--maliev-focus-color);
         }
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
         body {
             margin: 0;
             min-height: 100vh;
-            font-family: "Noto Sans", system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--ink);
+            min-height: 100dvh;
+            background: var(--maliev-bg);
+            color: var(--maliev-ink);
+            font-family: var(--maliev-font-sans);
+            font-feature-settings: "liga" 1;
         }
         .login-shell {
             min-height: 100vh;
+            min-height: 100dvh;
             display: grid;
             grid-template-rows: auto 1fr auto;
         }
@@ -98,15 +129,23 @@ public sealed class LoginPageController : Controller
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 18px clamp(20px, 4vw, 48px);
-            border-color: var(--border);
+            gap: 16px;
+            padding: 14px 20px;
+            background: var(--maliev-panel);
+            box-shadow: var(--maliev-shadow-ring);
         }
-        .login-header { border-bottom: 1px solid var(--border); }
-        .login-footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+        .login-header-content {
+            width: min(100%, 1080px);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
         .header-logo {
             display: flex;
             align-items: center;
-            min-height: 32px;
+            min-width: 0;
         }
         .header-logo-img {
             width: auto;
@@ -122,106 +161,232 @@ public sealed class LoginPageController : Controller
         :root[data-maliev-theme="dark"] .header-logo-img--dark {
             display: block;
         }
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            color: var(--maliev-muted);
+            font-size: var(--maliev-type-caption);
+            font-weight: 500;
+            letter-spacing: 0;
+        }
+        .header-nav-link {
+            white-space: nowrap;
+        }
         .login-main {
             display: grid;
             place-items: center;
-            padding: 28px 18px;
+            min-height: 0;
+            padding: 32px 16px;
         }
-        .login-card {
-            width: min(390px, 100%);
-            padding: 26px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--panel);
-            box-shadow: 0 18px 48px rgba(14, 23, 43, 0.14);
+        .login-gateway-card {
+            width: min(100%, 420px);
+            padding: 30px;
+            border: 0;
+            border-radius: var(--maliev-radius-md);
+            background: var(--maliev-panel);
+            box-shadow: var(--maliev-shadow-card);
+            color: var(--maliev-ink);
+        }
+        .login-card-heading {
+            margin-bottom: 24px;
+        }
+        .gateway-kicker {
+            margin: 0 0 8px;
+            color: var(--maliev-muted);
+            font-family: var(--maliev-font-mono);
+            font-size: var(--maliev-type-caption);
+            font-weight: 500;
+            line-height: 1.3;
+            letter-spacing: 0;
         }
         h1 {
             margin: 0;
-            font-size: 24px;
+            color: var(--maliev-ink);
+            font-size: var(--maliev-type-h1);
+            font-weight: 600;
+            line-height: 1.2;
             letter-spacing: 0;
         }
         .subtitle {
-            margin: 7px 0 24px;
-            color: var(--muted);
-            font-size: 13px;
+            margin: 8px 0 0;
+            color: var(--maliev-ink-2);
+            font-size: var(--maliev-type-body);
+            font-weight: 400;
+            line-height: 1.5;
+            letter-spacing: 0;
         }
         label {
             display: block;
-            margin: 14px 0 6px;
-            font-size: 12px;
-            font-weight: 700;
+            margin: 0 0 6px;
+            color: var(--maliev-ink);
+            font-size: var(--maliev-type-caption);
+            font-weight: 500;
+            line-height: 1.3;
+            letter-spacing: 0;
+        }
+        .field {
+            margin-bottom: 16px;
+        }
+        .password-label-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        .password-hint {
+            color: var(--maliev-muted);
+            font-size: var(--maliev-type-caption);
+            line-height: 1.3;
+            white-space: nowrap;
         }
         input[type="email"],
         input[type="password"] {
             width: 100%;
             height: 42px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
+            border: 0;
+            border-radius: var(--maliev-radius-sm);
             padding: 0 12px;
-            background: transparent;
-            color: var(--ink);
+            background: var(--maliev-panel);
+            box-shadow: var(--maliev-shadow-ring);
+            color: var(--maliev-ink);
             font: inherit;
+            font-size: var(--maliev-type-body);
+            letter-spacing: 0;
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+        }
+        input[type="email"]::placeholder,
+        input[type="password"]::placeholder {
+            color: var(--maliev-muted-2);
+            opacity: 1;
+        }
+        input[type="email"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            box-shadow: var(--maliev-focus-ring);
         }
         .submit,
         .btn-google,
         .theme-toggle-btn {
-            height: 42px;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            font-weight: 700;
+            border: 0;
+            border-radius: var(--maliev-radius-sm);
+            font-family: var(--maliev-font-sans);
+            font-size: var(--maliev-type-body);
+            font-weight: 600;
+            letter-spacing: 0;
             cursor: pointer;
         }
-        .submit {
-            width: 100%;
-            margin-top: 18px;
-            border-color: var(--accent);
-            background: var(--accent);
-            color: #fff;
-        }
+        .submit,
         .btn-google {
+            width: 100%;
+            height: 42px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            margin-top: 12px;
-            color: var(--ink);
+            gap: 8px;
             text-decoration: none;
-            background: var(--panel);
-            box-shadow: 0 6px 16px rgba(14, 23, 43, 0.06);
+            transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        }
+        .submit {
+            margin-top: 8px;
+            background: var(--maliev-ink);
+            color: var(--maliev-panel);
+            box-shadow: var(--maliev-shadow-ring);
+        }
+        .submit:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--maliev-shadow-md);
+        }
+        .btn-google {
+            background: var(--maliev-panel);
+            color: var(--maliev-ink);
+            box-shadow: var(--maliev-shadow-ring);
         }
         .btn-google:hover {
-            border-color: color-mix(in srgb, var(--accent), var(--border) 60%);
+            background: var(--maliev-panel-3);
             text-decoration: none;
         }
+        .submit:focus-visible,
+        .btn-google:focus-visible,
+        .footer-link:focus-visible,
+        .theme-toggle-btn:focus-visible {
+            outline: none;
+            box-shadow: var(--maliev-focus-ring);
+        }
+        .submit:active,
+        .btn-google:active {
+            transform: scale(0.99);
+        }
         .google-logo {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             flex: 0 0 auto;
         }
         .divider {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin: 18px 0 6px;
-            color: var(--muted);
-            font-size: 11px;
-            font-weight: 700;
+            gap: 12px;
+            margin: 18px 0;
+            color: var(--maliev-muted);
+            font-size: var(--maliev-type-caption);
+            font-weight: 400;
+            line-height: 1.3;
+            letter-spacing: 0;
         }
         .divider::before,
         .divider::after {
             content: "";
             flex: 1;
             height: 1px;
-            background: var(--border);
+            background: var(--maliev-border);
+        }
+        .footer-note {
+            margin: 24px 0 0;
+            color: var(--maliev-ink-2);
+            font-size: var(--maliev-type-caption);
+            line-height: 1.45;
+            text-align: center;
+            letter-spacing: 0;
+        }
+        .footer-note a,
+        .footer-link {
+            color: var(--maliev-ink);
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: var(--maliev-radius-xs);
+        }
+        .footer-note a:hover,
+        .footer-link:hover {
+            text-decoration: underline;
+        }
+        .login-footer {
+            color: var(--maliev-muted);
+            font-size: var(--maliev-type-caption);
+            line-height: 1.3;
+        }
+        .login-footer-content {
+            width: min(100%, 1080px);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
         .theme-toggle-btn {
-            width: 42px;
-            background: transparent;
-            color: var(--ink);
+            width: 32px;
+            height: 32px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             padding: 0;
+            background: var(--maliev-panel);
+            box-shadow: var(--maliev-shadow-ring);
+            color: var(--maliev-ink-2);
+        }
+        .theme-toggle-btn:hover {
+            background: var(--maliev-panel-3);
+            color: var(--maliev-ink);
         }
         .theme-icon {
             display: none;
@@ -234,19 +399,36 @@ public sealed class LoginPageController : Controller
         :root[data-maliev-mode="system"] [data-theme-icon="system"] {
             display: block;
         }
-        .error {
-            margin-bottom: 14px;
-            border: 1px solid #ef4444;
-            border-radius: 6px;
+        .error-alert {
+            margin-bottom: 16px;
+            border-radius: var(--maliev-radius-sm);
             padding: 10px 12px;
-            color: #b91c1c;
-            background: rgba(239, 68, 68, 0.08);
-            font-size: 13px;
+            color: var(--maliev-danger);
+            background: var(--maliev-danger-bg);
+            box-shadow: var(--maliev-shadow-ring);
+            font-size: var(--maliev-type-body);
+            line-height: 1.4;
         }
-        @media (max-width: 520px) {
+        @media (max-width: 640px) {
             .login-header,
-            .login-footer { padding: 14px 18px; }
-            .login-footer { display: block; }
+            .login-footer {
+                padding: 12px;
+            }
+            .header-nav {
+                display: none;
+            }
+            .login-main {
+                align-items: start;
+                padding: 18px 12px;
+            }
+            .login-gateway-card {
+                padding: 22px;
+            }
+            .login-footer-content {
+                flex-direction: column;
+                text-align: center;
+                gap: 6px;
+            }
         }
     </style>
     <script>
@@ -277,7 +459,7 @@ public sealed class LoginPageController : Controller
                     return;
                 }
 
-                const label = pref === 'dark' ? 'Dark Theme' : pref === 'light' ? 'Light Theme' : 'Auto Theme';
+                const label = pref === 'dark' ? 'Dark theme' : pref === 'light' ? 'Light theme' : 'Auto theme';
                 button.setAttribute('aria-label', label);
                 button.setAttribute('title', label);
             }
@@ -308,38 +490,54 @@ public sealed class LoginPageController : Controller
 <body>
     <div class="login-shell">
         <header class="login-header">
-            <div class="header-logo">
-                <img src="/images/logo.svg" alt="MALIEV Logo" class="header-logo-img header-logo-img--light" />
-                <img src="/images/logo-white.svg" alt="MALIEV Logo" class="header-logo-img header-logo-img--dark" />
+            <div class="login-header-content">
+                <div class="header-logo">
+                    <img src="/images/logo.svg" alt="MALIEV Logo" class="header-logo-img header-logo-img--light" />
+                    <img src="/images/logo-white.svg" alt="MALIEV Logo" class="header-logo-img header-logo-img--dark" />
+                </div>
+                <nav class="header-nav" aria-label="Gateway links">
+                    <span class="header-nav-link">Support</span>
+                    <span class="header-nav-link">System Status</span>
+                </nav>
+                <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" data-theme-toggle aria-label="Auto theme" title="Auto theme">
+                    <svg class="theme-icon" data-theme-icon="light" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2M5.64 5.64 4.22 4.22M19.78 19.78l-1.42-1.42M18.36 5.64l1.42-1.42M4.22 19.78l1.42-1.42" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="12" cy="12" r="4" stroke-width="2"/>
+                    </svg>
+                    <svg class="theme-icon" data-theme-icon="dark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3a7 7 0 1 0 11.5 11.5Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <svg class="theme-icon" data-theme-icon="system" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="3" y="4" width="18" height="12" rx="2" stroke-width="2"/>
+                        <path d="M8 20h8M12 16v4M16.5 9.5h2v2M18.5 9.5 15 13" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
             </div>
-            <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" data-theme-toggle aria-label="Auto Theme" title="Auto Theme">
-                <svg class="theme-icon" data-theme-icon="light" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2M5.64 5.64 4.22 4.22M19.78 19.78l-1.42-1.42M18.36 5.64l1.42-1.42M4.22 19.78l1.42-1.42" stroke-width="2" stroke-linecap="round"/>
-                    <circle cx="12" cy="12" r="4" stroke-width="2"/>
-                </svg>
-                <svg class="theme-icon" data-theme-icon="dark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3a7 7 0 1 0 11.5 11.5Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <svg class="theme-icon" data-theme-icon="system" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <rect x="3" y="4" width="18" height="12" rx="2" stroke-width="2"/>
-                    <path d="M8 20h8M12 16v4M16.5 9.5h2v2M18.5 9.5 15 13" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </button>
         </header>
         <main class="login-main">
-            <section class="login-card">
-                <h1>Intranet</h1>
-                <p class="subtitle">Enter your employee credentials to continue.</p>
+            <section class="login-gateway-card" aria-labelledby="login-title">
+                <div class="login-card-heading">
+                    <p class="gateway-kicker">Employee gateway</p>
+                    <h1 id="login-title">Sign in to MALIEV</h1>
+                    <p class="subtitle">Use your employee account to continue to the intranet workspace.</p>
+                </div>
                 {{errorHtml}}
                 <form method="post" action="/api/v1/auth/login-form">
                     <input type="hidden" name="ReturnUrl" value="{{encodedReturnUrl}}" />
-                    <label for="Username">Email address</label>
-                    <input id="Username" name="Username" type="email" autocomplete="username" placeholder="name@maliev.com" required />
-                    <label for="Password">Password</label>
-                    <input id="Password" name="Password" type="password" autocomplete="current-password" required />
-                    <button class="submit" type="submit">SIGN IN</button>
+                    <div class="field">
+                        <label for="Username">Email address</label>
+                        <input id="Username" name="Username" type="email" autocomplete="username" placeholder="name@maliev.com" required />
+                    </div>
+                    <div class="field">
+                        <div class="password-label-row">
+                            <label for="Password">Password</label>
+                            <span class="password-hint">Workspace password</span>
+                        </div>
+                        <input id="Password" name="Password" type="password" autocomplete="current-password" required />
+                    </div>
+                    <button class="submit" type="submit">Sign in</button>
                 </form>
-                <div class="divider">OR</div>
+                <div class="divider">or</div>
                 <a class="btn-google" href="/api/v1/auth/login?returnUrl={{encodedGoogleReturnUrl}}">
                     <svg class="google-logo" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -349,11 +547,17 @@ public sealed class LoginPageController : Controller
                     </svg>
                     <span>Sign in with Google</span>
                 </a>
+                <p class="footer-note">
+                    Not an employee? Visit our main page at
+                    <a href="https://www.maliev.com" target="_blank">www.maliev.com</a>
+                </p>
             </section>
         </main>
         <footer class="login-footer">
-            <span>MALIEV Co., Ltd.</span>
-            <span>www.maliev.com</span>
+            <div class="login-footer-content">
+                <span>MALIEV INC. ALL RIGHTS RESERVED.</span>
+                <a class="footer-link" href="https://www.maliev.com">www.maliev.com</a>
+            </div>
         </footer>
     </div>
 </body>

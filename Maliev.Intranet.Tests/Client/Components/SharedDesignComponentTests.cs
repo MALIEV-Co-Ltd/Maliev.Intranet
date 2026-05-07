@@ -94,6 +94,25 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void MudBlazorOverrides_ApplyGatewayDesignToStandardComponents()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
+
+        Assert.Contains(".mud-paper", styles, StringComparison.Ordinal);
+        Assert.Contains("background-color: var(--maliev-panel);", styles, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-card);", styles, StringComparison.Ordinal);
+        Assert.Contains(".mud-popover", styles, StringComparison.Ordinal);
+        Assert.Contains(".mud-menu", styles, StringComparison.Ordinal);
+        Assert.Contains(".mud-button-root.mud-button-filled-primary", styles, StringComparison.Ordinal);
+        Assert.Contains("background-color: var(--mud-palette-primary) !important;", styles, StringComparison.Ordinal);
+        Assert.Contains(".mud-button-root.mud-button-outlined", styles, StringComparison.Ordinal);
+        Assert.Contains(".mud-button-root.mud-button-text", styles, StringComparison.Ordinal);
+        Assert.Contains(".mud-table-container", styles, StringComparison.Ordinal);
+        Assert.Contains(".mud-tabs-toolbar", styles, StringComparison.Ordinal);
+        Assert.Contains("border-radius: var(--maliev-radius-pill);", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Avatar_RendersInitials_FromEmployeeName()
     {
         var cut = Render<Avatar>(parameters => parameters.Add(p => p.Name, "Nattapol Thanakit"));
