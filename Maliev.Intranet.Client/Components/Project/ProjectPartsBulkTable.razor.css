@@ -17,8 +17,9 @@
     justify-content: space-between;
     gap: 12px;
     padding: 12px 14px;
-    border-bottom: 1px solid var(--maliev-border);
+    border-bottom: 0;
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .pbt-heading {
@@ -35,15 +36,16 @@
 }
 
 .pbt-kicker {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--maliev-font-micro);
+    font-weight: 600;
     color: var(--mud-palette-primary);
     text-transform: uppercase;
+    letter-spacing: 0;
 }
 
 .pbt-title {
-    font-size: 16px;
-    font-weight: 700;
+    font-size: var(--mud-typography-h4-size);
+    font-weight: 600;
 }
 
 .pbt-actions,
@@ -79,13 +81,14 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-ink);
     font: inherit;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--maliev-font-small);
+    font-weight: 600;
     cursor: pointer;
 }
 
@@ -96,9 +99,15 @@
 }
 
 .pbt-primary-button {
-    border-color: var(--mud-palette-primary);
     background: var(--mud-palette-primary);
     color: var(--mud-palette-primary-text);
+}
+
+.pbt-action-button:focus-visible,
+.pbt-primary-button:focus-visible,
+.pbt-icon-button:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .pbt-action-button:disabled,
@@ -125,7 +134,6 @@
 
 .pbt-configurator-button:hover,
 .pbt-configurator-button:focus-visible {
-    border-color: var(--mud-palette-primary);
     background: var(--maliev-accent-soft);
     outline: none;
 }
@@ -137,8 +145,9 @@
     display: grid;
     gap: 10px;
     padding: 10px 14px;
-    border-bottom: 1px solid var(--maliev-border);
+    border-bottom: 0;
     background: var(--maliev-panel-2);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .pbt-bulk-summary {
@@ -146,7 +155,7 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 8px;
-    font-size: 12px;
+    font-size: var(--maliev-font-small);
     color: var(--maliev-muted);
 }
 
@@ -178,8 +187,8 @@
     align-items: center;
     gap: 6px;
     min-height: 30px;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--maliev-font-small);
+    font-weight: 600;
     white-space: nowrap;
 }
 
@@ -188,12 +197,18 @@
     min-width: 0;
     min-height: 32px;
     padding: 5px 8px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-ink);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--maliev-font-small);
+}
+
+.pbt-input:focus {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .pbt-input:disabled {
@@ -221,7 +236,7 @@
     border-collapse: separate;
     border-spacing: 0;
     table-layout: fixed;
-    font-size: 12px;
+    font-size: var(--maliev-font-small);
 }
 
 .pbt-table thead th {
@@ -232,8 +247,8 @@
     border-bottom: 1px solid var(--maliev-border);
     background: var(--maliev-panel);
     color: var(--maliev-muted);
-    font-size: 11px;
-    font-weight: 750;
+    font-size: var(--maliev-font-micro);
+    font-weight: 600;
     text-align: left;
 }
 
@@ -284,9 +299,10 @@
     width: 42px;
     height: 42px;
     overflow: hidden;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel-3);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-muted);
 }
 
@@ -310,8 +326,8 @@
 }
 
 .pbt-part-thumb-button:focus-visible {
-    outline: 2px solid var(--mud-palette-primary);
-    outline-offset: -2px;
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .pbt-part-copy {
@@ -322,7 +338,7 @@
 .pbt-part-name {
     overflow: hidden;
     color: var(--maliev-ink);
-    font-weight: 700;
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -331,13 +347,13 @@
 .pbt-subtext {
     overflow: hidden;
     color: var(--maliev-muted);
-    font-size: 11px;
+    font-size: var(--maliev-font-micro);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .pbt-price {
-    font-weight: 750;
+    font-weight: 600;
     color: var(--mud-palette-primary);
 }
 
@@ -369,10 +385,10 @@
     width: min(920px, calc(100vw - 24px));
     max-height: min(860px, calc(100vh - 24px));
     overflow: hidden;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-md);
     background: var(--maliev-panel);
-    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.28);
+    box-shadow: var(--maliev-shadow-card);
 }
 
 .pbt-preview-header {
@@ -381,7 +397,8 @@
     justify-content: space-between;
     gap: 12px;
     padding: 12px 14px;
-    border-bottom: 1px solid var(--maliev-border);
+    border-bottom: 0;
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .pbt-preview-actions {
@@ -399,7 +416,7 @@
 .pbt-preview-title {
     overflow: hidden;
     color: var(--maliev-ink);
-    font-weight: 750;
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -443,13 +460,14 @@
     justify-content: center;
     min-height: 22px;
     padding: 0 7px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel-3);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-muted);
     font: inherit;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--maliev-font-micro);
+    font-weight: 600;
     cursor: pointer;
 }
 
@@ -459,22 +477,19 @@
 
 .pbt-dfm:not(:disabled):hover,
 .pbt-dfm:not(:disabled):focus-visible {
-    border-color: var(--mud-palette-primary);
     outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .pbt-dfm--ready {
-    border-color: var(--mud-palette-success);
     color: var(--mud-palette-success);
 }
 
 .pbt-dfm--warning {
-    border-color: var(--mud-palette-warning);
     color: var(--mud-palette-warning);
 }
 
 .pbt-dfm--error {
-    border-color: var(--mud-palette-error);
     color: var(--mud-palette-error);
 }
 
@@ -485,8 +500,9 @@
 
 .pbt-advanced-panel {
     padding: 0;
-    border-bottom: 1px solid var(--maliev-border);
+    border-bottom: 0;
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .pbt-card-stack {
@@ -495,7 +511,7 @@
 
 @media (min-width: 1800px) {
     .pbt-table {
-        font-size: 13px;
+        font-size: var(--maliev-font-base);
     }
 
     .pbt-table thead th,
@@ -561,7 +577,7 @@
         top: auto;
         bottom: 0;
         z-index: 15;
-        box-shadow: 0 -10px 22px rgba(15, 23, 42, .12);
+        box-shadow: var(--maliev-shadow-card);
     }
 
     .pbt-bulk-summary {
@@ -592,13 +608,13 @@
         display: grid;
         gap: 10px;
         padding: 10px;
-        border: 1px solid var(--maliev-border);
+        border: 0;
         border-radius: var(--maliev-radius-sm);
         background: var(--maliev-panel);
+        box-shadow: var(--maliev-shadow-card);
     }
 
     .pbt-part-card--selected {
-        border-color: var(--mud-palette-primary);
         background: var(--maliev-accent-softer);
     }
 
@@ -616,7 +632,7 @@
         flex: 1 1 auto;
         min-width: 0;
         gap: 8px;
-        font-weight: 750;
+        font-weight: 600;
     }
 
     .pbt-card-head > .pbt-part-thumb {
@@ -641,7 +657,7 @@
     .pbt-card-subtitle {
         overflow: hidden;
         color: var(--maliev-muted);
-        font-size: 11px;
+        font-size: var(--maliev-font-micro);
         font-weight: 600;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -662,8 +678,8 @@
         gap: 4px;
         min-width: 0;
         color: var(--maliev-muted);
-        font-size: 11px;
-        font-weight: 700;
+        font-size: var(--maliev-font-micro);
+        font-weight: 600;
     }
 
     .pbt-card-actions {

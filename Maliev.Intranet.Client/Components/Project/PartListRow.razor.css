@@ -1,13 +1,14 @@
 .plr-wrapper {
-    border-radius: 8px;
-    border: 1px solid var(--mud-palette-lines-default);
+    border: 0;
+    border-radius: var(--maliev-radius-md);
     background: var(--mud-palette-surface);
-    transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--maliev-shadow-card);
+    transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .plr-wrapper:hover {
-    border-color: var(--mud-palette-lines-default);
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--maliev-shadow-md);
+    transform: translateY(-1px);
 }
 
 /* ── Collapsed card row ─────────────────────────────────────────── */
@@ -34,8 +35,9 @@
     width: 80px;
     height: 80px;
     background: var(--mud-palette-background);
-    border: 1px solid var(--mud-palette-lines-default);
-    border-radius: 6px;
+    border: 0;
+    border-radius: var(--maliev-radius-sm);
+    box-shadow: var(--maliev-shadow-ring);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -81,7 +83,7 @@
 }
 
 .plr-dfm-badge {
-    font-size: 10px;
+    font-size: var(--maliev-font-nano);
     height: 20px;
 }
 
@@ -109,12 +111,12 @@
 }
 
 .plr-total {
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
 }
 
 .plr-unit-price {
-    font-size: 11px;
+    font-size: var(--maliev-font-micro);
 }
 
 .plr-cell--actions {
@@ -152,7 +154,7 @@
 .plr-config-panel {
     border-top: 1px solid var(--mud-palette-lines-default);
     background: var(--mud-palette-surface);
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 var(--maliev-radius-md) var(--maliev-radius-md);
 }
 
 /* ── Responsive ─────────────────────────────────────────────────── */

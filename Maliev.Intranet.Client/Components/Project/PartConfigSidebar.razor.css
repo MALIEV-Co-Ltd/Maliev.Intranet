@@ -3,7 +3,8 @@
     min-width: 380px;
     height: 100%;
     background: var(--maliev-panel);
-    border-left: 1px solid var(--maliev-border);
+    border-left: 0;
+    box-shadow: var(--maliev-shadow-ring);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
@@ -37,8 +38,9 @@
 .pcs-footer {
     flex-shrink: 0;
     padding: 0;
-    border-top: 1px solid var(--maliev-border);
+    border-top: 0;
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 /* ── Price card (Production Routing wrapper) ──────────────────────── */
@@ -57,6 +59,7 @@
     background: var(--maliev-panel-3);
     padding: 8px 12px;
     border-radius: var(--maliev-radius-sm);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .pcs-routing-content {
@@ -86,7 +89,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 13px;
+    font-size: var(--maliev-font-base);
     margin-bottom: 8px;
     color: var(--maliev-muted);
 }
@@ -120,12 +123,13 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-md);
+    box-shadow: var(--maliev-shadow-ring);
     cursor: pointer;
     transition: all 0.15s ease;
     background: var(--maliev-panel);
-    font-size: 13px;
+    font-size: var(--maliev-font-base);
     font-weight: 500;
     flex: 1;
     user-select: none;
@@ -133,7 +137,7 @@
 
 .pcs-check-btn:hover {
     background: var(--maliev-panel-3);
-    border-color: var(--mud-palette-primary);
+    box-shadow: var(--maliev-shadow-md);
 }
 
 .pcs-check-btn input[type="checkbox"] {
@@ -146,7 +150,6 @@
 
 .pcs-check-btn.checked {
     background: var(--maliev-accent-softer);
-    border-color: var(--mud-palette-primary);
     color: var(--mud-palette-primary);
 }
 
@@ -161,7 +164,8 @@
         height: auto;
         overflow: visible;
         border-left: none;
-        border-top: 1px solid var(--maliev-border);
+        border-top: 0;
+        box-shadow: var(--maliev-shadow-ring);
     }
 
     .pcs-scroll {
@@ -180,7 +184,8 @@
     width: 100%;
     min-width: unset;
     border-left: none;
-    border-top: 1px solid var(--maliev-border);
+    border-top: 0;
+    box-shadow: var(--maliev-shadow-ring);
     height: auto;
 }
 

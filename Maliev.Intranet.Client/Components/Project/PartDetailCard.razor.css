@@ -150,11 +150,11 @@
     z-index: 8;
     min-width: 180px;
     max-width: min(260px, calc(100% - 24px));
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-md);
     background: color-mix(in srgb, var(--maliev-panel) 92%, transparent);
     backdrop-filter: blur(10px);
-    box-shadow: var(--maliev-shadow-md);
+    box-shadow: var(--maliev-shadow-card);
     overflow: hidden;
 }
 .pdc-body-tree-header {
@@ -167,7 +167,7 @@
     background: transparent;
     color: var(--maliev-ink);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--maliev-font-small);
     font-weight: 600;
     line-height: 1.2;
     text-align: left;
@@ -211,7 +211,7 @@
     background: transparent;
     color: var(--maliev-ink);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--maliev-font-small);
     text-align: left;
     min-width: 0;
 }
@@ -242,8 +242,8 @@
 .pdc-body-tree-check {
     flex-shrink: 0;
     color: var(--mud-palette-primary);
-    font-size: 12px;
-    font-weight: 700;
+    font-size: var(--maliev-font-small);
+    font-weight: 600;
 }
 /* ── Header Row ───────────────────────────────────────────────────────────────────── */
 .pdc-header {
@@ -253,7 +253,8 @@
     padding: 0 12px;
     height: 44px;
     background: var(--maliev-panel);
-    border-bottom: 1px solid var(--maliev-border);
+    border-bottom: 0;
+    box-shadow: var(--maliev-shadow-ring);
     flex-shrink: 0;
 }
 .pdc-header-left {
@@ -276,7 +277,7 @@
     min-width: 0;
 }
 .pdc-header-name {
-    font-size: 13px;
+    font-size: var(--maliev-font-base);
     font-weight: 600;
     color: var(--maliev-ink);
     overflow: hidden;
@@ -284,7 +285,7 @@
     white-space: nowrap;
 }
 .pdc-header-subline {
-    font-size: 10.5px;
+    font-size: var(--maliev-font-micro);
     color: var(--maliev-muted);
     display: flex;
     align-items: center;
@@ -297,13 +298,14 @@
     color: var(--maliev-muted-3);
 }
 .pdc-status-pill {
-    font-size: 10px;
+    font-size: var(--maliev-font-nano);
     font-weight: 600;
     padding: 2px 6px;
-    border-radius: 10px;
+    border-radius: var(--maliev-radius-pill);
+    box-shadow: var(--maliev-shadow-ring);
     white-space: nowrap;
     flex-shrink: 0;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
     display: flex;
     align-items: center;
     gap: 3px;
@@ -313,18 +315,19 @@
 }
 .pdc-status--ok    { background: var(--maliev-ok-bg);   color: var(--maliev-ok);     }
 .pdc-status--warn  { background: var(--maliev-warn-bg);  color: var(--maliev-warn);   }
-.pdc-status--error { background: #d9486015;           color: var(--maliev-danger); }
+.pdc-status--error { background: var(--maliev-danger-bg); color: var(--maliev-danger); }
 .pdc-status--muted { background: var(--maliev-panel-3);  color: var(--maliev-muted);  }
 .pdc-header-tabs {
     display: flex;
     gap: 2px;
     background: var(--maliev-panel-3);
-    border-radius: 6px;
+    border-radius: var(--maliev-radius-sm);
     padding: 2px;
+    box-shadow: var(--maliev-shadow-ring);
     flex-shrink: 0;
 }
 .pdc-tab {
-    font-size: 12px;
+    font-size: var(--maliev-font-small);
     font-weight: 500;
     padding: 4px 10px;
     border: none;
@@ -338,7 +341,7 @@
     gap: 4px;
 }
 .pdc-tab-icon {
-    font-size: 14px !important;
+    font-size: var(--maliev-icon-sm) !important;
     width: 14px !important;
     height: 14px !important;
     flex-shrink: 0;
@@ -348,10 +351,10 @@
     align-items: center;
     justify-content: center;
     background: var(--maliev-danger);
-    color: #fff;
+    color: var(--mud-palette-error-text);
     border-radius: var(--maliev-radius-pill);
-    font-size: 9px;
-    font-weight: 700;
+    font-size: var(--maliev-font-nano);
+    font-weight: 600;
     padding: 0 4px;
     min-width: 14px;
     height: 14px;
@@ -363,7 +366,7 @@
     background: var(--maliev-panel);
     color: var(--maliev-ink);
     font-weight: 600;
-    box-shadow: var(--maliev-shadow-sm);
+    box-shadow: var(--maliev-shadow-ring);
 }
 .pdc-header-right {
     display: flex;
@@ -376,16 +379,18 @@
     height: 28px;
     display: grid;
     place-items: center;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: 5px;
     background: transparent;
+    box-shadow: var(--maliev-shadow-ring);
     cursor: pointer;
     color: var(--maliev-muted);
     text-decoration: none;
     transition: background 0.15s, color 0.15s;
 }
 .pdc-icon-btn:hover { background: var(--maliev-panel-3); color: var(--maliev-ink); }
-.pdc-icon-btn--danger:hover { color: var(--maliev-danger); border-color: var(--maliev-danger); }
+.pdc-icon-btn:focus-visible { outline: none; box-shadow: var(--maliev-focus-ring); }
+.pdc-icon-btn--danger:hover { color: var(--maliev-danger); }
 
 /* ── Footer Row ───────────────────────────────────────────────────────────────────── */
 .pdc-footer {
@@ -395,9 +400,10 @@
     padding: 0 12px;
     height: 36px;
     background: var(--maliev-panel);
-    border-top: 1px solid var(--maliev-border);
+    border-top: 0;
+    box-shadow: var(--maliev-shadow-ring);
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: var(--maliev-font-small);
 }
 .pdc-footer-chips { display: flex; align-items: center; gap: 4px; }
 .pdc-chip {
@@ -414,30 +420,30 @@
     height: 13px;
 }
 .pdc-chip-process-label {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
+    font-size: var(--maliev-font-small);
+    font-weight: 600;
+    letter-spacing: 0;
 }
 .pdc-chip--material {
-    font-size: 11.5px;
+    font-size: var(--maliev-font-small);
     font-weight: 500;
     color: var(--maliev-ink-2);
 }
 .pdc-chip--finish {
-    font-size: 10.5px;
+    font-size: var(--maliev-font-micro);
     font-weight: 400;
     color: var(--maliev-muted);
 }
 .pdc-chip-sep {
     color: var(--maliev-muted-3);
-    font-size: 11px;
+    font-size: var(--maliev-font-micro);
     margin: 0 2px;
 }
 .pdc-footer-vdivider { width: 1px; height: 20px; background: var(--maliev-border); flex-shrink: 0; }
 .pdc-footer-price { display: flex; align-items: center; gap: 6px; }
-.pdc-footer-unit { font-size: 11px; color: var(--maliev-ink-2); }
+.pdc-footer-unit { font-size: var(--maliev-font-micro); color: var(--maliev-ink-2); }
 .pdc-footer-sep  { color: var(--maliev-muted-3); }
-.pdc-footer-total { font-size: 14px; font-weight: 700; color: var(--maliev-ink); }
+.pdc-footer-total { font-size: var(--maliev-font-large); font-weight: 600; color: var(--maliev-ink); }
 
 @media (max-width: 600px) {
     .pdc-header {

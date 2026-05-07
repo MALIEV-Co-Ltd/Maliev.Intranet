@@ -30,12 +30,13 @@
     gap: 8px;
     height: 34px;
     padding: 0 12px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-ink);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--maliev-font-small);
     font-weight: 600;
     cursor: pointer;
 }
@@ -52,7 +53,7 @@
     border-radius: var(--maliev-radius-pill);
     background: var(--maliev-accent-soft);
     color: var(--mud-palette-primary);
-    font-size: 10px;
+    font-size: var(--maliev-font-nano);
     font-family: var(--maliev-font-mono);
 }
 .pn-center {
@@ -72,18 +73,19 @@
     width: 34px;
     height: 34px;
     padding: 0;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--mud-palette-primary);
     font: inherit;
     cursor: pointer;
 }
 .pn-mode-icon-button:hover,
 .pn-mode-icon-button:focus-visible {
-    border-color: var(--mud-palette-primary);
     background: var(--maliev-accent-soft);
     outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 .pn-empty-detail {
     flex: 1;
@@ -101,7 +103,7 @@
 /* Hero dropzone — overrides FileUploadDropzone defaults for the empty-state CTA */
 .pn-empty-dropzone {
     padding: 60px 40px !important;
-    border-radius: 16px !important;
+    border-radius: var(--maliev-radius-md) !important;
     max-width: 600px;
     width: 100%;
 }
@@ -178,8 +180,9 @@
         justify-content: space-between;
         gap: 8px;
         padding: 8px 10px;
-        border-bottom: 1px solid var(--maliev-border);
+        border-bottom: 0;
         background: var(--maliev-panel);
+        box-shadow: var(--maliev-shadow-ring);
     }
     .pn-parts-toggle--mobile {
         display: inline-flex;
