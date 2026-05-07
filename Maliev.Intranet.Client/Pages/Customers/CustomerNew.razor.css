@@ -23,13 +23,64 @@
 }
 
 .ai-intake {
-    grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+    align-items: start;
+    gap: 1rem;
+    padding-top: 0.75rem;
 }
 
-.ai-intake .mlv-toolbar,
 .extraction-summary {
     grid-column: 1 / -1;
+}
+
+.ai-text-column,
+.ai-file-column {
+    min-width: 0;
+}
+
+.ai-file-column {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+}
+
+::deep .ai-text-input {
+    margin: 0;
+}
+
+::deep .ai-text-input .mud-input-control-input-container {
+    margin: 0;
+}
+
+::deep .ai-text-input .mud-input {
+    min-height: 116px;
+    align-items: flex-start;
+}
+
+::deep .ai-text-input textarea {
+    min-height: 92px !important;
+    padding: 0.75rem 0.9rem !important;
+    line-height: 1.45;
+}
+
+::deep .ai-file-upload .mud-chipset,
+::deep .ai-file-upload .mud-chip {
+    display: none !important;
+}
+
+.ai-dropzone {
+    min-height: 116px;
+    justify-content: center;
+    padding: 1rem 1.1rem;
+}
+
+.ai-action-row {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ai-extract-action {
+    min-height: 34px;
 }
 
 .ai-intake-toggle {

@@ -35,34 +35,41 @@
                     @if (_aiIntakeExpanded)
                     {
                         <div class="ai-intake">
-                            <MudTextField T="string"
-                                          Label="Paste customer text"
-                                          Value="@_extractionText"
-                                          ValueChanged="@((string value) => _extractionText = value)"
-                                          Variant="Variant.Outlined"
-                                          Lines="5"
-                                          Immediate="true"
-                                          Placeholder="Paste an email signature, business card text, tax invoice details, or customer request..." />
+                            <div class="ai-text-column">
+                                <MudTextField T="string"
+                                              Class="ai-text-input"
+                                              Label="Paste customer text"
+                                              Value="@_extractionText"
+                                              ValueChanged="@((string value) => _extractionText = value)"
+                                              Variant="Variant.Outlined"
+                                              Lines="4"
+                                              Immediate="true"
+                                              Placeholder="Paste an email signature, business card text, tax invoice details, or customer request..." />
+                            </div>
 
-                            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                           FilesChanged="OnExtractionFilesSelected"
-                                           Accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
-                                           MaximumFileCount="10">
-                                <CustomContent Context="uploadContext">
-                                    <button type="button" class="document-dropzone ai-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
-                                        <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
-                                        <span>
-                                            <strong>AI extraction files</strong>
-                                            <small>Choose one or more PDFs, images, DOCX, or text files</small>
-                                        </span>
-                                    </button>
-                                </CustomContent>
-                            </MudFileUpload>
+                            <div class="ai-file-column">
+                                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                               FilesChanged="OnExtractionFilesSelected"
+                                               Accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
+                                               Class="ai-file-upload"
+                                               Hidden="true"
+                                               MaximumFileCount="10">
+                                    <CustomContent Context="uploadContext">
+                                        <button type="button" class="document-dropzone ai-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                            <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
+                                            <span>
+                                                <strong>AI extraction files</strong>
+                                                <small>Choose one or more PDFs, images, DOCX, or text files</small>
+                                            </span>
+                                        </button>
+                                    </CustomContent>
+                                </MudFileUpload>
 
-                            <div class="mlv-toolbar" style="justify-content:flex-end">
-                                <SecondaryButton Icon="@Icons.Material.Outlined.Psychology" Disabled="@(!_hasExtractionInput || _extracting)" OnClick="ExtractAsync">
-                                    @(_extracting ? $"Extracting attempt {_currentExtractionAttempt}/{MaxExtractionAttempts}..." : "Extract and autofill")
-                                </SecondaryButton>
+                                <div class="ai-action-row">
+                                    <SecondaryButton Class="ai-extract-action" Icon="@Icons.Material.Outlined.Psychology" Disabled="@(!_hasExtractionInput || _extracting)" OnClick="ExtractAsync">
+                                        @(_extracting ? $"Extracting attempt {_currentExtractionAttempt}/{MaxExtractionAttempts}..." : "Extract and autofill")
+                                    </SecondaryButton>
+                                </div>
                             </div>
                         </div>
                     }
