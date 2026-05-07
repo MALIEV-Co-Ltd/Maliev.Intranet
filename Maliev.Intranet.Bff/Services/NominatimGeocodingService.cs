@@ -65,7 +65,14 @@ public sealed class NominatimGeocodingService(
                 DisplayName = first.DisplayName ?? normalizedQuery
             };
 
-            cache.Set(cacheKey, response, TimeSpan.FromDays(7));
+            cache.Set(
+                cacheKey,
+                response,
+                new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(7),
+                    Size = 1
+                });
             return response;
         }
         catch (Exception ex)

@@ -124,6 +124,49 @@ public class CustomersControllerTests
     }
 
     [Fact]
+    public async Task GeocodeAsync_WithSizeLimitedCache_ReturnsAndCachesResult()
+    {
+        var requestCount = 0;
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            requestCount++;
+            const string payload = """
+                [
+                  {
+                    "lat": "13.9467147",
+                    "lon": "100.4581962",
+                    "display_name": "บริษัท มาลีฟ จำกัด, จังหวัดนนทบุรี, ประเทศไทย"
+                  }
+                ]
+                """;
+
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(payload)
+            });
+        });
+
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        httpClientFactoryMock.Setup(factory => factory.CreateClient("Nominatim"))
+            .Returns(new HttpClient(handler) { BaseAddress = new Uri("https://nominatim.openstreetmap.org/") });
+        using var cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = 128 });
+        var service = new NominatimGeocodingService(
+            httpClientFactoryMock.Object,
+            cache,
+            new Mock<ILogger<NominatimGeocodingService>>().Object);
+
+        var first = await service.GeocodeAsync("36/1, คลองข่อย, ปากเกร็ด, นนทบุรี, 11120, Thailand");
+        var second = await service.GeocodeAsync("36/1, คลองข่อย, ปากเกร็ด, นนทบุรี, 11120, Thailand");
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.Equal(13.9467147, first.Latitude);
+        Assert.Equal(100.4581962, first.Longitude);
+        Assert.Equal(first.DisplayName, second.DisplayName);
+        Assert.Equal(1, requestCount);
+    }
+
+    [Fact]
     public async Task SendEmail_ShouldPublishNotification_WhenCustomerHasPrincipal()
     {
         var customerId = Guid.NewGuid();
