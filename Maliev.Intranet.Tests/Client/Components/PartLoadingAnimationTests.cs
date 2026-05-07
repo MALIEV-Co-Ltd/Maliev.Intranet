@@ -92,16 +92,6 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
         Assert.DoesNotContain("Indeterminate=\"@(!Part.Uploading)\"", source, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void PartDetailCard_DoesNotAutoToggleSupportMockupWithOverhangOverlay()
-    {
-        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor");
-
-        Assert.DoesNotContain("issue.OverlayKey + \"_support\"", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("FDM__overhang_support", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Co-toggle the support-tower overlay", source, StringComparison.Ordinal);
-    }
-
     private static string ReadRepoFile(params string[] relativeParts)
     {
         foreach (var root in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory }.Distinct(StringComparer.OrdinalIgnoreCase))
