@@ -517,6 +517,34 @@
     align-self: center;
 }
 
+::deep .address-suggestion {
+    display: block;
+    padding: 0.65rem 0.75rem;
+}
+
+::deep .address-suggestion-lines {
+    display: grid;
+    gap: 0.18rem;
+    min-width: 0;
+}
+
+::deep .address-suggestion-primary,
+::deep .address-suggestion-secondary,
+::deep .address-suggestion-postal {
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+::deep .address-suggestion-secondary {
+    color: var(--maliev-text-muted);
+    font-size: 0.86rem;
+}
+
+::deep .address-suggestion-postal {
+    color: var(--maliev-text-muted);
+    font-size: 0.82rem;
+}
+
 @media (max-width: 1100px) {
     .customer-create-layout,
     .ai-intake {
