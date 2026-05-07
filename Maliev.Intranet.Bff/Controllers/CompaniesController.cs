@@ -12,7 +12,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class CompaniesController(CustomerServiceClient client) : ControllerBase
+public class CompaniesController(CustomerServiceClient client, RegistryServiceClient registryClient, ILogger<CompaniesController> logger) : ControllerBase
 {
     /// <summary>
     /// Retrieves a paged list of companies.
@@ -32,7 +32,15 @@ public class CompaniesController(CustomerServiceClient client) : ControllerBase
     [HttpGet("search")]
     public async Task<ActionResult<List<CompanySearchResultDto>>> Search([FromQuery] string query, [FromQuery] int limit = 10, CancellationToken ct = default)
     {
-        var result = await client.SearchCompanyResultsAsync(query, limit, ct);
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Ok(new List<CompanySearchResultDto>());
+        }
+
+        var normalizedLimit = Math.Clamp(limit, 1, 20);
+        var internalResults = await SearchInternalCompaniesAsync(query, normalizedLimit, ct);
+        var registryResults = await SearchRegistryCompaniesAsync(query, normalizedLimit, ct);
+        var result = MergeCompanyResults(internalResults, registryResults, normalizedLimit);
         return Ok(result);
     }
 
@@ -81,4 +89,93 @@ public class CompaniesController(CustomerServiceClient client) : ControllerBase
         var result = await client.UpdateCompanyAsync(id, request, ct);
         return result != null ? Ok(result) : NotFound();
     }
+
+    private async Task<List<CompanySearchResultDto>> SearchInternalCompaniesAsync(string query, int limit, CancellationToken ct)
+    {
+        try
+        {
+            return await client.SearchCompanyResultsAsync(query, limit, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Internal company search failed for query {Query}", query);
+            return [];
+        }
+    }
+
+    private async Task<List<CompanySearchResultDto>> SearchRegistryCompaniesAsync(string query, int limit, CancellationToken ct)
+    {
+        try
+        {
+            var profiles = await registryClient.SearchCompaniesAsync(query, limit, ct);
+            return profiles.Select(ToCompanySearchResult).ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Registry company search failed for query {Query}", query);
+            return [];
+        }
+    }
+
+    private static List<CompanySearchResultDto> MergeCompanyResults(
+        IEnumerable<CompanySearchResultDto> internalResults,
+        IEnumerable<CompanySearchResultDto> registryResults,
+        int limit)
+    {
+        var merged = new List<CompanySearchResultDto>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var result in internalResults.Concat(registryResults))
+        {
+            var key = GetCompanySearchKey(result);
+            if (seen.Add(key))
+            {
+                merged.Add(result);
+            }
+
+            if (merged.Count >= limit)
+            {
+                break;
+            }
+        }
+
+        return merged;
+    }
+
+    private static CompanySearchResultDto ToCompanySearchResult(RegistryCompanyProfile profile)
+    {
+        var taxId = NormalizeTaxId(profile.TaxId);
+        return new CompanySearchResultDto
+        {
+            Name = FirstNonEmpty(profile.FullNameTh, profile.CompanyNameTh, taxId),
+            VatNumber = taxId,
+            RegistrationNumber = taxId,
+            Source = "Registry",
+            BusinessType = FirstNonEmpty(profile.BusinessObjectives, profile.StatusNameTh)
+        };
+    }
+
+    private static string GetCompanySearchKey(CompanySearchResultDto company)
+    {
+        var taxId = NormalizeTaxId(company.VatNumber ?? company.RegistrationNumber);
+        if (!string.IsNullOrWhiteSpace(taxId))
+        {
+            return $"tax:{taxId}";
+        }
+
+        return $"name:{company.Name.Trim()}";
+    }
+
+    private static string NormalizeTaxId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return new string(value.Where(char.IsDigit).ToArray());
+    }
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
 }

@@ -1,5 +1,7 @@
-using Maliev.Intranet.Shared;
+using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
+using Maliev.Intranet.Shared;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -16,15 +18,24 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     public virtual async Task<CustomerResponse?> CreateCustomerBasicAsync(CustomerOnboardingRequest request, CancellationToken ct = default)
     {
         // 1. Create Company if needed
-        Guid? companyId = null;
-        if (request.NewCompany != null)
+        Guid? companyId = request.Customer.CompanyId;
+        if (request.NewCompany != null && !companyId.HasValue)
         {
             var companyResponse = await httpClient.PostAsJsonAsync("/customer/v1/companies", request.NewCompany, ct);
-            if (companyResponse.IsSuccessStatusCode)
+            if (!companyResponse.IsSuccessStatusCode)
             {
-                var company = await companyResponse.Content.ReadFromJsonAsync<CompanyResponse>(ct);
-                companyId = company?.Id;
+                throw await CreateUpstreamExceptionAsync(
+                    companyResponse,
+                    "Company profile could not be created.",
+                    ct);
             }
+
+            var company = await companyResponse.Content.ReadFromJsonAsync<CompanyResponse>(ct);
+            companyId = company?.Id
+                ?? throw new HttpRequestException(
+                    "Company profile could not be created because CustomerService returned an empty response.",
+                    null,
+                    companyResponse.StatusCode);
         }
 
         if (companyId.HasValue
@@ -37,10 +48,22 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         // 2. Create Customer
         request.Customer.CompanyId = companyId;
         var customerResponse = await httpClient.PostAsJsonAsync("/customer/v1/customers", request.Customer, ct);
-        if (!customerResponse.IsSuccessStatusCode) return null;
+        if (!customerResponse.IsSuccessStatusCode)
+        {
+            throw await CreateUpstreamExceptionAsync(
+                customerResponse,
+                "Customer profile could not be created.",
+                ct);
+        }
 
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>(ct);
-        if (customer == null) return null;
+        if (customer == null)
+        {
+            throw new HttpRequestException(
+                "Customer profile was created but CustomerService returned an empty response.",
+                null,
+                customerResponse.StatusCode);
+        }
 
         if (request.Addresses.Count > 0)
         {
@@ -364,10 +387,161 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             return [];
         }
 
-        var response = await httpClient.GetFromJsonAsync<List<CompanySearchResultDto>>(
-            $"/customer/v1/companies/search?query={Uri.EscapeDataString(query)}&limit={limit}", ct);
-        return response ?? [];
+        var response = await httpClient.GetAsync(
+            $"/customer/v1/companies/search?query={Uri.EscapeDataString(query)}&limit={limit}",
+            ct);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return document.RootElement
+            .EnumerateArray()
+            .Select(MapCompanySearchResult)
+            .Where(company => !string.IsNullOrWhiteSpace(company.Name))
+            .ToList();
     }
+
+    private static CompanySearchResultDto MapCompanySearchResult(JsonElement element)
+    {
+        return new CompanySearchResultDto
+        {
+            Id = TryGetGuid(element, "id"),
+            Name = GetString(element, "name") ?? string.Empty,
+            VatNumber = GetString(element, "vatNumber"),
+            RegistrationNumber = GetString(element, "registrationNumber"),
+            ContactEmail = GetString(element, "contactEmail"),
+            ContactPhone = GetString(element, "contactPhone"),
+            Segment = GetString(element, "segment") ?? string.Empty,
+            Tier = GetString(element, "tier") ?? string.Empty,
+            Source = GetCompanySource(element),
+            BusinessType = GetString(element, "businessType"),
+            DefaultBillingAddress = TryGetProperty(element, "billingAddress", out var billingAddress)
+                ? MapAddressResponse(billingAddress)
+                : null
+        };
+    }
+
+    private static AddressResponse? MapAddressResponse(JsonElement element)
+    {
+        if (element.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        return new AddressResponse
+        {
+            Id = TryGetGuid(element, "id") ?? Guid.Empty,
+            OwnerType = GetString(element, "ownerType") ?? string.Empty,
+            OwnerId = TryGetGuid(element, "ownerId") ?? Guid.Empty,
+            Type = GetString(element, "type") ?? "Billing",
+            IsDefault = TryGetBool(element, "isDefault"),
+            AddressLine1 = GetString(element, "addressLine1") ?? string.Empty,
+            AddressLine2 = GetString(element, "addressLine2"),
+            AddressLine3 = GetString(element, "addressLine3"),
+            District = GetString(element, "district"),
+            City = GetString(element, "city") ?? string.Empty,
+            StateProvince = GetString(element, "stateProvince") ?? string.Empty,
+            PostalCode = GetString(element, "postalCode") ?? string.Empty,
+            CountryId = TryGetGuid(element, "countryId") ?? Guid.Empty,
+            RecipientName = GetString(element, "recipientName"),
+            RecipientPhone = GetString(element, "recipientPhone"),
+            CreatedAt = TryGetDateTime(element, "createdAt"),
+            UpdatedAt = TryGetDateTime(element, "updatedAt"),
+            Xmin = TryGetUInt32(element, "xmin")
+        };
+    }
+
+    private static string? GetCompanySource(JsonElement element)
+    {
+        if (!TryGetProperty(element, "source", out var source))
+        {
+            return null;
+        }
+
+        return source.ValueKind switch
+        {
+            JsonValueKind.String => source.GetString(),
+            JsonValueKind.Number when source.TryGetInt32(out var value) => value switch
+            {
+                0 => "Internal",
+                1 => "Registry",
+                _ => value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            },
+            _ => null
+        };
+    }
+
+    private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement property)
+    {
+        if (element.TryGetProperty(propertyName, out property))
+        {
+            return true;
+        }
+
+        foreach (var current in element.EnumerateObject())
+        {
+            if (string.Equals(current.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                property = current.Value;
+                return true;
+            }
+        }
+
+        property = default;
+        return false;
+    }
+
+    private static string? GetString(JsonElement element, string propertyName)
+    {
+        if (!TryGetProperty(element, propertyName, out var property)
+            || property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        return property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : property.ToString();
+    }
+
+    private static Guid? TryGetGuid(JsonElement element, string propertyName)
+    {
+        if (!TryGetProperty(element, propertyName, out var property)
+            || property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        if (property.ValueKind == JsonValueKind.String && property.TryGetGuid(out var value))
+        {
+            return value;
+        }
+
+        return null;
+    }
+
+    private static bool TryGetBool(JsonElement element, string propertyName) =>
+        TryGetProperty(element, propertyName, out var property)
+        && property.ValueKind == JsonValueKind.True;
+
+    private static DateTime TryGetDateTime(JsonElement element, string propertyName) =>
+        TryGetProperty(element, propertyName, out var property)
+        && property.ValueKind == JsonValueKind.String
+        && property.TryGetDateTime(out var value)
+            ? value
+            : default;
+
+    private static uint TryGetUInt32(JsonElement element, string propertyName) =>
+        TryGetProperty(element, propertyName, out var property)
+        && property.ValueKind == JsonValueKind.Number
+        && property.TryGetUInt32(out var value)
+            ? value
+            : 0;
 
     /// <summary>
     /// Creates a company in CustomerService.
@@ -621,12 +795,34 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     public virtual async Task CreateNdaWithDocumentsAsync(Guid customerId, CreateNDARequest nda, List<DocumentResponse> documents, CancellationToken ct = default)
     {
         var signedNdaDoc = documents.FirstOrDefault(d => d.DocumentCategory == "NDA" && d.DocumentSubType == "Signed");
-        var ndaResponse = await httpClient.PostAsJsonAsync("/customer/v1/ndas", new { customerId, documentReferenceId = signedNdaDoc?.Id, expiresAt = nda.ExpiresAt }, ct);
-        if (ndaResponse.IsSuccessStatusCode)
+        var ndaResponse = await httpClient.PostAsJsonAsync("/customer/v1/ndas", new
         {
-            var ndaJson = await ndaResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(ct);
-            if (ndaJson.ValueKind != System.Text.Json.JsonValueKind.Undefined && ndaJson.TryGetProperty("id", out var idProp) && ndaJson.TryGetProperty("version", out var vProp))
-                await httpClient.PatchAsJsonAsync($"/customer/v1/ndas/{idProp.GetGuid()}/status", new { status = "Signed", version = vProp.GetString() }, ct);
+            customerId,
+            documentReferenceId = signedNdaDoc?.Id,
+            expiresAt = nda.ExpiresAt
+        }, ct);
+
+        if (!ndaResponse.IsSuccessStatusCode)
+        {
+            throw await CreateUpstreamExceptionAsync(ndaResponse, "NDA record could not be created.", ct);
+        }
+
+        var createdNda = await ndaResponse.Content.ReadFromJsonAsync<NDAResponse>(ct);
+        if (createdNda != null && signedNdaDoc != null && nda.IsActive)
+        {
+            var statusResponse = await httpClient.PatchAsJsonAsync($"/customer/v1/ndas/{createdNda.Id}/status", new
+            {
+                status = "Signed",
+                signedAt = DateTime.UtcNow,
+                documentReferenceId = signedNdaDoc.Id,
+                expiresAt = nda.ExpiresAt,
+                xmin = createdNda.Xmin
+            }, ct);
+
+            if (!statusResponse.IsSuccessStatusCode)
+            {
+                throw await CreateUpstreamExceptionAsync(statusResponse, "NDA status could not be updated.", ct);
+            }
         }
     }
 
@@ -667,7 +863,92 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         return response.IsSuccessStatusCode;
     }
 
-    private static string ExtractErrorMessage(string errorBody, string fallback) => fallback;
+    private static async Task<HttpRequestException> CreateUpstreamExceptionAsync(
+        HttpResponseMessage response,
+        string fallback,
+        CancellationToken ct)
+    {
+        var message = await ReadUpstreamErrorMessageAsync(response, fallback, ct);
+        return new HttpRequestException(message, null, response.StatusCode);
+    }
+
+    private static async Task<string> ReadUpstreamErrorMessageAsync(
+        HttpResponseMessage response,
+        string fallback,
+        CancellationToken ct)
+    {
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return $"{fallback} HTTP {(int)response.StatusCode} {response.ReasonPhrase}".Trim();
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            var parts = new List<string>();
+
+            AddJsonString(parts, root, "message");
+            AddJsonString(parts, root, "title");
+            AddJsonDetails(parts, root, "details");
+            AddJsonDetails(parts, root, "errors");
+
+            if (parts.Count > 0)
+            {
+                return string.Join(" ", parts.Distinct(StringComparer.OrdinalIgnoreCase));
+            }
+        }
+        catch (JsonException)
+        {
+            // Fall back to the raw upstream body below.
+        }
+
+        return body.Length <= 1000 ? body : $"{body[..1000]}...";
+    }
+
+    private static void AddJsonString(List<string> parts, JsonElement root, string propertyName)
+    {
+        if (root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String)
+        {
+            var message = value.GetString();
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                parts.Add(message.Trim());
+            }
+        }
+    }
+
+    private static void AddJsonDetails(List<string> parts, JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var details) || details.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in details.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.Array)
+            {
+                var messages = property.Value
+                    .EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString())
+                    .Where(message => !string.IsNullOrWhiteSpace(message))
+                    .Select(message => message!.Trim());
+
+                parts.AddRange(messages);
+            }
+            else if (property.Value.ValueKind == JsonValueKind.String)
+            {
+                var message = property.Value.GetString();
+                if (!string.IsNullOrWhiteSpace(message))
+                {
+                    parts.Add(message.Trim());
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Promotes a customer to be the primary contact for their company.

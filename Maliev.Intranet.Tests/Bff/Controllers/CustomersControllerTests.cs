@@ -204,4 +204,19 @@ public class CustomersControllerTests
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
+
+    [Fact]
+    public async Task CreateBasic_ShouldReturnUpstreamStatus_WhenCustomerServiceRejectsRequest()
+    {
+        var request = new CustomerOnboardingRequest { Customer = new CreateCustomerRequest() };
+        _customerClientMock.Setup(x => x.CreateCustomerBasicAsync(request, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("A customer with email 'same@example.com' already exists", null, System.Net.HttpStatusCode.Conflict));
+
+        var result = await _controller.CreateBasic(request, CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(409, objectResult.StatusCode);
+        var error = Assert.IsType<ApiErrorResponse>(objectResult.Value);
+        Assert.Contains("same@example.com", error.Message);
+    }
 }

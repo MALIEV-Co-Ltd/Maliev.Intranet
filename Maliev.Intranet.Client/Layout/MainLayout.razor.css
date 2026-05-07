@@ -24,6 +24,17 @@
     height: 100%;
 }
 
+.app-shell ::deep .sidekick-chat-drawer.mud-drawer--closed {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    overflow: hidden;
+}
+
+.app-shell ::deep .sidekick-chat-drawer.mud-drawer--closed .mud-drawer-content {
+    display: none;
+}
+
 .app-shell ::deep .mud-drawer-overlay {
     background-color: rgba(0, 0, 0, 0.12);
     backdrop-filter: blur(1px);

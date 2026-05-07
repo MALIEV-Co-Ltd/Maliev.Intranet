@@ -274,6 +274,9 @@ public class NDAResponse
     public DateTime UpdatedAt { get; set; }
     /// <summary>Concurrency version token for the NDA record.</summary>
     public byte[] Version { get; set; } = [];
+    /// <summary>The PostgreSQL xmin concurrency token returned by CustomerService.</summary>
+    [JsonPropertyName("xmin")]
+    public uint Xmin { get; set; }
 }
 
 /// <summary>

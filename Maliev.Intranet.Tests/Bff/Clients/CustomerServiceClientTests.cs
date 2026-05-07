@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Tests.Testing;
@@ -23,6 +24,51 @@ public class CustomerServiceClientTests
         };
         var logger = new Mock<ILogger<CustomerServiceClient>>().Object;
         _client = new CustomerServiceClient(httpClient, logger);
+    }
+
+    [Fact]
+    public async Task SearchCompanyResultsAsync_MapsCustomerServiceWireShape()
+    {
+        var companyId = Guid.NewGuid();
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            Assert.Equal("/customer/v1/companies/search?query=ABC&limit=8", request.RequestUri!.PathAndQuery);
+            const string json = """
+            [
+              {
+                "id": "__COMPANY_ID__",
+                "name": "ABC Manufacturing",
+                "vatNumber": "1234567890123",
+                "segment": "Enterprise",
+                "source": 0,
+                "billingAddress": {
+                  "isDefault": true,
+                  "addressLine1": "88 Test Road",
+                  "city": "Bangkok",
+                  "stateProvince": "Bangkok",
+                  "postalCode": "10110"
+                }
+              }
+            ]
+            """;
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json.Replace("__COMPANY_ID__", companyId.ToString()), Encoding.UTF8, "application/json")
+            });
+        });
+        var client = new CustomerServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }, new Mock<ILogger<CustomerServiceClient>>().Object);
+
+        var results = await client.SearchCompanyResultsAsync("ABC", 8);
+
+        var result = Assert.Single(results);
+        Assert.Equal(companyId, result.Id);
+        Assert.Equal("ABC Manufacturing", result.Name);
+        Assert.Equal("1234567890123", result.VatNumber);
+        Assert.Equal("Internal", result.Source);
+        Assert.NotNull(result.DefaultBillingAddress);
+        Assert.Equal("88 Test Road", result.DefaultBillingAddress.AddressLine1);
+        Assert.Equal("Bangkok", result.DefaultBillingAddress.StateProvince);
     }
 
     [Fact]
@@ -67,6 +113,7 @@ public class CustomerServiceClientTests
         var calls = new List<string>();
         var addressPayloads = new List<string>();
         var documentPayload = string.Empty;
+        var ndaStatusPayload = string.Empty;
         var handler = new MockHttpMessageHandler((request, _) =>
         {
             calls.Add($"{request.Method} {request.RequestUri!.PathAndQuery}");
@@ -122,12 +169,13 @@ public class CustomerServiceClientTests
             {
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = JsonContent.Create(new { id = Guid.NewGuid(), version = "AAAAAAAAB9E=" })
+                    Content = JsonContent.Create(new NDAResponse { Id = Guid.NewGuid(), Xmin = 42 })
                 });
             }
 
             if (request.Method == HttpMethod.Patch && request.RequestUri.PathAndQuery.Contains("/customer/v1/ndas/", StringComparison.Ordinal))
             {
+                ndaStatusPayload = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
             }
 
@@ -204,6 +252,49 @@ public class CustomerServiceClientTests
 
         using var document = System.Text.Json.JsonDocument.Parse(documentPayload);
         Assert.Equal("Signed", document.RootElement.GetProperty("documentSubType").GetString());
+
+        using var ndaStatus = System.Text.Json.JsonDocument.Parse(ndaStatusPayload);
+        Assert.Equal("Signed", ndaStatus.RootElement.GetProperty("status").GetString());
+        Assert.Equal(42u, ndaStatus.RootElement.GetProperty("xmin").GetUInt32());
+    }
+
+    [Fact]
+    public async Task CreateCustomerBasicAsync_WhenCustomerServiceReturnsValidationError_ThrowsUpstreamMessage()
+    {
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            if (request.Method == HttpMethod.Post && request.RequestUri!.PathAndQuery == "/customer/v1/customers")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+                {
+                    Content = JsonContent.Create(new ApiErrorResponse
+                    {
+                        Message = "Customer profile could not be created.",
+                        Details = new Dictionary<string, string[]>
+                        {
+                            ["Email"] = ["A customer with email 'same@example.com' already exists"]
+                        }
+                    })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+
+        var client = new CustomerServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }, new Mock<ILogger<CustomerServiceClient>>().Object);
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.CreateCustomerBasicAsync(new CustomerOnboardingRequest
+        {
+            Customer = new CreateCustomerRequest
+            {
+                FirstName = "Same",
+                LastName = "Customer",
+                Email = "same@example.com"
+            }
+        }));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, exception.StatusCode);
+        Assert.Contains("same@example.com", exception.Message);
     }
 
     [Fact]

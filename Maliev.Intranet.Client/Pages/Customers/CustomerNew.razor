@@ -1,5 +1,6 @@
 @page "/customers/new"
 @using System.Net.Http.Headers
+@using System.Text.Json
 @using Maliev.Intranet.Shared.Services
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -19,47 +20,69 @@
 
         <div class="customer-create-layout">
             <div class="customer-create-main">
-                <PanelCard Title="AI intake">
-                    <div class="ai-intake">
-                        <MudTextField T="string"
-                                      Label="Paste customer text"
-                                      Value="@_extractionText"
-                                      ValueChanged="@((string value) => _extractionText = value)"
-                                      Variant="Variant.Outlined"
-                                      Lines="5"
-                                      Immediate="true"
-                                      Placeholder="Paste an email signature, business card text, tax invoice details, or customer request..." />
+                <PanelCard Title="AI data extraction">
+                    <button type="button" class="ai-intake-toggle" @onclick="ToggleAiIntake">
+                        <span>
+                            <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
+                            <strong>Extract from text or documents</strong>
+                        </span>
+                        <span class="ai-intake-toggle-meta">
+                            @GetAiIntakeStatus()
+                            <MudIcon Icon="@(_aiIntakeExpanded ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)" />
+                        </span>
+                    </button>
 
-                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                       FilesChanged="OnExtractionFilesSelected"
-                                       Accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
-                                       MaximumFileCount="10">
-                            <CustomContent Context="uploadContext">
-                                <button type="button" class="document-dropzone ai-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
-                                    <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
-                                    <span>
-                                        <strong>AI extraction files</strong>
-                                        <small>@GetFileSummary(_extractionFiles, "PDF, image, DOCX, or text")</small>
-                                    </span>
-                                </button>
-                            </CustomContent>
-                        </MudFileUpload>
+                    @if (_aiIntakeExpanded)
+                    {
+                        <div class="ai-intake">
+                            <MudTextField T="string"
+                                          Label="Paste customer text"
+                                          Value="@_extractionText"
+                                          ValueChanged="@((string value) => _extractionText = value)"
+                                          Variant="Variant.Outlined"
+                                          Lines="5"
+                                          Immediate="true"
+                                          Placeholder="Paste an email signature, business card text, tax invoice details, or customer request..." />
 
-                        <div class="mlv-toolbar" style="justify-content:flex-end">
-                            <SecondaryButton Icon="@Icons.Material.Outlined.Psychology" Disabled="@(!_hasExtractionInput || _extracting)" OnClick="ExtractAsync">
-                                @(_extracting ? "Extracting..." : "Extract and autofill")
-                            </SecondaryButton>
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                           FilesChanged="OnExtractionFilesSelected"
+                                           Accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
+                                           MaximumFileCount="10">
+                                <CustomContent Context="uploadContext">
+                                    <button type="button" class="document-dropzone ai-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                        <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
+                                        <span>
+                                            <strong>AI extraction files</strong>
+                                            <small>Choose one or more PDFs, images, DOCX, or text files</small>
+                                        </span>
+                                    </button>
+                                </CustomContent>
+                            </MudFileUpload>
+
+                            <div class="mlv-toolbar" style="justify-content:flex-end">
+                                <SecondaryButton Icon="@Icons.Material.Outlined.Psychology" Disabled="@(!_hasExtractionInput || _extracting)" OnClick="ExtractAsync">
+                                    @(_extracting ? $"Extracting attempt {_currentExtractionAttempt}/{MaxExtractionAttempts}..." : "Extract and autofill")
+                                </SecondaryButton>
+                            </div>
                         </div>
+                    }
 
-                        @if (_lastExtraction != null)
-                        {
-                            <div class="extraction-summary">
+                    @if (_lastExtraction != null)
+                    {
+                        <div class="extraction-summary expanded">
+                            <div>
                                 <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" />
                                 <span>Autofilled from AI extraction</span>
                                 <strong>@($"{_lastExtraction.Confidence:P0}")</strong>
                             </div>
-                        }
-                    </div>
+                            <dl>
+                                <dt>Attempts</dt><dd>@_lastExtractionAttempts of @MaxExtractionAttempts</dd>
+                                <dt>Contact</dt><dd>@FormatPair(_lastExtraction.Email, _lastExtraction.Mobile)</dd>
+                                <dt>Company</dt><dd>@FormatPair(_lastExtraction.CompanyName, _lastExtraction.VatNumber)</dd>
+                                <dt>Addresses</dt><dd>@(_lastExtraction.Addresses?.Count ?? 0)</dd>
+                            </dl>
+                        </div>
+                    }
                 </PanelCard>
 
                 <PanelCard Title="Customer profile">
@@ -96,86 +119,134 @@
                         </div>
 
                         <div class="company-grid">
-                            <MudAutocomplete T="RegistryCompanyProfile"
-                                             Label="Company name"
-                                             Text="@_companyName"
-                                             TextChanged="@((string value) => _companyName = value)"
-                                             ValueChanged="ApplyCompanySuggestion"
-                                             SearchFunc="SearchCompaniesAsync"
-                                             ToStringFunc="@(company => company?.CompanyNameTh ?? _companyName)"
-                                             Variant="Variant.Outlined"
-                                             Clearable="true"
-                                             CoerceText="false"
-                                             CoerceValue="false"
-                                             ResetValueOnEmptyText="false"
-                                             DebounceInterval="350"
-                                             MinCharacters="2"
-                                             Class="styled-autocomplete">
-                                <ItemTemplate Context="company">
-                                    <div class="suggestion-card company-suggestion">
-                                        <div>
-                                            <strong>@company.CompanyNameTh</strong>
-                                            <span>@(company.FullNameTh == company.CompanyNameTh ? company.BusinessObjectives : company.FullNameTh)</span>
+                            <FormField Label="Company lookup" Class="company-lookup">
+                                <MudAutocomplete T="CompanySearchResultDto"
+                                                 Text="@_companyLookup"
+                                                 TextChanged="OnCompanyLookupTextChanged"
+                                                 ValueChanged="ApplyCompanySuggestion"
+                                                 SearchFunc="SearchCompaniesAsync"
+                                                 ToStringFunc="@(company => company == null ? _companyLookup : FormatCompanySuggestionValue(company))"
+                                                 Placeholder="Search by company name or tax ID"
+                                                 Variant="Variant.Outlined"
+                                                 Clearable="true"
+                                                 Dense="true"
+                                                 CoerceText="false"
+                                                 CoerceValue="false"
+                                                 ResetValueOnEmptyText="false"
+                                                 DebounceInterval="350"
+                                                 MinCharacters="2"
+                                                 Class="styled-autocomplete">
+                                    <ItemTemplate Context="company">
+                                        <div class="suggestion-card company-suggestion">
+                                            <div>
+                                                <strong>@company.Name</strong>
+                                                <span>@FormatPair(company.VatNumber, company.RegistrationNumber)</span>
+                                            </div>
+                                            <div class="suggestion-meta">
+                                                <span>@(string.IsNullOrWhiteSpace(company.Source) ? "CustomerService" : company.Source)</span>
+                                                <small>@company.BusinessType</small>
+                                            </div>
                                         </div>
-                                        <div class="suggestion-meta">
-                                            <span>@company.TaxId</span>
-                                            <small>@(string.IsNullOrWhiteSpace(company.StatusNameTh) ? "Registry" : company.StatusNameTh)</small>
-                                        </div>
-                                    </div>
-                                </ItemTemplate>
-                            </MudAutocomplete>
+                                    </ItemTemplate>
+                                </MudAutocomplete>
+                            </FormField>
 
-                            <MudAutocomplete T="RegistryCompanyProfile"
-                                             Label="Company tax ID"
-                                             Text="@_companyTaxId"
-                                             TextChanged="@((string value) => _companyTaxId = value)"
-                                             ValueChanged="ApplyCompanySuggestion"
-                                             SearchFunc="SearchCompaniesAsync"
-                                             ToStringFunc="@(company => company?.TaxId ?? _companyTaxId)"
-                                             Variant="Variant.Outlined"
-                                             Clearable="true"
-                                             CoerceText="false"
-                                             CoerceValue="false"
-                                             ResetValueOnEmptyText="false"
-                                             DebounceInterval="350"
-                                             MinCharacters="2"
-                                             Class="styled-autocomplete">
-                                <ItemTemplate Context="company">
-                                    <div class="suggestion-card company-suggestion">
-                                        <div>
-                                            <strong>@company.TaxId</strong>
-                                            <span>@company.CompanyNameTh</span>
-                                        </div>
-                                        <div class="suggestion-meta">
-                                            <small>@company.CompanyTypeCode</small>
-                                        </div>
-                                    </div>
-                                </ItemTemplate>
-                            </MudAutocomplete>
+                            <FormField Label="Company name">
+                                <InputText class="mlv-form-input" @bind-Value="_companyName" />
+                            </FormField>
+
+                            <FormField Label="Company tax ID">
+                                <InputText class="mlv-form-input" @bind-Value="_companyTaxId" />
+                            </FormField>
 
                             <FormField Label="Company branch">
-                                <InputText class="mlv-form-input" @bind-Value="_companyBranch" />
+                                <select class="mlv-form-input" @bind="_companyBranchMode">
+                                    <option value="@BranchModeHeadOffice">@GetHeadOfficeBranchLabel()</option>
+                                    <option value="@BranchModeManual">Manual branch ID</option>
+                                </select>
                             </FormField>
+
+                            @if (_companyBranchMode == BranchModeManual)
+                            {
+                                <FormField Label="Branch ID">
+                                    <InputText class="mlv-form-input" @bind-Value="_companyBranchManual" />
+                                </FormField>
+                            }
                         </div>
+
+                        @if (CompanyBillingIndex >= 0)
+                        {
+                            var companyAddressIndex = CompanyBillingIndex;
+                            <div class="company-address-block">
+                                <div class="address-panel compact-address-panel">
+                                    <div class="address-panel-header">
+                                        <strong>Company billing address</strong>
+                                        <div>
+                                            <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(companyAddressIndex))">Copy customer billing</button>
+                                        </div>
+                                    </div>
+
+                                    <FormGrid>
+                                        <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine1" /></FormField>
+                                        <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine2" /></FormField>
+                                        <FormField Label="Subdistrict">
+                                            @AddressAutocomplete(companyAddressIndex, AddressField.Subdistrict)
+                                        </FormField>
+                                        <FormField Label="District">
+                                            @AddressAutocomplete(companyAddressIndex, AddressField.District)
+                                        </FormField>
+                                        <FormField Label="State / Province">
+                                            @AddressAutocomplete(companyAddressIndex, AddressField.Province)
+                                        </FormField>
+                                        <FormField Label="Postal code">
+                                            @AddressAutocomplete(companyAddressIndex, AddressField.PostalCode)
+                                        </FormField>
+                                    </FormGrid>
+                                </div>
+                            </div>
+                        }
 
                         <div class="section-divider">
                             <h3>Addresses</h3>
-                            <span>Customer billing, customer shipping, and company billing all use Thai/English registry suggestions.</span>
+                            <span>Customer billing and shipping addresses are separate, with billing available as the default copy source.</span>
                         </div>
 
-                        <div class="address-stack">
-                            @for (var i = 0; i < _addresses.Count; i++)
+                        <div class="address-two-column">
+                            @if (CustomerBillingIndex >= 0)
                             {
-                                var index = i;
+                                var index = CustomerBillingIndex;
                                 <div class="address-panel">
                                     <div class="address-panel-header">
-                                        <strong>@GetAddressTitle(_addresses[index].Request.Type)</strong>
+                                        <strong>Customer billing address</strong>
+                                    </div>
+
+                                    <FormGrid>
+                                        <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
+                                        <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
+                                        <FormField Label="Subdistrict">
+                                            @AddressAutocomplete(index, AddressField.Subdistrict)
+                                        </FormField>
+                                        <FormField Label="District">
+                                            @AddressAutocomplete(index, AddressField.District)
+                                        </FormField>
+                                        <FormField Label="State / Province">
+                                            @AddressAutocomplete(index, AddressField.Province)
+                                        </FormField>
+                                        <FormField Label="Postal code">
+                                            @AddressAutocomplete(index, AddressField.PostalCode)
+                                        </FormField>
+                                    </FormGrid>
+                                </div>
+                            }
+
+                            @if (CustomerShippingIndex >= 0)
+                            {
+                                var index = CustomerShippingIndex;
+                                <div class="address-panel">
+                                    <div class="address-panel-header">
+                                        <strong>Customer shipping address</strong>
                                         <div>
                                             <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(index))">Copy billing</button>
-                                            @if (_addresses.Count > 1)
-                                            {
-                                                <button type="button" class="address-remove" @onclick="@(() => RemoveAddress(index))">Remove</button>
-                                            }
                                         </div>
                                     </div>
 
@@ -201,40 +272,94 @@
 
                         <div class="section-divider">
                             <h3>Documents</h3>
-                            <span>Documents are uploaded after the customer record is created and linked automatically.</span>
+                            <span>Files upload immediately. Customer documents and NDA documents stay separate until they are linked on create.</span>
                         </div>
 
                         <div class="document-grid">
-                            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                           FilesChanged="OnCustomerDocumentsSelected"
-                                           Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
-                                           MaximumFileCount="20">
-                                <CustomContent Context="uploadContext">
-                                    <button type="button" class="document-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
-                                        <MudIcon Icon="@Icons.Material.Outlined.AttachFile" />
-                                        <span>
-                                            <strong>Customer documents</strong>
-                                            <small>@GetFileSummary(_customerDocuments, "Contracts, forms, IDs, certificates")</small>
-                                        </span>
-                                    </button>
-                                </CustomContent>
-                            </MudFileUpload>
+                            <div class="document-section">
+                                <div class="document-section-header">
+                                    <strong>Customer documents</strong>
+                                    <span>@GetUploadedDocumentCount(_customerDocumentUploads)</span>
+                                </div>
+                                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                               FilesChanged="OnCustomerDocumentsSelected"
+                                               Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
+                                               MaximumFileCount="20">
+                                    <CustomContent Context="uploadContext">
+                                        <button type="button" class="document-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                            <MudIcon Icon="@Icons.Material.Outlined.AttachFile" />
+                                            <span>
+                                                <strong>Upload standard documents</strong>
+                                                <small>Contracts, forms, IDs, certificates</small>
+                                            </span>
+                                        </button>
+                                    </CustomContent>
+                                </MudFileUpload>
+                                @DocumentUploadList(_customerDocumentUploads)
+                            </div>
 
-                            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                           FilesChanged="OnNdaDocumentsSelected"
-                                           Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                           MaximumFileCount="10">
-                                <CustomContent Context="uploadContext">
-                                    <button type="button" class="document-dropzone nda-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
-                                        <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
-                                        <span>
-                                            <strong>Customer NDA documents</strong>
-                                            <small>@GetFileSummary(_ndaDocuments, "Signed NDA or legal documents")</small>
-                                        </span>
-                                    </button>
-                                </CustomContent>
-                            </MudFileUpload>
+                            <div class="document-section nda-document-section">
+                                <div class="document-section-header">
+                                    <strong>NDA lifecycle</strong>
+                                    <span>@GetUploadedDocumentCount(_ndaDocumentUploads)</span>
+                                </div>
+                                <div class="nda-lifecycle-grid">
+                                    <FormField Label="Initial status">
+                                        <select class="mlv-form-input" @bind="_ndaStatus">
+                                            <option value="Signed">Signed</option>
+                                            <option value="Draft">Draft</option>
+                                        </select>
+                                    </FormField>
+                                    <FormField Label="Expiration date">
+                                        <InputDate class="mlv-form-input" @bind-Value="_ndaExpiresAt" />
+                                    </FormField>
+                                </div>
+                                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                               FilesChanged="OnNdaDocumentsSelected"
+                                               Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                               MaximumFileCount="10">
+                                    <CustomContent Context="uploadContext">
+                                        <button type="button" class="document-dropzone nda-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
+                                            <span>
+                                                <strong>Upload NDA documents</strong>
+                                                <small>Signed agreements or legal drafts</small>
+                                            </span>
+                                        </button>
+                                    </CustomContent>
+                                </MudFileUpload>
+                                @DocumentUploadList(_ndaDocumentUploads)
+                            </div>
                         </div>
+
+                        @if (_previewDocument != null)
+                        {
+                            <div class="document-preview-panel">
+                                <div class="document-preview-header">
+                                    <strong>@_previewDocument.FileName</strong>
+                                    <button type="button" class="address-remove" @onclick="CloseDocumentPreview">Close preview</button>
+                                </div>
+                                @if (_loadingDocumentPreview)
+                                {
+                                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                                }
+                                else if (!string.IsNullOrWhiteSpace(_documentPreviewUrl) && IsPreviewable(_previewDocument.MimeType))
+                                {
+                                    @if (IsPdf(_previewDocument.MimeType))
+                                    {
+                                        <iframe src="@_documentPreviewUrl" title="@_previewDocument.FileName"></iframe>
+                                    }
+                                    else
+                                    {
+                                        <img src="@_documentPreviewUrl" alt="@_previewDocument.FileName" />
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="document-preview-empty">Preview is not available for this file type.</div>
+                                }
+                            </div>
+                        }
 
                         <FormField Label="Notes">
                             <InputTextArea class="mlv-form-input notes-input" @bind-Value="_onboarding.InternalNote" />
@@ -242,7 +367,7 @@
 
                         <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
                             <SecondaryButton Href="/customers">Cancel</SecondaryButton>
-                            <PrimaryButton Type="submit" Disabled="@_saving" Icon="@Icons.Material.Outlined.PersonAdd">
+                            <PrimaryButton Type="submit" Disabled="@(_saving || _hasPendingDocumentUploads)" Icon="@Icons.Material.Outlined.PersonAdd">
                                 @(_saving ? "Creating..." : "Create Customer")
                             </PrimaryButton>
                         </div>
@@ -253,10 +378,33 @@
             <aside class="customer-create-side">
                 <PanelCard Title="Creation summary">
                     <div class="summary-stack">
-                        <div><span>Customer</span><strong>@GetCustomerName()</strong></div>
-                        <div><span>Company</span><strong>@(string.IsNullOrWhiteSpace(_companyName) ? "Private customer" : _companyName)</strong></div>
-                        <div><span>Branch</span><strong>@GetBranchLabel()</strong></div>
-                        <div><span>Documents</span><strong>@(_customerDocuments.Count + _ndaDocuments.Count)</strong></div>
+                        <section>
+                            <h4>Customer</h4>
+                            <div><span>Name</span><strong>@GetCustomerName()</strong></div>
+                            <div><span>Email</span><strong>@FormatValue(_onboarding.Customer.Email)</strong></div>
+                            <div><span>Phone</span><strong>@FormatPair(_onboarding.Customer.Mobile, _onboarding.Customer.Landline)</strong></div>
+                            <div><span>Segment / tier</span><strong>@($"{_onboarding.Customer.Segment} / {_onboarding.Customer.Tier}")</strong></div>
+                        </section>
+                        <section>
+                            <h4>Company</h4>
+                            <div><span>Name</span><strong>@(string.IsNullOrWhiteSpace(_companyName) ? "Private customer" : _companyName)</strong></div>
+                            <div><span>Tax ID</span><strong>@FormatValue(_companyTaxId)</strong></div>
+                            <div><span>Branch</span><strong>@GetBranchLabel()</strong></div>
+                            <div><span>Source</span><strong>@GetCompanySourceLabel()</strong></div>
+                        </section>
+                        <section>
+                            <h4>Addresses</h4>
+                            <div><span>Billing</span><strong>@FormatAddressSummary(CustomerBillingIndex)</strong></div>
+                            <div><span>Shipping</span><strong>@FormatAddressSummary(CustomerShippingIndex)</strong></div>
+                            <div><span>Company billing</span><strong>@FormatAddressSummary(CompanyBillingIndex)</strong></div>
+                        </section>
+                        <section>
+                            <h4>Files</h4>
+                            <div><span>Customer docs</span><strong>@GetUploadedDocumentCount(_customerDocumentUploads)</strong></div>
+                            <div><span>NDA docs</span><strong>@GetUploadedDocumentCount(_ndaDocumentUploads)</strong></div>
+                            <div><span>NDA status</span><strong>@_ndaStatus</strong></div>
+                            <div><span>AI confidence</span><strong>@(_lastExtraction == null ? "Not extracted" : $"{_lastExtraction.Confidence:P0}")</strong></div>
+                        </section>
                     </div>
                 </PanelCard>
             </aside>
@@ -279,26 +427,64 @@
         public RegistryThaiLocation? SelectedLocation { get; set; }
     }
 
-    private static readonly string[] _segments = ["Retail", "Enterprise", "Manufacturing", "Education", "Government"];
-    private static readonly string[] _tiers = ["Bronze", "Silver", "Gold", "VIP"];
+    private sealed class UploadedDocumentDraft
+    {
+        public string Category { get; set; } = DocumentCategories.General;
+        public string? SubType { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public long FileSize { get; set; }
+        public string MimeType { get; set; } = "application/octet-stream";
+        public string? UploadId { get; set; }
+        public string? FileReference { get; set; }
+        public string? StoragePath { get; set; }
+        public bool IsUploading { get; set; }
+        public string? Error { get; set; }
+        public bool IsUploaded => !string.IsNullOrWhiteSpace(UploadId) && string.IsNullOrWhiteSpace(Error);
+        public string LinkReference => string.IsNullOrWhiteSpace(UploadId) ? FileReference ?? string.Empty : UploadId;
+    }
+
+    private const int MaxExtractionAttempts = 3;
+    private const double HighConfidenceThreshold = 0.9;
+    private const string BranchModeHeadOffice = "HeadOffice";
+    private const string BranchModeManual = "Manual";
+
+    private static readonly string[] _segments = ["Retail", "Wholesale", "Enterprise", "Government"];
+    private static readonly string[] _tiers = ["Bronze", "Silver", "Gold", "Platinum", "VIP"];
 
     private CustomerOnboardingRequest _onboarding = CreateDefaultRequest();
     private List<AddressDraft> _addresses = CreateDefaultAddresses();
     private List<IBrowserFile> _extractionFiles = [];
-    private List<IBrowserFile> _customerDocuments = [];
-    private List<IBrowserFile> _ndaDocuments = [];
+    private List<UploadedDocumentDraft> _customerDocumentUploads = [];
+    private List<UploadedDocumentDraft> _ndaDocumentUploads = [];
     private List<CountryDto> _countries = [];
     private CountryDto? _thailand;
     private ExtractedCustomerDataResponse? _lastExtraction;
     private string _extractionText = string.Empty;
+    private string _companyLookup = string.Empty;
     private string _companyName = string.Empty;
     private string _companyTaxId = string.Empty;
-    private string _companyBranch = "00000";
+    private string _companyBranchMode = BranchModeHeadOffice;
+    private string _companyBranchManual = string.Empty;
+    private Guid? _selectedCompanyId;
+    private string? _selectedCompanySource;
+    private string? _selectedCompanyLookupValue;
+    private DateTime? _ndaExpiresAt;
+    private string _ndaStatus = "Signed";
+    private UploadedDocumentDraft? _previewDocument;
+    private string? _documentPreviewUrl;
+    private bool _aiIntakeExpanded;
     private bool _extracting;
     private bool _saving;
+    private bool _loadingDocumentPreview;
+    private int _currentExtractionAttempt;
+    private int _lastExtractionAttempts;
     private string? _error;
 
     private bool _hasExtractionInput => !string.IsNullOrWhiteSpace(_extractionText) || _extractionFiles.Count > 0;
+    private bool _hasPendingDocumentUploads => _customerDocumentUploads.Any(d => d.IsUploading) || _ndaDocumentUploads.Any(d => d.IsUploading);
+    private int CustomerBillingIndex => GetAddressIndex("Billing");
+    private int CustomerShippingIndex => GetAddressIndex("Shipping");
+    private int CompanyBillingIndex => GetAddressIndex("Company Billing");
 
     protected override async Task OnInitializedAsync()
     {
@@ -344,13 +530,14 @@
         builder.AddAttribute(6, "ToStringFunc", (Func<RegistryThaiLocation?, string>)(location => FormatLocationValue(location, index, field)));
         builder.AddAttribute(7, "Variant", Variant.Outlined);
         builder.AddAttribute(8, "Clearable", true);
-        builder.AddAttribute(9, "CoerceText", false);
-        builder.AddAttribute(10, "CoerceValue", false);
-        builder.AddAttribute(11, "ResetValueOnEmptyText", false);
-        builder.AddAttribute(12, "DebounceInterval", 350);
-        builder.AddAttribute(13, "MinCharacters", 2);
-        builder.AddAttribute(14, "Class", "styled-autocomplete");
-        builder.AddAttribute(15, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
+        builder.AddAttribute(9, "Dense", true);
+        builder.AddAttribute(10, "CoerceText", false);
+        builder.AddAttribute(11, "CoerceValue", false);
+        builder.AddAttribute(12, "ResetValueOnEmptyText", false);
+        builder.AddAttribute(13, "DebounceInterval", 350);
+        builder.AddAttribute(14, "MinCharacters", 2);
+        builder.AddAttribute(15, "Class", "styled-autocomplete");
+        builder.AddAttribute(16, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
         {
             itemBuilder.OpenElement(0, "div");
             itemBuilder.AddAttribute(1, "class", "suggestion-card address-suggestion");
@@ -373,58 +560,130 @@
         builder.CloseComponent();
     };
 
+    private RenderFragment DocumentUploadList(List<UploadedDocumentDraft> documents) => builder =>
+    {
+        if (documents.Count == 0)
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "document-upload-empty");
+            builder.AddContent(2, "No files uploaded yet.");
+            builder.CloseElement();
+            return;
+        }
+
+        builder.OpenElement(3, "div");
+        builder.AddAttribute(4, "class", "document-upload-list");
+        var sequence = 5;
+        foreach (var document in documents)
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", $"document-upload-item{(document == _previewDocument ? " active" : string.Empty)}");
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => PreviewUploadedDocumentAsync(document)));
+            builder.OpenElement(sequence++, "span");
+            builder.OpenElement(sequence++, "strong");
+            builder.AddContent(sequence++, document.FileName);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "small");
+            builder.AddContent(sequence++, FormatDocumentUploadStatus(document));
+            builder.CloseElement();
+            builder.CloseElement();
+            builder.OpenComponent<MudIcon>(sequence++);
+            builder.AddAttribute(sequence++, "Icon", GetDocumentStatusIcon(document));
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
     private void OnExtractionFilesSelected(IReadOnlyList<IBrowserFile> files) => _extractionFiles = files.Take(10).ToList();
 
-    private void OnCustomerDocumentsSelected(IReadOnlyList<IBrowserFile> files) => _customerDocuments = files.Take(20).ToList();
+    private async Task OnCustomerDocumentsSelected(IReadOnlyList<IBrowserFile> files) =>
+        await UploadDocumentGroupAsync(files, _customerDocumentUploads, DocumentCategories.General, null, 20);
 
-    private void OnNdaDocumentsSelected(IReadOnlyList<IBrowserFile> files) => _ndaDocuments = files.Take(10).ToList();
+    private async Task OnNdaDocumentsSelected(IReadOnlyList<IBrowserFile> files) =>
+        await UploadDocumentGroupAsync(files, _ndaDocumentUploads, DocumentCategories.NDA, "Signed", 10);
 
     private async Task ExtractAsync(MouseEventArgs _)
     {
         _extracting = true;
         _error = null;
+        _currentExtractionAttempt = 0;
 
         try
         {
-            using var content = new MultipartFormDataContent();
-            if (!string.IsNullOrWhiteSpace(_extractionText))
+            ExtractedCustomerDataResponse? bestResult = null;
+            string? lastError = null;
+
+            for (var attempt = 1; attempt <= MaxExtractionAttempts; attempt++)
             {
-                content.Add(new StringContent(_extractionText), "rawText");
+                _currentExtractionAttempt = attempt;
+                StateHasChanged();
+
+                var extracted = await RunExtractionAttemptAsync();
+                if (extracted == null)
+                {
+                    lastError = _error ?? "Customer extraction returned no usable data.";
+                    continue;
+                }
+
+                if (bestResult == null || extracted.Confidence > bestResult.Confidence)
+                {
+                    bestResult = extracted;
+                }
+
+                if (extracted.Confidence >= HighConfidenceThreshold)
+                {
+                    break;
+                }
             }
 
-            foreach (var file in _extractionFiles)
+            if (bestResult == null)
             {
-                var stream = file.OpenReadStream(10 * 1024 * 1024);
-                var fileContent = new StreamContent(stream);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-                content.Add(fileContent, "files", file.Name);
-            }
-
-            var response = await Http.PostAsync("api/v1/aiprocessing/extract-customer", content);
-            if (!response.IsSuccessStatusCode)
-            {
-                _error = "Customer information could not be extracted.";
+                _error = lastError ?? "Customer information could not be extracted.";
                 return;
             }
 
-            var extracted = await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
-            if (extracted == null)
-            {
-                _error = "Customer extraction returned no usable data.";
-                return;
-            }
-
-            ApplyExtraction(extracted);
-            _lastExtraction = extracted;
-            Snackbar.Add("Customer fields were autofilled from AI extraction.", Severity.Success);
+            _error = null;
+            _lastExtractionAttempts = _currentExtractionAttempt;
+            await ApplyExtractionAsync(bestResult);
+            _lastExtraction = bestResult;
+            Snackbar.Add("Customer fields were autofilled from the highest-confidence AI extraction.", Severity.Success);
         }
         finally
         {
             _extracting = false;
+            _currentExtractionAttempt = 0;
         }
     }
 
-    private void ApplyExtraction(ExtractedCustomerDataResponse extracted)
+    private async Task<ExtractedCustomerDataResponse?> RunExtractionAttemptAsync()
+    {
+        using var content = new MultipartFormDataContent();
+        if (!string.IsNullOrWhiteSpace(_extractionText))
+        {
+            content.Add(new StringContent(_extractionText), "rawText");
+        }
+
+        foreach (var file in _extractionFiles)
+        {
+            var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+            content.Add(fileContent, "files", file.Name);
+        }
+
+        var response = await Http.PostAsync("api/v1/aiprocessing/extract-customer", content);
+        if (!response.IsSuccessStatusCode)
+        {
+            _error = await ReadApiErrorMessageAsync(response, "Customer information could not be extracted.");
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
+    }
+
+    private async Task ApplyExtractionAsync(ExtractedCustomerDataResponse extracted)
     {
         SetIfPresent(value => _onboarding.Customer.FirstName = value, extracted.FirstName);
         SetIfPresent(value => _onboarding.Customer.LastName = value, extracted.LastName);
@@ -432,11 +691,21 @@
         SetIfPresent(value => _onboarding.Customer.Mobile = value, extracted.Mobile);
         SetIfPresent(value => _onboarding.Customer.Landline = value, extracted.Landline);
         SetIfPresent(value => _onboarding.Customer.Extension = value, extracted.Extension);
-        SetIfPresent(value => _onboarding.Customer.Segment = value, extracted.Segment);
+        SetIfPresent(value => _onboarding.Customer.Segment = NormalizeSegment(value), extracted.Segment);
         SetIfPresent(value => _companyName = value, extracted.CompanyName);
-        SetIfPresent(value => _companyTaxId = value, extracted.VatNumber);
 
-        _companyBranch = NormalizeBranch(extracted.BranchNumber);
+        if (!string.IsNullOrWhiteSpace(extracted.VatNumber))
+        {
+            _companyTaxId = NormalizeTaxId(extracted.VatNumber);
+            _companyLookup = _companyTaxId;
+            await ApplyBestCompanyMatchAsync(_companyTaxId);
+        }
+        else if (!string.IsNullOrWhiteSpace(extracted.CompanyName))
+        {
+            _companyLookup = extracted.CompanyName.Trim();
+        }
+
+        SetCompanyBranch(extracted.BranchNumber);
 
         if (extracted.Addresses?.Count > 0)
         {
@@ -455,6 +724,8 @@
                 _addresses.Add(CloneAddress(_addresses[0], "Company Billing"));
             }
         }
+
+        EnsureDefaultAddressSet();
     }
 
     private AddressDraft ToAddressDraft(ExtractedAddress address)
@@ -489,6 +760,7 @@
 
         try
         {
+            _onboarding.Customer.CompanyId = _selectedCompanyId;
             _onboarding.NewCompany = BuildCompanyRequest();
             _onboarding.Addresses = _addresses
                 .Where(a => !string.Equals(a.Request.Type, "Company Billing", StringComparison.OrdinalIgnoreCase))
@@ -496,12 +768,14 @@
                 .Where(HasAddressContent)
                 .ToList();
             _onboarding.CompanyBillingAddress = BuildCompanyBillingAddress();
+            _onboarding.Documents = BuildUploadedDocumentRequests();
+            _onboarding.Nda = BuildNdaRequest();
             _onboarding.InternalNote = BuildInternalNote();
 
             var response = await Http.PostAsJsonAsync("api/v1/customers/create-basic", _onboarding);
             if (!response.IsSuccessStatusCode)
             {
-                _error = "Customer could not be created.";
+                _error = await ReadApiErrorMessageAsync(response, "Customer could not be created.");
                 return;
             }
 
@@ -512,7 +786,6 @@
                 return;
             }
 
-            await UploadAndLinkDocumentsAsync(customer.Id);
             Snackbar.Add("Customer created.", Severity.Success);
             Navigation.NavigateTo($"/customers/{customer.Id}");
         }
@@ -529,6 +802,11 @@
 
     private CreateCompanyRequest? BuildCompanyRequest()
     {
+        if (_selectedCompanyId.HasValue)
+        {
+            return null;
+        }
+
         if (string.IsNullOrWhiteSpace(_companyName) && string.IsNullOrWhiteSpace(_companyTaxId))
         {
             return null;
@@ -573,85 +851,147 @@
         return parts.Count == 0 ? null : string.Join(Environment.NewLine + Environment.NewLine, parts);
     }
 
-    private async Task UploadAndLinkDocumentsAsync(Guid customerId)
-    {
-        var linkedDocuments = new List<DocumentResponse>();
-        linkedDocuments.AddRange(await UploadAndLinkDocumentGroupAsync(customerId, _customerDocuments, DocumentCategories.General, null));
-        linkedDocuments.AddRange(await UploadAndLinkDocumentGroupAsync(customerId, _ndaDocuments, DocumentCategories.NDA, "Signed"));
-
-        var ndaDocuments = linkedDocuments
-            .Where(doc => string.Equals(doc.DocumentCategory, DocumentCategories.NDA, StringComparison.OrdinalIgnoreCase))
+    private List<CreateDocumentRequest> BuildUploadedDocumentRequests() =>
+        _customerDocumentUploads
+            .Concat(_ndaDocumentUploads)
+            .Where(upload => upload.IsUploaded)
+            .Select(upload => new CreateDocumentRequest
+            {
+                DocumentCategory = upload.Category,
+                DocumentSubType = upload.SubType,
+                FileReference = upload.LinkReference,
+                FileName = upload.FileName,
+                FileSize = upload.FileSize,
+                MimeType = upload.MimeType
+            })
             .ToList();
 
-        if (ndaDocuments.Count > 0)
+    private CreateNDARequest? BuildNdaRequest()
+    {
+        var signedNda = _ndaDocumentUploads.FirstOrDefault(upload => upload.IsUploaded);
+        if (signedNda == null)
         {
-            await Http.PostAsJsonAsync($"api/v1/customers/{customerId}/nda", new CreateNdaStepRequest
-            {
-                Nda = new CreateNDARequest { IsActive = true, FileReference = ndaDocuments[0].FileReference, FileName = ndaDocuments[0].FileName },
-                Documents = ndaDocuments
-            });
+            return null;
         }
+
+        return new CreateNDARequest
+        {
+            ExpiresAt = _ndaExpiresAt,
+            IsActive = string.Equals(_ndaStatus, "Signed", StringComparison.OrdinalIgnoreCase),
+            FileReference = signedNda.LinkReference,
+            FileName = signedNda.FileName
+        };
     }
 
-    private async Task<List<DocumentResponse>> UploadAndLinkDocumentGroupAsync(Guid customerId, List<IBrowserFile> files, string category, string? subType)
+    private async Task UploadDocumentGroupAsync(
+        IReadOnlyList<IBrowserFile> files,
+        List<UploadedDocumentDraft> target,
+        string category,
+        string? subType,
+        int limit)
     {
-        if (files.Count == 0)
+        var acceptedFiles = files
+            .Take(limit)
+            .Where(file => !target.Any(existing => existing.FileName == file.Name && existing.FileSize == file.Size))
+            .ToList();
+
+        if (acceptedFiles.Count == 0)
         {
-            return [];
+            return;
         }
 
-        using var content = new MultipartFormDataContent();
-        foreach (var file in files)
+        var drafts = acceptedFiles.Select(file => new UploadedDocumentDraft
         {
-            var stream = file.OpenReadStream(10 * 1024 * 1024);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "files", file.Name);
-        }
-
-        var uploadUrl = $"api/v1/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}&customerId={customerId}";
-        if (!string.IsNullOrWhiteSpace(subType))
-        {
-            uploadUrl += $"&subType={Uri.EscapeDataString(subType)}";
-        }
-
-        var uploadResponse = await Http.PostAsync(uploadUrl, content);
-        if (!uploadResponse.IsSuccessStatusCode)
-        {
-            Snackbar.Add($"{category} document upload failed.", Severity.Warning);
-            return [];
-        }
-
-        var uploads = await uploadResponse.Content.ReadFromJsonAsync<List<BffUploadResponse>>() ?? [];
-        var documents = uploads.Select(upload => new CreateDocumentRequest
-        {
-            DocumentCategory = category,
-            DocumentSubType = subType,
-            FileReference = string.IsNullOrWhiteSpace(upload.FileReference) ? upload.UploadId : upload.FileReference,
-            FileName = upload.FileName,
-            FileSize = upload.FileSize,
-            MimeType = GetMimeType(upload.FileName)
+            Category = category,
+            SubType = subType,
+            FileName = file.Name,
+            FileSize = file.Size,
+            MimeType = string.IsNullOrWhiteSpace(file.ContentType) ? GetMimeType(file.Name) : file.ContentType,
+            IsUploading = true
         }).ToList();
 
-        var linkResponse = await Http.PostAsJsonAsync($"api/v1/aiprocessing/link-documents?ownerType=Customer&ownerId={customerId}", documents);
-        if (!linkResponse.IsSuccessStatusCode)
-        {
-            Snackbar.Add($"{category} documents uploaded but could not be linked.", Severity.Warning);
-            return [];
-        }
+        target.AddRange(drafts);
+        StateHasChanged();
 
-        return await linkResponse.Content.ReadFromJsonAsync<List<DocumentResponse>>() ?? [];
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            foreach (var file in acceptedFiles)
+            {
+                var stream = file.OpenReadStream(10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var uploadUrl = $"api/v1/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}";
+            if (!string.IsNullOrWhiteSpace(subType))
+            {
+                uploadUrl += $"&subType={Uri.EscapeDataString(subType)}";
+            }
+
+            var response = await Http.PostAsync(uploadUrl, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await ReadApiErrorMessageAsync(response, $"{category} upload failed.");
+                foreach (var draft in drafts)
+                {
+                    draft.Error = error;
+                    draft.IsUploading = false;
+                }
+
+                Snackbar.Add(error, Severity.Warning);
+                return;
+            }
+
+            var uploads = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>() ?? [];
+            foreach (var draft in drafts)
+            {
+                var upload = uploads.FirstOrDefault(item => string.Equals(item.FileName, draft.FileName, StringComparison.OrdinalIgnoreCase))
+                    ?? uploads.FirstOrDefault(item => string.IsNullOrWhiteSpace(item.FileName));
+
+                if (upload == null)
+                {
+                    draft.Error = "Upload completed but no file reference was returned.";
+                    draft.IsUploading = false;
+                    continue;
+                }
+
+                draft.UploadId = upload.UploadId;
+                draft.FileReference = upload.FileReference;
+                draft.StoragePath = upload.StoragePath;
+                draft.FileName = string.IsNullOrWhiteSpace(upload.FileName) ? draft.FileName : upload.FileName;
+                draft.FileSize = upload.FileSize > 0 ? upload.FileSize : draft.FileSize;
+                draft.IsUploading = false;
+            }
+
+            Snackbar.Add($"{category} upload completed.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            foreach (var draft in drafts)
+            {
+                draft.Error = ex.Message;
+                draft.IsUploading = false;
+            }
+
+            Snackbar.Add($"{category} upload failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            StateHasChanged();
+        }
     }
 
-    private async Task<IEnumerable<RegistryCompanyProfile>> SearchCompaniesAsync(string? value, CancellationToken ct)
+    private async Task<IEnumerable<CompanySearchResultDto>> SearchCompaniesAsync(string? value, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
         {
             return [];
         }
 
-        return await Http.GetFromJsonAsync<List<RegistryCompanyProfile>>(
-            $"api/v1/customers/companies/search?query={Uri.EscapeDataString(value.Trim())}&limit=8",
+        return await Http.GetFromJsonAsync<List<CompanySearchResultDto>>(
+            $"api/v1/companies/search?query={Uri.EscapeDataString(value.Trim())}&limit=8",
             ct) ?? [];
     }
 
@@ -665,16 +1005,87 @@
         return await ReferenceData.AutocompleteLocationsAsync(value.Trim(), 8, ct);
     }
 
-    private void ApplyCompanySuggestion(RegistryCompanyProfile? company)
+    private void OnCompanyLookupTextChanged(string value)
+    {
+        _companyLookup = value;
+        if (string.Equals(value, _selectedCompanyLookupValue, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _selectedCompanyId = null;
+        _selectedCompanySource = null;
+        _selectedCompanyLookupValue = null;
+        _onboarding.Customer.CompanyId = null;
+    }
+
+    private void ApplyCompanySuggestion(CompanySearchResultDto? company)
     {
         if (company == null)
         {
             return;
         }
 
-        _companyName = company.CompanyNameTh;
-        _companyTaxId = company.TaxId;
-        _companyBranch = "00000";
+        _selectedCompanyId = company.Id;
+        _selectedCompanySource = company.Source;
+        _companyName = company.Name;
+        _companyTaxId = NormalizeTaxId(company.VatNumber ?? company.RegistrationNumber);
+        _companyLookup = FormatCompanySuggestionValue(company);
+        _selectedCompanyLookupValue = _companyLookup;
+        _onboarding.Customer.CompanyId = company.Id;
+
+        if (company.DefaultBillingAddress != null)
+        {
+            ApplyCompanyBillingAddress(company.DefaultBillingAddress);
+        }
+
+        SetCompanyBranch(null);
+    }
+
+    private async Task ApplyBestCompanyMatchAsync(string query)
+    {
+        var matches = (await SearchCompaniesAsync(query, CancellationToken.None)).ToList();
+        if (matches.Count == 0)
+        {
+            return;
+        }
+
+        var normalizedQuery = NormalizeTaxId(query);
+        var match = matches.FirstOrDefault(company =>
+                string.Equals(NormalizeTaxId(company.VatNumber), normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(NormalizeTaxId(company.RegistrationNumber), normalizedQuery, StringComparison.OrdinalIgnoreCase))
+            ?? matches[0];
+
+        ApplyCompanySuggestion(match);
+    }
+
+    private void ApplyCompanyBillingAddress(AddressResponse address)
+    {
+        var index = CompanyBillingIndex;
+        if (index < 0)
+        {
+            _addresses.Add(new AddressDraft { Request = new CreateAddressRequest { Type = "Company Billing", IsDefault = true, CountryId = _thailand?.Id ?? Guid.Empty } });
+            index = _addresses.Count - 1;
+        }
+
+        _addresses[index] = new AddressDraft
+        {
+            Request = new CreateAddressRequest
+            {
+                Type = "Company Billing",
+                IsDefault = true,
+                AddressLine1 = address.AddressLine1,
+                AddressLine2 = address.AddressLine2,
+                AddressLine3 = address.AddressLine3,
+                District = address.District,
+                City = address.City,
+                StateProvince = address.StateProvince,
+                PostalCode = address.PostalCode,
+                CountryId = address.CountryId,
+                RecipientName = address.RecipientName,
+                RecipientPhone = address.RecipientPhone
+            }
+        };
     }
 
     private void ApplyLocation(int index, RegistryThaiLocation? location)
@@ -798,13 +1209,49 @@
         return string.IsNullOrWhiteSpace(name) ? "Not named yet" : name;
     }
 
-    private static string GetAddressTitle(string type) =>
-        string.Equals(type, "Company Billing", StringComparison.OrdinalIgnoreCase)
-            ? "Company billing address"
-            : $"Customer {type.ToLowerInvariant()} address";
+    private int GetAddressIndex(string type) =>
+        _addresses.FindIndex(a => string.Equals(a.Request.Type, type, StringComparison.OrdinalIgnoreCase));
 
     private string GetBranchLabel() =>
-        _companyBranch == "00000" ? "Head office / สำนักงานใหญ่" : $"Branch {_companyBranch}";
+        GetEffectiveCompanyBranch() == "00000" ? "Head office / สำนักงานใหญ่" : $"Branch {GetEffectiveCompanyBranch()}";
+
+    private string GetEffectiveCompanyBranch() =>
+        _companyBranchMode == BranchModeHeadOffice ? "00000" : NormalizeBranch(_companyBranchManual);
+
+    private string GetHeadOfficeBranchLabel() =>
+        IsThai(_companyName) || IsThai(_companyLookup) ? "สำนักงานใหญ่" : "Head Office";
+
+    private void SetCompanyBranch(string? branch)
+    {
+        var normalized = NormalizeBranch(branch);
+        if (normalized == "00000")
+        {
+            _companyBranchMode = BranchModeHeadOffice;
+            _companyBranchManual = string.Empty;
+            return;
+        }
+
+        _companyBranchMode = BranchModeManual;
+        _companyBranchManual = normalized;
+    }
+
+    private void EnsureDefaultAddressSet()
+    {
+        if (CustomerBillingIndex < 0)
+        {
+            _addresses.Insert(0, new AddressDraft { Request = new CreateAddressRequest { Type = "Billing", IsDefault = true, CountryId = _thailand?.Id ?? Guid.Empty } });
+        }
+
+        if (CustomerShippingIndex < 0)
+        {
+            _addresses.Add(CloneAddress(_addresses[CustomerBillingIndex], "Shipping"));
+        }
+
+        if (CompanyBillingIndex < 0)
+        {
+            _addresses.Add(CloneAddress(_addresses[CustomerBillingIndex], "Company Billing"));
+        }
+    }
 
     private static string NormalizeBranch(string? branch)
     {
@@ -826,8 +1273,20 @@
         return digits.Length > 0 ? digits.PadLeft(5, '0')[^5..] : normalized;
     }
 
-    private static string NormalizeAddressType(string? type) =>
-        string.Equals(type, "Shipping", StringComparison.OrdinalIgnoreCase) ? "Shipping" : "Billing";
+    private static string NormalizeAddressType(string? type)
+    {
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            return "Billing";
+        }
+
+        if (type.Contains("company", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Company Billing";
+        }
+
+        return type.Contains("shipping", StringComparison.OrdinalIgnoreCase) ? "Shipping" : "Billing";
+    }
 
     private static void SetIfPresent(Action<string> setter, string? value)
     {
@@ -839,8 +1298,210 @@
 
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
 
-    private static string GetFileSummary(IReadOnlyList<IBrowserFile> files, string emptyText) =>
-        files.Count == 0 ? emptyText : $"{files.Count} selected: {string.Join(", ", files.Take(2).Select(f => f.Name))}{(files.Count > 2 ? "..." : string.Empty)}";
+    private void ToggleAiIntake() => _aiIntakeExpanded = !_aiIntakeExpanded;
+
+    private string GetAiIntakeStatus()
+    {
+        if (_extracting)
+        {
+            return $"Attempt {_currentExtractionAttempt}/{MaxExtractionAttempts}";
+        }
+
+        if (_lastExtraction != null)
+        {
+            return $"{_lastExtraction.Confidence:P0} confidence";
+        }
+
+        return _aiIntakeExpanded ? "Expanded" : "Collapsed";
+    }
+
+    private string GetCompanySourceLabel()
+    {
+        if (_selectedCompanyId.HasValue)
+        {
+            return string.IsNullOrWhiteSpace(_selectedCompanySource) ? "Existing company" : _selectedCompanySource!;
+        }
+
+        return string.IsNullOrWhiteSpace(_companyName) && string.IsNullOrWhiteSpace(_companyTaxId)
+            ? "Private customer"
+            : "New company";
+    }
+
+    private static string FormatCompanySuggestionValue(CompanySearchResultDto company)
+    {
+        var tax = company.VatNumber ?? company.RegistrationNumber;
+        return string.IsNullOrWhiteSpace(tax) ? company.Name : $"{company.Name} ({tax})";
+    }
+
+    private static string FormatPair(string? first, string? second)
+    {
+        var values = new[] { first, second }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return values.Count == 0 ? "Not set" : string.Join(" / ", values);
+    }
+
+    private static string FormatValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not set" : value.Trim();
+
+    private string FormatAddressSummary(int index)
+    {
+        if (index < 0 || index >= _addresses.Count || !HasAddressContent(_addresses[index].Request))
+        {
+            return "Not set";
+        }
+
+        var address = _addresses[index].Request;
+        var parts = new[] { address.AddressLine1, address.District, address.City, address.StateProvince, address.PostalCode }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim());
+
+        return string.Join(", ", parts);
+    }
+
+    private static string NormalizeTaxId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.StartsWith("TH-", StringComparison.OrdinalIgnoreCase)
+            ? $"TH-{new string(trimmed[3..].Where(char.IsDigit).ToArray())}"
+            : new string(trimmed.Where(char.IsDigit).ToArray());
+    }
+
+    private static string NormalizeSegment(string value) =>
+        _segments.Contains(value, StringComparer.OrdinalIgnoreCase)
+            ? _segments.First(segment => segment.Equals(value, StringComparison.OrdinalIgnoreCase))
+            : "Retail";
+
+    private static int GetUploadedDocumentCount(List<UploadedDocumentDraft> documents) =>
+        documents.Count(document => document.IsUploaded);
+
+    private static string FormatDocumentUploadStatus(UploadedDocumentDraft document)
+    {
+        if (document.IsUploading)
+        {
+            return "Uploading...";
+        }
+
+        if (!string.IsNullOrWhiteSpace(document.Error))
+        {
+            return document.Error;
+        }
+
+        return document.IsUploaded ? FormatFileSize(document.FileSize) : "Waiting for upload";
+    }
+
+    private static string GetDocumentStatusIcon(UploadedDocumentDraft document)
+    {
+        if (document.IsUploading)
+        {
+            return Icons.Material.Outlined.Sync;
+        }
+
+        return string.IsNullOrWhiteSpace(document.Error)
+            ? Icons.Material.Outlined.Visibility
+            : Icons.Material.Outlined.ErrorOutline;
+    }
+
+    private async Task PreviewUploadedDocumentAsync(UploadedDocumentDraft document)
+    {
+        _previewDocument = document;
+        _documentPreviewUrl = null;
+
+        if (!document.IsUploaded || !IsPreviewable(document.MimeType))
+        {
+            return;
+        }
+
+        _loadingDocumentPreview = true;
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/aiprocessing/download-url/{Uri.EscapeDataString(document.UploadId!)}");
+            if (response.IsSuccessStatusCode)
+            {
+                using var payload = await response.Content.ReadFromJsonAsync<JsonDocument>();
+                if (payload?.RootElement.TryGetProperty("url", out var url) == true)
+                {
+                    _documentPreviewUrl = url.GetString();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Could not load document preview: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _loadingDocumentPreview = false;
+        }
+    }
+
+    private void CloseDocumentPreview()
+    {
+        _previewDocument = null;
+        _documentPreviewUrl = null;
+    }
+
+    private static bool IsPreviewable(string mimeType) => IsPdf(mimeType) || mimeType.Contains("image", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPdf(string mimeType) => mimeType.Contains("pdf", StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "0 KB";
+        }
+
+        return bytes >= 1024 * 1024
+            ? $"{bytes / 1024d / 1024d:F1} MB"
+            : $"{Math.Ceiling(bytes / 1024d):F0} KB";
+    }
+
+    private static async Task<string> ReadApiErrorMessageAsync(HttpResponseMessage response, string fallback)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return fallback;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            if (root.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String)
+            {
+                var text = message.GetString();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
+            }
+
+            if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+            {
+                var text = title.GetString();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Fall back to raw text below.
+        }
+
+        return body.Length <= 500 ? body : $"{body[..500]}...";
+    }
 
     private static string GetMimeType(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
     {

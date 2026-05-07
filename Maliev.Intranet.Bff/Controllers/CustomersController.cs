@@ -147,6 +147,17 @@ public class CustomersController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error in CreateBasic");
+            if (ex is HttpRequestException { StatusCode: not null } httpRequestException)
+            {
+                var statusCode = (int)httpRequestException.StatusCode.Value;
+                return StatusCode(statusCode, new ApiErrorResponse
+                {
+                    Message = httpRequestException.Message,
+                    Status = statusCode,
+                    Title = "Customer creation failed"
+                });
+            }
+
             return StatusCode(500, new ApiErrorResponse { Message = ex.Message });
         }
     }
