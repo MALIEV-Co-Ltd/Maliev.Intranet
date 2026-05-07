@@ -65,6 +65,25 @@
                                     </CustomContent>
                                 </MudFileUpload>
 
+                                @if (_extractionFiles.Count > 0)
+                                {
+                                    <div class="ai-selected-files" aria-label="Selected AI extraction files">
+                                        @foreach (var file in _extractionFiles)
+                                        {
+                                            <div class="ai-selected-file">
+                                                <MudIcon Icon="@Icons.Material.Outlined.Description" />
+                                                <span>
+                                                    <strong>@file.Name</strong>
+                                                    <small>@FormatFileSize(file.Size)</small>
+                                                </span>
+                                                <button type="button" aria-label="@($"Remove {file.Name}")" @onclick="() => RemoveExtractionFile(file)">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Close" />
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+
                                 <div class="ai-action-row">
                                     <SecondaryButton Class="ai-extract-action" Icon="@Icons.Material.Outlined.Psychology" Disabled="@(!_hasExtractionInput || _extracting)" OnClick="ExtractAsync">
                                         @(_extracting ? $"Extracting attempt {_currentExtractionAttempt}/{MaxExtractionAttempts}..." : "Extract and autofill")
@@ -615,6 +634,8 @@
     };
 
     private void OnExtractionFilesSelected(IReadOnlyList<IBrowserFile> files) => _extractionFiles = files.Take(10).ToList();
+
+    private void RemoveExtractionFile(IBrowserFile file) => _extractionFiles.Remove(file);
 
     private async Task OnCustomerDocumentsSelected(IReadOnlyList<IBrowserFile> files) =>
         await UploadDocumentGroupAsync(files, _customerDocumentUploads, DocumentCategories.General, null, 20);

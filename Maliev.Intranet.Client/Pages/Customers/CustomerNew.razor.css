@@ -64,7 +64,9 @@
 }
 
 ::deep .ai-file-upload .mud-chipset,
-::deep .ai-file-upload .mud-chip {
+.ai-file-column ::deep .mud-chipset,
+::deep .ai-file-upload .mud-chip,
+.ai-file-column ::deep .mud-chip {
     display: none !important;
 }
 
@@ -72,6 +74,76 @@
     min-height: 116px;
     justify-content: center;
     padding: 1rem 1.1rem;
+}
+
+.ai-selected-files {
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.ai-selected-file {
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr) 1.75rem;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 38px;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--maliev-border);
+    border-radius: 6px;
+    background: color-mix(in oklch, var(--mud-palette-primary) 4%, var(--mud-palette-surface));
+    color: var(--maliev-text);
+}
+
+.ai-selected-file > .mud-icon-root {
+    color: var(--mud-palette-primary);
+    font-size: 1rem;
+}
+
+.ai-selected-file span {
+    display: grid;
+    min-width: 0;
+    gap: 0.05rem;
+}
+
+.ai-selected-file strong,
+.ai-selected-file small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-selected-file strong {
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.ai-selected-file small {
+    color: var(--maliev-text-muted);
+    font-size: 0.75rem;
+}
+
+.ai-selected-file button {
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--maliev-text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.ai-selected-file button:hover {
+    background: color-mix(in oklch, var(--mud-palette-error) 10%, transparent);
+    color: var(--mud-palette-error);
+}
+
+.ai-selected-file button .mud-icon-root {
+    font-size: 1rem;
 }
 
 .ai-action-row {
