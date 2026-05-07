@@ -204,6 +204,13 @@
     overflow-wrap: anywhere;
 }
 
+::deep .document-file-upload .mud-chipset,
+::deep .document-file-upload .mud-chip,
+.document-section ::deep .mud-file-upload .mud-chipset,
+.document-section ::deep .mud-file-upload .mud-chip {
+    display: none !important;
+}
+
 .nda-dropzone {
     border-color: color-mix(in oklch, var(--mud-palette-warning) 55%, var(--maliev-border));
     background: linear-gradient(135deg, color-mix(in oklch, var(--mud-palette-warning) 12%, transparent), var(--mud-palette-surface));
@@ -224,6 +231,7 @@
 .document-upload-list {
     display: grid;
     gap: 0.5rem;
+    min-width: 0;
 }
 
 .document-upload-item {
@@ -238,6 +246,7 @@
     gap: 0.75rem;
     padding: 0.65rem 0.75rem;
     text-align: left;
+    min-width: 0;
 }
 
 .document-upload-item.active,
@@ -246,21 +255,42 @@
     background: color-mix(in oklch, var(--mud-palette-primary) 7%, var(--mud-palette-surface));
 }
 
-.document-upload-item span {
+.document-upload-main {
     display: grid;
     gap: 0.15rem;
     min-width: 0;
+    flex: 1 1 auto;
 }
 
-.document-upload-item strong,
-.document-upload-item small {
+.document-upload-name,
+.document-upload-status {
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.document-upload-item small {
+.document-upload-status {
     color: var(--maliev-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.25;
+}
+
+.document-upload-state {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 1.5rem;
+    color: var(--maliev-text-muted);
+}
+
+.document-upload-item.active .document-upload-state,
+.document-upload-item:hover .document-upload-state {
+    color: var(--mud-palette-primary);
+}
+
+.document-upload-item .mud-icon-root {
+    font-size: 1.1rem;
 }
 
 .document-preview-panel {

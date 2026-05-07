@@ -284,6 +284,8 @@
                                 <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                                                FilesChanged="OnCustomerDocumentsSelected"
                                                Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
+                                               Class="document-file-upload"
+                                               Hidden="true"
                                                MaximumFileCount="20">
                                     <CustomContent Context="uploadContext">
                                         <button type="button" class="document-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
@@ -317,6 +319,8 @@
                                 <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                                                FilesChanged="OnNdaDocumentsSelected"
                                                Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                               Class="document-file-upload"
+                                               Hidden="true"
                                                MaximumFileCount="10">
                                     <CustomContent Context="uploadContext">
                                         <button type="button" class="document-dropzone nda-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
@@ -582,16 +586,22 @@
             builder.AddAttribute(sequence++, "class", $"document-upload-item{(document == _previewDocument ? " active" : string.Empty)}");
             builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => PreviewUploadedDocumentAsync(document)));
             builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "document-upload-main");
             builder.OpenElement(sequence++, "strong");
+            builder.AddAttribute(sequence++, "class", "document-upload-name");
             builder.AddContent(sequence++, document.FileName);
             builder.CloseElement();
             builder.OpenElement(sequence++, "small");
+            builder.AddAttribute(sequence++, "class", "document-upload-status");
             builder.AddContent(sequence++, FormatDocumentUploadStatus(document));
             builder.CloseElement();
             builder.CloseElement();
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "document-upload-state");
             builder.OpenComponent<MudIcon>(sequence++);
             builder.AddAttribute(sequence++, "Icon", GetDocumentStatusIcon(document));
             builder.CloseComponent();
+            builder.CloseElement();
             builder.CloseElement();
         }
         builder.CloseElement();
