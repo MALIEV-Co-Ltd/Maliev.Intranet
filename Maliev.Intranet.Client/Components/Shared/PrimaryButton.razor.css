@@ -5,18 +5,30 @@
     justify-content: center;
     gap: 6px;
     padding: 0 12px;
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     font-size: var(--maliev-font-small);
-    font-weight: 700;
+    font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .mlv-button.primary {
-    border: 1px solid var(--maliev-accent);
-    background: var(--maliev-accent);
-    color: #fff;
+    background: var(--mud-palette-primary);
+    color: var(--mud-palette-primary-text);
+    box-shadow: var(--maliev-shadow-ring);
+}
+
+.mlv-button.primary:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--maliev-shadow-md);
+}
+
+.mlv-button.primary:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .mlv-button:disabled {

@@ -18,10 +18,17 @@
 
 .mud-input.mud-input-outlined {
     border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .mud-input.mud-input-outlined .mud-input-outlined-border {
+    border: 0 !important;
     border-radius: var(--maliev-radius-sm);
+}
+
+.mud-input-control:focus-within .mud-input.mud-input-outlined {
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .mud-input-adornment {
@@ -92,6 +99,7 @@
     min-width: 220px;
     z-index: 2000 !important;
     border-radius: var(--maliev-radius-sm) !important;
+    box-shadow: var(--maliev-shadow-card) !important;
     overflow: hidden;
 }
 
@@ -113,10 +121,17 @@
     padding: 5px 12px;
     font-size: var(--mud-typography-button-size);
     font-weight: 600;
+    box-shadow: var(--maliev-shadow-ring);
     border-radius: var(--maliev-radius-sm);
     min-width: unset;
     line-height: 1.4;
     text-transform: none;
+}
+
+.mud-button-root:focus-visible,
+.mud-icon-button-root:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .mud-button-root.mud-button-size-small {
@@ -167,7 +182,10 @@
 
 .mud-table-root {
     font-size: var(--mud-typography-body2-size);
-    border: 1px solid var(--mud-palette-lines-default);
+    border: 0;
+    border-radius: var(--maliev-radius-md);
+    box-shadow: var(--maliev-shadow-ring);
+    overflow: hidden;
 }
 
 .mud-table-head .mud-table-cell {
@@ -216,6 +234,7 @@
    ──────────────────────────────────────────────────────────────── */
 
 .mud-card {
+    border: 0;
     border-radius: var(--maliev-radius-md);
     box-shadow: var(--maliev-shadow-card);
 }
@@ -243,6 +262,7 @@
 .mud-alert {
     padding: 7px 10px;
     border-radius: var(--maliev-radius-sm);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .mud-alert-message {
@@ -280,6 +300,7 @@
 
 .mud-dialog {
     border-radius: var(--maliev-radius-md);
+    box-shadow: var(--maliev-shadow-card);
 }
 
 .mud-dialog .mud-dialog-title {
@@ -322,6 +343,11 @@
     min-height: unset;
 }
 
+.mud-menu-item:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
+}
+
 /* ── SWITCH / CHECKBOX ────────────────────────────────────────────
    MudSwitch, MudCheckBox
    ──────────────────────────────────────────────────────────────── */
@@ -351,6 +377,7 @@
     padding: 8px 12px;
     font-size: var(--mud-typography-body2-size);
     border-radius: var(--maliev-radius-sm);
+    box-shadow: var(--maliev-shadow-card);
 }
 
 /* ── BADGE ────────────────────────────────────────────────────────
@@ -386,4 +413,9 @@
 .mud-nav-link {
     padding: 6px 12px;
     font-size: var(--mud-typography-default-size);
+}
+
+.mud-nav-link:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }

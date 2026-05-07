@@ -2,7 +2,8 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background-color: var(--mud-palette-background);
+    background: var(--maliev-bg);
+    color: var(--maliev-ink);
     overflow: auto;
 }
 
@@ -66,10 +67,10 @@
 .glass-card {
     width: 100%;
     max-width: 440px;
-    padding: 3rem;
-    border-radius: var(--maliev-radius-xl);
+    padding: 2.25rem;
+    border-radius: var(--maliev-radius-md);
     background: var(--mud-palette-surface);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 24px 48px -12px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--maliev-shadow-card);
     position: relative;
     text-align: center;
     max-height: calc(100vh - 160px);
@@ -77,14 +78,14 @@
 }
 
 .dark-theme .glass-card {
-    background: rgba(28, 27, 27, 0.7);
+    background: var(--maliev-panel);
 }
 
 .form-title {
     font-size: var(--mud-typography-h1-size);
     font-weight: var(--mud-typography-h1-weight);
     line-height: var(--mud-typography-h1-lineheight);
-    letter-spacing: -0.025em;
+    letter-spacing: 0;
     color: var(--mud-palette-text-primary);
     margin-bottom: 0.5rem;
 }
@@ -118,7 +119,7 @@
 
 .input-wrapper:focus-within .input-field {
     outline: none;
-    border-color: var(--mud-palette-primary);
+    box-shadow: var(--maliev-focus-ring);
     background: var(--mud-palette-surface);
 }
 
@@ -130,14 +131,15 @@
     font-size: var(--mud-typography-body1-size);
     font-weight: var(--mud-typography-body1-weight);
     background: var(--mud-palette-surface);
-    border: 2px solid var(--mud-palette-lines-inputs);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--mud-palette-text-primary);
     transition: all 0.2s;
 }
 
 .dark-theme .input-field {
-    background: rgba(var(--mud-palette-white-rgb), 0.08);
+    background: var(--maliev-panel);
 }
 
 .input-field::placeholder {
@@ -168,6 +170,7 @@
 
 .forgot-link:hover {
     opacity: 0.8;
+    text-decoration: none;
 }
 
 .btn-primary {
@@ -182,6 +185,7 @@
     line-height: var(--mud-typography-button-lineheight);
     border: none;
     border-radius: var(--maliev-radius-sm);
+    box-shadow: var(--maliev-shadow-ring);
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
@@ -194,7 +198,12 @@
 .btn-primary:hover {
     opacity: 0.9;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(var(--mud-palette-primary-rgb), 0.3);
+    box-shadow: var(--maliev-shadow-md);
+}
+
+.btn-primary:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .btn-primary:active {
@@ -238,7 +247,7 @@
     font-weight: var(--mud-typography-button-weight);
     letter-spacing: var(--mud-typography-button-letterspacing, 0.025em);
     line-height: var(--mud-typography-button-lineheight);
-    border: 1px solid var(--mud-palette-lines-default);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     cursor: pointer;
     transition: all 0.2s;
@@ -247,12 +256,17 @@
     justify-content: center;
     gap: 0.75rem;
     text-decoration: none;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .btn-google:hover {
-    background: rgba(var(--mud-palette-white-rgb), 0.04);
+    background: var(--maliev-panel-3);
     text-decoration: none;
+}
+
+.btn-google:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .btn-google:active {
@@ -266,11 +280,7 @@
 
 .login-footer {
     padding: 1.5rem 2rem;
-    border-top: 1px solid rgba(var(--mud-palette-black-rgb), 0.1);
-}
-
-.dark-theme .login-footer {
-    border-top-color: rgba(var(--mud-palette-white-rgb), 0.1);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .footer-content {
@@ -317,9 +327,10 @@
 
 .error-alert {
     padding: 0.75rem 1rem;
-    background: var(--mud-palette-error-container);
-    color: var(--mud-palette-on-error-container);
+    background: var(--maliev-danger-bg);
+    color: var(--maliev-danger);
     border-radius: var(--maliev-radius-sm);
+    box-shadow: var(--maliev-shadow-ring);
     font-size: var(--mud-typography-body2-size);
     margin-bottom: 1rem;
 }
@@ -335,8 +346,13 @@
 }
 
 .theme-toggle-btn:hover {
-    background: rgba(var(--mud-palette-white-rgb), 0.08);
+    background: var(--maliev-panel-3);
     color: var(--mud-palette-primary);
+}
+
+.theme-toggle-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 @media (max-width: 640px) {

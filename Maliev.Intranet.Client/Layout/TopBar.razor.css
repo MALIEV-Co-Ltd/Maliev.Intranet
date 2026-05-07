@@ -1,7 +1,8 @@
 .topbar-root {
     height: 52px;
-    border-bottom: 1px solid var(--maliev-border);
+    border-bottom: 0;
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     display: flex;
     align-items: center;
     padding: 0 14px;
@@ -28,8 +29,8 @@
 }
 
 .topbar-logo-button:focus-visible {
-    outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 35%);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .topbar-logo-divider {
@@ -55,7 +56,7 @@
     padding: 6px 12px;
     font-size: var(--maliev-font-base);
     font-weight: 500;
-    border-radius: var(--maliev-radius-xs);
+    border-radius: var(--maliev-radius-sm);
     min-height: unset;
     white-space: nowrap;
     color: var(--maliev-muted);
@@ -81,21 +82,20 @@
 .topbar-nav ::deep .topbar-nav-quote .mud-nav-link {
     --topbar-quote-accent: var(--mud-palette-primary);
     --topbar-quote-accent-hover: color-mix(in oklab, var(--mud-palette-primary), #000 12%);
-    border: 1px solid var(--mud-palette-primary) !important;
+    border: 0 !important;
     background: var(--mud-palette-primary) !important;
-    color: #fff !important;
-    font-weight: 800;
+    color: var(--mud-palette-primary-text) !important;
+    font-weight: 600;
     padding-inline: 14px;
-    box-shadow: 0 2px 6px color-mix(in oklab, var(--mud-palette-primary), transparent 68%);
+    box-shadow: var(--maliev-shadow-ring), 0 2px 6px color-mix(in oklab, var(--mud-palette-primary), transparent 68%);
 }
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote:hover,
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote.active,
 .topbar-nav ::deep .topbar-nav-quote .mud-nav-link:hover,
 .topbar-nav ::deep .topbar-nav-quote .mud-nav-link.active {
-    border-color: var(--topbar-quote-accent-hover) !important;
     background: var(--topbar-quote-accent-hover) !important;
-    color: #fff !important;
+    color: var(--mud-palette-primary-text) !important;
 }
 
 .topbar-nav ::deep .mud-nav-link.topbar-nav-quote .mud-nav-link-text,
@@ -104,16 +104,17 @@
 .topbar-nav ::deep .topbar-nav-quote .mud-nav-link .mud-nav-link-text,
 .topbar-nav ::deep .topbar-nav-quote .mud-nav-link:hover .mud-nav-link-text,
 .topbar-nav ::deep .topbar-nav-quote .mud-nav-link.active .mud-nav-link-text {
-    color: #fff !important;
-    font-weight: 800;
+    color: var(--mud-palette-primary-text) !important;
+    font-weight: 600;
 }
 
 /* Search */
 .topbar-search { flex-shrink: 0; }
 
 .topbar-root ::deep .topbar-global-search .global-search-input {
-    border: 1px solid var(--maliev-border);
+    border: 0;
     background: var(--maliev-panel-3);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-ink);
 }
 
@@ -122,8 +123,8 @@
 }
 
 .topbar-root ::deep .topbar-global-search .global-search-input:focus {
-    border-color: var(--mud-palette-primary);
     background: var(--maliev-panel-3);
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .topbar-root ::deep .topbar-global-search .global-search-icon,
@@ -148,9 +149,10 @@
     width: 240px;
     height: 32px;
     padding: 0 10px 0 30px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel-2);
+    box-shadow: var(--maliev-shadow-ring);
     font-size: var(--maliev-font-base);
     font-family: inherit;
     color: var(--maliev-ink);
@@ -158,7 +160,9 @@
 }
 
 .topbar-search-input::placeholder { color: var(--maliev-muted-2); }
-.topbar-search-input:focus { border-color: var(--mud-palette-primary); }
+.topbar-search-input:focus {
+    box-shadow: var(--maliev-focus-ring);
+}
 
 /* Currency autocomplete */
 .topbar-root ::deep .topbar-currency-autocomplete {
@@ -176,9 +180,10 @@
 .topbar-currency-name { font-size: var(--maliev-font-micro); color: var(--maliev-muted); }
 
 .topbar-root ::deep .topbar-currency-autocomplete .mud-input {
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel-2);
+    box-shadow: var(--maliev-shadow-ring);
     height: 32px;
     font-size: var(--maliev-font-small);
     font-weight: 600;
@@ -257,19 +262,19 @@
 .topbar-profile:hover { background: var(--maliev-panel-2); }
 
 .topbar-profile:focus-visible {
-    outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 35%);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .topbar-avatar {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--maliev-accent), oklch(0.58 0.17 300));
-    color: #fff;
+    background: linear-gradient(135deg, var(--maliev-accent), var(--maliev-muted));
+    color: var(--mud-palette-primary-text);
     display: grid;
     place-items: center;
-    font-size: 11px;
+    font-size: var(--maliev-font-micro);
     font-weight: 600;
     flex-shrink: 0;
     overflow: hidden;
@@ -308,10 +313,10 @@
     z-index: 2600;
     width: 210px;
     padding: 6px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
-    box-shadow: var(--maliev-shadow-lg);
+    box-shadow: var(--maliev-shadow-card);
 }
 
 .topbar-profile-action {

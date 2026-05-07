@@ -30,6 +30,8 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
     {
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "StatusBadge.razor.css");
 
+        Assert.Contains("border-radius: var(--maliev-radius-pill);", styles, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", styles, StringComparison.Ordinal);
         Assert.Contains(".status-healthy", styles, StringComparison.Ordinal);
         Assert.Contains("var(--maliev-ok-bg)", styles, StringComparison.Ordinal);
         Assert.Contains(".status-unreachable", styles, StringComparison.Ordinal);
@@ -37,6 +39,58 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
         Assert.Contains("var(--maliev-danger-bg)", styles, StringComparison.Ordinal);
         Assert.Contains(".status-degraded", styles, StringComparison.Ordinal);
         Assert.Contains("var(--maliev-warn-bg)", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SharedSurfaces_UseShadowAsBorderCards()
+    {
+        var panelCard = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "PanelCard.razor.css");
+        var statTile = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "StatTile.razor.css");
+        var moduleHeader = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "ModuleHeader.razor.css");
+        var pageHeader = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "PageHeader.razor.css");
+
+        Assert.Contains("border: 0;", panelCard, StringComparison.Ordinal);
+        Assert.Contains("border-radius: var(--maliev-radius-md);", panelCard, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-card);", panelCard, StringComparison.Ordinal);
+
+        Assert.Contains("border: 0;", statTile, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-card);", statTile, StringComparison.Ordinal);
+        Assert.Contains("letter-spacing: 0;", statTile, StringComparison.Ordinal);
+
+        Assert.Contains("border-bottom: 0;", moduleHeader, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", moduleHeader, StringComparison.Ordinal);
+        Assert.Contains("border-bottom: 0;", pageHeader, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", pageHeader, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SharedButtons_UseMudPrimaryAndRingTokens()
+    {
+        var primary = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "PrimaryButton.razor.css");
+        var secondary = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "SecondaryButton.razor.css");
+
+        Assert.Contains("background: var(--mud-palette-primary);", primary, StringComparison.Ordinal);
+        Assert.Contains("color: var(--mud-palette-primary-text);", primary, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", primary, StringComparison.Ordinal);
+
+        Assert.Contains("background: var(--maliev-panel);", secondary, StringComparison.Ordinal);
+        Assert.Contains("color: var(--maliev-ink-2);", secondary, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", secondary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModulePagePrimitives_UseRingSurfacesAndZeroTracking()
+    {
+        var modulePages = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "module-pages.css");
+        var mudOverrides = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
+
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", modulePages, StringComparison.Ordinal);
+        Assert.Contains("letter-spacing: 0;", modulePages, StringComparison.Ordinal);
+        Assert.Contains("border-collapse: separate;", modulePages, StringComparison.Ordinal);
+
+        Assert.Contains(".mud-table-root", mudOverrides, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", mudOverrides, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-focus-ring);", mudOverrides, StringComparison.Ordinal);
     }
 
     [Fact]

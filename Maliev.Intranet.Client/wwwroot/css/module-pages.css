@@ -41,9 +41,10 @@
     display: inline-flex;
     gap: 2px;
     padding: 3px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .mlv-segmented button {
@@ -54,8 +55,13 @@
     background: transparent;
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
+}
+
+.mlv-segmented button:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .mlv-segmented button.active {
@@ -65,8 +71,13 @@
 
 .mlv-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: var(--maliev-radius-md);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     font-size: var(--maliev-font-base);
+    overflow: hidden;
 }
 
 .mlv-table th,
@@ -80,8 +91,8 @@
 .mlv-table th {
     color: var(--maliev-muted);
     font-size: var(--maliev-font-nano);
-    font-weight: 800;
-    letter-spacing: 0.07em;
+    font-weight: 600;
+    letter-spacing: 0;
     text-transform: uppercase;
 }
 
@@ -102,7 +113,7 @@
 
 .mlv-row-main {
     color: var(--maliev-ink);
-    font-weight: 700;
+    font-weight: 600;
 }
 
 .mlv-row-sub {
@@ -120,9 +131,10 @@
     place-items: center;
     min-height: 180px;
     padding: 28px;
-    border: 1px dashed var(--maliev-border);
-    border-radius: 8px;
+    border: 0;
+    border-radius: var(--maliev-radius-md);
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-muted);
     text-align: center;
 }
@@ -151,11 +163,19 @@
     width: 100%;
     min-height: 34px;
     padding: 0 10px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
-    background: var(--maliev-panel-2);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-ink);
     font: inherit;
+}
+
+.mlv-form-input:focus,
+.mlv-form-select:focus,
+.mlv-form-textarea:focus {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .mlv-form-textarea {
@@ -179,11 +199,18 @@
 .mlv-filter-field input {
     height: 36px;
     padding: 0 10px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-ink);
     font: inherit;
+}
+
+.mlv-filter-field select:focus,
+.mlv-filter-field input:focus {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 .mlv-two-column-grid {
@@ -208,16 +235,17 @@
     margin: 0;
     min-width: 0;
     color: var(--maliev-ink);
-    font-weight: 650;
+    font-weight: 600;
     overflow-wrap: anywhere;
 }
 
 .mlv-error {
     margin-bottom: 12px;
     padding: 10px 12px;
-    border: 1px solid var(--maliev-danger);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-danger-bg);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-danger);
     font-size: var(--maliev-font-small);
 }
@@ -249,11 +277,17 @@
 .mlv-page-size-select {
     height: 30px;
     min-width: 64px;
-    border: 1px solid var(--maliev-border);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-ink);
     font: inherit;
+}
+
+.mlv-page-size-select:focus {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }
 
 @media (max-width: 1000px) {

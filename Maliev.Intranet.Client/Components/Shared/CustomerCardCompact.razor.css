@@ -3,9 +3,10 @@
     align-items: center;
     gap: 8px;
     padding: 6px 8px;
-    border: 1px solid var(--mud-palette-primary);
+    border: 0;
     border-radius: var(--maliev-radius-sm);
-    background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
 }
 
 .ccc-avatar {
@@ -13,13 +14,13 @@
     height: 28px;
     border-radius: 50%;
     background: var(--mud-palette-primary);
-    color: #fff;
+    color: var(--mud-palette-primary-text);
     display: grid;
     place-items: center;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--maliev-font-nano);
+    font-weight: 600;
     flex-shrink: 0;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
 }
 
 .ccc-info {
@@ -62,4 +63,9 @@
 .ccc-clear:hover {
     background: var(--maliev-danger-bg);
     color: var(--maliev-danger);
+}
+
+.ccc-clear:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
 }

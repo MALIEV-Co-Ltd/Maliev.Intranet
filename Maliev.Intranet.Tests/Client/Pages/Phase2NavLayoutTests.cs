@@ -176,6 +176,20 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void TopBar_SourceCss_PreservesCompactCurrencyAndPrimaryQuoteSelectors()
+    {
+        var css = File.ReadAllText(FindSourceFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css"));
+
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", css, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav ::deep .mud-nav-link.topbar-nav-quote", css, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav ::deep .topbar-nav-quote .mud-nav-link", css, StringComparison.Ordinal);
+        Assert.Contains("background: var(--mud-palette-primary) !important;", css, StringComparison.Ordinal);
+        Assert.Contains("border-bottom: 0 !important;", css, StringComparison.Ordinal);
+        Assert.Contains("width: 5ch !important;", css, StringComparison.Ordinal);
+        Assert.DoesNotContain(".topbar-logo-button:hover", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_ProfileMenu_SignOut_NavigatesToLogout()
     {
         var navigation = Services.GetRequiredService<NavigationManager>();

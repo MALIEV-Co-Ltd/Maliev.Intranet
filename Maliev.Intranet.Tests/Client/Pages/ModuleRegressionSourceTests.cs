@@ -295,7 +295,8 @@ public class ModuleRegressionSourceTests
 
         Assert.Contains("background: var(--maliev-panel-3);", searchBlock, StringComparison.Ordinal);
         Assert.Contains("color: var(--maliev-ink);", searchBlock, StringComparison.Ordinal);
-        Assert.Contains("border: 1px solid var(--maliev-border);", searchBlock, StringComparison.Ordinal);
+        Assert.Contains("border: 0;", searchBlock, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", searchBlock, StringComparison.Ordinal);
         Assert.Contains(".topbar-root ::deep .topbar-global-search .global-search-input:focus", source, StringComparison.Ordinal);
         Assert.Contains(".topbar-root ::deep .topbar-global-search .global-search-icon", source, StringComparison.Ordinal);
     }
@@ -307,11 +308,28 @@ public class ModuleRegressionSourceTests
         var quoteBlock = ExtractCssBlock(source, ".topbar-nav ::deep .mud-nav-link.topbar-nav-quote");
 
         Assert.Contains("--topbar-quote-accent: var(--mud-palette-primary);", quoteBlock, StringComparison.Ordinal);
-        Assert.Contains("border: 1px solid var(--mud-palette-primary) !important;", quoteBlock, StringComparison.Ordinal);
+        Assert.Contains("border: 0 !important;", quoteBlock, StringComparison.Ordinal);
         Assert.Contains("background: var(--mud-palette-primary) !important;", quoteBlock, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring)", quoteBlock, StringComparison.Ordinal);
         Assert.Contains(".topbar-nav ::deep .topbar-nav-quote .mud-nav-link", source, StringComparison.Ordinal);
         Assert.DoesNotContain("--maliev-accent", quoteBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("#f97316", quoteBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LoginShell_UsesGatewayCardDesignWithoutRouteChanges()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor.css");
+
+        Assert.Contains("/api/v1/auth/login", source, StringComparison.Ordinal);
+        Assert.Contains("Sign in with Google", source, StringComparison.Ordinal);
+        Assert.Contains("background: var(--maliev-bg);", styles, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-card);", styles, StringComparison.Ordinal);
+        Assert.Contains("border-radius: var(--maliev-radius-md);", styles, StringComparison.Ordinal);
+        Assert.Contains("background: var(--mud-palette-primary);", styles, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain("letter-spacing: -", styles, StringComparison.Ordinal);
     }
 
     [Fact]
