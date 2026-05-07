@@ -858,6 +858,9 @@ public class CustomerOnboardingRequest
     /// <summary>Initial set of addresses to associate with the customer.</summary>
     public List<CreateAddressRequest> Addresses { get; set; } = new();
 
+    /// <summary>Optional billing address to associate with the newly created company.</summary>
+    public CreateAddressRequest? CompanyBillingAddress { get; set; }
+
     /// <summary>Optional request to create an initial NDA record.</summary>
     public CreateNDARequest? Nda { get; set; }
 

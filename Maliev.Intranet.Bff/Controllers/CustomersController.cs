@@ -154,7 +154,7 @@ public class CustomersController(
     [HttpPost("{id:guid}/addresses")]
     public async Task<IActionResult> CreateAddresses(Guid id, [FromBody] List<CreateAddressRequest> addresses, CancellationToken ct)
     {
-        var result = await client.CreateAddressesAsync(id, addresses, ct);
+        var result = await client.CreateAddressesAsync(id, addresses, ct: ct);
         return Ok(result);
     }
 

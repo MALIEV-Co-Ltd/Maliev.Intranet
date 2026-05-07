@@ -1,12 +1,15 @@
 @page "/customers/new"
+@using System.Net.Http.Headers
+@using Maliev.Intranet.Shared.Services
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IReferenceDataService ReferenceData
 
 <PageTitle>New Customer | MALIEV Intranet</PageTitle>
 
-<div class="mlv-module-shell">
-    <PageHeader Title="New Customer" Subtitle="Create an employee-visible customer record." BackHref="/customers" />
+<div class="mlv-module-shell customer-create-page">
+    <PageHeader Title="New Customer" Subtitle="Create a complete customer, company, address, document, and NDA profile." BackHref="/customers" />
 
     <PageBody>
         @if (!string.IsNullOrWhiteSpace(_error))
@@ -14,54 +17,504 @@
             <div class="mlv-error">@_error</div>
         }
 
-        <PanelCard Title="Customer profile">
-            <EditForm Model="@_request" OnValidSubmit="SaveAsync">
-                <DataAnnotationsValidator />
-                <FormGrid>
-                    <FormField Label="First name"><InputText class="mlv-form-input" @bind-Value="_request.FirstName" /></FormField>
-                    <FormField Label="Last name"><InputText class="mlv-form-input" @bind-Value="_request.LastName" /></FormField>
-                    <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_request.Email" /></FormField>
-                    <FormField Label="Mobile"><InputText class="mlv-form-input" @bind-Value="_request.Mobile" /></FormField>
-                    <FormField Label="Segment"><InputText class="mlv-form-input" @bind-Value="_request.Segment" /></FormField>
-                    <FormField Label="Tier"><InputText class="mlv-form-input" @bind-Value="_request.Tier" /></FormField>
-                </FormGrid>
-                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
-                    <SecondaryButton Href="/customers">Cancel</SecondaryButton>
-                    <PrimaryButton Type="submit" Disabled="@_saving">Create Customer</PrimaryButton>
-                </div>
-            </EditForm>
-        </PanelCard>
+        <div class="customer-create-layout">
+            <div class="customer-create-main">
+                <PanelCard Title="AI intake">
+                    <div class="ai-intake">
+                        <MudTextField T="string"
+                                      Label="Paste customer text"
+                                      Value="@_extractionText"
+                                      ValueChanged="@((string value) => _extractionText = value)"
+                                      Variant="Variant.Outlined"
+                                      Lines="5"
+                                      Immediate="true"
+                                      Placeholder="Paste an email signature, business card text, tax invoice details, or customer request..." />
+
+                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                       FilesChanged="OnExtractionFilesSelected"
+                                       Accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
+                                       MaximumFileCount="10">
+                            <CustomContent Context="uploadContext">
+                                <button type="button" class="document-dropzone ai-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                    <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
+                                    <span>
+                                        <strong>AI extraction files</strong>
+                                        <small>@GetFileSummary(_extractionFiles, "PDF, image, DOCX, or text")</small>
+                                    </span>
+                                </button>
+                            </CustomContent>
+                        </MudFileUpload>
+
+                        <div class="mlv-toolbar" style="justify-content:flex-end">
+                            <SecondaryButton Icon="@Icons.Material.Outlined.Psychology" Disabled="@(!_hasExtractionInput || _extracting)" OnClick="ExtractAsync">
+                                @(_extracting ? "Extracting..." : "Extract and autofill")
+                            </SecondaryButton>
+                        </div>
+
+                        @if (_lastExtraction != null)
+                        {
+                            <div class="extraction-summary">
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" />
+                                <span>Autofilled from AI extraction</span>
+                                <strong>@($"{_lastExtraction.Confidence:P0}")</strong>
+                            </div>
+                        }
+                    </div>
+                </PanelCard>
+
+                <PanelCard Title="Customer profile">
+                    <EditForm Model="@_onboarding.Customer" OnValidSubmit="SaveAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <FormGrid>
+                            <FormField Label="First name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.FirstName" /></FormField>
+                            <FormField Label="Last name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.LastName" /></FormField>
+                            <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Email" /></FormField>
+                            <FormField Label="Phone number"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Mobile" /></FormField>
+                            <FormField Label="Segment">
+                                <select class="mlv-form-input" @bind="_onboarding.Customer.Segment">
+                                    @foreach (var segment in _segments)
+                                    {
+                                        <option value="@segment">@segment</option>
+                                    }
+                                </select>
+                            </FormField>
+                            <FormField Label="Tier">
+                                <select class="mlv-form-input" @bind="_onboarding.Customer.Tier">
+                                    @foreach (var tier in _tiers)
+                                    {
+                                        <option value="@tier">@tier</option>
+                                    }
+                                </select>
+                            </FormField>
+                        </FormGrid>
+
+                        <div class="section-divider">
+                            <h3>Company</h3>
+                            <span>Registry-backed lookup by company name or 13-digit tax ID.</span>
+                        </div>
+
+                        <div class="company-grid">
+                            <MudAutocomplete T="RegistryCompanyProfile"
+                                             Label="Company name"
+                                             Text="@_companyName"
+                                             TextChanged="@((string value) => _companyName = value)"
+                                             ValueChanged="ApplyCompanySuggestion"
+                                             SearchFunc="SearchCompaniesAsync"
+                                             ToStringFunc="@(company => company?.CompanyNameTh ?? _companyName)"
+                                             Variant="Variant.Outlined"
+                                             Clearable="true"
+                                             CoerceText="false"
+                                             CoerceValue="false"
+                                             ResetValueOnEmptyText="false"
+                                             DebounceInterval="350"
+                                             MinCharacters="2"
+                                             Class="styled-autocomplete">
+                                <ItemTemplate Context="company">
+                                    <div class="suggestion-card company-suggestion">
+                                        <div>
+                                            <strong>@company.CompanyNameTh</strong>
+                                            <span>@(company.FullNameTh == company.CompanyNameTh ? company.BusinessObjectives : company.FullNameTh)</span>
+                                        </div>
+                                        <div class="suggestion-meta">
+                                            <span>@company.TaxId</span>
+                                            <small>@(string.IsNullOrWhiteSpace(company.StatusNameTh) ? "Registry" : company.StatusNameTh)</small>
+                                        </div>
+                                    </div>
+                                </ItemTemplate>
+                            </MudAutocomplete>
+
+                            <MudAutocomplete T="RegistryCompanyProfile"
+                                             Label="Company tax ID"
+                                             Text="@_companyTaxId"
+                                             TextChanged="@((string value) => _companyTaxId = value)"
+                                             ValueChanged="ApplyCompanySuggestion"
+                                             SearchFunc="SearchCompaniesAsync"
+                                             ToStringFunc="@(company => company?.TaxId ?? _companyTaxId)"
+                                             Variant="Variant.Outlined"
+                                             Clearable="true"
+                                             CoerceText="false"
+                                             CoerceValue="false"
+                                             ResetValueOnEmptyText="false"
+                                             DebounceInterval="350"
+                                             MinCharacters="2"
+                                             Class="styled-autocomplete">
+                                <ItemTemplate Context="company">
+                                    <div class="suggestion-card company-suggestion">
+                                        <div>
+                                            <strong>@company.TaxId</strong>
+                                            <span>@company.CompanyNameTh</span>
+                                        </div>
+                                        <div class="suggestion-meta">
+                                            <small>@company.CompanyTypeCode</small>
+                                        </div>
+                                    </div>
+                                </ItemTemplate>
+                            </MudAutocomplete>
+
+                            <FormField Label="Company branch">
+                                <InputText class="mlv-form-input" @bind-Value="_companyBranch" />
+                            </FormField>
+                        </div>
+
+                        <div class="section-divider">
+                            <h3>Addresses</h3>
+                            <span>Customer billing, customer shipping, and company billing all use Thai/English registry suggestions.</span>
+                        </div>
+
+                        <div class="address-stack">
+                            @for (var i = 0; i < _addresses.Count; i++)
+                            {
+                                var index = i;
+                                <div class="address-panel">
+                                    <div class="address-panel-header">
+                                        <strong>@GetAddressTitle(_addresses[index].Request.Type)</strong>
+                                        <div>
+                                            <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(index))">Copy billing</button>
+                                            @if (_addresses.Count > 1)
+                                            {
+                                                <button type="button" class="address-remove" @onclick="@(() => RemoveAddress(index))">Remove</button>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <FormGrid>
+                                        <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
+                                        <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
+                                        <FormField Label="Subdistrict">
+                                            @AddressAutocomplete(index, AddressField.Subdistrict)
+                                        </FormField>
+                                        <FormField Label="District">
+                                            @AddressAutocomplete(index, AddressField.District)
+                                        </FormField>
+                                        <FormField Label="State / Province">
+                                            @AddressAutocomplete(index, AddressField.Province)
+                                        </FormField>
+                                        <FormField Label="Postal code">
+                                            @AddressAutocomplete(index, AddressField.PostalCode)
+                                        </FormField>
+                                    </FormGrid>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="section-divider">
+                            <h3>Documents</h3>
+                            <span>Documents are uploaded after the customer record is created and linked automatically.</span>
+                        </div>
+
+                        <div class="document-grid">
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                           FilesChanged="OnCustomerDocumentsSelected"
+                                           Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
+                                           MaximumFileCount="20">
+                                <CustomContent Context="uploadContext">
+                                    <button type="button" class="document-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                        <MudIcon Icon="@Icons.Material.Outlined.AttachFile" />
+                                        <span>
+                                            <strong>Customer documents</strong>
+                                            <small>@GetFileSummary(_customerDocuments, "Contracts, forms, IDs, certificates")</small>
+                                        </span>
+                                    </button>
+                                </CustomContent>
+                            </MudFileUpload>
+
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                           FilesChanged="OnNdaDocumentsSelected"
+                                           Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                           MaximumFileCount="10">
+                                <CustomContent Context="uploadContext">
+                                    <button type="button" class="document-dropzone nda-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
+                                        <span>
+                                            <strong>Customer NDA documents</strong>
+                                            <small>@GetFileSummary(_ndaDocuments, "Signed NDA or legal documents")</small>
+                                        </span>
+                                    </button>
+                                </CustomContent>
+                            </MudFileUpload>
+                        </div>
+
+                        <FormField Label="Notes">
+                            <InputTextArea class="mlv-form-input notes-input" @bind-Value="_onboarding.InternalNote" />
+                        </FormField>
+
+                        <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                            <SecondaryButton Href="/customers">Cancel</SecondaryButton>
+                            <PrimaryButton Type="submit" Disabled="@_saving" Icon="@Icons.Material.Outlined.PersonAdd">
+                                @(_saving ? "Creating..." : "Create Customer")
+                            </PrimaryButton>
+                        </div>
+                    </EditForm>
+                </PanelCard>
+            </div>
+
+            <aside class="customer-create-side">
+                <PanelCard Title="Creation summary">
+                    <div class="summary-stack">
+                        <div><span>Customer</span><strong>@GetCustomerName()</strong></div>
+                        <div><span>Company</span><strong>@(string.IsNullOrWhiteSpace(_companyName) ? "Private customer" : _companyName)</strong></div>
+                        <div><span>Branch</span><strong>@GetBranchLabel()</strong></div>
+                        <div><span>Documents</span><strong>@(_customerDocuments.Count + _ndaDocuments.Count)</strong></div>
+                    </div>
+                </PanelCard>
+            </aside>
+        </div>
     </PageBody>
 </div>
 
 @code {
-    private CreateCustomerRequest _request = new()
+    private enum AddressField
     {
-        Segment = "Retail",
-        Tier = "Bronze",
-        PreferredLanguage = "en",
-        Timezone = "Asia/Bangkok"
-    };
+        Subdistrict,
+        District,
+        Province,
+        PostalCode
+    }
 
+    private sealed class AddressDraft
+    {
+        public CreateAddressRequest Request { get; set; } = new();
+        public RegistryThaiLocation? SelectedLocation { get; set; }
+    }
+
+    private static readonly string[] _segments = ["Retail", "Enterprise", "Manufacturing", "Education", "Government"];
+    private static readonly string[] _tiers = ["Bronze", "Silver", "Gold", "VIP"];
+
+    private CustomerOnboardingRequest _onboarding = CreateDefaultRequest();
+    private List<AddressDraft> _addresses = CreateDefaultAddresses();
+    private List<IBrowserFile> _extractionFiles = [];
+    private List<IBrowserFile> _customerDocuments = [];
+    private List<IBrowserFile> _ndaDocuments = [];
+    private List<CountryDto> _countries = [];
+    private CountryDto? _thailand;
+    private ExtractedCustomerDataResponse? _lastExtraction;
+    private string _extractionText = string.Empty;
+    private string _companyName = string.Empty;
+    private string _companyTaxId = string.Empty;
+    private string _companyBranch = "00000";
+    private bool _extracting;
     private bool _saving;
     private string? _error;
+
+    private bool _hasExtractionInput => !string.IsNullOrWhiteSpace(_extractionText) || _extractionFiles.Count > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _countries = await ReferenceData.GetCountriesAsync();
+        _thailand = _countries.FirstOrDefault(c => string.Equals(c.Code, "TH", StringComparison.OrdinalIgnoreCase))
+            ?? _countries.FirstOrDefault(c => c.Name.Contains("Thailand", StringComparison.OrdinalIgnoreCase));
+
+        if (_thailand != null)
+        {
+            foreach (var address in _addresses)
+            {
+                address.Request.CountryId = _thailand.Id;
+            }
+        }
+    }
+
+    private static CustomerOnboardingRequest CreateDefaultRequest() => new()
+    {
+        Customer = new CreateCustomerRequest
+        {
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }
+    };
+
+    private static List<AddressDraft> CreateDefaultAddresses() =>
+    [
+        new() { Request = new CreateAddressRequest { Type = "Billing", IsDefault = true } },
+        new() { Request = new CreateAddressRequest { Type = "Shipping", IsDefault = true } },
+        new() { Request = new CreateAddressRequest { Type = "Company Billing", IsDefault = true } }
+    ];
+
+    private RenderFragment AddressAutocomplete(int index, AddressField field) => builder =>
+    {
+        builder.OpenComponent<MudAutocomplete<RegistryThaiLocation>>(0);
+        builder.AddAttribute(1, "Text", GetAddressText(index, field));
+        builder.AddAttribute(2, "TextChanged", EventCallback.Factory.Create<string>(this, value => SetAddressText(index, field, value)));
+        builder.AddAttribute(3, "Value", _addresses[index].SelectedLocation);
+        builder.AddAttribute(4, "ValueChanged", EventCallback.Factory.Create<RegistryThaiLocation?>(this, location => ApplyLocation(index, location)));
+        builder.AddAttribute(5, "SearchFunc", (Func<string?, CancellationToken, Task<IEnumerable<RegistryThaiLocation>>>)SearchLocationsAsync);
+        builder.AddAttribute(6, "ToStringFunc", (Func<RegistryThaiLocation?, string>)(location => FormatLocationValue(location, index, field)));
+        builder.AddAttribute(7, "Variant", Variant.Outlined);
+        builder.AddAttribute(8, "Clearable", true);
+        builder.AddAttribute(9, "CoerceText", false);
+        builder.AddAttribute(10, "CoerceValue", false);
+        builder.AddAttribute(11, "ResetValueOnEmptyText", false);
+        builder.AddAttribute(12, "DebounceInterval", 350);
+        builder.AddAttribute(13, "MinCharacters", 2);
+        builder.AddAttribute(14, "Class", "styled-autocomplete");
+        builder.AddAttribute(15, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
+        {
+            itemBuilder.OpenElement(0, "div");
+            itemBuilder.AddAttribute(1, "class", "suggestion-card address-suggestion");
+            itemBuilder.OpenElement(2, "div");
+            itemBuilder.OpenElement(3, "strong");
+            itemBuilder.AddContent(4, FormatLocationPrimary(location, GetAddressText(index, field)));
+            itemBuilder.CloseElement();
+            itemBuilder.OpenElement(5, "span");
+            itemBuilder.AddContent(6, FormatLocationSecondary(location, GetAddressText(index, field)));
+            itemBuilder.CloseElement();
+            itemBuilder.CloseElement();
+            itemBuilder.OpenElement(7, "div");
+            itemBuilder.AddAttribute(8, "class", "suggestion-meta");
+            itemBuilder.OpenElement(9, "span");
+            itemBuilder.AddContent(10, location.PostalCode);
+            itemBuilder.CloseElement();
+            itemBuilder.CloseElement();
+            itemBuilder.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    private void OnExtractionFilesSelected(IReadOnlyList<IBrowserFile> files) => _extractionFiles = files.Take(10).ToList();
+
+    private void OnCustomerDocumentsSelected(IReadOnlyList<IBrowserFile> files) => _customerDocuments = files.Take(20).ToList();
+
+    private void OnNdaDocumentsSelected(IReadOnlyList<IBrowserFile> files) => _ndaDocuments = files.Take(10).ToList();
+
+    private async Task ExtractAsync(MouseEventArgs _)
+    {
+        _extracting = true;
+        _error = null;
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            if (!string.IsNullOrWhiteSpace(_extractionText))
+            {
+                content.Add(new StringContent(_extractionText), "rawText");
+            }
+
+            foreach (var file in _extractionFiles)
+            {
+                var stream = file.OpenReadStream(10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var response = await Http.PostAsync("api/v1/aiprocessing/extract-customer", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = "Customer information could not be extracted.";
+                return;
+            }
+
+            var extracted = await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
+            if (extracted == null)
+            {
+                _error = "Customer extraction returned no usable data.";
+                return;
+            }
+
+            ApplyExtraction(extracted);
+            _lastExtraction = extracted;
+            Snackbar.Add("Customer fields were autofilled from AI extraction.", Severity.Success);
+        }
+        finally
+        {
+            _extracting = false;
+        }
+    }
+
+    private void ApplyExtraction(ExtractedCustomerDataResponse extracted)
+    {
+        SetIfPresent(value => _onboarding.Customer.FirstName = value, extracted.FirstName);
+        SetIfPresent(value => _onboarding.Customer.LastName = value, extracted.LastName);
+        SetIfPresent(value => _onboarding.Customer.Email = value, extracted.Email);
+        SetIfPresent(value => _onboarding.Customer.Mobile = value, extracted.Mobile);
+        SetIfPresent(value => _onboarding.Customer.Landline = value, extracted.Landline);
+        SetIfPresent(value => _onboarding.Customer.Extension = value, extracted.Extension);
+        SetIfPresent(value => _onboarding.Customer.Segment = value, extracted.Segment);
+        SetIfPresent(value => _companyName = value, extracted.CompanyName);
+        SetIfPresent(value => _companyTaxId = value, extracted.VatNumber);
+
+        _companyBranch = NormalizeBranch(extracted.BranchNumber);
+
+        if (extracted.Addresses?.Count > 0)
+        {
+            _addresses = extracted.Addresses
+                .Take(3)
+                .Select(ToAddressDraft)
+                .ToList();
+
+            if (_addresses.All(a => !string.Equals(a.Request.Type, "Shipping", StringComparison.OrdinalIgnoreCase)))
+            {
+                _addresses.Add(CloneAddress(_addresses[0], "Shipping"));
+            }
+
+            if (_addresses.All(a => !string.Equals(a.Request.Type, "Company Billing", StringComparison.OrdinalIgnoreCase)))
+            {
+                _addresses.Add(CloneAddress(_addresses[0], "Company Billing"));
+            }
+        }
+    }
+
+    private AddressDraft ToAddressDraft(ExtractedAddress address)
+    {
+        var draft = new AddressDraft
+        {
+            SelectedLocation = address.Location,
+            Request = new CreateAddressRequest
+            {
+                Type = NormalizeAddressType(address.Type),
+                IsDefault = true,
+                AddressLine1 = address.AddressLine1 ?? string.Empty,
+                AddressLine2 = address.AddressLine2,
+                AddressLine3 = address.AddressLine3,
+                District = address.District,
+                City = address.City ?? string.Empty,
+                StateProvince = address.StateProvince ?? string.Empty,
+                PostalCode = address.PostalCode ?? string.Empty,
+                RecipientName = address.RecipientName,
+                RecipientPhone = address.RecipientPhone,
+                CountryId = _thailand?.Id ?? Guid.Empty
+            }
+        };
+
+        return draft;
+    }
 
     private async Task SaveAsync()
     {
         _saving = true;
         _error = null;
+
         try
         {
-            var response = await Http.PostAsJsonAsync("api/v1/customers", _request);
-            if (response.IsSuccessStatusCode)
-            {
-                Snackbar.Add("Customer created.", Severity.Success);
-                Navigation.NavigateTo("/customers");
-            }
-            else
+            _onboarding.NewCompany = BuildCompanyRequest();
+            _onboarding.Addresses = _addresses
+                .Where(a => !string.Equals(a.Request.Type, "Company Billing", StringComparison.OrdinalIgnoreCase))
+                .Select(a => a.Request)
+                .Where(HasAddressContent)
+                .ToList();
+            _onboarding.CompanyBillingAddress = BuildCompanyBillingAddress();
+            _onboarding.InternalNote = BuildInternalNote();
+
+            var response = await Http.PostAsJsonAsync("api/v1/customers/create-basic", _onboarding);
+            if (!response.IsSuccessStatusCode)
             {
                 _error = "Customer could not be created.";
+                return;
             }
+
+            var customer = await response.Content.ReadFromJsonAsync<CustomerResponse>();
+            if (customer == null)
+            {
+                _error = "Customer was created but the response was empty.";
+                return;
+            }
+
+            await UploadAndLinkDocumentsAsync(customer.Id);
+            Snackbar.Add("Customer created.", Severity.Success);
+            Navigation.NavigateTo($"/customers/{customer.Id}");
         }
         catch (Exception ex)
         {
@@ -73,4 +526,330 @@
             _saving = false;
         }
     }
+
+    private CreateCompanyRequest? BuildCompanyRequest()
+    {
+        if (string.IsNullOrWhiteSpace(_companyName) && string.IsNullOrWhiteSpace(_companyTaxId))
+        {
+            return null;
+        }
+
+        return new CreateCompanyRequest
+        {
+            Name = string.IsNullOrWhiteSpace(_companyName) ? _companyTaxId : _companyName,
+            VatNumber = string.IsNullOrWhiteSpace(_companyTaxId) ? null : _companyTaxId,
+            RegistrationNumber = string.IsNullOrWhiteSpace(_companyTaxId) ? null : _companyTaxId,
+            ContactEmail = _onboarding.Customer.Email,
+            ContactPhone = _onboarding.Customer.Mobile,
+            Segment = _onboarding.Customer.Segment,
+            Tier = _onboarding.Customer.Tier
+        };
+    }
+
+    private CreateAddressRequest? BuildCompanyBillingAddress()
+    {
+        var address = _addresses.FirstOrDefault(a => string.Equals(a.Request.Type, "Company Billing", StringComparison.OrdinalIgnoreCase));
+        if (address == null || !HasAddressContent(address.Request))
+        {
+            return null;
+        }
+
+        return CloneAddress(address, "Billing").Request;
+    }
+
+    private string? BuildInternalNote()
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_onboarding.InternalNote))
+        {
+            parts.Add(_onboarding.InternalNote.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(_companyName) || !string.IsNullOrWhiteSpace(_companyTaxId))
+        {
+            parts.Add($"Company branch: {GetBranchLabel()}");
+        }
+
+        return parts.Count == 0 ? null : string.Join(Environment.NewLine + Environment.NewLine, parts);
+    }
+
+    private async Task UploadAndLinkDocumentsAsync(Guid customerId)
+    {
+        var linkedDocuments = new List<DocumentResponse>();
+        linkedDocuments.AddRange(await UploadAndLinkDocumentGroupAsync(customerId, _customerDocuments, DocumentCategories.General, null));
+        linkedDocuments.AddRange(await UploadAndLinkDocumentGroupAsync(customerId, _ndaDocuments, DocumentCategories.NDA, "Signed"));
+
+        var ndaDocuments = linkedDocuments
+            .Where(doc => string.Equals(doc.DocumentCategory, DocumentCategories.NDA, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (ndaDocuments.Count > 0)
+        {
+            await Http.PostAsJsonAsync($"api/v1/customers/{customerId}/nda", new CreateNdaStepRequest
+            {
+                Nda = new CreateNDARequest { IsActive = true, FileReference = ndaDocuments[0].FileReference, FileName = ndaDocuments[0].FileName },
+                Documents = ndaDocuments
+            });
+        }
+    }
+
+    private async Task<List<DocumentResponse>> UploadAndLinkDocumentGroupAsync(Guid customerId, List<IBrowserFile> files, string category, string? subType)
+    {
+        if (files.Count == 0)
+        {
+            return [];
+        }
+
+        using var content = new MultipartFormDataContent();
+        foreach (var file in files)
+        {
+            var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "files", file.Name);
+        }
+
+        var uploadUrl = $"api/v1/aiprocessing/upload-documents?category={Uri.EscapeDataString(category)}&customerId={customerId}";
+        if (!string.IsNullOrWhiteSpace(subType))
+        {
+            uploadUrl += $"&subType={Uri.EscapeDataString(subType)}";
+        }
+
+        var uploadResponse = await Http.PostAsync(uploadUrl, content);
+        if (!uploadResponse.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"{category} document upload failed.", Severity.Warning);
+            return [];
+        }
+
+        var uploads = await uploadResponse.Content.ReadFromJsonAsync<List<BffUploadResponse>>() ?? [];
+        var documents = uploads.Select(upload => new CreateDocumentRequest
+        {
+            DocumentCategory = category,
+            DocumentSubType = subType,
+            FileReference = string.IsNullOrWhiteSpace(upload.FileReference) ? upload.UploadId : upload.FileReference,
+            FileName = upload.FileName,
+            FileSize = upload.FileSize,
+            MimeType = GetMimeType(upload.FileName)
+        }).ToList();
+
+        var linkResponse = await Http.PostAsJsonAsync($"api/v1/aiprocessing/link-documents?ownerType=Customer&ownerId={customerId}", documents);
+        if (!linkResponse.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"{category} documents uploaded but could not be linked.", Severity.Warning);
+            return [];
+        }
+
+        return await linkResponse.Content.ReadFromJsonAsync<List<DocumentResponse>>() ?? [];
+    }
+
+    private async Task<IEnumerable<RegistryCompanyProfile>> SearchCompaniesAsync(string? value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
+        {
+            return [];
+        }
+
+        return await Http.GetFromJsonAsync<List<RegistryCompanyProfile>>(
+            $"api/v1/customers/companies/search?query={Uri.EscapeDataString(value.Trim())}&limit=8",
+            ct) ?? [];
+    }
+
+    private async Task<IEnumerable<RegistryThaiLocation>> SearchLocationsAsync(string? value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
+        {
+            return [];
+        }
+
+        return await ReferenceData.AutocompleteLocationsAsync(value.Trim(), 8, ct);
+    }
+
+    private void ApplyCompanySuggestion(RegistryCompanyProfile? company)
+    {
+        if (company == null)
+        {
+            return;
+        }
+
+        _companyName = company.CompanyNameTh;
+        _companyTaxId = company.TaxId;
+        _companyBranch = "00000";
+    }
+
+    private void ApplyLocation(int index, RegistryThaiLocation? location)
+    {
+        if (location == null || index < 0 || index >= _addresses.Count)
+        {
+            return;
+        }
+
+        _addresses[index].SelectedLocation = location;
+        var useThai = IsThai(GetAddressText(index, AddressField.Subdistrict))
+            || IsThai(GetAddressText(index, AddressField.District))
+            || IsThai(GetAddressText(index, AddressField.Province));
+
+        _addresses[index].Request.District = useThai ? location.SubDistrictTh : location.SubDistrictEn;
+        _addresses[index].Request.City = useThai ? location.DistrictTh : location.DistrictEn;
+        _addresses[index].Request.StateProvince = useThai ? location.ProvinceTh : location.ProvinceEn;
+        _addresses[index].Request.PostalCode = location.PostalCode;
+    }
+
+    private void CopyBillingTo(int index)
+    {
+        var billing = _addresses.FirstOrDefault(a => string.Equals(a.Request.Type, "Billing", StringComparison.OrdinalIgnoreCase));
+        if (billing == null || index < 0 || index >= _addresses.Count)
+        {
+            return;
+        }
+
+        var targetType = _addresses[index].Request.Type;
+        _addresses[index] = CloneAddress(billing, targetType);
+    }
+
+    private void RemoveAddress(int index) => _addresses.RemoveAt(index);
+
+    private static AddressDraft CloneAddress(AddressDraft source, string type) => new()
+    {
+        SelectedLocation = source.SelectedLocation,
+        Request = new CreateAddressRequest
+        {
+            Type = type,
+            IsDefault = true,
+            AddressLine1 = source.Request.AddressLine1,
+            AddressLine2 = source.Request.AddressLine2,
+            AddressLine3 = source.Request.AddressLine3,
+            District = source.Request.District,
+            City = source.Request.City,
+            StateProvince = source.Request.StateProvince,
+            PostalCode = source.Request.PostalCode,
+            CountryId = source.Request.CountryId,
+            RecipientName = source.Request.RecipientName,
+            RecipientPhone = source.Request.RecipientPhone
+        }
+    };
+
+    private string GetAddressText(int index, AddressField field) => field switch
+    {
+        AddressField.Subdistrict => _addresses[index].Request.District ?? string.Empty,
+        AddressField.District => _addresses[index].Request.City,
+        AddressField.Province => _addresses[index].Request.StateProvince,
+        AddressField.PostalCode => _addresses[index].Request.PostalCode,
+        _ => string.Empty
+    };
+
+    private void SetAddressText(int index, AddressField field, string value)
+    {
+        switch (field)
+        {
+            case AddressField.Subdistrict:
+                _addresses[index].Request.District = value;
+                break;
+            case AddressField.District:
+                _addresses[index].Request.City = value;
+                break;
+            case AddressField.Province:
+                _addresses[index].Request.StateProvince = value;
+                break;
+            case AddressField.PostalCode:
+                _addresses[index].Request.PostalCode = value;
+                break;
+        }
+    }
+
+    private string FormatLocationValue(RegistryThaiLocation? location, int index, AddressField field)
+    {
+        if (location == null)
+        {
+            return GetAddressText(index, field);
+        }
+
+        var useThai = IsThai(GetAddressText(index, field));
+        return field switch
+        {
+            AddressField.Subdistrict => useThai ? location.SubDistrictTh : location.SubDistrictEn,
+            AddressField.District => useThai ? location.DistrictTh : location.DistrictEn,
+            AddressField.Province => useThai ? location.ProvinceTh : location.ProvinceEn,
+            AddressField.PostalCode => location.PostalCode,
+            _ => string.Empty
+        };
+    }
+
+    private static string FormatLocationPrimary(RegistryThaiLocation location, string input) =>
+        IsThai(input)
+            ? $"{location.SubDistrictTh} {location.DistrictTh} {location.ProvinceTh}"
+            : $"{location.SubDistrictEn}, {location.DistrictEn}, {location.ProvinceEn}";
+
+    private static string FormatLocationSecondary(RegistryThaiLocation location, string input) =>
+        IsThai(input)
+            ? $"{location.SubDistrictEn}, {location.DistrictEn}, {location.ProvinceEn}"
+            : $"{location.SubDistrictTh} {location.DistrictTh} {location.ProvinceTh}";
+
+    private static bool HasAddressContent(CreateAddressRequest address) =>
+        !string.IsNullOrWhiteSpace(address.AddressLine1)
+        || !string.IsNullOrWhiteSpace(address.District)
+        || !string.IsNullOrWhiteSpace(address.City)
+        || !string.IsNullOrWhiteSpace(address.StateProvince)
+        || !string.IsNullOrWhiteSpace(address.PostalCode);
+
+    private string GetCustomerName()
+    {
+        var name = $"{_onboarding.Customer.FirstName} {_onboarding.Customer.LastName}".Trim();
+        return string.IsNullOrWhiteSpace(name) ? "Not named yet" : name;
+    }
+
+    private static string GetAddressTitle(string type) =>
+        string.Equals(type, "Company Billing", StringComparison.OrdinalIgnoreCase)
+            ? "Company billing address"
+            : $"Customer {type.ToLowerInvariant()} address";
+
+    private string GetBranchLabel() =>
+        _companyBranch == "00000" ? "Head office / สำนักงานใหญ่" : $"Branch {_companyBranch}";
+
+    private static string NormalizeBranch(string? branch)
+    {
+        if (string.IsNullOrWhiteSpace(branch))
+        {
+            return "00000";
+        }
+
+        var normalized = branch.Trim();
+        if (normalized.Equals("0", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("00000", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("Head Office", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("สำนักงานใหญ่", StringComparison.OrdinalIgnoreCase))
+        {
+            return "00000";
+        }
+
+        var digits = new string(normalized.Where(char.IsDigit).ToArray());
+        return digits.Length > 0 ? digits.PadLeft(5, '0')[^5..] : normalized;
+    }
+
+    private static string NormalizeAddressType(string? type) =>
+        string.Equals(type, "Shipping", StringComparison.OrdinalIgnoreCase) ? "Shipping" : "Billing";
+
+    private static void SetIfPresent(Action<string> setter, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            setter(value.Trim());
+        }
+    }
+
+    private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
+
+    private static string GetFileSummary(IReadOnlyList<IBrowserFile> files, string emptyText) =>
+        files.Count == 0 ? emptyText : $"{files.Count} selected: {string.Join(", ", files.Take(2).Select(f => f.Name))}{(files.Count > 2 ? "..." : string.Empty)}";
+
+    private static string GetMimeType(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
+    {
+        ".pdf" => "application/pdf",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".png" => "image/png",
+        ".doc" => "application/msword",
+        ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".txt" => "text/plain",
+        _ => "application/octet-stream"
+    };
 }

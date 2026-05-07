@@ -27,6 +27,13 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             }
         }
 
+        if (companyId.HasValue
+            && request.CompanyBillingAddress != null
+            && HasRequiredAddressFields(request.CompanyBillingAddress))
+        {
+            await CreateAddressesAsync(companyId.Value, [request.CompanyBillingAddress], "Company", ensureDefaultShipping: false, ct: ct);
+        }
+
         // 2. Create Customer
         request.Customer.CompanyId = companyId;
         var customerResponse = await httpClient.PostAsJsonAsync("/customer/v1/customers", request.Customer, ct);
@@ -35,7 +42,24 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>(ct);
         if (customer == null) return null;
 
-        // 3. Create Note if needed
+        if (request.Addresses.Count > 0)
+        {
+            await CreateAddressesAsync(customer.Id, request.Addresses, ct: ct);
+        }
+
+        if (request.Documents.Count > 0)
+        {
+            var documents = await CreateDocumentsAsync("Customer", customer.Id, request.Documents, ct);
+            if (request.Nda != null)
+            {
+                await CreateNdaWithDocumentsAsync(customer.Id, request.Nda, documents, ct);
+            }
+        }
+        else if (request.Nda != null)
+        {
+            await CreateNdaWithDocumentsAsync(customer.Id, request.Nda, [], ct);
+        }
+
         if (!string.IsNullOrEmpty(request.InternalNote))
         {
             await httpClient.PostAsJsonAsync("/customer/v1/internal-notes", new CreateInternalNoteRequest
@@ -52,16 +76,23 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// <summary>
     /// Creates multiple addresses for a customer.
     /// </summary>
-    public virtual async Task<List<AddressResponse>> CreateAddressesAsync(Guid customerId, List<CreateAddressRequest> addresses, CancellationToken ct = default)
+    public virtual async Task<List<AddressResponse>> CreateAddressesAsync(
+        Guid ownerId,
+        List<CreateAddressRequest> addresses,
+        string ownerType = "Customer",
+        bool ensureDefaultShipping = true,
+        CancellationToken ct = default)
     {
-        var addressesToCreate = await EnsureDefaultShippingAddressAsync(customerId, addresses, ct);
+        var addressesToCreate = ensureDefaultShipping && string.Equals(ownerType, "Customer", StringComparison.OrdinalIgnoreCase)
+            ? await EnsureDefaultShippingAddressAsync(ownerId, addresses, ct)
+            : addresses;
         var results = new List<AddressResponse>();
         foreach (var address in addressesToCreate)
         {
             var response = await httpClient.PostAsJsonAsync("/customer/v1/addresses", new
             {
-                ownerType = "Customer",
-                ownerId = customerId,
+                ownerType,
+                ownerId,
                 type = address.Type,
                 isDefault = address.IsDefault,
                 addressLine1 = address.AddressLine1,
@@ -556,7 +587,19 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         var results = new List<DocumentResponse>();
         foreach (var doc in documents)
         {
-            var response = await httpClient.PostAsJsonAsync("/customer/v1/documents", new { ownerType, ownerId, documentType = doc.DocumentCategory, fileReference = doc.FileReference, filename = doc.FileName, fileSize = doc.FileSize, mimeType = doc.MimeType }, ct);
+            var response = await httpClient.PostAsJsonAsync("/customer/v1/documents", new
+            {
+                ownerType,
+                ownerId,
+                documentType = doc.DocumentCategory,
+                documentSubType = doc.DocumentSubType,
+                fileReference = doc.FileReference,
+                filename = doc.FileName,
+                fileSize = doc.FileSize,
+                mimeType = doc.MimeType,
+                description = doc.Description,
+                displayOrder = doc.DisplayOrder
+            }, ct);
             if (response.IsSuccessStatusCode) { var result = await response.Content.ReadFromJsonAsync<DocumentResponse>(ct); if (result != null) results.Add(result); }
         }
         return results;

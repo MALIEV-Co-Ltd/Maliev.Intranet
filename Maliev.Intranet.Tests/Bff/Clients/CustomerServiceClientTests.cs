@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Tests.Testing;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
@@ -55,6 +56,154 @@ public class CustomerServiceClientTests
         var result = await _client.CreateCustomerBasicAsync(request);
 
         Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task CreateCustomerBasicAsync_WithOnboardingPayload_CreatesRelatedRecords()
+    {
+        var customerId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        var calls = new List<string>();
+        var addressPayloads = new List<string>();
+        var documentPayload = string.Empty;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            calls.Add($"{request.Method} {request.RequestUri!.PathAndQuery}");
+
+            if (request.Method == HttpMethod.Post && request.RequestUri.PathAndQuery == "/customer/v1/companies")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new CompanyResponse { Id = companyId, Name = "บริษัท ทดสอบ จำกัด" })
+                });
+            }
+
+            if (request.Method == HttpMethod.Post && request.RequestUri.PathAndQuery == "/customer/v1/customers")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new CustomerResponse { Id = customerId })
+                });
+            }
+
+            if (request.Method == HttpMethod.Get && request.RequestUri.PathAndQuery.Contains("/customer/v1/addresses?ownerType=Customer", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new List<AddressResponse>())
+                });
+            }
+
+            if (request.Method == HttpMethod.Post && request.RequestUri.PathAndQuery == "/customer/v1/addresses")
+            {
+                addressPayloads.Add(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new AddressResponse { Id = Guid.NewGuid() })
+                });
+            }
+
+            if (request.Method == HttpMethod.Post && request.RequestUri.PathAndQuery == "/customer/v1/documents")
+            {
+                documentPayload = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new DocumentResponse
+                    {
+                        Id = Guid.NewGuid(),
+                        DocumentCategory = DocumentCategories.NDA,
+                        DocumentSubType = "Signed"
+                    })
+                });
+            }
+
+            if (request.Method == HttpMethod.Post && request.RequestUri.PathAndQuery == "/customer/v1/ndas")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { id = Guid.NewGuid(), version = "AAAAAAAAB9E=" })
+                });
+            }
+
+            if (request.Method == HttpMethod.Patch && request.RequestUri.PathAndQuery.Contains("/customer/v1/ndas/", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            }
+
+            if (request.Method == HttpMethod.Post && request.RequestUri.PathAndQuery == "/customer/v1/internal-notes")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+
+        var client = new CustomerServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }, new Mock<ILogger<CustomerServiceClient>>().Object);
+
+        var result = await client.CreateCustomerBasicAsync(new CustomerOnboardingRequest
+        {
+            Customer = new CreateCustomerRequest
+            {
+                FirstName = "Somchai",
+                LastName = "Mali",
+                Email = "somchai@example.com"
+            },
+            NewCompany = new CreateCompanyRequest { Name = "บริษัท ทดสอบ จำกัด", VatNumber = "1234567890123" },
+            Addresses =
+            [
+                new CreateAddressRequest
+                {
+                    Type = "Billing",
+                    AddressLine1 = "1 Silom",
+                    City = "Bang Rak",
+                    StateProvince = "Bangkok",
+                    PostalCode = "10500",
+                    CountryId = countryId
+                }
+            ],
+            CompanyBillingAddress = new CreateAddressRequest
+            {
+                Type = "Billing",
+                AddressLine1 = "99 Company Tower",
+                City = "Bang Rak",
+                StateProvince = "Bangkok",
+                PostalCode = "10500",
+                CountryId = countryId
+            },
+            Documents =
+            [
+                new CreateDocumentRequest
+                {
+                    DocumentCategory = DocumentCategories.NDA,
+                    DocumentSubType = "Signed",
+                    FileReference = "upload-1",
+                    FileName = "nda.pdf",
+                    FileSize = 100,
+                    MimeType = "application/pdf"
+                }
+            ],
+            Nda = new CreateNDARequest { IsActive = true, FileReference = "upload-1", FileName = "nda.pdf" },
+            InternalNote = "Company branch: Head office / สำนักงานใหญ่"
+        });
+
+        Assert.NotNull(result);
+        Assert.Contains("POST /customer/v1/companies", calls);
+        Assert.Contains("POST /customer/v1/customers", calls);
+        Assert.Contains("POST /customer/v1/addresses", calls);
+        Assert.Contains("POST /customer/v1/documents", calls);
+        Assert.Contains("POST /customer/v1/ndas", calls);
+        Assert.Contains("POST /customer/v1/internal-notes", calls);
+
+        Assert.Contains(addressPayloads, payload =>
+        {
+            using var address = System.Text.Json.JsonDocument.Parse(payload);
+            return address.RootElement.GetProperty("ownerType").GetString() == "Company"
+                && address.RootElement.GetProperty("ownerId").GetGuid() == companyId;
+        });
+
+        using var document = System.Text.Json.JsonDocument.Parse(documentPayload);
+        Assert.Equal("Signed", document.RootElement.GetProperty("documentSubType").GetString());
     }
 
     [Fact]
