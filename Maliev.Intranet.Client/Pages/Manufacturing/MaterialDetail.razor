@@ -1,7 +1,12 @@
 @page "/mfg/materials/{Id:guid}"
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
 @using Maliev.Intranet.Shared
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Material | MALIEV Intranet</PageTitle>
 
@@ -10,6 +15,18 @@
         @if (_material is not null)
         {
             <StatusBadge Status="@_material.Status" />
+            @if (_canUpdateMaterial)
+            {
+                @if (_editing)
+                {
+                    <SecondaryButton Icon="@Icons.Material.Outlined.Close" Disabled="@_saving" OnClick="@CancelEditAsync">Cancel</SecondaryButton>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Save" Disabled="@_saving" OnClick="@SaveMaterialAsync">Save</PrimaryButton>
+                }
+                else
+                {
+                    <SecondaryButton Icon="@Icons.Material.Outlined.Edit" OnClick="@StartEditAsync">Edit</SecondaryButton>
+                }
+            }
         }
     </PageHeader>
 
@@ -25,48 +42,141 @@
         else
         {
             <StatBar Class="mb-4">
-                <StatTile Label="Stock" Value="@($"{_material.QuantityOnHand:N0} {_material.Unit}")" />
+                <StatTile Label="Stock" Value="@($"{_material.QuantityOnHand:N0} {_material.Unit}")" Subtext="Aggregate stock; barcode lots pending" />
                 <StatTile Label="Unit price" Value="@_material.UnitPrice.ToString("N2")" />
-                <StatTile Label="Category" Value="@(string.IsNullOrWhiteSpace(_material.Category) ? "-" : _material.Category)" />
-                <StatTile Label="Updated" Value="@_material.UpdatedAt.ToString("dd MMM yyyy")" />
-            </StatBar>
-
-            <div class="mlv-two-column-grid">
-                <PanelCard Title="Profile">
-                    <dl class="mlv-detail-list">
-                        <dt>Code</dt><dd class="mlv-mono">@_material.SKU</dd>
-                        <dt>Status</dt><dd>@_material.Status</dd>
-                        <dt>Color</dt><dd>@(string.IsNullOrWhiteSpace(_material.Color) ? "-" : _material.Color)</dd>
-                        <dt>Description</dt><dd>@(string.IsNullOrWhiteSpace(_material.Description) ? "-" : _material.Description)</dd>
-                    </dl>
-                </PanelCard>
-
-                <PanelCard Title="Properties">
-                    @if (_material.Properties.Count == 0)
+                <StatTile Label="Processes" Value="">
+                    @if (MaterialProcesses.Count == 0)
                     {
-                        <div class="mlv-empty">No technical properties.</div>
+                        <span>-</span>
                     }
                     else
                     {
-                        <dl class="mlv-detail-list">
-                            @foreach (var property in _material.Properties)
+                        <div class="material-process-list" aria-label="Supported manufacturing processes">
+                            @foreach (var process in MaterialProcesses)
                             {
-                                <dt>@property.Key</dt><dd>@property.Value @property.Unit</dd>
+                                <span class="material-process-chip">@process</span>
                             }
-                        </dl>
+                        </div>
                     }
-                </PanelCard>
-            </div>
+                </StatTile>
+                <StatTile Label="Updated" Value="@_material.UpdatedAt.ToString("dd MMM yyyy")" />
+            </StatBar>
+
+            @if (_editing && _editContext is not null)
+            {
+                <EditForm EditContext="@_editContext" FormName="MaterialEditForm">
+                    <DataAnnotationsValidator />
+                    @MaterialContent
+                </EditForm>
+            }
+            else
+            {
+                @MaterialContent
+            }
         }
     </PageBody>
 </div>
 
 @code {
+    private RenderFragment MaterialContent => @<div class="mlv-two-column-grid">
+        <PanelCard Title="Profile">
+            @if (_editing && _editModel is not null)
+            {
+                <div class="material-edit-grid">
+                    <label class="material-edit-field">
+                        <span>Name</span>
+                        <input class="material-input" @bind="_editModel.Name" />
+                        <ValidationMessage For="@(() => _editModel!.Name)" />
+                    </label>
+                    <label class="material-edit-field">
+                        <span>Code</span>
+                        <input class="material-input mlv-mono" @bind="_editModel.SKU" />
+                        <ValidationMessage For="@(() => _editModel!.SKU)" />
+                    </label>
+                    <label class="material-edit-field">
+                        <span>Unit price</span>
+                        <input class="material-input" type="number" step="0.01" min="0" @bind="_editModel.UnitPrice" />
+                        <ValidationMessage For="@(() => _editModel!.UnitPrice)" />
+                    </label>
+                    <label class="material-edit-field">
+                        <span>Stock</span>
+                        <input class="material-input" type="number" step="1" min="0" @bind="_editModel.QuantityOnHand" />
+                        <ValidationMessage For="@(() => _editModel!.QuantityOnHand)" />
+                    </label>
+                    <label class="material-edit-field material-edit-field-wide">
+                        <span>Description</span>
+                        <textarea class="material-input material-textarea" rows="4" @bind="_editModel.Description"></textarea>
+                        <ValidationMessage For="@(() => _editModel!.Description)" />
+                    </label>
+                </div>
+            }
+            else if (_material is not null)
+            {
+                <dl class="mlv-detail-list">
+                    <dt>Code</dt><dd class="mlv-mono">@_material.SKU</dd>
+                    <dt>Status</dt><dd>@_material.Status</dd>
+                    <dt>Color</dt>
+                    <dd>
+                        @if (_material.Colors.Count == 0)
+                        {
+                            <span>-</span>
+                        }
+                        else
+                        {
+                            <div class="material-color-list" aria-label="Available colors">
+                                @foreach (var color in _material.Colors)
+                                {
+                                    <span class="material-color-chip" title="@color.Name">
+                                        <span class="material-color-dot" style="@ColorSwatchStyle(color)"></span>
+                                        <span>@color.Name</span>
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </dd>
+                    <dt>Description</dt><dd>@(string.IsNullOrWhiteSpace(_material.Description) ? "-" : _material.Description)</dd>
+                </dl>
+            }
+        </PanelCard>
+
+        <PanelCard Title="Properties">
+            @if (_material?.Properties.Count == 0)
+            {
+                <div class="mlv-empty">No technical properties.</div>
+            }
+            else if (_material is not null)
+            {
+                <dl class="mlv-detail-list">
+                    @foreach (var property in _material.Properties)
+                    {
+                        <dt>@property.Key</dt><dd>@property.Value @property.Unit</dd>
+                    }
+                </dl>
+            }
+        </PanelCard>
+    </div>;
+
     [Parameter]
     public Guid Id { get; set; }
 
     private MaterialDetailDto? _material;
+    private MaterialEditModel? _editModel;
+    private EditContext? _editContext;
     private bool _loading = true;
+    private bool _saving;
+    private bool _editing;
+    private bool _canUpdateMaterial;
+
+    private IReadOnlyList<string> MaterialProcesses =>
+        _material?.ManufacturingProcesses.Count > 0
+            ? _material.ManufacturingProcesses
+            : SplitDisplayList(_material?.Category);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _canUpdateMaterial = HasPermission(authState.User, MalievPermissions.Material.Update);
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -83,5 +193,176 @@
         {
             _loading = false;
         }
+    }
+
+    private Task StartEditAsync()
+    {
+        if (_material is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _editModel = new MaterialEditModel
+        {
+            Name = _material.Name,
+            SKU = _material.SKU,
+            Description = _material.Description,
+            UnitPrice = _material.UnitPrice,
+            QuantityOnHand = _material.QuantityOnHand
+        };
+        _editContext = new EditContext(_editModel);
+        _editing = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelEditAsync()
+    {
+        _editing = false;
+        _editModel = null;
+        _editContext = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveMaterialAsync()
+    {
+        if (_material is null || _editModel is null || _editContext is null || !_editContext.Validate())
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new UpdateMaterialRequest
+            {
+                Name = _editModel.Name.Trim(),
+                SKU = _editModel.SKU.Trim(),
+                Description = _editModel.Description?.Trim(),
+                UnitPrice = _editModel.UnitPrice,
+                QuantityOnHand = _editModel.QuantityOnHand
+            };
+
+            var response = await Http.PutAsJsonAsync($"api/v1/materials/{Id}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Unable to update material.", Severity.Error);
+                return;
+            }
+
+            var updated = await response.Content.ReadFromJsonAsync<MaterialDetailDto>();
+            if (updated is not null)
+            {
+                _material = updated;
+            }
+
+            await CancelEditAsync();
+            Snackbar.Add("Material updated.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to update material: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string ColorSwatchStyle(MaterialColorDto color)
+    {
+        var hex = IsHexColor(color.HexCode) ? color.HexCode : "#f5f5f5";
+        return $"background:{hex};";
+    }
+
+    private static bool IsHexColor(string? value)
+    {
+        if (value is not { Length: 7 } || value[0] != '#')
+        {
+            return false;
+        }
+
+        return value.Skip(1).All(Uri.IsHexDigit);
+    }
+
+    private static IReadOnlyList<string> SplitDisplayList(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private static bool HasPermission(ClaimsPrincipal user, string permission)
+    {
+        if (string.IsNullOrWhiteSpace(permission))
+        {
+            return false;
+        }
+
+        var permissions = user.Claims
+            .Where(claim => claim.Type is "permissions" or "permission")
+            .Select(claim => claim.Value)
+            .ToList();
+
+        if (permissions.Any(value => IsPlatformOwnerValue(value) || value == "*"))
+        {
+            return true;
+        }
+
+        if (user.Claims.Any(claim =>
+                (claim.Type == "roles" || claim.Type == "role" || claim.Type == ClaimTypes.Role) &&
+                IsPlatformOwnerValue(claim.Value)))
+        {
+            return true;
+        }
+
+        return permissions.Any(claim => IsPermissionMatch(permission, claim));
+    }
+
+    private static bool IsPlatformOwnerValue(string value)
+        => string.Equals(value, "platform.owner", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(value, "roles.platform.owner", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPermissionMatch(string required, string claim)
+    {
+        if (string.Equals(required, claim, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var requiredParts = required.Split('.');
+        var claimParts = claim.Split('.');
+
+        for (var i = 0; i < claimParts.Length; i++)
+        {
+            if (claimParts[i] == "*")
+            {
+                return i == claimParts.Length - 1;
+            }
+
+            if (i >= requiredParts.Length || !string.Equals(requiredParts[i], claimParts[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return claimParts.Length == requiredParts.Length;
+    }
+
+    private sealed class MaterialEditModel
+    {
+        [Required]
+        [StringLength(100, MinimumLength = 2)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(50, MinimumLength = 2)]
+        public string SKU { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string? Description { get; set; }
+
+        [Range(0, (double)decimal.MaxValue)]
+        public decimal UnitPrice { get; set; }
+
+        [Range(0, int.MaxValue)]
+        public int QuantityOnHand { get; set; }
     }
 }

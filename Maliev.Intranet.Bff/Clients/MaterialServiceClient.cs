@@ -74,7 +74,33 @@ public class MaterialServiceClient(HttpClient httpClient)
     /// <returns>The updated material detail.</returns>
     public async Task<MaterialDetailDto?> UpdateMaterialAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PutAsJsonAsync($"/material/v1/materials/{id}", request, ct);
+        var current = await httpClient.GetFromJsonAsync<MaterialServiceMaterialDto>($"/material/v1/materials/{id}", ct);
+        if (current is null)
+        {
+            return null;
+        }
+
+        var downstreamRequest = new MaterialServiceUpdateMaterialRequest
+        {
+            Name = FirstNonWhiteSpace(request.Name, current.Name),
+            Code = FirstNonWhiteSpace(request.SKU, current.Code),
+            Description = request.Description ?? current.Description,
+            PricePerUnit = request.UnitPrice ?? current.PricePerUnit,
+            StockLevel = request.QuantityOnHand ?? current.StockLevel,
+            SupplierId = current.SupplierId,
+            ManufacturingProcessIds = current.ManufacturingProcesses.Select(process => process.Id).ToList(),
+            ColorIds = current.AvailableColors.Select(color => color.Id).ToList(),
+            PostProcessingMethodIds = current.PostProcessingMethods.Select(method => method.Id).ToList(),
+            MechanicalProperties = current.MechanicalProperties
+                .Select(property => new MaterialServiceMechanicalPropertyRequest
+                {
+                    MechanicalPropertyId = property.MechanicalPropertyId,
+                    Value = property.Value
+                })
+                .ToList()
+        };
+
+        var response = await httpClient.PutAsJsonAsync($"/material/v1/materials/{id}", downstreamRequest, ct);
         if (response.IsSuccessStatusCode)
         {
             var material = await response.Content.ReadFromJsonAsync<MaterialServiceMaterialDto>(cancellationToken: ct);
@@ -137,21 +163,40 @@ public class MaterialServiceClient(HttpClient httpClient)
         };
     }
 
+    private static string FirstNonWhiteSpace(string? candidate, string fallback)
+        => string.IsNullOrWhiteSpace(candidate) ? fallback : candidate.Trim();
+
     private static MaterialDetailDto ToDetailDto(MaterialServiceMaterialDto material)
     {
+        var manufacturingProcesses = material.ManufacturingProcesses
+            .Select(process => process.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToList();
+
+        var colors = material.AvailableColors
+            .Select(color => new MaterialColorDto
+            {
+                Id = color.Id,
+                Name = color.Name,
+                HexCode = color.HexCode
+            })
+            .ToList();
+
         return new MaterialDetailDto
         {
             Id = material.Id,
             Name = material.Name,
             SKU = material.Code,
-            Category = string.Join(", ", material.ManufacturingProcesses.Select(process => process.Name)),
+            Category = string.Join(", ", manufacturingProcesses),
             Description = material.Description ?? string.Empty,
             UnitPrice = material.PricePerUnit,
             QuantityOnHand = material.StockLevel,
             ReorderLevel = 0,
             Unit = "pcs",
             Status = material.Active ? "Active" : "Inactive",
-            Color = string.Join(", ", material.AvailableColors.Select(color => color.Name)),
+            ManufacturingProcesses = manufacturingProcesses,
+            Color = string.Join(", ", colors.Select(color => color.Name)),
+            Colors = colors,
             Properties = material.MechanicalProperties
                 .Select(property => new MaterialPropertyDto
                 {
@@ -252,6 +297,9 @@ public class MaterialServiceNamedDto
 
     /// <summary>Name.</summary>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>Optional hex color code for color DTOs.</summary>
+    public string? HexCode { get; set; }
 }
 
 /// <summary>
@@ -269,5 +317,43 @@ public class MaterialServiceMechanicalPropertyDto
     public string Unit { get; set; } = string.Empty;
 
     /// <summary>Value.</summary>
+    public decimal Value { get; set; }
+}
+
+/// <summary>
+/// MaterialService update request shape.
+/// </summary>
+public sealed class MaterialServiceUpdateMaterialRequest
+{
+    /// <summary>Name of the material.</summary>
+    public string Name { get; set; } = string.Empty;
+    /// <summary>Unique material code.</summary>
+    public string Code { get; set; } = string.Empty;
+    /// <summary>Optional material description.</summary>
+    public string? Description { get; set; }
+    /// <summary>Price per unit.</summary>
+    public decimal PricePerUnit { get; set; }
+    /// <summary>Current stock level.</summary>
+    public int StockLevel { get; set; }
+    /// <summary>Optional supplier identifier.</summary>
+    public Guid? SupplierId { get; set; }
+    /// <summary>Manufacturing process identifiers to preserve.</summary>
+    public List<Guid> ManufacturingProcessIds { get; set; } = [];
+    /// <summary>Color identifiers to preserve.</summary>
+    public List<Guid> ColorIds { get; set; } = [];
+    /// <summary>Post-processing method identifiers to preserve.</summary>
+    public List<Guid> PostProcessingMethodIds { get; set; } = [];
+    /// <summary>Mechanical property values to preserve.</summary>
+    public List<MaterialServiceMechanicalPropertyRequest> MechanicalProperties { get; set; } = [];
+}
+
+/// <summary>
+/// MaterialService mechanical property update request shape.
+/// </summary>
+public sealed class MaterialServiceMechanicalPropertyRequest
+{
+    /// <summary>Mechanical property identifier.</summary>
+    public Guid MechanicalPropertyId { get; set; }
+    /// <summary>Material-specific property value.</summary>
     public decimal Value { get; set; }
 }

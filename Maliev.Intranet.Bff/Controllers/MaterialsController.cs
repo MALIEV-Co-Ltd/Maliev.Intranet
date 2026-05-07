@@ -49,7 +49,7 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     /// <param name="request">The creation request.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created material.</returns>
-    [RequirePermission(MalievPermissions.Material.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Material.Create, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost]
     public async Task<ActionResult<MaterialSummaryDto>> Create([FromBody] CreateMaterialRequest request, CancellationToken ct)
     {
@@ -64,7 +64,7 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     /// <param name="request">The update request.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The updated material.</returns>
-    [RequirePermission(MalievPermissions.Material.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Material.Update, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<MaterialDetailDto>> Update(Guid id, [FromBody] UpdateMaterialRequest request, CancellationToken ct)
     {
@@ -78,7 +78,7 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     /// <param name="id">The material ID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>No content.</returns>
-    [RequirePermission(MalievPermissions.Material.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Material.Delete, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult> Delete(Guid id, CancellationToken ct)
     {

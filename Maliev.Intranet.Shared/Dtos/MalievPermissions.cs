@@ -232,8 +232,14 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view material specifications and stock levels.</summary>
         public const string Read = "material.materials.read";
-        /// <summary>Permission to define new materials or update inventory details.</summary>
-        public const string Write = "material.materials.write";
+        /// <summary>Permission to define new materials.</summary>
+        public const string Create = "material.materials.create";
+        /// <summary>Permission to update material specifications or inventory details.</summary>
+        public const string Update = "material.materials.update";
+        /// <summary>Permission to remove material records.</summary>
+        public const string Delete = "material.materials.delete";
+        /// <summary>Legacy alias for material update permissions.</summary>
+        public const string Write = Update;
     }
 
     /// <summary>

@@ -1,6 +1,15 @@
 <div class="mlv-stat-tile @Class">
     <div class="mlv-stat-label">@Label</div>
-    <div class="mlv-stat-value" style="@ValueStyle">@Value</div>
+    <div class="mlv-stat-value @(ChildContent is null ? null : "content")" style="@ValueStyle">
+        @if (ChildContent is null)
+        {
+            @Value
+        }
+        else
+        {
+            @ChildContent
+        }
+    </div>
     @if (!string.IsNullOrWhiteSpace(Subtext))
     {
         <div class="mlv-stat-sub @TrendClass">
@@ -20,6 +29,7 @@
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public string? Subtext { get; set; }
     [Parameter] public bool? Trend { get; set; }
     [Parameter] public string? Color { get; set; }

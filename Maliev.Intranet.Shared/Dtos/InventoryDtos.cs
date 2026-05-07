@@ -52,10 +52,14 @@ public class MaterialDetailDto
     public string Unit { get; set; } = "pcs";
     /// <summary>The current availability status.</summary>
     public string Status { get; set; } = string.Empty;
+    /// <summary>Manufacturing process names that support this material.</summary>
+    public List<string> ManufacturingProcesses { get; set; } = [];
     /// <summary>Specific type of material (e.g., PLA, PETG).</summary>
     public string? MaterialType { get; set; }
     /// <summary>The color of the material, if applicable.</summary>
     public string? Color { get; set; }
+    /// <summary>Available material color options with display swatches.</summary>
+    public List<MaterialColorDto> Colors { get; set; } = [];
     /// <summary>The manufacturer or brand of the material.</summary>
     public string? Brand { get; set; }
     /// <summary>The weight of a single unit of material, if applicable.</summary>
@@ -70,6 +74,19 @@ public class MaterialDetailDto
     public DateTime CreatedAt { get; set; }
     /// <summary>The date and time when the record was last updated.</summary>
     public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// Represents an available material color and its display color.
+/// </summary>
+public class MaterialColorDto
+{
+    /// <summary>The unique identifier for the color option.</summary>
+    public Guid Id { get; set; }
+    /// <summary>The display name of the color.</summary>
+    public string Name { get; set; } = string.Empty;
+    /// <summary>The optional CSS-compatible hex color code.</summary>
+    public string? HexCode { get; set; }
 }
 
 /// <summary>
@@ -181,6 +198,8 @@ public sealed record CreateMaterialRequest
 /// </summary>
 public sealed record UpdateMaterialRequest
 {
+    /// <summary>The updated material SKU or code.</summary>
+    public string? SKU { get; set; }
     /// <summary>The updated display name.</summary>
     public string? Name { get; set; }
     /// <summary>The updated description.</summary>

@@ -177,6 +177,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains("</PageBody>", detail, StringComparison.Ordinal);
         Assert.Contains("<StatBar Class=\"mb-4\">", list, StringComparison.Ordinal);
         Assert.Contains("<StatBar Class=\"mb-4\">", detail, StringComparison.Ordinal);
+        Assert.Contains("Label=\"Processes\"", detail, StringComparison.Ordinal);
+        Assert.Contains("material-process-chip", detail, StringComparison.Ordinal);
+        Assert.Contains("material-color-dot", detail, StringComparison.Ordinal);
+        Assert.Contains("MalievPermissions.Material.Update", detail, StringComparison.Ordinal);
+        Assert.Contains("roles.platform.owner", detail, StringComparison.Ordinal);
+        Assert.Contains("Aggregate stock; barcode lots pending", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard>", list, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Profile\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Properties\">", detail, StringComparison.Ordinal);

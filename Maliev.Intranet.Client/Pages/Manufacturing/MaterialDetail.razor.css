@@ -1,0 +1,84 @@
+.material-process-list,
+.material-color-list {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+}
+
+.material-process-chip,
+.material-color-chip {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-3);
+    color: var(--maliev-ink);
+    box-shadow: var(--maliev-shadow-ring);
+    font-family: var(--mud-typography-default-family);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.material-color-dot {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    box-shadow: var(--maliev-shadow-ring);
+}
+
+.material-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.material-edit-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--maliev-ink);
+    font-size: var(--mud-typography-body2-size);
+    font-weight: 500;
+}
+
+.material-edit-field-wide {
+    grid-column: 1 / -1;
+}
+
+.material-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    border: 0;
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
+    color: var(--maliev-ink);
+    font-family: var(--mud-typography-default-family);
+    font-size: var(--mud-typography-body2-size);
+    line-height: 1.4;
+    padding: 8px 10px;
+}
+
+.material-input:focus {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
+}
+
+.material-textarea {
+    resize: vertical;
+}
+
+@media (max-width: 640px) {
+    .material-edit-grid {
+        grid-template-columns: 1fr;
+    }
+}

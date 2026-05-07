@@ -24,6 +24,13 @@
     line-height: 1.1;
 }
 
+.mlv-stat-value.content {
+    font-family: var(--mud-typography-default-family);
+    font-size: var(--mud-typography-body2-size);
+    font-weight: 500;
+    line-height: 1.35;
+}
+
 .mlv-stat-sub {
     display: inline-flex;
     align-items: center;
