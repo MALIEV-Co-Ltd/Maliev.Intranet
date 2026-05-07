@@ -347,6 +347,27 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void TopBar_TabletAndMobileLayoutKeepsNavSearchAndProfileInBounds()
+    {
+        var razor = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var searchStyles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "GlobalSearchBox.razor.css");
+
+        Assert.Contains("class=\"topbar-spacer\"", razor, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 1200px)", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-profile-info { display: none; }", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 1120px)", styles, StringComparison.Ordinal);
+        Assert.Contains("flex-wrap: wrap;", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-search", styles, StringComparison.Ordinal);
+        Assert.Contains("display: block;", styles, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 100%;", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain(".topbar-search { display: none; }", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain("@media (max-width: 960px)", searchStyles, StringComparison.Ordinal);
+        Assert.DoesNotContain("display: none", searchStyles, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void TopBar_QuoteNavigationAction_UsesPrimaryColor()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
@@ -372,6 +393,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Sign in with Google", source, StringComparison.Ordinal);
         Assert.Contains("class=\"login-gateway-card\"", source, StringComparison.Ordinal);
         Assert.Contains("footer-note-link", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Support", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("System Status", source, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-bg);", styles, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-card);", styles, StringComparison.Ordinal);
         Assert.Contains("border-radius: var(--maliev-radius-md);", styles, StringComparison.Ordinal);
@@ -391,6 +414,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Noto+Sans+Thai", bffLogin, StringComparison.Ordinal);
         Assert.Contains("login-gateway-card", bffLogin, StringComparison.Ordinal);
         Assert.Contains("Sign in to MALIEV", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain("Support", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain("System Status", bffLogin, StringComparison.Ordinal);
         Assert.Contains("--maliev-shadow-card", bffLogin, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-bg);", bffLogin, StringComparison.Ordinal);
         Assert.DoesNotContain("JetBrains+Mono", bffLogin, StringComparison.Ordinal);

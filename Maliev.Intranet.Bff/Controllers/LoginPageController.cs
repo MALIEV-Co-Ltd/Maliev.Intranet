@@ -161,18 +161,6 @@ public sealed class LoginPageController : Controller
         :root[data-maliev-theme="dark"] .header-logo-img--dark {
             display: block;
         }
-        .header-nav {
-            display: flex;
-            align-items: center;
-            gap: 18px;
-            color: var(--maliev-muted);
-            font-size: var(--maliev-type-caption);
-            font-weight: 500;
-            letter-spacing: 0;
-        }
-        .header-nav-link {
-            white-space: nowrap;
-        }
         .login-main {
             display: grid;
             place-items: center;
@@ -414,9 +402,6 @@ public sealed class LoginPageController : Controller
             .login-footer {
                 padding: 12px;
             }
-            .header-nav {
-                display: none;
-            }
             .login-main {
                 align-items: start;
                 padding: 18px 12px;
@@ -495,10 +480,6 @@ public sealed class LoginPageController : Controller
                     <img src="/images/logo.svg" alt="MALIEV Logo" class="header-logo-img header-logo-img--light" />
                     <img src="/images/logo-white.svg" alt="MALIEV Logo" class="header-logo-img header-logo-img--dark" />
                 </div>
-                <nav class="header-nav" aria-label="Gateway links">
-                    <span class="header-nav-link">Support</span>
-                    <span class="header-nav-link">System Status</span>
-                </nav>
                 <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" data-theme-toggle aria-label="Auto theme" title="Auto theme">
                     <svg class="theme-icon" data-theme-icon="light" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2M5.64 5.64 4.22 4.22M19.78 19.78l-1.42-1.42M18.36 5.64l1.42-1.42M4.22 19.78l1.42-1.42" stroke-width="2" stroke-linecap="round"/>

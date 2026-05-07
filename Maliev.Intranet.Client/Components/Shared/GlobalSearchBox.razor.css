@@ -290,9 +290,3 @@
 .global-search.sidebar-global-search .global-search-panel {
     width: min(340px, calc(100vw - 24px));
 }
-
-@media (max-width: 960px) {
-    .global-search.topbar-global-search {
-        display: none;
-    }
-}
