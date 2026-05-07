@@ -81,7 +81,8 @@
 
 .topbar-nav::-webkit-scrollbar { display: none; }
 
-.topbar-mobile-nav-popover {
+.topbar-mobile-drawer-backdrop,
+.topbar-mobile-nav-drawer {
     display: none;
 }
 
@@ -279,7 +280,7 @@
 .topbar-right {
     display: flex;
     align-items: center;
-    gap: 0;
+    gap: 8px;
     flex: 0 1 auto;
     min-width: 0;
 }
@@ -309,7 +310,8 @@
 
 .topbar-profile-menu {
     position: relative;
-    flex-shrink: 0;
+    flex: 0 0 auto;
+    min-width: 0;
 }
 
 .topbar-profile {
@@ -324,6 +326,8 @@
     font: inherit;
     cursor: pointer;
     transition: background 0.15s;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .topbar-profile:hover { background: var(--maliev-panel-2); }
@@ -381,6 +385,10 @@
     color: var(--maliev-muted-2);
 }
 
+.topbar-profile-chevron {
+    flex: 0 0 auto;
+}
+
 .topbar-profile-popover {
     position: absolute;
     top: calc(100% + 8px);
@@ -431,10 +439,13 @@
     .topbar-profile {
         width: 36px;
         height: 36px;
+        flex: 0 0 36px;
         justify-content: center;
         padding: 4px;
+        gap: 0;
     }
 
+    .topbar-profile ::deep .topbar-profile-chevron,
     .topbar-profile > .mud-icon-root {
         display: none;
     }
@@ -466,26 +477,76 @@
         display: none;
     }
 
-    .topbar-mobile-nav-popover {
-        position: absolute;
-        top: calc(100% + 6px);
-        left: 8px;
+    .topbar-mobile-drawer-backdrop {
+        position: fixed;
+        inset: 52px 0 0;
+        z-index: 2500;
+        display: block;
+        background: color-mix(in oklab, var(--maliev-ink), transparent 82%);
+    }
+
+    .topbar-mobile-nav-drawer {
+        position: fixed;
+        top: 52px;
+        bottom: 0;
+        left: 0;
         z-index: 2600;
         display: flex;
-        width: min(260px, calc(100vw - 16px));
-        padding: 6px;
-        border-radius: var(--maliev-radius-sm);
+        width: min(320px, calc(100vw - 28px));
+        padding: 12px;
+        border-radius: 0 var(--maliev-radius-md) var(--maliev-radius-md) 0;
         background: var(--maliev-panel);
         box-shadow: var(--maliev-shadow-card);
         flex-direction: column;
-        gap: 2px;
+        gap: 10px;
+        overflow-y: auto;
+    }
+
+    .topbar-mobile-drawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 36px;
+        color: var(--maliev-ink);
+        font-size: var(--maliev-font-small);
+        font-weight: 700;
+    }
+
+    .topbar-mobile-drawer-close {
+        display: inline-grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: 0;
+        border-radius: var(--maliev-radius-sm);
+        background: transparent;
+        color: var(--maliev-muted);
+        cursor: pointer;
+    }
+
+    .topbar-mobile-drawer-close:hover,
+    .topbar-mobile-drawer-close:focus-visible {
+        background: var(--maliev-panel-3);
+        color: var(--maliev-ink);
+        outline: none;
+    }
+
+    .topbar-mobile-drawer-close:focus-visible {
+        box-shadow: var(--maliev-focus-ring);
+    }
+
+    .topbar-mobile-nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
     }
 
     .topbar-mobile-nav-link {
         display: flex;
         align-items: center;
-        min-height: 34px;
-        padding: 7px 10px;
+        min-height: 38px;
+        padding: 8px 10px;
         border-radius: var(--maliev-radius-xs);
         color: var(--maliev-muted);
         font-size: var(--maliev-font-base);
@@ -516,6 +577,7 @@
     .topbar-right {
         justify-content: flex-end;
         flex: 1 1 auto;
+        gap: 6px;
     }
 
     .topbar-search {
@@ -555,6 +617,12 @@
     .topbar-profile {
         width: 32px;
         height: 32px;
+        flex-basis: 32px;
+    }
+
+    .topbar-avatar {
+        width: 28px;
+        height: 28px;
     }
 
     .topbar-root ::deep .topbar-currency-autocomplete .mud-input {

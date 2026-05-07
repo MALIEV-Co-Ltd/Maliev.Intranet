@@ -397,7 +397,7 @@ public class ModuleRegressionSourceTests
         var topbarRightBlock = ExtractCssBlock(source, ".topbar-right");
         var iconButtonBlock = ExtractCssBlock(source, ".topbar-right ::deep .mud-button-root.mud-icon-button");
 
-        Assert.Contains("gap: 0;", topbarRightBlock, StringComparison.Ordinal);
+        Assert.Contains("gap: 8px;", topbarRightBlock, StringComparison.Ordinal);
         Assert.Contains("height: 32px;", currencyFieldBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", currencyFieldBlock, StringComparison.Ordinal);
         Assert.Contains(".topbar-root ::deep .topbar-currency-autocomplete .mud-input-adornment", source, StringComparison.Ordinal);
@@ -421,18 +421,27 @@ public class ModuleRegressionSourceTests
         Assert.Contains("class=\"topbar-mobile-menu-button\"", razor, StringComparison.Ordinal);
         Assert.Contains("aria-controls=\"topbar-mobile-nav\"", razor, StringComparison.Ordinal);
         Assert.Contains("id=\"topbar-mobile-nav\"", razor, StringComparison.Ordinal);
+        Assert.Contains("class=\"topbar-mobile-drawer-backdrop\"", razor, StringComparison.Ordinal);
+        Assert.Contains("class=\"topbar-mobile-nav-drawer\"", razor, StringComparison.Ordinal);
+        Assert.Contains("class=\"topbar-mobile-nav-list\"", razor, StringComparison.Ordinal);
+        Assert.Contains("Class=\"topbar-profile-chevron\"", razor, StringComparison.Ordinal);
         Assert.Contains("GetMobileNavClass", razor, StringComparison.Ordinal);
         Assert.Contains("CloseMobileNav", razor, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 1200px)", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-profile-info { display: none; }", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-profile ::deep .topbar-profile-chevron", styles, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 1120px)", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-mobile-menu-button", styles, StringComparison.Ordinal);
-        Assert.Contains(".topbar-mobile-nav-popover", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-mobile-drawer-backdrop", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-mobile-nav-drawer", styles, StringComparison.Ordinal);
+        Assert.Contains("position: fixed;", ExtractCssBlock(mobileStyles, ".topbar-mobile-nav-drawer"), StringComparison.Ordinal);
+        Assert.Contains("width: min(320px, calc(100vw - 28px));", styles, StringComparison.Ordinal);
         Assert.Contains("flex-wrap: nowrap;", styles, StringComparison.Ordinal);
         Assert.Contains("display: none;", ExtractCssBlock(mobileStyles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains(".topbar-search", styles, StringComparison.Ordinal);
         Assert.Contains("display: block;", styles, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 clamp(160px, 32vw, 260px);", styles, StringComparison.Ordinal);
+        Assert.Contains("gap: 6px;", ExtractCssBlock(mobileStyles, ".topbar-right"), StringComparison.Ordinal);
         Assert.Contains(".topbar-right ::deep .topbar-theme-toggle", styles, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 420px)", styles, StringComparison.Ordinal);
         Assert.DoesNotContain("flex-wrap: wrap;", styles, StringComparison.Ordinal);
