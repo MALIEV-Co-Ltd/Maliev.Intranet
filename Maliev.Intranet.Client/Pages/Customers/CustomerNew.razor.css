@@ -19,7 +19,50 @@
 
 .customer-create-side {
     position: sticky;
-    top: 1rem;
+    top: 0;
+}
+
+.customer-create-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+    padding: 0.25rem;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+    overflow-x: auto;
+}
+
+.customer-create-tabs button {
+    min-height: 34px;
+    padding: 0 0.85rem;
+    border: 0;
+    border-radius: var(--maliev-radius-xs);
+    background: transparent;
+    color: var(--maliev-text-muted);
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.customer-create-tabs button:hover,
+.customer-create-tabs button:focus-visible,
+.customer-create-tabs button.active {
+    background: var(--mud-palette-surface);
+    color: var(--maliev-text);
+    outline: none;
+    box-shadow: var(--maliev-shadow-ring);
+}
+
+.customer-create-tabs button:focus-visible {
+    box-shadow: var(--maliev-focus-ring);
+}
+
+.customer-create-tab-panel {
+    min-height: 430px;
 }
 
 .ai-intake {
@@ -189,17 +232,68 @@
 .document-grid,
 .company-grid {
     display: grid;
+    gap: 0.95rem;
+}
+
+.document-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.company-grid {
+    grid-template-columns: 1fr;
+}
+
+.company-editor {
+    display: grid;
     gap: 1rem;
 }
 
-.company-lookup,
-.company-address-block {
+.company-lookup {
     grid-column: 1 / -1;
 }
 
+.company-core-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(170px, 0.8fr) minmax(132px, 0.5fr) minmax(118px, 0.45fr);
+    gap: 0.85rem;
+    align-items: end;
+}
+
+.company-branch-field {
+    max-width: 180px;
+}
+
+.company-manual-branch-field {
+    max-width: 150px;
+}
+
 .company-address-block {
-    margin-top: 1rem;
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 0.1rem;
+    padding: 1rem;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklch, var(--mud-palette-primary) 3%, var(--mud-palette-surface));
+}
+
+.company-address-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--maliev-border);
+}
+
+.company-address-header > div {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.company-address-header span {
+    color: var(--maliev-text-muted);
+    font-size: 0.84rem;
 }
 
 .address-two-column {
@@ -210,6 +304,12 @@
     margin: 1.25rem 0 0.8rem;
     padding-top: 1rem;
     border-top: 1px solid var(--maliev-border);
+}
+
+.section-divider.compact {
+    margin: 0 0 0.2rem;
+    padding-top: 0;
+    border-top: 0;
 }
 
 .section-divider h3 {
@@ -654,6 +754,22 @@
     font-size: 1rem;
 }
 
+::deep .company-lookup-input .mud-input.mud-input-outlined {
+    height: 44px;
+    min-height: 44px;
+    background: var(--mud-palette-surface);
+}
+
+::deep .company-lookup-input .mud-input-slot {
+    height: 42px !important;
+    font-size: 0.98rem !important;
+    font-weight: 650 !important;
+}
+
+::deep .company-lookup-input .mud-input-adornment {
+    height: 44px;
+}
+
 ::deep .suggestion-card {
     width: 100%;
     display: flex;
@@ -728,18 +844,19 @@
 
 @media (max-width: 720px) {
     .document-grid,
-    .company-grid,
+    .company-core-row,
     .address-two-column,
     .nda-lifecycle-grid {
         grid-template-columns: 1fr;
     }
 
-    .company-lookup,
-    .company-address-block {
-        grid-column: auto;
+    .company-branch-field,
+    .company-manual-branch-field {
+        max-width: none;
     }
 
-    .address-panel-header {
+    .address-panel-header,
+    .company-address-header {
         align-items: flex-start;
         flex-direction: column;
     }

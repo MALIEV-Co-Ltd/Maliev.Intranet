@@ -469,6 +469,28 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerNew_UsesTabbedWorkflowAndIntegratedCompanyLayout()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor.css");
+
+        Assert.Contains("class=\"customer-create-tabs\"", page, StringComparison.Ordinal);
+        Assert.Contains("CreateTab.Company", page, StringComparison.Ordinal);
+        Assert.Contains("CreateTab.Documents", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"customer-create-tab-panel\"", page, StringComparison.Ordinal);
+        Assert.Contains("Class=\"styled-autocomplete company-lookup-input\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"company-core-row\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"company-address-block\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"company-address-header\"", page, StringComparison.Ordinal);
+        Assert.Contains("top: 0;", ExtractCssBlock(styles, ".customer-create-side"), StringComparison.Ordinal);
+        Assert.Contains("min-height: 430px;", ExtractCssBlock(styles, ".customer-create-tab-panel"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1.25fr) minmax(170px, 0.8fr) minmax(132px, 0.5fr) minmax(118px, 0.45fr);", ExtractCssBlock(styles, ".company-core-row"), StringComparison.Ordinal);
+        Assert.Contains("max-width: 180px;", ExtractCssBlock(styles, ".company-branch-field"), StringComparison.Ordinal);
+        Assert.Contains("height: 44px;", ExtractCssBlock(styles, "::deep .company-lookup-input .mud-input.mud-input-outlined"), StringComparison.Ordinal);
+        Assert.Contains("border-bottom: 1px solid var(--maliev-border);", ExtractCssBlock(styles, ".company-address-header"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LoginShell_UsesGatewayCardDesignWithoutRouteChanges()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor");

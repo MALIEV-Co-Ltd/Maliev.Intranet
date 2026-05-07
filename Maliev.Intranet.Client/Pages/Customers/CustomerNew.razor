@@ -117,284 +117,310 @@
                         <DataAnnotationsValidator />
                         <ValidationSummary />
 
-                        <FormGrid>
-                            <FormField Label="First name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.FirstName" /></FormField>
-                            <FormField Label="Last name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.LastName" /></FormField>
-                            <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Email" /></FormField>
-                            <FormField Label="Phone number"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Mobile" /></FormField>
-                            <FormField Label="Segment">
-                                <select class="mlv-form-input" @bind="_onboarding.Customer.Segment">
-                                    @foreach (var segment in _segments)
-                                    {
-                                        <option value="@segment">@segment</option>
-                                    }
-                                </select>
-                            </FormField>
-                            <FormField Label="Tier">
-                                <select class="mlv-form-input" @bind="_onboarding.Customer.Tier">
-                                    @foreach (var tier in _tiers)
-                                    {
-                                        <option value="@tier">@tier</option>
-                                    }
-                                </select>
-                            </FormField>
-                        </FormGrid>
+                        <nav class="customer-create-tabs" aria-label="Customer creation sections">
+                            <button type="button" class="@GetCreateTabClass(CreateTab.Contact)" @onclick="@(() => _activeCreateTab = CreateTab.Contact)">Customer</button>
+                            <button type="button" class="@GetCreateTabClass(CreateTab.Company)" @onclick="@(() => _activeCreateTab = CreateTab.Company)">Company</button>
+                            <button type="button" class="@GetCreateTabClass(CreateTab.Addresses)" @onclick="@(() => _activeCreateTab = CreateTab.Addresses)">Addresses</button>
+                            <button type="button" class="@GetCreateTabClass(CreateTab.Documents)" @onclick="@(() => _activeCreateTab = CreateTab.Documents)">Documents</button>
+                            <button type="button" class="@GetCreateTabClass(CreateTab.Notes)" @onclick="@(() => _activeCreateTab = CreateTab.Notes)">Notes</button>
+                        </nav>
 
-                        <div class="section-divider">
-                            <h3>Company</h3>
-                            <span>Registry-backed lookup by company name or 13-digit tax ID.</span>
-                        </div>
-
-                        <div class="company-grid">
-                            <FormField Label="Company lookup" Class="company-lookup">
-                                <MudAutocomplete T="CompanySearchResultDto"
-                                                 Text="@_companyLookup"
-                                                 TextChanged="OnCompanyLookupTextChanged"
-                                                 ValueChanged="ApplyCompanySuggestion"
-                                                 SearchFunc="SearchCompaniesAsync"
-                                                 ToStringFunc="@(company => company == null ? _companyLookup : company.Name)"
-                                                 Placeholder="Search by company name or tax ID"
-                                                 Variant="Variant.Outlined"
-                                                 Clearable="true"
-                                                 Dense="true"
-                                                 CoerceText="false"
-                                                 CoerceValue="false"
-                                                 ResetValueOnEmptyText="false"
-                                                 DebounceInterval="350"
-                                                 MinCharacters="2"
-                                                 Class="styled-autocomplete">
-                                    <ItemTemplate Context="company">
-                                        <div class="suggestion-card company-suggestion">
-                                            <div>
-                                                <strong>@company.Name</strong>
-                                                <span>@FormatPair(company.VatNumber, company.RegistrationNumber)</span>
-                                            </div>
-                                            <div class="suggestion-meta">
-                                                <span>@(string.IsNullOrWhiteSpace(company.Source) ? "CustomerService" : company.Source)</span>
-                                                <small>@company.BusinessType</small>
-                                            </div>
-                                        </div>
-                                    </ItemTemplate>
-                                </MudAutocomplete>
-                            </FormField>
-
-                            <FormField Label="Company name">
-                                <InputText class="mlv-form-input" @bind-Value="_companyName" />
-                            </FormField>
-
-                            <FormField Label="Company tax ID">
-                                <InputText class="mlv-form-input" @bind-Value="_companyTaxId" />
-                            </FormField>
-
-                            <FormField Label="Company branch">
-                                <select class="mlv-form-input" @bind="_companyBranchMode">
-                                    <option value="@BranchModeHeadOffice">@GetHeadOfficeBranchLabel()</option>
-                                    <option value="@BranchModeManual">Manual branch ID</option>
-                                </select>
-                            </FormField>
-
-                            @if (_companyBranchMode == BranchModeManual)
+                        <div class="customer-create-tab-panel">
+                            @if (_activeCreateTab == CreateTab.Contact)
                             {
-                                <FormField Label="Branch ID">
-                                    <InputText class="mlv-form-input" @bind-Value="_companyBranchManual" />
-                                </FormField>
-                            }
-                        </div>
-
-                        @if (CompanyBillingIndex >= 0)
-                        {
-                            var companyAddressIndex = CompanyBillingIndex;
-                            <div class="company-address-block">
-                                <div class="address-panel compact-address-panel">
-                                    <div class="address-panel-header">
-                                        <strong>Company billing address</strong>
-                                        <div>
-                                            <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(companyAddressIndex))">Copy customer billing</button>
-                                        </div>
-                                    </div>
-
-                                    <FormGrid>
-                                        <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine1" /></FormField>
-                                        <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine2" /></FormField>
-                                        <FormField Label="Subdistrict">
-                                            @AddressAutocomplete(companyAddressIndex, AddressField.Subdistrict)
-                                        </FormField>
-                                        <FormField Label="District">
-                                            @AddressAutocomplete(companyAddressIndex, AddressField.District)
-                                        </FormField>
-                                        <FormField Label="State / Province">
-                                            @AddressAutocomplete(companyAddressIndex, AddressField.Province)
-                                        </FormField>
-                                        <FormField Label="Postal code">
-                                            @AddressAutocomplete(companyAddressIndex, AddressField.PostalCode)
-                                        </FormField>
-                                    </FormGrid>
-                                </div>
-                            </div>
-                        }
-
-                        <div class="section-divider">
-                            <h3>Addresses</h3>
-                            <span>Customer billing and shipping addresses are separate, with billing available as the default copy source.</span>
-                        </div>
-
-                        <div class="address-two-column">
-                            @if (CustomerBillingIndex >= 0)
-                            {
-                                var index = CustomerBillingIndex;
-                                <div class="address-panel">
-                                    <div class="address-panel-header">
-                                        <strong>Customer billing address</strong>
-                                    </div>
-
-                                    <FormGrid>
-                                        <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
-                                        <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
-                                        <FormField Label="Subdistrict">
-                                            @AddressAutocomplete(index, AddressField.Subdistrict)
-                                        </FormField>
-                                        <FormField Label="District">
-                                            @AddressAutocomplete(index, AddressField.District)
-                                        </FormField>
-                                        <FormField Label="State / Province">
-                                            @AddressAutocomplete(index, AddressField.Province)
-                                        </FormField>
-                                        <FormField Label="Postal code">
-                                            @AddressAutocomplete(index, AddressField.PostalCode)
-                                        </FormField>
-                                    </FormGrid>
-                                </div>
-                            }
-
-                            @if (CustomerShippingIndex >= 0)
-                            {
-                                var index = CustomerShippingIndex;
-                                <div class="address-panel">
-                                    <div class="address-panel-header">
-                                        <strong>Customer shipping address</strong>
-                                        <div>
-                                            <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(index))">Copy billing</button>
-                                        </div>
-                                    </div>
-
-                                    <FormGrid>
-                                        <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
-                                        <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
-                                        <FormField Label="Subdistrict">
-                                            @AddressAutocomplete(index, AddressField.Subdistrict)
-                                        </FormField>
-                                        <FormField Label="District">
-                                            @AddressAutocomplete(index, AddressField.District)
-                                        </FormField>
-                                        <FormField Label="State / Province">
-                                            @AddressAutocomplete(index, AddressField.Province)
-                                        </FormField>
-                                        <FormField Label="Postal code">
-                                            @AddressAutocomplete(index, AddressField.PostalCode)
-                                        </FormField>
-                                    </FormGrid>
-                                </div>
-                            }
-                        </div>
-
-                        <div class="section-divider">
-                            <h3>Documents</h3>
-                            <span>Files upload immediately. Customer documents and NDA documents stay separate until they are linked on create.</span>
-                        </div>
-
-                        <div class="document-grid">
-                            <div class="document-section">
-                                <div class="document-section-header">
-                                    <strong>Customer documents</strong>
-                                    <span>@GetUploadedDocumentCount(_customerDocumentUploads)</span>
-                                </div>
-                                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                               FilesChanged="OnCustomerDocumentsSelected"
-                                               Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
-                                               Class="document-file-upload"
-                                               Hidden="true"
-                                               MaximumFileCount="20">
-                                    <CustomContent Context="uploadContext">
-                                        <button type="button" class="document-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
-                                            <MudIcon Icon="@Icons.Material.Outlined.AttachFile" />
-                                            <span>
-                                                <strong>Upload standard documents</strong>
-                                                <small>Contracts, forms, IDs, certificates</small>
-                                            </span>
-                                        </button>
-                                    </CustomContent>
-                                </MudFileUpload>
-                                @DocumentUploadList(_customerDocumentUploads)
-                            </div>
-
-                            <div class="document-section nda-document-section">
-                                <div class="document-section-header">
-                                    <strong>NDA lifecycle</strong>
-                                    <span>@GetUploadedDocumentCount(_ndaDocumentUploads)</span>
-                                </div>
-                                <div class="nda-lifecycle-grid">
-                                    <FormField Label="Initial status">
-                                        <select class="mlv-form-input" @bind="_ndaStatus">
-                                            <option value="Signed">Signed</option>
-                                            <option value="Draft">Draft</option>
+                                <FormGrid>
+                                    <FormField Label="First name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.FirstName" /></FormField>
+                                    <FormField Label="Last name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.LastName" /></FormField>
+                                    <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Email" /></FormField>
+                                    <FormField Label="Phone number"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Mobile" /></FormField>
+                                    <FormField Label="Segment">
+                                        <select class="mlv-form-input" @bind="_onboarding.Customer.Segment">
+                                            @foreach (var segment in _segments)
+                                            {
+                                                <option value="@segment">@segment</option>
+                                            }
                                         </select>
                                     </FormField>
-                                    <FormField Label="Expiration date">
-                                        <InputDate class="mlv-form-input" @bind-Value="_ndaExpiresAt" />
+                                    <FormField Label="Tier">
+                                        <select class="mlv-form-input" @bind="_onboarding.Customer.Tier">
+                                            @foreach (var tier in _tiers)
+                                            {
+                                                <option value="@tier">@tier</option>
+                                            }
+                                        </select>
+                                    </FormField>
+                                </FormGrid>
+                            }
+                            else if (_activeCreateTab == CreateTab.Company)
+                            {
+                                <div class="company-editor">
+                                    <div class="section-divider compact">
+                                        <h3>Company</h3>
+                                        <span>Registry-backed lookup by company name or 13-digit tax ID.</span>
+                                    </div>
+
+                                    <div class="company-grid">
+                                        <FormField Label="Company lookup" Class="company-lookup">
+                                            <MudAutocomplete T="CompanySearchResultDto"
+                                                             Text="@_companyLookup"
+                                                             TextChanged="OnCompanyLookupTextChanged"
+                                                             ValueChanged="ApplyCompanySuggestion"
+                                                             SearchFunc="SearchCompaniesAsync"
+                                                             ToStringFunc="@(company => company == null ? _companyLookup : company.Name)"
+                                                             Placeholder="Search by company name or tax ID"
+                                                             Variant="Variant.Outlined"
+                                                             Clearable="true"
+                                                             Dense="true"
+                                                             CoerceText="false"
+                                                             CoerceValue="false"
+                                                             ResetValueOnEmptyText="false"
+                                                             DebounceInterval="350"
+                                                             MinCharacters="2"
+                                                             Class="styled-autocomplete company-lookup-input">
+                                                <ItemTemplate Context="company">
+                                                    <div class="suggestion-card company-suggestion">
+                                                        <div>
+                                                            <strong>@company.Name</strong>
+                                                            <span>@FormatPair(company.VatNumber, company.RegistrationNumber)</span>
+                                                        </div>
+                                                        <div class="suggestion-meta">
+                                                            <span>@(string.IsNullOrWhiteSpace(company.Source) ? "CustomerService" : company.Source)</span>
+                                                            <small>@company.BusinessType</small>
+                                                        </div>
+                                                    </div>
+                                                </ItemTemplate>
+                                            </MudAutocomplete>
+                                        </FormField>
+
+                                        <div class="company-core-row">
+                                            <FormField Label="Company name" Class="company-name-field">
+                                                <InputText class="mlv-form-input" @bind-Value="_companyName" />
+                                            </FormField>
+
+                                            <FormField Label="Company tax ID" Class="company-tax-field">
+                                                <InputText class="mlv-form-input" @bind-Value="_companyTaxId" />
+                                            </FormField>
+
+                                            <FormField Label="Company branch" Class="company-branch-field">
+                                                <select class="mlv-form-input" @bind="_companyBranchMode">
+                                                    <option value="@BranchModeHeadOffice">@GetHeadOfficeBranchLabel()</option>
+                                                    <option value="@BranchModeManual">Manual branch ID</option>
+                                                </select>
+                                            </FormField>
+
+                                            @if (_companyBranchMode == BranchModeManual)
+                                            {
+                                                <FormField Label="Branch ID" Class="company-manual-branch-field">
+                                                    <InputText class="mlv-form-input" @bind-Value="_companyBranchManual" />
+                                                </FormField>
+                                            }
+                                        </div>
+
+                                        @if (CompanyBillingIndex >= 0)
+                                        {
+                                            var companyAddressIndex = CompanyBillingIndex;
+                                            <div class="company-address-block">
+                                                <div class="company-address-header">
+                                                    <div>
+                                                        <strong>Company billing address</strong>
+                                                        <span>Stored with the company and copied into onboarding when needed.</span>
+                                                    </div>
+                                                    <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(companyAddressIndex))">Copy customer billing</button>
+                                                </div>
+
+                                                <FormGrid>
+                                                    <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine1" /></FormField>
+                                                    <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine2" /></FormField>
+                                                    <FormField Label="Subdistrict">
+                                                        @AddressAutocomplete(companyAddressIndex, AddressField.Subdistrict)
+                                                    </FormField>
+                                                    <FormField Label="District">
+                                                        @AddressAutocomplete(companyAddressIndex, AddressField.District)
+                                                    </FormField>
+                                                    <FormField Label="State / Province">
+                                                        @AddressAutocomplete(companyAddressIndex, AddressField.Province)
+                                                    </FormField>
+                                                    <FormField Label="Postal code">
+                                                        @AddressAutocomplete(companyAddressIndex, AddressField.PostalCode)
+                                                    </FormField>
+                                                </FormGrid>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            else if (_activeCreateTab == CreateTab.Addresses)
+                            {
+                                <div class="section-divider compact">
+                                    <h3>Addresses</h3>
+                                    <span>Customer billing and shipping addresses are separate, with billing available as the default copy source.</span>
+                                </div>
+
+                                <div class="address-two-column">
+                                    @if (CustomerBillingIndex >= 0)
+                                    {
+                                        var index = CustomerBillingIndex;
+                                        <div class="address-panel">
+                                            <div class="address-panel-header">
+                                                <strong>Customer billing address</strong>
+                                            </div>
+
+                                            <FormGrid>
+                                                <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
+                                                <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
+                                                <FormField Label="Subdistrict">
+                                                    @AddressAutocomplete(index, AddressField.Subdistrict)
+                                                </FormField>
+                                                <FormField Label="District">
+                                                    @AddressAutocomplete(index, AddressField.District)
+                                                </FormField>
+                                                <FormField Label="State / Province">
+                                                    @AddressAutocomplete(index, AddressField.Province)
+                                                </FormField>
+                                                <FormField Label="Postal code">
+                                                    @AddressAutocomplete(index, AddressField.PostalCode)
+                                                </FormField>
+                                            </FormGrid>
+                                        </div>
+                                    }
+
+                                    @if (CustomerShippingIndex >= 0)
+                                    {
+                                        var index = CustomerShippingIndex;
+                                        <div class="address-panel">
+                                            <div class="address-panel-header">
+                                                <strong>Customer shipping address</strong>
+                                                <div>
+                                                    <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(index))">Copy billing</button>
+                                                </div>
+                                            </div>
+
+                                            <FormGrid>
+                                                <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
+                                                <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
+                                                <FormField Label="Subdistrict">
+                                                    @AddressAutocomplete(index, AddressField.Subdistrict)
+                                                </FormField>
+                                                <FormField Label="District">
+                                                    @AddressAutocomplete(index, AddressField.District)
+                                                </FormField>
+                                                <FormField Label="State / Province">
+                                                    @AddressAutocomplete(index, AddressField.Province)
+                                                </FormField>
+                                                <FormField Label="Postal code">
+                                                    @AddressAutocomplete(index, AddressField.PostalCode)
+                                                </FormField>
+                                            </FormGrid>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else if (_activeCreateTab == CreateTab.Documents)
+                            {
+                                <div class="section-divider compact">
+                                    <h3>Documents</h3>
+                                    <span>Files upload immediately. Customer documents and NDA documents stay separate until they are linked on create.</span>
+                                </div>
+
+                                <div class="document-grid">
+                                    <div class="document-section">
+                                        <div class="document-section-header">
+                                            <strong>Customer documents</strong>
+                                            <span>@GetUploadedDocumentCount(_customerDocumentUploads)</span>
+                                        </div>
+                                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                       FilesChanged="OnCustomerDocumentsSelected"
+                                                       Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
+                                                       Class="document-file-upload"
+                                                       Hidden="true"
+                                                       MaximumFileCount="20">
+                                            <CustomContent Context="uploadContext">
+                                                <button type="button" class="document-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.AttachFile" />
+                                                    <span>
+                                                        <strong>Upload standard documents</strong>
+                                                        <small>Contracts, forms, IDs, certificates</small>
+                                                    </span>
+                                                </button>
+                                            </CustomContent>
+                                        </MudFileUpload>
+                                        @DocumentUploadList(_customerDocumentUploads)
+                                    </div>
+
+                                    <div class="document-section nda-document-section">
+                                        <div class="document-section-header">
+                                            <strong>NDA lifecycle</strong>
+                                            <span>@GetUploadedDocumentCount(_ndaDocumentUploads)</span>
+                                        </div>
+                                        <div class="nda-lifecycle-grid">
+                                            <FormField Label="Initial status">
+                                                <select class="mlv-form-input" @bind="_ndaStatus">
+                                                    <option value="Signed">Signed</option>
+                                                    <option value="Draft">Draft</option>
+                                                </select>
+                                            </FormField>
+                                            <FormField Label="Expiration date">
+                                                <InputDate class="mlv-form-input" @bind-Value="_ndaExpiresAt" />
+                                            </FormField>
+                                        </div>
+                                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                       FilesChanged="OnNdaDocumentsSelected"
+                                                       Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                       Class="document-file-upload"
+                                                       Hidden="true"
+                                                       MaximumFileCount="10">
+                                            <CustomContent Context="uploadContext">
+                                                <button type="button" class="document-dropzone nda-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
+                                                    <span>
+                                                        <strong>Upload NDA documents</strong>
+                                                        <small>Signed agreements or legal drafts</small>
+                                                    </span>
+                                                </button>
+                                            </CustomContent>
+                                        </MudFileUpload>
+                                        @DocumentUploadList(_ndaDocumentUploads)
+                                    </div>
+                                </div>
+
+                                @if (_previewDocument != null)
+                                {
+                                    <div class="document-preview-panel">
+                                        <div class="document-preview-header">
+                                            <strong>@_previewDocument.FileName</strong>
+                                            <button type="button" class="address-remove" @onclick="CloseDocumentPreview">Close preview</button>
+                                        </div>
+                                        @if (_loadingDocumentPreview)
+                                        {
+                                            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(_documentPreviewUrl) && IsPreviewable(_previewDocument.MimeType))
+                                        {
+                                            @if (IsPdf(_previewDocument.MimeType))
+                                            {
+                                                <iframe src="@_documentPreviewUrl" title="@_previewDocument.FileName"></iframe>
+                                            }
+                                            else
+                                            {
+                                                <img src="@_documentPreviewUrl" alt="@_previewDocument.FileName" />
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <div class="document-preview-empty">Preview is not available for this file type.</div>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else if (_activeCreateTab == CreateTab.Notes)
+                            {
+                                <div class="notes-panel">
+                                    <FormField Label="Notes">
+                                        <InputTextArea class="mlv-form-input notes-input" @bind-Value="_onboarding.InternalNote" />
                                     </FormField>
                                 </div>
-                                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                               FilesChanged="OnNdaDocumentsSelected"
-                                               Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                               Class="document-file-upload"
-                                               Hidden="true"
-                                               MaximumFileCount="10">
-                                    <CustomContent Context="uploadContext">
-                                        <button type="button" class="document-dropzone nda-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
-                                            <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
-                                            <span>
-                                                <strong>Upload NDA documents</strong>
-                                                <small>Signed agreements or legal drafts</small>
-                                            </span>
-                                        </button>
-                                    </CustomContent>
-                                </MudFileUpload>
-                                @DocumentUploadList(_ndaDocumentUploads)
-                            </div>
+                            }
                         </div>
-
-                        @if (_previewDocument != null)
-                        {
-                            <div class="document-preview-panel">
-                                <div class="document-preview-header">
-                                    <strong>@_previewDocument.FileName</strong>
-                                    <button type="button" class="address-remove" @onclick="CloseDocumentPreview">Close preview</button>
-                                </div>
-                                @if (_loadingDocumentPreview)
-                                {
-                                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-                                }
-                                else if (!string.IsNullOrWhiteSpace(_documentPreviewUrl) && IsPreviewable(_previewDocument.MimeType))
-                                {
-                                    @if (IsPdf(_previewDocument.MimeType))
-                                    {
-                                        <iframe src="@_documentPreviewUrl" title="@_previewDocument.FileName"></iframe>
-                                    }
-                                    else
-                                    {
-                                        <img src="@_documentPreviewUrl" alt="@_previewDocument.FileName" />
-                                    }
-                                }
-                                else
-                                {
-                                    <div class="document-preview-empty">Preview is not available for this file type.</div>
-                                }
-                            </div>
-                        }
-
-                        <FormField Label="Notes">
-                            <InputTextArea class="mlv-form-input notes-input" @bind-Value="_onboarding.InternalNote" />
-                        </FormField>
 
                         <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
                             <SecondaryButton Href="/customers">Cancel</SecondaryButton>
@@ -444,6 +470,15 @@
 </div>
 
 @code {
+    private enum CreateTab
+    {
+        Contact,
+        Company,
+        Addresses,
+        Documents,
+        Notes
+    }
+
     private enum AddressField
     {
         Subdistrict,
@@ -475,6 +510,7 @@
     }
 
     private const int MaxExtractionAttempts = 3;
+    private CreateTab _activeCreateTab = CreateTab.Contact;
     private const double HighConfidenceThreshold = 0.9;
     private const string BranchModeHeadOffice = "HeadOffice";
     private const string BranchModeManual = "Manual";
@@ -1359,6 +1395,9 @@
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
 
     private void ToggleAiIntake() => _aiIntakeExpanded = !_aiIntakeExpanded;
+
+    private string GetCreateTabClass(CreateTab tab) =>
+        tab == _activeCreateTab ? "active" : string.Empty;
 
     private string GetAiIntakeStatus()
     {
