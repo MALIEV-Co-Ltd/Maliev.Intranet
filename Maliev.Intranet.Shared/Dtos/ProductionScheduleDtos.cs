@@ -106,6 +106,27 @@ public sealed class ProductionScheduleSlotDto
 }
 
 /// <summary>
+/// Describes a schedule slot move requested from the visual production board.
+/// </summary>
+public sealed record ProductionScheduleSlotMoveRequest
+{
+    /// <summary>Gets the moved schedule slot.</summary>
+    public required ProductionScheduleSlotDto Slot { get; init; }
+
+    /// <summary>Gets the target machine identifier or asset code.</summary>
+    public required string MachineId { get; init; }
+
+    /// <summary>Gets the target machine display name.</summary>
+    public string? MachineName { get; init; }
+
+    /// <summary>Gets the requested scheduled start time in UTC.</summary>
+    public required DateTime ScheduledStart { get; init; }
+
+    /// <summary>Gets the requested scheduled end time in UTC.</summary>
+    public required DateTime ScheduledEnd { get; init; }
+}
+
+/// <summary>
 /// Request model for moving a queued job to a schedule slot.
 /// </summary>
 public sealed record RescheduleJobRequest

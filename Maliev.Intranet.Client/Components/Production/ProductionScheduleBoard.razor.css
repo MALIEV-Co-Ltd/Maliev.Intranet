@@ -206,6 +206,7 @@
 
 .psb-machine-heading,
 .psb-day-heading,
+.psb-time-heading,
 .psb-machine-cell,
 .psb-group-label {
     border-right: 1px solid var(--maliev-border-subtle);
@@ -226,7 +227,8 @@
     text-transform: uppercase;
 }
 
-.psb-day-heading {
+.psb-day-heading,
+.psb-time-heading {
     display: grid;
     place-items: center;
     gap: 1px;
@@ -234,6 +236,11 @@
     border-bottom: 1px solid var(--maliev-border-subtle);
     color: var(--maliev-muted);
     font-size: var(--maliev-font-nano);
+}
+
+.psb-time-heading {
+    padding: 0 4px;
+    font-weight: 800;
 }
 
 .psb-day-heading strong {
@@ -330,9 +337,34 @@
     background: rgba(148, 163, 184, 0.04);
 }
 
+.psb-slot-drop-target {
+    position: absolute;
+    inset-block: 0;
+    z-index: 1;
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-right: 1px solid rgba(148, 163, 184, 0.22);
+    background: transparent;
+    cursor: copy;
+}
+
+.psb-slot-drop-target:nth-child(even) {
+    background: rgba(148, 163, 184, 0.04);
+}
+
+.psb-slot-drop-target:hover,
+.psb-slot-drop-target:focus-visible {
+    outline: 1px dashed var(--maliev-info);
+    outline-offset: -2px;
+    background: rgba(37, 99, 235, 0.08);
+}
+
 .psb-slot {
     position: absolute;
     top: 18px;
+    z-index: 2;
     display: grid;
     align-content: center;
     min-width: 28px;

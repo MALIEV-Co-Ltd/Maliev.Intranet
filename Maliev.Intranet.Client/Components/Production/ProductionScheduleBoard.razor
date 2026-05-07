@@ -80,12 +80,24 @@
         <div class="production-schedule-board-shell" tabindex="0">
             <div class="psb-grid-header" style="@GridStyle">
                 <div class="psb-machine-heading">Work center</div>
-                @foreach (var day in VisibleDays)
+                @if (IsDayView)
                 {
-                    <div class="psb-day-heading">
-                        <span>@day.ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant()</span>
-                        <strong>@day.Day</strong>
-                    </div>
+                    @foreach (var timeSlot in VisibleTimeSlots)
+                    {
+                        <div class="psb-time-heading" data-time-slot="@FormatSlotInstant(timeSlot)">
+                            <span>@timeSlot.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)</span>
+                        </div>
+                    }
+                }
+                else
+                {
+                    @foreach (var day in VisibleDays)
+                    {
+                        <div class="psb-day-heading">
+                            <span>@day.ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant()</span>
+                            <strong>@day.Day</strong>
+                        </div>
+                    }
                 }
             </div>
 
@@ -108,16 +120,35 @@
                             <small>@FormatTechnology(machine.Technology)</small>
                         </div>
                         <div class="psb-track">
-                            @foreach (var day in VisibleDays)
+                            @if (IsDayView)
                             {
-                                <div class="psb-day-band" style="@DayBandStyle(day)"></div>
+                                @foreach (var timeSlot in VisibleTimeSlots)
+                                {
+                                    <button type="button"
+                                            class="psb-slot-drop-target"
+                                            style="@TimeSlotStyle(timeSlot)"
+                                            data-machine-id="@machine.MachineId"
+                                            data-time-slot="@FormatSlotInstant(timeSlot)"
+                                            aria-label="@($"Move slot to {machine.MachineName} at {timeSlot.ToLocalTime():HH:mm}")"
+                                            @ondragover:preventDefault
+                                            @ondrop="@(() => DropSlotAsync(machine, timeSlot))"></button>
+                                }
+                            }
+                            else
+                            {
+                                @foreach (var day in VisibleDays)
+                                {
+                                    <div class="psb-day-band" style="@DayBandStyle(day)"></div>
+                                }
                             }
                             @foreach (var slot in VisibleSlots(machine))
                             {
                                 <button type="button"
                                         class="@SlotClass(slot)"
                                         style="@SlotStyle(slot)"
-                                        draggable="@CanDrag(slot)"
+                                        draggable="@BoolText(CanDrag(slot))"
+                                        @ondragstart="@(() => StartDrag(slot))"
+                                        @ondragend="ClearDrag"
                                         aria-label="@SlotAriaLabel(slot)"
                                         aria-disabled="@BoolText(IsLocked(slot))"
                                         data-slot-id="@slot.SlotId"
@@ -178,13 +209,20 @@
     /// <summary>Raised when a movable slot requests rescheduling.</summary>
     [Parameter] public EventCallback<ProductionScheduleSlotDto> MoveRequested { get; set; }
 
+    /// <summary>Raised when a slot is dropped onto a concrete board time slot.</summary>
+    [Parameter] public EventCallback<ProductionScheduleSlotMoveRequest> SlotDropped { get; set; }
+
     private const int DayColumnMinWidth = 180;
+    private const int DayTimeSlotMinutes = 30;
+    private const int DayTimeSlotCount = 48;
+    private const int DayTimeSlotMinWidth = 58;
     private DateTime? _localRangeStart;
     private DateTime? _lastBoardRangeStart;
     private string _search = string.Empty;
     private string _technologyFilter = string.Empty;
     private string _zoom = "Week";
     private Guid? _selectedSlotId;
+    private ProductionScheduleSlotDto? _draggingSlot;
 
     private string BoardClass => string.Join(
         ' ',
@@ -199,9 +237,16 @@
 
     private string RangeLabel => $"{VisibleRangeStart.ToLocalTime():MMM d, yyyy} - {VisibleRangeEnd.AddTicks(-1).ToLocalTime():MMM d, yyyy}";
 
+    private bool IsDayView => string.Equals(_zoom, "Day", StringComparison.OrdinalIgnoreCase);
+
     private IReadOnlyList<DateTime> VisibleDays => Enumerable
         .Range(0, Math.Max(1, (VisibleRangeEnd.Date - VisibleRangeStart.Date).Days))
         .Select(offset => VisibleRangeStart.Date.AddDays(offset))
+        .ToList();
+
+    private IReadOnlyList<DateTime> VisibleTimeSlots => Enumerable
+        .Range(0, DayTimeSlotCount)
+        .Select(offset => VisibleRangeStart.AddMinutes(offset * DayTimeSlotMinutes))
         .ToList();
 
     private IReadOnlyList<string> Technologies => (Board?.Machines ?? [])
@@ -221,8 +266,15 @@
         .GroupBy(machine => MachineGroupName(machine.Category))
         .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
 
-    private string GridStyle =>
-        $"grid-template-columns: minmax(176px, 220px) repeat({VisibleDays.Count}, minmax({DayColumnMinWidth}px, 1fr)); min-width: {220 + (VisibleDays.Count * DayColumnMinWidth)}px;";
+    private string GridStyle
+    {
+        get
+        {
+            var columnCount = IsDayView ? DayTimeSlotCount : VisibleDays.Count;
+            var minWidth = IsDayView ? DayTimeSlotMinWidth : DayColumnMinWidth;
+            return $"grid-template-columns: minmax(176px, 220px) repeat({columnCount}, minmax({minWidth}px, 1fr)); min-width: {220 + (columnCount * minWidth)}px;";
+        }
+    }
 
     private string ResolvedFocusMachineId
     {
@@ -328,6 +380,49 @@
         return string.Format(CultureInfo.InvariantCulture, "left: {0:0.###}%; width: {1:0.###}%;", left, width);
     }
 
+    private string TimeSlotStyle(DateTime timeSlot)
+    {
+        var rangeMinutes = Math.Max(1, (VisibleRangeEnd - VisibleRangeStart).TotalMinutes);
+        var left = (timeSlot - VisibleRangeStart).TotalMinutes / rangeMinutes * 100;
+        var width = DayTimeSlotMinutes / rangeMinutes * 100;
+        return string.Format(CultureInfo.InvariantCulture, "left: {0:0.###}%; width: {1:0.###}%;", left, width);
+    }
+
+    private void StartDrag(ProductionScheduleSlotDto slot)
+    {
+        if (CanDrag(slot))
+            _draggingSlot = slot;
+    }
+
+    private void ClearDrag()
+    {
+        _draggingSlot = null;
+    }
+
+    private async Task DropSlotAsync(ProductionScheduleMachineDto machine, DateTime scheduledStart)
+    {
+        if (_draggingSlot is not { } slot || !CanDrag(slot))
+            return;
+
+        var duration = NormalizeUtc(slot.ScheduledEnd) - NormalizeUtc(slot.ScheduledStart);
+        if (duration <= TimeSpan.Zero)
+            duration = TimeSpan.FromMinutes(DayTimeSlotMinutes);
+
+        _selectedSlotId = slot.SlotId;
+        var request = new ProductionScheduleSlotMoveRequest
+        {
+            Slot = slot,
+            MachineId = machine.MachineId,
+            MachineName = machine.MachineName,
+            ScheduledStart = DateTime.SpecifyKind(scheduledStart, DateTimeKind.Utc),
+            ScheduledEnd = DateTime.SpecifyKind(scheduledStart.Add(duration), DateTimeKind.Utc)
+        };
+
+        ClearDrag();
+        if (SlotDropped.HasDelegate)
+            await SlotDropped.InvokeAsync(request);
+    }
+
     private async Task SelectSlotAsync(ProductionScheduleSlotDto slot)
     {
         _selectedSlotId = slot.SlotId;
@@ -368,7 +463,7 @@
 
     private static bool CanDrag(ProductionScheduleSlotDto slot) => CanMove(slot);
 
-    private static bool CanMove(ProductionScheduleSlotDto slot) => slot.CanMove && !slot.IsProposed && !IsLocked(slot);
+    private static bool CanMove(ProductionScheduleSlotDto slot) => (slot.CanMove || slot.IsProposed) && !IsLocked(slot);
 
     private static bool IsLocked(ProductionScheduleSlotDto slot)
     {
@@ -393,6 +488,9 @@
 
     private static string FormatSlotTime(ProductionScheduleSlotDto slot) =>
         $"{NormalizeUtc(slot.ScheduledStart).ToLocalTime():MMM d HH:mm} - {NormalizeUtc(slot.ScheduledEnd).ToLocalTime():HH:mm}";
+
+    private static string FormatSlotInstant(DateTime value) =>
+        NormalizeUtc(value).ToString("O", CultureInfo.InvariantCulture);
 
     private static string FormatTechnology(string? technology)
     {

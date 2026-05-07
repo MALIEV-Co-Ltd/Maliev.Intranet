@@ -5,6 +5,7 @@ using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
@@ -28,6 +29,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     private readonly List<string> _requestedPaths = [];
     private readonly List<string> _requestedRequests = [];
     private JsonDocument? _quotationPdfRequest;
+    private JsonDocument? _planningHoldRequest;
     private bool _notePosted;
     private bool _bracketDfmAcknowledged;
 
@@ -263,6 +265,45 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             Assert.Contains("class=\"psb-machine-row focused\"", cut.Markup);
             Assert.Contains($"data-project-part-id=\"{_sensorPartId}\"", cut.Markup);
         });
+    }
+
+    [Fact]
+    public async Task ProjectDetail_PlanningDayView_DropsProposedSlotIntoHalfHourPlanningHold()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Planning", cut.Markup));
+        cut.Find("button[data-tab='planning']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("production-schedule-board", cut.Markup));
+
+        cut.FindAll(".psb-zoom button").First(button => button.TextContent == "Day").Click();
+        cut.Find("button[aria-label='Next schedule range']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("data-time-slot=\"2026-04-19T00:00:00.0000000Z\"", cut.Markup);
+            Assert.Contains("data-time-slot=\"2026-04-19T23:30:00.0000000Z\"", cut.Markup);
+            Assert.Contains("00:00", cut.Markup);
+            Assert.Contains("23:30", cut.Markup);
+        });
+
+        var proposed = cut.Find("button.psb-slot-proposed");
+        Assert.Equal("true", proposed.GetAttribute("draggable"));
+
+        await proposed.TriggerEventAsync("ondragstart", new DragEventArgs());
+        await cut.Find("button.psb-slot-drop-target[data-machine-id='CNC-01'][data-time-slot='2026-04-19T13:00:00.0000000Z']")
+            .TriggerEventAsync("ondrop", new DragEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedRequests, request => request == $"POST /api/v1/projects/{_projectId}/parts/{_bracketPartId}/planning-hold");
+            Assert.NotNull(_planningHoldRequest);
+        });
+
+        var root = _planningHoldRequest!.RootElement;
+        Assert.Equal("CNC-01", root.GetProperty("machineId").GetString());
+        Assert.Equal("2026-04-19T13:00:00Z", root.GetProperty("scheduledStartTime").GetDateTime().ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"));
+        Assert.Equal("2026-04-19T16:00:00Z", root.GetProperty("scheduledEndTime").GetDateTime().ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"));
     }
 
     [Fact]
@@ -685,6 +726,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         if (request.Method == HttpMethod.Post
             && pathAndQuery.Equals($"/api/v1/projects/{_projectId}/parts/{_bracketPartId}/planning-hold", StringComparison.Ordinal))
         {
+            _planningHoldRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
             return Json(BuildPlanningHold(_bracketPartId, 4));
         }
 
@@ -962,8 +1004,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                     {
                         SlotId = Guid.Parse("91919191-9191-9191-9191-919191919191"),
                         ProjectId = _projectId,
-                        ProjectPartId = _fixturePartId,
-                        FileName = "fixture-base.step",
+                        ProjectPartId = _bracketPartId,
+                        FileName = "bracket-left.stl",
                         MachineId = "CNC-01",
                         MachineName = "CNC Mill 01",
                         Technology = "CNC_MILL",

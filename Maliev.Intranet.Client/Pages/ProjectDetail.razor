@@ -770,7 +770,8 @@
         builder.AddAttribute(7, "SelectedPartId", selectedPlan?.PartId);
         builder.AddAttribute(8, "FocusMachineId", ResolvePlanningFocusMachineId(selectedPlan));
         builder.AddAttribute(9, "SlotGapPixels", 6);
-        builder.AddAttribute(10, "OnRefresh", EventCallback.Factory.Create(this, LoadProductionPlanAsync));
+        builder.AddAttribute(10, "SlotDropped", EventCallback.Factory.Create<ProductionScheduleSlotMoveRequest>(this, MovePlanningSlotAsync));
+        builder.AddAttribute(11, "OnRefresh", EventCallback.Factory.Create(this, LoadProductionPlanAsync));
         builder.CloseComponent();
         builder.CloseElement();
     };
@@ -1739,12 +1740,77 @@
         await SavePlanningHoldAsync(plan, update: true);
     }
 
-    private async Task SavePlanningHoldAsync(ProjectProductionPartPlanDto plan, bool update)
+    private async Task MovePlanningSlotAsync(ProductionScheduleSlotMoveRequest request)
+    {
+        var slot = request.Slot;
+        if (slot.JobId is Guid jobId)
+        {
+            await MovePlanningJobAsync(jobId, request);
+            return;
+        }
+
+        if (slot.ProjectPartId is not Guid partId)
+        {
+            Snackbar.Add("This schedule slot is not linked to a project part.", Severity.Info);
+            return;
+        }
+
+        var plan = _productionPlan?.Parts.FirstOrDefault(candidate => candidate.PartId == partId);
+        if (plan is null)
+        {
+            Snackbar.Add("Project part could not be found for this schedule slot.", Severity.Error);
+            return;
+        }
+
+        if (slot.HoldId is Guid)
+        {
+            await SavePlanningHoldAsync(plan, update: true, request);
+            return;
+        }
+
+        if (slot.IsProposed)
+        {
+            await SavePlanningHoldAsync(plan, update: false, request);
+        }
+    }
+
+    private async Task MovePlanningJobAsync(Guid jobId, ProductionScheduleSlotMoveRequest request)
+    {
+        try
+        {
+            var response = await Http.PatchAsJsonAsync(
+                $"api/v1/jobs/{jobId}/schedule",
+                new RescheduleJobRequest
+                {
+                    MachineId = request.MachineId,
+                    ScheduledStartTime = request.ScheduledStart,
+                    ScheduledEndTime = request.ScheduledEnd,
+                    QueuePosition = request.Slot.QueuePosition > 0 ? request.Slot.QueuePosition : null,
+                    CascadeFollowingJobs = true
+                });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(string.IsNullOrWhiteSpace(error) ? "Schedule could not be updated." : error, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Schedule updated.", Severity.Success);
+            await LoadProductionPlanAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Schedule update error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SavePlanningHoldAsync(ProjectProductionPartPlanDto plan, bool update, ProductionScheduleSlotMoveRequest? moveRequest = null)
     {
         _holdSavingPartIds.Add(plan.PartId);
         try
         {
-            var createRequest = BuildPlanningHoldRequest(plan);
+            var createRequest = BuildPlanningHoldRequest(plan, moveRequest);
             HttpResponseMessage response;
             if (update && plan.ActiveHold is not null)
             {
@@ -1815,26 +1881,31 @@
         }
     }
 
-    private CreateProductionPlanningHoldRequest BuildPlanningHoldRequest(ProjectProductionPartPlanDto plan)
+    private CreateProductionPlanningHoldRequest BuildPlanningHoldRequest(ProjectProductionPartPlanDto plan, ProductionScheduleSlotMoveRequest? moveRequest = null)
     {
         var routing = plan.Routing!;
-        var start = routing.ProposedSlotStart?.UtcDateTime
+        var start = moveRequest?.ScheduledStart
+            ?? routing.ProposedSlotStart?.UtcDateTime
             ?? routing.EstimatedStartDate.UtcDateTime;
-        if (start <= DateTime.UtcNow)
+        if (moveRequest is null && start <= DateTime.UtcNow)
             start = DateTime.UtcNow.AddHours(1);
 
         var setupMinutes = DefaultSetupMinutes(plan.ProcessType);
         var productionMinutes = Math.Max(30, plan.Quantity * 30);
+        var end = moveRequest?.ScheduledEnd
+            ?? routing.ProposedSlotEnd?.UtcDateTime
+            ?? start.AddMinutes(setupMinutes + productionMinutes);
+
         return new CreateProductionPlanningHoldRequest
         {
             ProjectId = Id,
             ProjectPartId = plan.PartId,
             Technology = plan.ProcessType ?? string.Empty,
-            MachineId = FirstNonEmpty(routing.MachineCode, routing.MachineId == Guid.Empty ? null : routing.MachineId.ToString()),
-            MachineName = routing.MachineName,
+            MachineId = moveRequest?.MachineId ?? FirstNonEmpty(routing.MachineCode, routing.MachineId == Guid.Empty ? null : routing.MachineId.ToString()),
+            MachineName = moveRequest?.MachineName ?? routing.MachineName,
             QueuePosition = 0,
             ScheduledStartTime = start,
-            ScheduledEndTime = routing.ProposedSlotEnd?.UtcDateTime ?? start.AddMinutes(setupMinutes + productionMinutes),
+            ScheduledEndTime = end,
             SetupTimeMinutes = setupMinutes,
             ProductionTimeMinutes = productionMinutes,
             Quantity = Math.Max(1, plan.Quantity),
