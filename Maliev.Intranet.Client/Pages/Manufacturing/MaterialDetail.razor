@@ -13,55 +13,52 @@
         }
     </PageHeader>
 
-    @if (_loading)
-    {
-        <div class="mlv-empty">Loading material...</div>
-    }
-    else if (_material is null)
-    {
-        <div class="mlv-empty">Material not found.</div>
-    }
-    else
-    {
-        <section class="mlv-stats-grid">
-            <StatTile Label="Stock" Value="@($"{_material.QuantityOnHand:N0} {_material.Unit}")" />
-            <StatTile Label="Unit price" Value="@_material.UnitPrice.ToString("N2")" />
-            <StatTile Label="Category" Value="@(string.IsNullOrWhiteSpace(_material.Category) ? "-" : _material.Category)" />
-            <StatTile Label="Updated" Value="@_material.UpdatedAt.ToString("dd MMM yyyy")" />
-        </section>
+    <PageBody>
+        @if (_loading)
+        {
+            <div class="mlv-empty">Loading material...</div>
+        }
+        else if (_material is null)
+        {
+            <div class="mlv-empty">Material not found.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Stock" Value="@($"{_material.QuantityOnHand:N0} {_material.Unit}")" />
+                <StatTile Label="Unit price" Value="@_material.UnitPrice.ToString("N2")" />
+                <StatTile Label="Category" Value="@(string.IsNullOrWhiteSpace(_material.Category) ? "-" : _material.Category)" />
+                <StatTile Label="Updated" Value="@_material.UpdatedAt.ToString("dd MMM yyyy")" />
+            </StatBar>
 
-        <section class="mlv-panel-grid">
-            <div class="mlv-panel">
-                <h2>Profile</h2>
-                <div class="mlv-list">
-                    <div class="mlv-list-row"><span>Code</span><strong class="mlv-mono">@_material.SKU</strong></div>
-                    <div class="mlv-list-row"><span>Status</span><strong>@_material.Status</strong></div>
-                    <div class="mlv-list-row"><span>Color</span><strong>@(string.IsNullOrWhiteSpace(_material.Color) ? "-" : _material.Color)</strong></div>
-                    <div class="mlv-list-row"><span>Description</span><strong>@(string.IsNullOrWhiteSpace(_material.Description) ? "-" : _material.Description)</strong></div>
-                </div>
-            </div>
+            <div class="mlv-two-column-grid">
+                <PanelCard Title="Profile">
+                    <dl class="mlv-detail-list">
+                        <dt>Code</dt><dd class="mlv-mono">@_material.SKU</dd>
+                        <dt>Status</dt><dd>@_material.Status</dd>
+                        <dt>Color</dt><dd>@(string.IsNullOrWhiteSpace(_material.Color) ? "-" : _material.Color)</dd>
+                        <dt>Description</dt><dd>@(string.IsNullOrWhiteSpace(_material.Description) ? "-" : _material.Description)</dd>
+                    </dl>
+                </PanelCard>
 
-            <div class="mlv-panel">
-                <h2>Properties</h2>
-                @if (_material.Properties.Count == 0)
-                {
-                    <div class="mlv-empty">No technical properties.</div>
-                }
-                else
-                {
-                    <div class="mlv-list">
-                        @foreach (var property in _material.Properties)
-                        {
-                            <div class="mlv-list-row">
-                                <span>@property.Key</span>
-                                <strong>@property.Value @property.Unit</strong>
-                            </div>
-                        }
-                    </div>
-                }
+                <PanelCard Title="Properties">
+                    @if (_material.Properties.Count == 0)
+                    {
+                        <div class="mlv-empty">No technical properties.</div>
+                    }
+                    else
+                    {
+                        <dl class="mlv-detail-list">
+                            @foreach (var property in _material.Properties)
+                            {
+                                <dt>@property.Key</dt><dd>@property.Value @property.Unit</dd>
+                            }
+                        </dl>
+                    }
+                </PanelCard>
             </div>
-        </section>
-    }
+        }
+    </PageBody>
 </div>
 
 @code {

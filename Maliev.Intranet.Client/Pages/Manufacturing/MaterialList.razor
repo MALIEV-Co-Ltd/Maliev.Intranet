@@ -9,26 +9,26 @@
 <div class="mlv-module-shell">
     <PageHeader Title="Materials" Subtitle="Catalog materials and stock levels" BackHref="/mfg" />
 
-    <section class="mlv-stats-grid">
-        <StatTile Label="Materials" Value="@_meta.TotalItems.ToString("N0")" />
-        <StatTile Label="On page" Value="@_materials.Count.ToString("N0")" />
-        <StatTile Label="Active" Value="@_materials.Count(IsActive).ToString("N0")" />
-        <StatTile Label="Stock value" Value="@_materials.Sum(m => m.UnitPrice * m.QuantityOnHand).ToString("N2")" />
-    </section>
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Materials" Value="@_meta.TotalItems.ToString("N0")" />
+            <StatTile Label="On page" Value="@_materials.Count.ToString("N0")" />
+            <StatTile Label="Active" Value="@_materials.Count(IsActive).ToString("N0")" />
+            <StatTile Label="Stock value" Value="@_materials.Sum(m => m.UnitPrice * m.QuantityOnHand).ToString("N2")" />
+        </StatBar>
 
-    <section class="mlv-panel">
-        @if (_loading)
-        {
-            <div class="mlv-empty">Loading materials...</div>
-        }
-        else if (_materials.Count == 0)
-        {
-            <div class="mlv-empty">No materials found.</div>
-        }
-        else
-        {
-            <div class="mlv-table-wrap">
-                <table class="mlv-data-table">
+        <PanelCard>
+            @if (_loading)
+            {
+                <div class="mlv-empty">Loading materials...</div>
+            }
+            else if (_materials.Count == 0)
+            {
+                <div class="mlv-empty">No materials found.</div>
+            }
+            else
+            {
+                <table class="mlv-table">
                     <thead>
                         <tr>
                             <th>Code</th>
@@ -53,16 +53,16 @@
                         }
                     </tbody>
                 </table>
-            </div>
-        }
-    </section>
+            }
+        </PanelCard>
 
-    <PaginationFooter Meta="@_meta"
-                      CurrentPage="@_page"
-                      PageSize="@_pageSize"
-                      PageChanged="OnPageChanged"
-                      PageSizeChanged="OnPageSizeChanged"
-                      Disabled="@_loading" />
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
+    </PageBody>
 </div>
 
 @code {

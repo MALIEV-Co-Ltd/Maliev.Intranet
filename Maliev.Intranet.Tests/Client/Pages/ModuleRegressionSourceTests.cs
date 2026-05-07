@@ -164,6 +164,34 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void MaterialPages_UseSharedPageBodySpacing()
+    {
+        var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialList.razor");
+        var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor");
+
+        Assert.Contains("@page \"/mfg/materials\"", list, StringComparison.Ordinal);
+        Assert.Contains("@page \"/mfg/materials/{Id:guid}\"", detail, StringComparison.Ordinal);
+        Assert.Contains("<PageBody>", list, StringComparison.Ordinal);
+        Assert.Contains("</PageBody>", list, StringComparison.Ordinal);
+        Assert.Contains("<PageBody>", detail, StringComparison.Ordinal);
+        Assert.Contains("</PageBody>", detail, StringComparison.Ordinal);
+        Assert.Contains("<StatBar Class=\"mb-4\">", list, StringComparison.Ordinal);
+        Assert.Contains("<StatBar Class=\"mb-4\">", detail, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard>", list, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard Title=\"Profile\">", detail, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard Title=\"Properties\">", detail, StringComparison.Ordinal);
+        Assert.Contains("class=\"mlv-table\"", list, StringComparison.Ordinal);
+        Assert.Contains("class=\"mlv-detail-list\"", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("mlv-stats-grid", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("mlv-stats-grid", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("mlv-panel", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("mlv-panel", detail, StringComparison.Ordinal);
+        Assert.Contains("PaginationFooter", list, StringComparison.Ordinal);
+        Assert.Contains("api/v1/materials?page={_page}&pageSize={_pageSize}", list, StringComparison.Ordinal);
+        Assert.Contains("api/v1/materials/{Id}", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SystemHealthPage_RendersAllServiceHealthFields()
     {
         var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "SystemHealth.razor");
