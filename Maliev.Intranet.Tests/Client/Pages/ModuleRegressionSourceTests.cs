@@ -129,6 +129,18 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerDetail_InternalNotesPreserveMultilineFormatting()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor.css");
+        var noteTextBlock = ExtractCssBlock(styles, ".customer-note-text");
+
+        Assert.Contains("class=\"customer-note-text\"", source, StringComparison.Ordinal);
+        Assert.Contains("white-space: pre-wrap;", noteTextBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow-wrap: anywhere;", noteTextBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PurchasingPages_UseIntIdsAndServerPagination()
     {
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor");

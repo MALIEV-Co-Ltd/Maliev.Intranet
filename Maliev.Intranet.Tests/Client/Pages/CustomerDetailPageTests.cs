@@ -242,6 +242,20 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CustomerDetail_InternalNotesUseMultilineTextStyle()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='notes']").Click();
+
+        var note = cut.Find(".customer-note-text");
+
+        Assert.Equal("p", note.TagName, ignoreCase: true);
+        Assert.Contains("Added internal note", note.TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerDetail_SendEmail_OpensComposeDialogWithoutPosting()
     {
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
