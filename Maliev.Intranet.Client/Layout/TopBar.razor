@@ -15,8 +15,18 @@
         <button type="button"
                 class="topbar-logo-button"
                 aria-label="Go to dashboard"
-                @onclick="@(() => Navigation.NavigateTo("/"))">
+                @onclick="NavigateHome">
             <MudImage Src="@LogoUrl" Alt="MALIEV" Height="22" />
+        </button>
+
+        <button type="button"
+                class="topbar-mobile-menu-button"
+                aria-label="@MobileNavButtonLabel"
+                aria-haspopup="menu"
+                aria-expanded="@_mobileNavOpen.ToString().ToLowerInvariant()"
+                aria-controls="topbar-mobile-nav"
+                @onclick="ToggleMobileNav">
+            <MudIcon Icon="@(_mobileNavOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Menu)" Size="Size.Small" />
         </button>
     </div>
 
@@ -30,6 +40,21 @@
             <MudNavLink Href="@item.Href" Match="@item.Match" Class="@item.Class">@item.Label</MudNavLink>
         }
     </nav>
+
+    @if (_mobileNavOpen)
+    {
+        <nav id="topbar-mobile-nav" class="topbar-mobile-nav-popover" aria-label="Primary navigation">
+            @foreach (var item in _navItems)
+            {
+                <NavLink href="@item.Href"
+                         Match="@item.Match"
+                         class="@GetMobileNavClass(item)"
+                         @onclick="CloseMobileNav">
+                    @item.Label
+                </NavLink>
+            }
+        </nav>
+    }
 
     <div class="topbar-spacer" />
 
@@ -73,6 +98,7 @@
         @* Theme toggle *@
         <MudTooltip Text="@GetThemeLabel()" Placement="Placement.Bottom">
             <MudIconButton Icon="@GetThemeIcon()"
+                           Class="topbar-theme-toggle"
                            Size="Size.Medium"
                            OnClick="@OnToggleTheme"
                            Color="Color.Default" />
@@ -81,6 +107,7 @@
         @* AI Assistant *@
         <MudTooltip Text="AI Assistant" Placement="Placement.Bottom">
             <MudIconButton Icon="@Icons.Material.Outlined.Chat"
+                           Class="topbar-chat-toggle"
                            Size="Size.Medium"
                            OnClick="@ToggleChat"
                            Color="@(ChatDrawerOpen ? Color.Primary : Color.Default)" />
@@ -148,6 +175,7 @@
     [Parameter] public EventCallback OnToggleTheme { get; set; }
 
     private bool _profileMenuOpen;
+    private bool _mobileNavOpen;
     private string? _profileJobTitle;
 
     private record NavItem(string Label, string Href, NavLinkMatch Match = NavLinkMatch.Prefix, string? Class = null);
@@ -165,6 +193,8 @@
     private string LogoUrl => LayoutService.IsDarkMode
         ? "images/logo-white.svg"
         : "images/logo.svg";
+
+    private string MobileNavButtonLabel => _mobileNavOpen ? "Close navigation menu" : "Open navigation menu";
 
     private string GetThemeIcon() => LayoutService.CurrentMode switch
     {
@@ -258,12 +288,35 @@
         }
     }
 
-    private void ToggleProfileMenu() => _profileMenuOpen = !_profileMenuOpen;
+    private void NavigateHome()
+    {
+        _mobileNavOpen = false;
+        _profileMenuOpen = false;
+        Navigation.NavigateTo("/");
+    }
+
+    private void ToggleMobileNav()
+    {
+        _profileMenuOpen = false;
+        _mobileNavOpen = !_mobileNavOpen;
+    }
+
+    private void CloseMobileNav() => _mobileNavOpen = false;
+
+    private static string GetMobileNavClass(NavItem item) =>
+        string.IsNullOrWhiteSpace(item.Class) ? "topbar-mobile-nav-link" : $"topbar-mobile-nav-link {item.Class}";
+
+    private void ToggleProfileMenu()
+    {
+        _mobileNavOpen = false;
+        _profileMenuOpen = !_profileMenuOpen;
+    }
 
     private void CloseProfileMenu() => _profileMenuOpen = false;
 
     private void HandleLogout()
     {
+        _mobileNavOpen = false;
         _profileMenuOpen = false;
         Navigation.NavigateTo("/api/v1/auth/logout", forceLoad: true);
     }

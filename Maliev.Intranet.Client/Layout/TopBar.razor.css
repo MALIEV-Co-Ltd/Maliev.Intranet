@@ -38,6 +38,28 @@
     box-shadow: var(--maliev-focus-ring);
 }
 
+.topbar-mobile-menu-button {
+    display: none;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--maliev-radius-sm);
+    background: transparent;
+    color: var(--maliev-ink);
+    cursor: pointer;
+}
+
+.topbar-mobile-menu-button:hover {
+    background: var(--maliev-panel-3);
+}
+
+.topbar-mobile-menu-button:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
+}
+
 .topbar-logo-divider {
     width: 1px;
     height: 20px;
@@ -58,6 +80,10 @@
 }
 
 .topbar-nav::-webkit-scrollbar { display: none; }
+
+.topbar-mobile-nav-popover {
+    display: none;
+}
 
 .topbar-nav ::deep .mud-nav-link {
     padding: 6px 12px;
@@ -422,55 +448,138 @@
 
 @media (max-width: 1120px) {
     .topbar-logo-divider { display: none; }
+
     .topbar-root {
-        height: auto;
+        height: 52px;
         min-height: 52px;
-        flex-wrap: wrap;
-        align-content: flex-start;
+        flex-wrap: nowrap;
         gap: 6px;
-        padding: 6px 8px;
+        padding: 0 8px;
         overflow: visible;
     }
 
-    .topbar-left {
-        order: 1;
+    .topbar-mobile-menu-button {
+        display: inline-grid;
+    }
+
+    .topbar-nav {
+        display: none;
+    }
+
+    .topbar-mobile-nav-popover {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 8px;
+        z-index: 2600;
+        display: flex;
+        width: min(260px, calc(100vw - 16px));
+        padding: 6px;
+        border-radius: var(--maliev-radius-sm);
+        background: var(--maliev-panel);
+        box-shadow: var(--maliev-shadow-card);
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .topbar-mobile-nav-link {
+        display: flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 7px 10px;
+        border-radius: var(--maliev-radius-xs);
+        color: var(--maliev-muted);
+        font-size: var(--maliev-font-base);
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .topbar-mobile-nav-link:hover,
+    .topbar-mobile-nav-link:focus-visible,
+    .topbar-mobile-nav-link.active {
+        background: var(--maliev-panel-3);
+        color: var(--maliev-ink);
+        outline: none;
+    }
+
+    .topbar-mobile-nav-link.topbar-nav-quote,
+    .topbar-mobile-nav-link.topbar-nav-quote:hover,
+    .topbar-mobile-nav-link.topbar-nav-quote:focus-visible,
+    .topbar-mobile-nav-link.topbar-nav-quote.active {
+        background: var(--mud-palette-primary);
+        color: var(--mud-palette-primary-text);
     }
 
     .topbar-spacer {
-        order: 1;
-        flex: 1 1 auto;
+        display: none;
     }
 
     .topbar-right {
-        order: 1;
-        flex-wrap: wrap;
         justify-content: flex-end;
         flex: 1 1 auto;
     }
 
-    .topbar-nav {
-        order: 2;
-        flex: 1 1 100%;
-        min-width: 0;
-    }
-
     .topbar-search {
-        order: 2;
         display: block;
-        flex: 1 1 100%;
-        min-width: 0;
-        max-width: none;
+        flex: 1 1 clamp(160px, 32vw, 260px);
+        min-width: 160px;
+        max-width: 280px;
     }
 
     .topbar-divider {
         display: none;
     }
-
-    .topbar-nav ::deep .mud-nav-link { padding: 6px 8px; font-size: var(--maliev-font-small); }
 }
 
 @media (max-width: 720px) {
+    .topbar-root {
+        gap: 4px;
+        padding: 0 6px;
+    }
+
+    .topbar-left {
+        gap: 4px;
+    }
+
+    .topbar-logo-button {
+        max-width: 86px;
+        overflow: hidden;
+    }
+
+    .topbar-search {
+        flex-basis: 118px;
+        min-width: 108px;
+        max-width: none;
+    }
+
+    .topbar-right ::deep .mud-button-root.mud-icon-button,
+    .topbar-profile {
+        width: 32px;
+        height: 32px;
+    }
+
     .topbar-root ::deep .topbar-currency-autocomplete .mud-input {
         padding-left: 6px;
+    }
+}
+
+@media (max-width: 520px) {
+    .topbar-right ::deep .topbar-theme-toggle {
+        display: none !important;
+    }
+
+    .topbar-search {
+        flex-basis: 104px;
+        min-width: 96px;
+    }
+}
+
+@media (max-width: 420px) {
+    .topbar-root ::deep .topbar-currency-autocomplete {
+        display: none !important;
+    }
+
+    .topbar-search {
+        flex-basis: auto;
+        min-width: 0;
     }
 }
