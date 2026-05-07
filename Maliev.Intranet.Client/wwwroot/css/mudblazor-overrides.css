@@ -113,6 +113,67 @@
     line-height: 1.3;
 }
 
+.mud-popover .suggestion-card {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 18%, var(--maliev-border));
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin: 0.25rem 0;
+    background: linear-gradient(135deg, color-mix(in oklch, var(--mud-palette-primary) 6%, transparent), var(--mud-palette-surface));
+}
+
+.mud-popover .suggestion-card strong,
+.mud-popover .suggestion-card span,
+.mud-popover .suggestion-card small {
+    display: block;
+}
+
+.mud-popover .suggestion-card strong {
+    font-weight: 750;
+}
+
+.mud-popover .suggestion-card span,
+.mud-popover .suggestion-card small {
+    color: var(--maliev-text-muted);
+}
+
+.mud-popover .suggestion-meta {
+    text-align: right;
+    white-space: nowrap;
+    align-self: center;
+}
+
+.mud-popover .address-suggestion {
+    display: block;
+    padding: 0.65rem 0.75rem;
+}
+
+.mud-popover .address-suggestion-lines {
+    display: grid;
+    gap: 0.18rem;
+    min-width: 0;
+}
+
+.mud-popover .address-suggestion-primary,
+.mud-popover .address-suggestion-secondary,
+.mud-popover .address-suggestion-postal {
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.mud-popover .address-suggestion-secondary {
+    color: var(--maliev-text-muted);
+    font-size: 0.86rem;
+}
+
+.mud-popover .address-suggestion-postal {
+    color: var(--maliev-text-muted);
+    font-size: 0.82rem;
+}
+
 /* ── BUTTONS ──────────────────────────────────────────────────────
    MudButton, MudIconButton
    ──────────────────────────────────────────────────────────────── */
