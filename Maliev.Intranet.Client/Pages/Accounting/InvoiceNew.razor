@@ -33,7 +33,7 @@
                             }
                         </select>
                     </FormField>
-                    <FormField Label="Customer PO number"><InputText class="mlv-form-input" @bind-Value="_request.PoNumber" /></FormField>
+                    <FormField Label="Customer PO number"><ImmediateInputText class="mlv-form-input" @bind-Value="_request.PoNumber" /></FormField>
                     <FormField Label="Customer PO document">
                         <InputFile class="mlv-form-input" OnChange="OnPoDocumentSelected" />
                         @if (_poDocument is not null)
@@ -47,10 +47,10 @@
                     </FormField>
                     <FormField Label="Issue date"><InputDate class="mlv-form-input" @bind-Value="_request.IssueDate" /></FormField>
                     <FormField Label="Due date"><InputDate class="mlv-form-input" @bind-Value="_request.DueDate" /></FormField>
-                    <FormField Label="Description"><InputText class="mlv-form-input" @bind-Value="_line.Description" /></FormField>
-                    <FormField Label="Quantity"><InputNumber class="mlv-form-input" @bind-Value="_line.Quantity" /></FormField>
-                    <FormField Label="Unit price"><InputNumber class="mlv-form-input" @bind-Value="_line.UnitPrice" /></FormField>
-                    <FormField Label="Tax rate"><InputNumber class="mlv-form-input" @bind-Value="_line.TaxRate" /></FormField>
+                    <FormField Label="Description"><ImmediateInputText class="mlv-form-input" @bind-Value="_line.Description" /></FormField>
+                    <FormField Label="Quantity"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_line.Quantity" /></FormField>
+                    <FormField Label="Unit price"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_line.UnitPrice" /></FormField>
+                    <FormField Label="Tax rate"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_line.TaxRate" /></FormField>
                 </FormGrid>
 
                 @if (_customerLoading)

@@ -107,7 +107,7 @@
                        type="number"
                        min="1"
                        value="@_bulkPatch.Quantity"
-                       @onchange="OnBulkQuantityChanged" />
+                       @oninput="OnBulkQuantityChanged" />
 
                 <span class="pbt-bulk-field">Inspection</span>
                 <select class="pbt-input"
@@ -125,7 +125,7 @@
                     <input class="pbt-input"
                            value="@_bulkPatch.RoughnessCode"
                            placeholder="RA_3_2"
-                           @onchange="OnBulkRoughnessChanged" />
+                           @oninput="OnBulkRoughnessChanged" />
                 }
 
                 <span class="pbt-bulk-field">Threaded holes</span>
@@ -149,7 +149,7 @@
                           value="@_bulkPatch.PartNotes"
                           placeholder="Part note"
                           rows="3"
-                          @onchange="OnBulkNotesChanged"></textarea>
+                          @oninput="OnBulkNotesChanged"></textarea>
             </div>
         </div>
     }
@@ -274,7 +274,7 @@
                                    type="number"
                                    min="1"
                                    value="@part.Quantity"
-                                   @onchange="@((ChangeEventArgs args) => ChangeQuantityAsync(part, args.Value?.ToString()))" />
+                                   @oninput="@((ChangeEventArgs args) => ChangeQuantityAsync(part, args.Value?.ToString()))" />
                         </td>
                         <td>
                             <select class="pbt-input"
@@ -483,7 +483,7 @@
                                type="number"
                                min="1"
                                value="@part.Quantity"
-                               @onchange="@((ChangeEventArgs args) => ChangeQuantityAsync(part, args.Value?.ToString()))" />
+                               @oninput="@((ChangeEventArgs args) => ChangeQuantityAsync(part, args.Value?.ToString()))" />
                     </label>
                     <label>
                         <span>Inspection</span>

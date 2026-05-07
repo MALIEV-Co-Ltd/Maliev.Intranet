@@ -48,7 +48,7 @@
                         <div class="customer-form-grid">
                             <label class="customer-field">
                                 <span>Full name</span>
-                                <input class="customer-input" @bind="_edit.FullName" />
+                                <input class="customer-input" @bind="_edit.FullName" @bind:event="oninput" />
                             </label>
                             <label class="customer-field">
                                 <span>Company</span>
@@ -59,11 +59,11 @@
                             </label>
                             <label class="customer-field">
                                 <span>Email</span>
-                                <input class="customer-input" type="email" @bind="_edit.Email" />
+                                <input class="customer-input" type="email" @bind="_edit.Email" @bind:event="oninput" />
                             </label>
                             <label class="customer-field">
                                 <span>Phone</span>
-                                <input class="customer-input" @bind="_edit.Phone" />
+                                <input class="customer-input" @bind="_edit.Phone" @bind:event="oninput" />
                             </label>
                         </div>
                     </section>
@@ -562,7 +562,7 @@
                     <div class="customer-form-grid">
                         <label class="customer-field">
                             <span>Recipient name</span>
-                            <input class="customer-input" @bind="_addressEdit.Label" />
+                            <input class="customer-input" @bind="_addressEdit.Label" @bind:event="oninput" />
                         </label>
                         <label class="customer-field">
                             <span>Type</span>
@@ -574,11 +574,11 @@
                         </label>
                         <label class="customer-field customer-span-2">
                             <span>Street</span>
-                            <input class="customer-input" @bind="_addressEdit.AddressLine1" />
+                            <input class="customer-input" @bind="_addressEdit.AddressLine1" @bind:event="oninput" />
                         </label>
                         <label class="customer-field customer-span-2">
                             <span>Street 2</span>
-                            <input class="customer-input" @bind="_addressEdit.AddressLine2" />
+                            <input class="customer-input" @bind="_addressEdit.AddressLine2" @bind:event="oninput" />
                         </label>
                         <label class="customer-field customer-suggestion-field">
                             <span>City</span>
@@ -724,7 +724,7 @@
                 <label class="customer-field customer-span-2">
                     <span>Company lookup</span>
                     <div class="customer-split-field">
-                        <input class="customer-input" placeholder="Name or tax ID..." @bind="_companyLookupQuery" />
+                        <input class="customer-input" placeholder="Name or tax ID..." @bind="_companyLookupQuery" @bind:event="oninput" />
                         <button type="button" class="customer-inline-action" @onclick="SearchCompaniesAsync">Search</button>
                     </div>
                 </label>
@@ -747,23 +747,23 @@
                 }
                 <label class="customer-field customer-span-2">
                     <span>Company name</span>
-                    <input class="customer-input" @bind="_companyEdit.Name" />
+                    <input class="customer-input" @bind="_companyEdit.Name" @bind:event="oninput" />
                 </label>
                 <label class="customer-field">
                     <span>Tax ID</span>
-                    <input class="customer-input" @bind="_companyEdit.VatNumber" />
+                    <input class="customer-input" @bind="_companyEdit.VatNumber" @bind:event="oninput" />
                 </label>
                 <label class="customer-field">
                     <span>Registration number</span>
-                    <input class="customer-input" @bind="_companyEdit.RegistrationNumber" />
+                    <input class="customer-input" @bind="_companyEdit.RegistrationNumber" @bind:event="oninput" />
                 </label>
                 <label class="customer-field">
                     <span>Contact email</span>
-                    <input class="customer-input" type="email" @bind="_companyEdit.ContactEmail" />
+                    <input class="customer-input" type="email" @bind="_companyEdit.ContactEmail" @bind:event="oninput" />
                 </label>
                 <label class="customer-field">
                     <span>Contact phone</span>
-                    <input class="customer-input" @bind="_companyEdit.ContactPhone" />
+                    <input class="customer-input" @bind="_companyEdit.ContactPhone" @bind:event="oninput" />
                 </label>
             </div>
         </div>

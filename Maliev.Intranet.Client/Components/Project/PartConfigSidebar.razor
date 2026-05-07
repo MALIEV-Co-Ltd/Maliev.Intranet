@@ -350,6 +350,7 @@
                                                           Placeholder="RAL 9005, Pantone Black C..."
                                                           Variant="Variant.Outlined"
                                                           Margin="Margin.Dense"
+                                                          Immediate="true"
                                                           FullWidth="true" />
                                         </div>
                                     }
@@ -412,6 +413,7 @@
                                     <MudTextField T="string" Label="@opt.Label" Value="@currentText"
                                                   ValueChanged="@(val => OnProcessOptionValueChanged(opt.ConfigKey, val))"
                                                   Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                  Immediate="true"
                                                   HelperText="@opt.HelpText" FullWidth="true" />
                                 }
                             </div>
@@ -463,7 +465,7 @@
                     <button class="pcs-qty-btn"
                             @onclick="@(() => OnQuantityChanged(Math.Max(1, Part!.Quantity - 1)))">−</button>
                     <input type="number" class="pcs-qty-input" value="@Part!.Quantity" min="1" max="999999"
-                           @onchange="@(e => OnQuantityChanged(int.TryParse(e.Value?.ToString(), out var q) ? Math.Max(1, q) : 1))" />
+                           @oninput="@(e => OnQuantityChanged(int.TryParse(e.Value?.ToString(), out var q) ? Math.Max(1, q) : 1))" />
                     <button class="pcs-qty-btn" @onclick="@(() => OnQuantityChanged(Part!.Quantity + 1))">+</button>
                 </div>
                 <div class="pcs-qty-presets">
@@ -488,7 +490,7 @@
                           value="@Part!.PartNotes"
                           placeholder="Manufacturing notes for this part"
                           rows="4"
-                          @onchange="@(e => OnNotesChanged(e.Value?.ToString()))"></textarea>
+                          @oninput="@(e => OnNotesChanged(e.Value?.ToString()))"></textarea>
             </section>
         </div>
 

@@ -125,15 +125,15 @@
             <PanelCard Title="Income entry">
                 <FormGrid>
                     <FormField Label="Date"><input type="date" class="mlv-form-input" @bind="_incomeForm.Date" @bind:format="yyyy-MM-dd" /></FormField>
-                    <FormField Label="Description"><input class="mlv-form-input" @bind="_incomeForm.Description" /></FormField>
-                    <FormField Label="Reference"><input class="mlv-form-input" @bind="_incomeForm.Reference" /></FormField>
+                    <FormField Label="Description"><input class="mlv-form-input" @bind="_incomeForm.Description" @bind:event="oninput" /></FormField>
+                    <FormField Label="Reference"><input class="mlv-form-input" @bind="_incomeForm.Reference" @bind:event="oninput" /></FormField>
                     <FormField Label="Debit account">
                         <select class="mlv-form-input" @bind="_incomeDebitAccountId">@AccountOptions()</select>
                     </FormField>
                     <FormField Label="Credit account">
                         <select class="mlv-form-input" @bind="_incomeCreditAccountId">@AccountOptions()</select>
                     </FormField>
-                    <FormField Label="Amount"><input type="number" step="0.01" class="mlv-form-input" @bind="_incomeForm.Amount" /></FormField>
+                    <FormField Label="Amount"><input type="number" step="0.01" class="mlv-form-input" @bind="_incomeForm.Amount" @bind:event="oninput" /></FormField>
                     <FormField Label="Transfer slip or receipt">
                         <InputFile class="mlv-form-input" OnChange="@(args => OnDocumentSelected(args, _incomeForm))" />
                         @if (_incomeForm.Document is not null)
@@ -152,15 +152,15 @@
             <PanelCard Title="Expense entry">
                 <FormGrid>
                     <FormField Label="Date"><input type="date" class="mlv-form-input" @bind="_expenseForm.Date" @bind:format="yyyy-MM-dd" /></FormField>
-                    <FormField Label="Description"><input class="mlv-form-input" @bind="_expenseForm.Description" /></FormField>
-                    <FormField Label="Reference"><input class="mlv-form-input" @bind="_expenseForm.Reference" /></FormField>
+                    <FormField Label="Description"><input class="mlv-form-input" @bind="_expenseForm.Description" @bind:event="oninput" /></FormField>
+                    <FormField Label="Reference"><input class="mlv-form-input" @bind="_expenseForm.Reference" @bind:event="oninput" /></FormField>
                     <FormField Label="Debit account">
                         <select class="mlv-form-input" @bind="_expenseDebitAccountId">@AccountOptions()</select>
                     </FormField>
                     <FormField Label="Credit account">
                         <select class="mlv-form-input" @bind="_expenseCreditAccountId">@AccountOptions()</select>
                     </FormField>
-                    <FormField Label="Amount"><input type="number" step="0.01" class="mlv-form-input" @bind="_expenseForm.Amount" /></FormField>
+                    <FormField Label="Amount"><input type="number" step="0.01" class="mlv-form-input" @bind="_expenseForm.Amount" @bind:event="oninput" /></FormField>
                     <FormField Label="Receipt or supplier document">
                         <InputFile class="mlv-form-input" OnChange="@(args => OnDocumentSelected(args, _expenseForm))" />
                         @if (_expenseForm.Document is not null)
@@ -272,7 +272,7 @@
                         </label>
                         <label class="mlv-filter-field">
                             <span>Source system</span>
-                            <input class="mlv-form-input" @bind="_reconciliationSource" />
+                            <input class="mlv-form-input" @bind="_reconciliationSource" @bind:event="oninput" />
                         </label>
                     </div>
                     <PrimaryButton Icon="@Icons.Material.Outlined.LockOpen" OnClick="@OpenPeriodAsync">Open Period</PrimaryButton>

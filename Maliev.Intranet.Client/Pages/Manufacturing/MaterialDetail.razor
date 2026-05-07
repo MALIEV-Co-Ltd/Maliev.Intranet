@@ -85,27 +85,27 @@
                 <div class="material-edit-grid">
                     <label class="material-edit-field">
                         <span>Name</span>
-                        <input class="material-input" @bind="_editModel.Name" />
+                        <input class="material-input" @bind="_editModel.Name" @bind:event="oninput" />
                         <ValidationMessage For="@(() => _editModel!.Name)" />
                     </label>
                     <label class="material-edit-field">
                         <span>Code</span>
-                        <input class="material-input mlv-mono" @bind="_editModel.SKU" />
+                        <input class="material-input mlv-mono" @bind="_editModel.SKU" @bind:event="oninput" />
                         <ValidationMessage For="@(() => _editModel!.SKU)" />
                     </label>
                     <label class="material-edit-field">
                         <span>Unit price</span>
-                        <input class="material-input" type="number" step="0.01" min="0" @bind="_editModel.UnitPrice" />
+                        <input class="material-input" type="number" step="0.01" min="0" @bind="_editModel.UnitPrice" @bind:event="oninput" />
                         <ValidationMessage For="@(() => _editModel!.UnitPrice)" />
                     </label>
                     <label class="material-edit-field">
                         <span>Stock</span>
-                        <input class="material-input" type="number" step="1" min="0" @bind="_editModel.QuantityOnHand" />
+                        <input class="material-input" type="number" step="1" min="0" @bind="_editModel.QuantityOnHand" @bind:event="oninput" />
                         <ValidationMessage For="@(() => _editModel!.QuantityOnHand)" />
                     </label>
                     <label class="material-edit-field material-edit-field-wide">
                         <span>Description</span>
-                        <textarea class="material-input material-textarea" rows="4" @bind="_editModel.Description"></textarea>
+                        <textarea class="material-input material-textarea" rows="4" @bind="_editModel.Description" @bind:event="oninput"></textarea>
                         <ValidationMessage For="@(() => _editModel!.Description)" />
                     </label>
                 </div>

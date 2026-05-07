@@ -14,7 +14,7 @@
 
         <input type="text"
                value="@_titleDraft"
-               @onchange="(e) => _titleDraft = e.Value?.ToString() ?? string.Empty"
+               @oninput="OnTitleInputAsync"
                @onblur="CommitTitle"
                class="tb-title-input"
                size="14" />
@@ -57,6 +57,7 @@
                        Style="width:120px;flex-shrink:0;"
                        Clearable="false"
                        ShowProgressIndicator="true"
+                       Immediate="true"
                        DebounceInterval="300"
                        CoerceText="true">
             <ItemTemplate Context="item">
@@ -156,6 +157,12 @@
     {
         if (_titleDraft != Title)
             await OnTitleChanged.InvokeAsync(_titleDraft);
+    }
+
+    private async Task OnTitleInputAsync(ChangeEventArgs args)
+    {
+        _titleDraft = args.Value?.ToString() ?? string.Empty;
+        await OnTitleChanged.InvokeAsync(_titleDraft);
     }
 
     private Task ToggleLayout() =>

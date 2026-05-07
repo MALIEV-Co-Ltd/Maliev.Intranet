@@ -11,7 +11,7 @@
     @* ── Page Header: title + duplicate ────────────────────────────────── *@
     <div class="plp-page-header">
         <input type="text" value="@Title"
-               @onchange="@(e => OnTitleChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty))" @onblur="@OnTitleCommit"
+               @oninput="@(e => OnTitleChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty))" @onblur="@OnTitleCommit"
                class="plp-title-input" size="14" title="Project title" />
         <button class="plp-duplicate-btn" title="Duplicate project" disabled="@(!CanDuplicateProject)" @onclick="@OnDuplicate">
             <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" />

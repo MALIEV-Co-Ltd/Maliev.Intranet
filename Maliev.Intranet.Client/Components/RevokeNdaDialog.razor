@@ -5,7 +5,7 @@
 <MudDialog>
     <DialogContent>
         <MudText>Are you sure you want to revoke this NDA? This action cannot be undone.</MudText>
-        <MudTextField @bind-Value="_reason" Label="Revocation Reason" Variant="Variant.Outlined" Lines="3" Class="mt-4" Required="true" RequiredError="Reason is required" />
+        <MudTextField @bind-Value="_reason" Label="Revocation Reason" Variant="Variant.Outlined" Lines="3" Class="mt-4" Required="true" RequiredError="Reason is required" Immediate="true" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>

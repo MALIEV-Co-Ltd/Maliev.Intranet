@@ -59,22 +59,22 @@
                     @if (Address.Type == "Shipping")
                     {
                         <MudItem xs="12" sm="6">
-                            <MudTextField T="string" Label="Recipient Name" @bind-Value="Address.RecipientName" Variant="Variant.Outlined" Placeholder="@CustomerName" Margin="Margin.Dense" />
+                            <MudTextField T="string" Label="Recipient Name" @bind-Value="Address.RecipientName" Immediate="true" Variant="Variant.Outlined" Placeholder="@CustomerName" Margin="Margin.Dense" />
                         </MudItem>
                         <MudItem xs="12" sm="6">
-                            <MudTextField T="string" Label="Recipient Phone" @bind-Value="Address.RecipientPhone" Variant="Variant.Outlined" Placeholder="@CustomerMobile" Margin="Margin.Dense" />
+                            <MudTextField T="string" Label="Recipient Phone" @bind-Value="Address.RecipientPhone" Immediate="true" Variant="Variant.Outlined" Placeholder="@CustomerMobile" Margin="Margin.Dense" />
                         </MudItem>
                     }
 
                     <MudItem xs="12">
-                        <MudTextField T="string" Label="Address Line 1" @bind-Value="Address.AddressLine1" Variant="Variant.Outlined" Required="true" Placeholder="House/building number, street" Margin="Margin.Dense" />
+                        <MudTextField T="string" Label="Address Line 1" @bind-Value="Address.AddressLine1" Immediate="true" Variant="Variant.Outlined" Required="true" Placeholder="House/building number, street" Margin="Margin.Dense" />
                     </MudItem>
 
                     <MudItem xs="12" sm="6">
-                        <MudTextField T="string" Label="Address Line 2 (Optional)" @bind-Value="Address.AddressLine2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        <MudTextField T="string" Label="Address Line 2 (Optional)" @bind-Value="Address.AddressLine2" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
                     </MudItem>
                     <MudItem xs="12" sm="6">
-                        <MudTextField T="string" Label="Address Line 3 (Optional)" @bind-Value="Address.AddressLine3" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        <MudTextField T="string" Label="Address Line 3 (Optional)" @bind-Value="Address.AddressLine3" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
                     </MudItem>
 
                     <MudItem xs="12" sm="6">
@@ -86,6 +86,7 @@
                                          SearchFunc="@SearchLocations"
                                          ToStringFunc="@GetLocationString"
                                          Variant="Variant.Outlined"
+                                         Immediate="true"
                                          Clearable="true"
                                          CoerceText="false"
                                          CoerceValue="false"
@@ -114,6 +115,7 @@
                                          SearchFunc="@SearchLocations"
                                          ToStringFunc="@GetCityString"
                                          Variant="Variant.Outlined"
+                                         Immediate="true"
                                          Margin="Margin.Dense"
                                          Validation="@(new Func<RegistryThaiLocation?, string?>(v => string.IsNullOrEmpty(Address.City) ? "Required" : null))"
                                          Clearable="true"
@@ -142,6 +144,7 @@
                                          SearchFunc="@SearchLocations"
                                          ToStringFunc="@GetProvinceString"
                                          Variant="Variant.Outlined"
+                                         Immediate="true"
                                          Margin="Margin.Dense"
                                          Validation="@(new Func<RegistryThaiLocation?, string?>(v => string.IsNullOrEmpty(Address.StateProvince) ? "Required" : null))"
                                          Clearable="true"
@@ -170,6 +173,7 @@
                                          SearchFunc="@SearchLocations"
                                          ToStringFunc="@(l => l?.PostalCode ?? (Address.PostalCode ?? string.Empty))"
                                          Variant="Variant.Outlined"
+                                         Immediate="true"
                                          Margin="Margin.Dense"
                                          Validation="@(new Func<RegistryThaiLocation?, string?>(v => string.IsNullOrEmpty(Address.PostalCode) ? "Required" : null))"
                                          Clearable="true"
@@ -196,6 +200,7 @@
                                          SearchFunc="@SearchCountries"
                                          ToStringFunc="@(c => c?.Name ?? string.Empty)"
                                          Variant="Variant.Outlined"
+                                         Immediate="true"
                                          Margin="Margin.Dense"
                                          Required="true"
                                          ValueChanged="@OnCountryChanged"

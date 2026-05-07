@@ -59,13 +59,13 @@
                             </select>
                         </FormField>
                         <FormField Label="Customer PO">
-                            <InputText class="mlv-form-input" @bind-Value="_request.CustomerPo" />
+                            <ImmediateInputText class="mlv-form-input" @bind-Value="_request.CustomerPo" />
                         </FormField>
                         <FormField Label="Expected delivery">
                             <InputDate class="mlv-form-input" @bind-Value="_request.ExpectedDeliveryDate" />
                         </FormField>
                         <FormField Label="WHT rate">
-                            <InputNumber class="mlv-form-input" @bind-Value="_request.WhtRate" />
+                            <ImmediateInputNumber class="mlv-form-input" @bind-Value="_request.WhtRate" />
                         </FormField>
                         <FormField Label="Order item">
                             <select class="mlv-form-input" @bind="_selectedSourceOrderItemId" disabled="@(!_lineOptions.Any())">
@@ -76,10 +76,10 @@
                             </select>
                         </FormField>
                         <FormField Label="Quantity">
-                            <InputNumber class="mlv-form-input" @bind-Value="_line.Quantity" />
+                            <ImmediateInputNumber class="mlv-form-input" @bind-Value="_line.Quantity" />
                         </FormField>
                         <FormField Label="Notes" Class="mlv-span-6">
-                            <InputTextArea class="mlv-form-textarea" @bind-Value="_request.Notes" />
+                            <ImmediateInputTextArea class="mlv-form-textarea" @bind-Value="_request.Notes" />
                         </FormField>
                     </FormGrid>
                     <div class="mlv-toolbar mt-4" style="justify-content:flex-end">

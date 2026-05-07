@@ -18,8 +18,8 @@
             <EditForm Model="@_request" OnValidSubmit="SaveAsync">
                 <DataAnnotationsValidator />
                 <FormGrid>
-                    <FormField Label="Name"><InputText class="mlv-form-input" @bind-Value="_request.DisplayName" /></FormField>
-                    <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_request.Email" /></FormField>
+                    <FormField Label="Name"><ImmediateInputText class="mlv-form-input" @bind-Value="_request.DisplayName" /></FormField>
+                    <FormField Label="Email"><ImmediateInputText class="mlv-form-input" @bind-Value="_request.Email" /></FormField>
                     <FormField Label="Role">
                         <InputSelect class="mlv-form-input" @bind-Value="_request.RoleId" disabled="@(_rolesLoading || _roles.Count == 0)">
                             @foreach (var role in _roles)

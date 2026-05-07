@@ -83,6 +83,7 @@
                 <MudAutocomplete T="string" Label="Document Category" @bind-Value="Category"
                                  SearchFunc="@SearchCategories"
                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                 Immediate="true"
                                  DebounceInterval="300"
                                  CoerceText="false" CoerceValue="false"
                                  Placeholder="Select or type a category" />

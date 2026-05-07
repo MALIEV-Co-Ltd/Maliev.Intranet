@@ -9,6 +9,7 @@
                 <MudTextField @bind-Value="_request.Name"
                               Label="Attachment Name"
                               Required="true"
+                              Immediate="true"
                               Variant="Variant.Outlined"
                               HelperText="e.g., 'Ø10mm End Mill', '125mm Chuck'" />
             </MudItem>
@@ -30,11 +31,13 @@
             <MudItem xs="12" md="6">
                 <MudTextField @bind-Value="_request.SerialNumber"
                               Label="Serial Number (optional)"
+                              Immediate="true"
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="12">
                 <MudTextField @bind-Value="_request.ConditionNotes"
                               Label="Condition Notes (optional)"
+                              Immediate="true"
                               Variant="Variant.Outlined"
                               Lines="2" />
             </MudItem>

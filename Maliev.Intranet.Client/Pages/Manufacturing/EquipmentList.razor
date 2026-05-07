@@ -53,7 +53,7 @@
         {
             <PanelCard Title="Register equipment" Class="mb-4">
                 <FormGrid>
-                    <FormField Label="Name"><InputText class="mlv-form-input" @bind-Value="_newEquipment.Name" /></FormField>
+                    <FormField Label="Name"><ImmediateInputText class="mlv-form-input" @bind-Value="_newEquipment.Name" /></FormField>
                     <FormField Label="Category">
                         <select class="mlv-form-input" @bind="_newEquipment.Category">
                             @foreach (var category in _categories)
@@ -62,11 +62,11 @@
                             }
                         </select>
                     </FormField>
-                    <FormField Label="Brand"><InputText class="mlv-form-input" @bind-Value="_newEquipment.Brand" /></FormField>
-                    <FormField Label="Model"><InputText class="mlv-form-input" @bind-Value="_newEquipment.ModelName" /></FormField>
-                    <FormField Label="Serial"><InputText class="mlv-form-input" @bind-Value="_newEquipment.ManufacturerSerialNumber" /></FormField>
-                    <FormField Label="Sub-category"><InputText class="mlv-form-input" @bind-Value="_newEquipment.SubCategory" /></FormField>
-                    <FormField Label="Price THB"><InputNumber class="mlv-form-input" @bind-Value="_newEquipment.PurchasePriceTHB" /></FormField>
+                    <FormField Label="Brand"><ImmediateInputText class="mlv-form-input" @bind-Value="_newEquipment.Brand" /></FormField>
+                    <FormField Label="Model"><ImmediateInputText class="mlv-form-input" @bind-Value="_newEquipment.ModelName" /></FormField>
+                    <FormField Label="Serial"><ImmediateInputText class="mlv-form-input" @bind-Value="_newEquipment.ManufacturerSerialNumber" /></FormField>
+                    <FormField Label="Sub-category"><ImmediateInputText class="mlv-form-input" @bind-Value="_newEquipment.SubCategory" /></FormField>
+                    <FormField Label="Price THB"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_newEquipment.PurchasePriceTHB" /></FormField>
                 </FormGrid>
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
                     <SecondaryButton OnClick="@HideCreateAsync">Cancel</SecondaryButton>

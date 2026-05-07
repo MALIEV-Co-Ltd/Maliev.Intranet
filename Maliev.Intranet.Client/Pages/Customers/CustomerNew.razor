@@ -129,10 +129,10 @@
                             @if (_activeCreateTab == CreateTab.Contact)
                             {
                                 <FormGrid>
-                                    <FormField Label="First name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.FirstName" /></FormField>
-                                    <FormField Label="Last name"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.LastName" /></FormField>
-                                    <FormField Label="Email"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Email" /></FormField>
-                                    <FormField Label="Phone number"><InputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Mobile" /></FormField>
+                                    <FormField Label="First name"><ImmediateInputText class="mlv-form-input" @bind-Value="_onboarding.Customer.FirstName" /></FormField>
+                                    <FormField Label="Last name"><ImmediateInputText class="mlv-form-input" @bind-Value="_onboarding.Customer.LastName" /></FormField>
+                                    <FormField Label="Email"><ImmediateInputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Email" /></FormField>
+                                    <FormField Label="Phone number"><ImmediateInputText class="mlv-form-input" @bind-Value="_onboarding.Customer.Mobile" /></FormField>
                                     <div class="customer-classification-default">
                                         <span>Initial classification</span>
                                         <strong>@GetInitialClassificationLabel()</strong>
@@ -160,6 +160,7 @@
                                                              Variant="Variant.Outlined"
                                                              Clearable="true"
                                                              Dense="true"
+                                                             Immediate="true"
                                                              CoerceText="false"
                                                              CoerceValue="false"
                                                              ResetValueOnEmptyText="false"
@@ -183,11 +184,11 @@
 
                                         <div class="company-core-row">
                                             <FormField Label="Company name" Class="company-name-field">
-                                                <InputText class="mlv-form-input" @bind-Value="_companyName" />
+                                                <ImmediateInputText class="mlv-form-input" @bind-Value="_companyName" />
                                             </FormField>
 
                                             <FormField Label="Company tax ID" Class="company-tax-field">
-                                                <InputText class="mlv-form-input" @bind-Value="_companyTaxId" />
+                                                <ImmediateInputText class="mlv-form-input" @bind-Value="_companyTaxId" />
                                             </FormField>
 
                                             <FormField Label="Company branch" Class="company-branch-field">
@@ -200,7 +201,7 @@
                                             @if (_companyBranchMode == BranchModeManual)
                                             {
                                                 <FormField Label="Branch ID" Class="company-manual-branch-field">
-                                                    <InputText class="mlv-form-input" @bind-Value="_companyBranchManual" />
+                                                    <ImmediateInputText class="mlv-form-input" @bind-Value="_companyBranchManual" />
                                                 </FormField>
                                             }
                                         </div>
@@ -218,8 +219,8 @@
                                                 </div>
 
                                                 <FormGrid>
-                                                    <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine1" /></FormField>
-                                                    <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine2" /></FormField>
+                                                    <FormField Label="Address line 1"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine1" /></FormField>
+                                                    <FormField Label="Address line 2"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine2" /></FormField>
                                                     <FormField Label="Subdistrict">
                                                         @AddressAutocomplete(companyAddressIndex, AddressField.Subdistrict)
                                                     </FormField>
@@ -255,8 +256,8 @@
                                             </div>
 
                                             <FormGrid>
-                                                <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
-                                                <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
+                                                <FormField Label="Address line 1"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
+                                                <FormField Label="Address line 2"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
                                                 <FormField Label="Subdistrict">
                                                     @AddressAutocomplete(index, AddressField.Subdistrict)
                                                 </FormField>
@@ -285,8 +286,8 @@
                                             </div>
 
                                             <FormGrid>
-                                                <FormField Label="Address line 1"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
-                                                <FormField Label="Address line 2"><InputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
+                                                <FormField Label="Address line 1"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
+                                                <FormField Label="Address line 2"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
                                                 <FormField Label="Subdistrict">
                                                     @AddressAutocomplete(index, AddressField.Subdistrict)
                                                 </FormField>
@@ -405,7 +406,7 @@
                             {
                                 <div class="notes-panel">
                                     <FormField Label="Notes">
-                                        <InputTextArea class="mlv-form-input notes-input" @bind-Value="_onboarding.InternalNote" />
+                                        <ImmediateInputTextArea class="mlv-form-input notes-input" @bind-Value="_onboarding.InternalNote" />
                                     </FormField>
                                 </div>
                             }
@@ -591,10 +592,11 @@
         builder.AddAttribute(10, "CoerceText", false);
         builder.AddAttribute(11, "CoerceValue", false);
         builder.AddAttribute(12, "ResetValueOnEmptyText", false);
-        builder.AddAttribute(13, "DebounceInterval", 350);
-        builder.AddAttribute(14, "MinCharacters", 2);
-        builder.AddAttribute(15, "Class", "styled-autocomplete");
-        builder.AddAttribute(16, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
+        builder.AddAttribute(13, "Immediate", true);
+        builder.AddAttribute(14, "DebounceInterval", 350);
+        builder.AddAttribute(15, "MinCharacters", 2);
+        builder.AddAttribute(16, "Class", "styled-autocomplete");
+        builder.AddAttribute(17, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
         {
             itemBuilder.OpenElement(0, "div");
             itemBuilder.AddAttribute(1, "class", "suggestion-card address-suggestion");

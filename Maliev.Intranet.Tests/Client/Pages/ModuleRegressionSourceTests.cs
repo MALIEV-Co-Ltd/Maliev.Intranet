@@ -1,7 +1,49 @@
+using System.Text.RegularExpressions;
+
 namespace Maliev.Intranet.Tests.Client.Pages;
 
 public class ModuleRegressionSourceTests
 {
+    [Fact]
+    public void ClientTextInputs_UpdateOnInputInsteadOfBlur()
+    {
+        var clientRoot = FindRepoDirectory("Maliev.Intranet.Client");
+        var offenders = new List<string>();
+        var mudInputPattern = new Regex("<Mud(?<component>TextField|NumericField|Autocomplete)\\b");
+        var nativeInputPattern = new Regex("<(?<component>input|textarea)\\b");
+        var deferredBlazorInputPattern = new Regex("<(?<component>InputText|InputTextArea|InputNumber)\\b");
+
+        foreach (var file in Directory.EnumerateFiles(clientRoot, "*.razor", SearchOption.AllDirectories))
+        {
+            var source = File.ReadAllText(file);
+            foreach (var match in mudInputPattern.Matches(source).Cast<System.Text.RegularExpressions.Match>())
+            {
+                var block = ReadStartTag(source, match.Index);
+                if (IsEditableBoundMudInput(block) && !block.Contains("Immediate=\"true\"", StringComparison.Ordinal))
+                {
+                    offenders.Add(FormatInputOffender(clientRoot, file, source, match.Index, match.Groups["component"].Value));
+                }
+            }
+
+            foreach (var match in nativeInputPattern.Matches(source).Cast<System.Text.RegularExpressions.Match>())
+            {
+                var block = ReadStartTag(source, match.Index);
+                if ((IsEditableBoundNativeTextInput(block) && !block.Contains("@bind:event=\"oninput\"", StringComparison.Ordinal))
+                    || IsEditableNativeTextInputWithChangeHandler(block))
+                {
+                    offenders.Add(FormatInputOffender(clientRoot, file, source, match.Index, match.Groups["component"].Value));
+                }
+            }
+
+            foreach (var match in deferredBlazorInputPattern.Matches(source).Cast<System.Text.RegularExpressions.Match>())
+            {
+                offenders.Add(FormatInputOffender(clientRoot, file, source, match.Index, match.Groups["component"].Value));
+            }
+        }
+
+        Assert.True(offenders.Count == 0, $"Editable text-like inputs must update on input, not blur:{Environment.NewLine}{string.Join(Environment.NewLine, offenders)}");
+    }
+
     [Fact]
     public void CustomerList_SubscribesToCustomerChangedRealtimeSignal()
     {
@@ -621,6 +663,103 @@ public class ModuleRegressionSourceTests
         }
 
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
+    }
+
+    private static string FindRepoDirectory(string directoryName)
+    {
+        var startDirectories = new List<string>();
+        var configuredRoot = Environment.GetEnvironmentVariable("MALIEV_INTRANET_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configuredRoot))
+        {
+            startDirectories.Add(configuredRoot);
+        }
+
+        startDirectories.Add(AppContext.BaseDirectory);
+        startDirectories.Add(Directory.GetCurrentDirectory());
+
+        foreach (var startDirectory in startDirectories.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var current = new DirectoryInfo(startDirectory);
+            while (current is not null)
+            {
+                var candidate = Path.Combine(current.FullName, directoryName);
+                if (Directory.Exists(candidate))
+                {
+                    return candidate;
+                }
+
+                current = current.Parent;
+            }
+        }
+
+        throw new DirectoryNotFoundException($"Unable to locate {directoryName} from {AppContext.BaseDirectory}.");
+    }
+
+    private static string ReadStartTag(string source, int startIndex)
+    {
+        var inQuote = false;
+        for (var index = startIndex; index < source.Length; index++)
+        {
+            if (source[index] == '"')
+            {
+                inQuote = !inQuote;
+            }
+            else if (!inQuote && source[index] == '>')
+            {
+                return source[startIndex..(index + 1)];
+            }
+        }
+
+        return source[startIndex..];
+    }
+
+    private static bool IsEditableBoundMudInput(string block)
+    {
+        return HasEditableBinding(block)
+            && !HasTrueAttribute(block, "ReadOnly")
+            && !HasTrueAttribute(block, "Disabled");
+    }
+
+    private static bool IsEditableBoundNativeTextInput(string block)
+    {
+        return block.Contains("@bind", StringComparison.Ordinal)
+            && !HasTrueAttribute(block, "readonly")
+            && !HasTrueAttribute(block, "disabled")
+            && !HasNonTextInputType(block);
+    }
+
+    private static bool IsEditableNativeTextInputWithChangeHandler(string block)
+    {
+        return block.Contains("value=", StringComparison.Ordinal)
+            && block.Contains("@onchange", StringComparison.Ordinal)
+            && !block.Contains("@oninput", StringComparison.Ordinal)
+            && !HasTrueAttribute(block, "readonly")
+            && !HasTrueAttribute(block, "disabled")
+            && !HasNonTextInputType(block);
+    }
+
+    private static bool HasEditableBinding(string block)
+    {
+        return block.Contains("@bind-Value", StringComparison.Ordinal)
+            || block.Contains("@bind-Text", StringComparison.Ordinal)
+            || block.Contains("ValueChanged", StringComparison.Ordinal)
+            || block.Contains("TextChanged", StringComparison.Ordinal);
+    }
+
+    private static bool HasTrueAttribute(string block, string attributeName)
+    {
+        return block.Contains($"{attributeName}=\"true\"", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasNonTextInputType(string block)
+    {
+        return Regex.IsMatch(block, "\\btype\\s*=\\s*\"(?:checkbox|radio|file|date|datetime-local|color)\"", RegexOptions.IgnoreCase);
+    }
+
+    private static string FormatInputOffender(string root, string file, string source, int index, string component)
+    {
+        var line = source[..index].Count(c => c == '\n') + 1;
+        return $"{Path.GetRelativePath(root, file)}:{line} {component}";
     }
 
     private static string ExtractCssBlock(string source, string selector)

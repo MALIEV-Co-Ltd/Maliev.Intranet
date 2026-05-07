@@ -41,7 +41,7 @@
             @if (_showCancel)
             {
                 <PanelCard Title="Cancel purchase order" Class="mb-4">
-                    <textarea class="mlv-form-input" rows="3" @bind="_cancelReason" placeholder="Cancellation reason"></textarea>
+                    <textarea class="mlv-form-input" rows="3" @bind="_cancelReason" @bind:event="oninput" placeholder="Cancellation reason"></textarea>
                     <div class="mlv-toolbar mt-3" style="justify-content:flex-end">
                         <SecondaryButton Disabled="@_busy" OnClick="@HideCancelAsync">Keep PO</SecondaryButton>
                         <PrimaryButton Icon="@Icons.Material.Outlined.Cancel" Disabled="@_busy" OnClick="@CancelAsync">Confirm cancel</PrimaryButton>
@@ -128,7 +128,7 @@
                             <option value="Invoice">Invoice</option>
                             <option value="Other">Other</option>
                         </select>
-                        <input class="mlv-form-input" placeholder="Description" @bind="_fileDescription" />
+                        <input class="mlv-form-input" placeholder="Description" @bind="_fileDescription" @bind:event="oninput" />
                     </div>
                     <PrimaryButton Icon="@Icons.Material.Outlined.AttachFile" Disabled="@(_selectedFile is null || _fileUploading)" OnClick="@UploadFileAsync">Attach document</PrimaryButton>
                 </div>

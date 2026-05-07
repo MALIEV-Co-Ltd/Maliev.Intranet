@@ -55,17 +55,17 @@
                                 <div class="profile-edit-grid">
                                     <label class="profile-field">
                                         <span>Preferred name</span>
-                                        <InputText class="profile-input" @bind-Value="_editModel.PreferredName" />
+                                        <ImmediateInputText class="profile-input" @bind-Value="_editModel.PreferredName" />
                                         <ValidationMessage For="@(() => _editModel.PreferredName)" />
                                     </label>
                                     <label class="profile-field">
                                         <span>Personal email</span>
-                                        <InputText class="profile-input" type="email" @bind-Value="_editModel.PersonalEmail" />
+                                        <ImmediateInputText class="profile-input" type="email" @bind-Value="_editModel.PersonalEmail" />
                                         <ValidationMessage For="@(() => _editModel.PersonalEmail)" />
                                     </label>
                                     <label class="profile-field">
                                         <span>Mobile phone</span>
-                                        <InputText class="profile-input" type="tel" @bind-Value="_editModel.MobilePhone" />
+                                        <ImmediateInputText class="profile-input" type="tel" @bind-Value="_editModel.MobilePhone" />
                                         <ValidationMessage For="@(() => _editModel.MobilePhone)" />
                                     </label>
                                 </div>
