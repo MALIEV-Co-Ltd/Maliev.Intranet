@@ -172,9 +172,9 @@ public class GlobalSearchBoxTests
         var css = File.ReadAllText(cssPath);
         var closedInputWrapBlock = ExtractCssBlock(css, ".global-search-input-wrap");
 
-        Assert.DoesNotContain("z-index: 2501;", closedInputWrapBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("z-index: 2701;", closedInputWrapBlock, StringComparison.Ordinal);
         Assert.Contains(".global-search.is-open .global-search-input-wrap", css, StringComparison.Ordinal);
-        Assert.Contains("z-index: 2501;", ExtractCssBlock(css, ".global-search.is-open .global-search-input-wrap"), StringComparison.Ordinal);
+        Assert.Contains("z-index: 2701;", ExtractCssBlock(css, ".global-search.is-open .global-search-input-wrap"), StringComparison.Ordinal);
     }
 
     [Fact]

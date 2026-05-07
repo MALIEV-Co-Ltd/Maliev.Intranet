@@ -10,13 +10,13 @@
 }
 
 .global-search.is-open .global-search-input-wrap {
-    z-index: 2501;
+    z-index: 2701;
 }
 
 .global-search-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 2499;
+    z-index: 2699;
     border: 0;
     background: transparent;
     cursor: default;
@@ -81,7 +81,7 @@
     max-height: min(520px, calc(100vh - 96px));
     overflow-x: hidden;
     overflow-y: auto;
-    z-index: 2501;
+    z-index: 2700;
     box-sizing: border-box;
     border: 0;
     border-radius: var(--maliev-radius-sm);
@@ -281,6 +281,12 @@
 
 .global-search.topbar-global-search {
     width: 260px;
+}
+
+.global-search.topbar-global-search .global-search-panel {
+    right: 0;
+    left: auto;
+    width: min(420px, calc(100vw - 24px));
 }
 
 .global-search.sidebar-global-search {

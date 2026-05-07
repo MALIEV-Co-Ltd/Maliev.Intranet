@@ -324,15 +324,27 @@ public class ModuleRegressionSourceTests
     [Fact]
     public void TopBar_GlobalSearch_UsesTopbarSurfaceColors()
     {
+        var razor = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var searchStyles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "GlobalSearchBox.razor.css");
         var searchBlock = ExtractCssBlock(source, ".topbar-root ::deep .topbar-global-search .global-search-input");
+        var topbarRootBlock = ExtractCssBlock(source, ".topbar-root");
+        var searchIndex = razor.IndexOf("class=\"topbar-search\"", StringComparison.Ordinal);
+        var currencyIndex = razor.IndexOf("Class=\"topbar-currency-autocomplete\"", StringComparison.Ordinal);
 
+        Assert.NotEqual(-1, searchIndex);
+        Assert.NotEqual(-1, currencyIndex);
+        Assert.True(searchIndex < currencyIndex);
+        Assert.Contains("overflow: visible;", topbarRootBlock, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-panel-3);", searchBlock, StringComparison.Ordinal);
         Assert.Contains("color: var(--maliev-ink);", searchBlock, StringComparison.Ordinal);
         Assert.Contains("border: 0;", searchBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", searchBlock, StringComparison.Ordinal);
         Assert.Contains(".topbar-root ::deep .topbar-global-search .global-search-input:focus", source, StringComparison.Ordinal);
         Assert.Contains(".topbar-root ::deep .topbar-global-search .global-search-icon", source, StringComparison.Ordinal);
+        Assert.Contains(".global-search.topbar-global-search .global-search-panel", searchStyles, StringComparison.Ordinal);
+        Assert.Contains("right: 0;", searchStyles, StringComparison.Ordinal);
+        Assert.Contains("left: auto;", searchStyles, StringComparison.Ordinal);
     }
 
     [Fact]

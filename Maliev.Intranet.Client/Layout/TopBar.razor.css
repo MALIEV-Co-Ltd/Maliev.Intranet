@@ -1,4 +1,6 @@
 .topbar-root {
+    position: relative;
+    z-index: 20;
     height: 52px;
     width: 100%;
     min-width: 0;
@@ -10,7 +12,7 @@
     padding: 0 14px;
     gap: 12px;
     flex-shrink: 0;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .topbar-left {
@@ -115,8 +117,9 @@
 
 /* Search */
 .topbar-search {
-    flex: 0 1 260px;
+    flex: 0 0 268px;
     min-width: 180px;
+    max-width: min(28vw, 320px);
 }
 
 .topbar-spacer {
@@ -249,7 +252,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     min-width: 0;
 }
 
@@ -409,8 +412,9 @@
     }
 
     .topbar-search {
-        flex-basis: 240px;
+        flex-basis: 220px;
         min-width: 160px;
+        max-width: 240px;
     }
 }
 
@@ -437,6 +441,9 @@
 
     .topbar-right {
         order: 1;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        flex: 1 1 auto;
     }
 
     .topbar-nav {
@@ -446,10 +453,11 @@
     }
 
     .topbar-search {
-        order: 3;
+        order: 2;
         display: block;
         flex: 1 1 100%;
         min-width: 0;
+        max-width: none;
     }
 
     .topbar-divider {

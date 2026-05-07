@@ -31,17 +31,17 @@
         }
     </nav>
 
-    @* ── Search ── *@
-    <div class="topbar-search">
-        <GlobalSearchBox Class="topbar-global-search"
-                         Placeholder="Search..."
-                         Limit="8" />
-    </div>
-
     <div class="topbar-spacer" />
 
     @* ── Right: Actions ── *@
     <div class="topbar-right">
+        @* Search *@
+        <div class="topbar-search">
+            <GlobalSearchBox Class="topbar-global-search"
+                             Placeholder="Search..."
+                             Limit="8" />
+        </div>
+
         @* Currency selector *@
         <MudAutocomplete T="CurrencyDto"
                          Value="@_selectedCurrency"
