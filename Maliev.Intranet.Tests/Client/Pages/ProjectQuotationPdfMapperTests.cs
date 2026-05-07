@@ -232,6 +232,23 @@ public class ProjectQuotationPdfMapperTests
     }
 
     /// <summary>
+    /// Verifies ISO 2768 tolerance codes keep the expected standard casing and spacing.
+    /// </summary>
+    [Fact]
+    public void BuildLineItemDetailLines_WithIso2768CCode_UsesCanonicalCasing()
+    {
+        var part = new PartViewModel
+        {
+            ToleranceCode = "Iso2768 C",
+        };
+
+        var lines = ProjectQuotationPdfMapper.BuildLineItemDetailLines(part);
+
+        Assert.Contains("Tolerance: ISO 2768-c", lines);
+        Assert.DoesNotContain("Tolerance: Iso2768 C", lines);
+    }
+
+    /// <summary>
     /// Verifies Thai company quotation data uses Thai branch and multiline address format.
     /// </summary>
     [Fact]

@@ -475,8 +475,9 @@ public static class ProjectQuotationPdfMapper
 
         return normalized switch
         {
-            "ISO2768_M" or "ISO_2768_M" or "MEDIUM" => "Medium (ISO2768-m)",
-            "ISO2768_F" or "ISO_2768_F" or "FINE" => "Fine (ISO2768-f)",
+            "ISO2768_C" or "ISO_2768_C" => "ISO 2768-c",
+            "ISO2768_M" or "ISO_2768_M" or "MEDIUM" => "Medium (ISO 2768-m)",
+            "ISO2768_F" or "ISO_2768_F" or "FINE" => "Fine (ISO 2768-f)",
             _ => FormatOptionName(toleranceCode),
         };
     }
@@ -512,7 +513,10 @@ public static class ProjectQuotationPdfMapper
         part.ProcessCode?.Contains("FDM", StringComparison.OrdinalIgnoreCase) == true;
 
     private static string NormalizeCode(string value) =>
-        value.Trim().ToUpperInvariant();
+        value.Trim()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", "_", StringComparison.Ordinal)
+            .ToUpperInvariant();
 
     private static string FormatOptionName(string value) =>
         string.Join(

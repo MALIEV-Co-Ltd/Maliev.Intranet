@@ -107,7 +107,7 @@ public class ProjectQuotationPdfDataFactoryTests
         Assert.Equal("Aluminum 6061-T6", data.Items[0].MaterialName);
         Assert.Contains("Bounding box: 11.7 x 11.7 x 7.2 mm", data.Items[0].DetailLines);
         Assert.Contains("Surface finish: As-machined", data.Items[0].DetailLines);
-        Assert.Contains("Tolerance: Medium (ISO2768-m)", data.Items[0].DetailLines);
+        Assert.Contains("Tolerance: Medium (ISO 2768-m)", data.Items[0].DetailLines);
         Assert.Contains("Surface roughness: Ra 3.2 um", data.Items[0].DetailLines);
         Assert.Contains("Color: Black", data.Items[0].DetailLines);
         Assert.Contains("Inspection: Standard", data.Items[0].DetailLines);
@@ -121,5 +121,79 @@ public class ProjectQuotationPdfDataFactoryTests
         Assert.Equal(5000m, data.ManualDiscountAmount);
         Assert.Contains(data.Discounts, discount => discount.Conditions == "Automatic bulk-order savings");
         Assert.Contains(data.Discounts, discount => discount.Conditions == "Manual discount" && discount.DiscountValue == 3000m);
+    }
+
+    /// <summary>
+    /// Verifies the automatic PDF uses the same part order as the generated quotation line items.
+    /// </summary>
+    [Fact]
+    public void Build_WithProjectPartsOutOfOrder_UsesQuotationLineItemOrder()
+    {
+        var project = new ProjectDetailDto
+        {
+            CustomerName = "Nat Buyer",
+            CreatedAt = new DateTime(2026, 5, 7, 0, 0, 0, DateTimeKind.Utc),
+            Currency = "THB",
+            Parts =
+            [
+                new ProjectPartDto
+                {
+                    FileName = "bravo.step",
+                    ProcessType = "CNC_MILLING",
+                    MaterialName = "Aluminum 6061-T6",
+                    Quantity = 3,
+                    ConfirmedUnitPrice = 200m,
+                    Tolerance = "Iso2768 C",
+                },
+                new ProjectPartDto
+                {
+                    FileName = "alpha.step",
+                    ProcessType = "CNC_MILLING",
+                    MaterialName = "Aluminum 6061-T6",
+                    Quantity = 2,
+                    ConfirmedUnitPrice = 100m,
+                    Tolerance = "Iso2768 C",
+                },
+            ],
+        };
+        var quotation = new QuotationDetailDto
+        {
+            QuotationNumber = "Q-ORDER",
+            CustomerName = "Nat Buyer",
+            CurrentVersionNumber = 1,
+            CreatedAt = project.CreatedAt,
+            CurrencyCode = "THB",
+            Versions =
+            [
+                new QuotationVersionDto
+                {
+                    VersionNumber = 1,
+                    LineItems =
+                    [
+                        new QuotationItemDto
+                        {
+                            Description = "alpha.step - CNC_MILLING (Aluminum 6061-T6)",
+                            Quantity = 2,
+                            UnitPrice = 100m,
+                        },
+                        new QuotationItemDto
+                        {
+                            Description = "bravo.step - CNC_MILLING (Aluminum 6061-T6)",
+                            Quantity = 3,
+                            UnitPrice = 200m,
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var data = ProjectQuotationPdfDataFactory.Build(project, quotation);
+
+        Assert.Equal("alpha.step", data.Items[0].PartName);
+        Assert.Equal("bravo.step", data.Items[1].PartName);
+        Assert.Equal(1, data.Items[0].Index);
+        Assert.Equal(2, data.Items[1].Index);
+        Assert.Contains("Tolerance: ISO 2768-c", data.Items[0].DetailLines);
+        Assert.Contains("Tolerance: ISO 2768-c", data.Items[1].DetailLines);
     }
 }

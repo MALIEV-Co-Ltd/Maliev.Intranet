@@ -76,10 +76,13 @@ internal static class ProjectQuotationPdfDataFactory
         return projectSubtotal > 0m ? projectSubtotal : quotation.SubTotal;
     }
 
-    private static List<QuotationPdfItem> BuildItems(ProjectDetailDto project, IReadOnlyList<QuotationItemDto> lineItems) =>
-        project.Parts.Select((part, index) =>
+    private static List<QuotationPdfItem> BuildItems(ProjectDetailDto project, IReadOnlyList<QuotationItemDto> lineItems)
+    {
+        var orderedParts = OrderPartsByQuotationLineItems(project.Parts, lineItems);
+
+        return orderedParts.Select((part, index) =>
         {
-            var lineItem = index < lineItems.Count ? lineItems[index] : null;
+            var lineItem = FindLineItemForPart(part, lineItems);
             var unitPrice = lineItem?.UnitPrice > 0m ? lineItem.UnitPrice : GetPartUnitPrice(part);
             var quantity = lineItem?.Quantity > 0m ? lineItem.Quantity : part.Quantity;
 
@@ -98,6 +101,38 @@ internal static class ProjectQuotationPdfDataFactory
                 ThumbnailUrl = part.ThumbnailUrl
             };
         }).ToList();
+    }
+
+    private static List<ProjectPartDto> OrderPartsByQuotationLineItems(
+        IReadOnlyList<ProjectPartDto> parts,
+        IReadOnlyList<QuotationItemDto> lineItems)
+    {
+        if (lineItems.Count == 0)
+            return parts.ToList();
+
+        var remaining = new List<ProjectPartDto>(parts);
+        var ordered = new List<ProjectPartDto>();
+
+        foreach (var lineItem in lineItems)
+        {
+            var index = remaining.FindIndex(part => LineItemDescribesPart(lineItem, part));
+            if (index < 0)
+                continue;
+
+            ordered.Add(remaining[index]);
+            remaining.RemoveAt(index);
+        }
+
+        ordered.AddRange(remaining);
+        return ordered;
+    }
+
+    private static QuotationItemDto? FindLineItemForPart(ProjectPartDto part, IReadOnlyList<QuotationItemDto> lineItems) =>
+        lineItems.FirstOrDefault(lineItem => LineItemDescribesPart(lineItem, part));
+
+    private static bool LineItemDescribesPart(QuotationItemDto lineItem, ProjectPartDto part) =>
+        !string.IsNullOrWhiteSpace(part.FileName)
+        && lineItem.Description.StartsWith(part.FileName, StringComparison.OrdinalIgnoreCase);
 
     private static List<string> BuildCustomerDisplayLines(ProjectDetailDto project, CustomerDetailDto? customerDetail)
     {
@@ -361,8 +396,9 @@ internal static class ProjectQuotationPdfDataFactory
 
         return normalized switch
         {
-            "ISO2768_M" or "ISO_2768_M" or "MEDIUM" => "Medium (ISO2768-m)",
-            "ISO2768_F" or "ISO_2768_F" or "FINE" => "Fine (ISO2768-f)",
+            "ISO2768_C" or "ISO_2768_C" => "ISO 2768-c",
+            "ISO2768_M" or "ISO_2768_M" or "MEDIUM" => "Medium (ISO 2768-m)",
+            "ISO2768_F" or "ISO_2768_F" or "FINE" => "Fine (ISO 2768-f)",
             _ => FormatOptionName(value),
         };
     }
