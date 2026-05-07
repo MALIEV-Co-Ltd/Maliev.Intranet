@@ -221,46 +221,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         _hubConnection.On<SignalRFileAnalysisPayload>("FileAnalysisCompleted", async payload =>
         {
-            var parts = FindPartsByStoragePath(payload.StoragePath);
-            if (parts.Count == 0) return;
-
-            if (payload.Failed)
-            {
-                foreach (var p in parts)
-                {
-                    p.AwaitingPreview = false;
-                    p.AnalysisErrorCode = payload.ErrorCode;
-                    p.DfmAnalysisTimedOut = true;
-                    p.StatusText = DfmStatusMessages.GetStatusText(payload.ErrorCode);
-                }
-                StopStatusWatchdogs(parts);
-                TriggerAutoSave();
-                TriggerDeferredStorageMigration();
-                await InvokeAsync(StateHasChanged);
-                return;
-            }
-
-            foreach (var part in parts)
-            {
-                await ApplyAnalysisStatusAsync(part, ToFileAnalysisStatus(payload));
-
-                if (payload.BodyCount.HasValue)
-                {
-                    part.BodyCount = payload.BodyCount.Value;
-                    if (payload.Bodies != null)
-                        part.Bodies = payload.Bodies.Select(b => new PartViewModel.BodyInfo(
-                            b.Index,
-                            b.Name,
-                            b.VolumeCm3,
-                            new[] { b.BboxMin.X, b.BboxMin.Y, b.BboxMin.Z },
-                            new[] { b.BboxMax.X, b.BboxMax.Y, b.BboxMax.Z },
-                            null
-                        )).ToList();
-                }
-
-            }
-            TriggerAutoSave();
-            await InvokeAsync(StateHasChanged);
+            await ApplyFileAnalysisCompletedPayloadAsync(payload);
         });
 
         _hubConnection.On<SignalRGlbReadyPayload>("GlbReady", async payload =>
@@ -822,6 +783,73 @@ public partial class ProjectNew : IAsyncDisposable
         if (part.ProcessId.HasValue && part.MaterialId.HasValue
             && part.AvailableMaterials.Count > 0)
             TriggerPricingAsync(part);
+    }
+
+    private async Task ApplyFileAnalysisCompletedPayloadAsync(SignalRFileAnalysisPayload payload)
+    {
+        var parts = FindPartsByStoragePath(payload.StoragePath);
+        if (parts.Count == 0) return;
+
+        if (payload.Failed)
+        {
+            if (IsPreviewArtifactFailure(payload.ErrorCode))
+            {
+                var status = ToFileAnalysisStatus(payload);
+                foreach (var part in parts)
+                {
+                    ApplyPreviewStatus(part, status);
+                    part.AwaitingPreview = false;
+                    part.StatusText = "Ready";
+                }
+
+                TriggerAutoSave();
+                TriggerDeferredStorageMigration();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            foreach (var p in parts)
+            {
+                p.AwaitingPreview = false;
+                p.AnalysisErrorCode = payload.ErrorCode;
+                p.DfmAnalysisTimedOut = true;
+                p.StatusText = DfmStatusMessages.GetStatusText(payload.ErrorCode);
+            }
+            StopStatusWatchdogs(parts);
+            TriggerAutoSave();
+            TriggerDeferredStorageMigration();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        foreach (var part in parts)
+        {
+            await ApplyAnalysisStatusAsync(part, ToFileAnalysisStatus(payload));
+
+            if (payload.BodyCount.HasValue)
+            {
+                part.BodyCount = payload.BodyCount.Value;
+                if (payload.Bodies != null)
+                    part.Bodies = payload.Bodies.Select(b => new PartViewModel.BodyInfo(
+                        b.Index,
+                        b.Name,
+                        b.VolumeCm3,
+                        new[] { b.BboxMin.X, b.BboxMin.Y, b.BboxMin.Z },
+                        new[] { b.BboxMax.X, b.BboxMax.Y, b.BboxMax.Z },
+                        null
+                    )).ToList();
+            }
+
+        }
+        TriggerAutoSave();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static bool IsPreviewArtifactFailure(string? errorCode)
+    {
+        return string.Equals(errorCode, "preview-generation-failed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(errorCode, "preview-url-resolution-failed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(errorCode, "thumbnail-url-resolution-failed", StringComparison.OrdinalIgnoreCase);
     }
 
     private static FileAnalysisStatusDto ToFileAnalysisStatus(SignalRFileAnalysisPayload payload)

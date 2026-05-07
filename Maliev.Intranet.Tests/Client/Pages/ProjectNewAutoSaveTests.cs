@@ -1413,6 +1413,46 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task ApplyFileAnalysisCompletedPayloadAsync_WhenPreviewUrlResolutionFails_PreservesThumbnail()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "hero-3d-compressed.glb",
+            StoragePath = "projects/uploads/hero-3d-compressed.glb",
+            AwaitingPreview = true,
+            StatusText = "Analyze your model..."
+        };
+        GetParts(cut.Instance).Add(part);
+
+        var payload = new global::Maliev.Intranet.Client.SignalRFileAnalysisPayload
+        {
+            StoragePath = "projects/uploads/hero-3d-compressed.glb",
+            Failed = true,
+            ErrorCode = "preview-url-resolution-failed",
+            PreviewUrls = new global::Maliev.Intranet.Client.SignalRPreviewUrls
+            {
+                ThumbnailSmall = "https://signed.example/thumb-small.webp",
+                ThumbnailLarge = "https://signed.example/thumb-large.webp",
+                ThumbnailSmallGcsPath = "projects/uploads/hero-3d-compressed.glb_thumbnail_small.webp",
+                ThumbnailLargeGcsPath = "projects/uploads/hero-3d-compressed.glb_thumbnail_large.webp"
+            }
+        };
+
+        await InvokePrivateTaskWithArgsAsync(cut, "ApplyFileAnalysisCompletedPayloadAsync", payload);
+
+        Assert.Equal("https://signed.example/thumb-small.webp", part.ThumbnailSmallUrl);
+        Assert.Equal("https://signed.example/thumb-large.webp", part.ThumbnailLargeUrl);
+        Assert.Equal("projects/uploads/hero-3d-compressed.glb_thumbnail_small.webp", part.ThumbnailSmallGcsPath);
+        Assert.Equal("projects/uploads/hero-3d-compressed.glb_thumbnail_large.webp", part.ThumbnailLargeGcsPath);
+        Assert.False(part.AwaitingPreview);
+        Assert.False(part.DfmAnalysisTimedOut);
+        Assert.Null(part.AnalysisErrorCode);
+        Assert.Equal("Ready", part.StatusText);
+    }
+
+    [Fact]
     public void SaveDraftToServerAsync_FirstSave_PostsToProjectsEndpoint()
     {
         var createRequestId = Guid.NewGuid();
