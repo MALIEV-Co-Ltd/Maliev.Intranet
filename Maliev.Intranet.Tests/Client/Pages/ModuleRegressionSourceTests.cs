@@ -404,6 +404,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("border: 0 !important;", iconButtonBlock, StringComparison.Ordinal);
         Assert.Contains("background: transparent;", iconButtonBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: none !important;", iconButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(source, ".topbar-divider"), StringComparison.Ordinal);
+        Assert.Contains("margin: 0;", ExtractCssBlock(source, ".topbar-divider"), StringComparison.Ordinal);
         Assert.Contains(".topbar-right ::deep .mud-button-root.mud-icon-button:hover", source, StringComparison.Ordinal);
         Assert.Contains(".topbar-right ::deep .mud-button-root.mud-icon-button:focus-visible", source, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-focus-ring) !important;", source, StringComparison.Ordinal);
@@ -427,7 +429,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Class=\"topbar-profile-chevron\"", razor, StringComparison.Ordinal);
         Assert.Contains("GetMobileNavClass", razor, StringComparison.Ordinal);
         Assert.Contains("CloseMobileNav", razor, StringComparison.Ordinal);
-        Assert.Contains("@media (max-width: 1200px)", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 1280px)", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-profile-info { display: none; }", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-profile ::deep .topbar-profile-chevron", styles, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 1120px)", styles, StringComparison.Ordinal);

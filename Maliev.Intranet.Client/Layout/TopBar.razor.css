@@ -302,10 +302,11 @@
 }
 
 .topbar-divider {
+    display: none;
     width: 1px;
     height: 20px;
     background: var(--maliev-border);
-    margin: 0 4px;
+    margin: 0;
 }
 
 .topbar-profile-menu {
@@ -434,8 +435,9 @@
     background: var(--maliev-border);
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
     .topbar-profile-info { display: none; }
+
     .topbar-profile {
         width: 36px;
         height: 36px;
