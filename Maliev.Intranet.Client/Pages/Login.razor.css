@@ -13,7 +13,7 @@
     z-index: 50;
     padding: 14px 20px;
     background: var(--maliev-panel);
-    box-shadow: var(--maliev-shadow-ring);
+    box-shadow: none;
 }
 
 .login-header-content {
@@ -322,8 +322,8 @@
     padding: 0;
     border: 0;
     border-radius: var(--maliev-radius-sm);
-    background: var(--maliev-panel);
-    box-shadow: var(--maliev-shadow-ring);
+    background: transparent;
+    box-shadow: none;
     color: var(--mud-palette-text-secondary);
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease;

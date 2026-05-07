@@ -132,7 +132,9 @@ public sealed class LoginPageController : Controller
             gap: 16px;
             padding: 14px 20px;
             background: var(--maliev-panel);
-            box-shadow: var(--maliev-shadow-ring);
+        }
+        .login-header {
+            box-shadow: none;
         }
         .login-header-content {
             width: min(100%, 1080px);
@@ -352,6 +354,7 @@ public sealed class LoginPageController : Controller
             color: var(--maliev-muted);
             font-size: var(--maliev-type-caption);
             line-height: 1.3;
+            box-shadow: var(--maliev-shadow-ring);
         }
         .login-footer-content {
             width: min(100%, 1080px);
@@ -368,8 +371,8 @@ public sealed class LoginPageController : Controller
             align-items: center;
             justify-content: center;
             padding: 0;
-            background: var(--maliev-panel);
-            box-shadow: var(--maliev-shadow-ring);
+            background: transparent;
+            box-shadow: none;
             color: var(--maliev-ink-2);
         }
         .theme-toggle-btn:hover {
@@ -536,7 +539,7 @@ public sealed class LoginPageController : Controller
         </main>
         <footer class="login-footer">
             <div class="login-footer-content">
-                <span>MALIEV INC. ALL RIGHTS RESERVED.</span>
+                <span>MALIEV CO., LTD.</span>
                 <a class="footer-link" href="https://www.maliev.com">www.maliev.com</a>
             </div>
         </footer>
