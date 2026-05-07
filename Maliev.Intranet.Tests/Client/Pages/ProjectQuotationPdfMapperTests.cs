@@ -102,6 +102,7 @@ public class ProjectQuotationPdfMapperTests
                         ["material_color"] = "Black",
                         ["deburring"] = "true",
                     },
+                    PartNotes = "hello test 123",
                 },
             ],
             [new ProcessDto(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "FDM", "3D Printing (FDM)", null, 1)]);
@@ -124,11 +125,48 @@ public class ProjectQuotationPdfMapperTests
         Assert.Contains("Tolerance: FDM Standard +-0.3mm", data.Items[0].DetailLines);
         Assert.Contains("Surface roughness: Ra 1.6 um", data.Items[0].DetailLines);
         Assert.Contains("Color: Black", data.Items[0].DetailLines);
-        Assert.Contains("Tapped holes: 4 x M3", data.Items[0].Notes);
-        Assert.Contains("Inserts: 2 x HeatSet", data.Items[0].Notes);
+        Assert.Contains("Tapped holes: 4 x M3", data.Items[0].DetailLines);
+        Assert.Contains("Inserts: 2 x HeatSet", data.Items[0].DetailLines);
         Assert.Contains("Deburring", data.Items[0].DetailLines);
-        Assert.Contains("Inspection: Dimensional", data.Items[0].Notes);
-        Assert.Contains("Drawing: bracket-drawing.pdf", data.Items[0].Notes);
+        Assert.Contains("Inspection: Dimensional", data.Items[0].DetailLines);
+        Assert.Contains("Drawing: bracket-drawing.pdf", data.Items[0].DetailLines);
+        Assert.Equal("hello test 123", data.Items[0].Notes);
+        Assert.DoesNotContain("Bounding box:", data.Items[0].Notes, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Verifies ProjectNew quotation notes use only the part note text, not the full configuration details.
+    /// </summary>
+    [Fact]
+    public void BuildLineItemNotes_WithPartNote_ReturnsOnlyPartNote()
+    {
+        var part = new PartViewModel
+        {
+            Dimensions = new FileAnalysisDimensionsDto { X = 27.5, Y = 24.5, Z = 18.5 },
+            FinishCode = "AS_PRINTED",
+            ToleranceCode = "FDM_STD",
+            ProcessCode = "FDM",
+            RoughnessCode = "RA_3_2",
+            InspectionLevel = InspectionLevel.Standard,
+            PartNotes = "hello test 123",
+            DrawingFiles =
+            [
+                new DraftProjectAttachmentDto { Name = "Screenshot 2026-05-07 184328.png" },
+                new DraftProjectAttachmentDto { Name = "Screenshot 2026-05-07 183642.png" },
+            ],
+        };
+
+        var notes = ProjectQuotationPdfMapper.BuildLineItemNotes(part);
+        var detailLines = ProjectQuotationPdfMapper.BuildLineItemDetailLines(part);
+
+        Assert.Equal("hello test 123", notes);
+        Assert.Contains("Bounding box: 27.5 x 24.5 x 18.5 mm", detailLines);
+        Assert.Contains("Surface finish: As-printed", detailLines);
+        Assert.Contains("Tolerance: FDM Standard +-0.3mm", detailLines);
+        Assert.Contains("Surface roughness: Ra 3.2 um", detailLines);
+        Assert.Contains("Inspection: Standard", detailLines);
+        Assert.Contains("Drawing: Screenshot 2026-05-07 184328.png, Screenshot 2026-05-07 183642.png", detailLines);
+        Assert.DoesNotContain("hello test 123", detailLines);
     }
 
     /// <summary>

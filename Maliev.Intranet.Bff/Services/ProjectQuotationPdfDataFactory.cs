@@ -156,14 +156,14 @@ internal static class ProjectQuotationPdfDataFactory
             lines.Add($"Drawing: {string.Join(", ", drawingNames)}");
         }
 
-        AddIfPresent(lines, part.PartNotes);
         return lines;
     }
 
     private static string? BuildPartNotes(ProjectPartDto part)
     {
-        var lines = BuildPartDetailLines(part);
-        return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
+        return string.IsNullOrWhiteSpace(part.PartNotes)
+            ? null
+            : part.PartNotes.Trim();
     }
 
     private static decimal ResolveDiscountAmount(SalesDiscountStructureDto? discount, decimal lineSubtotal)

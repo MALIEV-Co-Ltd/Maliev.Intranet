@@ -100,9 +100,9 @@ public static class ProjectQuotationPdfMapper
     /// </summary>
     public static string? BuildLineItemNotes(PartViewModel part)
     {
-        var notes = BuildLineItemDetailLines(part);
-
-        return notes.Count == 0 ? null : string.Join(Environment.NewLine, notes);
+        return string.IsNullOrWhiteSpace(part.PartNotes)
+            ? null
+            : part.PartNotes.Trim();
     }
 
     /// <summary>
@@ -152,9 +152,6 @@ public static class ProjectQuotationPdfMapper
 
         if (part.DrawingFiles.Count > 0)
             notes.Add($"Drawing: {string.Join(", ", part.DrawingFiles.Select(file => file.Name).Where(name => !string.IsNullOrWhiteSpace(name)))}");
-
-        if (!string.IsNullOrWhiteSpace(part.PartNotes))
-            notes.Add(part.PartNotes);
 
         return notes;
     }

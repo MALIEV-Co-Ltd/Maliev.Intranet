@@ -44,6 +44,7 @@ public class ProjectQuotationPdfDataFactoryTests
                     Finish = "As Machined",
                     Tolerance = "ISO 2768-m",
                     Dimensions = new ModelDimensionsDto { X = 11.7, Y = 11.7, Z = 7.2 },
+                    PartNotes = "hello test 123",
                     DrawingFiles =
                     [
                         new ProjectPartAttachmentDto { FileName = "drawing.png" }
@@ -104,6 +105,8 @@ public class ProjectQuotationPdfDataFactoryTests
         Assert.Equal("Aluminum 6061-T6", data.Items[0].MaterialName);
         Assert.Contains("11.7 x 11.7 x 7.2 mm", data.Items[0].DetailLines);
         Assert.Contains("Drawing: drawing.png", data.Items[0].DetailLines);
+        Assert.Equal("hello test 123", data.Items[0].Notes);
+        Assert.DoesNotContain("Drawing:", data.Items[0].Notes, StringComparison.Ordinal);
         Assert.Contains(data.Discounts, discount => discount.Conditions == "Automatic bulk-order savings");
         Assert.Contains(data.Discounts, discount => discount.Conditions == "Manual discount" && discount.DiscountValue == 3000m);
     }
