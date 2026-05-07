@@ -233,6 +233,22 @@
     gap: 4px;
 }
 
+.topbar-right ::deep .mud-button-root.mud-icon-button {
+    border: 0 !important;
+    background: transparent;
+    box-shadow: none !important;
+}
+
+.topbar-right ::deep .mud-button-root.mud-icon-button:hover,
+.topbar-right ::deep .mud-button-root.mud-icon-button:active {
+    background: var(--maliev-panel-3);
+    box-shadow: none !important;
+}
+
+.topbar-right ::deep .mud-button-root.mud-icon-button:focus-visible {
+    box-shadow: var(--maliev-focus-ring) !important;
+}
+
 .topbar-divider {
     width: 1px;
     height: 20px;

@@ -330,6 +330,23 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void TopBar_RightIconButtons_AreBorderless()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var currencyFieldBlock = ExtractCssBlock(source, ".topbar-root ::deep .topbar-currency-autocomplete .mud-input");
+        var iconButtonBlock = ExtractCssBlock(source, ".topbar-right ::deep .mud-button-root.mud-icon-button");
+
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", currencyFieldBlock, StringComparison.Ordinal);
+        Assert.Contains(".topbar-root ::deep .topbar-currency-autocomplete .mud-input-adornment", source, StringComparison.Ordinal);
+        Assert.Contains("border: 0 !important;", iconButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("background: transparent;", iconButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: none !important;", iconButtonBlock, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right ::deep .mud-button-root.mud-icon-button:hover", source, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right ::deep .mud-button-root.mud-icon-button:focus-visible", source, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-focus-ring) !important;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_QuoteNavigationAction_UsesPrimaryColor()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
