@@ -655,8 +655,8 @@
 
 .customer-address-editor-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
-    gap: 18px;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
+    gap: 20px;
     align-items: start;
 }
 
@@ -667,6 +667,7 @@
 
 .customer-address-lookup-panel {
     display: grid;
+    align-content: start;
     gap: 10px;
 }
 
@@ -741,12 +742,12 @@
 .customer-address-map-panel {
     display: grid;
     gap: 8px;
-    min-height: 260px;
+    min-height: 320px;
 }
 
 .customer-address-map {
     width: 100%;
-    min-height: 220px;
+    min-height: 280px;
     overflow: hidden;
     border: 1px solid var(--maliev-border);
     border-radius: 8px;

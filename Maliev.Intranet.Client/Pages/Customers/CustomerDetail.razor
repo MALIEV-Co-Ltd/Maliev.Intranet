@@ -799,6 +799,7 @@
     private string? _addressLookupError;
     private bool _applyingLocation;
     private bool _addressMapInitialized;
+    private bool _addressMapNeedsSavedAddress;
     private AddressField? _activeAddressSuggestionField;
     private AddressLanguage _addressLookupLanguage = AddressLanguage.English;
     private AddressLanguage _addressSuggestionLanguage = AddressLanguage.English;
@@ -891,6 +892,12 @@
         {
             _addressMapInitialized = true;
             await JS.InvokeVoidAsync("malievAddressMap.initialize", AddressMapElementId);
+            if (_addressMapNeedsSavedAddress)
+            {
+                _addressMapNeedsSavedAddress = false;
+                await GeocodeSavedAddressAsync();
+                StateHasChanged();
+            }
         }
     }
 
@@ -1197,6 +1204,8 @@
     {
         _addressEdit = AddressEditModel.FromAddress(address);
         ResetAddressLookupState();
+        _addressLookupQuery = BuildAddressMapQuery(_addressEdit);
+        _addressMapNeedsSavedAddress = !string.IsNullOrWhiteSpace(_addressLookupQuery);
     }
 
     private async Task CloseAddressModalAsync()
@@ -1214,6 +1223,7 @@
         _addressMapLocation = null;
         _activeAddressSuggestionField = null;
         _addressMapInitialized = false;
+        _addressMapNeedsSavedAddress = false;
         _locationMatches.Clear();
         _fieldLocationMatches.Clear();
     }
@@ -1583,6 +1593,28 @@
             return;
         }
 
+        await GeocodeAddressQueryAsync(query);
+    }
+
+    private async Task GeocodeSavedAddressAsync()
+    {
+        if (_addressEdit is null)
+        {
+            return;
+        }
+
+        var query = BuildAddressMapQuery(_addressEdit);
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        _addressLookupQuery = query;
+        await GeocodeAddressQueryAsync(query);
+    }
+
+    private async Task GeocodeAddressQueryAsync(string query)
+    {
         try
         {
             _addressMapLocation = await Http.GetFromJsonAsync<AddressGeocodeResponse>(
@@ -1601,6 +1633,25 @@
         {
             Console.WriteLine(ex.Message);
         }
+    }
+
+    private string BuildAddressMapQuery(AddressEditModel address)
+    {
+        var countryName = _countries.FirstOrDefault(country => country.Id == address.CountryId)?.Name;
+        var parts = new[]
+        {
+            address.AddressLine1,
+            address.AddressLine2,
+            address.District,
+            address.City,
+            address.StateProvince,
+            address.PostalCode,
+            countryName
+        };
+
+        return string.Join(", ", parts
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .Select(part => part!.Trim()));
     }
 
     private void SetAddressFieldValue(AddressField field, string value)

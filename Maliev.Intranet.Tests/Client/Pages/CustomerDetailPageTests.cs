@@ -218,6 +218,26 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CustomerDetail_EditAddressGeocodesSavedAddressForMap()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='addresses']").Click();
+        cut.Find("button.customer-address-edit").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedPaths, path =>
+                path.StartsWith("/api/v1/customers/locations/thai/geocode", StringComparison.Ordinal) &&
+                path.Contains("100%20Tech%20Blvd", StringComparison.Ordinal) &&
+                path.Contains("San%20Jose", StringComparison.Ordinal) &&
+                path.Contains("United%20States", StringComparison.Ordinal));
+            Assert.Contains("Khlong Khoi, Pak Kret, Nonthaburi, Thailand", cut.Markup);
+        });
+    }
+
+    [Fact]
     public void CustomerDetail_AddressAutocomplete_ThaiInputShowsThaiSuggestionAndPopulatesThaiFields()
     {
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));

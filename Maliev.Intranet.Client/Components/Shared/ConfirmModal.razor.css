@@ -16,6 +16,14 @@
     box-shadow: var(--maliev-shadow-lg);
 }
 
+.mlv-modal.customer-modal-wide {
+    width: min(620px, calc(100vw - 40px));
+}
+
+.mlv-modal.customer-modal-address {
+    width: min(980px, calc(100vw - 40px));
+}
+
 .mlv-modal-header {
     display: flex;
     align-items: center;
