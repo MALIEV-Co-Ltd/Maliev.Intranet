@@ -249,7 +249,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         cut.FindAll(".customer-suggestion-field input").ToList()[1].Input("คลองข่อย");
 
         cut.WaitForAssertion(
-            () => Assert.Contains("คลองข่อย, ปากเกร็ด, นนทบุรี 11120", cut.Markup),
+            () => Assert.Contains("คลองข่อย, ปากเกร็ด, นนทบุรี, 11120", cut.Markup),
             TimeSpan.FromSeconds(5));
         cut.Find(".customer-autocomplete-list button").Click();
 
@@ -274,7 +274,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         cut.FindAll(".customer-suggestion-field input").ToList()[1].Input("Khlong Khoi");
 
         cut.WaitForAssertion(
-            () => Assert.Contains("Khlong Khoi, Pak Kret, Nonthaburi 11120", cut.Markup),
+            () => Assert.Contains("Khlong Khoi, Pak Kret, Nonthaburi, 11120", cut.Markup),
             TimeSpan.FromSeconds(5));
         cut.Find(".customer-autocomplete-list button").Click();
 
