@@ -73,9 +73,9 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
         cut.WaitForAssertion(() => Assert.Contains("Edit profile", cut.Markup));
         cut.FindAll("button").Single(button => button.TextContent.Contains("Edit profile", StringComparison.Ordinal)).Click();
 
-        cut.Find("input").Change("M");
-        cut.Find("input[type='email']").Change("mia.updated@example.com");
-        cut.Find("input[type='tel']").Change("+66811111111");
+        cut.Find("input").Input("M");
+        cut.Find("input[type='email']").Input("mia.updated@example.com");
+        cut.Find("input[type='tel']").Input("+66811111111");
 
         cut.FindAll("button").Single(button => button.TextContent.Contains("Save changes", StringComparison.Ordinal)).Click();
 

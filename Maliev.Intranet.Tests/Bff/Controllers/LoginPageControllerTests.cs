@@ -50,7 +50,7 @@ public class LoginPageControllerTests
         Assert.Contains("data-theme-icon=\"dark\"", content.Content);
         Assert.Contains("data-theme-icon=\"light\"", content.Content);
         Assert.Contains("data-theme-icon=\"system\"", content.Content);
-        Assert.Contains("MALIEV Co., Ltd.", content.Content);
+        Assert.Contains("MALIEV CO., LTD.", content.Content);
         Assert.DoesNotContain("MALIEV INC. Employee systems", content.Content, StringComparison.Ordinal);
         Assert.DoesNotContain(">A</button>", content.Content, StringComparison.Ordinal);
     }
