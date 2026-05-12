@@ -314,6 +314,31 @@ public static class MalievPermissions
     }
 
     /// <summary>
+    /// Permissions for Commerce storefront catalog and shop order management.
+    /// </summary>
+    public static class Commerce
+    {
+        /// <summary>Permission to view Commerce products.</summary>
+        public const string ProductsRead = "commerce.products.read";
+        /// <summary>Permission to create Commerce products.</summary>
+        public const string ProductsCreate = "commerce.products.create";
+        /// <summary>Permission to update Commerce products.</summary>
+        public const string ProductsUpdate = "commerce.products.update";
+        /// <summary>Permission to archive Commerce products.</summary>
+        public const string ProductsDelete = "commerce.products.delete";
+        /// <summary>Permission to view Commerce collections.</summary>
+        public const string CollectionsRead = "commerce.collections.read";
+        /// <summary>Permission to create Commerce collections.</summary>
+        public const string CollectionsCreate = "commerce.collections.create";
+        /// <summary>Permission to update Commerce collections.</summary>
+        public const string CollectionsUpdate = "commerce.collections.update";
+        /// <summary>Permission to unpublish Commerce collections.</summary>
+        public const string CollectionsDelete = "commerce.collections.delete";
+        /// <summary>Permission to import Commerce catalog data.</summary>
+        public const string ImportsCreate = "commerce.imports.create";
+    }
+
+    /// <summary>
     /// Permissions for AI-driven data extraction and analysis services.
     /// </summary>
     public static class Prediction

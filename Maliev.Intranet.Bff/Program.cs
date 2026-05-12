@@ -391,6 +391,7 @@ try
     builder.AddBffServiceClient<EmployeeServiceClient>("EmployeeService");
     builder.AddBffServiceClient<InvoiceServiceClient>("InvoiceService");
     builder.AddBffServiceClient<PaymentServiceClient>("PaymentService");
+    builder.AddBffServiceClient<CommerceServiceClient>("CommerceService");
     builder.AddBffServiceClient<PdfServiceClient>("PdfService");
     builder.AddBffServiceClient<SupplierServiceClient>("SupplierService");
     builder.AddBffServiceClient<UploadServiceClient>("UploadService");
