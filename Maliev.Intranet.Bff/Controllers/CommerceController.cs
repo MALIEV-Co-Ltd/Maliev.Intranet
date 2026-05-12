@@ -130,16 +130,4 @@ public sealed class CommerceController(CommerceServiceClient client) : Controlle
         return unpublished ? NoContent() : NotFound();
     }
 
-    /// <summary>
-    /// Imports the injection molding machine listing from Shopify.
-    /// </summary>
-    [HttpPost("imports/shopify/injection-molding-machine")]
-    [RequirePermission(MalievPermissions.Commerce.ImportsCreate, AuthenticationSchemes = "Bearer,Cookies")]
-    public async Task<ActionResult<CommerceShopifyImportResult>> ImportInjectionMoldingMachine(
-        [FromBody] CommerceShopifyImportRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await client.ImportInjectionMoldingMachineAsync(request, cancellationToken);
-        return result is null ? BadRequest() : Ok(result);
-    }
 }

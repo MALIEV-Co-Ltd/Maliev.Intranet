@@ -128,18 +128,6 @@ public sealed class CommerceServiceClient(HttpClient httpClient)
         return response.IsSuccessStatusCode;
     }
 
-    /// <summary>
-    /// Imports the Shopify injection molding machine listing.
-    /// </summary>
-    public async Task<CommerceShopifyImportResult?> ImportInjectionMoldingMachineAsync(
-        CommerceShopifyImportRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        using var response = await httpClient.PostAsJsonAsync("/commerce/v1/imports/shopify/injection-molding-machine", request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<CommerceShopifyImportResult>(cancellationToken: cancellationToken);
-    }
-
     private sealed class CommerceServicePagedResponse<T>
     {
         public List<T> Items { get; set; } = [];

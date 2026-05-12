@@ -334,8 +334,6 @@ public static class MalievPermissions
         public const string CollectionsUpdate = "commerce.collections.update";
         /// <summary>Permission to unpublish Commerce collections.</summary>
         public const string CollectionsDelete = "commerce.collections.delete";
-        /// <summary>Permission to import Commerce catalog data.</summary>
-        public const string ImportsCreate = "commerce.imports.create";
     }
 
     /// <summary>

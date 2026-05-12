@@ -7,10 +7,14 @@
 
 <div class="mlv-module-shell">
     <PageHeader Title="Commerce Catalog"
-                Subtitle="Employee-managed storefront products, collections, variants, media, and Shopify imports"
+                Subtitle="Employee-managed storefront products, collections, variants, and media"
                 BackHref="/" />
 
     <PageBody>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+            Starter draft listings for the 30g and 50g pneumatic injection molding machines are seeded by CommerceService. Use this page to review, complete, and publish product listings.
+        </MudAlert>
+
         <StatBar Class="mb-4">
             <StatTile Label="Products" Value="@_meta.TotalItems.ToString("N0")" />
             <StatTile Label="Collections" Value="@_collections.Count.ToString("N0")" />
@@ -98,27 +102,6 @@
                                       Disabled="@_loadingProducts" />
                 </PanelCard>
 
-                <PanelCard>
-                    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-3">
-                        <div>
-                            <MudText Typo="Typo.h6">Shopify machine import</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Pulls only the pneumatic injection molding machine listing into the Commerce catalog.</MudText>
-                        </div>
-                        <div class="d-flex align-center gap-3">
-                            <MudSwitch @bind-Value="_importDryRun" Color="Color.Primary" Label="Dry run" />
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.CloudDownload" OnClick="ImportInjectionMachineAsync" Disabled="@_importing">
-                                Import machine
-                            </MudButton>
-                        </div>
-                    </div>
-
-                    @if (_lastImport is not null)
-                    {
-                        <MudAlert Severity="@(_lastImport.DryRun ? Severity.Info : Severity.Success)" Dense="true">
-                            Read @_lastImport.ProductsRead, created @_lastImport.ProductsCreated, updated @_lastImport.ProductsUpdated, skipped @_lastImport.ProductsSkipped, collections created @_lastImport.CollectionsCreated.
-                        </MudAlert>
-                    }
-                </PanelCard>
             </MudItem>
 
             <MudItem xs="12" lg="4">
@@ -224,15 +207,12 @@
     private PaginationMeta _meta = new();
     private CommerceProductMutationRequest _productForm = NewProductForm();
     private CommerceCollectionMutationRequest _collectionForm = new();
-    private CommerceShopifyImportResult? _lastImport;
     private Guid? _editingProductId;
     private Guid? _editingCollectionId;
     private string? _query;
     private string _collectionFilter = string.Empty;
     private bool _loadingProducts = true;
     private bool _savingProduct;
-    private bool _importing;
-    private bool _importDryRun = true;
     private int _page = 1;
     private int _pageSize = 24;
 
@@ -401,33 +381,6 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Unable to save collection: {ex.Message}", Severity.Error);
-        }
-    }
-
-    private async Task ImportInjectionMachineAsync()
-    {
-        _importing = true;
-        try
-        {
-            var request = new CommerceShopifyImportRequest
-            {
-                DryRun = _importDryRun,
-                PageSize = 20
-            };
-            var response = await Http.PostAsJsonAsync("api/v1/commerce/imports/shopify/injection-molding-machine", request);
-            response.EnsureSuccessStatusCode();
-            _lastImport = await response.Content.ReadFromJsonAsync<CommerceShopifyImportResult>();
-            Snackbar.Add(_importDryRun ? "Shopify dry run completed." : "Shopify machine import completed.", Severity.Success);
-            await LoadCollectionsAsync();
-            await LoadProductsAsync();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Unable to import Shopify listing: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _importing = false;
         }
     }
 
