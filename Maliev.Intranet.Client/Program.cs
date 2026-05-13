@@ -1,6 +1,8 @@
 using Maliev.Intranet.Client;
+using Maliev.Intranet.Client.Authorization;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Logging;
@@ -14,6 +16,8 @@ builder.Logging.AddFilter("Microsoft.AspNetCore.Components.WebAssembly", LogLeve
 builder.Logging.AddFilter("Maliev.Intranet.Client.Components.Project.PartConfigSidebar", LogLevel.Warning);
 
 builder.Services.AddAuthorizationCore();
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
+builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 // Resolve authenticated employee state from the BFF cookie after the WASM shell starts.
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
