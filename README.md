@@ -37,6 +37,7 @@ To maintain high performance and low complexity, the following are **NOT** used:
 - ✅ **XML Documentation**: Required on all public members.
 - ✅ **BFF Pattern**: Client-side WASM never calls domain services directly; all requests route through the Intranet BFF.
 - ✅ **IAM Integration**: Permissions mapped via GCP-style naming: `{service}.{resource}.{action}`.
+- ✅ **Privileged Seed Controls**: Customer seed endpoints use service-account downstream calls, but the BFF entrypoint requires an authenticated caller with `customer.customers.write`.
 
 ---
 
@@ -90,6 +91,24 @@ The Intranet portal orchestrates data from the following domains:
 | **Accounting** | Invoices & Payments |
 | **Material/Supplier** | Procurement & Inventory |
 | **Employee** | Staff Directory & Roles |
+
+---
+
+## 🔐 Permission Model
+
+The BFF authorizes operational routes with `[RequirePermission]` before it calls downstream services. Browser flows may authenticate with cookies, while service/API callers use bearer tokens; both resolve to the same MALIEV IAM permissions.
+
+| Boundary | Permission |
+|----------|------------|
+| Customer onboarding, document upload, and data mutation | `customer.customers.write` or `customer.profile.write` |
+| Customer search and profile reads | `customer.customers.read` / `customer.customers.list` |
+| AI customer extraction | `prediction.extractions.extract` |
+| Chat session and streaming message APIs | `chat.sessions.create` |
+| Customer seed route (`POST /api/v1/Seed/customers` and `/api/seed/customers`) | `customer.customers.write` |
+
+Seed operations are intentionally not public. They use service-account clients to reach CustomerService and CountryService, so the BFF must verify the caller before any downstream seed work starts.
+
+Chat streaming callbacks remain anonymous at the HTTP authentication layer because ChatbotService posts them as server-to-server callbacks, but every callback URL carries a short-lived Data Protection token bound to the chat session ID.
 
 ---
 

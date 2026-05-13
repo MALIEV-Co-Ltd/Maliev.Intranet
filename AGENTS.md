@@ -188,6 +188,8 @@ public static class CustomerExtensions
 - **SignalR**: Hubs should be located in `Maliev.Intranet.Bff/Hubs`. Use typed hubs if possible.
 - **Identity**: Identity is propagated to downstream services via `UserContextHandler`, which forwards the user's platform JWT as a Bearer token. The JWT `sub` claim contains the user's GUID. No separate `X-User-Id` header is forwarded.
 - **Permissions**: Follow GCP-style naming: `{service}.{resource}.{action}` (e.g., `orders.shipments.create`).
+- **Service-account BFF routes**: Any BFF endpoint that uses a service-account HTTP client must still require an authenticated caller with a matching `[RequirePermission]` before starting work. The customer seed route is the reference pattern: it accepts cookies or bearer tokens and requires `customer.customers.write`.
+- **Callback-only BFF routes**: If a downstream service must call back without a user bearer token, bind the callback to a short-lived server-generated token or equivalent signature. Do not rely on obscurity of a SignalR group or session ID.
 
 ---
 

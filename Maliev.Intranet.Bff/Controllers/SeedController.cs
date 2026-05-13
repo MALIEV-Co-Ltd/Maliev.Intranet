@@ -1,7 +1,7 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Bff.Hubs;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using System.Net.Http.Json;
@@ -15,7 +15,6 @@ namespace Maliev.Intranet.Bff.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-[AllowAnonymous]
 public class SeedController(
     IHttpClientFactory httpClientFactory,
     IHubContext<NotificationHub> hubContext,
@@ -27,6 +26,7 @@ public class SeedController(
     /// Seeds the Maliev customer data. Idempotent - checks if data already exists.
     /// Requires user to be logged in with appropriate permissions.
     /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("customers")]
     [HttpPost("/api/seed/customers")]
     public async Task<IActionResult> SeedCustomers(CancellationToken ct)

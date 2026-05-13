@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +19,8 @@ public class ChatController(
     ChatbotServiceClient chatbotClient,
     IChatContextResolver contextResolver,
     ChatHubService chatHubService,
-    IConfiguration configuration) : ControllerBase
+    IConfiguration configuration,
+    IChatCallbackTokenService callbackTokenService) : ControllerBase
 {
     /// <summary>
     /// Initiates a new chat session.
@@ -127,7 +129,8 @@ public class ChatController(
         {
             callbackBaseUrl = $"{Request.Scheme}://{Request.Host}";
         }
-        var callbackUrl = $"{callbackBaseUrl}/api/v1/chat/callback/{request.SessionId}/thinking";
+        var callbackToken = callbackTokenService.CreateToken(request.SessionId);
+        var callbackUrl = $"{callbackBaseUrl.TrimEnd('/')}/api/v1/chat/callback/{request.SessionId}/thinking?token={Uri.EscapeDataString(callbackToken)}";
 
         var result = await chatbotClient.SendMessageStreamAsync(
             request.SessionId,

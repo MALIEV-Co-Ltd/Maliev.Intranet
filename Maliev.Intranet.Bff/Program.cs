@@ -62,6 +62,7 @@ try
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.IProjectDraftService, Maliev.Intranet.Client.Services.ProjectDraftService>();
     builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
     builder.Services.AddScoped<Maliev.Intranet.Bff.Services.IChatContextResolver, Maliev.Intranet.Bff.Services.ChatContextResolver>();
+    builder.Services.AddSingleton<Maliev.Intranet.Bff.Security.IChatCallbackTokenService, Maliev.Intranet.Bff.Security.ChatCallbackTokenService>();
     builder.Services.AddSingleton<Maliev.Intranet.Bff.Services.ChatHubService>();
     builder.Services.AddSingleton<Maliev.Intranet.Shared.Services.IMarkdownService, Maliev.Intranet.Shared.Services.MarkdownService>();
     builder.Services.AddSingleton<Maliev.Intranet.Client.Services.FileTypesSettings>(sp =>
