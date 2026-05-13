@@ -39,7 +39,7 @@ public static class BffHttpClientExtensions
             var explicitUrl = config[$"Services:{serviceName}:BaseUrl"];
             client.BaseAddress = !string.IsNullOrEmpty(explicitUrl)
                 ? new Uri(explicitUrl)
-                : new Uri($"http://{serviceName}");
+                : new Uri($"https+http://{serviceName}");
 
             // HttpClient.Timeout must not be set when using resilience handlers —
             // it fires as TaskCanceledException that bypasses the resilience pipeline.
@@ -68,7 +68,7 @@ public static class BffHttpClientExtensions
             var explicitUrl = config[$"Services:{serviceName}:BaseUrl"];
             client.BaseAddress = !string.IsNullOrEmpty(explicitUrl)
                 ? new Uri(explicitUrl)
-                : new Uri($"http://{serviceName}");
+                : new Uri($"https+http://{serviceName}");
 
             client.Timeout = Timeout.InfiniteTimeSpan;
             configureClient?.Invoke(client);
@@ -102,7 +102,7 @@ public static class BffHttpClientExtensions
             var explicitUrl = config[$"Services:{serviceName}:BaseUrl"];
             client.BaseAddress = !string.IsNullOrEmpty(explicitUrl)
                 ? new Uri(explicitUrl)
-                : new Uri($"http://{serviceName}");
+                : new Uri($"https+http://{serviceName}");
 
             client.Timeout = Timeout.InfiniteTimeSpan;
             configureClient?.Invoke(client);
