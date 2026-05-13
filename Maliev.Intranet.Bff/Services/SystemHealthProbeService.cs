@@ -8,6 +8,14 @@ namespace Maliev.Intranet.Bff.Services;
 /// </summary>
 public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactory, IConfiguration configuration) : ISystemHealthProbeService
 {
+    private static readonly TimeSpan[] TransientRetryDelays =
+    [
+        TimeSpan.FromMilliseconds(500),
+        TimeSpan.FromSeconds(1),
+        TimeSpan.FromSeconds(2),
+        TimeSpan.FromSeconds(3)
+    ];
+
     /// <inheritdoc />
     public IReadOnlyList<SystemHealthTarget> Targets { get; } =
     [
@@ -81,7 +89,7 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
             var client = httpClientFactory.CreateClient("ServiceHealthCheck");
             client.BaseAddress = new Uri(baseUrl);
 
-            var liveness = await ProbeAsync(client, target.LivenessPath, TimeSpan.FromSeconds(5), ct);
+            var liveness = await ProbeWithTransientRetriesAsync(client, target.LivenessPath, TimeSpan.FromSeconds(5), ct);
             status.LivenessResponseTimeMs = liveness.ResponseTimeMs;
             if (!liveness.IsSuccess)
             {
@@ -91,7 +99,7 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
                 return status;
             }
 
-            var readiness = await ProbeAsync(client, target.ReadinessPath, TimeSpan.FromSeconds(10), ct);
+            var readiness = await ProbeWithTransientRetriesAsync(client, target.ReadinessPath, TimeSpan.FromSeconds(10), ct);
             status.ReadinessResponseTimeMs = readiness.ResponseTimeMs;
             status.ResponseTimeMs = readiness.ResponseTimeMs;
             if (readiness.IsSuccess)
@@ -111,6 +119,28 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
         }
 
         return status;
+    }
+
+    private static async Task<ProbeResult> ProbeWithTransientRetriesAsync(
+        HttpClient client,
+        string path,
+        TimeSpan timeout,
+        CancellationToken ct)
+    {
+        var result = await ProbeAsync(client, path, timeout, ct);
+
+        foreach (var delay in TransientRetryDelays)
+        {
+            if (result.IsSuccess || !result.IsTransient)
+            {
+                return result;
+            }
+
+            await Task.Delay(delay, ct);
+            result = await ProbeAsync(client, path, timeout, ct);
+        }
+
+        return result;
     }
 
     private static async Task<ProbeResult> ProbeAsync(HttpClient client, string path, TimeSpan timeout, CancellationToken ct)
@@ -167,6 +197,15 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
                 sw.Elapsed.TotalMilliseconds,
                 $"Health probe {path} timed out after {timeout.TotalSeconds:N0} seconds.");
         }
+        catch (HttpRequestException ex)
+        {
+            sw.Stop();
+            return new ProbeResult(
+                false,
+                sw.Elapsed.TotalMilliseconds,
+                $"Health probe {path} request failed: {ex.Message}",
+                IsTransient: true);
+        }
     }
 
     private static string? TrimErrorBody(string? body)
@@ -183,5 +222,6 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
         bool IsSuccess,
         double ResponseTimeMs,
         string? ErrorMessage = null,
-        string? ErrorBody = null);
+        string? ErrorBody = null,
+        bool IsTransient = false);
 }

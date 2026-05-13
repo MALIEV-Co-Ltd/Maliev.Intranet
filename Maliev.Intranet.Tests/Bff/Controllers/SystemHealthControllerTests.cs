@@ -75,6 +75,28 @@ public class SystemHealthControllerTests
     }
 
     [Fact]
+    public async Task GetSystemHealth_WhenTransientLivenessRequestFails_RetriesBeforeMarkingUnreachable()
+    {
+        var geometryLivenessAttempts = 0;
+        var probeService = CreateProbeService(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/geometry/liveness" &&
+                Interlocked.Increment(ref geometryLivenessAttempts) == 1)
+            {
+                throw new HttpRequestException("The response ended prematurely.");
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+
+        var services = await probeService.CheckAllAsync(CancellationToken.None);
+
+        var geometry = Assert.Single(services, service => service.ServiceName == "GeometryService");
+        Assert.Equal("Healthy", geometry.Status);
+        Assert.Equal(2, geometryLivenessAttempts);
+    }
+
+    [Fact]
     public async Task GetSystemHealth_UsesProbeServiceAndPreservesLiveResponseShape()
     {
         var probeService = new Mock<ISystemHealthProbeService>();
