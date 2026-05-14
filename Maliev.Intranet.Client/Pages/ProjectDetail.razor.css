@@ -1036,6 +1036,94 @@
     line-height: 1.45;
 }
 
+.project-record-shell ::deep .project-commercial-card {
+    grid-column: 1 / -1;
+}
+
+.project-record-shell ::deep .project-revision-list {
+    display: grid;
+    gap: 12px;
+}
+
+.project-record-shell ::deep .project-revision-item {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+}
+
+.project-record-shell ::deep .project-revision-item.current {
+    border-color: var(--maliev-info);
+    background: var(--maliev-info-bg);
+}
+
+.project-record-shell ::deep .project-revision-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.project-record-shell ::deep .project-revision-header strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-base);
+}
+
+.project-record-shell ::deep .project-revision-current {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: var(--maliev-radius-xs);
+    background: var(--maliev-info);
+    color: white;
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.project-record-shell ::deep .project-revision-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    margin: 0;
+}
+
+.project-record-shell ::deep .project-revision-meta dt,
+.project-record-shell ::deep .project-revision-meta dd {
+    margin: 0;
+}
+
+.project-record-shell ::deep .project-revision-meta dt {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.project-record-shell ::deep .project-revision-meta dd {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.project-record-shell ::deep .project-revision-summary {
+    margin: 0;
+    color: var(--maliev-ink-2);
+    font-size: var(--maliev-font-small);
+    line-height: 1.45;
+}
+
+.project-record-shell ::deep .project-revision-pdf-link {
+    color: var(--maliev-info);
+    font-size: var(--maliev-font-small);
+    font-weight: 800;
+    text-decoration: none;
+}
+
 .project-record-shell ::deep .project-commercial-summary {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

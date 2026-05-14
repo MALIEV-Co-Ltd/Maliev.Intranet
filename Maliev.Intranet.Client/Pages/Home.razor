@@ -128,7 +128,7 @@
             {
                 yield return ("Orders", _orders.Count.ToString("N0"), "recent records", null);
                 yield return ("Action items", (_actionItems?.Categories.Sum(c => c.Count) ?? 0).ToString("N0"), "open work", null);
-                yield return ("Quotes", "Live", "ProjectNew ready", true);
+                yield return ("Quotes", "Live", "Project quote workspace ready", true);
                 yield return ("Services", "BFF", "proxied endpoints", null);
             }
         }

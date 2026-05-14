@@ -2859,6 +2859,10 @@ public partial class ProjectNew : IAsyncDisposable
                     ShippingCost = Math.Max(0m, _shippingCost),
                     TaxAmount = CalculateQuotationTaxAmount(),
                     QuotationTerms = _quotationTerms,
+                    ChangeSummary = isUpdatingExistingProject
+                        ? "Regenerated from employee project quote workspace."
+                        : "Initial quotation generated from employee project quote workspace.",
+                    IdempotencyKey = $"{projectId:N}:{DateTime.UtcNow:yyyyMMddHHmmssfff}"
                 });
             if (!quoteResponse.IsSuccessStatusCode)
             {

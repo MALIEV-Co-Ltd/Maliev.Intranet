@@ -70,6 +70,28 @@ public class QuotationServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Attaches a generated PDF URL to a specific quotation version.
+    /// </summary>
+    /// <param name="id">The quotation ID.</param>
+    /// <param name="versionNumber">The quotation version number.</param>
+    /// <param name="pdfUrl">The generated PDF URL.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>True when the version artifact was updated.</returns>
+    public async Task<bool> AttachVersionPdfArtifactAsync(Guid id, int versionNumber, string pdfUrl, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/quotation/v1/quotations/{id}/versions/{versionNumber}/pdf-artifact",
+            new
+            {
+                pdfArtifactUrl = pdfUrl,
+                pdfGeneratedAt = DateTime.UtcNow
+            },
+            ct);
+
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>
     /// Deletes a quotation.
     /// </summary>
     /// <param name="id">The quotation ID.</param>

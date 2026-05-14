@@ -179,8 +179,12 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("project-quote-workspace", cut.Markup);
         Assert.Contains("Quote document", cut.Markup);
+        Assert.Contains("Quote revision history", cut.Markup);
         Assert.Contains("Commercial breakdown", cut.Markup);
-        Assert.Contains("https://storage.example/quote-auto.pdf", cut.Markup);
+        Assert.Contains("https://storage.example/quote-v2.pdf", cut.Markup);
+        Assert.Contains("Version 2", cut.Markup);
+        Assert.Contains("Current", cut.Markup);
+        Assert.Contains("Updated finish and delivery terms.", cut.Markup);
         Assert.DoesNotContain("No PDF generated", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("Line subtotal", cut.Markup);
         Assert.Contains("Parts subtotal", cut.Markup);
@@ -838,6 +842,11 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                 CurrencyCode = "THB",
                 DeliveryExpectations = "7-10 business days",
                 SpecialTerms = "50% deposit required before production.",
+                ChangeSummary = "Updated finish and delivery terms.",
+                ProjectSnapshotHash = "0123456789abcdef",
+                PdfArtifactUrl = "https://storage.example/quote-v2.pdf",
+                PdfGeneratedAt = new DateTime(2026, 4, 18, 14, 30, 0, DateTimeKind.Utc),
+                GeneratedByDisplayName = "Alex Kim",
                 CreatedBy = "Alex Kim",
                 CreatedAt = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
             }

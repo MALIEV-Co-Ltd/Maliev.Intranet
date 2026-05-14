@@ -364,6 +364,8 @@ public class ProjectServiceClient(HttpClient httpClient)
 
         public decimal TotalPrice { get; set; }
 
+        public int? CurrentQuotationVersionNumber { get; set; }
+
         public DateTime CreatedAt { get; set; }
 
         public ProjectSummaryDto ToIntranetDto() => new()
@@ -376,6 +378,7 @@ public class ProjectServiceClient(HttpClient httpClient)
             Status = Status,
             PartsCount = PartsCount,
             TotalPrice = ResolveTotalPrice(TotalEstimatedPrice, TotalPrice),
+            CurrentQuotationVersionNumber = CurrentQuotationVersionNumber,
             CreatedAt = CreatedAt
         };
     }
@@ -399,6 +402,14 @@ public class ProjectServiceClient(HttpClient httpClient)
         public Guid? QuotationId { get; set; }
 
         public string? QuotationNumber { get; set; }
+
+        public Guid? CurrentQuotationVersionId { get; set; }
+
+        public int? CurrentQuotationVersionNumber { get; set; }
+
+        public Guid? SourceProjectId { get; set; }
+
+        public string? SourceProjectNumber { get; set; }
 
         public string? QuotationStatus { get; set; }
 
@@ -444,6 +455,10 @@ public class ProjectServiceClient(HttpClient httpClient)
                 Currency = string.IsNullOrWhiteSpace(Currency) ? "THB" : Currency,
                 QuotationId = QuotationId,
                 QuotationNumber = QuotationNumber,
+                CurrentQuotationVersionId = CurrentQuotationVersionId,
+                CurrentQuotationVersionNumber = CurrentQuotationVersionNumber,
+                SourceProjectId = SourceProjectId,
+                SourceProjectNumber = SourceProjectNumber,
                 QuotationStatus = ResolveQuotationStatus(Status, QuotationStatus, QuotationId),
                 CreatedBy = CreatedBy,
                 CreatedByName = CreatedByName,

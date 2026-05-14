@@ -32,6 +32,9 @@ public class ProjectSummaryDto
     /// <summary>Gets or sets the total confirmed price across all parts.</summary>
     public decimal TotalPrice { get; set; }
 
+    /// <summary>Gets or sets the current quotation version number, if a quotation has been generated.</summary>
+    public int? CurrentQuotationVersionNumber { get; set; }
+
     /// <summary>Gets or sets the date the project was created.</summary>
     public DateTime CreatedAt { get; set; }
 }
@@ -133,6 +136,18 @@ public class ProjectDetailDto
 
     /// <summary>Gets or sets the quotation status once the quotation has been generated.</summary>
     public string? QuotationStatus { get; set; }
+
+    /// <summary>Gets or sets the current quotation version ID once generated.</summary>
+    public Guid? CurrentQuotationVersionId { get; set; }
+
+    /// <summary>Gets or sets the current quotation version number once generated.</summary>
+    public int? CurrentQuotationVersionNumber { get; set; }
+
+    /// <summary>Gets or sets the source project identifier when this project is a duplicate/reorder draft.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>Gets or sets the source project number when this project is a duplicate/reorder draft.</summary>
+    public string? SourceProjectNumber { get; set; }
 
     /// <summary>Gets or sets the user ID who created this project.</summary>
     public string? CreatedBy { get; set; }
@@ -461,6 +476,13 @@ public class CreateProjectRequest
     /// <summary>Gets or sets the currency code. Defaults to THB.</summary>
     [MaxLength(3)]
     public string Currency { get; set; } = "THB";
+
+    /// <summary>Gets or sets the source project identifier when creating a duplicate/reorder draft.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>Gets or sets the source project number when creating a duplicate/reorder draft.</summary>
+    [MaxLength(30)]
+    public string? SourceProjectNumber { get; set; }
 }
 
 /// <summary>
@@ -747,6 +769,14 @@ public class GenerateQuotationRequest
     /// <summary>Gets or sets customer-facing quotation terms shown on the PDF.</summary>
     [MaxLength(2000)]
     public string? QuotationTerms { get; set; }
+
+    /// <summary>Gets or sets the change summary captured on the quotation version.</summary>
+    [MaxLength(1000)]
+    public string? ChangeSummary { get; set; }
+
+    /// <summary>Gets or sets an optional idempotency key for duplicate submit protection.</summary>
+    [MaxLength(128)]
+    public string? IdempotencyKey { get; set; }
 }
 
 /// <summary>

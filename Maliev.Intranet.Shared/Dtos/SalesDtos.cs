@@ -82,6 +82,12 @@ public class QuotationDetailDto
     /// <summary>The number of the source Request for Quotation (RFQ), if applicable.</summary>
     public string? SourceRfqNumber { get; set; }
 
+    /// <summary>The source ProjectService project identifier when generated from a project workspace.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>The source ProjectService project number when generated from a project workspace.</summary>
+    public string? SourceProjectNumber { get; set; }
+
     /// <summary>The sequence number of the current active version of the quotation.</summary>
     public int CurrentVersionNumber { get; set; }
 
@@ -164,11 +170,32 @@ public class QuotationVersionDto
     /// <summary>A brief summary of what changed in this version compared to the previous one.</summary>
     public string? ChangeSummary { get; set; }
 
+    /// <summary>Immutable JSON project snapshot captured for this quotation version.</summary>
+    public string? ProjectSnapshotJson { get; set; }
+
+    /// <summary>Deterministic hash of the immutable project snapshot.</summary>
+    public string? ProjectSnapshotHash { get; set; }
+
+    /// <summary>Customer-facing PDF artifact URL for this exact version.</summary>
+    public string? PdfArtifactUrl { get; set; }
+
+    /// <summary>Storage path for the PDF artifact for this exact version.</summary>
+    public string? PdfArtifactStoragePath { get; set; }
+
+    /// <summary>Timestamp when the PDF artifact was generated for this exact version.</summary>
+    public DateTime? PdfGeneratedAt { get; set; }
+
+    /// <summary>Human-readable display name of the user who generated this version.</summary>
+    public string? GeneratedByDisplayName { get; set; }
+
     /// <summary>Customer-facing special terms shown on generated PDFs.</summary>
     public string? SpecialTerms { get; set; }
 
     /// <summary>The identifier of the user who created this version.</summary>
     public string CreatedBy { get; set; } = string.Empty;
+
+    /// <summary>The identifier of the user who created this version as returned by QuotationService.</summary>
+    public string CreatedByUserId { get; set; } = string.Empty;
 
     /// <summary>The date and time when this version was created.</summary>
     public DateTime CreatedAt { get; set; }

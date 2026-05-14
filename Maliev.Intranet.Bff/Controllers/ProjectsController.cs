@@ -198,7 +198,9 @@ public class ProjectsController(
             CustomerName = source.CustomerName,
             Title = string.IsNullOrWhiteSpace(request?.Title) ? BuildCopyTitle(source.Title) : request!.Title!,
             Description = source.Description,
-            Currency = string.IsNullOrWhiteSpace(source.Currency) ? "THB" : source.Currency
+            Currency = string.IsNullOrWhiteSpace(source.Currency) ? "THB" : source.Currency,
+            SourceProjectId = source.Id,
+            SourceProjectNumber = source.ProjectNumber
         };
 
         var (created, errorContent, statusCode) = await client.CreateProjectAsync(createRequest, ct);
@@ -443,6 +445,23 @@ public class ProjectsController(
             quotation.QuotationNumber,
             pdfData,
             ct: ct);
+
+        if (!string.IsNullOrWhiteSpace(pdfUrl))
+        {
+            var versionNumber = project.CurrentQuotationVersionNumber ?? quotation.CurrentVersionNumber;
+            if (versionNumber > 0)
+            {
+                var attached = await quotationClient.AttachVersionPdfArtifactAsync(quotationId, versionNumber, pdfUrl, ct);
+                if (!attached)
+                {
+                    _logger.LogWarning(
+                        "Generated quotation PDF for project {ProjectId}, but failed to attach it to quotation {QuotationId} version {VersionNumber}.",
+                        projectId,
+                        quotationId,
+                        versionNumber);
+                }
+            }
+        }
 
         return !string.IsNullOrWhiteSpace(pdfUrl);
     }

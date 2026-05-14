@@ -658,6 +658,7 @@ public class ProjectsControllerTests
         var quotationId = Guid.NewGuid();
         const string QuotationNumber = "Q-3EF52DCB";
         var projectReloadCount = 0;
+        var attachedPdfArtifact = false;
         JsonElement? pdfRequestPayload = null;
         var generatedProject = new ProjectDetailDto
         {
@@ -667,6 +668,7 @@ public class ProjectsControllerTests
             CustomerName = "Somchai Patel",
             QuotationId = quotationId,
             QuotationNumber = QuotationNumber,
+            CurrentQuotationVersionNumber = 1,
             CreatedAt = DateTime.UtcNow,
             ValidUntil = DateTime.UtcNow.AddDays(30),
             Currency = "THB",
@@ -731,6 +733,13 @@ public class ProjectsControllerTests
         });
         var quotationHandler = new MockHttpMessageHandler((req, _) =>
         {
+            if (req.Method == HttpMethod.Post &&
+                req.RequestUri!.AbsolutePath.EndsWith($"/quotation/v1/quotations/{quotationId}/versions/1/pdf-artifact", StringComparison.Ordinal))
+            {
+                attachedPdfArtifact = true;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            }
+
             Assert.Equal(HttpMethod.Get, req.Method);
             Assert.EndsWith($"/quotation/v1/quotations/{quotationId}", req.RequestUri!.AbsolutePath);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -764,6 +773,7 @@ public class ProjectsControllerTests
         Assert.Equal("Quotation", pdfRequestPayload.Value.GetProperty("documentType").GetString());
         Assert.Equal(QuotationNumber, pdfRequestPayload.Value.GetProperty("referenceId").GetString());
         Assert.Equal("Quotation", pdfRequestPayload.Value.GetProperty("templateCode").GetString());
+        Assert.True(attachedPdfArtifact);
     }
 
     [Fact]
