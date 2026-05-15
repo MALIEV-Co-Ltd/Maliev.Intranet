@@ -97,6 +97,43 @@ public class SystemHealthControllerTests
     }
 
     [Fact]
+    public async Task GetSystemHealth_ThrottlesConcurrentServiceProbes()
+    {
+        var currentConcurrency = 0;
+        var maxConcurrency = 0;
+        var probeService = CreateProbeService(
+            async (_, ct) =>
+            {
+                var active = Interlocked.Increment(ref currentConcurrency);
+                while (true)
+                {
+                    var observed = Volatile.Read(ref maxConcurrency);
+                    if (active <= observed ||
+                        Interlocked.CompareExchange(ref maxConcurrency, active, observed) == observed)
+                    {
+                        break;
+                    }
+                }
+
+                try
+                {
+                    await Task.Delay(25, ct);
+                    return new HttpResponseMessage(HttpStatusCode.OK);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref currentConcurrency);
+                }
+            },
+            maxConcurrentProbes: 2);
+
+        var services = await probeService.CheckAllAsync(CancellationToken.None);
+
+        Assert.True(services.Count >= 30);
+        Assert.True(maxConcurrency <= 2, $"Expected at most 2 concurrent probes, but observed {maxConcurrency}.");
+    }
+
+    [Fact]
     public async Task GetSystemHealth_UsesProbeServiceAndPreservesLiveResponseShape()
     {
         var probeService = new Mock<ISystemHealthProbeService>();
@@ -164,13 +201,29 @@ public class SystemHealthControllerTests
 
     private static SystemHealthProbeService CreateProbeService(Func<HttpRequestMessage, HttpResponseMessage> handler)
     {
+        return CreateProbeService(
+            (request, _) => Task.FromResult(handler(request)));
+    }
+
+    private static SystemHealthProbeService CreateProbeService(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler,
+        int? maxConcurrentProbes = null)
+    {
         var factory = new Mock<IHttpClientFactory>();
         factory
             .Setup(x => x.CreateClient("ServiceHealthCheck"))
-            .Returns(() => new HttpClient(new MockHttpMessageHandler((request, _) =>
-                Task.FromResult(handler(request)))));
+            .Returns(() => new HttpClient(new MockHttpMessageHandler(handler)));
 
-        var configuration = new ConfigurationBuilder().Build();
+        var configurationBuilder = new ConfigurationBuilder();
+        if (maxConcurrentProbes is not null)
+        {
+            configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SystemHealth:MaxConcurrentProbes"] = maxConcurrentProbes.Value.ToString()
+            });
+        }
+
+        var configuration = configurationBuilder.Build();
         return new SystemHealthProbeService(factory.Object, configuration);
     }
 }

@@ -16,6 +16,10 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
         TimeSpan.FromSeconds(3)
     ];
 
+    private readonly int _maxConcurrentProbes = Math.Max(
+        1,
+        configuration.GetValue<int?>("SystemHealth:MaxConcurrentProbes") ?? 8);
+
     /// <inheritdoc />
     public IReadOnlyList<SystemHealthTarget> Targets { get; } =
     [
@@ -59,7 +63,20 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
     /// <inheritdoc />
     public async Task<IReadOnlyList<ServiceHealthStatus>> CheckAllAsync(CancellationToken ct)
     {
-        var healthStatuses = await Task.WhenAll(Targets.Select(target => CheckServiceHealthAsync(target, ct)));
+        using var semaphore = new SemaphoreSlim(_maxConcurrentProbes);
+        var healthStatuses = await Task.WhenAll(Targets.Select(async target =>
+        {
+            await semaphore.WaitAsync(ct);
+            try
+            {
+                return await CheckServiceHealthAsync(target, ct);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }));
+
         return healthStatuses.OrderBy(s => s.ServiceName).ToList();
     }
 
