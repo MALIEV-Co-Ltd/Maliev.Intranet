@@ -123,4 +123,52 @@ public sealed class EmployeesControllerProfileTests
         Assert.Equal(string.Empty, profile.Role);
         iamClient.Verify(client => client.GetPrincipalRolesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task GetMyProfile_UsesCookieNameIdentifierClaim()
+    {
+        var principalId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+        var employeeId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+        var employeeClient = new Mock<EmployeeServiceClient>(new HttpClient { BaseAddress = new Uri("http://employee") });
+        employeeClient.Setup(client => client.GetByPrincipalIdAsync(principalId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EmployeeDetailDto
+            {
+                Id = employeeId,
+                FirstName = "Codex",
+                LastName = "Limited",
+                Email = "aspire-limited@debug.com"
+            });
+        employeeClient.Setup(client => client.GetSelfServiceProfileAsync(employeeId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EmployeeSelfProfileDto
+            {
+                Id = employeeId,
+                FirstName = "Codex",
+                LastName = "Limited",
+                WorkEmail = "aspire-limited@debug.com"
+            });
+
+        var iamClient = new Mock<IAMServiceClient>(new HttpClient { BaseAddress = new Uri("http://iam") });
+        var controller = new EmployeesController(employeeClient.Object, iamClient.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([
+                        new Claim(ClaimTypes.NameIdentifier, principalId.ToString()),
+                        new Claim("email", "aspire-limited@debug.com")
+                    ], "Cookies"))
+                }
+            }
+        };
+
+        var result = await controller.GetMyProfile(CancellationToken.None);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var profile = Assert.IsType<EmployeeSelfProfileDto>(ok.Value);
+
+        Assert.Equal(employeeId, profile.Id);
+        Assert.Equal("aspire-limited@debug.com", profile.WorkEmail);
+        employeeClient.Verify(client => client.GetByPrincipalIdAsync(principalId, It.IsAny<CancellationToken>()), Times.Once);
+        employeeClient.Verify(client => client.GetSelfServiceProfileAsync(employeeId, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

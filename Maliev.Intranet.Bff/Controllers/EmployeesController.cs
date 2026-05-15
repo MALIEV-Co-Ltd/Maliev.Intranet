@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -86,7 +88,7 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
     [HttpGet("me")]
     public async Task<ActionResult<EmployeeDetailDto>> GetMe(CancellationToken ct)
     {
-        var principalIdStr = User.FindFirst("sub")?.Value ?? User.FindFirst("user_id")?.Value;
+        var principalIdStr = ResolveCurrentPrincipalIdClaim();
         if (!Guid.TryParse(principalIdStr, out var principalId))
             return NotFound();
 
@@ -170,10 +172,17 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
 
     private async Task<EmployeeDetailDto?> ResolveCurrentEmployeeAsync(CancellationToken ct)
     {
-        var principalIdStr = User.FindFirst("sub")?.Value ?? User.FindFirst("user_id")?.Value;
+        var principalIdStr = ResolveCurrentPrincipalIdClaim();
         return Guid.TryParse(principalIdStr, out var principalId)
             ? await client.GetByPrincipalIdAsync(principalId, ct)
             : null;
+    }
+
+    private string? ResolveCurrentPrincipalIdClaim()
+    {
+        return User.FindFirst("sub")?.Value
+            ?? User.FindFirst("user_id")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     }
 
     private async Task EnrichCurrentUserProfileAsync(EmployeeDetailDto? profile, Guid principalId, CancellationToken ct)
