@@ -284,7 +284,11 @@ public static class MalievPermissions
     public static class Leave
     {
         /// <summary>Permission to view personal or team leave balances.</summary>
-        public const string Read = "leave.balances.read";
+        public const string BalanceRead = "leave.balances.read";
+        /// <summary>Permission to view personal or team leave requests.</summary>
+        public const string RequestsRead = "leave.requests.read";
+        /// <summary>Legacy alias for leave balance read access.</summary>
+        public const string Read = BalanceRead;
         /// <summary>Permission to submit new leave requests.</summary>
         public const string Write = "leave.requests.create";
         /// <summary>Permission to approve or reject leave requests assigned to the employee.</summary>

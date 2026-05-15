@@ -50,7 +50,7 @@ public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient
     /// <summary>
     /// Gets leave balances for the current user.
     /// </summary>
-    [RequirePermission(MalievPermissions.Leave.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Leave.BalanceRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("balances")]
     public async Task<ActionResult<List<LeaveBalanceDto>>> GetBalances(CancellationToken ct)
     {
@@ -64,7 +64,7 @@ public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient
     /// <summary>
     /// Gets leave requests for the current user.
     /// </summary>
-    [RequirePermission(MalievPermissions.Leave.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Leave.RequestsRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("requests")]
     public async Task<ActionResult<List<LeaveRequestSummaryDto>>> GetRequests(CancellationToken ct)
     {
@@ -113,7 +113,7 @@ public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient
     /// <summary>
     /// Gets pending leave approvals assigned to the current user.
     /// </summary>
-    [RequirePermission(MalievPermissions.Leave.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Leave.RequestsRead, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("approvals")]
     public async Task<ActionResult<List<LeaveRequestDetailDto>>> GetApprovals(CancellationToken ct)
     {
