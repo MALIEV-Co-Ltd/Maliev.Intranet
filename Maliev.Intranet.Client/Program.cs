@@ -41,7 +41,10 @@ builder.Services.AddMudServices();
 builder.Services.AddHttpClient("MalievAPI", client =>
 {
     client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
-    client.Timeout = TimeSpan.FromSeconds(30);
+    // Keep the browser client above the BFF's 180 s resilience budget so cold
+    // Aspire/service-discovery starts can return their real result instead of
+    // being aborted by WebAssembly at 30 s.
+    client.Timeout = TimeSpan.FromSeconds(200);
 });
 
 // Add convenience accessor for components
