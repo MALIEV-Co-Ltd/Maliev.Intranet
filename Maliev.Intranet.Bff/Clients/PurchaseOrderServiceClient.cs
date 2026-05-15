@@ -36,7 +36,7 @@ public interface IPurchaseOrderServiceClient
     /// <summary>
     /// Creates a new purchase order.
     /// </summary>
-    Task<PurchaseOrderDto?> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default);
+    Task<(PurchaseOrderDto? Result, string? ErrorContent, int StatusCode)> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Approves a pending purchase order.
@@ -56,7 +56,7 @@ public interface IPurchaseOrderServiceClient
     /// <summary>
     /// Cancels a purchase order.
     /// </summary>
-    Task<bool> CancelPurchaseOrderAsync(int id, CancelPurchaseOrderRequest request, CancellationToken ct = default);
+    Task<(bool Success, string? ErrorContent, int StatusCode)> CancelPurchaseOrderAsync(int id, CancelPurchaseOrderRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Exports a purchase order in the requested format.
@@ -66,7 +66,7 @@ public interface IPurchaseOrderServiceClient
     /// <summary>
     /// Registers an uploaded file against a purchase order.
     /// </summary>
-    Task<PurchaseOrderFileDto?> RegisterFileAsync(int id, RegisterPurchaseOrderFileRequest request, CancellationToken ct = default);
+    Task<(PurchaseOrderFileDto? Result, string? ErrorContent, int StatusCode)> RegisterFileAsync(int id, RegisterPurchaseOrderFileRequest request, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -112,7 +112,7 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
     }
 
     /// <inheritdoc />
-    public async Task<PurchaseOrderDto?> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default)
+    public async Task<(PurchaseOrderDto? Result, string? ErrorContent, int StatusCode)> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default)
     {
         var downstreamRequest = new DownstreamCreatePurchaseOrderRequest
         {
@@ -135,7 +135,7 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
         };
 
         using var response = await httpClient.PostAsJsonAsync("/purchase-order/v1/purchase-orders", downstreamRequest, JsonOptions, ct);
-        return await ReadPurchaseOrderAsync(response, ct);
+        return await ReadPurchaseOrderWithErrorAsync(response, ct);
     }
 
     /// <inheritdoc />
@@ -161,7 +161,7 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
     }
 
     /// <inheritdoc />
-    public async Task<bool> CancelPurchaseOrderAsync(int id, CancelPurchaseOrderRequest request, CancellationToken ct = default)
+    public async Task<(bool Success, string? ErrorContent, int StatusCode)> CancelPurchaseOrderAsync(int id, CancelPurchaseOrderRequest request, CancellationToken ct = default)
     {
         using var response = await httpClient.PostAsJsonAsync(
             $"/purchase-order/v1/purchase-orders/{id}/cancel",
@@ -169,7 +169,12 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
             JsonOptions,
             ct);
 
-        return response.IsSuccessStatusCode;
+        if (response.IsSuccessStatusCode)
+        {
+            return (true, null, (int)response.StatusCode);
+        }
+
+        return (false, await response.Content.ReadAsStringAsync(ct), (int)response.StatusCode);
     }
 
     /// <inheritdoc />
@@ -180,7 +185,7 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
     }
 
     /// <inheritdoc />
-    public async Task<PurchaseOrderFileDto?> RegisterFileAsync(int id, RegisterPurchaseOrderFileRequest request, CancellationToken ct = default)
+    public async Task<(PurchaseOrderFileDto? Result, string? ErrorContent, int StatusCode)> RegisterFileAsync(int id, RegisterPurchaseOrderFileRequest request, CancellationToken ct = default)
     {
         var downstreamRequest = new DownstreamRegisterPurchaseOrderFileRequest
         {
@@ -200,11 +205,11 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
 
         if (!response.IsSuccessStatusCode)
         {
-            return null;
+            return (null, await response.Content.ReadAsStringAsync(ct), (int)response.StatusCode);
         }
 
         var file = await response.Content.ReadFromJsonAsync<DownstreamPurchaseOrderFileResponse>(JsonOptions, ct);
-        return file?.ToDto();
+        return (file?.ToDto(), null, (int)response.StatusCode);
     }
 
     private static string BuildSearchPath(
@@ -254,6 +259,19 @@ public class PurchaseOrderServiceClient(HttpClient httpClient) : IPurchaseOrderS
 
         var downstream = await response.Content.ReadFromJsonAsync<DownstreamPurchaseOrderDetailResponse>(JsonOptions, ct);
         return downstream?.ToDto();
+    }
+
+    private static async Task<(PurchaseOrderDto? Result, string? ErrorContent, int StatusCode)> ReadPurchaseOrderWithErrorAsync(
+        HttpResponseMessage response,
+        CancellationToken ct)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            return (null, await response.Content.ReadAsStringAsync(ct), (int)response.StatusCode);
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<DownstreamPurchaseOrderDetailResponse>(JsonOptions, ct);
+        return (result?.ToDto(), null, (int)response.StatusCode);
     }
 
     private static PagedResponse<PurchaseOrderDto> MapPaged(DownstreamPaginatedResponse<DownstreamPurchaseOrderResponse> response)

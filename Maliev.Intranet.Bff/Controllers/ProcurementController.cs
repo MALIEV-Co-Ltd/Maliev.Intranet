@@ -71,10 +71,16 @@ public class ProcurementController(IPurchaseOrderServiceClient client, UploadSer
     [HttpPost]
     public async Task<ActionResult<PurchaseOrderDto>> Create([FromBody] CreatePurchaseOrderRequest request, CancellationToken ct)
     {
-        var result = await client.CreatePurchaseOrderAsync(request, ct);
-        return result is not null
-            ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result)
-            : BadRequest("Purchase order could not be created. Check the selected supplier, source order, currency, and line item.");
+        var (result, errorContent, statusCode) = await client.CreatePurchaseOrderAsync(request, ct);
+        if (result is not null)
+        {
+            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+        }
+
+        var message = string.IsNullOrWhiteSpace(errorContent)
+            ? "Purchase order could not be created. Check the selected supplier, source order, currency, and line item."
+            : errorContent;
+        return StatusCode(statusCode == 0 ? StatusCodes.Status400BadRequest : statusCode, message);
     }
 
     /// <summary>
@@ -120,8 +126,13 @@ public class ProcurementController(IPurchaseOrderServiceClient client, UploadSer
     [HttpPost("{id:int}/cancel")]
     public async Task<IActionResult> Cancel(int id, [FromBody] CancelPurchaseOrderRequest request, CancellationToken ct)
     {
-        var result = await client.CancelPurchaseOrderAsync(id, request, ct);
-        return result ? NoContent() : BadRequest();
+        var (success, errorContent, statusCode) = await client.CancelPurchaseOrderAsync(id, request, ct);
+        if (success)
+        {
+            return NoContent();
+        }
+
+        return StatusCode(statusCode == 0 ? StatusCodes.Status400BadRequest : statusCode, string.IsNullOrWhiteSpace(errorContent) ? "Purchase order could not be cancelled." : errorContent);
     }
 
     /// <summary>
@@ -170,7 +181,7 @@ public class ProcurementController(IPurchaseOrderServiceClient client, UploadSer
             return StatusCode(StatusCodes.Status502BadGateway, "Upload failed.");
         }
 
-        var result = await client.RegisterFileAsync(id, new RegisterPurchaseOrderFileRequest
+        var (result, errorContent, statusCode) = await client.RegisterFileAsync(id, new RegisterPurchaseOrderFileRequest
         {
             FileName = safeFileName,
             ObjectName = upload.StoragePath ?? upload.FileReference ?? storagePath,
@@ -182,7 +193,7 @@ public class ProcurementController(IPurchaseOrderServiceClient client, UploadSer
 
         return result is not null
             ? Ok(result)
-            : StatusCode(StatusCodes.Status502BadGateway, "Purchase order file could not be linked.");
+            : StatusCode(statusCode == 0 ? StatusCodes.Status502BadGateway : statusCode, string.IsNullOrWhiteSpace(errorContent) ? "Purchase order file could not be linked." : errorContent);
     }
 
     /// <summary>

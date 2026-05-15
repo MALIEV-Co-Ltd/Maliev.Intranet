@@ -164,7 +164,7 @@ public class PurchaseOrderServiceClientTests
             });
         });
 
-        var result = await client.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
+        var (result, errorContent, statusCode) = await client.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
         {
             OrderType = 1,
             SupplierId = 12,
@@ -181,6 +181,8 @@ public class PurchaseOrderServiceClientTests
         Assert.Equal(HttpMethod.Post, capturedRequest.Method);
         Assert.Equal("/purchase-order/v1/purchase-orders", capturedRequest.RequestUri!.PathAndQuery);
         Assert.NotNull(result);
+        Assert.Null(errorContent);
+        Assert.Equal(200, statusCode);
         Assert.Equal(1002, result.Id);
         Assert.NotNull(payload);
 
@@ -194,6 +196,27 @@ public class PurchaseOrderServiceClientTests
         Assert.Equal(3m, root.GetProperty("whtRate").GetDecimal());
         Assert.Equal(9001, root.GetProperty("items")[0].GetProperty("externalOrderItemId").GetInt32());
         Assert.Equal(2m, root.GetProperty("items")[0].GetProperty("quantity").GetDecimal());
+    }
+
+    [Fact]
+    public async Task CreatePurchaseOrderAsync_WhenBadRequest_ReturnsErrorContent()
+    {
+        const string errorBody = """{"error":"Source order is required"}""";
+        var client = MakeClient(HttpStatusCode.BadRequest, errorBody);
+
+        var (result, errorContent, statusCode) = await client.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
+        {
+            OrderType = 1,
+            SupplierId = 12,
+            OrderId = 44,
+            CurrencyCode = "THB",
+            Items = [new PurchaseOrderLineItemDto { SourceOrderItemId = "primary", Quantity = 1 }]
+        });
+
+        Assert.Null(result);
+        Assert.NotNull(errorContent);
+        Assert.Contains("Source order is required", errorContent);
+        Assert.Equal(400, statusCode);
     }
 
     [Theory]
@@ -261,7 +284,7 @@ public class PurchaseOrderServiceClientTests
             });
         });
 
-        var result = await client.RegisterFileAsync(1001, new RegisterPurchaseOrderFileRequest
+        var (result, errorContent, statusCode) = await client.RegisterFileAsync(1001, new RegisterPurchaseOrderFileRequest
         {
             FileName = "supplier-quote.pdf",
             ObjectName = "purchase-orders/1001/supplier-quote.pdf",
@@ -284,8 +307,31 @@ public class PurchaseOrderServiceClientTests
         Assert.Equal(3, root.GetProperty("documentType").GetInt32());
         Assert.Equal("Supplier quote", root.GetProperty("description").GetString());
         Assert.NotNull(result);
+        Assert.Null(errorContent);
+        Assert.Equal(200, statusCode);
         Assert.Equal(9, result.Id);
         Assert.Equal("Reference", result.DocumentType);
+    }
+
+    [Fact]
+    public async Task RegisterFileAsync_WhenConflict_ReturnsErrorContent()
+    {
+        const string errorBody = """{"message":"Cannot attach files to cancelled purchase order."}""";
+        var client = MakeClient(HttpStatusCode.Conflict, errorBody);
+
+        var (result, errorContent, statusCode) = await client.RegisterFileAsync(1001, new RegisterPurchaseOrderFileRequest
+        {
+            FileName = "supplier-quote.pdf",
+            ObjectName = "purchase-orders/1001/supplier-quote.pdf",
+            FileSize = 2048,
+            ContentType = "application/pdf",
+            DocumentType = "Reference"
+        });
+
+        Assert.Null(result);
+        Assert.NotNull(errorContent);
+        Assert.Contains("cancelled purchase order", errorContent);
+        Assert.Equal(409, statusCode);
     }
 
     private static PurchaseOrderServiceClient MakeClient(Func<HttpRequestMessage, HttpContent> contentFactory)
@@ -309,6 +355,20 @@ public class PurchaseOrderServiceClientTests
             {
                 Content = await contentFactory(request)
             });
+
+        return new PurchaseOrderServiceClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("http://test")
+        });
+    }
+
+    private static PurchaseOrderServiceClient MakeClient(HttpStatusCode statusCode, string content)
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent(content)
+            }));
 
         return new PurchaseOrderServiceClient(new HttpClient(handler)
         {

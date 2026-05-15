@@ -50,8 +50,26 @@ public class SuppliersController(SupplierServiceClient client) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateSupplierRequest request, CancellationToken ct)
     {
-        var response = await client.CreateSupplierAsync(request, ct);
-        return response.IsSuccessStatusCode ? StatusCode(201) : StatusCode((int)response.StatusCode);
+        using var response = await client.CreateSupplierAsync(request, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return string.IsNullOrWhiteSpace(body)
+                ? StatusCode((int)response.StatusCode)
+                : StatusCode((int)response.StatusCode, body);
+        }
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return StatusCode((int)response.StatusCode);
+        }
+
+        return new ContentResult
+        {
+            StatusCode = (int)response.StatusCode,
+            Content = body,
+            ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/json"
+        };
     }
 
     /// <summary>

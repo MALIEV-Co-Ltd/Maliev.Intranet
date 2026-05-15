@@ -70,7 +70,7 @@ public class ProcurementControllerTests
                 1001,
                 It.Is<CancelPurchaseOrderRequest>(request => request.Reason == "Duplicate"),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .ReturnsAsync((true, null, 204));
 
         var controller = new ProcurementController(client.Object);
 

@@ -243,6 +243,10 @@ public sealed record CreateSupplierRequest
     [Required]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>The supplier tax identification number.</summary>
+    [Required]
+    public string TaxId { get; set; } = string.Empty;
+
     /// <summary>The primary contact email address for orders.</summary>
     [Required]
     public string Email { get; set; } = string.Empty;
@@ -253,10 +257,17 @@ public sealed record CreateSupplierRequest
     public string Country { get; set; } = string.Empty;
     /// <summary>The primary business address.</summary>
     public string? Address { get; set; }
+    /// <summary>The city where the supplier is located.</summary>
+    [Required]
+    public string City { get; set; } = string.Empty;
+    /// <summary>The postal code for the supplier address.</summary>
+    public string? PostalCode { get; set; }
     /// <summary>The name of the primary contact person.</summary>
     public string? ContactPerson { get; set; }
     /// <summary>The official website URL.</summary>
     public string? Website { get; set; }
+    /// <summary>The supplier capabilities or supported service categories.</summary>
+    public List<string> Capabilities { get; set; } = [];
 }
 
 /// <summary>

@@ -48,7 +48,23 @@ public class SupplierServiceClient(HttpClient httpClient)
     /// </summary>
     public async Task<HttpResponseMessage> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken ct = default)
     {
-        return await httpClient.PostAsJsonAsync("/supplier/v1/suppliers", request, ct);
+        var downstreamRequest = new DownstreamCreateSupplierRequest(
+            request.Name,
+            request.TaxId,
+            request.Address ?? string.Empty,
+            request.City,
+            request.Country,
+            request.PostalCode,
+            null,
+            request.Capabilities,
+            new DownstreamCreateContactRequest(
+                string.IsNullOrWhiteSpace(request.ContactPerson) ? request.Name : request.ContactPerson,
+                request.Email,
+                "Primary",
+                request.Phone ?? string.Empty,
+                true));
+
+        return await httpClient.PostAsJsonAsync("/supplier/v1/suppliers", downstreamRequest, ct);
     }
 
     /// <summary>
@@ -157,4 +173,22 @@ public class SupplierServiceClient(HttpClient httpClient)
         [property: JsonPropertyName("phoneNumber")] string? PhoneNumber);
 
     private sealed record PerformanceSummaryResponse(decimal? OverallRating);
+
+    private sealed record DownstreamCreateSupplierRequest(
+        [property: JsonPropertyName("companyName")] string CompanyName,
+        [property: JsonPropertyName("taxId")] string TaxId,
+        [property: JsonPropertyName("address")] string Address,
+        [property: JsonPropertyName("city")] string City,
+        [property: JsonPropertyName("country")] string Country,
+        [property: JsonPropertyName("postalCode")] string? PostalCode,
+        [property: JsonPropertyName("materialCategoryIds")] IEnumerable<Guid>? MaterialCategoryIds,
+        [property: JsonPropertyName("capabilities")] IEnumerable<string>? Capabilities,
+        [property: JsonPropertyName("primaryContact")] DownstreamCreateContactRequest? PrimaryContact);
+
+    private sealed record DownstreamCreateContactRequest(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("email")] string Email,
+        [property: JsonPropertyName("role")] string Role,
+        [property: JsonPropertyName("phone")] string Phone,
+        [property: JsonPropertyName("isPrimary")] bool IsPrimary);
 }
