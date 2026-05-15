@@ -1,0 +1,277 @@
+@page "/hr/leave"
+@using System.Net.Http.Json
+@using Maliev.Intranet.Shared.Dtos
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Leave Management | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Leave Management" Subtitle="Request time off, track leave balances, and approve assigned requests.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <StatBar Class="mb-4">
+            <StatTile Label="Available" Value="@TotalAvailable.ToString("N1")" />
+            <StatTile Label="Used" Value="@TotalUsed.ToString("N1")" />
+            <StatTile Label="Requests" Value="@_requests.Count.ToString("N0")" />
+            <StatTile Label="Approvals" Value="@_approvals.Count.ToString("N0")" />
+        </StatBar>
+
+        <div class="mlv-grid">
+            <div class="mlv-span-5">
+                <PanelCard Title="Request leave">
+                    <EditForm Model="@_request" OnValidSubmit="SubmitRequestAsync">
+                        <DataAnnotationsValidator />
+                        <FormGrid>
+                            <FormField Label="Leave type" Class="mlv-span-6">
+                                <select class="mlv-form-input" @bind="_request.LeaveType">
+                                    <option value="Annual">Annual</option>
+                                    <option value="Sick">Sick</option>
+                                    <option value="Personal">Personal</option>
+                                    <option value="Unpaid">Unpaid</option>
+                                </select>
+                            </FormField>
+                            <FormField Label="Half day" Class="mlv-span-6">
+                                <select class="mlv-form-input" @bind="_request.HalfDayPeriod">
+                                    <option value="">Full day</option>
+                                    <option value="Morning">Morning</option>
+                                    <option value="Afternoon">Afternoon</option>
+                                </select>
+                            </FormField>
+                            <FormField Label="Start date" Class="mlv-span-6">
+                                <InputDate class="mlv-form-input" @bind-Value="_request.StartDate" />
+                            </FormField>
+                            <FormField Label="End date" Class="mlv-span-6">
+                                <InputDate class="mlv-form-input" @bind-Value="_request.EndDate" />
+                            </FormField>
+                            <FormField Label="Reason" Class="mlv-span-12">
+                                <ImmediateInputTextArea class="mlv-form-textarea" @bind-Value="_request.Reason" />
+                                <ValidationMessage For="@(() => _request.Reason)" />
+                            </FormField>
+                        </FormGrid>
+                        <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                            <PrimaryButton Type="submit" Icon="@Icons.Material.Outlined.EventAvailable" Disabled="@_saving">Submit leave request</PrimaryButton>
+                        </div>
+                    </EditForm>
+                </PanelCard>
+            </div>
+
+            <div class="mlv-span-7">
+                <PanelCard Title="Balances">
+                    @if (_balances.Count == 0)
+                    {
+                        <div class="mlv-empty">No leave balances available.</div>
+                    }
+                    else
+                    {
+                        <table class="mlv-table">
+                            <thead><tr><th>Type</th><th>Entitled</th><th>Used</th><th>Available</th></tr></thead>
+                            <tbody>
+                                @foreach (var balance in _balances)
+                                {
+                                    <tr>
+                                        <td>@Display(balance.LeaveType)</td>
+                                        <td>@balance.Entitlement.ToString("N1")</td>
+                                        <td>@balance.Used.ToString("N1")</td>
+                                        <td>@balance.Available.ToString("N1")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </PanelCard>
+            </div>
+
+            <div class="mlv-span-7">
+                <PanelCard Title="My leave requests">
+                    @if (_requests.Count == 0)
+                    {
+                        <div class="mlv-empty">No leave requests yet.</div>
+                    }
+                    else
+                    {
+                        <table class="mlv-table">
+                            <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead>
+                            <tbody>
+                                @foreach (var request in _requests)
+                                {
+                                    <tr>
+                                        <td>@Display(request.LeaveType)</td>
+                                        <td>@FormatRange(request.StartDate, request.EndDate)</td>
+                                        <td>@request.Days.ToString("N1")</td>
+                                        <td><StatusBadge Status="@request.Status" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </PanelCard>
+            </div>
+
+            <div class="mlv-span-5">
+                <PanelCard Title="Pending approvals">
+                    @if (_approvals.Count == 0)
+                    {
+                        <div class="mlv-empty">No leave requests pending your approval.</div>
+                    }
+                    else
+                    {
+                        <div class="mlv-list">
+                            @foreach (var approval in _approvals)
+                            {
+                                <div class="mlv-list-row">
+                                    <div>
+                                        <div class="mlv-row-main">@Display(approval.LeaveType) leave</div>
+                                        <div class="mlv-row-sub">@FormatRange(approval.StartDate, approval.EndDate) - @Display(approval.Reason)</div>
+                                    </div>
+                                    <PrimaryButton Icon="@Icons.Material.Outlined.CheckCircle" Disabled="@_saving" OnClick="@((MouseEventArgs _) => ApproveAsync(approval.Id))">Approve request</PrimaryButton>
+                                </div>
+                            }
+                        </div>
+                    }
+                </PanelCard>
+            </div>
+        </div>
+    </PageBody>
+</div>
+
+@code {
+    private List<LeaveBalanceDto> _balances = [];
+    private List<LeaveRequestSummaryDto> _requests = [];
+    private List<LeaveRequestDetailDto> _approvals = [];
+    private SubmitLeaveRequestDto _request = CreateDefaultRequest();
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+
+    private decimal TotalAvailable => _balances.Sum(balance => balance.Available);
+    private decimal TotalUsed => _balances.Sum(balance => balance.Used);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var balancesTask = Http.GetFromJsonAsync<List<LeaveBalanceDto>>("api/v1/timeoff/balances");
+            var requestsTask = Http.GetFromJsonAsync<List<LeaveRequestSummaryDto>>("api/v1/timeoff/requests");
+            var approvalsTask = Http.GetFromJsonAsync<List<LeaveRequestDetailDto>>("api/v1/timeoff/approvals");
+            await Task.WhenAll(balancesTask!, requestsTask!, approvalsTask!);
+
+            _balances = balancesTask.Result ?? [];
+            _requests = requestsTask.Result ?? [];
+            _approvals = approvalsTask.Result ?? [];
+        }
+        catch (Exception ex)
+        {
+            _error = "Leave information could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SubmitRequestAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/v1/timeoff/requests", _request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = "Leave request could not be submitted.";
+                Snackbar.Add(_error, Severity.Warning);
+                return;
+            }
+
+            Snackbar.Add("Leave request submitted.", Severity.Success);
+            _request = CreateDefaultRequest();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = "Leave request could not be submitted.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ApproveAsync(Guid requestId)
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync(
+                $"api/v1/timeoff/requests/{requestId}/decision",
+                new ApproveRejectLeaveRequest
+                {
+                    Decision = "Approved",
+                    Comments = "Approved from Intranet leave management."
+                });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = "Leave request could not be approved.";
+                Snackbar.Add(_error, Severity.Warning);
+                return;
+            }
+
+            Snackbar.Add("Leave request approved.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = "Leave request could not be approved.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static SubmitLeaveRequestDto CreateDefaultRequest()
+    {
+        var start = DateTime.Today.AddDays(7);
+        return new SubmitLeaveRequestDto
+        {
+            LeaveType = "Annual",
+            StartDate = start,
+            EndDate = start,
+            Reason = "Planned leave"
+        };
+    }
+
+    private static string FormatRange(DateTime start, DateTime end) =>
+        start.Date == end.Date
+            ? start.ToString("dd MMM yyyy")
+            : $"{start:dd MMM yyyy} - {end:dd MMM yyyy}";
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+}

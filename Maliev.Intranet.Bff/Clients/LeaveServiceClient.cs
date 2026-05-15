@@ -1,5 +1,6 @@
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using System.Text.Json;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -21,7 +22,7 @@ public interface ILeaveServiceClient
     /// <summary>
     /// Submits a new leave request.
     /// </summary>
-    Task<LeaveRequestDetailDto?> SubmitRequestAsync(Guid employeeId, SubmitLeaveRequestDto request, CancellationToken ct = default);
+    Task<LeaveRequestDetailDto?> SubmitRequestAsync(Guid employeeId, SubmitLeaveRequestDto request, Guid? approverId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Gets pending approvals for a manager.
@@ -44,12 +45,18 @@ public interface ILeaveServiceClient
 /// </summary>
 public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
+
     /// <inheritdoc />
     public async Task<List<LeaveBalanceDto>> GetMyBalancesAsync(Guid employeeId, CancellationToken ct = default)
     {
         var response = await httpClient.GetAsync($"/leave/v1/LeaveBalances/{employeeId}", ct);
         if (!response.IsSuccessStatusCode) return [];
-        return await response.Content.ReadFromJsonAsync<List<LeaveBalanceDto>>(cancellationToken: ct) ?? [];
+        var json = await response.Content.ReadAsStringAsync(ct);
+        return ReadJsonArray(json).Select(MapBalance).ToList();
     }
 
     /// <inheritdoc />
@@ -60,30 +67,74 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
 
         var response = await httpClient.GetAsync(url, ct);
         if (!response.IsSuccessStatusCode) return [];
-        return await response.Content.ReadFromJsonAsync<List<LeaveRequestSummaryDto>>(cancellationToken: ct) ?? [];
+        var json = await response.Content.ReadAsStringAsync(ct);
+        return ReadJsonArray(json).Select(MapRequestSummary).ToList();
     }
 
     /// <inheritdoc />
-    public async Task<LeaveRequestDetailDto?> SubmitRequestAsync(Guid employeeId, SubmitLeaveRequestDto request, CancellationToken ct = default)
+    public async Task<LeaveRequestDetailDto?> SubmitRequestAsync(Guid employeeId, SubmitLeaveRequestDto request, Guid? approverId = null, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync($"/leave/v1/LeaveRequests/{employeeId}", request, ct);
-        if (response.IsSuccessStatusCode)
+        var payload = new
         {
-            return await response.Content.ReadFromJsonAsync<LeaveRequestDetailDto>(cancellationToken: ct);
+            leave_type = ParseLeaveType(request.LeaveType),
+            start_date = request.StartDate,
+            end_date = request.EndDate,
+            half_day_period = ParseHalfDayPeriod(request.HalfDayPeriod),
+            reason = request.Reason,
+            approver_id = approverId
+        };
+
+        var response = await httpClient.PostAsJsonAsync($"/leave/v1/LeaveRequests/{employeeId}", payload, JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
         }
-        return null;
+
+        var json = await response.Content.ReadAsStringAsync(ct);
+        using var document = JsonDocument.Parse(json);
+        var requestId = GetGuid(document.RootElement, "id", "Id");
+        if (requestId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return new LeaveRequestDetailDto
+        {
+            Id = requestId,
+            EmployeeId = employeeId,
+            LeaveType = NormalizeLeaveType(request.LeaveType),
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            Days = CalculateDays(request.StartDate, request.EndDate, request.HalfDayPeriod),
+            Reason = request.Reason,
+            Status = "Pending",
+            RequestedAt = DateTime.UtcNow
+        };
     }
 
     /// <inheritdoc />
     public async Task<List<LeaveRequestDetailDto>> GetPendingApprovalsAsync(Guid managerId, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<List<LeaveRequestDetailDto>>($"/leave/v1/LeaveRequests/pending/{managerId}", ct) ?? [];
+        using var response = await httpClient.GetAsync($"/leave/v1/LeaveRequests/pending/{managerId}", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        var json = await response.Content.ReadAsStringAsync(ct);
+        return ReadJsonArray(json).Select(MapRequestDetail).ToList();
     }
 
     /// <inheritdoc />
     public async Task<bool> ProcessDecisionAsync(Guid requestId, Guid approverId, ApproveRejectLeaveRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync($"/leave/v1/LeaveRequests/{requestId}/decision?approverId={approverId}", request, ct);
+        var payload = new
+        {
+            decision = ParseDecision(request.Decision),
+            comments = request.Comments
+        };
+
+        var response = await httpClient.PostAsJsonAsync($"/leave/v1/LeaveRequests/{requestId}/decision?approverId={approverId}", payload, JsonOptions, ct);
         return response.IsSuccessStatusCode;
     }
 
@@ -94,5 +145,216 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
         if (!httpResponse.IsSuccessStatusCode) return 0;
         var response = await httpResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
         return response.TryGetProperty("count", out var count) ? count.GetInt32() : 0;
+    }
+
+    private static IEnumerable<JsonElement> ReadJsonArray(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.ValueKind == JsonValueKind.Array
+            ? document.RootElement.EnumerateArray().Select(item => item.Clone()).ToList()
+            : [];
+    }
+
+    private static LeaveBalanceDto MapBalance(JsonElement element) => new()
+    {
+        LeaveType = FormatLeaveType(GetInt32(element, "leave_type", "leaveType", "LeaveType")),
+        Entitlement = GetDecimal(element, "entitled", "Entitled", "entitlement", "Entitlement"),
+        Used = GetDecimal(element, "used", "Used"),
+        Available = GetDecimal(element, "available", "Available")
+    };
+
+    private static LeaveRequestSummaryDto MapRequestSummary(JsonElement element) => new()
+    {
+        Id = GetGuid(element, "id", "Id"),
+        LeaveType = FormatLeaveType(GetInt32(element, "leave_type", "leaveType", "LeaveType")),
+        StartDate = GetDateTime(element, "start_date", "startDate", "StartDate"),
+        EndDate = GetDateTime(element, "end_date", "endDate", "EndDate"),
+        Days = GetDecimal(element, "total_days", "totalDays", "TotalDays", "days", "Days"),
+        Status = FormatLeaveStatus(GetStatusValue(element, "status", "Status"))
+    };
+
+    private static LeaveRequestDetailDto MapRequestDetail(JsonElement element) => new()
+    {
+        Id = GetGuid(element, "id", "Id"),
+        EmployeeId = GetGuid(element, "employee_id", "employeeId", "EmployeeId"),
+        LeaveType = FormatLeaveType(GetInt32(element, "leave_type", "leaveType", "LeaveType")),
+        StartDate = GetDateTime(element, "start_date", "startDate", "StartDate"),
+        EndDate = GetDateTime(element, "end_date", "endDate", "EndDate"),
+        Days = GetDecimal(element, "total_days", "totalDays", "TotalDays", "days", "Days"),
+        Reason = GetString(element, "reason", "Reason"),
+        Status = FormatLeaveStatus(GetStatusValue(element, "status", "Status")),
+        RequestedAt = GetDateTime(element, "created_at", "createdAt", "CreatedAt")
+    };
+
+    private static int ParseLeaveType(string? value) =>
+        NormalizeLeaveType(value).ToLowerInvariant() switch
+        {
+            "sick" => 2,
+            "personal" => 3,
+            "maternity" => 4,
+            "paternity" => 5,
+            "unpaid" => 6,
+            "bereavement" => 7,
+            "study" => 8,
+            _ => 1
+        };
+
+    private static string NormalizeLeaveType(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "Annual" : value.Trim();
+
+    private static int ParseHalfDayPeriod(string? value) =>
+        (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "morning" => 1,
+            "afternoon" => 2,
+            _ => 0
+        };
+
+    private static int ParseDecision(string? value) =>
+        (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "reject" or "rejected" => 3,
+            _ => 2
+        };
+
+    private static string FormatLeaveType(int value) => value switch
+    {
+        2 => "Sick",
+        3 => "Personal",
+        4 => "Maternity",
+        5 => "Paternity",
+        6 => "Unpaid",
+        7 => "Bereavement",
+        8 => "Study",
+        _ => "Annual"
+    };
+
+    private static string FormatLeaveStatus(int value) => value switch
+    {
+        2 => "Approved",
+        3 => "Rejected",
+        4 => "Cancelled",
+        5 => "PartiallyApproved",
+        _ => "Pending"
+    };
+
+    private static decimal CalculateDays(DateTime startDate, DateTime endDate, string? halfDayPeriod) =>
+        ParseHalfDayPeriod(halfDayPeriod) == 0
+            ? Math.Max(1, (decimal)(endDate.Date - startDate.Date).TotalDays + 1)
+            : 0.5m;
+
+    private static string GetString(JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String)
+            {
+                return value.GetString() ?? string.Empty;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static Guid GetGuid(JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (element.TryGetProperty(name, out var value) &&
+                value.ValueKind == JsonValueKind.String &&
+                Guid.TryParse(value.GetString(), out var guid))
+            {
+                return guid;
+            }
+        }
+
+        return Guid.Empty;
+    }
+
+    private static int GetInt32(JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!element.TryGetProperty(name, out var value))
+            {
+                continue;
+            }
+
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number))
+            {
+                return number;
+            }
+
+            if (value.ValueKind == JsonValueKind.String)
+            {
+                var text = value.GetString();
+                if (int.TryParse(text, out number))
+                {
+                    return number;
+                }
+
+                return ParseLeaveType(text);
+            }
+        }
+
+        return 0;
+    }
+
+    private static int GetStatusValue(JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!element.TryGetProperty(name, out var value))
+            {
+                continue;
+            }
+
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number))
+            {
+                return number;
+            }
+
+            if (value.ValueKind == JsonValueKind.String)
+            {
+                return (value.GetString() ?? string.Empty).Trim().ToLowerInvariant() switch
+                {
+                    "approved" => 2,
+                    "rejected" => 3,
+                    "cancelled" => 4,
+                    "partiallyapproved" or "partially approved" => 5,
+                    _ => 1
+                };
+            }
+        }
+
+        return 0;
+    }
+
+    private static decimal GetDecimal(JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (element.TryGetProperty(name, out var value) && value.TryGetDecimal(out var number))
+            {
+                return number;
+            }
+        }
+
+        return 0;
+    }
+
+    private static DateTime GetDateTime(JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (element.TryGetProperty(name, out var value) &&
+                value.ValueKind == JsonValueKind.String &&
+                DateTimeOffset.TryParse(value.GetString(), out var dateTime))
+            {
+                return dateTime.DateTime;
+            }
+        }
+
+        return DateTime.MinValue;
     }
 }

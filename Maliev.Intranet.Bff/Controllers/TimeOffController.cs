@@ -17,13 +17,14 @@ namespace Maliev.Intranet.Bff.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient employeeServiceClient) : ControllerBase
 {
-    private async Task<Guid> GetEmployeeIdAsync(CancellationToken ct)
+    private async Task<EmployeeDetailDto?> GetEmployeeProfileAsync(CancellationToken ct)
     {
         // Try to get explicit employee_id claim first (if enriched)
         var employeeIdClaim = User.FindFirst("employee_id")?.Value;
         if (Guid.TryParse(employeeIdClaim, out var employeeId))
         {
-            return employeeId;
+            return await employeeServiceClient.GetEmployeeByIdAsync(employeeId, ct)
+                ?? new EmployeeDetailDto { Id = employeeId };
         }
 
         // Fallback: look up by Principal ID (sub)
@@ -33,11 +34,17 @@ public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient
             var employee = await employeeServiceClient.GetByPrincipalIdAsync(principalId, ct);
             if (employee != null)
             {
-                return employee.Id;
+                return await employeeServiceClient.GetEmployeeByIdAsync(employee.Id, ct) ?? employee;
             }
         }
 
-        return Guid.Empty;
+        return null;
+    }
+
+    private async Task<Guid> GetEmployeeIdAsync(CancellationToken ct)
+    {
+        var employee = await GetEmployeeProfileAsync(ct);
+        return employee?.Id ?? Guid.Empty;
     }
 
     /// <summary>
@@ -75,10 +82,45 @@ public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient
     [HttpPost("requests")]
     public async Task<ActionResult<LeaveRequestDetailDto>> SubmitRequest([FromBody] SubmitLeaveRequestDto request, CancellationToken ct)
     {
+        var employee = await GetEmployeeProfileAsync(ct);
+        if (employee is null || employee.Id == Guid.Empty) return Unauthorized();
+
+        var approverId = Guid.TryParse(employee.ManagerId, out var managerId) && managerId != employee.Id
+            ? managerId
+            : (Guid?)null;
+
+        var result = await client.SubmitRequestAsync(employee.Id, request, approverId, ct);
+        return result != null ? Ok(result) : BadRequest();
+    }
+
+    /// <summary>
+    /// Gets pending leave approvals assigned to the current user.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Leave.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("approvals")]
+    public async Task<ActionResult<List<LeaveRequestDetailDto>>> GetApprovals(CancellationToken ct)
+    {
         var employeeId = await GetEmployeeIdAsync(ct);
         if (employeeId == Guid.Empty) return Unauthorized();
 
-        var result = await client.SubmitRequestAsync(employeeId, request, ct);
-        return result != null ? Ok(result) : BadRequest();
+        var result = await client.GetPendingApprovalsAsync(employeeId, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Approves or rejects a pending leave request assigned to the current user.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Leave.Approve, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("requests/{requestId:guid}/decision")]
+    public async Task<IActionResult> ProcessDecision(
+        Guid requestId,
+        [FromBody] ApproveRejectLeaveRequest request,
+        CancellationToken ct)
+    {
+        var employeeId = await GetEmployeeIdAsync(ct);
+        if (employeeId == Guid.Empty) return Unauthorized();
+
+        var success = await client.ProcessDecisionAsync(requestId, employeeId, request, ct);
+        return success ? Ok() : BadRequest();
     }
 }

@@ -287,6 +287,8 @@ public static class MalievPermissions
         public const string Read = "leave.balances.read";
         /// <summary>Permission to submit new leave requests.</summary>
         public const string Write = "leave.requests.create";
+        /// <summary>Permission to approve or reject leave requests assigned to the employee.</summary>
+        public const string Approve = "leave.requests.approve";
     }
 
     /// <summary>
