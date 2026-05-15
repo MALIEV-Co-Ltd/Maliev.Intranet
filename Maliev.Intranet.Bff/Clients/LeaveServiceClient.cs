@@ -41,6 +41,65 @@ public interface ILeaveServiceClient
 }
 
 /// <summary>
+/// Represents a failed LeaveService request with the downstream response preserved.
+/// </summary>
+public sealed class LeaveServiceRequestException : Exception
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LeaveServiceRequestException"/> class.
+    /// </summary>
+    public LeaveServiceRequestException(System.Net.HttpStatusCode statusCode, string responseBody)
+        : base($"LeaveService request failed with HTTP {(int)statusCode}: {responseBody}")
+    {
+        StatusCode = statusCode;
+        ResponseBody = responseBody;
+    }
+
+    /// <summary>
+    /// Gets the downstream HTTP status code.
+    /// </summary>
+    public System.Net.HttpStatusCode StatusCode { get; }
+
+    /// <summary>
+    /// Gets the downstream response body.
+    /// </summary>
+    public string ResponseBody { get; }
+
+    /// <summary>
+    /// Gets the most useful user-facing message from the downstream response.
+    /// </summary>
+    public string ClientMessage
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(ResponseBody))
+            {
+                return "Leave service rejected the request.";
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(ResponseBody);
+                foreach (var propertyName in new[] { "message", "detail", "title" })
+                {
+                    if (document.RootElement.TryGetProperty(propertyName, out var property) &&
+                        property.ValueKind == JsonValueKind.String)
+                    {
+                        return property.GetString() ?? ResponseBody;
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                return ResponseBody;
+            }
+
+            return ResponseBody;
+        }
+    }
+}
+
+/// <summary>
 /// Default implementation of the leave service client.
 /// </summary>
 public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
@@ -77,8 +136,8 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
         var payload = new
         {
             leave_type = ParseLeaveType(request.LeaveType),
-            start_date = request.StartDate,
-            end_date = request.EndDate,
+            start_date = ToUtcDate(request.StartDate),
+            end_date = ToUtcDate(request.EndDate),
             half_day_period = ParseHalfDayPeriod(request.HalfDayPeriod),
             reason = request.Reason,
             approver_id = approverId
@@ -87,7 +146,8 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
         var response = await httpClient.PostAsJsonAsync($"/leave/v1/LeaveRequests/{employeeId}", payload, JsonOptions, ct);
         if (!response.IsSuccessStatusCode)
         {
-            return null;
+            var error = await response.Content.ReadAsStringAsync(ct);
+            throw new LeaveServiceRequestException(response.StatusCode, error);
         }
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -242,6 +302,9 @@ public class LeaveServiceClient(HttpClient httpClient) : ILeaveServiceClient
         ParseHalfDayPeriod(halfDayPeriod) == 0
             ? Math.Max(1, (decimal)(endDate.Date - startDate.Date).TotalDays + 1)
             : 0.5m;
+
+    private static DateTimeOffset ToUtcDate(DateTime value) =>
+        new(DateTime.SpecifyKind(value.Date, DateTimeKind.Utc));
 
     private static string GetString(JsonElement element, params string[] names)
     {

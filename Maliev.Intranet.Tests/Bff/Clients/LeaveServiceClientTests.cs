@@ -77,5 +77,31 @@ public class LeaveServiceClientTests
         Assert.Equal(1, payload.GetProperty("leave_type").GetInt32());
         Assert.Equal(0, payload.GetProperty("half_day_period").GetInt32());
         Assert.Equal(approverId, payload.GetProperty("approver_id").GetGuid());
+        Assert.Equal("2026-06-01T00:00:00+00:00", payload.GetProperty("start_date").GetString());
+        Assert.Equal("2026-06-02T00:00:00+00:00", payload.GetProperty("end_date").GetString());
+    }
+
+    [Fact]
+    public async Task SubmitRequestAsync_WhenDownstreamRejects_PreservesErrorMessage()
+    {
+        var employeeId = Guid.NewGuid();
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = JsonContent.Create(new { message = "Insufficient balance for this leave request." })
+            }));
+        var client = new LeaveServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://leave") });
+
+        var exception = await Assert.ThrowsAsync<LeaveServiceRequestException>(() =>
+            client.SubmitRequestAsync(employeeId, new SubmitLeaveRequestDto
+            {
+                LeaveType = "Annual",
+                StartDate = new DateTime(2026, 6, 1),
+                EndDate = new DateTime(2026, 6, 2),
+                Reason = "Family appointment"
+            }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, exception.StatusCode);
+        Assert.Equal("Insufficient balance for this leave request.", exception.ClientMessage);
     }
 }

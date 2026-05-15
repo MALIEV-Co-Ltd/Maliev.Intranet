@@ -89,8 +89,25 @@ public class TimeOffController(ILeaveServiceClient client, EmployeeServiceClient
             ? managerId
             : (Guid?)null;
 
-        var result = await client.SubmitRequestAsync(employee.Id, request, approverId, ct);
-        return result != null ? Ok(result) : BadRequest();
+        try
+        {
+            var result = await client.SubmitRequestAsync(employee.Id, request, approverId, ct);
+            return result != null
+                ? Ok(result)
+                : BadRequest(new ApiErrorResponse
+                {
+                    Code = "leave.submit_failed",
+                    Message = "Leave service rejected the request."
+                });
+        }
+        catch (LeaveServiceRequestException ex)
+        {
+            return StatusCode((int)ex.StatusCode, new ApiErrorResponse
+            {
+                Code = "leave.submit_failed",
+                Message = ex.ClientMessage
+            });
+        }
     }
 
     /// <summary>
