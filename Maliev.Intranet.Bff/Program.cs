@@ -442,7 +442,7 @@ try
     {
         var config = sp.GetRequiredService<IConfiguration>();
         var explicitUrl = config["Services:CountryService:BaseUrl"];
-        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://CountryService");
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "https+http://CountryService");
         client.Timeout = TimeSpan.FromSeconds(90);
     })
     .AddServiceDiscovery()
@@ -454,7 +454,7 @@ try
     {
         var config = sp.GetRequiredService<IConfiguration>();
         var explicitUrl = config["Services:CustomerService:BaseUrl"];
-        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://CustomerService");
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "https+http://CustomerService");
         client.Timeout = TimeSpan.FromSeconds(90);
     })
     .AddServiceDiscovery()
@@ -474,7 +474,7 @@ try
     {
         var config = sp.GetRequiredService<IConfiguration>();
         var explicitUrl = config["Services:UploadService:BaseUrl"];
-        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://UploadService");
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "https+http://UploadService");
         client.Timeout = TimeSpan.FromSeconds(120);
     })
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { MaxConnectionsPerServer = 20 })
@@ -492,7 +492,7 @@ try
     {
         var config = sp.GetRequiredService<IConfiguration>();
         var explicitUrl = config["Services:CountryService:BaseUrl"];
-        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "http://CountryService");
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl) ? explicitUrl : "https+http://CountryService");
         client.Timeout = TimeSpan.FromSeconds(30);
     })
     .AddServiceDiscovery()

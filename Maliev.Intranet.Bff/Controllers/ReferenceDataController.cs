@@ -17,6 +17,7 @@ public class ReferenceDataController : ControllerBase
 {
     private readonly IReferenceDataService _referenceDataService;
     private readonly CurrencyServiceClient _currencyClient;
+    private readonly IWebHostEnvironment _environment;
     private readonly ILogger<ReferenceDataController> _logger;
 
     /// <summary>
@@ -24,14 +25,17 @@ public class ReferenceDataController : ControllerBase
     /// </summary>
     /// <param name="referenceDataService">Reference data service.</param>
     /// <param name="currencyClient">Currency service client.</param>
+    /// <param name="environment">The current hosting environment.</param>
     /// <param name="logger">Logger instance.</param>
     public ReferenceDataController(
         IReferenceDataService referenceDataService,
         CurrencyServiceClient currencyClient,
+        IWebHostEnvironment environment,
         ILogger<ReferenceDataController> logger)
     {
         _referenceDataService = referenceDataService;
         _currencyClient = currencyClient;
+        _environment = environment;
         _logger = logger;
     }
 
@@ -52,7 +56,10 @@ public class ReferenceDataController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching countries");
-            return StatusCode(500, "An error occurred while fetching countries");
+            return Problem(
+                title: "Country reference data unavailable",
+                detail: _environment.IsProduction() ? null : ex.Message,
+                statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 

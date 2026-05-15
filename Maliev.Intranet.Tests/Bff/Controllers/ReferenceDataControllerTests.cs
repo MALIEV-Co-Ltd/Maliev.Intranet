@@ -4,6 +4,7 @@ using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -23,7 +24,9 @@ public class ReferenceDataControllerTests
         _loggerMock = new Mock<ILogger<ReferenceDataController>>();
         var httpClient = new HttpClient(new MockHttpMessageHandler()) { BaseAddress = new Uri("http://test") };
         var currencyClient = new CurrencyServiceClient(httpClient);
-        _controller = new ReferenceDataController(_serviceMock.Object, currencyClient, _loggerMock.Object);
+        var environmentMock = new Mock<IWebHostEnvironment>();
+        environmentMock.SetupGet(environment => environment.EnvironmentName).Returns("Testing");
+        _controller = new ReferenceDataController(_serviceMock.Object, currencyClient, environmentMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -49,6 +52,9 @@ public class ReferenceDataControllerTests
 
         var statusResult = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(500, statusResult.StatusCode);
+        var problemDetails = Assert.IsType<ProblemDetails>(statusResult.Value);
+        Assert.Equal("Country reference data unavailable", problemDetails.Title);
+        Assert.Equal("Test error", problemDetails.Detail);
     }
 
     [Theory]

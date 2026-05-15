@@ -47,12 +47,23 @@ public class ReferenceDataService : IReferenceDataService
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Failed to fetch countries from Country Service. Status: {StatusCode}", response.StatusCode);
-                return new List<CountryDto>();
+                var error = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError(
+                    "Failed to fetch countries from Country Service. Status: {StatusCode}. Body: {Body}",
+                    response.StatusCode,
+                    error);
+                throw new HttpRequestException(
+                    $"Country Service returned {(int)response.StatusCode} {response.ReasonPhrase}: {error}",
+                    null,
+                    response.StatusCode);
             }
 
             var countryResponse = await response.Content.ReadFromJsonAsync<CountryPaginatedResponse<CountryDto>>(cancellationToken);
             var countries = countryResponse?.Data.ToList() ?? [];
+            if (countries.Count == 0)
+            {
+                throw new InvalidOperationException("Country Service returned no countries. Address workflows require seeded country reference data.");
+            }
 
             _logger.LogInformation("Fetched {Count} countries from Country Service", countries.Count);
 
@@ -61,7 +72,7 @@ public class ReferenceDataService : IReferenceDataService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading countries from Country Service");
-            return new List<CountryDto>();
+            throw;
         }
     }
 

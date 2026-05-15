@@ -41,10 +41,9 @@ public class ReferenceDataServiceTests
     public async Task GetCountriesAsync_ShouldReturnCountries_WhenSuccessful()
     {
         var countryId = Guid.NewGuid();
-        var countries = new List<CountryDto> { new() { Id = countryId, Name = "Thailand" } };
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = JsonContent.Create(new { data = countries })
+            Content = JsonContent.Create(new { data = new[] { new { id = countryId, iso2 = "TH", name = "Thailand" } } })
         };
 
         _httpMessageHandlerMock.Protected()
@@ -58,20 +57,47 @@ public class ReferenceDataServiceTests
 
         Assert.Single(result);
         Assert.Equal(countryId, result[0].Id);
+        Assert.Equal("TH", result[0].Code);
+        Assert.Equal("Thailand", result[0].Name);
     }
 
     [Fact]
-    public async Task GetCountriesAsync_ShouldReturnEmpty_WhenError()
+    public async Task GetCountriesAsync_WhenCountryServiceFails_Throws()
     {
         _httpMessageHandlerMock.Protected()
             .Setup<Task<HttpResponseMessage>>(
                 "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                ReasonPhrase = "Internal Server Error",
+                Content = new StringContent("seed failure")
+            });
 
-        var result = await _service.GetCountriesAsync();
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetCountriesAsync());
 
-        Assert.Empty(result);
+        Assert.Equal(HttpStatusCode.InternalServerError, exception.StatusCode);
+        Assert.Contains("seed failure", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetCountriesAsync_WhenCountryServiceReturnsNoCountries_Throws()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new { data = Array.Empty<object>() })
+        };
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(response);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => _service.GetCountriesAsync());
+
+        Assert.Contains("returned no countries", exception.Message);
     }
 }
