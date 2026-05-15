@@ -74,7 +74,7 @@ public class ProcurementController(IPurchaseOrderServiceClient client, UploadSer
         var (result, errorContent, statusCode) = await client.CreatePurchaseOrderAsync(request, ct);
         if (result is not null)
         {
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            return CreatedAtAction(nameof(GetById), new { version = "1.0", id = result.Id }, result);
         }
 
         var message = string.IsNullOrWhiteSpace(errorContent)

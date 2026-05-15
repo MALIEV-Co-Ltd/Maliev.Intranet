@@ -63,6 +63,31 @@ public class ProcurementControllerTests
     }
 
     [Fact]
+    public async Task Create_IncludesApiVersionInCreatedAtRouteValues()
+    {
+        var client = new Mock<IPurchaseOrderServiceClient>();
+        client.Setup(c => c.CreatePurchaseOrderAsync(
+                It.IsAny<CreatePurchaseOrderRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((new PurchaseOrderDto { Id = 1002, PoNumber = "PO-1002" }, null, 201));
+
+        var controller = new ProcurementController(client.Object);
+
+        var result = await controller.Create(new CreatePurchaseOrderRequest
+        {
+            SupplierServiceId = Guid.NewGuid(),
+            SourceOrderId = "ORD-1002",
+            CurrencyCode = "THB",
+            Items = [new PurchaseOrderLineItemDto { SourceOrderItemId = "primary", Quantity = 1 }]
+        }, CancellationToken.None);
+
+        var created = Assert.IsType<CreatedAtActionResult>(result.Result);
+        Assert.Equal(nameof(ProcurementController.GetById), created.ActionName);
+        Assert.Equal("1.0", created.RouteValues!["version"]);
+        Assert.Equal(1002, created.RouteValues["id"]);
+    }
+
+    [Fact]
     public async Task Cancel_ForwardsReasonToPurchaseOrderService()
     {
         var client = new Mock<IPurchaseOrderServiceClient>();
