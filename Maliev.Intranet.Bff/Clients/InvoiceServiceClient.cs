@@ -110,7 +110,10 @@ public class InvoiceServiceClient(HttpClient httpClient)
     /// </summary>
     public async Task<bool> FinalizeInvoiceAsync(Guid id, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsync($"/invoice/v1/invoices/{id}/finalize", null, ct);
+        var response = await httpClient.PostAsJsonAsync($"/invoice/v1/invoices/{id}/finalize", new
+        {
+            finalizedBy = "Maliev.Intranet"
+        }, ct);
         return response.IsSuccessStatusCode;
     }
 

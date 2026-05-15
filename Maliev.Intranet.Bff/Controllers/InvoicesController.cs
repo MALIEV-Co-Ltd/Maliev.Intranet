@@ -59,7 +59,7 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
     public async Task<ActionResult<InvoiceSummaryDto>> Create([FromBody] CreateInvoiceRequest request, CancellationToken ct)
     {
         var result = await client.CreateInvoiceAsync(request, ct);
-        return result != null ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result) : BadRequest();
+        return result != null ? CreatedAtAction(nameof(GetById), new { version = "1.0", id = result.Id }, result) : BadRequest();
     }
 
     /// <summary>

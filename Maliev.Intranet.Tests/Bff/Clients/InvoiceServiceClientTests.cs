@@ -184,6 +184,33 @@ public sealed class InvoiceServiceClientTests
         Assert.Equal(7m, line.TaxRate);
     }
 
+    [Fact]
+    public async Task FinalizeInvoiceAsync_PostsRequiredFinalizedByPayload()
+    {
+        var invoiceId = Guid.Parse("8a071819-a277-4c7d-914d-45a0ac2602f2");
+        JsonDocument? capturedPayload = null;
+        var client = MakeClient(async (request, ct) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal($"/invoice/v1/invoices/{invoiceId}/finalize", request.RequestUri!.PathAndQuery);
+            var payload = await request.Content!.ReadAsStringAsync(ct);
+            capturedPayload = JsonDocument.Parse(payload);
+
+            return JsonContent.Create(new
+            {
+                id = invoiceId,
+                invoiceNumber = "INV-2026-0004",
+                status = "Finalized"
+            });
+        });
+
+        var result = await client.FinalizeInvoiceAsync(invoiceId);
+
+        Assert.True(result);
+        Assert.NotNull(capturedPayload);
+        Assert.Equal("Maliev.Intranet", capturedPayload.RootElement.GetProperty("finalizedBy").GetString());
+    }
+
     private static InvoiceServiceClient MakeClient(Func<HttpRequestMessage, HttpContent> contentFactory)
     {
         var handler = new MockHttpMessageHandler((request, _) =>
