@@ -118,7 +118,7 @@
         {
             var suppliersTask = Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>("api/v1/suppliers?page=1&pageSize=100");
             var ordersTask = Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/v1/orders?page=1&pageSize=100");
-            var currenciesTask = Http.GetFromJsonAsync<List<CurrencyDto>>("api/v1/reference-data/currencies");
+            var currenciesTask = Http.GetFromJsonAsync<List<CurrencyDto>>("api/v1/referenceData/currencies");
 
             await Task.WhenAll(suppliersTask!, ordersTask!, currenciesTask!);
 
