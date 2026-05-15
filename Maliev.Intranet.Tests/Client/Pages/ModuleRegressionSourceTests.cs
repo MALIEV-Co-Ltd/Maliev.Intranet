@@ -286,6 +286,7 @@ public class ModuleRegressionSourceTests
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "SystemHealth.razor.css");
         var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "SystemHealthController.cs");
         var probeService = ReadRepoFile("Maliev.Intranet.Bff", "Services", "SystemHealthProbeService.cs");
+        var bffProgram = ReadRepoFile("Maliev.Intranet.Bff", "Program.cs");
 
         Assert.Contains("@page \"/admin/system-health\"", page, StringComparison.Ordinal);
         Assert.Contains("DomainGroup", page, StringComparison.Ordinal);
@@ -330,6 +331,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("TimeSpan.FromSeconds(5)", probeService, StringComparison.Ordinal);
         Assert.Contains("TimeSpan.FromSeconds(10)", probeService, StringComparison.Ordinal);
         Assert.Contains("Task.WhenAny", probeService, StringComparison.Ordinal);
+        Assert.Contains("\"ServiceHealthCheck\"", bffProgram, StringComparison.Ordinal);
+        Assert.Contains("\"ServiceHealthCheck-standard\"", bffProgram, StringComparison.Ordinal);
+        Assert.Contains("CircuitBreaker.MinimumThroughput = int.MaxValue", bffProgram, StringComparison.Ordinal);
         Assert.DoesNotContain("aspire-liveness", probeService, StringComparison.Ordinal);
     }
 

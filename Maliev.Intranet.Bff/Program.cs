@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http.Resilience;
 using MudBlazor.Services;
 using StackExchange.Redis;
 using System.Security.Cryptography.X509Certificates;
@@ -510,6 +511,13 @@ try
         client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
     })
     .AddServiceDiscovery();
+    builder.Services.Configure<HttpStandardResilienceOptions>("ServiceHealthCheck-standard", options =>
+    {
+        // Health probes already apply short per-probe timeouts and explicit retries.
+        // A shared circuit breaker makes the dashboard report stale "circuit open" failures
+        // instead of checking whether a dependency has recovered.
+        options.CircuitBreaker.MinimumThroughput = int.MaxValue;
+    });
 
     builder.Services.AddHttpClient("BffInternal")
     .AddHttpMessageHandler<Maliev.Intranet.Bff.Handlers.CookieForwardingHandler>()
