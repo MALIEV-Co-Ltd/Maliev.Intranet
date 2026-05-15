@@ -375,6 +375,56 @@ public class CustomerServiceClientTests
     }
 
     [Fact]
+    public async Task CreateAddressesAsync_WhenDownstreamAddressCreateFails_ThrowsUpstreamError()
+    {
+        var customerId = Guid.NewGuid();
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m =>
+                    m.Method == HttpMethod.Get &&
+                    m.RequestUri!.PathAndQuery.Contains($"/addresses?ownerType=Customer&ownerId={customerId}")),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new List<AddressResponse>())
+            });
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m =>
+                    m.Method == HttpMethod.Post &&
+                    m.RequestUri!.PathAndQuery.Contains("/addresses")),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = JsonContent.Create(new ApiErrorResponse
+                {
+                    Message = "Country ID is not valid"
+                })
+            });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _client.CreateAddressesAsync(customerId,
+        [
+            new CreateAddressRequest
+            {
+                Type = "Billing",
+                IsDefault = true,
+                AddressLine1 = "36/1 Moo 3",
+                City = "Pak Kret",
+                StateProvince = "Nonthaburi",
+                PostalCode = "11120",
+                CountryId = Guid.NewGuid()
+            }
+        ]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, exception.StatusCode);
+        Assert.Contains("Country ID is not valid", exception.Message);
+    }
+
+    [Fact]
     public async Task GetCustomerByIdAsync_ShouldAggregateData()
     {
         var customerId = Guid.NewGuid();

@@ -134,7 +134,13 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             {
                 var result = await response.Content.ReadFromJsonAsync<AddressResponse>(ct);
                 if (result != null) results.Add(result);
+                continue;
             }
+
+            throw await CreateUpstreamExceptionAsync(
+                response,
+                $"{address.Type} address could not be created.",
+                ct);
         }
         return results;
     }
