@@ -11,6 +11,7 @@ obj/
 *.swp
 *.swo
 *.user
+*.lscache
 *.csproj.user
 *.rsuser
 *.DotSettings.user

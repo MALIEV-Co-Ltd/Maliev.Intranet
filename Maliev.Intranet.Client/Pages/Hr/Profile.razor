@@ -20,17 +20,17 @@
             <div class="mlv-error">@_error</div>
         }
 
-        @if (_profile is null && !_loading)
+        @if (!HasProfile && !_loading)
         {
             <div class="mlv-empty">Your employee profile could not be found.</div>
         }
-        else if (_profile is not null)
+        else if (HasProfile)
         {
             <StatBar Class="mb-4">
                 <StatTile Label="Status" Value="@DisplayStatus" />
-                <StatTile Label="Department" Value="@Display(_profile.Department)" />
+                <StatTile Label="Department" Value="@DisplayDepartment" />
                 <StatTile Label="Job Title" Value="@DisplayJobTitle" />
-                <StatTile Label="Manager" Value="@Display(_profile.ManagerName)" />
+                <StatTile Label="Manager" Value="@DisplayManager" />
             </StatBar>
 
             <div class="mlv-grid">
@@ -74,12 +74,12 @@
 
                         <table class="mlv-table profile-table">
                             <tbody>
-                                <tr><th>Name</th><td>@_profile.Name</td></tr>
+                                <tr><th>Name</th><td>@DisplayName</td></tr>
                                 <tr><th>Preferred name</th><td>@Display(_selfProfile?.PreferredName)</td></tr>
                                 <tr><th>Email</th><td>@DisplayEmail</td></tr>
                                 <tr><th>Personal email</th><td>@Display(_selfProfile?.PersonalEmail)</td></tr>
-                                <tr><th>Phone</th><td>@Display(_selfProfile?.MobilePhone ?? _profile.Phone)</td></tr>
-                                <tr><th>Location</th><td>@Display(_profile.WorkLocation)</td></tr>
+                                <tr><th>Phone</th><td>@DisplayPhone</td></tr>
+                                <tr><th>Location</th><td>@DisplayWorkLocation</td></tr>
                                 <tr><th>Employee type</th><td>@DisplayEmployeeType</td></tr>
                                 <tr><th>Hire date</th><td>@DisplayHireDate</td></tr>
                             </tbody>
@@ -110,14 +110,14 @@
                     <PanelCard Title="Teams and documents">
                         <div class="mlv-grid">
                             <div class="mlv-span-6">
-                                @if (_profile.Teams.Count == 0)
+                                @if (ProfileTeams.Count == 0)
                                 {
                                     <div class="mlv-empty">No team assignments.</div>
                                 }
                                 else
                                 {
                                     <div class="mlv-list">
-                                        @foreach (var team in _profile.Teams)
+                                        @foreach (var team in ProfileTeams)
                                         {
                                             <div class="mlv-list-row">
                                                 <div>
@@ -134,14 +134,14 @@
                                 }
                             </div>
                             <div class="mlv-span-6">
-                                @if (_profile.Documents.Count == 0)
+                                @if (ProfileDocuments.Count == 0)
                                 {
                                     <div class="mlv-empty">No employee documents.</div>
                                 }
                                 else
                                 {
                                     <div class="mlv-list">
-                                        @foreach (var doc in _profile.Documents)
+                                        @foreach (var doc in ProfileDocuments)
                                         {
                                             <div class="mlv-list-row">
                                                 <div>
@@ -174,8 +174,17 @@
     private bool _saving;
     private string? _error;
 
+    private bool HasProfile => _profile is not null || _selfProfile is not null;
+    private IReadOnlyList<EmployeeTeamDto> ProfileTeams => _profile?.Teams ?? [];
+    private IReadOnlyList<EmployeeDocumentDto> ProfileDocuments => _profile?.Documents ?? [];
+    private string SelfProfileName => FirstNonBlank(_selfProfile?.FullName, $"{_selfProfile?.FirstName} {_selfProfile?.LastName}".Trim());
+    private string DisplayName => Display(FirstNonBlank(_profile?.Name, SelfProfileName));
     private string DisplayEmail => Display(FirstNonBlank(_profile?.Email, _selfProfile?.WorkEmail));
+    private string DisplayDepartment => Display(FirstNonBlank(_profile?.Department, _selfProfile?.DepartmentName));
     private string DisplayJobTitle => Display(FirstNonBlank(_profile?.Title, _selfProfile?.JobTitle));
+    private string DisplayManager => Display(FirstNonBlank(_profile?.ManagerName, _selfProfile?.ManagerName));
+    private string DisplayPhone => Display(FirstNonBlank(_selfProfile?.MobilePhone, _profile?.Phone));
+    private string DisplayWorkLocation => Display(FirstNonBlank(_profile?.WorkLocation, _selfProfile?.WorkLocation));
     private string DisplayStatus => Display(FirstNonBlank(_profile?.Status, _selfProfile?.EmploymentStatus, "Active"));
     private string DisplayEmployeeType => FormatEmployeeType(FirstNonBlank(_profile?.EmployeeType, _selfProfile?.EmploymentType, "FullTime"));
     private string DisplayHireDate => (_profile?.HireDate ?? _selfProfile?.StartDate ?? _selfProfile?.CreatedAt)?.ToString("dd MMM yyyy") ?? "-";
@@ -190,14 +199,20 @@
         _error = null;
         try
         {
-            var profileTask = Http.GetFromJsonAsync<EmployeeDetailDto>("api/v1/employees/me");
-            var selfProfileTask = Http.GetFromJsonAsync<EmployeeSelfProfileDto>("api/v1/employees/me/profile");
-            var preferencesTask = Http.GetFromJsonAsync<UserPreferenceDto>("api/v1/preferences/intranet-profile");
+            var profileTask = GetOptionalJsonAsync<EmployeeDetailDto>("api/v1/employees/me");
+            var selfProfileTask = GetOptionalJsonAsync<EmployeeSelfProfileDto>("api/v1/employees/me/profile");
+            var preferencesTask = GetOptionalJsonAsync<UserPreferenceDto>("api/v1/preferences/intranet-profile");
             await Task.WhenAll(profileTask, selfProfileTask, preferencesTask);
             _profile = await profileTask;
             _selfProfile = await selfProfileTask;
             _preferences = await preferencesTask;
             ResetEditModel();
+
+            if (!HasProfile)
+            {
+                _error = "Profile data could not be loaded.";
+                Snackbar.Add(_error, Severity.Warning);
+            }
         }
         catch (Exception ex)
         {
@@ -208,6 +223,25 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task<T?> GetOptionalJsonAsync<T>(string url)
+    {
+        try
+        {
+            using var response = await Http.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                return default;
+            }
+
+            return await response.Content.ReadFromJsonAsync<T>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            return default;
         }
     }
 
