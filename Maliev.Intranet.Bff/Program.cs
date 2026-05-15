@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Hosting;
 using MudBlazor.Services;
 using StackExchange.Redis;
@@ -27,6 +28,7 @@ try
     Program.Log.StartingHost(bootstrapLogger, "Intranet BFF");
 
     var builder = WebApplication.CreateBuilder(args);
+    builder.WebHost.UseStaticWebAssets();
 
     // Add shared secrets from Aspire AppHost directory during local development
 
