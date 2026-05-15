@@ -45,51 +45,70 @@ public class InvoiceServiceClient(HttpClient httpClient)
     /// <summary>
     /// Creates a new invoice.
     /// </summary>
-    public async Task<InvoiceSummaryDto?> CreateInvoiceAsync(CreateInvoiceRequest request, CancellationToken ct = default)
+    public async Task<(InvoiceSummaryDto? Result, string? ErrorContent, int StatusCode)> CreateInvoiceAsync(CreateInvoiceRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/invoice/v1/invoices", new
+        try
         {
-            customerId = request.CustomerId,
-            billingIdentityType = request.BillingIdentityType,
-            customerName = request.CustomerName,
-            customerTaxId = request.CustomerTaxId,
-            billingAddress = request.BillingAddress,
-            shippingAddress = request.ShippingAddress,
-            poNumber = request.PoNumber,
-            currency = request.Currency,
-            issueDate = request.IssueDate,
-            dueDate = request.DueDate,
-            paymentTermsDays = request.PaymentTermsDays,
-            lines = request.Items.Select((item, index) => new
+            var response = await httpClient.PostAsJsonAsync("/invoice/v1/invoices", new
             {
-                lineNumber = index + 1,
-                description = item.Description,
-                quantity = item.Quantity,
-                unitPrice = item.UnitPrice,
-                taxCategory = item.TaxRate > 0 ? "VAT" : "Exempt",
-                taxRate = item.TaxRate
-            }).ToList()
-        }, ct);
-        if (response.IsSuccessStatusCode)
-        {
+                customerId = request.CustomerId,
+                billingIdentityType = request.BillingIdentityType,
+                customerName = request.CustomerName,
+                customerTaxId = request.CustomerTaxId,
+                billingAddress = request.BillingAddress,
+                shippingAddress = request.ShippingAddress,
+                poNumber = request.PoNumber,
+                currency = request.Currency,
+                issueDate = request.IssueDate,
+                dueDate = request.DueDate,
+                paymentTermsDays = request.PaymentTermsDays,
+                lines = request.Items.Select((item, index) => new
+                {
+                    lineNumber = index + 1,
+                    description = item.Description,
+                    quantity = item.Quantity,
+                    unitPrice = item.UnitPrice,
+                    taxCategory = item.TaxRate > 0 ? "VAT" : "Exempt",
+                    taxRate = item.TaxRate
+                }).ToList()
+            }, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(ct);
+                return (null, errorContent, (int)response.StatusCode);
+            }
+
             var invoice = await response.Content.ReadFromJsonAsync<InvoiceServiceInvoiceResponse>(cancellationToken: ct);
-            return invoice?.ToSummary();
+            return (invoice?.ToSummary(), null, (int)response.StatusCode);
         }
-        return null;
+        catch (Exception ex)
+        {
+            return (null, $"Exception calling InvoiceService: {ex.Message}", 0);
+        }
     }
 
     /// <summary>
     /// Registers an invoice file reference after upload.
     /// </summary>
-    public async Task<InvoiceFileReferenceDto?> RegisterFileAsync(Guid invoiceId, RegisterInvoiceFileRequest request, CancellationToken ct = default)
+    public async Task<(InvoiceFileReferenceDto? Result, string? ErrorContent, int StatusCode)> RegisterFileAsync(Guid invoiceId, RegisterInvoiceFileRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync($"/invoice/v1/invoices/{invoiceId}/files", request, ct);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            return null;
-        }
+            var response = await httpClient.PostAsJsonAsync($"/invoice/v1/invoices/{invoiceId}/files", request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(ct);
+                return (null, errorContent, (int)response.StatusCode);
+            }
 
-        return await response.Content.ReadFromJsonAsync<InvoiceFileReferenceDto>(cancellationToken: ct);
+            var fileReference = await response.Content.ReadFromJsonAsync<InvoiceFileReferenceDto>(cancellationToken: ct);
+            return (fileReference, null, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            return (null, $"Exception calling InvoiceService: {ex.Message}", 0);
+        }
     }
 
     /// <summary>

@@ -281,7 +281,7 @@
 
     private bool ValidateInvoice()
     {
-        if (_selectedCustomer is null || _request.CustomerId == Guid.Empty)
+        if (_request.CustomerId == Guid.Empty)
         {
             _error = "Select a customer before creating an invoice.";
             return false;

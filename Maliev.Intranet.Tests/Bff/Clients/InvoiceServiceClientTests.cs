@@ -84,7 +84,7 @@ public sealed class InvoiceServiceClientTests
             });
         });
 
-        var result = await client.CreateInvoiceAsync(new CreateInvoiceRequest
+        var (result, errorContent, statusCode) = await client.CreateInvoiceAsync(new CreateInvoiceRequest
         {
             CustomerId = Guid.Parse("efcb0881-e6be-4a81-af52-4d3f2d7df0fa"),
             BillingIdentityType = BillingIdentityType.Corporate,
@@ -110,6 +110,8 @@ public sealed class InvoiceServiceClientTests
         });
 
         Assert.NotNull(result);
+        Assert.Null(errorContent);
+        Assert.Equal(200, statusCode);
         Assert.Equal("INV-2026-0002", result.InvoiceNumber);
         Assert.NotNull(capturedPayload);
         var root = capturedPayload.RootElement;
@@ -125,6 +127,105 @@ public sealed class InvoiceServiceClientTests
         Assert.Equal(2500m, line.GetProperty("unitPrice").GetDecimal());
         Assert.Equal("VAT", line.GetProperty("taxCategory").GetString());
         Assert.Equal(7m, line.GetProperty("taxRate").GetDecimal());
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_When400_ReturnsNullResultAndErrorContent()
+    {
+        const string errorBody = """{"error":"Corporate customer must have a company profile"}""";
+        var client = MakeClient(HttpStatusCode.BadRequest, errorBody);
+
+        var (result, errorContent, statusCode) = await client.CreateInvoiceAsync(new CreateInvoiceRequest
+        {
+            CustomerId = Guid.Parse("7cda8f87-9841-4a9a-b589-994614f3ae7e"),
+            BillingIdentityType = BillingIdentityType.Corporate,
+            CustomerName = "Apex Robotics",
+            CustomerTaxId = "0125561001573",
+            BillingAddress = "88 Test Road, Bangkok 10110",
+            Currency = "THB",
+            IssueDate = new DateTime(2026, 5, 3),
+            DueDate = new DateTime(2026, 6, 2),
+            PaymentTermsDays = 30,
+            Items =
+            [
+                new InvoiceItemDto
+                {
+                    Description = "Machined aluminum bracket",
+                    Quantity = 2,
+                    UnitPrice = 2500m,
+                    TaxRate = 7m
+                }
+            ]
+        });
+
+        Assert.Null(result);
+        Assert.NotNull(errorContent);
+        Assert.Contains("Corporate customer must have a company profile", errorContent);
+        Assert.Equal(400, statusCode);
+    }
+
+    [Fact]
+    public async Task RegisterFileAsync_PostsInvoiceFileReferenceContract()
+    {
+        var invoiceId = Guid.Parse("a5fed6f4-8815-43d2-88d6-23f32f89f780");
+        JsonDocument? capturedPayload = null;
+        var client = MakeClient(async (request, ct) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal($"/invoice/v1/invoices/{invoiceId}/files", request.RequestUri!.PathAndQuery);
+            var payload = await request.Content!.ReadAsStringAsync(ct);
+            capturedPayload = JsonDocument.Parse(payload);
+
+            return JsonContent.Create(new
+            {
+                id = Guid.Parse("82f9cd4d-2f4a-4d51-8fb3-6e611f611ad6"),
+                invoiceId,
+                fileType = "CustomerPO",
+                fileUrl = "customers/c1/invoices/i1/customer-po.txt",
+                fileSizeBytes = 128L,
+                generatedBy = "Maliev.Intranet"
+            });
+        });
+
+        var (result, errorContent, statusCode) = await client.RegisterFileAsync(invoiceId, new RegisterInvoiceFileRequest
+        {
+            FileType = "CustomerPO",
+            FileUrl = "customers/c1/invoices/i1/customer-po.txt",
+            FileSizeBytes = 128L,
+            GeneratedBy = "Maliev.Intranet"
+        });
+
+        Assert.NotNull(result);
+        Assert.Null(errorContent);
+        Assert.Equal(200, statusCode);
+        Assert.Equal(invoiceId, result.InvoiceId);
+        Assert.Equal("CustomerPO", result.FileType);
+        Assert.NotNull(capturedPayload);
+        Assert.Equal("CustomerPO", capturedPayload.RootElement.GetProperty("fileType").GetString());
+        Assert.Equal("customers/c1/invoices/i1/customer-po.txt", capturedPayload.RootElement.GetProperty("fileUrl").GetString());
+        Assert.Equal(128L, capturedPayload.RootElement.GetProperty("fileSizeBytes").GetInt64());
+        Assert.Equal("Maliev.Intranet", capturedPayload.RootElement.GetProperty("generatedBy").GetString());
+    }
+
+    [Fact]
+    public async Task RegisterFileAsync_WhenConflict_ReturnsNullResultAndErrorContent()
+    {
+        const string errorBody = """{"message":"Cannot register file for cancelled invoice."}""";
+        var invoiceId = Guid.Parse("9c095a3f-0467-4dc3-87eb-b00ed7739dce");
+        var client = MakeClient(HttpStatusCode.Conflict, errorBody);
+
+        var (result, errorContent, statusCode) = await client.RegisterFileAsync(invoiceId, new RegisterInvoiceFileRequest
+        {
+            FileType = "CustomerPO",
+            FileUrl = "customers/c1/invoices/i1/customer-po.txt",
+            FileSizeBytes = 128L,
+            GeneratedBy = "Maliev.Intranet"
+        });
+
+        Assert.Null(result);
+        Assert.NotNull(errorContent);
+        Assert.Contains("cancelled invoice", errorContent);
+        Assert.Equal(409, statusCode);
     }
 
     [Fact]
@@ -232,6 +333,20 @@ public sealed class InvoiceServiceClientTests
             {
                 Content = await contentFactory(request, ct)
             });
+
+        return new InvoiceServiceClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("http://invoice-service")
+        });
+    }
+
+    private static InvoiceServiceClient MakeClient(HttpStatusCode statusCode, string body)
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent(body)
+            }));
 
         return new InvoiceServiceClient(new HttpClient(handler)
         {

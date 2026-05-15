@@ -58,8 +58,24 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
     [HttpPost]
     public async Task<ActionResult<InvoiceSummaryDto>> Create([FromBody] CreateInvoiceRequest request, CancellationToken ct)
     {
-        var result = await client.CreateInvoiceAsync(request, ct);
-        return result != null ? CreatedAtAction(nameof(GetById), new { version = "1.0", id = result.Id }, result) : BadRequest();
+        var (result, errorContent, statusCode) = await client.CreateInvoiceAsync(request, ct);
+        if (result is not null)
+        {
+            return CreatedAtAction(nameof(GetById), new { version = "1.0", id = result.Id }, result);
+        }
+
+        var userMessage = statusCode switch
+        {
+            0 => string.IsNullOrWhiteSpace(errorContent)
+                ? "InvoiceService is unreachable or returned no response."
+                : errorContent,
+            401 => "Not authorised - the BFF could not authenticate with InvoiceService.",
+            403 => "Permission denied - you may lack the 'invoice.invoices.create' permission in IAM.",
+            _ when !string.IsNullOrWhiteSpace(errorContent) => errorContent,
+            _ => $"InvoiceService returned HTTP {statusCode}."
+        };
+
+        return StatusCode(statusCode == 0 ? StatusCodes.Status502BadGateway : statusCode, userMessage);
     }
 
     /// <summary>
@@ -108,7 +124,7 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
             return StatusCode(500, "Upload failed.");
         }
 
-        var fileReference = await client.RegisterFileAsync(id, new RegisterInvoiceFileRequest
+        var (fileReference, errorContent, statusCode) = await client.RegisterFileAsync(id, new RegisterInvoiceFileRequest
         {
             FileType = fileType,
             FileUrl = upload.StoragePath ?? upload.FileReference ?? storagePath,
@@ -116,7 +132,15 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
             GeneratedBy = User.Identity?.Name ?? "Maliev.Intranet"
         }, ct);
 
-        return fileReference != null ? Ok(fileReference) : StatusCode(500, "Invoice file could not be linked.");
+        if (fileReference is not null)
+        {
+            return Ok(fileReference);
+        }
+
+        var message = string.IsNullOrWhiteSpace(errorContent)
+            ? "Invoice file could not be linked."
+            : errorContent;
+        return StatusCode(statusCode == 0 ? StatusCodes.Status502BadGateway : statusCode, message);
     }
 
     /// <summary>
