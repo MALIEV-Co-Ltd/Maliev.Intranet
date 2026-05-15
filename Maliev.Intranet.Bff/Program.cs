@@ -140,7 +140,7 @@ try
     // Register IAM management client for admin operations
     builder.Services.AddHttpClient<Maliev.Intranet.Bff.Clients.IAMServiceClient>(client =>
     {
-        client.BaseAddress = new Uri("http://IAMService");
+        client.BaseAddress = new Uri("https+http://IAMService");
     })
     .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>()
     .AddServiceDiscovery();
@@ -148,7 +148,7 @@ try
     // Named client for IAM bootstrap (no UserContextHandler - token attached manually)
     builder.Services.AddHttpClient("IAMServiceBootstrap", client =>
     {
-        client.BaseAddress = new Uri("http://IAMService");
+        client.BaseAddress = new Uri("https+http://IAMService");
     })
     .AddServiceDiscovery();
 

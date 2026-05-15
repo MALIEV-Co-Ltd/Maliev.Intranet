@@ -5,6 +5,7 @@ public class ProgramHttpClientConfigurationTests
     [Theory]
     [InlineData("\"https+http://CountryService\"")]
     [InlineData("\"https+http://CustomerService\"")]
+    [InlineData("\"https+http://IAMService\"")]
     [InlineData("\"https+http://UploadService\"")]
     public void ServiceAccountClients_PreferHttpsServiceDiscovery_ToPreserveAuthorizationHeader(string expectedBaseAddress)
     {
