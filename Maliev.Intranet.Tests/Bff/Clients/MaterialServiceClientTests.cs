@@ -10,6 +10,49 @@ namespace Maliev.Intranet.Tests.Bff.Clients;
 public class MaterialServiceClientTests
 {
     [Fact]
+    public async Task CreateMaterialAsync_MapsIntranetFieldsToMaterialServiceWireShape()
+    {
+        CapturedMaterialCreate? captured = null;
+        var created = CreateServiceMaterial(
+            name: "E2E PEEK",
+            code: "E2E-PEEK",
+            pricePerUnit: 125.75m,
+            stockLevel: 42);
+        var client = CreateClient(async (request, ct) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/material/v1/materials", request.RequestUri?.AbsolutePath);
+            var payload = await request.Content!.ReadAsStringAsync(ct);
+            captured = JsonSerializer.Deserialize<CapturedMaterialCreate>(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return JsonResponse(created);
+        });
+
+        var result = await client.CreateMaterialAsync(new CreateMaterialRequest
+        {
+            Name = " E2E PEEK ",
+            SKU = " E2E-PEEK ",
+            Description = " High performance production material ",
+            UnitPrice = 125.75m,
+            QuantityOnHand = 42,
+            Unit = "pcs"
+        });
+
+        Assert.NotNull(result);
+        Assert.NotNull(captured);
+        Assert.Equal("E2E PEEK", captured.Name);
+        Assert.Equal("E2E-PEEK", captured.Code);
+        Assert.Equal("High performance production material", captured.Description);
+        Assert.Equal(125.75m, captured.PricePerUnit);
+        Assert.Equal(42, captured.StockLevel);
+        Assert.Empty(captured.ManufacturingProcessIds);
+        Assert.Empty(captured.ColorIds);
+        Assert.Empty(captured.PostProcessingMethodIds);
+        Assert.Empty(captured.MechanicalProperties);
+        Assert.Equal(created.Id, result.Id);
+        Assert.Equal("E2E-PEEK", result.SKU);
+    }
+
+    [Fact]
     public async Task GetMaterialByIdAsync_WhenMaterialHasProcessesColorsAndProperties_MapsDetailFields()
     {
         var material = CreateServiceMaterial();
@@ -120,6 +163,19 @@ public class MaterialServiceClientTests
     }
 
     private sealed record CapturedMaterialUpdate
+    {
+        public string Name { get; init; } = string.Empty;
+        public string Code { get; init; } = string.Empty;
+        public string? Description { get; init; }
+        public decimal PricePerUnit { get; init; }
+        public int StockLevel { get; init; }
+        public List<Guid> ManufacturingProcessIds { get; init; } = [];
+        public List<Guid> ColorIds { get; init; } = [];
+        public List<Guid> PostProcessingMethodIds { get; init; } = [];
+        public List<CapturedMechanicalProperty> MechanicalProperties { get; init; } = [];
+    }
+
+    private sealed record CapturedMaterialCreate
     {
         public string Name { get; init; } = string.Empty;
         public string Code { get; init; } = string.Empty;

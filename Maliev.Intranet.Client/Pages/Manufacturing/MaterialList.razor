@@ -7,7 +7,9 @@
 <PageTitle>Materials | MALIEV Intranet</PageTitle>
 
 <div class="mlv-module-shell">
-    <PageHeader Title="Materials" Subtitle="Catalog materials and stock levels" BackHref="/mfg" />
+    <PageHeader Title="Materials" Subtitle="Catalog materials and stock levels" BackHref="/mfg">
+        <PrimaryButton Icon="@Icons.Material.Outlined.Add" OnClick="@ShowCreateAsync">Add Material</PrimaryButton>
+    </PageHeader>
 
     <PageBody>
         <StatBar Class="mb-4">
@@ -16,6 +18,24 @@
             <StatTile Label="Active" Value="@_materials.Count(IsActive).ToString("N0")" />
             <StatTile Label="Stock value" Value="@_materials.Sum(m => m.UnitPrice * m.QuantityOnHand).ToString("N2")" />
         </StatBar>
+
+        @if (_showCreate)
+        {
+            <PanelCard Title="Create material" Class="mb-4">
+                <FormGrid>
+                    <FormField Label="Name"><ImmediateInputText class="mlv-form-input" @bind-Value="_newMaterial.Name" /></FormField>
+                    <FormField Label="Code"><ImmediateInputText class="mlv-form-input mlv-mono" @bind-Value="_newMaterial.SKU" /></FormField>
+                    <FormField Label="Unit price"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_newMaterial.UnitPrice" /></FormField>
+                    <FormField Label="Stock"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_newMaterial.QuantityOnHand" /></FormField>
+                    <FormField Label="Unit"><ImmediateInputText class="mlv-form-input" @bind-Value="_newMaterial.Unit" /></FormField>
+                    <FormField Label="Description" Class="mlv-span-6"><ImmediateInputTextArea class="mlv-form-textarea" @bind-Value="_newMaterial.Description" /></FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                    <SecondaryButton OnClick="@HideCreateAsync">Cancel</SecondaryButton>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Save" Disabled="@_saving" OnClick="@CreateMaterialAsync">Create Material</PrimaryButton>
+                </div>
+            </PanelCard>
+        }
 
         <PanelCard>
             @if (_loading)
@@ -69,8 +89,11 @@
     private readonly List<MaterialSummaryDto> _materials = [];
     private PaginationMeta _meta = new();
     private bool _loading = true;
+    private bool _saving;
+    private bool _showCreate;
     private int _page = 1;
     private int _pageSize = 20;
+    private CreateMaterialRequest _newMaterial = new() { Unit = "pcs" };
 
     protected override async Task OnInitializedAsync()
     {
@@ -110,6 +133,69 @@
         _pageSize = pageSize;
         _page = 1;
         await LoadAsync();
+    }
+
+    private Task ShowCreateAsync(MouseEventArgs _)
+    {
+        _showCreate = true;
+        return Task.CompletedTask;
+    }
+
+    private Task HideCreateAsync(MouseEventArgs _)
+    {
+        _showCreate = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task CreateMaterialAsync(MouseEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_newMaterial.Name) ||
+            string.IsNullOrWhiteSpace(_newMaterial.SKU) ||
+            _newMaterial.UnitPrice <= 0)
+        {
+            Snackbar.Add("Enter material name, code, and a positive unit price.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = _newMaterial with
+            {
+                Name = _newMaterial.Name.Trim(),
+                SKU = _newMaterial.SKU.Trim(),
+                Unit = string.IsNullOrWhiteSpace(_newMaterial.Unit) ? "pcs" : _newMaterial.Unit.Trim(),
+                Description = _newMaterial.Description?.Trim() ?? string.Empty
+            };
+
+            var response = await Http.PostAsJsonAsync("api/v1/materials", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Material could not be created.", Severity.Warning);
+                return;
+            }
+
+            var created = await response.Content.ReadFromJsonAsync<MaterialSummaryDto>();
+            Snackbar.Add("Material created.", Severity.Success);
+            _newMaterial = new CreateMaterialRequest { Unit = "pcs" };
+            _showCreate = false;
+
+            if (created is not null)
+            {
+                Navigation.NavigateTo($"/mfg/materials/{created.Id}");
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to create material: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 
     private static bool IsActive(MaterialSummaryDto material)

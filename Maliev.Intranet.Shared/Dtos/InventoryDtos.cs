@@ -189,6 +189,9 @@ public sealed record CreateMaterialRequest
     /// <summary>The initial unit price for the material.</summary>
     public decimal UnitPrice { get; set; }
 
+    /// <summary>The initial quantity available on hand.</summary>
+    public int QuantityOnHand { get; set; }
+
     /// <summary>The default unit of measurement (e.g., "kg").</summary>
     public string Unit { get; set; } = "pcs";
 }

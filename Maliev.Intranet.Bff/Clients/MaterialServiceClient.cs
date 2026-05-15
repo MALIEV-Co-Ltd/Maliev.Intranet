@@ -56,7 +56,16 @@ public class MaterialServiceClient(HttpClient httpClient)
     /// <returns>The created material summary.</returns>
     public async Task<MaterialSummaryDto?> CreateMaterialAsync(CreateMaterialRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/material/v1/materials", request, ct);
+        var downstreamRequest = new MaterialServiceCreateMaterialRequest
+        {
+            Name = request.Name.Trim(),
+            Code = request.SKU.Trim(),
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            PricePerUnit = request.UnitPrice,
+            StockLevel = request.QuantityOnHand
+        };
+
+        var response = await httpClient.PostAsJsonAsync("/material/v1/materials", downstreamRequest, ct);
         if (response.IsSuccessStatusCode)
         {
             var material = await response.Content.ReadFromJsonAsync<MaterialServiceMaterialDto>(cancellationToken: ct);
@@ -344,6 +353,33 @@ public sealed class MaterialServiceUpdateMaterialRequest
     /// <summary>Post-processing method identifiers to preserve.</summary>
     public List<Guid> PostProcessingMethodIds { get; set; } = [];
     /// <summary>Mechanical property values to preserve.</summary>
+    public List<MaterialServiceMechanicalPropertyRequest> MechanicalProperties { get; set; } = [];
+}
+
+/// <summary>
+/// MaterialService create request shape.
+/// </summary>
+public sealed class MaterialServiceCreateMaterialRequest
+{
+    /// <summary>Name of the material.</summary>
+    public string Name { get; set; } = string.Empty;
+    /// <summary>Unique material code.</summary>
+    public string Code { get; set; } = string.Empty;
+    /// <summary>Optional material description.</summary>
+    public string? Description { get; set; }
+    /// <summary>Price per unit.</summary>
+    public decimal PricePerUnit { get; set; }
+    /// <summary>Current stock level.</summary>
+    public int StockLevel { get; set; }
+    /// <summary>Optional supplier identifier.</summary>
+    public Guid? SupplierId { get; set; }
+    /// <summary>Manufacturing process identifiers.</summary>
+    public List<Guid> ManufacturingProcessIds { get; set; } = [];
+    /// <summary>Color identifiers.</summary>
+    public List<Guid> ColorIds { get; set; } = [];
+    /// <summary>Post-processing method identifiers.</summary>
+    public List<Guid> PostProcessingMethodIds { get; set; } = [];
+    /// <summary>Mechanical property values.</summary>
     public List<MaterialServiceMechanicalPropertyRequest> MechanicalProperties { get; set; } = [];
 }
 
