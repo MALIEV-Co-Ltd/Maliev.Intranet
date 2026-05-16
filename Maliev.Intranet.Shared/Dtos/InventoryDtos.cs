@@ -130,6 +130,12 @@ public class SupplierSummaryDto
     public Guid Id { get; set; }
     /// <summary>The legal display name of the supplier.</summary>
     public string Name { get; set; } = string.Empty;
+    /// <summary>The supplier tax identification number.</summary>
+    public string? TaxId { get; set; }
+    /// <summary>The city where the supplier is located.</summary>
+    public string? City { get; set; }
+    /// <summary>The country where the supplier is based.</summary>
+    public string? Country { get; set; }
     /// <summary>The primary contact email address for orders.</summary>
     public string Email { get; set; } = string.Empty;
     /// <summary>The current business status of the supplier (e.g., Active, Restricted).</summary>
@@ -147,6 +153,8 @@ public class SupplierDetailDto
     public Guid Id { get; set; }
     /// <summary>The legal display name of the supplier.</summary>
     public string Name { get; set; } = string.Empty;
+    /// <summary>The supplier tax identification number.</summary>
+    public string? TaxId { get; set; }
     /// <summary>The primary contact email address.</summary>
     public string Email { get; set; } = string.Empty;
     /// <summary>The primary contact phone number.</summary>
@@ -155,6 +163,10 @@ public class SupplierDetailDto
     public string Country { get; set; } = string.Empty;
     /// <summary>The full physical address of the supplier.</summary>
     public string? Address { get; set; }
+    /// <summary>The city where the supplier is located.</summary>
+    public string? City { get; set; }
+    /// <summary>The postal code for the supplier address.</summary>
+    public string? PostalCode { get; set; }
     /// <summary>The current business status.</summary>
     public string Status { get; set; } = string.Empty;
     /// <summary>The current performance rating of the supplier.</summary>
@@ -163,6 +175,10 @@ public class SupplierDetailDto
     public string? ContactPerson { get; set; }
     /// <summary>The official website URL of the supplier.</summary>
     public string? Website { get; set; }
+    /// <summary>The supplier capabilities or supported service categories.</summary>
+    public List<string> Capabilities { get; set; } = [];
+    /// <summary>The row version used for optimistic concurrency control.</summary>
+    public string RowVersion { get; set; } = string.Empty;
     /// <summary>The date and time when the supplier record was created.</summary>
     public DateTime CreatedAt { get; set; }
 }
@@ -292,4 +308,12 @@ public sealed record UpdateSupplierRequest
     public string? ContactPerson { get; set; }
     /// <summary>The updated website URL.</summary>
     public string? Website { get; set; }
+    /// <summary>The updated city where the supplier is located.</summary>
+    public string? City { get; set; }
+    /// <summary>The updated postal code for the supplier address.</summary>
+    public string? PostalCode { get; set; }
+    /// <summary>The updated supplier capabilities or supported service categories.</summary>
+    public List<string>? Capabilities { get; set; }
+    /// <summary>The row version required by SupplierService for optimistic concurrency control.</summary>
+    public string? RowVersion { get; set; }
 }

@@ -1,0 +1,243 @@
+@page "/purchasing/suppliers"
+@using System.Text.Json
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Supplier Profiles | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="Supplier Profiles" Subtitle="Procurement supplier source records and purchasing readiness." BackHref="/purchasing">
+        <PrimaryButton Icon="@Icons.Material.Outlined.AddBusiness" OnClick="@ShowCreateAsync">New Supplier</PrimaryButton>
+    </PageHeader>
+
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Suppliers" Value="@_meta.TotalItems.ToString("N0")" />
+            <StatTile Label="On page" Value="@_suppliers.Count.ToString("N0")" />
+            <StatTile Label="Active" Value="@_suppliers.Count(IsActive).ToString("N0")" />
+            <StatTile Label="Countries" Value="@_suppliers.Select(s => s.Country).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).Count().ToString("N0")" />
+        </StatBar>
+
+        @if (_showCreate)
+        {
+            <PanelCard Title="Create supplier" Class="mb-4">
+                <FormGrid>
+                    <FormField Label="Supplier name"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.Name" /></FormField>
+                    <FormField Label="Tax ID"><ImmediateInputText class="mlv-form-input mlv-mono" @bind-Value="_newSupplier.TaxId" /></FormField>
+                    <FormField Label="Email"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.Email" /></FormField>
+                    <FormField Label="Phone"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.Phone" /></FormField>
+                    <FormField Label="Contact person"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.ContactPerson" /></FormField>
+                    <FormField Label="Country"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.Country" /></FormField>
+                    <FormField Label="City"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.City" /></FormField>
+                    <FormField Label="Postal code"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.PostalCode" /></FormField>
+                    <FormField Label="Address" Class="mlv-span-6"><ImmediateInputTextArea class="mlv-form-textarea" @bind-Value="_newSupplier.Address" /></FormField>
+                    <FormField Label="Capabilities" Class="mlv-span-6">
+                        <ImmediateInputText class="mlv-form-input" @bind-Value="_capabilityText" placeholder="CNC, Sheet metal, Anodizing" />
+                    </FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                    <SecondaryButton OnClick="@HideCreateAsync">Cancel</SecondaryButton>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Save" Disabled="@_saving" OnClick="@CreateSupplierAsync">Create Supplier</PrimaryButton>
+                </div>
+            </PanelCard>
+        }
+
+        <PanelCard>
+            @if (_loading)
+            {
+                <div class="mlv-empty">Loading suppliers...</div>
+            }
+            else if (_suppliers.Count == 0)
+            {
+                <div class="mlv-empty">No suppliers found.</div>
+            }
+            else
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Supplier</th>
+                            <th>Tax ID</th>
+                            <th>Country</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var supplier in _suppliers)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/purchasing/suppliers/{supplier.Id}"))">
+                                <td>
+                                    <div class="mlv-row-main">@supplier.Name</div>
+                                    <div class="mlv-row-sub">@Display(supplier.City)</div>
+                                </td>
+                                <td class="mlv-mono">@Display(supplier.TaxId)</td>
+                                <td>@Display(supplier.Country)</td>
+                                <td><StatusBadge Status="@supplier.Status" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </PanelCard>
+
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
+    </PageBody>
+</div>
+
+@code {
+    private readonly List<SupplierSummaryDto> _suppliers = [];
+    private PaginationMeta _meta = new();
+    private CreateSupplierRequest _newSupplier = new()
+    {
+        Country = "Thailand",
+        City = "Bangkok"
+    };
+    private string _capabilityText = string.Empty;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _showCreate;
+    private int _page = 1;
+    private int _pageSize = 20;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>($"api/v1/suppliers?page={_page}&pageSize={_pageSize}");
+            _suppliers.Clear();
+            _suppliers.AddRange(response?.Data ?? []);
+            _meta = response?.Meta ?? new PaginationMeta();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load suppliers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = pageSize;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private Task ShowCreateAsync(MouseEventArgs _)
+    {
+        _showCreate = true;
+        return Task.CompletedTask;
+    }
+
+    private Task HideCreateAsync(MouseEventArgs _)
+    {
+        _showCreate = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task CreateSupplierAsync(MouseEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_newSupplier.Name) ||
+            string.IsNullOrWhiteSpace(_newSupplier.TaxId) ||
+            string.IsNullOrWhiteSpace(_newSupplier.Email) ||
+            string.IsNullOrWhiteSpace(_newSupplier.Address) ||
+            string.IsNullOrWhiteSpace(_newSupplier.City) ||
+            string.IsNullOrWhiteSpace(_newSupplier.Country))
+        {
+            Snackbar.Add("Enter supplier name, tax ID, email, address, city, and country.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            _newSupplier.Capabilities = SplitDisplayList(_capabilityText).ToList();
+            _newSupplier.Name = _newSupplier.Name.Trim();
+            _newSupplier.TaxId = _newSupplier.TaxId.Trim();
+            _newSupplier.Email = _newSupplier.Email.Trim();
+            _newSupplier.Address = _newSupplier.Address?.Trim();
+            _newSupplier.City = _newSupplier.City.Trim();
+            _newSupplier.Country = _newSupplier.Country.Trim();
+            _newSupplier.PostalCode = _newSupplier.PostalCode?.Trim();
+            _newSupplier.ContactPerson = _newSupplier.ContactPerson?.Trim();
+
+            var response = await Http.PostAsJsonAsync("api/v1/suppliers", _newSupplier);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(string.IsNullOrWhiteSpace(body) ? "Supplier could not be created." : body, Severity.Warning);
+                return;
+            }
+
+            var supplierId = await ReadSupplierIdAsync(response);
+            Snackbar.Add("Supplier created.", Severity.Success);
+            _newSupplier = new CreateSupplierRequest { Country = "Thailand", City = "Bangkok" };
+            _capabilityText = string.Empty;
+            _showCreate = false;
+
+            if (supplierId is not null)
+            {
+                Navigation.NavigateTo($"/purchasing/suppliers/{supplierId}");
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to create supplier: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static async Task<Guid?> ReadSupplierIdAsync(HttpResponseMessage response)
+    {
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var document = await JsonDocument.ParseAsync(stream);
+        return document.RootElement.TryGetProperty("id", out var idElement) &&
+            Guid.TryParse(idElement.GetString(), out var id)
+                ? id
+                : null;
+    }
+
+    private static IReadOnlyList<string> SplitDisplayList(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private static bool IsActive(SupplierSummaryDto supplier)
+    {
+        return string.Equals(supplier.Status, "Active", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+}

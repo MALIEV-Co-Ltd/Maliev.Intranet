@@ -72,6 +72,113 @@ public sealed class SupplierServiceClientTests
         Assert.True(primaryContact.GetProperty("isPrimary").GetBoolean());
     }
 
+    [Fact]
+    public async Task GetSupplierByIdAsync_MapsSupplierServiceDetailToIntranetSupplierDetail()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var supplierId = Guid.Parse("651cce38-3571-4f34-8355-b43d70586dbd");
+        var client = MakeClient(request =>
+        {
+            capturedRequest = request;
+            return Task.FromResult<HttpContent>(JsonContent.Create(new
+            {
+                id = supplierId,
+                companyName = "Thai Metals Supply",
+                taxId = "0105569000001",
+                address = "88 Rama IX Road",
+                city = "Bangkok",
+                country = "Thailand",
+                postalCode = "10310",
+                status = "Active",
+                rowVersion = "42",
+                contacts = new[]
+                {
+                    new
+                    {
+                        name = "Niran Supplier",
+                        email = "sales@thai-metals.example",
+                        phoneNumber = "+66 2 555 0101"
+                    }
+                },
+                capabilities = new[]
+                {
+                    new { name = "CNC", isActive = true },
+                    new { name = "Paused capability", isActive = false }
+                },
+                performanceSummary = new { overallRating = 4.5m },
+                createdAt = DateTime.UtcNow
+            }));
+        });
+
+        var detail = await client.GetSupplierByIdAsync(supplierId);
+
+        Assert.NotNull(detail);
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Get, capturedRequest.Method);
+        Assert.Equal($"/supplier/v1/suppliers/{supplierId}", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.Equal(supplierId, detail.Id);
+        Assert.Equal("Thai Metals Supply", detail.Name);
+        Assert.Equal("0105569000001", detail.TaxId);
+        Assert.Equal("88 Rama IX Road", detail.Address);
+        Assert.Equal("Bangkok", detail.City);
+        Assert.Equal("Thailand", detail.Country);
+        Assert.Equal("10310", detail.PostalCode);
+        Assert.Equal("42", detail.RowVersion);
+        Assert.Equal("Niran Supplier", detail.ContactPerson);
+        Assert.Equal("sales@thai-metals.example", detail.Email);
+        Assert.Equal("+66 2 555 0101", detail.Phone);
+        Assert.Equal(4.5m, detail.Rating);
+        var capability = Assert.Single(detail.Capabilities);
+        Assert.Equal("CNC", capability);
+    }
+
+    [Fact]
+    public async Task UpdateSupplierAsync_MapsIntranetSupplierRequestToSupplierServiceConcurrencyContract()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        string? payload = null;
+        var supplierId = Guid.Parse("bc0591e2-89f9-4f61-a756-76042d9a49c3");
+        var client = MakeClient(async request =>
+        {
+            capturedRequest = request;
+            payload = await request.Content!.ReadAsStringAsync();
+            return JsonContent.Create(new
+            {
+                id = supplierId,
+                companyName = "Thai Metals Supply Revised",
+                rowVersion = "43"
+            });
+        });
+
+        using var response = await client.UpdateSupplierAsync(supplierId, new UpdateSupplierRequest
+        {
+            Name = "Thai Metals Supply Revised",
+            Address = "99 Revised Road",
+            City = "Bangkok",
+            Country = "Thailand",
+            PostalCode = "10260",
+            Capabilities = ["CNC", "Anodizing"],
+            RowVersion = "42"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Put, capturedRequest.Method);
+        Assert.Equal($"/supplier/v1/suppliers/{supplierId}", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.NotNull(payload);
+
+        using var document = JsonDocument.Parse(payload);
+        var root = document.RootElement;
+        Assert.Equal("Thai Metals Supply Revised", root.GetProperty("companyName").GetString());
+        Assert.Equal("99 Revised Road", root.GetProperty("address").GetString());
+        Assert.Equal("Bangkok", root.GetProperty("city").GetString());
+        Assert.Equal("Thailand", root.GetProperty("country").GetString());
+        Assert.Equal("10260", root.GetProperty("postalCode").GetString());
+        Assert.Equal("CNC", root.GetProperty("capabilities")[0].GetString());
+        Assert.Equal("Anodizing", root.GetProperty("capabilities")[1].GetString());
+        Assert.Equal("42", root.GetProperty("rowVersion").GetString());
+    }
+
     private static SupplierServiceClient MakeClient(Func<HttpRequestMessage, Task<HttpContent>> contentFactory)
     {
         var handler = new MockHttpMessageHandler(async (request, _) =>

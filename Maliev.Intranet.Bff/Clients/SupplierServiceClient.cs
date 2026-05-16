@@ -72,7 +72,17 @@ public class SupplierServiceClient(HttpClient httpClient)
     /// </summary>
     public async Task<HttpResponseMessage> UpdateSupplierAsync(Guid id, UpdateSupplierRequest request, CancellationToken ct = default)
     {
-        return await httpClient.PutAsJsonAsync($"/supplier/v1/suppliers/{id}", request, ct);
+        var downstreamRequest = new DownstreamUpdateSupplierRequest(
+            string.IsNullOrWhiteSpace(request.Name) ? null : request.Name.Trim(),
+            string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
+            string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim(),
+            string.IsNullOrWhiteSpace(request.Country) ? null : request.Country.Trim(),
+            string.IsNullOrWhiteSpace(request.PostalCode) ? null : request.PostalCode.Trim(),
+            null,
+            request.Capabilities,
+            request.RowVersion ?? string.Empty);
+
+        return await httpClient.PutAsJsonAsync($"/supplier/v1/suppliers/{id}", downstreamRequest, ct);
     }
 
     /// <summary>
@@ -129,6 +139,9 @@ public class SupplierServiceClient(HttpClient httpClient)
             {
                 Id = Id,
                 Name = CompanyName,
+                TaxId = TaxId,
+                City = City,
+                Country = Country,
                 Status = Status ?? string.Empty,
                 Email = string.Empty,
                 Rating = 0m
@@ -139,12 +152,15 @@ public class SupplierServiceClient(HttpClient httpClient)
     private sealed record SupplierDetailResponse(
         Guid Id,
         string CompanyName,
+        string? TaxId,
         string? Address,
         string? City,
         string? Country,
         string? PostalCode,
         string? Status,
+        string? RowVersion,
         IReadOnlyList<SupplierContactResponse>? Contacts,
+        IReadOnlyList<CapabilityResponse>? Capabilities,
         PerformanceSummaryResponse? PerformanceSummary,
         DateTime CreatedAt)
     {
@@ -155,13 +171,18 @@ public class SupplierServiceClient(HttpClient httpClient)
             {
                 Id = Id,
                 Name = CompanyName,
+                TaxId = TaxId,
                 Email = contact?.Email ?? string.Empty,
                 Phone = contact?.PhoneNumber,
                 Country = Country ?? string.Empty,
-                Address = string.Join(", ", new[] { Address, City, PostalCode, Country }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                Address = Address,
+                City = City,
+                PostalCode = PostalCode,
                 Status = Status ?? string.Empty,
                 Rating = PerformanceSummary?.OverallRating ?? 0m,
                 ContactPerson = contact?.Name,
+                Capabilities = Capabilities?.Where(capability => capability.IsActive).Select(capability => capability.Name).ToList() ?? [],
+                RowVersion = RowVersion ?? string.Empty,
                 CreatedAt = CreatedAt
             };
         }
@@ -171,6 +192,10 @@ public class SupplierServiceClient(HttpClient httpClient)
         string Name,
         string? Email,
         [property: JsonPropertyName("phoneNumber")] string? PhoneNumber);
+
+    private sealed record CapabilityResponse(
+        string Name,
+        bool IsActive);
 
     private sealed record PerformanceSummaryResponse(decimal? OverallRating);
 
@@ -191,4 +216,14 @@ public class SupplierServiceClient(HttpClient httpClient)
         [property: JsonPropertyName("role")] string Role,
         [property: JsonPropertyName("phone")] string Phone,
         [property: JsonPropertyName("isPrimary")] bool IsPrimary);
+
+    private sealed record DownstreamUpdateSupplierRequest(
+        [property: JsonPropertyName("companyName")] string? CompanyName,
+        [property: JsonPropertyName("address")] string? Address,
+        [property: JsonPropertyName("city")] string? City,
+        [property: JsonPropertyName("country")] string? Country,
+        [property: JsonPropertyName("postalCode")] string? PostalCode,
+        [property: JsonPropertyName("materialCategoryIds")] IEnumerable<Guid>? MaterialCategoryIds,
+        [property: JsonPropertyName("capabilities")] IEnumerable<string>? Capabilities,
+        [property: JsonPropertyName("rowVersion")] string RowVersion);
 }

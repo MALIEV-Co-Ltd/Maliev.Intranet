@@ -1,0 +1,226 @@
+@page "/purchasing/suppliers/{Id:guid}"
+@using Maliev.Intranet.Shared
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Supplier Profile | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@(_supplier?.Name ?? "Supplier Profile")" Subtitle="@_supplier?.TaxId" BackHref="/purchasing/suppliers">
+        @if (_supplier is not null)
+        {
+            <StatusBadge Status="@_supplier.Status" />
+            @if (_editing)
+            {
+                <SecondaryButton Icon="@Icons.Material.Outlined.Close" Disabled="@_saving" OnClick="@CancelEditAsync">Cancel</SecondaryButton>
+                <PrimaryButton Icon="@Icons.Material.Outlined.Save" Disabled="@(_saving || string.IsNullOrWhiteSpace(_supplier.RowVersion))" OnClick="@SaveSupplierAsync">Save</PrimaryButton>
+            }
+            else
+            {
+                <SecondaryButton Icon="@Icons.Material.Outlined.Edit" OnClick="@StartEditAsync">Edit</SecondaryButton>
+            }
+        }
+    </PageHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <div class="mlv-empty">Loading supplier...</div>
+        }
+        else if (_supplier is null)
+        {
+            <div class="mlv-empty">Supplier not found.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Status" Value="@Display(_supplier.Status)" />
+                <StatTile Label="Country" Value="@Display(_supplier.Country)" />
+                <StatTile Label="Capabilities" Value="@_supplier.Capabilities.Count.ToString("N0")" />
+                <StatTile Label="Created" Value="@_supplier.CreatedAt.ToString("dd MMM yyyy")" />
+            </StatBar>
+
+            <div class="mlv-two-column-grid">
+                <PanelCard Title="Profile">
+                    @if (_editing)
+                    {
+                        <FormGrid>
+                            <FormField Label="Supplier name"><ImmediateInputText class="mlv-form-input" @bind-Value="_edit.Name" /></FormField>
+                            <FormField Label="Country"><ImmediateInputText class="mlv-form-input" @bind-Value="_edit.Country" /></FormField>
+                            <FormField Label="City"><ImmediateInputText class="mlv-form-input" @bind-Value="_edit.City" /></FormField>
+                            <FormField Label="Postal code"><ImmediateInputText class="mlv-form-input" @bind-Value="_edit.PostalCode" /></FormField>
+                            <FormField Label="Address" Class="mlv-span-6"><ImmediateInputTextArea class="mlv-form-textarea" @bind-Value="_edit.Address" /></FormField>
+                            <FormField Label="Capabilities" Class="mlv-span-6">
+                                <ImmediateInputText class="mlv-form-input" @bind-Value="_capabilityText" placeholder="CNC, Sheet metal, Anodizing" />
+                            </FormField>
+                        </FormGrid>
+                    }
+                    else
+                    {
+                        <dl class="mlv-detail-list">
+                            <dt>Tax ID</dt><dd class="mlv-mono">@Display(_supplier.TaxId)</dd>
+                            <dt>Address</dt><dd>@Display(_supplier.Address)</dd>
+                            <dt>City</dt><dd>@Display(_supplier.City)</dd>
+                            <dt>Postal code</dt><dd>@Display(_supplier.PostalCode)</dd>
+                            <dt>Country</dt><dd>@Display(_supplier.Country)</dd>
+                        </dl>
+                    }
+                </PanelCard>
+
+                <PanelCard Title="Primary Contact">
+                    <dl class="mlv-detail-list">
+                        <dt>Name</dt><dd>@Display(_supplier.ContactPerson)</dd>
+                        <dt>Email</dt><dd>@Display(_supplier.Email)</dd>
+                        <dt>Phone</dt><dd>@Display(_supplier.Phone)</dd>
+                    </dl>
+                </PanelCard>
+
+                <PanelCard Title="Capabilities">
+                    @if (_supplier.Capabilities.Count == 0)
+                    {
+                        <div class="mlv-empty">No supplier capabilities recorded.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-2" aria-label="Supplier capabilities">
+                            @foreach (var capability in _supplier.Capabilities)
+                            {
+                                <span class="maliev-badge maliev-badge--muted">@capability</span>
+                            }
+                        </div>
+                    }
+                </PanelCard>
+
+                <PanelCard Title="Procurement Controls">
+                    <dl class="mlv-detail-list">
+                        <dt>Concurrency token</dt><dd class="mlv-mono">@Display(_supplier.RowVersion)</dd>
+                        <dt>Documents</dt><dd>Upload workflow pending supplier document classification.</dd>
+                        <dt>Payment terms</dt><dd>Commercial supplier terms pending procurement master-data model.</dd>
+                    </dl>
+                </PanelCard>
+            </div>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private SupplierDetailDto? _supplier;
+    private UpdateSupplierRequest _edit = new();
+    private string _capabilityText = string.Empty;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _editing;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _supplier = await Http.GetFromJsonAsync<SupplierDetailDto>($"api/v1/suppliers/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load supplier: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task StartEditAsync()
+    {
+        if (_supplier is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _edit = new UpdateSupplierRequest
+        {
+            Name = _supplier.Name,
+            Address = _supplier.Address,
+            City = _supplier.City,
+            Country = _supplier.Country,
+            PostalCode = _supplier.PostalCode,
+            RowVersion = _supplier.RowVersion,
+            Capabilities = _supplier.Capabilities.ToList()
+        };
+        _capabilityText = string.Join(", ", _supplier.Capabilities);
+        _editing = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelEditAsync()
+    {
+        _editing = false;
+        _edit = new UpdateSupplierRequest();
+        _capabilityText = string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveSupplierAsync(MouseEventArgs _)
+    {
+        if (_supplier is null || string.IsNullOrWhiteSpace(_edit.RowVersion))
+        {
+            Snackbar.Add("Supplier must be loaded before editing.", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_edit.Name) ||
+            string.IsNullOrWhiteSpace(_edit.Address) ||
+            string.IsNullOrWhiteSpace(_edit.City) ||
+            string.IsNullOrWhiteSpace(_edit.Country))
+        {
+            Snackbar.Add("Enter supplier name, address, city, and country.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            _edit.Name = _edit.Name.Trim();
+            _edit.Address = _edit.Address?.Trim();
+            _edit.City = _edit.City?.Trim();
+            _edit.Country = _edit.Country?.Trim();
+            _edit.PostalCode = _edit.PostalCode?.Trim();
+            _edit.Capabilities = SplitDisplayList(_capabilityText).ToList();
+
+            var response = await Http.PutAsJsonAsync($"api/v1/suppliers/{Id}", _edit);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Supplier could not be updated. Refresh and try again if another user changed it.", Severity.Warning);
+                return;
+            }
+
+            await LoadAsync();
+            await CancelEditAsync();
+            Snackbar.Add("Supplier updated.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to update supplier: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static IReadOnlyList<string> SplitDisplayList(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+}
