@@ -147,6 +147,7 @@ public class ProjectServiceClient(HttpClient httpClient)
             MarkingType = request.MarkingType.ToString(),
             request.MarkingText,
             request.DfmAcknowledged,
+            request.HasDfmWarnings,
             request.HasThreadedHoles,
             request.ThreadedHoleSpec,
             request.ThreadedHoleCount,
@@ -203,6 +204,7 @@ public class ProjectServiceClient(HttpClient httpClient)
             MarkingType = request.MarkingType.ToString(),
             request.MarkingText,
             request.DfmAcknowledged,
+            request.HasDfmWarnings,
             request.HasThreadedHoles,
             request.ThreadedHoleSpec,
             request.ThreadedHoleCount,
@@ -520,6 +522,8 @@ public class ProjectServiceClient(HttpClient httpClient)
 
         public bool DfmAcknowledged { get; set; }
 
+        public bool HasDfmWarnings { get; set; }
+
         public bool HasThreadedHoles { get; set; }
 
         public string? ThreadedHoleSpec { get; set; }
@@ -628,6 +632,7 @@ public class ProjectServiceClient(HttpClient httpClient)
                 MarkingType = ParseEnumOrDefault(MarkingType, PartMarkingType.None),
                 MarkingText = MarkingText,
                 DfmAcknowledged = DfmAcknowledged,
+                HasDfmWarnings = HasDfmWarnings,
                 HasThreadedHoles = HasThreadedHoles,
                 ThreadedHoleSpec = ThreadedHoleSpec,
                 ThreadedHoleCount = ThreadedHoleCount,

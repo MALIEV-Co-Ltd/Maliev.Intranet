@@ -131,6 +131,8 @@ public class ProjectServiceClientCreateTests
               "customNotes": "Deburr all edges before anodizing.",
               "aiSuggestedPrice": 1200,
               "confirmedUnitPrice": 1250,
+              "dfmAcknowledged": true,
+              "hasDfmWarnings": true,
               "boundingBoxX": 80,
               "boundingBoxY": 149,
               "boundingBoxZ": 5,
@@ -160,6 +162,8 @@ public class ProjectServiceClientCreateTests
         Assert.Equal("https://storage.example/thumb.png", part.ModelPreviewUrl);
         Assert.Equal(80d, part.Dimensions?.X);
         Assert.True(part.IsManifold);
+        Assert.True(part.DfmAcknowledged);
+        Assert.True(part.HasDfmWarnings);
     }
 
     [Fact]
@@ -261,6 +265,8 @@ public class ProjectServiceClientCreateTests
             BoundingBoxY = 149m,
             BoundingBoxZ = 5m,
             IsManifold = true,
+            HasDfmWarnings = true,
+            DfmAcknowledged = false,
             PartNotes = "Deburr all edges before anodizing."
         });
 
@@ -272,6 +278,40 @@ public class ProjectServiceClientCreateTests
         Assert.Equal(80m, json.RootElement.GetProperty("boundingBoxX").GetDecimal());
         Assert.Equal("Deburr all edges before anodizing.", json.RootElement.GetProperty("customNotes").GetString());
         Assert.True(json.RootElement.GetProperty("isManifold").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("hasDfmWarnings").GetBoolean());
+        Assert.False(json.RootElement.GetProperty("dfmAcknowledged").GetBoolean());
+    }
+
+    [Fact]
+    public async Task UpdatePartAsync_ForwardsDfmWarningState()
+    {
+        string? body = null;
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+        var handler = new MockHttpMessageHandler(async (request, ct) =>
+        {
+            body = await request.Content!.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        });
+        var client = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+
+        var response = await client.UpdatePartAsync(projectId, partId, new UpdateProjectPartRequest
+        {
+            ProcessType = "CNC_MILL",
+            MaterialId = materialId,
+            MaterialName = "Aluminium 6061-T6",
+            MaterialCode = "AL6061-T6",
+            Quantity = 4,
+            DfmAcknowledged = true,
+            HasDfmWarnings = true
+        });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.NotNull(body);
+        using var json = System.Text.Json.JsonDocument.Parse(body);
+        Assert.True(json.RootElement.GetProperty("hasDfmWarnings").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("dfmAcknowledged").GetBoolean());
     }
 
     // ── Error path — error content surfaced ───────────────────────────────────

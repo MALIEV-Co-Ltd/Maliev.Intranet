@@ -416,7 +416,7 @@ try
         var explicitUrl = config["Services:UploadService:BaseUrl"];
         client.BaseAddress = !string.IsNullOrEmpty(explicitUrl)
             ? new Uri(explicitUrl)
-            : new Uri("http://UploadService");
+            : new Uri("https+http://UploadService");
         client.Timeout = Timeout.InfiniteTimeSpan;
     })
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { MaxConnectionsPerServer = 20 })

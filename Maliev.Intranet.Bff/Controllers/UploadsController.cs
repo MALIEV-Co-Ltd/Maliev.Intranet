@@ -157,7 +157,7 @@ public class UploadsController(
             : request.ContentType;
 
         var storagePath = BuildProjectUploadPath(request.ProjectId, request.CustomerId, fileName);
-        var session = await uploadClient.InitiateResumableUploadAsync(
+        var (session, errorContent, statusCode) = await uploadClient.InitiateResumableUploadWithDiagnosticsAsync(
             fileName,
             contentType,
             request.FileSize,
@@ -165,7 +165,11 @@ public class UploadsController(
             true,
             ct);
 
-        return session != null ? Ok(session) : StatusCode(500, "Upload initiation failed.");
+        return session != null
+            ? Ok(session)
+            : StatusCode(
+                statusCode == 0 ? StatusCodes.Status502BadGateway : statusCode,
+                string.IsNullOrWhiteSpace(errorContent) ? "Upload initiation failed." : errorContent);
     }
 
     /// <summary>

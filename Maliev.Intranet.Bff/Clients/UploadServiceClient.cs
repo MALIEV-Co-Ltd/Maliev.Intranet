@@ -48,13 +48,15 @@ public class UploadServiceClient
             content.Position = 0;
         }
 
-        using var gcsClient = new HttpClient();
-        using var uploadContent = new StreamContent(content);
-        uploadContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-        uploadContent.Headers.ContentLength = totalSize;
-        uploadContent.Headers.ContentRange = new ContentRangeHeaderValue(0, totalSize - 1, totalSize);
+        var contentRange = $"bytes 0-{totalSize - 1}/{totalSize}";
+        using var uploadResponse = await ResumeResumableUploadAsync(
+            session.UploadId,
+            content,
+            contentType,
+            totalSize,
+            contentRange,
+            ct);
 
-        var uploadResponse = await gcsClient.PutAsync(session.SessionUri, uploadContent, ct);
         if (!uploadResponse.IsSuccessStatusCode)
         {
             return null;
@@ -74,6 +76,28 @@ public class UploadServiceClient
         bool overwrite = true,
         CancellationToken ct = default)
     {
+        var (session, _, _) = await InitiateResumableUploadWithDiagnosticsAsync(
+            fileName,
+            contentType,
+            fileSize,
+            path,
+            overwrite,
+            ct);
+
+        return session;
+    }
+
+    /// <summary>
+    /// Initiates a resumable upload session and returns downstream diagnostics when UploadService rejects the request.
+    /// </summary>
+    public async Task<(BffResumableUploadSessionResponse? Session, string? ErrorContent, int StatusCode)> InitiateResumableUploadWithDiagnosticsAsync(
+        string fileName,
+        string contentType,
+        long fileSize,
+        string path,
+        bool overwrite = true,
+        CancellationToken ct = default)
+    {
         var initiateRequest = new InitiateResumableUploadRequest(
             Path: path,
             FileName: fileName,
@@ -85,16 +109,17 @@ public class UploadServiceClient
         var initiateResponse = await _httpClient.PostAsJsonAsync("/upload/v1/uploads/resumable", initiateRequest, ct);
         if (!initiateResponse.IsSuccessStatusCode)
         {
-            return null;
+            var errorContent = await initiateResponse.Content.ReadAsStringAsync(ct);
+            return (null, errorContent, (int)initiateResponse.StatusCode);
         }
 
         var session = await initiateResponse.Content.ReadFromJsonAsync<InitiateResumableUploadResponse>(cancellationToken: ct);
         if (session == null || string.IsNullOrWhiteSpace(session.SessionUri))
         {
-            return null;
+            return (null, "UploadService returned an invalid resumable upload session.", (int)initiateResponse.StatusCode);
         }
 
-        return new BffResumableUploadSessionResponse
+        return (new BffResumableUploadSessionResponse
         {
             UploadId = session.UploadId,
             SessionUri = session.SessionUri,
@@ -102,7 +127,7 @@ public class UploadServiceClient
             FileName = fileName,
             FileSize = fileSize,
             ExpiresAt = session.ExpiresAt
-        };
+        }, null, (int)initiateResponse.StatusCode);
     }
 
     /// <summary>
