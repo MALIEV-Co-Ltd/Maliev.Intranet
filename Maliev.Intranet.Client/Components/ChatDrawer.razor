@@ -167,7 +167,7 @@
                                            Size="Size.Small"
                                            Color="Color.Primary"
                                            Class="sidekick-suggested-action"
-                                           OnClick="@(() => HandleSuggestedAction(action.Text))">
+                                           OnClick="@(() => HandleSuggestedAction(action))">
                                     @action.Text
                                 </MudButton>
                             }
@@ -515,6 +515,57 @@
     {
         _currentInput = actionText;
         await SendMessage();
+    }
+
+    private async Task HandleSuggestedAction(BffSuggestedAction action)
+    {
+        await HandleSuggestedAction(BuildSuggestedActionPrompt(action));
+    }
+
+    private static string BuildSuggestedActionPrompt(BffSuggestedAction action)
+    {
+        if (string.IsNullOrWhiteSpace(action.Data))
+        {
+            return action.Text;
+        }
+
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(action.Data);
+            var root = document.RootElement;
+
+            if (root.TryGetProperty("quotationId", out var quotationId) &&
+                quotationId.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var value = quotationId.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    if (action.Action.Equals("SendReminder", StringComparison.OrdinalIgnoreCase) ||
+                        action.Text.Contains("reminder", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return $"Send reminder for quotation {value}";
+                    }
+
+                    return $"{action.Text} for quotation {value}";
+                }
+            }
+
+            if (root.TryGetProperty("orderId", out var orderId) &&
+                orderId.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var value = orderId.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return $"{action.Text} for order {value}";
+                }
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Keep suggested actions usable even if a service returns malformed action data.
+        }
+
+        return action.Text;
     }
 
     private void StartNewConversation()
