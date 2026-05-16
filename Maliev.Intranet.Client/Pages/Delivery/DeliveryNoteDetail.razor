@@ -1,0 +1,231 @@
+@page "/finance/delivery-notes/{DeliveryNoteId}"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Delivery Note | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="@(_note?.DeliveryNoteNumber ?? "Delivery Note")" Subtitle="Carrier, shipment items, customer delivery status, PDF request, and proof-of-delivery state.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.ArrowBack" Href="/finance/delivery-notes">Back to Delivery Notes</SecondaryButton>
+        <SecondaryButton Icon="@Icons.Material.Outlined.PictureAsPdf" Disabled="@(_note is null || _pdfRequesting)" OnClick="@RequestPdfAsync">Request PDF</SecondaryButton>
+        <PrimaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        @if (_note is not null)
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Status" Value="@DisplayStatus(_note.Status)" />
+                <StatTile Label="Items" Value="@_note.Items.Count.ToString("N0")" />
+                <StatTile Label="Carrier" Value="@Display(_note.CarrierName)" />
+                <StatTile Label="Tracking" Value="@Display(_note.TrackingNumber)" />
+            </StatBar>
+
+            <PanelCard Title="Delivery status">
+                <div class="mlv-toolbar mb-3">
+                    <div class="mlv-toolbar-left">
+                        <StatusBadge Status="@_note.Status" />
+                        <span class="mlv-mono">@_note.DeliveryNoteId</span>
+                    </div>
+                    <div class="mlv-toolbar-right">
+                        <SecondaryButton Icon="@Icons.Material.Outlined.LocalShipping" Disabled="@(!CanMarkInTransit)" OnClick="@MarkInTransitAsync">Mark In Transit</SecondaryButton>
+                        <PrimaryButton Icon="@Icons.Material.Outlined.DoneAll" Disabled="@(!CanMarkDelivered)" OnClick="@MarkDeliveredAsync">Mark Delivered</PrimaryButton>
+                    </div>
+                </div>
+
+                <FormGrid>
+                    <FormField Label="Received by"><input class="mlv-form-input" @bind="_receivedBy" @bind:event="oninput" /></FormField>
+                    <FormField Label="Actual delivery time"><input type="datetime-local" class="mlv-form-input" @bind="_actualDeliveryTime" @bind:format="yyyy-MM-ddTHH:mm" /></FormField>
+                </FormGrid>
+
+                @if (_pdfRequest is not null)
+                {
+                    <div class="mlv-form-help mt-3">@_pdfRequest.Status: @_pdfRequest.Message</div>
+                }
+            </PanelCard>
+
+            <PanelCard Title="Customer and destination">
+                <dl class="mlv-detail-grid">
+                    <div><dt>Customer</dt><dd>@Display(_note.CustomerName)</dd></div>
+                    <div><dt>Order</dt><dd class="mlv-mono">@Display(_note.OrderNumber)</dd></div>
+                    <div><dt>Delivery date</dt><dd>@_note.DeliveryDate.ToString("dd MMM yyyy")</dd></div>
+                    <div><dt>Contact</dt><dd>@Display(_note.DeliveryContactName)</dd></div>
+                    <div><dt>Phone</dt><dd>@Display(_note.DeliveryContactPhone)</dd></div>
+                    <div><dt>Address</dt><dd>@Display(_note.CustomerAddress)</dd></div>
+                    <div><dt>Instructions</dt><dd>@Display(_note.DeliveryInstructions)</dd></div>
+                    <div><dt>Received by</dt><dd>@Display(_note.ReceivedByName)</dd></div>
+                </dl>
+            </PanelCard>
+
+            <PanelCard Title="Items">
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Description</th>
+                            <th>Ordered</th>
+                            <th>Manufactured</th>
+                            <th>Delivered</th>
+                            <th>Unit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _note.Items)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="mlv-row-main">@Display(item.ProductName)</div>
+                                    <div class="mlv-row-sub mlv-mono">@Display(item.ProductCode)</div>
+                                </td>
+                                <td>@Display(item.ProductDescription)</td>
+                                <td class="mlv-mono">@item.QuantityOrdered.ToString("N2")</td>
+                                <td class="mlv-mono">@item.QuantityManufactured.ToString("N2")</td>
+                                <td class="mlv-mono">@item.QuantityDelivered.ToString("N2")</td>
+                                <td>@Display(item.UnitOfMeasure)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public string DeliveryNoteId { get; set; } = string.Empty;
+
+    private DeliveryNoteDetailDto? _note;
+    private DeliveryPdfRequestResponse? _pdfRequest;
+    private bool _loading = true;
+    private bool _statusUpdating;
+    private bool _pdfRequesting;
+    private string? _error;
+    private string _receivedBy = string.Empty;
+    private DateTime _actualDeliveryTime = DateTime.Now;
+
+    private bool CanMarkInTransit => _note is not null &&
+        !_statusUpdating &&
+        string.Equals(_note.Status, "Pending", StringComparison.OrdinalIgnoreCase);
+
+    private bool CanMarkDelivered => _note is not null &&
+        !_statusUpdating &&
+        (string.Equals(_note.Status, "InTransit", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(_note.Status, "PartiallyDelivered", StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task MarkInTransitAsync(MouseEventArgs _) => await UpdateStatusAsync("InTransit");
+
+    private async Task MarkDeliveredAsync(MouseEventArgs _) => await UpdateStatusAsync("Delivered");
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _note = await Http.GetFromJsonAsync<DeliveryNoteDetailDto>($"api/v1/deliverynotes/{Uri.EscapeDataString(DeliveryNoteId)}");
+            if (_note is null)
+            {
+                _error = "Delivery note was not found.";
+                return;
+            }
+
+            _receivedBy = string.IsNullOrWhiteSpace(_note.ReceivedByName) ? _receivedBy : _note.ReceivedByName!;
+            if (_note.ActualDeliveryTime.HasValue)
+            {
+                _actualDeliveryTime = _note.ActualDeliveryTime.Value.ToLocalTime();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Delivery note could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task UpdateStatusAsync(string status)
+    {
+        if (status == "Delivered" && string.IsNullOrWhiteSpace(_receivedBy))
+        {
+            Snackbar.Add("Enter the receiver name before marking delivered.", Severity.Warning);
+            return;
+        }
+
+        _statusUpdating = true;
+        try
+        {
+            var response = await Http.PatchAsJsonAsync($"api/v1/deliverynotes/{Uri.EscapeDataString(DeliveryNoteId)}/status", new UpdateDeliveryStatusRequest
+            {
+                NewStatus = status,
+                ReceivedByName = status == "Delivered" ? _receivedBy : null,
+                ActualDeliveryTime = status == "Delivered" ? _actualDeliveryTime : null
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _error = $"Delivery status could not be updated. HTTP {(int)response.StatusCode}: {body}";
+                Snackbar.Add("Delivery status could not be updated.", Severity.Warning);
+                return;
+            }
+
+            _note = await response.Content.ReadFromJsonAsync<DeliveryNoteDetailDto>();
+            Snackbar.Add(status == "Delivered" ? "Delivery marked delivered." : "Delivery marked in transit.", Severity.Success);
+        }
+        finally
+        {
+            _statusUpdating = false;
+        }
+    }
+
+    private async Task RequestPdfAsync(MouseEventArgs _)
+    {
+        _pdfRequesting = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/v1/deliverynotes/{Uri.EscapeDataString(DeliveryNoteId)}/pdf", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Delivery note PDF could not be requested.", Severity.Warning);
+                return;
+            }
+
+            _pdfRequest = await response.Content.ReadFromJsonAsync<DeliveryPdfRequestResponse>();
+            Snackbar.Add("Delivery note PDF requested.", Severity.Success);
+        }
+        finally
+        {
+            _pdfRequesting = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string DisplayStatus(string status) =>
+        status switch
+        {
+            "InTransit" => "In Transit",
+            "PartiallyDelivered" => "Partially Delivered",
+            _ => status
+        };
+}

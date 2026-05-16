@@ -46,12 +46,13 @@ public class DtoSerializationTests
     [Fact]
     public void DeliveryNoteSummaryDto_ShouldRoundtrip()
     {
-        var dto = new DeliveryNoteSummaryDto { Id = Guid.NewGuid(), OrderNumber = "ORD-456", Status = "Delivered" };
+        var dto = new DeliveryNoteSummaryDto { Id = "DN-2026-000001", DeliveryNoteId = "DN-2026-000001", OrderId = "ORD-456", Status = "Delivered" };
         var json = JsonSerializer.Serialize(dto, Options);
         var result = JsonSerializer.Deserialize<DeliveryNoteSummaryDto>(json, Options);
 
         Assert.NotNull(result);
         Assert.Equal(dto.Id, result.Id);
+        Assert.Equal(dto.DeliveryNoteId, result.DeliveryNoteId);
         Assert.Equal(dto.Status, result.Status);
     }
 
@@ -72,15 +73,29 @@ public class DtoSerializationTests
     {
         var dto = new CreateDeliveryNoteRequest
         {
-            OrderId = Guid.NewGuid(),
-            Notes = "Test notes",
-            Items = new List<CreateDeliveryNoteItemRequest> { new() { OrderItemId = Guid.NewGuid(), Quantity = 5 } }
+            OrderId = "ORD-456",
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "Test Customer",
+            DeliveryInstructions = "Test notes",
+            Items = new List<CreateDeliveryNoteItemRequest>
+            {
+                new()
+                {
+                    ProductCode = "PART-1",
+                    ProductName = "Test part",
+                    QuantityOrdered = 5,
+                    QuantityManufactured = 5,
+                    QuantityDelivered = 5,
+                    UnitOfMeasure = "pcs"
+                }
+            }
         };
         var json = JsonSerializer.Serialize(dto, Options);
         var result = JsonSerializer.Deserialize<CreateDeliveryNoteRequest>(json, Options);
 
         Assert.NotNull(result);
         Assert.Equal(dto.OrderId, result.OrderId);
+        Assert.Equal(dto.CustomerId, result.CustomerId);
         Assert.Single(result.Items);
     }
 

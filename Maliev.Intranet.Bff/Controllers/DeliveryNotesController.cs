@@ -32,8 +32,8 @@ public class DeliveryNotesController(IDeliveryServiceClient client) : Controller
     /// Retrieves a delivery note by ID.
     /// </summary>
     [RequirePermission(MalievPermissions.Delivery.Read, AuthenticationSchemes = "Bearer,Cookies")]
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<DeliveryNoteDetailDto>> GetById(Guid id, CancellationToken ct = default)
+    [HttpGet("{id}")]
+    public async Task<ActionResult<DeliveryNoteDetailDto>> GetById(string id, CancellationToken ct = default)
     {
         var result = await client.GetDeliveryNoteAsync(id, ct);
         return result != null ? Ok(result) : NotFound();
@@ -47,15 +47,15 @@ public class DeliveryNotesController(IDeliveryServiceClient client) : Controller
     public async Task<ActionResult<DeliveryNoteDetailDto>> Create([FromBody] CreateDeliveryNoteRequest request, CancellationToken ct)
     {
         var result = await client.CreateDeliveryNoteAsync(request, ct);
-        return result != null ? CreatedAtAction(nameof(GetById), new { id = result.Id }, result) : BadRequest();
+        return result != null ? CreatedAtAction(nameof(GetById), new { id = result.Id, version = "1.0" }, result) : BadRequest();
     }
 
     /// <summary>
     /// Updates the status of a delivery note.
     /// </summary>
     [RequirePermission(MalievPermissions.Delivery.UpdateStatus, AuthenticationSchemes = "Bearer,Cookies")]
-    [HttpPatch("{id:guid}/status")]
-    public async Task<ActionResult<DeliveryNoteDetailDto>> UpdateStatus(Guid id, [FromBody] UpdateDeliveryStatusRequest request, CancellationToken ct)
+    [HttpPatch("{id}/status")]
+    public async Task<ActionResult<DeliveryNoteDetailDto>> UpdateStatus(string id, [FromBody] UpdateDeliveryStatusRequest request, CancellationToken ct)
     {
         var result = await client.UpdateDeliveryStatusAsync(id, request, ct);
         return result != null ? Ok(result) : NotFound();
@@ -65,8 +65,8 @@ public class DeliveryNotesController(IDeliveryServiceClient client) : Controller
     /// Generates a PDF for a delivery note.
     /// </summary>
     [RequirePermission(MalievPermissions.Delivery.GeneratePdf, AuthenticationSchemes = "Bearer,Cookies")]
-    [HttpPost("{id:guid}/pdf")]
-    public async Task<ActionResult<string>> GeneratePdf(Guid id, CancellationToken ct)
+    [HttpPost("{id}/pdf")]
+    public async Task<ActionResult<DeliveryPdfRequestResponse>> GeneratePdf(string id, CancellationToken ct)
     {
         var url = await client.GeneratePdfAsync(id, ct);
         return url != null ? Ok(url) : BadRequest();
@@ -76,8 +76,8 @@ public class DeliveryNotesController(IDeliveryServiceClient client) : Controller
     /// Deletes a delivery note.
     /// </summary>
     [RequirePermission(MalievPermissions.Delivery.Delete, AuthenticationSchemes = "Bearer,Cookies")]
-    [HttpDelete("{id:guid}")]
-    public async Task<ActionResult> Delete(Guid id, CancellationToken ct)
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> Delete(string id, CancellationToken ct)
     {
         var success = await client.DeleteDeliveryNoteAsync(id, ct);
         return success ? NoContent() : NotFound();

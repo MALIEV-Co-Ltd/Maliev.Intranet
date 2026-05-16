@@ -8,16 +8,28 @@ namespace Maliev.Intranet.Shared.Dtos;
 public sealed record DeliveryNoteSummaryDto
 {
     /// <summary>Gets or sets the unique identifier of the delivery note.</summary>
-    public Guid Id { get; set; }
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the service-owned delivery note identifier.</summary>
+    public string DeliveryNoteId { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the human-readable delivery note number.</summary>
     public string DeliveryNoteNumber { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the associated order identifier.</summary>
+    public string? OrderId { get; set; }
+
+    /// <summary>Gets or sets the associated purchase order identifier.</summary>
+    public int? PurchaseOrderId { get; set; }
+
     /// <summary>Gets or sets the associated order number.</summary>
-    public string OrderNumber { get; set; } = string.Empty;
+    public string? OrderNumber { get; set; }
+
+    /// <summary>Gets or sets the unique identifier of the customer.</summary>
+    public Guid CustomerId { get; set; }
 
     /// <summary>Gets or sets the name of the customer receiving the delivery.</summary>
-    public string CustomerName { get; set; } = string.Empty;
+    public string? CustomerName { get; set; }
 
     /// <summary>Gets or sets the scheduled or actual delivery date.</summary>
     public DateTime DeliveryDate { get; set; }
@@ -25,11 +37,17 @@ public sealed record DeliveryNoteSummaryDto
     /// <summary>Gets or sets the current status of the delivery (e.g., "Shipped", "Delivered").</summary>
     public string Status { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the name of the shipping carrier.</summary>
+    public string? CarrierName { get; set; }
+
     /// <summary>Gets or sets the tracking number for the shipment.</summary>
-    public string TrackingNumber { get; set; } = string.Empty;
+    public string? TrackingNumber { get; set; }
 
     /// <summary>Gets or sets the number of items included in this delivery.</summary>
     public int ItemCount { get; set; }
+
+    /// <summary>Gets or sets the UTC timestamp when the record was created.</summary>
+    public DateTime CreatedAt { get; set; }
 }
 
 /// <summary>
@@ -38,13 +56,19 @@ public sealed record DeliveryNoteSummaryDto
 public sealed record DeliveryNoteDetailDto
 {
     /// <summary>Gets or sets the unique identifier of the delivery note.</summary>
-    public Guid Id { get; set; }
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the service-owned delivery note identifier.</summary>
+    public string DeliveryNoteId { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the human-readable delivery note number.</summary>
     public string DeliveryNoteNumber { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the unique identifier of the associated order.</summary>
     public string? OrderId { get; set; }
+
+    /// <summary>Gets or sets the associated purchase order identifier.</summary>
+    public int? PurchaseOrderId { get; set; }
 
     /// <summary>Gets or sets the associated order number.</summary>
     public string OrderNumber { get; set; } = string.Empty;
@@ -53,7 +77,7 @@ public sealed record DeliveryNoteDetailDto
     public Guid CustomerId { get; set; }
 
     /// <summary>Gets or sets the name of the customer receiving the delivery.</summary>
-    public string CustomerName { get; set; } = string.Empty;
+    public string? CustomerName { get; set; }
 
     /// <summary>Gets or sets the billing or primary address of the customer.</summary>
     public string CustomerAddress { get; set; } = string.Empty;
@@ -103,6 +127,18 @@ public sealed record DeliveryNoteDetailDto
     /// <summary>Gets or sets internal notes for the delivery staff.</summary>
     public string? InternalNotes { get; set; }
 
+    /// <summary>Gets or sets the delivery contact email address.</summary>
+    public string? DeliveryContactEmail { get; set; }
+
+    /// <summary>Gets or sets the shipping cost.</summary>
+    public decimal? ShippingCost { get; set; }
+
+    /// <summary>Gets or sets the shipping cost currency.</summary>
+    public string? ShippingCostCurrency { get; set; }
+
+    /// <summary>Gets or sets the timestamp when delivery evidence was signed.</summary>
+    public DateTime? SignedAt { get; set; }
+
     /// <summary>Gets or sets the name of the person who received the delivery.</summary>
     public string? ReceivedByName { get; set; }
 
@@ -120,6 +156,9 @@ public sealed record DeliveryNoteDetailDto
 
     /// <summary>Gets or sets the name of the user who last updated the record.</summary>
     public string? UpdatedBy { get; set; }
+
+    /// <summary>Gets or sets the concurrency version returned by the service.</summary>
+    public uint Version { get; set; }
 }
 
 /// <summary>
@@ -129,6 +168,12 @@ public sealed record DeliveryNoteItemDto
 {
     /// <summary>Gets or sets the unique identifier of the delivery note item.</summary>
     public long Id { get; set; }
+
+    /// <summary>Gets or sets the associated order identifier.</summary>
+    public string? OrderId { get; set; }
+
+    /// <summary>Gets or sets the associated purchase order item identifier.</summary>
+    public int? PurchaseOrderItemId { get; set; }
 
     /// <summary>Gets or sets the unique product code.</summary>
     public string? ProductCode { get; set; }
@@ -153,6 +198,9 @@ public sealed record DeliveryNoteItemDto
 
     /// <summary>Gets or sets additional notes for this specific item in the delivery.</summary>
     public string? ItemNotes { get; set; }
+
+    /// <summary>Gets or sets the concurrency version returned by the service.</summary>
+    public uint Version { get; set; }
 }
 
 /// <summary>
@@ -161,8 +209,17 @@ public sealed record DeliveryNoteItemDto
 public sealed record CreateDeliveryNoteRequest
 {
     /// <summary>Gets or sets the unique identifier of the order to create a delivery note for.</summary>
+    public string? OrderId { get; set; }
+
+    /// <summary>Gets or sets the purchase order identifier to create a delivery note for.</summary>
+    public int? PurchaseOrderId { get; set; }
+
+    /// <summary>Gets or sets the unique identifier of the customer receiving the delivery.</summary>
     [Required]
-    public Guid OrderId { get; set; }
+    public Guid CustomerId { get; set; }
+
+    /// <summary>Gets or sets the name of the customer receiving the delivery.</summary>
+    public string? CustomerName { get; set; }
 
     /// <summary>Gets or sets the scheduled delivery date.</summary>
     [Required]
@@ -175,13 +232,40 @@ public sealed record CreateDeliveryNoteRequest
     public string? CarrierName { get; set; }
 
     /// <summary>Gets or sets the name of the contact person at the delivery location.</summary>
-    public string? DeliveryContact { get; set; }
+    public string? DeliveryContactName { get; set; }
 
     /// <summary>Gets or sets the phone number of the contact person at the delivery location.</summary>
-    public string? DeliveryPhone { get; set; }
+    public string? DeliveryContactPhone { get; set; }
+
+    /// <summary>Gets or sets the email address of the contact person at the delivery location.</summary>
+    public string? DeliveryContactEmail { get; set; }
+
+    /// <summary>Gets or sets the first line of the shipping address.</summary>
+    public string? ShippingAddressLine1 { get; set; }
+
+    /// <summary>Gets or sets the second line of the shipping address.</summary>
+    public string? ShippingAddressLine2 { get; set; }
+
+    /// <summary>Gets or sets the city of the shipping address.</summary>
+    public string? ShippingCity { get; set; }
+
+    /// <summary>Gets or sets the province or state of the shipping address.</summary>
+    public string? ShippingProvince { get; set; }
+
+    /// <summary>Gets or sets the postal code of the shipping address.</summary>
+    public string? ShippingPostalCode { get; set; }
+
+    /// <summary>Gets or sets the country of the shipping address.</summary>
+    public string? ShippingCountry { get; set; }
+
+    /// <summary>Gets or sets the shipping cost.</summary>
+    public decimal? ShippingCost { get; set; }
+
+    /// <summary>Gets or sets the shipping cost currency.</summary>
+    public string? ShippingCostCurrency { get; set; }
 
     /// <summary>Gets or sets additional notes or instructions for the delivery.</summary>
-    public string? Notes { get; set; }
+    public string? DeliveryInstructions { get; set; }
 
     /// <summary>Gets or sets the collection of items to be included in the delivery.</summary>
     public List<CreateDeliveryNoteItemRequest> Items { get; set; } = [];
@@ -192,13 +276,41 @@ public sealed record CreateDeliveryNoteRequest
 /// </summary>
 public sealed record CreateDeliveryNoteItemRequest
 {
-    /// <summary>Gets or sets the unique identifier of the order item to include.</summary>
-    [Required]
-    public Guid OrderItemId { get; set; }
+    /// <summary>Gets or sets the associated order identifier.</summary>
+    public string? OrderId { get; set; }
 
-    /// <summary>Gets or sets the quantity of the item to be delivered.</summary>
-    [Range(1, int.MaxValue)]
-    public int Quantity { get; set; }
+    /// <summary>Gets or sets the associated purchase order item identifier.</summary>
+    public int? PurchaseOrderItemId { get; set; }
+
+    /// <summary>Gets or sets the unique product code.</summary>
+    [Required]
+    public string ProductCode { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the display name of the product.</summary>
+    [Required]
+    public string ProductName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a detailed description of the product.</summary>
+    public string? ProductDescription { get; set; }
+
+    /// <summary>Gets or sets the total quantity originally ordered.</summary>
+    [Range(typeof(decimal), "0.0001", "79228162514264337593543950335")]
+    public decimal QuantityOrdered { get; set; }
+
+    /// <summary>Gets or sets the quantity that has been manufactured and is ready for delivery.</summary>
+    [Range(typeof(decimal), "0.0001", "79228162514264337593543950335")]
+    public decimal QuantityManufactured { get; set; }
+
+    /// <summary>Gets or sets the quantity included in this delivery.</summary>
+    [Range(typeof(decimal), "0.0001", "79228162514264337593543950335")]
+    public decimal QuantityDelivered { get; set; }
+
+    /// <summary>Gets or sets the unit of measure for the quantity.</summary>
+    [Required]
+    public string UnitOfMeasure { get; set; } = "pcs";
+
+    /// <summary>Gets or sets additional notes for this item.</summary>
+    public string? ItemNotes { get; set; }
 }
 
 /// <summary>
@@ -208,14 +320,29 @@ public sealed record UpdateDeliveryStatusRequest
 {
     /// <summary>Gets or sets the new status of the delivery (e.g., "Delivered", "Cancelled").</summary>
     [Required]
-    public string Status { get; set; } = string.Empty;
+    public string NewStatus { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the name of the person who received the delivery.</summary>
-    public string? ReceivedBy { get; set; }
+    public string? ReceivedByName { get; set; }
 
     /// <summary>Gets or sets the actual time when the delivery was received.</summary>
-    public DateTime? ReceivedAt { get; set; }
+    public DateTime? ActualDeliveryTime { get; set; }
 
-    /// <summary>Gets or sets additional notes related to the status update.</summary>
-    public string? Notes { get; set; }
+    /// <summary>Gets or sets the signature file identifier linked to proof of delivery.</summary>
+    public Guid? SignatureFileId { get; set; }
+}
+
+/// <summary>
+/// Response returned when delivery note PDF generation is queued.
+/// </summary>
+public sealed record DeliveryPdfRequestResponse
+{
+    /// <summary>Gets or sets the delivery note identifier.</summary>
+    public string DeliveryNoteId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the queued PDF request status.</summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the status message returned by the service.</summary>
+    public string? Message { get; set; }
 }

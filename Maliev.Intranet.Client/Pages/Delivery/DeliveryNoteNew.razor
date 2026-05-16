@@ -1,0 +1,166 @@
+@page "/finance/delivery-notes/new"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>New Delivery Note | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="New Delivery Note" Subtitle="Create shipment documentation from a customer order or purchase-order context.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.ArrowBack" Href="/finance/delivery-notes">Back to Delivery Notes</SecondaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <PanelCard Title="Shipment identity">
+            <FormGrid>
+                <FormField Label="Source order ID"><input class="mlv-form-input" @bind="_request.OrderId" @bind:event="oninput" /></FormField>
+                <FormField Label="Purchase order ID"><input type="number" class="mlv-form-input" @bind="_purchaseOrderIdText" @bind:event="oninput" /></FormField>
+                <FormField Label="Customer ID"><input class="mlv-form-input" @bind="_customerIdText" @bind:event="oninput" /></FormField>
+                <FormField Label="Customer name"><input class="mlv-form-input" @bind="_request.CustomerName" @bind:event="oninput" /></FormField>
+                <FormField Label="Delivery date"><input type="date" class="mlv-form-input" @bind="_request.DeliveryDate" @bind:format="yyyy-MM-dd" /></FormField>
+                <FormField Label="Carrier"><input class="mlv-form-input" @bind="_request.CarrierName" @bind:event="oninput" /></FormField>
+                <FormField Label="Tracking number"><input class="mlv-form-input" @bind="_request.TrackingNumber" @bind:event="oninput" /></FormField>
+                <FormField Label="Shipping cost"><input type="number" step="0.01" class="mlv-form-input" @bind="_request.ShippingCost" @bind:event="oninput" /></FormField>
+                <FormField Label="Shipping currency"><input class="mlv-form-input" @bind="_request.ShippingCostCurrency" @bind:event="oninput" /></FormField>
+            </FormGrid>
+        </PanelCard>
+
+        <PanelCard Title="Destination">
+            <FormGrid>
+                <FormField Label="Address line 1"><input class="mlv-form-input" @bind="_request.ShippingAddressLine1" @bind:event="oninput" /></FormField>
+                <FormField Label="Address line 2"><input class="mlv-form-input" @bind="_request.ShippingAddressLine2" @bind:event="oninput" /></FormField>
+                <FormField Label="City"><input class="mlv-form-input" @bind="_request.ShippingCity" @bind:event="oninput" /></FormField>
+                <FormField Label="Province"><input class="mlv-form-input" @bind="_request.ShippingProvince" @bind:event="oninput" /></FormField>
+                <FormField Label="Postal code"><input class="mlv-form-input" @bind="_request.ShippingPostalCode" @bind:event="oninput" /></FormField>
+                <FormField Label="Country"><input class="mlv-form-input" @bind="_request.ShippingCountry" @bind:event="oninput" /></FormField>
+                <FormField Label="Contact name"><input class="mlv-form-input" @bind="_request.DeliveryContactName" @bind:event="oninput" /></FormField>
+                <FormField Label="Contact phone"><input class="mlv-form-input" @bind="_request.DeliveryContactPhone" @bind:event="oninput" /></FormField>
+                <FormField Label="Contact email"><input type="email" class="mlv-form-input" @bind="_request.DeliveryContactEmail" @bind:event="oninput" /></FormField>
+                <FormField Label="Delivery instructions"><textarea class="mlv-form-input" rows="3" @bind="_request.DeliveryInstructions" @bind:event="oninput"></textarea></FormField>
+            </FormGrid>
+        </PanelCard>
+
+        <PanelCard Title="Delivery item">
+            <FormGrid>
+                <FormField Label="Product code"><input class="mlv-form-input" @bind="_item.ProductCode" @bind:event="oninput" /></FormField>
+                <FormField Label="Product name"><input class="mlv-form-input" @bind="_item.ProductName" @bind:event="oninput" /></FormField>
+                <FormField Label="Description"><input class="mlv-form-input" @bind="_item.ProductDescription" @bind:event="oninput" /></FormField>
+                <FormField Label="Ordered quantity"><input type="number" step="0.01" class="mlv-form-input" @bind="_item.QuantityOrdered" @bind:event="oninput" /></FormField>
+                <FormField Label="Manufactured quantity"><input type="number" step="0.01" class="mlv-form-input" @bind="_item.QuantityManufactured" @bind:event="oninput" /></FormField>
+                <FormField Label="Delivered quantity"><input type="number" step="0.01" class="mlv-form-input" @bind="_item.QuantityDelivered" @bind:event="oninput" /></FormField>
+                <FormField Label="Unit"><input class="mlv-form-input" @bind="_item.UnitOfMeasure" @bind:event="oninput" /></FormField>
+                <FormField Label="Item notes"><input class="mlv-form-input" @bind="_item.ItemNotes" @bind:event="oninput" /></FormField>
+            </FormGrid>
+
+            <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                <PrimaryButton Icon="@Icons.Material.Outlined.LocalShipping" Disabled="@_saving" OnClick="@CreateAsync">Create Delivery Note</PrimaryButton>
+            </div>
+        </PanelCard>
+    </PageBody>
+</div>
+
+@code {
+    private CreateDeliveryNoteRequest _request = new()
+    {
+        DeliveryDate = DateTime.Today.AddDays(1),
+        ShippingCountry = "Thailand",
+        ShippingCostCurrency = "THB"
+    };
+    private CreateDeliveryNoteItemRequest _item = new()
+    {
+        UnitOfMeasure = "pcs",
+        QuantityOrdered = 1,
+        QuantityManufactured = 1,
+        QuantityDelivered = 1
+    };
+    private string _customerIdText = string.Empty;
+    private string _purchaseOrderIdText = string.Empty;
+    private string? _error;
+    private bool _saving;
+
+    private async Task CreateAsync(MouseEventArgs _)
+    {
+        _error = ValidateAndPrepare();
+        if (_error is not null)
+        {
+            Snackbar.Add(_error, Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            _request.Items = [_item];
+            var response = await Http.PostAsJsonAsync("api/v1/deliverynotes", _request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _error = $"Delivery note could not be created. HTTP {(int)response.StatusCode}: {body}";
+                Snackbar.Add("Delivery note could not be created.", Severity.Warning);
+                return;
+            }
+
+            var created = await response.Content.ReadFromJsonAsync<DeliveryNoteDetailDto>();
+            if (created is null || string.IsNullOrWhiteSpace(created.DeliveryNoteId))
+            {
+                _error = "DeliveryService did not return a delivery note identifier.";
+                Snackbar.Add(_error, Severity.Warning);
+                return;
+            }
+
+            Snackbar.Add("Delivery note created.", Severity.Success);
+            Navigation.NavigateTo($"/finance/delivery-notes/{created.DeliveryNoteId}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private string? ValidateAndPrepare()
+    {
+        if (string.IsNullOrWhiteSpace(_request.OrderId) && string.IsNullOrWhiteSpace(_purchaseOrderIdText))
+        {
+            return "Enter an order ID or purchase order ID.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(_purchaseOrderIdText) && int.TryParse(_purchaseOrderIdText, out var purchaseOrderId))
+        {
+            _request.PurchaseOrderId = purchaseOrderId;
+        }
+        else if (!string.IsNullOrWhiteSpace(_purchaseOrderIdText))
+        {
+            return "Enter a valid purchase order ID.";
+        }
+
+        if (!Guid.TryParse(_customerIdText, out var customerId))
+        {
+            return "Enter a valid customer ID.";
+        }
+
+        _request.CustomerId = customerId;
+
+        if (string.IsNullOrWhiteSpace(_request.CustomerName))
+        {
+            return "Enter the customer name.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_item.ProductCode) || string.IsNullOrWhiteSpace(_item.ProductName))
+        {
+            return "Enter the product code and product name.";
+        }
+
+        if (_item.QuantityDelivered <= 0 || _item.QuantityDelivered > _item.QuantityManufactured || _item.QuantityDelivered > _item.QuantityOrdered)
+        {
+            return "Delivered quantity must be positive and cannot exceed manufactured or ordered quantity.";
+        }
+
+        _item.OrderId = _request.OrderId;
+        return null;
+    }
+}

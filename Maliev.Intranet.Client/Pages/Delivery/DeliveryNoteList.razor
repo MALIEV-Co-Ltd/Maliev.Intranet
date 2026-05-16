@@ -1,0 +1,165 @@
+@page "/finance/delivery-notes"
+@page "/delivery-notes"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Delivery Notes | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Delivery Notes" Subtitle="Outbound logistics documentation, carrier tracking, proof of delivery, and customer-facing shipment state.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+        <PrimaryButton Icon="@Icons.Material.Outlined.LocalShipping" Href="/finance/delivery-notes/new">New Delivery Note</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Matching notes" Value="@_meta.TotalItems.ToString("N0")" />
+            <StatTile Label="Pending" Value="@_notes.Count(n => IsStatus(n, "Pending")).ToString("N0")" />
+            <StatTile Label="In transit" Value="@_notes.Count(n => IsStatus(n, "InTransit")).ToString("N0")" />
+            <StatTile Label="Delivered" Value="@_notes.Count(n => IsStatus(n, "Delivered")).ToString("N0")" Trend="true" />
+        </StatBar>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <PanelCard>
+            @if (_notes.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Delivery note</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Carrier</th>
+                            <th>Tracking</th>
+                            <th>Items</th>
+                            <th>Delivery date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var note in _notes)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/finance/delivery-notes/{note.DeliveryNoteId}"))">
+                                <td>
+                                    <div class="mlv-row-main mlv-mono">@Display(note.DeliveryNoteNumber)</div>
+                                    <div class="mlv-row-sub">Order @Display(note.OrderNumber)</div>
+                                </td>
+                                <td>@Display(note.CustomerName)</td>
+                                <td><StatusBadge Status="@note.Status" /></td>
+                                <td>@Display(note.CarrierName)</td>
+                                <td class="mlv-mono">@Display(note.TrackingNumber)</td>
+                                <td>@note.ItemCount.ToString("N0")</td>
+                                <td>@note.DeliveryDate.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">
+                    No delivery notes match this view.
+                    <div class="mt-3">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.LocalShipping" Href="/finance/delivery-notes/new">Create Delivery Note</PrimaryButton>
+                    </div>
+                </div>
+            }
+        </PanelCard>
+
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
+    </PageBody>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public int? QueryPageSize { get; set; }
+
+    private List<DeliveryNoteSummaryDto> _notes = [];
+    private PaginationMeta _meta = new();
+    private bool _loading = true;
+    private string? _error;
+    private int _page = 1;
+    private int _pageSize = 20;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _page = Math.Max(1, QueryPage ?? 1);
+        _pageSize = NormalizePageSize(QueryPageSize ?? 20);
+        await LoadAsync();
+    }
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = NormalizePageSize(pageSize);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task NavigateAndLoadAsync()
+    {
+        var query = new List<string>();
+        if (_page > 1) query.Add($"page={_page}");
+        if (_pageSize != 20) query.Add($"pageSize={_pageSize}");
+        Navigation.NavigateTo(query.Count == 0 ? "/finance/delivery-notes" : $"/finance/delivery-notes?{string.Join("&", query)}", replace: true);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<DeliveryNoteSummaryDto>>($"api/v1/deliverynotes?page={_page}&pageSize={_pageSize}");
+            _notes = response?.Data.ToList() ?? [];
+            _meta = response?.Meta ?? new();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
+        }
+        catch (Exception ex)
+        {
+            _error = "Delivery notes could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static int NormalizePageSize(int pageSize) => pageSize switch
+    {
+        <= 10 => 10,
+        <= 20 => 20,
+        _ => 50
+    };
+
+    private static bool IsStatus(DeliveryNoteSummaryDto note, string status) =>
+        string.Equals(note.Status, status, StringComparison.OrdinalIgnoreCase);
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+}

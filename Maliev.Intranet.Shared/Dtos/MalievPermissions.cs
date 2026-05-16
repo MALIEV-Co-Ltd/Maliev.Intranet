@@ -552,17 +552,17 @@ public static class MalievPermissions
     public static class Delivery
     {
         /// <summary>Permission to view delivery notes and shipping status.</summary>
-        public const string Read = "delivery.delivery-notes.read";
+        public const string Read = "delivery.deliverynotes.read";
         /// <summary>Permission to create new delivery documentation.</summary>
-        public const string Create = "delivery.delivery-notes.create";
+        public const string Create = "delivery.deliverynotes.create";
         /// <summary>Permission to update existing delivery details.</summary>
-        public const string Update = "delivery.delivery-notes.update";
+        public const string Update = "delivery.deliverynotes.update";
         /// <summary>Permission to delete delivery records.</summary>
-        public const string Delete = "delivery.delivery-notes.delete";
+        public const string Delete = "delivery.deliverynotes.delete";
         /// <summary>Permission to modify the lifecycle status of a delivery.</summary>
-        public const string UpdateStatus = "delivery.delivery-notes.update-status";
+        public const string UpdateStatus = "delivery.deliverynotes.update";
         /// <summary>Permission to generate PDF representations of delivery notes.</summary>
-        public const string GeneratePdf = "delivery.delivery-notes.generate-pdf";
+        public const string GeneratePdf = "delivery.deliverynotes.generate";
     }
 
     /// <summary>
