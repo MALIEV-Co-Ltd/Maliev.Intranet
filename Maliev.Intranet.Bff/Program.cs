@@ -405,7 +405,7 @@ try
     builder.AddBffServiceClient<ComplianceServiceClient>("ComplianceService");
     builder.AddBffServiceClient<PerformanceServiceClient>("PerformanceService");
     builder.AddBffServiceClient<CompensationServiceClient>("CompensationService");
-    builder.AddBffServiceClient<DeliveryServiceClient>("DeliveryService");
+    builder.AddBffServiceClient<IDeliveryServiceClient, DeliveryServiceClient>("DeliveryService");
     builder.AddBffServiceClient<IAccountingServiceClient, AccountingServiceClient>("AccountingService");
 
     // Raw resumable upload proxy requests stream the browser request body to UploadService.

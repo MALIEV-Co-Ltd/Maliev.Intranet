@@ -14,6 +14,17 @@ public class ProgramHttpClientConfigurationTests
         Assert.Contains(expectedBaseAddress, programSource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DeliveryNotesController_ClientInterface_IsRegistered()
+    {
+        var programSource = File.ReadAllText(FindProgramSource());
+
+        Assert.Contains(
+            "builder.AddBffServiceClient<IDeliveryServiceClient, DeliveryServiceClient>(\"DeliveryService\")",
+            programSource,
+            StringComparison.Ordinal);
+    }
+
     private static string FindProgramSource()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
