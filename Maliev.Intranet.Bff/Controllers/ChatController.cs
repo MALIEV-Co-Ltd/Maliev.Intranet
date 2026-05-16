@@ -6,6 +6,7 @@ using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
@@ -20,6 +21,7 @@ public class ChatController(
     IChatContextResolver contextResolver,
     ChatHubService chatHubService,
     IConfiguration configuration,
+    IHostEnvironment hostEnvironment,
     IChatCallbackTokenService callbackTokenService) : ControllerBase
 {
     /// <summary>
@@ -37,7 +39,7 @@ public class ChatController(
             ct);
 
         if (result == null)
-            return StatusCode(500, "Failed to initiate chat session.");
+            return ChatbotFailure("Failed to initiate chat session.");
 
         return Ok(new BffChatSessionResponse
         {
@@ -80,7 +82,7 @@ public class ChatController(
             ct: ct);
 
         if (result == null)
-            return StatusCode(500, "Failed to get AI response.");
+            return ChatbotFailure("Failed to get AI response.");
 
         return Ok(new BffChatMessageResponse
         {
@@ -140,7 +142,7 @@ public class ChatController(
             ct: ct);
 
         if (result == null)
-            return StatusCode(500, "Failed to get AI response.");
+            return ChatbotFailure("Failed to get AI response.");
 
         var response = new BffChatMessageResponse
         {
@@ -178,5 +180,19 @@ public class ChatController(
 
         var genericTerms = new[] { "VIEW ALL SERVICES", "CONTACT US", "REQUEST A QUOTE" };
         return genericTerms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private ObjectResult ChatbotFailure(string message)
+    {
+        if (hostEnvironment.IsProduction() || string.IsNullOrWhiteSpace(chatbotClient.LastError))
+        {
+            return StatusCode(500, message);
+        }
+
+        return StatusCode(500, new
+        {
+            message,
+            downstream = chatbotClient.LastError
+        });
     }
 }

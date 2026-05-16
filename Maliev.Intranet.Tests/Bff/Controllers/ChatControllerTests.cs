@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Maliev.Intranet.Tests.Testing;
@@ -22,6 +23,7 @@ public class ChatControllerTests
     private readonly Mock<IClientProxy> _clientProxyMock;
     private readonly Mock<ChatHubService> _chatHubServiceMock;
     private readonly Mock<IConfiguration> _configMock;
+    private readonly Mock<IHostEnvironment> _hostEnvironmentMock;
     private readonly Mock<IChatCallbackTokenService> _callbackTokenServiceMock;
     private readonly ChatController _controller;
 
@@ -39,6 +41,10 @@ public class ChatControllerTests
         _chatHubServiceMock = new Mock<ChatHubService>(hubContextMock.Object);
 
         _configMock = new Mock<IConfiguration>();
+        _hostEnvironmentMock = new Mock<IHostEnvironment>();
+        _hostEnvironmentMock
+            .SetupGet(environment => environment.EnvironmentName)
+            .Returns("Testing");
         _callbackTokenServiceMock = new Mock<IChatCallbackTokenService>();
         _callbackTokenServiceMock
             .Setup(service => service.CreateToken(It.IsAny<Guid>()))
@@ -49,6 +55,7 @@ public class ChatControllerTests
             _contextResolverMock.Object,
             _chatHubServiceMock.Object,
             _configMock.Object,
+            _hostEnvironmentMock.Object,
             _callbackTokenServiceMock.Object);
     }
 

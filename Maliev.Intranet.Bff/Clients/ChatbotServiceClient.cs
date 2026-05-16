@@ -18,6 +18,11 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     };
 
     /// <summary>
+    /// Gets the most recent downstream failure detail observed by this scoped client.
+    /// </summary>
+    public string? LastError { get; private set; }
+
+    /// <summary>
     /// Checks whether the ChatbotService is reachable without creating a chat session.
     /// </summary>
     public virtual async Task<bool> CheckHealthAsync(CancellationToken ct = default)
@@ -44,6 +49,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     /// </summary>
     public virtual async Task<ChatbotSessionResponse?> InitiateSessionAsync(string channel, string language, CancellationToken ct = default)
     {
+        LastError = null;
         try
         {
             var payload = new { channel, language };
@@ -53,6 +59,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
                 logger.LogError("ChatbotService session initiation failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
                 return null;
             }
@@ -61,11 +68,13 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         }
         catch (OperationCanceledException)
         {
+            LastError = "ChatbotService session initiation timed out.";
             logger.LogWarning("ChatbotService session initiation timed out.");
             return null;
         }
         catch (Exception ex)
         {
+            LastError = ex.Message;
             logger.LogError(ex, "ChatbotService session initiation failed unexpectedly.");
             return null;
         }
@@ -82,6 +91,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         object? responseSchema = null,
         CancellationToken ct = default)
     {
+        LastError = null;
         try
         {
             var payload = new ChatbotSendMessageRequest
@@ -99,6 +109,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
                 logger.LogError("ChatbotService send message failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
                 return null;
             }
@@ -107,11 +118,13 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         }
         catch (OperationCanceledException)
         {
+            LastError = "ChatbotService send message timed out.";
             logger.LogWarning("ChatbotService send message timed out.");
             return null;
         }
         catch (Exception ex)
         {
+            LastError = ex.Message;
             logger.LogError(ex, "ChatbotService send message failed unexpectedly.");
             return null;
         }
@@ -127,6 +140,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         List<ChatbotAttachment>? attachments = null,
         CancellationToken ct = default)
     {
+        LastError = null;
         try
         {
             var payload = new ChatbotSendMessageRequest
@@ -143,6 +157,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
                 logger.LogError("ChatbotService stream message failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
                 return null;
             }
@@ -151,11 +166,13 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         }
         catch (OperationCanceledException)
         {
+            LastError = "ChatbotService stream message timed out.";
             logger.LogWarning("ChatbotService stream message timed out.");
             return null;
         }
         catch (Exception ex)
         {
+            LastError = ex.Message;
             logger.LogError(ex, "ChatbotService stream message failed unexpectedly.");
             return null;
         }
@@ -166,6 +183,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     /// </summary>
     public virtual async Task<ChatbotCustomerIntentResponse?> ExtractCustomerIntentAsync(string userMessage, CancellationToken ct = default)
     {
+        LastError = null;
         try
         {
             var payload = new { user_message = userMessage };
@@ -174,6 +192,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
                 logger.LogError("ChatbotService customer intent extraction failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
                 return null;
             }
@@ -181,11 +200,13 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         }
         catch (OperationCanceledException)
         {
+            LastError = "ChatbotService customer intent extraction timed out.";
             logger.LogWarning("ChatbotService customer intent extraction timed out.");
             return null;
         }
         catch (Exception ex)
         {
+            LastError = ex.Message;
             logger.LogError(ex, "ChatbotService customer intent extraction failed.");
             return null;
         }
@@ -202,6 +223,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     public virtual async Task<ChatbotExtractCustomerResponse?> ExtractCustomerAsync(
         List<string> storagePaths, string? rawText, List<ChatbotExtractionFileData>? files = null, CancellationToken ct = default)
     {
+        LastError = null;
         try
         {
             var payload = new ChatbotExtractCustomerRequest
@@ -216,6 +238,7 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
                 logger.LogError("ChatbotService customer extraction failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
                 return null;
             }
@@ -224,11 +247,13 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         }
         catch (OperationCanceledException)
         {
+            LastError = "ChatbotService customer extraction timed out.";
             logger.LogWarning("ChatbotService customer extraction timed out.");
             return null;
         }
         catch (Exception ex)
         {
+            LastError = ex.Message;
             logger.LogError(ex, "ChatbotService customer extraction failed unexpectedly.");
             return null;
         }
