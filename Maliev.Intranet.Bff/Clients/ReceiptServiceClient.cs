@@ -37,13 +37,15 @@ public class ReceiptServiceClient(HttpClient httpClient) : IReceiptServiceClient
     /// <inheritdoc />
     public async Task<PagedResponse<ReceiptDto>?> GetReceiptsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<ReceiptDto>>($"/receipt/v1/receipts?page={page}&pageSize={pageSize}", ct);
+        var response = await httpClient.GetFromJsonAsync<ReceiptServicePagedResponse<ReceiptServiceReceiptResponse>>($"/receipt/v1/receipts?page={page}&pageSize={pageSize}", ct);
+        return response?.ToPagedResponse() ?? new PagedResponse<ReceiptDto>();
     }
 
     /// <inheritdoc />
     public async Task<ReceiptDto?> GetReceiptByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<ReceiptDto>($"/receipt/v1/receipts/{id}", ct);
+        var response = await httpClient.GetFromJsonAsync<ReceiptServiceReceiptResponse>($"/receipt/v1/receipts/{id}", ct);
+        return response?.ToDto();
     }
 
     /// <inheritdoc />
@@ -52,7 +54,8 @@ public class ReceiptServiceClient(HttpClient httpClient) : IReceiptServiceClient
         var response = await httpClient.PostAsJsonAsync("/receipt/v1/receipts", request, ct);
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<ReceiptDto>(cancellationToken: ct);
+            var receipt = await response.Content.ReadFromJsonAsync<ReceiptServiceReceiptResponse>(cancellationToken: ct);
+            return receipt?.ToDto();
         }
         return null;
     }
@@ -62,5 +65,78 @@ public class ReceiptServiceClient(HttpClient httpClient) : IReceiptServiceClient
     {
         var response = await httpClient.PostAsync($"/receipt/v1/receipts/{id}/void", null, ct);
         return response.IsSuccessStatusCode;
+    }
+
+    private sealed class ReceiptServicePagedResponse<T>
+    {
+        public List<T> Data { get; set; } = [];
+        public ReceiptServicePaginationMetadata Pagination { get; set; } = new();
+
+        public PagedResponse<ReceiptDto> ToPagedResponse()
+        {
+            return new PagedResponse<ReceiptDto>
+            {
+                Data = Data.OfType<ReceiptServiceReceiptResponse>().Select(receipt => receipt.ToDto()).ToList(),
+                Meta = new PaginationMeta
+                {
+                    CurrentPage = Pagination.CurrentPage,
+                    PageSize = Pagination.PageSize,
+                    TotalCount = Pagination.TotalCount,
+                    TotalItems = Pagination.TotalCount,
+                    TotalPages = Pagination.TotalPages
+                }
+            };
+        }
+    }
+
+    private sealed class ReceiptServicePaginationMetadata
+    {
+        public int CurrentPage { get; set; }
+        public int PageSize { get; set; }
+        public int TotalCount { get; set; }
+        public int TotalPages { get; set; }
+    }
+
+    private sealed class ReceiptServiceReceiptResponse
+    {
+        public Guid Id { get; set; }
+        public string ReceiptNumber { get; set; } = string.Empty;
+        public Guid InvoiceId { get; set; }
+        public DateTime IssueDate { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public Guid? PdfReferenceId { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string CreatedBy { get; set; } = string.Empty;
+        public List<ReceiptServiceLineItemResponse> LineItems { get; set; } = [];
+
+        public ReceiptDto ToDto() => new()
+        {
+            Id = Id,
+            ReceiptNumber = ReceiptNumber,
+            InvoiceId = InvoiceId,
+            CustomerName = CustomerName,
+            Date = IssueDate,
+            IssueDate = IssueDate,
+            TotalAmount = TotalAmount,
+            PaymentMethod = PaymentMethod ?? "Bank Transfer",
+            Status = Status,
+            PdfReferenceId = PdfReferenceId,
+            CreatedAt = CreatedAt,
+            CreatedBy = CreatedBy,
+            Lines = LineItems.Select(line => new ReceiptLineItemDto
+            {
+                Description = line.Description,
+                Amount = line.LineTotal
+            }).ToList()
+        };
+    }
+
+    private sealed class ReceiptServiceLineItemResponse
+    {
+        public string Description { get; set; } = string.Empty;
+        public decimal LineTotal { get; set; }
     }
 }

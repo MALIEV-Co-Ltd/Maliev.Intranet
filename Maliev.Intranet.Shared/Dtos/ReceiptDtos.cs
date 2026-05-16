@@ -16,11 +16,17 @@ public sealed record ReceiptDto
     /// <summary>The identifier of the associated invoice for this receipt.</summary>
     public string InvoiceNumber { get; set; } = string.Empty;
 
+    /// <summary>The unique identifier of the associated invoice for this receipt.</summary>
+    public Guid InvoiceId { get; set; }
+
     /// <summary>The display name of the customer receiving the receipt.</summary>
     public string CustomerName { get; set; } = string.Empty;
 
     /// <summary>The date when the receipt was issued.</summary>
     public DateTime Date { get; set; }
+
+    /// <summary>The date when the receipt was issued by ReceiptService.</summary>
+    public DateTime IssueDate { get; set; }
 
     /// <summary>The unique identifier of the customer in the system.</summary>
     public Guid CustomerId { get; set; }
@@ -36,6 +42,15 @@ public sealed record ReceiptDto
 
     /// <summary>The current status of the receipt record.</summary>
     public string Status { get; set; } = "Valid";
+
+    /// <summary>The optional generated PDF artifact reference.</summary>
+    public Guid? PdfReferenceId { get; set; }
+
+    /// <summary>The UTC timestamp when the receipt was created.</summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>The user or service principal that created the receipt.</summary>
+    public string CreatedBy { get; set; } = string.Empty;
 
     /// <summary>The list of individual line items that make up the total receipt amount.</summary>
     public List<ReceiptLineItemDto> Lines { get; set; } = [];
@@ -58,15 +73,18 @@ public sealed record ReceiptLineItemDto
 /// </summary>
 public sealed record CreateReceiptRequest
 {
-    /// <summary>The identifier of the customer for whom the receipt is created.</summary>
+    /// <summary>The unique identifier of the invoice that the receipt is generated from.</summary>
     [Required]
-    public Guid CustomerId { get; set; }
+    public Guid InvoiceId { get; set; }
 
-    /// <summary>The issue date for the receipt.</summary>
+    /// <summary>The receipt amount, which may be a full or partial invoice amount.</summary>
     [Required]
-    public DateTime Date { get; set; }
+    [Range(0.01, double.MaxValue)]
+    public decimal Amount { get; set; }
 
-    /// <summary>The list of receipt line items and amounts to include.</summary>
-    [Required]
-    public List<ReceiptLineItemDto> Lines { get; set; } = [];
+    /// <summary>The payment method displayed on the receipt.</summary>
+    public string? PaymentMethod { get; set; } = "Bank Transfer";
+
+    /// <summary>The optional split-invoice segment identifier for partial segment receipts.</summary>
+    public Guid? InvoiceSegmentId { get; set; }
 }

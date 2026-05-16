@@ -22,6 +22,9 @@ public class InvoiceSummaryDto
     /// <summary>Gets or sets the remaining balance to be paid on the invoice.</summary>
     public decimal Balance { get; set; }
 
+    /// <summary>Gets or sets the amount already allocated to the invoice.</summary>
+    public decimal PaidAmount { get; set; }
+
     /// <summary>Gets or sets the date the invoice was issued.</summary>
     public DateTime IssueDate { get; set; }
 
@@ -93,6 +96,12 @@ public class InvoiceDetailDto
 
     /// <summary>Gets or sets the total invoice amount including taxes.</summary>
     public decimal Total { get; set; }
+
+    /// <summary>Gets or sets the amount already allocated to the invoice.</summary>
+    public decimal PaidAmount { get; set; }
+
+    /// <summary>Gets or sets the remaining balance still due on the invoice.</summary>
+    public decimal Balance { get; set; }
 
     /// <summary>Gets or sets the date the invoice was issued.</summary>
     public DateTime IssueDate { get; set; }
@@ -472,4 +481,57 @@ public sealed record VoidPaymentRequest
     /// <summary>Gets or sets the reason for voiding the payment.</summary>
     [Required]
     public string Reason { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Request payload for recording and allocating an employee-entered invoice payment.
+/// </summary>
+public sealed record RecordInvoicePaymentRequest
+{
+    /// <summary>Gets or sets the amount being allocated to the invoice.</summary>
+    [Range(0.01, double.MaxValue)]
+    public decimal Amount { get; set; }
+
+    /// <summary>Gets or sets the payment method, such as Bank Transfer, Cash, Credit Card, or QR Payment.</summary>
+    [Required]
+    public string PaymentMethod { get; set; } = "Bank Transfer";
+
+    /// <summary>Gets or sets the date the payment was received.</summary>
+    public DateTime PaymentDate { get; set; } = DateTime.Today;
+
+    /// <summary>Gets or sets an optional bank, transfer, or gateway reference number.</summary>
+    public string? ReferenceNumber { get; set; }
+
+    /// <summary>Gets or sets optional staff notes about the payment evidence.</summary>
+    public string? Notes { get; set; }
+}
+
+/// <summary>
+/// Response payload for a recorded invoice payment and the updated invoice state.
+/// </summary>
+public sealed record RecordInvoicePaymentResponse
+{
+    /// <summary>Gets or sets the created payment identifier.</summary>
+    public Guid PaymentId { get; set; }
+
+    /// <summary>Gets or sets the invoice identifier the payment was allocated to.</summary>
+    public Guid InvoiceId { get; set; }
+
+    /// <summary>Gets or sets the invoice number after allocation.</summary>
+    public string? InvoiceNumber { get; set; }
+
+    /// <summary>Gets or sets the updated invoice status.</summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the amount allocated by this operation.</summary>
+    public decimal AllocatedAmount { get; set; }
+
+    /// <summary>Gets or sets the total amount already allocated to the invoice.</summary>
+    public decimal PaidAmount { get; set; }
+
+    /// <summary>Gets or sets the remaining invoice balance after allocation.</summary>
+    public decimal Balance { get; set; }
+
+    /// <summary>Gets or sets the updated invoice detail returned by InvoiceService.</summary>
+    public InvoiceDetailDto Invoice { get; set; } = new();
 }

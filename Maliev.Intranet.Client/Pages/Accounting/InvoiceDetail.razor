@@ -26,6 +26,8 @@
         {
             <StatBar Class="mb-4">
                 <StatTile Label="Total" Value="@_invoice.Total.ToString("N2")" />
+                <StatTile Label="Paid" Value="@_invoice.PaidAmount.ToString("N2")" Trend="@(_invoice.PaidAmount > 0)" />
+                <StatTile Label="Balance" Value="@_invoice.Balance.ToString("N2")" Trend="@(_invoice.Balance <= 0)" />
                 <StatTile Label="Tax" Value="@_invoice.TaxAmount.ToString("N2")" />
                 <StatTile Label="Currency" Value="@_invoice.Currency" />
                 <StatTile Label="Due" Value="@_invoice.DueDate.ToString("dd MMM")" />
@@ -57,6 +59,72 @@
                         <div class="mlv-empty">No line items.</div>
                     }
                 </PanelCard>
+                <PanelCard Title="Payment" Class="mlv-span-5">
+                    <FormGrid>
+                        <FormField Label="Amount"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_payment.Amount" /></FormField>
+                        <FormField Label="Payment method">
+                            <select class="mlv-form-input" @bind="_payment.PaymentMethod">
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="QR Payment">QR Payment</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Cash">Cash</option>
+                            </select>
+                        </FormField>
+                        <FormField Label="Payment date"><InputDate class="mlv-form-input" @bind-Value="_payment.PaymentDate" /></FormField>
+                        <FormField Label="Reference"><ImmediateInputText class="mlv-form-input" @bind-Value="_payment.ReferenceNumber" /></FormField>
+                        <FormField Label="Notes"><ImmediateInputText class="mlv-form-input" @bind-Value="_payment.Notes" /></FormField>
+                    </FormGrid>
+                    @if (!string.IsNullOrWhiteSpace(_paymentError))
+                    {
+                        <div class="mlv-error mt-3">@_paymentError</div>
+                    }
+                    <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.Payments" Disabled="@(!CanRecordPayment)" OnClick="@(_ => RecordPaymentAsync())">Record Payment</PrimaryButton>
+                    </div>
+                </PanelCard>
+                <PanelCard Title="Receipts" Class="mlv-span-7">
+                    <FormGrid>
+                        <FormField Label="Receipt amount"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_receiptAmount" /></FormField>
+                        <FormField Label="Receipt method">
+                            <select class="mlv-form-input" @bind="_receiptPaymentMethod">
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="QR Payment">QR Payment</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Cash">Cash</option>
+                            </select>
+                        </FormField>
+                    </FormGrid>
+                    @if (!string.IsNullOrWhiteSpace(_receiptError))
+                    {
+                        <div class="mlv-error mt-3">@_receiptError</div>
+                    }
+                    <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.ReceiptLong" Disabled="@(!CanCreateReceipt)" OnClick="@(_ => CreateReceiptAsync())">Create Receipt</PrimaryButton>
+                    </div>
+
+                    @if (_receipts.Count > 0)
+                    {
+                        <table class="mlv-table mt-4">
+                            <thead><tr><th>Receipt</th><th>Status</th><th>Method</th><th>Amount</th><th>Date</th></tr></thead>
+                            <tbody>
+                                @foreach (var receipt in _receipts)
+                                {
+                                    <tr>
+                                        <td class="mlv-mono">@receipt.ReceiptNumber</td>
+                                        <td><StatusBadge Status="@receipt.Status" /></td>
+                                        <td>@receipt.PaymentMethod</td>
+                                        <td class="mlv-mono">@receipt.TotalAmount.ToString("N2")</td>
+                                        <td>@receipt.IssueDate.ToString("dd MMM yyyy")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty mt-4">No receipts have been created for this invoice.</div>
+                    }
+                </PanelCard>
             </div>
         }
     </PageBody>
@@ -65,13 +133,38 @@
 @code {
     [Parameter] public Guid Id { get; set; }
     private InvoiceDetailDto? _invoice;
+    private readonly RecordInvoicePaymentRequest _payment = new()
+    {
+        PaymentDate = DateTime.Today,
+        PaymentMethod = "Bank Transfer"
+    };
+    private readonly List<ReceiptDto> _receipts = [];
+    private decimal _receiptAmount;
+    private string _receiptPaymentMethod = "Bank Transfer";
     private bool _loading = true;
+    private bool _paymentSaving;
+    private bool _receiptSaving;
+    private string? _paymentError;
+    private string? _receiptError;
+
+    private bool CanRecordPayment =>
+        _invoice is not null &&
+        !_paymentSaving &&
+        _payment.Amount > 0 &&
+        !IsClosedForPayment(_invoice.Status);
+
+    private bool CanCreateReceipt =>
+        _invoice is not null &&
+        !_receiptSaving &&
+        _receiptAmount > 0 &&
+        IsReceiptableStatus(_invoice.Status);
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _invoice = await Http.GetFromJsonAsync<InvoiceDetailDto>($"api/v1/invoices/{Id}");
+            await LoadInvoiceAsync();
+            await LoadReceiptsAsync();
         }
         catch (Exception ex)
         {
@@ -82,5 +175,134 @@
         {
             _loading = false;
         }
+    }
+
+    private async Task LoadInvoiceAsync()
+    {
+        _invoice = await Http.GetFromJsonAsync<InvoiceDetailDto>($"api/v1/invoices/{Id}");
+        if (_invoice is null)
+            return;
+
+        _invoice.Balance = _invoice.Balance > 0 || _invoice.PaidAmount > 0
+            ? _invoice.Balance
+            : IsClosedForPayment(_invoice.Status) ? 0m : _invoice.Total;
+        _payment.Amount = _invoice.Balance > 0 ? _invoice.Balance : _invoice.Total;
+        _receiptAmount = _invoice.PaidAmount > 0 ? _invoice.PaidAmount : _invoice.Total;
+        _receiptPaymentMethod = _payment.PaymentMethod;
+    }
+
+    private async Task LoadReceiptsAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<ReceiptDto>>("api/v1/receipts?page=1&pageSize=50");
+            _receipts.Clear();
+            _receipts.AddRange((response?.Data ?? []).Where(receipt => receipt.InvoiceId == Id));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Receipt history could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task RecordPaymentAsync()
+    {
+        if (_invoice is null)
+            return;
+
+        _paymentSaving = true;
+        _paymentError = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/invoices/{Id}/payments", _payment);
+            if (!response.IsSuccessStatusCode)
+            {
+                _paymentError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(_paymentError))
+                {
+                    _paymentError = "Payment could not be recorded.";
+                }
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<RecordInvoicePaymentResponse>();
+            if (result is not null)
+            {
+                _invoice = result.Invoice;
+                _payment.Amount = _invoice.Balance > 0 ? _invoice.Balance : _payment.Amount;
+                _receiptAmount = result.AllocatedAmount;
+                _receiptPaymentMethod = _payment.PaymentMethod;
+            }
+
+            Snackbar.Add("Payment recorded.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _paymentError = "Payment could not be recorded.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _paymentSaving = false;
+        }
+    }
+
+    private async Task CreateReceiptAsync()
+    {
+        _receiptSaving = true;
+        _receiptError = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/receipts", new CreateReceiptRequest
+            {
+                InvoiceId = Id,
+                Amount = _receiptAmount,
+                PaymentMethod = _receiptPaymentMethod
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _receiptError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(_receiptError))
+                {
+                    _receiptError = "Receipt could not be created.";
+                }
+                return;
+            }
+
+            var receipt = await response.Content.ReadFromJsonAsync<ReceiptDto>();
+            if (receipt is not null)
+            {
+                _receipts.RemoveAll(existing => existing.Id == receipt.Id);
+                _receipts.Insert(0, receipt);
+            }
+
+            Snackbar.Add("Receipt created.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _receiptError = "Receipt could not be created.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _receiptSaving = false;
+        }
+    }
+
+    private static bool IsClosedForPayment(string status)
+    {
+        return string.Equals(status, "FullyPaid", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "Paid", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "Draft", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsReceiptableStatus(string status)
+    {
+        return string.Equals(status, "FullyPaid", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "Paid", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "PartiallyPaid", StringComparison.OrdinalIgnoreCase);
     }
 }

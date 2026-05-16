@@ -1,6 +1,7 @@
 using System.Net;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Microsoft.AspNetCore.Http;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -137,6 +138,76 @@ public class InvoiceServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Records a payment in InvoiceService and immediately allocates it to the target invoice.
+    /// </summary>
+    public async Task<(RecordInvoicePaymentResponse? Result, string? ErrorContent, int StatusCode)> RecordInvoicePaymentAsync(
+        Guid invoiceId,
+        RecordInvoicePaymentRequest request,
+        string recordedBy,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var paymentResponse = await httpClient.PostAsJsonAsync("/invoice/v1/payments", new
+            {
+                paymentAmount = request.Amount,
+                paymentDate = request.PaymentDate,
+                paymentMethod = request.PaymentMethod,
+                referenceNumber = request.ReferenceNumber,
+                notes = request.Notes,
+                recordedBy
+            }, ct);
+
+            if (!paymentResponse.IsSuccessStatusCode)
+            {
+                var errorContent = await paymentResponse.Content.ReadAsStringAsync(ct);
+                return (null, errorContent, (int)paymentResponse.StatusCode);
+            }
+
+            var payment = await paymentResponse.Content.ReadFromJsonAsync<InvoiceServicePaymentResponse>(cancellationToken: ct);
+            if (payment is null || payment.Id == Guid.Empty)
+            {
+                return (null, "InvoiceService returned an empty payment response.", StatusCodes.Status502BadGateway);
+            }
+
+            var linkResponse = await httpClient.PostAsJsonAsync($"/invoice/v1/payments/invoices/{invoiceId}/link", new
+            {
+                paymentId = payment.Id,
+                allocatedAmount = request.Amount
+            }, ct);
+
+            if (!linkResponse.IsSuccessStatusCode)
+            {
+                var errorContent = await linkResponse.Content.ReadAsStringAsync(ct);
+                return (null, errorContent, (int)linkResponse.StatusCode);
+            }
+
+            var invoice = await linkResponse.Content.ReadFromJsonAsync<InvoiceServiceInvoiceResponse>(cancellationToken: ct);
+            if (invoice is null)
+            {
+                return (null, "InvoiceService returned an empty invoice allocation response.", StatusCodes.Status502BadGateway);
+            }
+
+            var detail = invoice.ToDetail();
+            return (new RecordInvoicePaymentResponse
+            {
+                PaymentId = payment.Id,
+                InvoiceId = detail.Id,
+                InvoiceNumber = detail.InvoiceNumber,
+                Status = detail.Status,
+                AllocatedAmount = request.Amount,
+                PaidAmount = detail.PaidAmount,
+                Balance = detail.Balance,
+                Invoice = detail
+            }, null, (int)linkResponse.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            return (null, $"Exception calling InvoiceService: {ex.Message}", 0);
+        }
+    }
+
+    /// <summary>
     /// Cancels an invoice.
     /// </summary>
     public async Task<bool> CancelInvoiceAsync(Guid id, CancelInvoiceRequest request, CancellationToken ct = default)
@@ -267,6 +338,11 @@ public class InvoiceServiceClient(HttpClient httpClient)
         public decimal TaxAmount { get; set; }
         public decimal WithholdingTaxAmount { get; set; }
         public decimal GrandTotal { get; set; }
+        public decimal PaidAmount { get; set; }
+        public decimal TotalPaidAmount { get; set; }
+        public decimal Balance { get; set; }
+        public decimal OutstandingBalance { get; set; }
+        public decimal RemainingBalance { get; set; }
         public DateTime IssueDate { get; set; }
         public DateTime DueDate { get; set; }
         public int PaymentTermsDays { get; set; }
@@ -281,13 +357,33 @@ public class InvoiceServiceClient(HttpClient httpClient)
         public DateTime UpdatedAt { get; set; }
         public List<InvoiceServiceLineResponse> Lines { get; set; } = [];
 
+        private decimal ResolvedPaidAmount => PaidAmount > 0 ? PaidAmount : TotalPaidAmount;
+
+        private decimal ResolvedBalance
+        {
+            get
+            {
+                if (Balance > 0) return Balance;
+                if (OutstandingBalance > 0) return OutstandingBalance;
+                if (RemainingBalance > 0) return RemainingBalance;
+                if (string.Equals(Status, "FullyPaid", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Status, "Paid", StringComparison.OrdinalIgnoreCase))
+                {
+                    return 0m;
+                }
+
+                return Math.Max(GrandTotal - ResolvedPaidAmount, 0m);
+            }
+        }
+
         public InvoiceSummaryDto ToSummary() => new()
         {
             Id = Id,
             InvoiceNumber = InvoiceNumber ?? string.Empty,
             CustomerName = CustomerName,
             Total = GrandTotal,
-            Balance = GrandTotal,
+            Balance = ResolvedBalance,
+            PaidAmount = ResolvedPaidAmount,
             IssueDate = IssueDate,
             DueDate = DueDate,
             Status = Status,
@@ -313,6 +409,8 @@ public class InvoiceServiceClient(HttpClient httpClient)
             TaxAmount = TaxAmount,
             WithholdingTaxAmount = WithholdingTaxAmount,
             Total = GrandTotal,
+            PaidAmount = ResolvedPaidAmount,
+            Balance = ResolvedBalance,
             IssueDate = IssueDate,
             DueDate = DueDate,
             PaymentTermsDays = PaymentTermsDays,
@@ -340,5 +438,10 @@ public class InvoiceServiceClient(HttpClient httpClient)
         public decimal Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TaxRate { get; set; }
+    }
+
+    private sealed class InvoiceServicePaymentResponse
+    {
+        public Guid Id { get; set; }
     }
 }

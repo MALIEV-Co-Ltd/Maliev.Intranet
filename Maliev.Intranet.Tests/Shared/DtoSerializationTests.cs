@@ -98,12 +98,18 @@ public class DtoSerializationTests
     [Fact]
     public void CreateReceiptRequest_ShouldRoundtrip()
     {
-        var dto = new CreateReceiptRequest { CustomerId = Guid.NewGuid(), Date = DateTime.UtcNow, Lines = [new() { Description = "Test", Amount = 100 }] };
+        var dto = new CreateReceiptRequest
+        {
+            InvoiceId = Guid.NewGuid(),
+            Amount = 100m,
+            PaymentMethod = "Bank Transfer"
+        };
         var json = JsonSerializer.Serialize(dto, Options);
         var result = JsonSerializer.Deserialize<CreateReceiptRequest>(json, Options);
         Assert.NotNull(result);
-        Assert.Equal(dto.CustomerId, result.CustomerId);
-        Assert.Single(result.Lines);
+        Assert.Equal(dto.InvoiceId, result.InvoiceId);
+        Assert.Equal(dto.Amount, result.Amount);
+        Assert.Equal(dto.PaymentMethod, result.PaymentMethod);
     }
 
     [Fact]

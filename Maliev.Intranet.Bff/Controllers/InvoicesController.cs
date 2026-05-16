@@ -166,6 +166,26 @@ public class InvoicesController(InvoiceServiceClient client, PdfServiceClient pd
     }
 
     /// <summary>
+    /// Records and allocates a payment against an invoice.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Invoice.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/payments")]
+    public async Task<ActionResult<RecordInvoicePaymentResponse>> RecordPayment(Guid id, [FromBody] RecordInvoicePaymentRequest request, CancellationToken ct)
+    {
+        var recordedBy = User.Identity?.Name ?? "Maliev.Intranet";
+        var (result, errorContent, statusCode) = await client.RecordInvoicePaymentAsync(id, request, recordedBy, ct);
+        if (result is not null)
+        {
+            return Ok(result);
+        }
+
+        var message = string.IsNullOrWhiteSpace(errorContent)
+            ? "Invoice payment could not be recorded."
+            : errorContent;
+        return StatusCode(statusCode == 0 ? StatusCodes.Status502BadGateway : statusCode, message);
+    }
+
+    /// <summary>
     /// Cancels an invoice.
     /// </summary>
     [RequirePermission(MalievPermissions.Invoice.Void, AuthenticationSchemes = "Bearer,Cookies")]

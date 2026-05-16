@@ -312,6 +312,87 @@ public sealed class InvoiceServiceClientTests
         Assert.Equal("Maliev.Intranet", capturedPayload.RootElement.GetProperty("finalizedBy").GetString());
     }
 
+    [Fact]
+    public async Task RecordInvoicePaymentAsync_PostsPaymentAndLinksAllocationToInvoice()
+    {
+        var invoiceId = Guid.Parse("27366a6d-2981-4aac-bf97-af22f3c667d9");
+        var paymentId = Guid.Parse("74241d6a-010e-4d09-9c4e-bb1f2321b814");
+        JsonDocument? paymentPayload = null;
+        JsonDocument? linkPayload = null;
+        var client = MakeClient(async (request, ct) =>
+        {
+            var payload = await request.Content!.ReadAsStringAsync(ct);
+            if (request.RequestUri!.PathAndQuery == "/invoice/v1/payments")
+            {
+                paymentPayload = JsonDocument.Parse(payload);
+                return JsonContent.Create(new
+                {
+                    id = paymentId,
+                    paymentAmount = 2675m,
+                    paymentDate = new DateTime(2026, 5, 3),
+                    paymentMethod = "Bank Transfer",
+                    referenceNumber = "BANK-2026-001",
+                    recordedBy = "employee@maliev.local"
+                });
+            }
+
+            Assert.Equal($"/invoice/v1/payments/invoices/{invoiceId}/link", request.RequestUri.PathAndQuery);
+            linkPayload = JsonDocument.Parse(payload);
+            return JsonContent.Create(new
+            {
+                id = invoiceId,
+                invoiceNumber = "INV-2026-0005",
+                customerId = Guid.Parse("f9c82504-83d8-468d-8a72-37124de1ef43"),
+                customerName = "Paid Customer Co.",
+                customerTaxId = "0105569000001",
+                billingAddress = "11 Billing Road",
+                currency = "THB",
+                subtotal = 2500m,
+                taxAmount = 175m,
+                grandTotal = 2675m,
+                paidAmount = 2675m,
+                balance = 0m,
+                status = "FullyPaid",
+                issueDate = new DateTime(2026, 5, 3),
+                dueDate = new DateTime(2026, 6, 2),
+                paymentTermsDays = 30,
+                lines = new[]
+                {
+                    new { description = "Machining", quantity = 2m, unitPrice = 1250m, taxRate = 7m }
+                }
+            });
+        });
+
+        var (result, errorContent, statusCode) = await client.RecordInvoicePaymentAsync(
+            invoiceId,
+            new RecordInvoicePaymentRequest
+            {
+                Amount = 2675m,
+                PaymentDate = new DateTime(2026, 5, 3),
+                PaymentMethod = "Bank Transfer",
+                ReferenceNumber = "BANK-2026-001",
+                Notes = "Verified bank transfer slip."
+            },
+            "employee@maliev.local");
+
+        Assert.NotNull(result);
+        Assert.Null(errorContent);
+        Assert.Equal(200, statusCode);
+        Assert.Equal(paymentId, result.PaymentId);
+        Assert.Equal(invoiceId, result.InvoiceId);
+        Assert.Equal("FullyPaid", result.Status);
+        Assert.Equal(2675m, result.PaidAmount);
+        Assert.Equal(0m, result.Balance);
+        Assert.NotNull(paymentPayload);
+        Assert.Equal(2675m, paymentPayload.RootElement.GetProperty("paymentAmount").GetDecimal());
+        Assert.Equal("Bank Transfer", paymentPayload.RootElement.GetProperty("paymentMethod").GetString());
+        Assert.Equal("BANK-2026-001", paymentPayload.RootElement.GetProperty("referenceNumber").GetString());
+        Assert.Equal("employee@maliev.local", paymentPayload.RootElement.GetProperty("recordedBy").GetString());
+        Assert.NotNull(linkPayload);
+        Assert.Equal(paymentId, linkPayload.RootElement.GetProperty("paymentId").GetGuid());
+        Assert.Equal(2675m, linkPayload.RootElement.GetProperty("allocatedAmount").GetDecimal());
+    }
+
     private static InvoiceServiceClient MakeClient(Func<HttpRequestMessage, HttpContent> contentFactory)
     {
         var handler = new MockHttpMessageHandler((request, _) =>
