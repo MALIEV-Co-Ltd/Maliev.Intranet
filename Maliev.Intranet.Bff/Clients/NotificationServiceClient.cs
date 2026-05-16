@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Maliev.MessagingContracts.Contracts.Shared;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -32,6 +33,15 @@ public class NotificationServiceClient(HttpClient httpClient) : INotificationSer
         var response = await httpClient.PutAsJsonAsync($"/notification/v1/preferences/{userId}", request, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<UserNotificationPreferenceDto>(cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Dispatches a notification event through NotificationService.
+    /// </summary>
+    public async Task DispatchEventAsync(NotificationEvent notificationEvent, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/notification/v1/events", notificationEvent, JsonOptions, ct);
+        response.EnsureSuccessStatusCode();
     }
 
     /// <summary>
@@ -249,6 +259,10 @@ public class NotificationServiceClient(HttpClient httpClient) : INotificationSer
 
         public string? MessageContent { get; set; }
 
+        public string? ProviderResponse { get; set; }
+
+        public string? ProviderMessageId { get; set; }
+
         public int AttemptNumber { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
@@ -266,6 +280,8 @@ public class NotificationServiceClient(HttpClient httpClient) : INotificationSer
             Recipient = RecipientIdentifier,
             Subject = MessageContent,
             Status = Status,
+            Error = ProviderResponse,
+            ProviderMessageId = ProviderMessageId,
             RetryCount = Math.Max(0, AttemptNumber - 1),
             CreatedAt = CreatedAt.UtcDateTime,
             DeliveredAt = DeliveredAt?.UtcDateTime

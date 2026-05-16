@@ -6,7 +6,6 @@ using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
 using Maliev.MessagingContracts.Contracts.Shared;
-using MassTransit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -24,7 +23,7 @@ public class CustomersController(
     RegistryServiceClient registryClient,
     IReferenceDataService referenceDataService,
     IAMServiceClient iamClient,
-    IPublishEndpoint publishEndpoint,
+    INotificationServiceClient notificationClient,
     IHubContext<NotificationHub> hubContext,
     NominatimGeocodingService geocodingService,
     ILogger<CustomersController> logger) : ControllerBase
@@ -100,7 +99,7 @@ public class CustomersController(
             IsPublic: false,
             Payload: new NotificationEventPayload(
                 NotificationType: request.Subject.Trim(),
-                Priority: "normal",
+                Priority: "standard",
                 TargetUsers: [new NotificationEventPayloadTargetUsersItem(customer.PrincipalId.Value.ToString(), "customer")],
                 TemplateId: string.Empty,
                 Parameters: new Dictionary<string, string>
@@ -110,7 +109,7 @@ public class CustomersController(
                 },
                 Metadata: new NotificationEventPayloadMetadata(customer.PreferredLanguage, "intranet-customer-detail")));
 
-        await publishEndpoint.Publish(notification, ct);
+        await notificationClient.DispatchEventAsync(notification, ct);
         return Accepted(new { messageId });
     }
 

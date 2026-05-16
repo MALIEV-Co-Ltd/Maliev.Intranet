@@ -187,6 +187,11 @@ public sealed record NotificationDeliveryLogDto
     public string? Error { get; set; }
 
     /// <summary>
+    /// Provider-specific message identifier or local simulated provider identifier.
+    /// </summary>
+    public string? ProviderMessageId { get; set; }
+
+    /// <summary>
     /// The number of delivery retry attempts performed.
     /// </summary>
     public int RetryCount { get; set; }

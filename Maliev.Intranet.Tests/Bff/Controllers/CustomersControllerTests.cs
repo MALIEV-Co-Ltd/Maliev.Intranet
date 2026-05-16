@@ -4,7 +4,6 @@ using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Services;
-using MassTransit;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -20,7 +19,7 @@ public class CustomersControllerTests
     private readonly Mock<RegistryServiceClient> _registryClientMock;
     private readonly Mock<IReferenceDataService> _refDataServiceMock;
     private readonly Mock<IAMServiceClient> _iamClientMock;
-    private readonly Mock<IPublishEndpoint> _publishEndpointMock;
+    private readonly Mock<INotificationServiceClient> _notificationClientMock;
     private readonly Mock<IHubContext<NotificationHub>> _hubContextMock;
     private readonly Mock<ILogger<CustomersController>> _loggerMock;
     private readonly NominatimGeocodingService _geocodingService;
@@ -35,7 +34,11 @@ public class CustomersControllerTests
         _registryClientMock = new Mock<RegistryServiceClient>(httpClient);
         _refDataServiceMock = new Mock<IReferenceDataService>();
         _iamClientMock = new Mock<IAMServiceClient>(httpClient);
-        _publishEndpointMock = new Mock<IPublishEndpoint>();
+        _notificationClientMock = new Mock<INotificationServiceClient>();
+        _notificationClientMock.Setup(x => x.DispatchEventAsync(
+                It.IsAny<Maliev.MessagingContracts.Contracts.Shared.NotificationEvent>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         _hubContextMock = new Mock<IHubContext<NotificationHub>>();
         _loggerMock = new Mock<ILogger<CustomersController>>();
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
@@ -51,7 +54,7 @@ public class CustomersControllerTests
             _registryClientMock.Object,
             _refDataServiceMock.Object,
             _iamClientMock.Object,
-            _publishEndpointMock.Object,
+            _notificationClientMock.Object,
             _hubContextMock.Object,
             _geocodingService,
             _loggerMock.Object);
@@ -188,10 +191,11 @@ public class CustomersControllerTests
         }, CancellationToken.None);
 
         Assert.IsType<AcceptedResult>(result);
-        _publishEndpointMock.Verify(x => x.Publish(
+        _notificationClientMock.Verify(x => x.DispatchEventAsync(
             It.Is<Maliev.MessagingContracts.Contracts.Shared.NotificationEvent>(notification =>
                 notification.Payload.TargetUsers.Single().UserId == principalId.ToString()
                 && notification.Payload.NotificationType == "Quote update"
+                && notification.Payload.Priority == "standard"
                 && notification.Payload.TemplateId == string.Empty),
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -210,7 +214,7 @@ public class CustomersControllerTests
         }, CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
-        _publishEndpointMock.Verify(x => x.Publish(
+        _notificationClientMock.Verify(x => x.DispatchEventAsync(
             It.IsAny<Maliev.MessagingContracts.Contracts.Shared.NotificationEvent>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }

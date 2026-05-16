@@ -1,5 +1,6 @@
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Maliev.MessagingContracts.Contracts.Shared;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -17,6 +18,11 @@ public interface INotificationServiceClient
     /// Updates notification preferences for a specific user.
     /// </summary>
     Task<UserNotificationPreferenceDto?> UpdatePreferencesAsync(string userId, UpdateNotificationPreferenceRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Dispatches a notification event through NotificationService.
+    /// </summary>
+    Task DispatchEventAsync(NotificationEvent notificationEvent, CancellationToken ct = default);
 
     /// <summary>
     /// Retrieves a paged list of notification templates.
