@@ -76,11 +76,14 @@ public class NotificationServiceClient(HttpClient httpClient) : INotificationSer
         var response = await httpClient.PostAsJsonAsync("/notification/v1/templates", new
         {
             templateKey = request.TemplateKey,
+            displayName = request.Name,
             version = request.Version,
             language = request.Language,
             channelType = ChannelTypeValue(request.ChannelType),
+            subjectTemplate = request.SubjectTemplate,
             contentTemplate = request.BodyTemplate,
-            parameters = ExtractParameters(request.BodyTemplate)
+            isActive = true,
+            parameters = ExtractParameters(request.SubjectTemplate, request.BodyTemplate)
         }, JsonOptions, ct);
         if (response.IsSuccessStatusCode)
         {
@@ -96,10 +99,14 @@ public class NotificationServiceClient(HttpClient httpClient) : INotificationSer
     public async Task<NotificationTemplateDto?> UpdateTemplateAsync(Guid id, UpdateNotificationTemplateRequest request, CancellationToken ct = default)
     {
         var bodyTemplate = request.BodyTemplate ?? string.Empty;
+        var subjectTemplate = request.SubjectTemplate ?? string.Empty;
         var response = await httpClient.PutAsJsonAsync($"/notification/v1/templates/{id}", new
         {
+            displayName = request.Name,
+            subjectTemplate,
             contentTemplate = bodyTemplate,
-            parameters = ExtractParameters(bodyTemplate)
+            isActive = request.IsActive,
+            parameters = ExtractParameters(subjectTemplate, bodyTemplate)
         }, JsonOptions, ct);
         if (response.IsSuccessStatusCode)
         {
@@ -178,14 +185,16 @@ public class NotificationServiceClient(HttpClient httpClient) : INotificationSer
         return "email";
     }
 
-    private static string[] ExtractParameters(string? template)
+    private static string[] ExtractParameters(params string?[] templates)
     {
-        if (string.IsNullOrWhiteSpace(template))
+        if (templates.Length == 0 || templates.All(string.IsNullOrWhiteSpace))
         {
             return [];
         }
 
-        return Regex.Matches(template, @"\{\{(\w+)\}\}")
+        return templates
+            .Where(template => !string.IsNullOrWhiteSpace(template))
+            .SelectMany(template => Regex.Matches(template!, @"\{\{(\w+)\}\}"))
             .Select(match => match.Groups[1].Value)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -223,25 +232,31 @@ public class NotificationServiceClient(HttpClient httpClient) : INotificationSer
 
         public string TemplateKey { get; set; } = string.Empty;
 
+        public string DisplayName { get; set; } = string.Empty;
+
         public int Version { get; set; }
 
         public string Language { get; set; } = string.Empty;
 
         public JsonElement ChannelType { get; set; }
 
+        public string SubjectTemplate { get; set; } = string.Empty;
+
         public string ContentTemplate { get; set; } = string.Empty;
+
+        public bool IsActive { get; set; } = true;
 
         public NotificationTemplateDto ToDto() => new()
         {
             Id = Id,
-            Name = TemplateKey,
+            Name = string.IsNullOrWhiteSpace(DisplayName) ? TemplateKey : DisplayName,
             TemplateKey = TemplateKey,
-            SubjectTemplate = string.Empty,
+            SubjectTemplate = SubjectTemplate,
             BodyTemplate = ContentTemplate,
             ChannelType = ChannelTypeName(ChannelType),
             Language = Language,
             Version = Version,
-            IsActive = true
+            IsActive = IsActive
         };
     }
 

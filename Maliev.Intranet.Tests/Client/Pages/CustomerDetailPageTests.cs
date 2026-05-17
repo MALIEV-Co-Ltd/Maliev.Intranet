@@ -22,6 +22,8 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly List<JsonDocument> _customerUpdatePayloads = [];
     private readonly List<JsonDocument> _addressCreatePayloads = [];
     private readonly List<JsonDocument> _noteCreatePayloads = [];
+    private readonly List<CreateNotificationTemplateRequest> _templateCreateRequests = [];
+    private readonly List<(Guid Id, UpdateNotificationTemplateRequest Request)> _templateUpdateRequests = [];
     private TaskCompletionSource<object?>? _notePostRelease;
     private bool _includeDuplicateDefaultBilling;
     private bool _projectResponseIsEmpty;
@@ -518,12 +520,67 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
 
         cut.Find("button.customer-email-open").Click();
 
+        cut.WaitForAssertion(() => Assert.Contains("Customer follow-up", cut.Markup));
         Assert.Contains("Email customer", cut.Markup);
         Assert.Contains("sarah@axion.io", cut.Markup);
         Assert.Contains("customer-email-subject", cut.Markup);
         Assert.Contains("customer-email-body", cut.Markup);
+        Assert.Contains("Reusable customer emails", cut.Markup);
+        Assert.Contains("Customer follow-up", cut.Markup);
+        Assert.Contains("customer-modal-email", cut.Markup);
         Assert.Empty(_emailRequests);
+        Assert.Contains(_requestedPaths, path => path.Equals("/api/v1/notifications/templates?page=1&pageSize=50&filter=customer-email", StringComparison.Ordinal));
         Assert.DoesNotContain(_requestedPaths, path => path.Equals($"/api/v1/customers/{_customerId}/email", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CustomerDetail_SendEmailDialog_AppliesSelectedTemplate()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+
+        cut.Find("button.customer-email-open").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Customer follow-up", cut.Markup));
+
+        Assert.Equal("Follow-up for Axion Robotics", cut.Find("input.customer-email-subject").GetAttribute("value"));
+        Assert.Contains("Hello Sarah Chen", TextAreaValue(cut.Find("textarea.customer-email-body")));
+        Assert.Contains("Axion Robotics", TextAreaValue(cut.Find("textarea.customer-email-body")));
+
+        cut.FindAll(".customer-email-template-option")
+            .Single(option => option.TextContent.Contains("Request missing details", StringComparison.Ordinal))
+            .Click();
+
+        Assert.Equal("Documents needed for Axion Robotics", cut.Find("input.customer-email-subject").GetAttribute("value"));
+        Assert.Contains("send the missing documents", TextAreaValue(cut.Find("textarea.customer-email-body")));
+    }
+
+    [Fact]
+    public void CustomerDetail_SendEmailDialog_CreatesAndUpdatesTemplates()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+
+        cut.Find("button.customer-email-open").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Customer follow-up", cut.Markup));
+
+        cut.Find(".customer-email-template-new").Click();
+        cut.Find("input.customer-email-template-name").Input("Custom customer reply");
+        cut.Find("input.customer-email-template-key").Input("customer-email-custom-reply");
+        cut.Find("input.customer-email-template-subject").Input("Reply for {{customerName}}");
+        cut.Find("textarea.customer-email-template-body").Input("Hello {{customerName}}, this is a custom message.");
+        cut.Find(".customer-email-template-save").Click();
+
+        cut.WaitForAssertion(() => Assert.Single(_templateCreateRequests));
+        Assert.Equal("customer-email-custom-reply", _templateCreateRequests.Single().TemplateKey);
+        Assert.Equal("Reply for {{customerName}}", _templateCreateRequests.Single().SubjectTemplate);
+
+        cut.Find("input.customer-email-template-name").Input("Updated customer reply");
+        cut.Find(".customer-email-template-save").Click();
+
+        cut.WaitForAssertion(() => Assert.Single(_templateUpdateRequests));
+        Assert.Equal("Updated customer reply", _templateUpdateRequests.Single().Request.Name);
     }
 
     [Fact]
@@ -534,6 +591,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
 
         cut.Find("button.customer-email-open").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Customer follow-up", cut.Markup));
         cut.Find("input.customer-email-subject").Input("Updated production schedule");
         cut.Find("textarea.customer-email-body").Input("Please review the attached production schedule before tomorrow.");
         cut.Find("button.customer-email-send").Click();
@@ -617,6 +675,91 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                     TotalItems = totalCount,
                     TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling((double)totalCount / Math.Max(1, pageSize))
                 }
+            });
+        }
+
+        if (request.Method == HttpMethod.Get &&
+            pathAndQuery.StartsWith("/api/v1/notifications/templates", StringComparison.Ordinal))
+        {
+            return Json(new PagedResponse<NotificationTemplateDto>
+            {
+                Data =
+                [
+                    new NotificationTemplateDto
+                    {
+                        Id = Guid.Parse("12121212-1212-1212-1212-121212121212"),
+                        Name = "Customer follow-up",
+                        TemplateKey = "customer-email-follow-up",
+                        SubjectTemplate = "Follow-up for {{companyName}}",
+                        BodyTemplate = "Hello {{customerName}},\n\nI am following up about {{companyName}}.",
+                        ChannelType = "email",
+                        Language = "en",
+                        Version = 1,
+                        IsActive = true
+                    },
+                    new NotificationTemplateDto
+                    {
+                        Id = Guid.Parse("13131313-1313-1313-1313-131313131313"),
+                        Name = "Request missing details",
+                        TemplateKey = "customer-email-document-request",
+                        SubjectTemplate = "Documents needed for {{companyName}}",
+                        BodyTemplate = "Hello {{customerName}},\n\nPlease send the missing documents for {{companyName}}.",
+                        ChannelType = "email",
+                        Language = "en",
+                        Version = 1,
+                        IsActive = true
+                    }
+                ],
+                Meta = new PaginationMeta { CurrentPage = 1, PageSize = 50, TotalCount = 2, TotalItems = 2, TotalPages = 1 }
+            });
+        }
+
+        if (request.Method == HttpMethod.Post &&
+            pathAndQuery.Equals("/api/v1/notifications/templates", StringComparison.Ordinal))
+        {
+            var payload = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? "{}";
+            var createRequest = JsonSerializer.Deserialize<CreateNotificationTemplateRequest>(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (createRequest is not null)
+            {
+                _templateCreateRequests.Add(createRequest);
+            }
+
+            return Json(new NotificationTemplateDto
+            {
+                Id = Guid.Parse("14141414-1414-1414-1414-141414141414"),
+                Name = createRequest?.Name ?? "Custom customer reply",
+                TemplateKey = createRequest?.TemplateKey ?? "customer-email-custom-reply",
+                SubjectTemplate = createRequest?.SubjectTemplate ?? string.Empty,
+                BodyTemplate = createRequest?.BodyTemplate ?? string.Empty,
+                ChannelType = createRequest?.ChannelType ?? "email",
+                Language = createRequest?.Language ?? "en",
+                Version = createRequest?.Version ?? 1,
+                IsActive = true
+            });
+        }
+
+        if (request.Method == HttpMethod.Put &&
+            pathAndQuery.StartsWith("/api/v1/notifications/templates/", StringComparison.Ordinal))
+        {
+            var templateId = Guid.Parse(pathAndQuery.Split('/').Last());
+            var payload = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? "{}";
+            var updateRequest = JsonSerializer.Deserialize<UpdateNotificationTemplateRequest>(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (updateRequest is not null)
+            {
+                _templateUpdateRequests.Add((templateId, updateRequest));
+            }
+
+            return Json(new NotificationTemplateDto
+            {
+                Id = templateId,
+                Name = updateRequest?.Name ?? "Updated customer reply",
+                TemplateKey = "customer-email-custom-reply",
+                SubjectTemplate = updateRequest?.SubjectTemplate ?? string.Empty,
+                BodyTemplate = updateRequest?.BodyTemplate ?? string.Empty,
+                ChannelType = "email",
+                Language = "en",
+                Version = 1,
+                IsActive = updateRequest?.IsActive ?? true
             });
         }
 
@@ -962,6 +1105,9 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         {
             Content = JsonContent.Create(body)
         });
+
+    private static string TextAreaValue(IElement element) =>
+        element.GetAttribute("value") ?? element.TextContent;
 
     private async Task<HttpResponseMessage> HandleNoteCreateAsync(HttpRequestMessage request)
     {

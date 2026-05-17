@@ -301,6 +301,23 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerDetail_EmailDialogStaysOpenAndUsesNotificationTemplates()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor.css");
+
+        Assert.Contains("<ConfirmModal Open=\"@_emailComposerOpen\"", source, StringComparison.Ordinal);
+        Assert.Contains("Class=\"customer-modal-email\"", source, StringComparison.Ordinal);
+        Assert.Contains("CloseOnBackdropClick=\"false\"", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/notifications/templates?page=1&pageSize=50&filter=customer-email", source, StringComparison.Ordinal);
+        Assert.Contains("SaveEmailTemplateAsync", source, StringComparison.Ordinal);
+        Assert.Contains("CreateNotificationTemplateRequest", source, StringComparison.Ordinal);
+        Assert.Contains("UpdateNotificationTemplateRequest", source, StringComparison.Ordinal);
+        Assert.Contains(".customer-email-template-panel", styles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1fr);", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PurchasingPages_UseIntIdsAndServerPagination()
     {
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor");

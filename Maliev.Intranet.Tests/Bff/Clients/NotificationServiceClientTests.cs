@@ -25,10 +25,13 @@ public sealed class NotificationServiceClientTests
                     {
                         id = Guid.NewGuid(),
                         templateKey = "order-confirmed",
+                        displayName = "Order confirmed",
                         version = 1,
                         language = "en",
                         channelType = 0,
-                        contentTemplate = "Hello {{name}}"
+                        subjectTemplate = "Order #{{orderId}} confirmed",
+                        contentTemplate = "Hello {{name}}",
+                        isActive = false
                     }
                 },
                 page = 2,
@@ -45,7 +48,10 @@ public sealed class NotificationServiceClientTests
         Assert.NotNull(result);
         var template = Assert.Single(result.Data);
         Assert.Equal("order-confirmed", template.TemplateKey);
+        Assert.Equal("Order confirmed", template.Name);
+        Assert.Equal("Order #{{orderId}} confirmed", template.SubjectTemplate);
         Assert.Equal("Hello {{name}}", template.BodyTemplate);
+        Assert.False(template.IsActive);
         Assert.Equal("email", template.ChannelType);
         Assert.Equal(2, result.Meta.CurrentPage);
         Assert.Equal(11, result.Meta.TotalCount);
@@ -62,10 +68,13 @@ public sealed class NotificationServiceClientTests
             {
                 id = Guid.NewGuid(),
                 templateKey = "payment-failed",
+                displayName = "Payment failed",
                 version = 1,
                 language = "en",
                 channelType = 0,
-                contentTemplate = "Payment {{amount}} failed"
+                subjectTemplate = "Payment failed for {{customerName}}",
+                contentTemplate = "Payment {{amount}} failed",
+                isActive = true
             });
         });
 
@@ -75,7 +84,7 @@ public sealed class NotificationServiceClientTests
             Name = "Payment failed",
             ChannelType = "email",
             Language = "en",
-            SubjectTemplate = "Payment failed",
+            SubjectTemplate = "Payment failed for {{customerName}}",
             BodyTemplate = "Payment {{amount}} failed"
         });
 
@@ -83,9 +92,55 @@ public sealed class NotificationServiceClientTests
         using var document = JsonDocument.Parse(payload);
         var root = document.RootElement;
         Assert.Equal("payment-failed", root.GetProperty("templateKey").GetString());
+        Assert.Equal("Payment failed", root.GetProperty("displayName").GetString());
         Assert.Equal(0, root.GetProperty("channelType").GetInt32());
+        Assert.Equal("Payment failed for {{customerName}}", root.GetProperty("subjectTemplate").GetString());
         Assert.Equal("Payment {{amount}} failed", root.GetProperty("contentTemplate").GetString());
-        Assert.Equal("amount", root.GetProperty("parameters")[0].GetString());
+        var parameters = root.GetProperty("parameters").EnumerateArray().Select(parameter => parameter.GetString()).ToArray();
+        Assert.Contains("customerName", parameters);
+        Assert.Contains("amount", parameters);
+    }
+
+    [Fact]
+    public async Task UpdateTemplateAsync_PostsNotificationServiceMetadataContractShape()
+    {
+        string? payload = null;
+        var templateId = Guid.NewGuid();
+        var client = MakeClient(async request =>
+        {
+            payload = await request.Content!.ReadAsStringAsync();
+            return JsonContent.Create(new
+            {
+                id = templateId,
+                templateKey = "customer-email-follow-up",
+                displayName = "Updated follow-up",
+                version = 1,
+                language = "en",
+                channelType = 0,
+                subjectTemplate = "Follow-up for {{customerName}}",
+                contentTemplate = "Hello {{customerName}}, about {{companyName}}",
+                isActive = false
+            });
+        });
+
+        await client.UpdateTemplateAsync(templateId, new()
+        {
+            Name = "Updated follow-up",
+            SubjectTemplate = "Follow-up for {{customerName}}",
+            BodyTemplate = "Hello {{customerName}}, about {{companyName}}",
+            IsActive = false
+        });
+
+        Assert.NotNull(payload);
+        using var document = JsonDocument.Parse(payload);
+        var root = document.RootElement;
+        Assert.Equal("Updated follow-up", root.GetProperty("displayName").GetString());
+        Assert.Equal("Follow-up for {{customerName}}", root.GetProperty("subjectTemplate").GetString());
+        Assert.Equal("Hello {{customerName}}, about {{companyName}}", root.GetProperty("contentTemplate").GetString());
+        Assert.False(root.GetProperty("isActive").GetBoolean());
+        var parameters = root.GetProperty("parameters").EnumerateArray().Select(parameter => parameter.GetString()).ToArray();
+        Assert.Contains("customerName", parameters);
+        Assert.Contains("companyName", parameters);
     }
 
     [Fact]

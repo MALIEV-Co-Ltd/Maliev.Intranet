@@ -560,29 +560,91 @@
               ConfirmLabel="@EmailConfirmLabel"
               ConfirmDisabled="@EmailConfirmDisabled"
               ConfirmButtonClass="customer-email-send"
-              Class="customer-modal-wide"
+              Class="customer-modal-email"
+              CloseOnBackdropClick="false"
               OnCancel="CloseEmailComposerAsync"
               OnConfirm="SendCustomerEmailAsync">
     @if (_customer is not null)
     {
         <div class="customer-email-modal">
-            <p class="customer-email-recipient">To <span>@_customer.Email</span></p>
-            <label class="customer-field">
-                <span>Subject</span>
-                <input class="customer-input customer-email-subject" @bind="_emailSubject" @bind:event="oninput" disabled="@_emailQueued" />
-            </label>
-            <label class="customer-field">
-                <span>Message</span>
-                <textarea class="customer-textarea customer-email-body" @bind="_emailBody" @bind:event="oninput" disabled="@_emailQueued"></textarea>
-            </label>
-            @if (!string.IsNullOrWhiteSpace(_emailError))
-            {
-                <div class="customer-email-state error">@_emailError</div>
-            }
-            else if (_emailQueued)
-            {
-                <div class="customer-email-state success">Email queued for delivery.</div>
-            }
+            <aside class="customer-email-template-panel" aria-label="Email templates">
+                <div class="customer-email-template-head">
+                    <div>
+                        <span class="customer-email-template-label">Templates</span>
+                        <strong>Reusable customer emails</strong>
+                    </div>
+                    <button type="button" class="customer-template-ghost customer-email-template-new" @onclick="NewEmailTemplate" disabled="@_savingEmailTemplate">New</button>
+                </div>
+
+                @if (_emailTemplatesLoading)
+                {
+                    <div class="customer-email-template-empty">Loading templates...</div>
+                }
+                else if (_emailTemplates.Count == 0)
+                {
+                    <div class="customer-email-template-empty">No customer email templates yet.</div>
+                }
+                else
+                {
+                    <div class="customer-email-template-list">
+                        @foreach (var template in _emailTemplates)
+                        {
+                            <button type="button" class="@EmailTemplateButtonClass(template)" @onclick="@(() => SelectEmailTemplate(template))">
+                                <span>@template.Name</span>
+                                <small>@EmailTemplateSubjectPreview(template)</small>
+                            </button>
+                        }
+                    </div>
+                }
+
+                <div class="customer-email-template-editor">
+                    <label class="customer-field">
+                        <span>Template name</span>
+                        <input class="customer-input customer-email-template-name" @bind="_emailTemplateName" @bind:event="oninput" disabled="@_savingEmailTemplate" />
+                    </label>
+                    <label class="customer-field">
+                        <span>Template key</span>
+                        <input class="customer-input customer-email-template-key" @bind="_emailTemplateKey" @bind:event="oninput" disabled="@(!EmailTemplateIsNew || _savingEmailTemplate)" />
+                    </label>
+                    <label class="customer-field">
+                        <span>Subject template</span>
+                        <input class="customer-input customer-email-template-subject" @bind="_emailTemplateSubject" @bind:event="oninput" disabled="@_savingEmailTemplate" />
+                    </label>
+                    <label class="customer-field">
+                        <span>Body template</span>
+                        <textarea class="customer-textarea customer-email-template-body" @bind="_emailTemplateBody" @bind:event="oninput" disabled="@_savingEmailTemplate"></textarea>
+                    </label>
+                    <label class="customer-checkbox-row">
+                        <input type="checkbox" @bind="_emailTemplateIsActive" disabled="@_savingEmailTemplate" />
+                        <span>Active template</span>
+                    </label>
+                    @if (!string.IsNullOrWhiteSpace(_emailTemplateError))
+                    {
+                        <div class="customer-email-state error">@_emailTemplateError</div>
+                    }
+                    <button type="button" class="customer-inline-action customer-email-template-save" @onclick="SaveEmailTemplateAsync" disabled="@EmailTemplateSaveDisabled">@EmailTemplateSaveLabel</button>
+                </div>
+            </aside>
+
+            <div class="customer-email-compose-panel">
+                <p class="customer-email-recipient">To <span>@_customer.Email</span></p>
+                <label class="customer-field">
+                    <span>Subject</span>
+                    <input class="customer-input customer-email-subject" @bind="_emailSubject" @bind:event="oninput" disabled="@_emailQueued" />
+                </label>
+                <label class="customer-field">
+                    <span>Message</span>
+                    <textarea class="customer-textarea customer-email-body" @bind="_emailBody" @bind:event="oninput" disabled="@_emailQueued"></textarea>
+                </label>
+                @if (!string.IsNullOrWhiteSpace(_emailError))
+                {
+                    <div class="customer-email-state error">@_emailError</div>
+                }
+                else if (_emailQueued)
+                {
+                    <div class="customer-email-state success">Email queued for delivery.</div>
+                }
+            </div>
         </div>
     }
 </ConfirmModal>
@@ -832,12 +894,21 @@
     private bool _sendingEmail;
     private bool _emailComposerOpen;
     private bool _emailQueued;
+    private bool _emailTemplatesLoading;
+    private bool _savingEmailTemplate;
     private bool _paymentTermsOpen;
     private bool _activityLoading;
     private string? _error;
     private string _emailSubject = string.Empty;
     private string _emailBody = string.Empty;
     private string? _emailError;
+    private string? _emailTemplateError;
+    private Guid? _selectedEmailTemplateId;
+    private string _emailTemplateName = string.Empty;
+    private string _emailTemplateKey = string.Empty;
+    private string _emailTemplateSubject = string.Empty;
+    private string _emailTemplateBody = string.Empty;
+    private bool _emailTemplateIsActive = true;
     private string _newNoteText = string.Empty;
     private string _activitySearch = string.Empty;
     private const int InternalNoteMaxLength = 5000;
@@ -863,6 +934,7 @@
     private readonly List<RegistryThaiLocation> _fieldLocationMatches = [];
     private readonly List<CompanySearchResultDto> _companyMatches = [];
     private readonly List<RegistryCompanyProfile> _registryCompanyMatches = [];
+    private readonly List<NotificationTemplateDto> _emailTemplates = [];
 
     private string CustomerType => HasCompany ? "Company" : "Individual";
     private bool HasCompany => _customer?.CompanyId is not null || !string.IsNullOrWhiteSpace(_customer?.CompanyName);
@@ -896,6 +968,15 @@
     private string CompanyConfirmLabel => _companyEdit?.ExistingCompanyId is Guid ? "Link company" : "Create and link";
     private string EmailConfirmLabel => _sendingEmail ? "Sending..." : _emailQueued ? "Queued" : "Send email";
     private bool EmailConfirmDisabled => _sendingEmail || _emailQueued;
+    private bool EmailTemplateIsNew => _selectedEmailTemplateId is null;
+    private string EmailTemplateSaveLabel => _savingEmailTemplate
+        ? "Saving..."
+        : EmailTemplateIsNew ? "Create template" : "Update template";
+    private bool EmailTemplateSaveDisabled => _savingEmailTemplate ||
+        string.IsNullOrWhiteSpace(_emailTemplateName) ||
+        string.IsNullOrWhiteSpace(_emailTemplateKey) ||
+        string.IsNullOrWhiteSpace(_emailTemplateSubject) ||
+        string.IsNullOrWhiteSpace(_emailTemplateBody);
     private int NoteCharacterCount => _newNoteText.Length;
     private bool CanPostInternalNote => !_postingNote && !string.IsNullOrWhiteSpace(_newNoteText) && NoteCharacterCount <= InternalNoteMaxLength;
     private string NoteCounterClass => NoteCharacterCount > InternalNoteMaxLength ? "customer-note-counter over-limit" : "customer-note-counter";
@@ -1173,19 +1254,33 @@
         await SaveCustomerCoreAsync();
     }
 
-    private Task OpenEmailComposerAsync(MouseEventArgs _)
+    private async Task OpenEmailComposerAsync(MouseEventArgs _)
     {
         if (_customer is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         _emailSubject = string.Empty;
         _emailBody = $"Hello {_customer.Name},\n\n";
         _emailError = null;
+        _emailTemplateError = null;
         _emailQueued = false;
         _emailComposerOpen = true;
-        return Task.CompletedTask;
+
+        await LoadEmailTemplatesAsync();
+        var selectedTemplate = _emailTemplates.FirstOrDefault(template => template.Id == _selectedEmailTemplateId)
+            ?? _emailTemplates.FirstOrDefault(template => string.Equals(template.TemplateKey, "customer-email-follow-up", StringComparison.OrdinalIgnoreCase))
+            ?? _emailTemplates.FirstOrDefault();
+
+        if (selectedTemplate is not null)
+        {
+            SelectEmailTemplate(selectedTemplate);
+        }
+        else
+        {
+            NewEmailTemplate();
+        }
     }
 
     private Task CloseEmailComposerAsync()
@@ -1195,6 +1290,215 @@
         _emailQueued = false;
         return Task.CompletedTask;
     }
+
+    private async Task LoadEmailTemplatesAsync()
+    {
+        _emailTemplatesLoading = true;
+        _emailTemplateError = null;
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<NotificationTemplateDto>>("api/v1/notifications/templates?page=1&pageSize=50&filter=customer-email");
+            _emailTemplates.Clear();
+            _emailTemplates.AddRange((response?.Data ?? [])
+                .Where(template => string.Equals(template.ChannelType, "email", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(template => template.IsActive)
+                .ThenBy(template => template.Name));
+        }
+        catch (Exception ex)
+        {
+            _emailTemplateError = "Email templates could not be loaded.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _emailTemplatesLoading = false;
+        }
+    }
+
+    private void SelectEmailTemplate(NotificationTemplateDto template)
+    {
+        _selectedEmailTemplateId = template.Id;
+        _emailTemplateName = template.Name;
+        _emailTemplateKey = template.TemplateKey;
+        _emailTemplateSubject = template.SubjectTemplate;
+        _emailTemplateBody = template.BodyTemplate;
+        _emailTemplateIsActive = template.IsActive;
+        _emailTemplateError = null;
+        _emailError = null;
+        _emailQueued = false;
+        _emailSubject = RenderEmailTemplate(template.SubjectTemplate);
+        _emailBody = RenderEmailTemplate(template.BodyTemplate);
+    }
+
+    private void NewEmailTemplate()
+    {
+        _selectedEmailTemplateId = null;
+        _emailTemplateName = "Customer email";
+        _emailTemplateKey = NextCustomerEmailTemplateKey();
+        _emailTemplateSubject = string.IsNullOrWhiteSpace(_emailSubject) ? "Message from MALIEV" : _emailSubject;
+        _emailTemplateBody = string.IsNullOrWhiteSpace(_emailBody) ? $"Hello {_customer?.Name},\n\n" : _emailBody;
+        _emailTemplateIsActive = true;
+        _emailTemplateError = null;
+    }
+
+    private async Task SaveEmailTemplateAsync()
+    {
+        if (EmailTemplateSaveDisabled)
+        {
+            return;
+        }
+
+        var templateKey = NormalizeTemplateKey(_emailTemplateKey);
+        if (!IsTemplateKeyValid(templateKey))
+        {
+            _emailTemplateError = "Template key must be kebab-case and start with a letter.";
+            return;
+        }
+
+        _savingEmailTemplate = true;
+        _emailTemplateError = null;
+
+        try
+        {
+            HttpResponseMessage response;
+            if (EmailTemplateIsNew)
+            {
+                response = await Http.PostAsJsonAsync("api/v1/notifications/templates", new CreateNotificationTemplateRequest
+                {
+                    Name = _emailTemplateName.Trim(),
+                    TemplateKey = templateKey,
+                    SubjectTemplate = _emailTemplateSubject.Trim(),
+                    BodyTemplate = _emailTemplateBody.Trim(),
+                    ChannelType = "email",
+                    Language = "en",
+                    Version = 1
+                });
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/v1/notifications/templates/{_selectedEmailTemplateId}", new UpdateNotificationTemplateRequest
+                {
+                    Name = _emailTemplateName.Trim(),
+                    SubjectTemplate = _emailTemplateSubject.Trim(),
+                    BodyTemplate = _emailTemplateBody.Trim(),
+                    IsActive = _emailTemplateIsActive
+                });
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _emailTemplateError = "Template could not be saved.";
+                return;
+            }
+
+            var savedTemplate = await response.Content.ReadFromJsonAsync<NotificationTemplateDto>();
+            if (savedTemplate is not null)
+            {
+                UpsertEmailTemplate(savedTemplate);
+                SelectEmailTemplate(savedTemplate);
+            }
+        }
+        catch (Exception ex)
+        {
+            _emailTemplateError = "Template could not be saved.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _savingEmailTemplate = false;
+        }
+    }
+
+    private void UpsertEmailTemplate(NotificationTemplateDto template)
+    {
+        _emailTemplates.RemoveAll(existing => existing.Id == template.Id);
+        _emailTemplates.Add(template);
+        _emailTemplates.Sort((left, right) =>
+        {
+            var activeCompare = right.IsActive.CompareTo(left.IsActive);
+            return activeCompare != 0 ? activeCompare : string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    private string RenderEmailTemplate(string template)
+    {
+        if (_customer is null)
+        {
+            return template;
+        }
+
+        var companyName = string.IsNullOrWhiteSpace(_customer.CompanyName) ? _customer.Name : _customer.CompanyName;
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["customerName"] = _customer.Name,
+            ["name"] = _customer.Name,
+            ["customerEmail"] = _customer.Email,
+            ["email"] = _customer.Email,
+            ["companyName"] = companyName,
+            ["customerCode"] = CustomerCode
+        };
+
+        var rendered = template;
+        foreach (var pair in values)
+        {
+            rendered = rendered.Replace($"{{{{{pair.Key}}}}}", pair.Value, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return rendered;
+    }
+
+    private string EmailTemplateButtonClass(NotificationTemplateDto template)
+    {
+        var classes = "customer-email-template-option";
+        if (_selectedEmailTemplateId == template.Id)
+        {
+            classes += " selected";
+        }
+
+        if (!template.IsActive)
+        {
+            classes += " inactive";
+        }
+
+        return classes;
+    }
+
+    private static string EmailTemplateSubjectPreview(NotificationTemplateDto template) =>
+        string.IsNullOrWhiteSpace(template.SubjectTemplate) ? "No subject" : template.SubjectTemplate;
+
+    private string NextCustomerEmailTemplateKey()
+    {
+        var suffix = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
+        return $"customer-email-{suffix}";
+    }
+
+    private static string NormalizeTemplateKey(string value)
+    {
+        var key = value.Trim().ToLowerInvariant();
+        var builder = new System.Text.StringBuilder(key.Length);
+        var previousHyphen = false;
+        foreach (var character in key)
+        {
+            if (char.IsAsciiLetterOrDigit(character))
+            {
+                builder.Append(character);
+                previousHyphen = false;
+            }
+            else if (!previousHyphen)
+            {
+                builder.Append('-');
+                previousHyphen = true;
+            }
+        }
+
+        return builder.ToString().Trim('-');
+    }
+
+    private static bool IsTemplateKeyValid(string key) =>
+        key.Length >= 3 &&
+        char.IsAsciiLetterLower(key[0]) &&
+        key.All(character => char.IsAsciiLetterLower(character) || char.IsAsciiDigit(character) || character == '-');
 
     private async Task SendCustomerEmailAsync()
     {

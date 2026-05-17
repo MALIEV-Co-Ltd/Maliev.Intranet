@@ -724,14 +724,141 @@ select.customer-input {
     width: min(620px, 100%);
 }
 
+::deep .customer-modal-email {
+    width: min(980px, 100%);
+}
+
 ::deep .customer-modal-address {
     width: min(980px, 100%);
 }
 
-.customer-email-modal,
+.customer-email-modal {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
 .customer-address-form {
     display: grid;
     gap: 14px;
+}
+
+.customer-email-template-panel {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    padding-right: 16px;
+    border-right: 1px solid var(--maliev-border);
+}
+
+.customer-email-template-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.customer-email-template-head div {
+    display: grid;
+    gap: 3px;
+}
+
+.customer-email-template-head strong {
+    color: var(--maliev-ink);
+}
+
+.customer-email-template-label {
+    color: var(--maliev-muted);
+    font-size: var(--mud-typography-overline-size);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.customer-template-ghost {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in oklab, var(--maliev-info), transparent 65%);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklab, var(--maliev-info), transparent 94%);
+    color: var(--maliev-info);
+    font: inherit;
+    font-size: var(--maliev-font-small);
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.customer-template-ghost:hover {
+    border-color: var(--maliev-info);
+    background: color-mix(in oklab, var(--maliev-info), transparent 88%);
+}
+
+.customer-email-template-list {
+    display: grid;
+    gap: 8px;
+    max-height: 210px;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.customer-email-template-option {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.customer-email-template-option:hover {
+    border-color: color-mix(in oklab, var(--maliev-info), transparent 45%);
+    background: color-mix(in oklab, var(--maliev-info), transparent 95%);
+}
+
+.customer-email-template-option.selected {
+    border-color: var(--maliev-info);
+    background: color-mix(in oklab, var(--maliev-info), transparent 90%);
+}
+
+.customer-email-template-option.inactive {
+    color: var(--maliev-muted);
+}
+
+.customer-email-template-option span {
+    font-weight: 800;
+}
+
+.customer-email-template-option small,
+.customer-email-template-empty {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.35;
+}
+
+.customer-email-template-empty {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border: 1px dashed var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+}
+
+.customer-email-template-editor,
+.customer-email-compose-panel {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+}
+
+.customer-email-template-body {
+    min-height: 120px;
 }
 
 .customer-address-editor-grid {
@@ -907,32 +1034,6 @@ select.customer-input {
     color: var(--maliev-danger);
 }
 
-.customer-email-template-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--maliev-border);
-}
-
-.customer-email-template-row button {
-    min-height: 30px;
-    padding: 0 12px;
-    border: 1px solid var(--maliev-border);
-    border-radius: var(--maliev-radius-sm);
-    background: var(--maliev-panel);
-    color: var(--maliev-ink);
-    font: inherit;
-    font-size: var(--maliev-font-small);
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.customer-email-template-row button:hover {
-    border-color: var(--maliev-info);
-    color: var(--maliev-info);
-}
-
 .customer-split-field {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -991,6 +1092,17 @@ select.customer-input {
 @media (max-width: 1120px) {
     .customer-record-grid {
         grid-template-columns: 1fr;
+    }
+
+    .customer-email-modal {
+        grid-template-columns: 1fr;
+    }
+
+    .customer-email-template-panel {
+        padding-right: 0;
+        padding-bottom: 16px;
+        border-right: 0;
+        border-bottom: 1px solid var(--maliev-border);
     }
 }
 
