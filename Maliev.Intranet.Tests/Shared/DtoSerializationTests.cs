@@ -180,6 +180,33 @@ public class DtoSerializationTests
     }
 
     [Fact]
+    public void BffUploadResponse_ShouldRoundtripSignedUrlFromUploadService()
+    {
+        const string json = """
+            {
+                "uploadId": "upload-123",
+                "fileName": "customer.pdf",
+                "fileSize": 48000,
+                "storagePath": "customers/customer-1/customer.pdf",
+                "fileReference": "upload-123",
+                "signedUrl": "https://signed.example/customer.pdf"
+            }
+            """;
+        var webOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        var result = JsonSerializer.Deserialize<BffUploadResponse>(json, webOptions);
+
+        Assert.NotNull(result);
+        Assert.Equal("upload-123", result.UploadId);
+        Assert.Equal("customers/customer-1/customer.pdf", result.StoragePath);
+        Assert.Equal("https://signed.example/customer.pdf", result.SignedUrl);
+
+        using var serialized = JsonDocument.Parse(JsonSerializer.Serialize(result, webOptions));
+        Assert.True(serialized.RootElement.TryGetProperty("signedUrl", out var signedUrl));
+        Assert.Equal("https://signed.example/customer.pdf", signedUrl.GetString());
+    }
+
+    [Fact]
     public void BffMigrateProjectResponseDto_ShouldUseCamelCaseWireShape_WithNestedStatus()
     {
         var dto = new BffMigrateProjectResponseDto

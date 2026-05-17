@@ -515,6 +515,13 @@
                                         {
                                             <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
                                         }
+                                        else if (!string.IsNullOrWhiteSpace(_documentPreviewError))
+                                        {
+                                            <div class="document-preview-empty error">
+                                                <MudIcon Icon="@Icons.Material.Outlined.ErrorOutline" />
+                                                <span>@_documentPreviewError</span>
+                                            </div>
+                                        }
                                         else if (!string.IsNullOrWhiteSpace(_documentPreviewUrl) && IsPreviewable(_previewDocument.MimeType))
                                         {
                                             @if (IsPdf(_previewDocument.MimeType))
@@ -635,10 +642,11 @@
         public string? UploadId { get; set; }
         public string? FileReference { get; set; }
         public string? StoragePath { get; set; }
+        public string? SignedUrl { get; set; }
         public bool IsUploading { get; set; }
         public string? Error { get; set; }
-        public bool IsUploaded => !string.IsNullOrWhiteSpace(UploadId) && string.IsNullOrWhiteSpace(Error);
-        public string LinkReference => string.IsNullOrWhiteSpace(UploadId) ? FileReference ?? string.Empty : UploadId;
+        public bool IsUploaded => !string.IsNullOrWhiteSpace(LinkReference) && string.IsNullOrWhiteSpace(Error);
+        public string LinkReference => FirstNonEmpty(UploadId, FileReference, StoragePath) ?? string.Empty;
     }
 
     private const int MaxExtractionAttempts = 3;
@@ -673,6 +681,7 @@
     private string _ndaStatus = "Signed";
     private UploadedDocumentDraft? _previewDocument;
     private string? _documentPreviewUrl;
+    private string? _documentPreviewError;
     private bool _aiIntakeExpanded;
     private bool _extracting;
     private bool _saving;
@@ -1246,6 +1255,7 @@
                 draft.UploadId = upload.UploadId;
                 draft.FileReference = upload.FileReference;
                 draft.StoragePath = upload.StoragePath;
+                draft.SignedUrl = upload.SignedUrl;
                 draft.FileName = string.IsNullOrWhiteSpace(upload.FileName) ? draft.FileName : upload.FileName;
                 draft.FileSize = upload.FileSize > 0 ? upload.FileSize : draft.FileSize;
                 draft.IsUploading = false;
@@ -1792,6 +1802,9 @@
     private static int GetUploadedDocumentCount(List<UploadedDocumentDraft> documents) =>
         documents.Count(document => document.IsUploaded);
 
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
     private static string FormatDocumentUploadStatus(UploadedDocumentDraft document)
     {
         if (document.IsUploading)
@@ -1842,6 +1855,7 @@
         }
 
         return string.IsNullOrWhiteSpace(document.Error)
+            && document.IsUploaded
             ? "document-upload-badge uploaded"
             : "document-upload-badge error";
     }
@@ -1853,35 +1867,44 @@
             return "Uploading";
         }
 
-        return string.IsNullOrWhiteSpace(document.Error) ? "Uploaded" : "Issue";
+        return string.IsNullOrWhiteSpace(document.Error) && document.IsUploaded ? "Uploaded" : "Issue";
     }
 
     private async Task PreviewUploadedDocumentAsync(UploadedDocumentDraft document)
     {
         _previewDocument = document;
         _documentPreviewUrl = null;
+        _documentPreviewError = null;
 
-        if (!document.IsUploaded || !IsPreviewable(document.MimeType))
+        if (!IsPreviewable(document.MimeType))
         {
+            _documentPreviewError = "Preview is available for PDF and image files only.";
+            return;
+        }
+
+        if (!document.IsUploaded)
+        {
+            _documentPreviewError = "Upload finished without a file reference for preview.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(document.SignedUrl))
+        {
+            _documentPreviewUrl = document.SignedUrl;
             return;
         }
 
         _loadingDocumentPreview = true;
         try
         {
-            var response = await Http.GetAsync($"api/v1/aiprocessing/download-url/{Uri.EscapeDataString(document.UploadId!)}");
-            if (response.IsSuccessStatusCode)
-            {
-                using var payload = await response.Content.ReadFromJsonAsync<JsonDocument>();
-                if (payload?.RootElement.TryGetProperty("url", out var url) == true)
-                {
-                    _documentPreviewUrl = url.GetString();
-                }
-            }
+            _documentPreviewUrl = await ReadPreviewUrlAsync(document.LinkReference);
+            _documentPreviewError = string.IsNullOrWhiteSpace(_documentPreviewUrl)
+                ? "Could not create a secure preview link for this document."
+                : null;
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Could not load document preview: {ex.Message}", Severity.Warning);
+            _documentPreviewError = $"Could not load document preview: {ex.Message}";
         }
         finally
         {
@@ -1889,10 +1912,28 @@
         }
     }
 
+    private async Task<string?> ReadPreviewUrlAsync(string fileReference)
+    {
+        using var response = await Http.GetAsync($"api/v1/aiprocessing/download-url?fileReference={Uri.EscapeDataString(fileReference)}");
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        using var payload = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        if (payload?.RootElement.TryGetProperty("url", out var url) == true && url.ValueKind == JsonValueKind.String)
+        {
+            return url.GetString();
+        }
+
+        return null;
+    }
+
     private void CloseDocumentPreview()
     {
         _previewDocument = null;
         _documentPreviewUrl = null;
+        _documentPreviewError = null;
     }
 
     private static bool IsPreviewable(string mimeType) => IsPdf(mimeType) || mimeType.Contains("image", StringComparison.OrdinalIgnoreCase);

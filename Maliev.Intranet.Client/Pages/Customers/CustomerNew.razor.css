@@ -920,6 +920,11 @@
     text-align: center;
 }
 
+.document-preview-empty.error {
+    color: var(--mud-palette-error);
+    background: color-mix(in oklch, var(--mud-palette-error) 6%, transparent);
+}
+
 .document-preview-empty .mud-icon-root {
     color: var(--mud-palette-primary);
     font-size: var(--mud-typography-h4-size);

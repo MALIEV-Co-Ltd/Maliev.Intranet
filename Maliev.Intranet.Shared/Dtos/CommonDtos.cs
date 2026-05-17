@@ -358,6 +358,12 @@ public class BffUploadResponse
     /// </summary>
     [JsonPropertyName("fileReference")]
     public string? FileReference { get; set; }
+
+    /// <summary>
+    /// A temporary signed URL returned by the upload service for immediate preview.
+    /// </summary>
+    [JsonPropertyName("signedUrl")]
+    public string? SignedUrl { get; set; }
 }
 
 /// <summary>

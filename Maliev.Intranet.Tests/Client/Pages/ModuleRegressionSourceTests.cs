@@ -613,7 +613,15 @@ public class ModuleRegressionSourceTests
         Assert.Contains("DocumentUploadList(_customerDocumentUploads, DocumentPanel.Standard)", page, StringComparison.Ordinal);
         Assert.Contains("DocumentUploadList(_ndaDocumentUploads, DocumentPanel.Nda)", page, StringComparison.Ordinal);
         Assert.Contains("class=\"document-preview-panel persistent\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"document-preview-empty error\"", page, StringComparison.Ordinal);
         Assert.Contains("PreviewUploadedDocumentAsync(drafts.FirstOrDefault(draft => draft.IsUploaded) ?? drafts[0])", page, StringComparison.Ordinal);
+        Assert.Contains("public string? SignedUrl { get; set; }", page, StringComparison.Ordinal);
+        Assert.Contains("private string? _documentPreviewError;", page, StringComparison.Ordinal);
+        Assert.Contains("draft.SignedUrl = upload.SignedUrl;", page, StringComparison.Ordinal);
+        Assert.Contains("if (!string.IsNullOrWhiteSpace(document.SignedUrl))", page, StringComparison.Ordinal);
+        Assert.Contains("_documentPreviewUrl = document.SignedUrl;", page, StringComparison.Ordinal);
+        Assert.Contains("ReadPreviewUrlAsync(document.LinkReference)", page, StringComparison.Ordinal);
+        Assert.Contains("download-url?fileReference=", page, StringComparison.Ordinal);
         Assert.Contains("MaxItems=\"8\"", page, StringComparison.Ordinal);
         Assert.Contains("ReturnedItemsCountChanged=\"UpdateCompanySuggestionCount\"", page, StringComparison.Ordinal);
         Assert.Contains("<BeforeItemsTemplate>", page, StringComparison.Ordinal);
@@ -657,6 +665,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("border-left: 3px solid var(--mud-palette-primary);", ExtractCssBlock(styles, ".document-upload-item"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: auto minmax(0, 1fr) auto;", ExtractCssBlock(styles, ".document-upload-item"), StringComparison.Ordinal);
         Assert.Contains("min-height: 340px;", ExtractCssBlock(styles, ".document-preview-panel.persistent"), StringComparison.Ordinal);
+        Assert.Contains("color: var(--mud-palette-error);", ExtractCssBlock(styles, ".document-preview-empty.error"), StringComparison.Ordinal);
         Assert.Contains("display: inline-flex;", ExtractCssBlock(styles, ".document-upload-size"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: auto minmax(0, 1fr) auto;", ExtractCssBlock(styles, "::deep .address-suggestion-card"), StringComparison.Ordinal);
         Assert.Contains("border-left: 3px solid var(--mud-palette-secondary);", ExtractCssBlock(styles, "::deep .address-suggestion-card"), StringComparison.Ordinal);

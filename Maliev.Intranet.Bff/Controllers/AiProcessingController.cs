@@ -586,12 +586,39 @@ public class AiProcessingController(
     /// </summary>
     [RequirePermission(MalievPermissions.Customer.Read)]
     [HttpGet("download-url/{fileReference}")]
-    public async Task<ActionResult<string>> GetDownloadUrl(string fileReference)
+    public Task<IActionResult> GetDownloadUrlByRoute(string fileReference, CancellationToken cancellationToken = default) =>
+        GetDownloadUrlResultAsync(fileReference, cancellationToken);
+
+    /// <summary>
+    /// Gets a signed download URL for a file using a query-bound reference.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Customer.Read)]
+    [HttpGet("download-url")]
+    public Task<IActionResult> GetDownloadUrl([FromQuery] string fileReference, CancellationToken cancellationToken = default) =>
+        GetDownloadUrlResultAsync(fileReference, cancellationToken);
+
+    private async Task<IActionResult> GetDownloadUrlResultAsync(string fileReference, CancellationToken cancellationToken)
     {
-        var url = await uploadClient.GetDownloadUrlAsync(fileReference);
-        if (string.IsNullOrEmpty(url)) return NotFound("File not found or URL generation failed.");
+        if (string.IsNullOrWhiteSpace(fileReference))
+        {
+            return BadRequest("File reference is required.");
+        }
+
+        var trimmedReference = fileReference.Trim();
+        var url = LooksLikeStoragePath(trimmedReference)
+            ? await uploadClient.GetDownloadUrlByPathAsync(trimmedReference, cancellationToken)
+            : await uploadClient.GetDownloadUrlAsync(trimmedReference, cancellationToken);
+
+        if (string.IsNullOrEmpty(url))
+        {
+            return NotFound("File not found or URL generation failed.");
+        }
+
         return Ok(new { url });
     }
+
+    private static bool LooksLikeStoragePath(string fileReference) =>
+        fileReference.Contains('/', StringComparison.Ordinal) || fileReference.Contains('\\', StringComparison.Ordinal);
 
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
 
