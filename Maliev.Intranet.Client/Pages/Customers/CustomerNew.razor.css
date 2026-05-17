@@ -1046,16 +1046,90 @@
     height: 44px;
 }
 
+::deep .company-lookup-popover {
+    border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 22%, var(--maliev-border));
+    border-radius: var(--maliev-radius-sm);
+    box-shadow: 0 16px 36px color-mix(in oklch, var(--maliev-text) 12%, transparent);
+    overflow: hidden;
+}
+
+::deep .company-lookup-results {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.45rem;
+    background:
+        linear-gradient(180deg,
+            color-mix(in oklch, var(--mud-palette-primary) 4%, transparent),
+            color-mix(in oklch, var(--mud-palette-surface) 96%, transparent)),
+        var(--mud-palette-surface);
+}
+
+::deep .company-lookup-result-item {
+    min-height: 0;
+    padding: 0 !important;
+    border-radius: var(--maliev-radius-sm);
+}
+
+::deep .company-suggestion-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.65rem 0.75rem 0.55rem;
+    border-bottom: 1px solid var(--maliev-border);
+}
+
+::deep .company-suggestion-header > span:first-child {
+    display: grid;
+    min-width: 0;
+    gap: 0.05rem;
+}
+
+::deep .company-suggestion-header strong {
+    color: var(--maliev-text);
+    font-size: var(--mud-typography-body2-size);
+    font-weight: 800;
+}
+
+::deep .company-suggestion-header small {
+    color: var(--maliev-text-muted);
+    font-size: var(--mud-typography-caption-size);
+    line-height: var(--mud-typography-caption-lineheight);
+}
+
+::deep .company-suggestion-count {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.5rem;
+    padding: 0 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--mud-palette-primary) 10%, transparent);
+    color: var(--mud-palette-primary);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
 ::deep .suggestion-card {
     width: 100%;
+}
+
+::deep .company-suggestion-card {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
+    min-width: 0;
     border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 18%, var(--maliev-border));
-    border-radius: 8px;
-    padding: 0.75rem;
-    margin: 0.25rem 0;
-    background: linear-gradient(135deg, color-mix(in oklch, var(--mud-palette-primary) 6%, transparent), var(--mud-palette-surface));
+    border-left: 3px solid var(--mud-palette-primary);
+    border-radius: var(--maliev-radius-sm);
+    padding: 0.72rem 0.8rem;
+    margin: 0;
+    background:
+        linear-gradient(135deg,
+            color-mix(in oklch, var(--mud-palette-primary) 5%, transparent),
+            color-mix(in oklch, var(--mud-palette-surface) 96%, transparent)),
+        var(--mud-palette-surface);
+    box-shadow: 0 6px 18px color-mix(in oklch, var(--maliev-text) 6%, transparent);
 }
 
 ::deep .suggestion-card strong,
@@ -1068,15 +1142,96 @@
     font-weight: 750;
 }
 
+::deep .company-suggestion-main {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+    align-content: center;
+}
+
+::deep .company-suggestion-main strong {
+    color: var(--maliev-text);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+::deep .company-suggestion-tax {
+    font-family: var(--mud-typography-default-family);
+    color: var(--maliev-text-muted);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 700;
+    line-height: var(--mud-typography-caption-lineheight);
+}
+
 ::deep .suggestion-card span,
 ::deep .suggestion-card small {
     color: var(--maliev-text-muted);
 }
 
+::deep .company-suggestion-meta,
 ::deep .suggestion-meta {
+    display: grid;
+    justify-items: end;
+    gap: 0.25rem;
+    min-width: 150px;
     text-align: right;
-    white-space: nowrap;
     align-self: center;
+}
+
+::deep .company-suggestion-registry {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.35rem;
+    padding: 0 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--mud-palette-info) 10%, transparent);
+    color: var(--mud-palette-info);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+::deep .company-suggestion-status {
+    max-width: 240px;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--mud-palette-success) 8%, transparent);
+    color: color-mix(in oklch, var(--mud-palette-success) 72%, var(--maliev-text));
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 700;
+    line-height: var(--mud-typography-caption-lineheight);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+::deep .company-suggestion-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-height: 4.5rem;
+    padding: 0.9rem;
+    color: var(--maliev-text-muted);
+}
+
+::deep .company-suggestion-empty .mud-icon-root {
+    color: var(--mud-palette-primary);
+}
+
+::deep .company-suggestion-empty span {
+    display: grid;
+    gap: 0.1rem;
+}
+
+::deep .company-suggestion-empty strong {
+    color: var(--maliev-text);
+    font-size: var(--mud-typography-body2-size);
+    font-weight: 800;
+}
+
+::deep .company-suggestion-empty small {
+    font-size: var(--mud-typography-caption-size);
+    line-height: var(--mud-typography-caption-lineheight);
 }
 
 ::deep .address-suggestion {
@@ -1152,5 +1307,24 @@
 
     .extraction-confidence {
         margin-left: 0;
+    }
+
+    ::deep .company-suggestion-header,
+    ::deep .company-suggestion-card {
+        grid-template-columns: 1fr;
+    }
+
+    ::deep .company-suggestion-card {
+        display: grid;
+    }
+
+    ::deep .company-suggestion-meta {
+        justify-items: start;
+        min-width: 0;
+        text-align: left;
+    }
+
+    ::deep .company-suggestion-status {
+        max-width: 100%;
     }
 }

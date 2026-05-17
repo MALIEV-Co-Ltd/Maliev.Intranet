@@ -604,6 +604,19 @@ public class ModuleRegressionSourceTests
         Assert.Contains("CreateTab.Documents", page, StringComparison.Ordinal);
         Assert.Contains("class=\"customer-create-tab-panel\"", page, StringComparison.Ordinal);
         Assert.Contains("Class=\"styled-autocomplete company-lookup-input\"", page, StringComparison.Ordinal);
+        Assert.Contains("MaxItems=\"8\"", page, StringComparison.Ordinal);
+        Assert.Contains("ReturnedItemsCountChanged=\"UpdateCompanySuggestionCount\"", page, StringComparison.Ordinal);
+        Assert.Contains("<BeforeItemsTemplate>", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"company-suggestion-header\"", page, StringComparison.Ordinal);
+        Assert.Contains("@GetCompanySuggestionCountText()", page, StringComparison.Ordinal);
+        Assert.Contains("<NoItemsTemplate>", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"company-suggestion-empty\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"suggestion-card company-suggestion-card\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"company-suggestion-registry\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"company-suggestion-status\"", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"company-suggestion-tax\"", page, StringComparison.Ordinal);
+        Assert.Contains("private int _companySuggestionCount;", page, StringComparison.Ordinal);
+        Assert.Contains("private void UpdateCompanySuggestionCount(int count)", page, StringComparison.Ordinal);
         Assert.Contains("class=\"company-core-row\"", page, StringComparison.Ordinal);
         Assert.Contains("class=\"company-address-block\"", page, StringComparison.Ordinal);
         Assert.Contains("class=\"company-address-header\"", page, StringComparison.Ordinal);
@@ -617,6 +630,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("grid-template-columns: minmax(0, 1.25fr) minmax(170px, 0.8fr) minmax(132px, 0.5fr) minmax(118px, 0.45fr);", ExtractCssBlock(styles, ".company-core-row"), StringComparison.Ordinal);
         Assert.Contains("max-width: 180px;", ExtractCssBlock(styles, ".company-branch-field"), StringComparison.Ordinal);
         Assert.Contains("height: 44px;", ExtractCssBlock(styles, "::deep .company-lookup-input .mud-input.mud-input-outlined"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr) auto;", ExtractCssBlock(styles, "::deep .company-suggestion-header"), StringComparison.Ordinal);
+        Assert.Contains("border-left: 3px solid var(--mud-palette-primary);", ExtractCssBlock(styles, "::deep .company-suggestion-card"), StringComparison.Ordinal);
+        Assert.Contains("display: inline-flex;", ExtractCssBlock(styles, "::deep .company-suggestion-registry"), StringComparison.Ordinal);
+        Assert.Contains("border-radius: 999px;", ExtractCssBlock(styles, "::deep .company-suggestion-status"), StringComparison.Ordinal);
+        Assert.Contains("font-family: var(--mud-typography-default-family);", ExtractCssBlock(styles, "::deep .company-suggestion-tax"), StringComparison.Ordinal);
         Assert.Contains("border-bottom: 1px solid var(--maliev-border);", ExtractCssBlock(styles, ".company-address-header"), StringComparison.Ordinal);
     }
 

@@ -232,19 +232,42 @@
                                                              ResetValueOnEmptyText="false"
                                                              DebounceInterval="350"
                                                              MinCharacters="2"
+                                                             MaxItems="8"
+                                                             ReturnedItemsCountChanged="UpdateCompanySuggestionCount"
+                                                             PopoverClass="company-lookup-popover"
+                                                             ListClass="company-lookup-results"
+                                                             ListItemClass="company-lookup-result-item"
                                                              Class="styled-autocomplete company-lookup-input">
+                                                <BeforeItemsTemplate>
+                                                    <div class="company-suggestion-header">
+                                                        <span>
+                                                            <strong>Company matches</strong>
+                                                            <small>Saved customers and Registry-backed companies</small>
+                                                        </span>
+                                                        <span class="company-suggestion-count">@GetCompanySuggestionCountText()</span>
+                                                    </div>
+                                                </BeforeItemsTemplate>
                                                 <ItemTemplate Context="company">
-                                                    <div class="suggestion-card company-suggestion">
-                                                        <div>
+                                                    <div class="suggestion-card company-suggestion-card">
+                                                        <div class="company-suggestion-main">
                                                             <strong>@company.Name</strong>
-                                                            <span>@FormatPair(company.VatNumber, company.RegistrationNumber)</span>
+                                                            <span class="company-suggestion-tax">@FormatPair(company.VatNumber, company.RegistrationNumber)</span>
                                                         </div>
-                                                        <div class="suggestion-meta">
-                                                            <span>@(string.IsNullOrWhiteSpace(company.Source) ? "CustomerService" : company.Source)</span>
-                                                            <small>@company.BusinessType</small>
+                                                        <div class="company-suggestion-meta">
+                                                            <span class="company-suggestion-registry">@GetCompanySourceBadge(company)</span>
+                                                            <small class="company-suggestion-status">@GetCompanyBusinessType(company)</small>
                                                         </div>
                                                     </div>
                                                 </ItemTemplate>
+                                                <NoItemsTemplate>
+                                                    <div class="company-suggestion-empty">
+                                                        <MudIcon Icon="@Icons.Material.Outlined.SearchOff" />
+                                                        <span>
+                                                            <strong>No matching companies</strong>
+                                                            <small>Check the Thai or English name, or search by 13-digit tax ID.</small>
+                                                        </span>
+                                                    </div>
+                                                </NoItemsTemplate>
                                             </MudAutocomplete>
                                         </FormField>
 
@@ -568,6 +591,7 @@
     }
 
     private const int MaxExtractionAttempts = 3;
+    private const int CompanySuggestionSearchLimit = 20;
     private CreateTab _activeCreateTab = CreateTab.Contact;
     private const double HighConfidenceThreshold = 0.9;
     private const string BranchModeHeadOffice = "HeadOffice";
@@ -592,6 +616,7 @@
     private Guid? _selectedCompanyId;
     private string? _selectedCompanySource;
     private string? _selectedCompanyLookupValue;
+    private int _companySuggestionCount;
     private DateTime? _ndaExpiresAt;
     private string _ndaStatus = "Signed";
     private UploadedDocumentDraft? _previewDocument;
@@ -1141,11 +1166,12 @@
     {
         if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
         {
+            _companySuggestionCount = 0;
             return [];
         }
 
         return await Http.GetFromJsonAsync<List<CompanySearchResultDto>>(
-            $"api/v1/companies/search?query={Uri.EscapeDataString(value.Trim())}&limit=8",
+            $"api/v1/companies/search?query={Uri.EscapeDataString(value.Trim())}&limit={CompanySuggestionSearchLimit}",
             ct) ?? [];
     }
 
@@ -1162,6 +1188,10 @@
     private void OnCompanyLookupTextChanged(string value)
     {
         _companyLookup = value;
+        _companySuggestionCount = string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2
+            ? 0
+            : _companySuggestionCount;
+
         if (string.Equals(value, _selectedCompanyLookupValue, StringComparison.Ordinal))
         {
             return;
@@ -1212,6 +1242,30 @@
 
         ApplyCompanySuggestion(match);
     }
+
+    private void UpdateCompanySuggestionCount(int count)
+    {
+        _companySuggestionCount = count;
+    }
+
+    private string GetCompanySuggestionCountText()
+    {
+        if (_companySuggestionCount == 0)
+        {
+            return "No matches";
+        }
+
+        var suffix = _companySuggestionCount == 1 ? "match" : "matches";
+        return _companySuggestionCount > 8
+            ? $"{_companySuggestionCount} {suffix}, showing first 8"
+            : $"{_companySuggestionCount} {suffix}";
+    }
+
+    private static string GetCompanySourceBadge(CompanySearchResultDto company) =>
+        string.IsNullOrWhiteSpace(company.Source) ? "Saved company" : company.Source.Trim();
+
+    private static string GetCompanyBusinessType(CompanySearchResultDto company) =>
+        string.IsNullOrWhiteSpace(company.BusinessType) ? "Customer record" : company.BusinessType.Trim();
 
     private void ApplyCompanyBillingAddress(AddressResponse address)
     {
