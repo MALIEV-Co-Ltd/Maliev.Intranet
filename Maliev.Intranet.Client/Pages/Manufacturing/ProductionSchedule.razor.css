@@ -229,6 +229,12 @@
     text-transform: uppercase;
 }
 
+.production-move-grid label small {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    line-height: 1.2;
+}
+
 .production-move-grid input,
 .production-move-grid select {
     width: 100%;
@@ -241,6 +247,14 @@
     font: inherit;
     font-size: var(--maliev-font-small);
     padding: 0 10px;
+}
+
+.production-move-grid select:disabled {
+    border-color: var(--maliev-border-subtle);
+    background: var(--maliev-panel-2);
+    color: var(--maliev-muted);
+    cursor: not-allowed;
+    opacity: 1;
 }
 
 .production-move-checkbox {

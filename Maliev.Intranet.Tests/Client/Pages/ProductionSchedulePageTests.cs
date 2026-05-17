@@ -102,6 +102,11 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         cut.Find($"button[data-job-id='{_jobId}'] .psb-slot-move").Click();
 
         cut.WaitForAssertion(() => Assert.Contains("Reschedule slot", cut.Markup));
+        var machineSelect = cut.Find(".production-move-panel select");
+        Assert.True(machineSelect.HasAttribute("disabled"));
+        Assert.Equal("production-move-machine-lock", machineSelect.GetAttribute("aria-describedby"));
+        Assert.Contains("Locked to the selected slot.", cut.Markup);
+
         cut.Find("button.production-move-save").Click();
 
         cut.WaitForAssertion(() =>

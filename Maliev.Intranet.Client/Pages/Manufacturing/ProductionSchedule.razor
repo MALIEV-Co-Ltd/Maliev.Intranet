@@ -45,12 +45,13 @@
                 <div class="production-move-grid">
                     <label>
                         <span>Machine</span>
-                        <select value="@_moveMachineId" @onchange="OnMoveMachineChanged">
+                        <select value="@_moveMachineId" disabled aria-describedby="production-move-machine-lock">
                             @foreach (var machine in MoveMachines)
                             {
                                 <option value="@machine.MachineId">@machine.MachineName</option>
                             }
                         </select>
+                        <small id="production-move-machine-lock">Locked to the selected slot.</small>
                     </label>
 
                     <label>
