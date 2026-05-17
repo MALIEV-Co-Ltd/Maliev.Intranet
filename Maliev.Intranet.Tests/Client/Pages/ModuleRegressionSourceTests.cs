@@ -409,6 +409,9 @@ public class ModuleRegressionSourceTests
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "EquipmentList.razor");
         var listStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "EquipmentList.razor.css");
         var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "EquipmentDetail.razor");
+        var detailStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "EquipmentDetail.razor.css");
+        var facilityDtos = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "FacilityDtos.cs");
+        var equipmentsController = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "EquipmentsController.cs");
 
         Assert.Contains("@page \"/mfg/equipment\"", list, StringComparison.Ordinal);
         Assert.Contains("PaginationFooter", list, StringComparison.Ordinal);
@@ -427,6 +430,18 @@ public class ModuleRegressionSourceTests
         Assert.Contains("/maintenance", detail, StringComparison.Ordinal);
         Assert.Contains("/loans", detail, StringComparison.Ordinal);
         Assert.Contains("/attachments", detail, StringComparison.Ordinal);
+        Assert.Contains("<InputFile OnChange=\"OnMaintenanceFilesSelected\" multiple", detail, StringComparison.Ordinal);
+        Assert.Contains("MultipartFormDataContent", detail, StringComparison.Ordinal);
+        Assert.Contains("maintenance-document-list", detail, StringComparison.Ordinal);
+        Assert.Contains("OpenMaintenanceDocumentAsync", detail, StringComparison.Ordinal);
+        Assert.Contains("api/v1/equipments/{Id}/maintenance/download-url", detail, StringComparison.Ordinal);
+        Assert.Contains(".maintenance-document-list", detailStyles, StringComparison.Ordinal);
+        Assert.Contains(".maintenance-file-input", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("public List<MaintenanceLogDocumentDto> Documents { get; set; } = [];", facilityDtos, StringComparison.Ordinal);
+        Assert.Contains("public List<CreateMaintenanceLogDocumentDto> Documents { get; set; } = [];", facilityDtos, StringComparison.Ordinal);
+        Assert.Contains("[FromForm] List<IFormFile>? files", equipmentsController, StringComparison.Ordinal);
+        Assert.Contains("equipment-maintenance/{id}", equipmentsController, StringComparison.Ordinal);
+        Assert.Contains("maintenance/download-url", equipmentsController, StringComparison.Ordinal);
     }
 
     [Fact]

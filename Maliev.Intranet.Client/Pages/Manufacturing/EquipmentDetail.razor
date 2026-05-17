@@ -1,7 +1,10 @@
 @page "/mfg/equipment/{Id:guid}"
+@using System.Net.Http.Headers
+@using System.Text.Json.Serialization
 @using Maliev.Intranet.Shared
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageTitle>Equipment | MALIEV Intranet</PageTitle>
 
@@ -58,14 +61,38 @@
                     <FormField Label="Vendor"><ImmediateInputText class="mlv-form-input" @bind-Value="_maintenance.VendorName" /></FormField>
                     <FormField Label="Cost THB"><ImmediateInputNumber class="mlv-form-input" @bind-Value="_maintenance.CostTHB" /></FormField>
                     <FormField Label="Description" Class="mlv-span-6"><ImmediateInputTextArea class="mlv-form-textarea" @bind-Value="_maintenance.Description" /></FormField>
+                    <label class="mlv-form-field mlv-span-6 maintenance-file-input">
+                        <span>Files</span>
+                        <InputFile OnChange="OnMaintenanceFilesSelected" multiple />
+                        <small>Attach maintenance reports, findings, service photos, receipts, or vendor documents up to 10 MB each.</small>
+                        @if (_maintenanceFiles.Count > 0)
+                        {
+                            <div class="maintenance-selected-files">
+                                @foreach (var file in _maintenanceFiles)
+                                {
+                                    <span>
+                                        <MudIcon Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" />
+                                        @file.Name
+                                        <em>@FormatFileSize(file.Size)</em>
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </label>
                 </FormGrid>
+                @if (!string.IsNullOrWhiteSpace(_maintenanceError))
+                {
+                    <div class="maintenance-error">@_maintenanceError</div>
+                }
                 <div class="mlv-toolbar mt-3" style="justify-content:flex-end">
-                    <PrimaryButton Icon="@Icons.Material.Outlined.Build" OnClick="@AddMaintenanceAsync">Add Maintenance</PrimaryButton>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Build" Disabled="@_maintenanceSaving" OnClick="@AddMaintenanceAsync">
+                        @(_maintenanceSaving ? "Adding..." : "Add Maintenance")
+                    </PrimaryButton>
                 </div>
                 @if (_maintenanceLogs.Count > 0)
                 {
                     <table class="mlv-table mt-4">
-                        <thead><tr><th>Type</th><th>Description</th><th>Vendor</th><th>Cost</th><th>Date</th></tr></thead>
+                        <thead><tr><th>Type</th><th>Description</th><th>Vendor</th><th>Cost</th><th>Date</th><th>Files</th></tr></thead>
                         <tbody>
                             @foreach (var log in _maintenanceLogs)
                             {
@@ -75,6 +102,25 @@
                                     <td>@Display(log.VendorName)</td>
                                     <td class="mlv-mono">@((log.CostTHB ?? 0).ToString("N2"))</td>
                                     <td>@log.OccurredAt.ToString("dd MMM yyyy")</td>
+                                    <td>
+                                        @if (log.Documents.Count == 0)
+                                        {
+                                            <span class="mlv-row-sub">-</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="maintenance-document-list">
+                                                @foreach (var document in log.Documents)
+                                                {
+                                                    <button type="button" class="maintenance-document-button" @onclick="() => OpenMaintenanceDocumentAsync(document)">
+                                                        <MudIcon Icon="@GetDocumentIcon(document.ContentType)" Size="Size.Small" />
+                                                        <span>@document.FileName</span>
+                                                        <em>@FormatFileSize(document.FileSizeBytes)</em>
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -164,8 +210,11 @@
     private List<MaintenanceLogDto> _maintenanceLogs = [];
     private List<EquipmentLoanDto> _loans = [];
     private List<EquipmentAttachmentDto> _attachments = [];
+    private List<IBrowserFile> _maintenanceFiles = [];
     private bool _loading = true;
+    private bool _maintenanceSaving;
     private string _newNote = string.Empty;
+    private string? _maintenanceError;
     private DateTime _maintenanceDate = DateTime.Today;
     private AddMaintenanceLogRequest _maintenance = new() { Type = "Preventive", Description = string.Empty, OccurredAt = DateTime.UtcNow };
 
@@ -219,21 +268,132 @@
 
     private async Task AddMaintenanceAsync(MouseEventArgs _)
     {
+        _maintenanceError = null;
         if (string.IsNullOrWhiteSpace(_maintenance.Description))
         {
-            Snackbar.Add("Enter maintenance description.", Severity.Warning);
+            _maintenanceError = "Enter maintenance description.";
             return;
         }
 
-        _maintenance.OccurredAt = DateTime.SpecifyKind(_maintenanceDate, DateTimeKind.Local).ToUniversalTime();
-        var response = await Http.PostAsJsonAsync($"api/v1/equipments/{Id}/maintenance", _maintenance);
-        Snackbar.Add(response.IsSuccessStatusCode ? "Maintenance log added." : "Maintenance log could not be added.", response.IsSuccessStatusCode ? Severity.Success : Severity.Warning);
-        if (response.IsSuccessStatusCode)
+        _maintenanceSaving = true;
+        try
         {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(string.IsNullOrWhiteSpace(_maintenance.Type) ? "Preventive" : _maintenance.Type.Trim()), "type");
+            content.Add(new StringContent(_maintenance.Description.Trim()), "description");
+            content.Add(new StringContent(DateTime.SpecifyKind(_maintenanceDate, DateTimeKind.Local).ToUniversalTime().ToString("O")), "occurredAt");
+
+            if (!string.IsNullOrWhiteSpace(_maintenance.VendorName))
+            {
+                content.Add(new StringContent(_maintenance.VendorName.Trim()), "vendorName");
+            }
+
+            if (_maintenance.CostTHB.HasValue)
+            {
+                content.Add(new StringContent(_maintenance.CostTHB.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)), "costTHB");
+            }
+
+            if (_maintenance.NextServiceDueDate.HasValue)
+            {
+                content.Add(new StringContent(_maintenance.NextServiceDueDate.Value.ToString("yyyy-MM-dd")), "nextServiceDueDate");
+            }
+
+            foreach (var file in _maintenanceFiles)
+            {
+                var stream = file.OpenReadStream(MaxMaintenanceDocumentBytes);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(
+                    string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var response = await Http.PostAsync($"api/v1/equipments/{Id}/maintenance", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _maintenanceError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(_maintenanceError))
+                {
+                    _maintenanceError = "Maintenance log could not be added.";
+                }
+
+                return;
+            }
+
             _maintenance = new AddMaintenanceLogRequest { Type = "Preventive", Description = string.Empty, OccurredAt = DateTime.UtcNow };
+            _maintenanceFiles = [];
             await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _maintenanceError = $"Maintenance log could not be added: {ex.Message}";
+        }
+        finally
+        {
+            _maintenanceSaving = false;
         }
     }
 
+    private void OnMaintenanceFilesSelected(InputFileChangeEventArgs args)
+    {
+        _maintenanceError = null;
+        var files = args.GetMultipleFiles(8);
+        var oversizedFile = files.FirstOrDefault(file => file.Size > MaxMaintenanceDocumentBytes);
+        if (oversizedFile is not null)
+        {
+            _maintenanceError = $"Maintenance document '{oversizedFile.Name}' exceeds the 10 MB limit.";
+            _maintenanceFiles = [];
+            return;
+        }
+
+        _maintenanceFiles = files.ToList();
+    }
+
+    private async Task OpenMaintenanceDocumentAsync(MaintenanceLogDocumentDto document)
+    {
+        if (string.IsNullOrWhiteSpace(document.StoragePath))
+        {
+            return;
+        }
+
+        var response = await Http.GetFromJsonAsync<DownloadUrlResponse>(
+            $"api/v1/equipments/{Id}/maintenance/download-url?fileReference={Uri.EscapeDataString(document.StoragePath)}");
+        if (!string.IsNullOrWhiteSpace(response?.Url))
+        {
+            await JS.InvokeVoidAsync("open", response.Url, "_blank");
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        if (bytes < 1024 * 1024)
+        {
+            return $"{bytes / 1024d:0.#} KB";
+        }
+
+        return $"{bytes / 1024d / 1024d:0.#} MB";
+    }
+
+    private static string GetDocumentIcon(string? contentType) => contentType?.ToLowerInvariant() switch
+    {
+        string value when value.Contains("pdf", StringComparison.Ordinal) => Icons.Material.Outlined.PictureAsPdf,
+        string value when value.StartsWith("image/", StringComparison.Ordinal) => Icons.Material.Outlined.Image,
+        string value when value.Contains("spreadsheet", StringComparison.Ordinal) || value.Contains("excel", StringComparison.Ordinal) => Icons.Material.Outlined.TableChart,
+        string value when value.Contains("word", StringComparison.Ordinal) || value.Contains("document", StringComparison.Ordinal) => Icons.Material.Outlined.Article,
+        _ => Icons.Material.Outlined.Description
+    };
+
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private const long MaxMaintenanceDocumentBytes = 10 * 1024 * 1024;
+
+    private sealed class DownloadUrlResponse
+    {
+        [JsonPropertyName("url")]
+        public string? Url { get; set; }
+    }
 }

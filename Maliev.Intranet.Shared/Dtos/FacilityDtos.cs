@@ -199,6 +199,54 @@ public class MaintenanceLogDto
 
     /// <summary>Gets or sets the timestamp when the log entry was created (UTC).</summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>Gets or sets uploaded documents, findings, photos, and reports attached to the log.</summary>
+    public List<MaintenanceLogDocumentDto> Documents { get; set; } = [];
+}
+
+/// <summary>
+/// Represents an uploaded document attached to an equipment maintenance log.
+/// </summary>
+public class MaintenanceLogDocumentDto
+{
+    /// <summary>Gets or sets the unique identifier of the document metadata record.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the ID of the maintenance log that owns this document.</summary>
+    public Guid MaintenanceLogId { get; set; }
+
+    /// <summary>Gets or sets the original file name shown to employees.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the MIME content type of the uploaded file.</summary>
+    public string ContentType { get; set; } = "application/octet-stream";
+
+    /// <summary>Gets or sets the file size in bytes.</summary>
+    public long FileSizeBytes { get; set; }
+
+    /// <summary>Gets or sets the UploadService storage path or external file reference.</summary>
+    public string StoragePath { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the timestamp when the document was attached to the log.</summary>
+    public DateTime UploadedAt { get; set; }
+}
+
+/// <summary>
+/// Metadata for a pre-uploaded maintenance document sent to FacilityService when creating a log.
+/// </summary>
+public class CreateMaintenanceLogDocumentDto
+{
+    /// <summary>Gets or sets the original file name shown to employees.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the MIME content type of the uploaded file.</summary>
+    public string ContentType { get; set; } = "application/octet-stream";
+
+    /// <summary>Gets or sets the file size in bytes.</summary>
+    public long FileSizeBytes { get; set; }
+
+    /// <summary>Gets or sets the UploadService storage path or external file reference.</summary>
+    public string StoragePath { get; set; } = string.Empty;
 }
 
 // ---------------------------------------------------------------------------
@@ -452,6 +500,9 @@ public sealed record AddMaintenanceLogRequest
 
     /// <summary>Gets or sets the next scheduled service date.</summary>
     public DateOnly? NextServiceDueDate { get; set; }
+
+    /// <summary>Gets or sets pre-uploaded maintenance document metadata.</summary>
+    public List<CreateMaintenanceLogDocumentDto> Documents { get; set; } = [];
 }
 
 /// <summary>

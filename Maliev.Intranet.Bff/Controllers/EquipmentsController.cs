@@ -11,11 +11,18 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Covers equipment lifecycle, notes, loans, maintenance logs, and CNC attachments.
 /// </summary>
 /// <param name="client">The facility service client.</param>
+/// <param name="uploadClient">The upload service client.</param>
+/// <param name="logger">The logger.</param>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class EquipmentsController(IFacilityServiceClient client) : ControllerBase
+public class EquipmentsController(
+    IFacilityServiceClient client,
+    UploadServiceClient uploadClient,
+    ILogger<EquipmentsController> logger) : ControllerBase
 {
+    private const long MaxMaintenanceDocumentBytes = 10 * 1024 * 1024;
+
     // -----------------------------------------------------------------------
     // Equipment CRUD
     // -----------------------------------------------------------------------
@@ -295,7 +302,8 @@ public class EquipmentsController(IFacilityServiceClient client) : ControllerBas
     }
 
     /// <summary>
-    /// Adds a maintenance log entry to a piece of equipment.
+    /// Adds a maintenance log entry to a piece of equipment from a JSON payload.
+    /// Preserves the existing API shape for callers that do not upload files.
     /// </summary>
     /// <param name="id">The unique identifier of the equipment.</param>
     /// <param name="request">The maintenance log details.</param>
@@ -303,13 +311,143 @@ public class EquipmentsController(IFacilityServiceClient client) : ControllerBas
     /// <returns>The created maintenance log DTO.</returns>
     [RequirePermission(MalievPermissions.Facility.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:guid}/maintenance")]
-    public async Task<ActionResult<MaintenanceLogDto>> AddMaintenanceLog(
+    [Consumes("application/json")]
+    public async Task<ActionResult<MaintenanceLogDto>> AddMaintenanceLogJson(
         Guid id,
         [FromBody] AddMaintenanceLogRequest request,
         CancellationToken ct = default)
     {
         var result = await client.AddMaintenanceLogAsync(id, request, ct);
         return result is not null ? Ok(result) : BadRequest();
+    }
+
+    /// <summary>
+    /// Adds a maintenance log entry to a piece of equipment with uploaded maintenance documents.
+    /// </summary>
+    /// <param name="id">The unique identifier of the equipment.</param>
+    /// <param name="type">The maintenance type.</param>
+    /// <param name="description">The maintenance description.</param>
+    /// <param name="occurredAt">When the maintenance occurred.</param>
+    /// <param name="vendorName">Optional maintenance vendor.</param>
+    /// <param name="costTHB">Optional maintenance cost in THB.</param>
+    /// <param name="nextServiceDueDate">Optional next service due date.</param>
+    /// <param name="files">Optional maintenance documents, findings, photos, or reports.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created maintenance log DTO.</returns>
+    [RequirePermission(MalievPermissions.Facility.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id:guid}/maintenance")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<MaintenanceLogDto>> AddMaintenanceLogForm(
+        Guid id,
+        [FromForm] string type,
+        [FromForm] string description,
+        [FromForm] DateTime occurredAt,
+        [FromForm] string? vendorName,
+        [FromForm] decimal? costTHB,
+        [FromForm] DateOnly? nextServiceDueDate,
+        [FromForm] List<IFormFile>? files,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(description))
+        {
+            return BadRequest("Maintenance type and description are required.");
+        }
+
+        var documents = new List<CreateMaintenanceLogDocumentDto>();
+        foreach (var file in files ?? [])
+        {
+            if (file.Length == 0)
+            {
+                continue;
+            }
+
+            if (file.Length > MaxMaintenanceDocumentBytes)
+            {
+                return BadRequest($"Maintenance document '{file.FileName}' exceeds the 10 MB limit.");
+            }
+
+            var safeFileName = Path.GetFileName(file.FileName);
+            var uniquePrefix = Guid.NewGuid().ToString("N")[..8];
+            var storagePath = $"equipment-maintenance/{id}/{uniquePrefix}_{safeFileName}";
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+                ? "application/octet-stream"
+                : file.ContentType;
+
+            await using var stream = file.OpenReadStream();
+            var upload = await uploadClient.UploadFileAsync(
+                safeFileName,
+                stream,
+                contentType,
+                storagePath,
+                overwrite: true,
+                ct);
+
+            if (upload is null)
+            {
+                logger.LogWarning(
+                    "Maintenance document upload failed for equipment {EquipmentId} and file {FileName}",
+                    id,
+                    safeFileName);
+                return StatusCode(StatusCodes.Status502BadGateway, "Maintenance document upload failed.");
+            }
+
+            documents.Add(new CreateMaintenanceLogDocumentDto
+            {
+                FileName = safeFileName,
+                ContentType = contentType,
+                FileSizeBytes = file.Length,
+                StoragePath = upload.StoragePath ?? upload.FileReference ?? upload.UploadId
+            });
+        }
+
+        var request = new AddMaintenanceLogRequest
+        {
+            Type = type.Trim(),
+            Description = description.Trim(),
+            OccurredAt = occurredAt,
+            VendorName = vendorName?.Trim(),
+            CostTHB = costTHB,
+            NextServiceDueDate = nextServiceDueDate,
+            Documents = documents
+        };
+
+        var result = await client.AddMaintenanceLogAsync(id, request, ct);
+        return result is not null ? Ok(result) : BadRequest();
+    }
+
+    /// <summary>
+    /// Gets a signed download URL for a maintenance document file reference.
+    /// </summary>
+    /// <param name="id">The unique identifier of the equipment.</param>
+    /// <param name="fileReference">The stored file reference or storage path.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A signed download URL.</returns>
+    [RequirePermission(MalievPermissions.Facility.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("{id:guid}/maintenance/download-url")]
+    public async Task<IActionResult> GetMaintenanceDocumentDownloadUrl(
+        Guid id,
+        [FromQuery] string fileReference,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(fileReference))
+        {
+            return BadRequest("File reference is required.");
+        }
+
+        var trimmedReference = fileReference.Trim();
+        var isStoragePath = LooksLikeStoragePath(trimmedReference);
+        if (isStoragePath && !IsEquipmentMaintenancePath(trimmedReference, id))
+        {
+            return BadRequest("File reference does not belong to this equipment maintenance record.");
+        }
+
+        var url = isStoragePath
+            ? await uploadClient.GetDownloadUrlByPathAsync(trimmedReference, ct)
+            : await uploadClient.GetDownloadUrlAsync(trimmedReference, ct);
+
+        return string.IsNullOrWhiteSpace(url)
+            ? NotFound("Maintenance document file was not found.")
+            : Ok(new { url });
     }
 
     // -----------------------------------------------------------------------
@@ -369,5 +507,14 @@ public class EquipmentsController(IFacilityServiceClient client) : ControllerBas
     {
         var result = await client.UpdateAttachmentAsync(id, attachmentId, request, ct);
         return result is not null ? Ok(result) : NotFound();
+    }
+
+    private static bool LooksLikeStoragePath(string fileReference) =>
+        fileReference.Contains('/', StringComparison.Ordinal) || fileReference.Contains('\\', StringComparison.Ordinal);
+
+    private static bool IsEquipmentMaintenancePath(string fileReference, Guid equipmentId)
+    {
+        var normalized = fileReference.Replace('\\', '/');
+        return normalized.StartsWith($"equipment-maintenance/{equipmentId}/", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -1,0 +1,94 @@
+.maintenance-file-input input[type="file"] {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--mud-palette-surface);
+}
+
+.maintenance-file-input small {
+    display: block;
+    margin-top: 6px;
+    color: var(--maliev-text-muted);
+    font-size: var(--mud-typography-caption-size);
+}
+
+.maintenance-selected-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.maintenance-selected-files span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklch, var(--mud-palette-primary) 6%, var(--mud-palette-surface));
+    font-size: var(--mud-typography-body2-size);
+}
+
+.maintenance-selected-files em,
+.maintenance-document-button em {
+    color: var(--maliev-text-muted);
+    font-size: var(--mud-typography-caption-size);
+    font-style: normal;
+}
+
+.maintenance-error {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklch, var(--mud-palette-error) 35%, var(--mud-palette-lines-default));
+    border-radius: var(--maliev-radius-sm);
+    color: var(--mud-palette-error);
+    background: color-mix(in oklch, var(--mud-palette-error) 8%, var(--mud-palette-surface));
+    font-size: var(--mud-typography-body2-size);
+}
+
+.maintenance-document-list {
+    display: grid;
+    gap: 6px;
+    min-width: 180px;
+}
+
+.maintenance-document-button {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 34px;
+    padding: 6px 8px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--maliev-radius-sm);
+    color: var(--maliev-text);
+    background: var(--mud-palette-surface);
+    text-align: left;
+}
+
+.maintenance-document-button:hover,
+.maintenance-document-button:focus-visible {
+    border-color: color-mix(in oklch, var(--mud-palette-primary) 42%, var(--mud-palette-lines-default));
+    background: color-mix(in oklch, var(--mud-palette-primary) 8%, var(--mud-palette-surface));
+}
+
+.maintenance-document-button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--mud-typography-body2-size);
+}
+
+@media (max-width: 760px) {
+    .maintenance-document-button {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .maintenance-document-button em {
+        grid-column: 2;
+    }
+}
