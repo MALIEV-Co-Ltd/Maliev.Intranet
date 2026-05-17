@@ -617,6 +617,13 @@ public class ModuleRegressionSourceTests
         Assert.Contains("class=\"company-suggestion-tax\"", page, StringComparison.Ordinal);
         Assert.Contains("private int _companySuggestionCount;", page, StringComparison.Ordinal);
         Assert.Contains("private void UpdateCompanySuggestionCount(int count)", page, StringComparison.Ordinal);
+        Assert.Contains("\"PopoverClass\", \"address-lookup-popover\"", page, StringComparison.Ordinal);
+        Assert.Contains("\"ListClass\", \"address-lookup-results\"", page, StringComparison.Ordinal);
+        Assert.Contains("\"ListItemClass\", \"address-lookup-result-item\"", page, StringComparison.Ordinal);
+        Assert.Contains("\"class\", \"suggestion-card address-suggestion-card\"", page, StringComparison.Ordinal);
+        Assert.Contains("\"class\", \"address-suggestion-marker\"", page, StringComparison.Ordinal);
+        Assert.Contains("\"class\", \"address-suggestion-meta\"", page, StringComparison.Ordinal);
+        Assert.Contains("\"class\", \"address-suggestion-postal-badge\"", page, StringComparison.Ordinal);
         Assert.Contains("class=\"company-core-row\"", page, StringComparison.Ordinal);
         Assert.Contains("class=\"company-address-block\"", page, StringComparison.Ordinal);
         Assert.Contains("class=\"company-address-header\"", page, StringComparison.Ordinal);
@@ -635,6 +642,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("display: inline-flex;", ExtractCssBlock(styles, "::deep .company-suggestion-registry"), StringComparison.Ordinal);
         Assert.Contains("border-radius: 999px;", ExtractCssBlock(styles, "::deep .company-suggestion-status"), StringComparison.Ordinal);
         Assert.Contains("font-family: var(--mud-typography-default-family);", ExtractCssBlock(styles, "::deep .company-suggestion-tax"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: auto minmax(0, 1fr) auto;", ExtractCssBlock(styles, "::deep .address-suggestion-card"), StringComparison.Ordinal);
+        Assert.Contains("border-left: 3px solid var(--mud-palette-secondary);", ExtractCssBlock(styles, "::deep .address-suggestion-card"), StringComparison.Ordinal);
+        Assert.Contains("border-radius: 999px;", ExtractCssBlock(styles, "::deep .address-suggestion-marker"), StringComparison.Ordinal);
+        Assert.Contains("display: grid;", ExtractCssBlock(styles, "::deep .address-suggestion-meta"), StringComparison.Ordinal);
+        Assert.Contains("font-family: var(--mud-typography-default-family);", ExtractCssBlock(styles, "::deep .address-suggestion-postal-badge"), StringComparison.Ordinal);
         Assert.Contains("border-bottom: 1px solid var(--maliev-border);", ExtractCssBlock(styles, ".company-address-header"), StringComparison.Ordinal);
     }
 

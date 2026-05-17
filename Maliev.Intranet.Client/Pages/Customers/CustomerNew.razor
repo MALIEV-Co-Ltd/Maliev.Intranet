@@ -690,25 +690,43 @@
         builder.AddAttribute(14, "DebounceInterval", 350);
         builder.AddAttribute(15, "MinCharacters", 2);
         builder.AddAttribute(16, "Class", "styled-autocomplete");
-        builder.AddAttribute(17, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
+        builder.AddAttribute(17, "PopoverClass", "address-lookup-popover");
+        builder.AddAttribute(18, "ListClass", "address-lookup-results");
+        builder.AddAttribute(19, "ListItemClass", "address-lookup-result-item");
+        builder.AddAttribute(20, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
         {
-            itemBuilder.OpenElement(0, "div");
-            itemBuilder.AddAttribute(1, "class", "suggestion-card address-suggestion");
-            itemBuilder.OpenElement(2, "div");
-            itemBuilder.AddAttribute(3, "class", "address-suggestion-lines");
-            itemBuilder.OpenElement(4, "strong");
-            itemBuilder.AddAttribute(5, "class", "address-suggestion-primary");
-            itemBuilder.AddContent(6, FormatLocationPrimary(location, GetAddressText(index, field)));
+            var sequence = 0;
+            itemBuilder.OpenElement(sequence++, "div");
+            itemBuilder.AddAttribute(sequence++, "class", "suggestion-card address-suggestion-card");
+            itemBuilder.OpenElement(sequence++, "span");
+            itemBuilder.AddAttribute(sequence++, "class", "address-suggestion-marker");
+            itemBuilder.AddAttribute(sequence++, "aria-hidden", "true");
             itemBuilder.CloseElement();
-            itemBuilder.OpenElement(7, "span");
-            itemBuilder.AddAttribute(8, "class", "address-suggestion-secondary");
-            itemBuilder.AddContent(9, FormatLocationSecondary(location, GetAddressText(index, field)));
+
+            itemBuilder.OpenElement(sequence++, "div");
+            itemBuilder.AddAttribute(sequence++, "class", "address-suggestion-lines");
+            itemBuilder.OpenElement(sequence++, "strong");
+            itemBuilder.AddAttribute(sequence++, "class", "address-suggestion-primary");
+            itemBuilder.AddContent(sequence++, FormatLocationPrimary(location, GetAddressText(index, field)));
             itemBuilder.CloseElement();
-            itemBuilder.OpenElement(10, "span");
-            itemBuilder.AddAttribute(11, "class", "address-suggestion-postal");
-            itemBuilder.AddContent(12, location.PostalCode);
+            itemBuilder.OpenElement(sequence++, "span");
+            itemBuilder.AddAttribute(sequence++, "class", "address-suggestion-secondary");
+            itemBuilder.AddContent(sequence++, FormatLocationSecondary(location, GetAddressText(index, field)));
             itemBuilder.CloseElement();
             itemBuilder.CloseElement();
+
+            itemBuilder.OpenElement(sequence++, "div");
+            itemBuilder.AddAttribute(sequence++, "class", "address-suggestion-meta");
+            itemBuilder.OpenElement(sequence++, "span");
+            itemBuilder.AddAttribute(sequence++, "class", "address-suggestion-postal-badge");
+            itemBuilder.AddContent(sequence++, location.PostalCode);
+            itemBuilder.CloseElement();
+            itemBuilder.OpenElement(sequence++, "small");
+            itemBuilder.AddAttribute(sequence++, "class", "address-suggestion-source");
+            itemBuilder.AddContent(sequence++, "Registry location");
+            itemBuilder.CloseElement();
+            itemBuilder.CloseElement();
+
             itemBuilder.CloseElement();
         }));
         builder.CloseComponent();

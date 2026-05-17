@@ -1234,32 +1234,118 @@
     line-height: var(--mud-typography-caption-lineheight);
 }
 
-::deep .address-suggestion {
-    display: block;
-    padding: 0.65rem 0.75rem;
+::deep .address-lookup-popover {
+    border: 1px solid color-mix(in oklch, var(--mud-palette-secondary) 22%, var(--maliev-border));
+    border-radius: var(--maliev-radius-sm);
+    box-shadow: 0 16px 36px color-mix(in oklch, var(--maliev-text) 10%, transparent);
+    overflow: hidden;
+}
+
+::deep .address-lookup-results {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.45rem;
+    background:
+        linear-gradient(180deg,
+            color-mix(in oklch, var(--mud-palette-secondary) 5%, transparent),
+            color-mix(in oklch, var(--mud-palette-surface) 96%, transparent)),
+        var(--mud-palette-surface);
+}
+
+::deep .address-lookup-result-item {
+    min-height: 0;
+    padding: 0 !important;
+    border-radius: var(--maliev-radius-sm);
+}
+
+::deep .address-suggestion-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    border: 1px solid color-mix(in oklch, var(--mud-palette-secondary) 18%, var(--maliev-border));
+    border-left: 3px solid var(--mud-palette-secondary);
+    border-radius: var(--maliev-radius-sm);
+    padding: 0.72rem 0.8rem;
+    background:
+        linear-gradient(135deg,
+            color-mix(in oklch, var(--mud-palette-secondary) 5%, transparent),
+            color-mix(in oklch, var(--mud-palette-surface) 96%, transparent)),
+        var(--mud-palette-surface);
+    box-shadow: 0 6px 18px color-mix(in oklch, var(--maliev-text) 5%, transparent);
+}
+
+::deep .address-suggestion-marker {
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--mud-palette-secondary) 12%, transparent);
+    position: relative;
+}
+
+::deep .address-suggestion-marker::after {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: var(--mud-palette-secondary);
+    box-shadow: 0 0 0 0.24rem color-mix(in oklch, var(--mud-palette-secondary) 12%, transparent);
 }
 
 ::deep .address-suggestion-lines {
     display: grid;
-    gap: 0.18rem;
+    gap: 0.16rem;
     min-width: 0;
 }
 
 ::deep .address-suggestion-primary,
-::deep .address-suggestion-secondary,
-::deep .address-suggestion-postal {
+::deep .address-suggestion-secondary {
     line-height: 1.25;
     overflow-wrap: anywhere;
 }
 
-::deep .address-suggestion-secondary {
-    color: var(--maliev-text-muted);
-    font-size: 0.86rem;
+::deep .address-suggestion-primary {
+    color: var(--maliev-text);
+    font-size: var(--mud-typography-body2-size);
+    font-weight: 800;
 }
 
-::deep .address-suggestion-postal {
+::deep .address-suggestion-secondary {
     color: var(--maliev-text-muted);
-    font-size: 0.82rem;
+    font-size: var(--mud-typography-caption-size);
+    line-height: var(--mud-typography-caption-lineheight);
+}
+
+::deep .address-suggestion-meta {
+    display: grid;
+    justify-items: end;
+    gap: 0.22rem;
+    min-width: 78px;
+    text-align: right;
+}
+
+::deep .address-suggestion-postal-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--mud-palette-secondary) 11%, transparent);
+    color: var(--mud-palette-secondary);
+    font-family: var(--mud-typography-default-family);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+::deep .address-suggestion-source {
+    color: var(--maliev-text-muted);
+    font-size: var(--mud-typography-caption-size);
+    line-height: var(--mud-typography-caption-lineheight);
+    white-space: nowrap;
 }
 
 @media (max-width: 1100px) {
@@ -1326,5 +1412,17 @@
 
     ::deep .company-suggestion-status {
         max-width: 100%;
+    }
+
+    ::deep .address-suggestion-card {
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: start;
+    }
+
+    ::deep .address-suggestion-meta {
+        grid-column: 2;
+        justify-items: start;
+        min-width: 0;
+        text-align: left;
     }
 }
