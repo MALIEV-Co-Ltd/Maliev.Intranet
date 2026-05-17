@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 
@@ -14,11 +16,31 @@ public class MaterialServiceClient(HttpClient httpClient)
     /// </summary>
     /// <param name="page">The page number to retrieve.</param>
     /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="search">Optional search text for material name, code, or description.</param>
+    /// <param name="sortBy">Optional downstream sort field.</param>
+    /// <param name="sortDesc">Whether to sort descending.</param>
+    /// <param name="minPrice">Optional minimum unit price filter.</param>
+    /// <param name="maxPrice">Optional maximum unit price filter.</param>
+    /// <param name="supplierId">Optional supplier identifier filter.</param>
+    /// <param name="manufacturingProcess">Optional manufacturing process name filter.</param>
+    /// <param name="color">Optional material color name filter.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A paged response containing material summaries.</returns>
-    public async Task<PagedResponse<MaterialSummaryDto>?> GetMaterialsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
+    public async Task<PagedResponse<MaterialSummaryDto>?> GetMaterialsAsync(
+        int page = 1,
+        int pageSize = 20,
+        string? search = null,
+        string? sortBy = null,
+        bool sortDesc = false,
+        decimal? minPrice = null,
+        decimal? maxPrice = null,
+        Guid? supplierId = null,
+        string? manufacturingProcess = null,
+        string? color = null,
+        CancellationToken ct = default)
     {
-        var response = await httpClient.GetFromJsonAsync<MaterialServicePagedResult<MaterialServiceMaterialDto>>($"/material/v1/materials?page={page}&pageSize={pageSize}", ct);
+        var query = BuildMaterialsQuery(page, pageSize, search, sortBy, sortDesc, minPrice, maxPrice, supplierId, manufacturingProcess, color);
+        var response = await httpClient.GetFromJsonAsync<MaterialServicePagedResult<MaterialServiceMaterialDto>>($"/material/v1/materials?{query}", ct);
 
         return response is null
             ? null
@@ -173,6 +195,62 @@ public class MaterialServiceClient(HttpClient httpClient)
     /// <summary>Returns surface finishes compatible with a specific material.</summary>
     public Task<List<CatalogSurfaceFinishDto>?> GetFinishesByMaterialAsync(Guid materialId, CancellationToken ct = default) =>
         httpClient.GetFromJsonAsync<List<CatalogSurfaceFinishDto>>($"/material/v1/manufacturing/materials/{materialId}/finishes", ct);
+
+    private static string BuildMaterialsQuery(
+        int page,
+        int pageSize,
+        string? search,
+        string? sortBy,
+        bool sortDesc,
+        decimal? minPrice,
+        decimal? maxPrice,
+        Guid? supplierId,
+        string? manufacturingProcess,
+        string? color)
+    {
+        var query = new List<string>
+        {
+            $"page={page.ToString(CultureInfo.InvariantCulture)}",
+            $"pageSize={pageSize.ToString(CultureInfo.InvariantCulture)}"
+        };
+
+        AddQueryParameter(query, "search", search);
+        AddQueryParameter(query, "sortBy", sortBy);
+        if (sortDesc)
+        {
+            AddQueryParameter(query, "sortDesc", "true");
+        }
+
+        if (minPrice.HasValue)
+        {
+            AddQueryParameter(query, "minPrice", minPrice.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (maxPrice.HasValue)
+        {
+            AddQueryParameter(query, "maxPrice", maxPrice.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (supplierId.HasValue)
+        {
+            AddQueryParameter(query, "supplierId", supplierId.Value.ToString());
+        }
+
+        AddQueryParameter(query, "manufacturingProcess", manufacturingProcess);
+        AddQueryParameter(query, "color", color);
+
+        return string.Join("&", query);
+    }
+
+    private static void AddQueryParameter(List<string> query, string name, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        query.Add($"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value.Trim())}");
+    }
 
     private static MaterialSummaryDto ToSummaryDto(MaterialServiceMaterialDto material)
     {

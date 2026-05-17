@@ -21,12 +21,30 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     /// </summary>
     /// <param name="page">The page number.</param>
     /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="search">Optional search text for material name, code, or description.</param>
+    /// <param name="sortBy">Optional downstream sort field.</param>
+    /// <param name="sortDesc">Whether to sort descending.</param>
+    /// <param name="minPrice">Optional minimum unit price filter.</param>
+    /// <param name="maxPrice">Optional maximum unit price filter.</param>
+    /// <param name="supplierId">Optional supplier identifier filter.</param>
+    /// <param name="manufacturingProcess">Optional manufacturing process name filter.</param>
+    /// <param name="color">Optional material color name filter.</param>
     /// <returns>A paged list of materials.</returns>
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<MaterialSummaryDto>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<ActionResult<PagedResponse<MaterialSummaryDto>>> Get(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDesc = false,
+        [FromQuery] decimal? minPrice = null,
+        [FromQuery] decimal? maxPrice = null,
+        [FromQuery] Guid? supplierId = null,
+        [FromQuery] string? manufacturingProcess = null,
+        [FromQuery] string? color = null)
     {
-        var result = await client.GetMaterialsAsync(page, pageSize);
+        var result = await client.GetMaterialsAsync(page, pageSize, search, sortBy, sortDesc, minPrice, maxPrice, supplierId, manufacturingProcess, color);
         return result != null ? Ok(result) : Ok(new PagedResponse<MaterialSummaryDto>());
     }
 

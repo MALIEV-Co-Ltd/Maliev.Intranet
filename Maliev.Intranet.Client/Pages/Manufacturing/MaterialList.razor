@@ -1,5 +1,7 @@
 @page "/mfg/materials"
+@using System.Globalization
 @using Maliev.Intranet.Shared
+@using Maliev.Intranet.Shared.Dtos
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -37,6 +39,70 @@
                 </div>
             </PanelCard>
         }
+
+        <PanelCard Class="material-filter-panel mb-4">
+            <div class="material-filter-grid">
+                <label class="material-filter-field material-filter-search">
+                    <span>Search</span>
+                    <input class="mlv-form-input material-search-input"
+                           placeholder="Name, code, description..."
+                           value="@_search"
+                           @oninput="@((ChangeEventArgs args) => _search = args.Value?.ToString() ?? string.Empty)"
+                           @onkeydown="OnSearchKeyDown" />
+                </label>
+                <label class="material-filter-field">
+                    <span>Process</span>
+                    <select class="mlv-form-input material-process-filter" @bind="_manufacturingProcessFilter">
+                        <option value="">All processes</option>
+                        @foreach (var process in _processOptions.OrderBy(process => process.SortOrder).ThenBy(process => process.Name))
+                        {
+                            <option value="@process.Name">@process.Name</option>
+                        }
+                    </select>
+                </label>
+                <label class="material-filter-field">
+                    <span>Color</span>
+                    <select class="mlv-form-input material-color-filter" @bind="_colorFilter">
+                        <option value="">All colors</option>
+                        @foreach (var color in _colorOptions.OrderBy(color => color.Name))
+                        {
+                            <option value="@color.Name">@color.Name</option>
+                        }
+                    </select>
+                </label>
+                <label class="material-filter-field">
+                    <span>Min price</span>
+                    <input class="mlv-form-input"
+                           inputmode="decimal"
+                           value="@_minPriceText"
+                           @oninput="@((ChangeEventArgs args) => _minPriceText = args.Value?.ToString() ?? string.Empty)" />
+                </label>
+                <label class="material-filter-field">
+                    <span>Max price</span>
+                    <input class="mlv-form-input"
+                           inputmode="decimal"
+                           value="@_maxPriceText"
+                           @oninput="@((ChangeEventArgs args) => _maxPriceText = args.Value?.ToString() ?? string.Empty)" />
+                </label>
+                <label class="material-filter-field">
+                    <span>Sort</span>
+                    <select class="mlv-form-input material-sort-select" @bind="_sortBy">
+                        <option value="name">Name</option>
+                        <option value="price">Unit price</option>
+                        <option value="stock">Stock</option>
+                        <option value="createdAt">Newest</option>
+                    </select>
+                </label>
+                <label class="material-filter-toggle">
+                    <input type="checkbox" @bind="_sortDesc" />
+                    <span>Descending</span>
+                </label>
+                <div class="material-filter-actions">
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Search" Disabled="@_loading" OnClick="@ApplyFiltersAsync">Search</PrimaryButton>
+                    <SecondaryButton Icon="@Icons.Material.Outlined.FilterAltOff" Disabled="@(!HasActiveFilters || _loading)" OnClick="@ClearFiltersAsync">Clear</SecondaryButton>
+                </div>
+            </div>
+        </PanelCard>
 
         <PanelCard>
             @if (_loading)
@@ -119,12 +185,30 @@
     private int _page = 1;
     private int _pageSize = 20;
     private CreateMaterialRequest _newMaterial = new() { Unit = "pcs" };
+    private string _search = string.Empty;
+    private string _manufacturingProcessFilter = string.Empty;
+    private string _colorFilter = string.Empty;
+    private string _minPriceText = string.Empty;
+    private string _maxPriceText = string.Empty;
+    private string _sortBy = "name";
+    private bool _sortDesc;
+    private readonly List<ProcessDto> _processOptions = [];
+    private readonly List<MaterialColorDto> _colorOptions = [];
     private int StockAlertCount => _materials.Count(NeedsStockAction);
     private string StockAlertColor => StockAlertCount > 0 ? "var(--maliev-danger)" : "var(--maliev-ok)";
     private string StockAlertSubtext => StockAlertCount > 0 ? "Needs restock or stock update" : "No active alerts";
+    private bool HasActiveFilters =>
+        !string.IsNullOrWhiteSpace(_search)
+        || !string.IsNullOrWhiteSpace(_manufacturingProcessFilter)
+        || !string.IsNullOrWhiteSpace(_colorFilter)
+        || !string.IsNullOrWhiteSpace(_minPriceText)
+        || !string.IsNullOrWhiteSpace(_maxPriceText)
+        || !string.Equals(_sortBy, "name", StringComparison.OrdinalIgnoreCase)
+        || _sortDesc;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadFilterOptionsAsync();
         await LoadAsync();
     }
 
@@ -133,7 +217,12 @@
         _loading = true;
         try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>($"api/v1/materials?page={_page}&pageSize={_pageSize}");
+            if (!TryReadPriceFilters(out var minPrice, out var maxPrice))
+            {
+                return;
+            }
+
+            var response = await Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>(BuildMaterialsRequestUri(minPrice, maxPrice));
             _materials.Clear();
             _materials.AddRange(response?.Data ?? []);
             _meta = response?.Meta ?? new PaginationMeta();
@@ -150,6 +239,103 @@
         }
     }
 
+    private async Task LoadFilterOptionsAsync()
+    {
+        try
+        {
+            var processesTask = Http.GetFromJsonAsync<List<ProcessDto>>("api/v1/catalog/processes");
+            var colorsTask = Http.GetFromJsonAsync<List<MaterialColorDto>>("api/v1/materials/reference/colors");
+            await Task.WhenAll(processesTask, colorsTask);
+
+            _processOptions.Clear();
+            _processOptions.AddRange(processesTask.Result ?? []);
+            _colorOptions.Clear();
+            _colorOptions.AddRange(colorsTask.Result ?? []);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load material filters: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private string BuildMaterialsRequestUri(decimal? minPrice, decimal? maxPrice)
+    {
+        var query = new List<string>
+        {
+            $"page={_page.ToString(CultureInfo.InvariantCulture)}",
+            $"pageSize={_pageSize.ToString(CultureInfo.InvariantCulture)}"
+        };
+
+        AddQueryParameter(query, "search", _search);
+        AddQueryParameter(query, "manufacturingProcess", _manufacturingProcessFilter);
+        AddQueryParameter(query, "color", _colorFilter);
+        AddQueryParameter(query, "sortBy", _sortBy);
+        if (_sortDesc)
+        {
+            AddQueryParameter(query, "sortDesc", "true");
+        }
+
+        if (minPrice.HasValue)
+        {
+            AddQueryParameter(query, "minPrice", minPrice.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (maxPrice.HasValue)
+        {
+            AddQueryParameter(query, "maxPrice", maxPrice.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        return $"api/v1/materials?{string.Join("&", query)}";
+    }
+
+    private static void AddQueryParameter(List<string> query, string name, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        query.Add($"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value.Trim())}");
+    }
+
+    private bool TryReadPriceFilters(out decimal? minPrice, out decimal? maxPrice)
+    {
+        minPrice = null;
+        maxPrice = null;
+
+        if (!TryReadDecimalFilter(_minPriceText, "minimum price", out minPrice) ||
+            !TryReadDecimalFilter(_maxPriceText, "maximum price", out maxPrice))
+        {
+            return false;
+        }
+
+        if (minPrice.HasValue && maxPrice.HasValue && minPrice.Value > maxPrice.Value)
+        {
+            Snackbar.Add("Minimum price must be less than or equal to maximum price.", Severity.Warning);
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryReadDecimalFilter(string value, string label, out decimal? result)
+    {
+        result = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed) && parsed >= 0)
+        {
+            result = parsed;
+            return true;
+        }
+
+        Snackbar.Add($"Enter a valid {label}.", Severity.Warning);
+        return false;
+    }
+
     private async Task OnPageChanged(int page)
     {
         _page = page;
@@ -161,6 +347,34 @@
         _pageSize = pageSize;
         _page = 1;
         await LoadAsync();
+    }
+
+    private async Task ApplyFiltersAsync(MouseEventArgs _)
+    {
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearFiltersAsync(MouseEventArgs _)
+    {
+        _search = string.Empty;
+        _manufacturingProcessFilter = string.Empty;
+        _colorFilter = string.Empty;
+        _minPriceText = string.Empty;
+        _maxPriceText = string.Empty;
+        _sortBy = "name";
+        _sortDesc = false;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            _page = 1;
+            await LoadAsync();
+        }
     }
 
     private Task ShowCreateAsync(MouseEventArgs _)

@@ -480,6 +480,17 @@ public class ModuleRegressionSourceTests
         Assert.Contains("NeedsStockAction", list, StringComparison.Ordinal);
         Assert.Contains("Order more", list, StringComparison.Ordinal);
         Assert.Contains("Update stock", list, StringComparison.Ordinal);
+        Assert.Contains("material-filter-panel", list, StringComparison.Ordinal);
+        Assert.Contains("material-filter-grid", listStyles, StringComparison.Ordinal);
+        Assert.Contains("material-search-input", list, StringComparison.Ordinal);
+        Assert.Contains("material-process-filter", list, StringComparison.Ordinal);
+        Assert.Contains("material-color-filter", list, StringComparison.Ordinal);
+        Assert.Contains("material-sort-select", list, StringComparison.Ordinal);
+        Assert.Contains("ApplyFiltersAsync", list, StringComparison.Ordinal);
+        Assert.Contains("ClearFiltersAsync", list, StringComparison.Ordinal);
+        Assert.Contains("LoadFilterOptionsAsync", list, StringComparison.Ordinal);
+        Assert.Contains("api/v1/catalog/processes", list, StringComparison.Ordinal);
+        Assert.Contains("api/v1/materials/reference/colors", list, StringComparison.Ordinal);
         Assert.Contains("material-stock-alert--critical", listStyles, StringComparison.Ordinal);
         Assert.Contains("material-stock-alert--warning", listStyles, StringComparison.Ordinal);
         Assert.Contains("class=\"mlv-detail-list\"", detail, StringComparison.Ordinal);
@@ -488,7 +499,12 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("mlv-panel", list, StringComparison.Ordinal);
         Assert.DoesNotContain("mlv-panel", detail, StringComparison.Ordinal);
         Assert.Contains("PaginationFooter", list, StringComparison.Ordinal);
-        Assert.Contains("api/v1/materials?page={_page}&pageSize={_pageSize}", list, StringComparison.Ordinal);
+        Assert.Contains("BuildMaterialsRequestUri", list, StringComparison.Ordinal);
+        Assert.Contains("AddQueryParameter(query, \"search\", _search)", list, StringComparison.Ordinal);
+        Assert.Contains("manufacturingProcess", list, StringComparison.Ordinal);
+        Assert.Contains("sortBy", list, StringComparison.Ordinal);
+        Assert.Contains("search, sortBy, sortDesc, minPrice, maxPrice, supplierId, manufacturingProcess, color", materialClient, StringComparison.Ordinal);
+        Assert.Contains("[FromQuery] string? search = null", materialsController, StringComparison.Ordinal);
         Assert.Contains("api/v1/materials/{Id}", detail, StringComparison.Ordinal);
     }
 
