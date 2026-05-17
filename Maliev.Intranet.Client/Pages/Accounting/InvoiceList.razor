@@ -260,48 +260,57 @@
         }
         else if (_tab == "Reports")
         {
-            <PanelCard Title="Reports">
-                <div class="mlv-toolbar mb-3">
-                    <div class="mlv-toolbar-left">
-                        <label class="mlv-filter-field">
+            <PanelCard Title="Reports" Class="accounting-report-panel">
+                <div class="accounting-report-toolbar">
+                    <div class="accounting-report-filters">
+                        <label class="mlv-filter-field accounting-report-field accounting-report-type-field">
                             <span>Report</span>
-                            <select @bind="_reportType">
+                            <select class="mlv-form-select" @bind="_reportType">
                                 <option value="income-statement">Income statement</option>
                                 <option value="balance-sheet">Balance sheet</option>
                                 <option value="trial-balance">Trial balance</option>
                             </select>
                         </label>
-                        <label class="mlv-filter-field">
+                        <label class="mlv-filter-field accounting-report-field">
                             <span>Start</span>
                             <input type="date" class="mlv-form-input" @bind="_reportStart" @bind:format="yyyy-MM-dd" />
                         </label>
-                        <label class="mlv-filter-field">
+                        <label class="mlv-filter-field accounting-report-field">
                             <span>End</span>
                             <input type="date" class="mlv-form-input" @bind="_reportEnd" @bind:format="yyyy-MM-dd" />
                         </label>
                     </div>
-                    <PrimaryButton Icon="@Icons.Material.Outlined.Assessment" OnClick="@LoadReportAsync">Run Report</PrimaryButton>
+                    <PrimaryButton Class="accounting-report-run-button" Icon="@Icons.Material.Outlined.Assessment" OnClick="@LoadReportAsync">Run Report</PrimaryButton>
                 </div>
                 @if (_report is null)
                 {
-                    <div class="mlv-empty">Run a report to view accounting totals.</div>
+                    <div class="mlv-empty accounting-report-empty">Run a report to view accounting totals.</div>
                 }
                 else
                 {
-                    <div class="mlv-row-main">@_report.ReportName</div>
-                    @foreach (var reportSection in _report.Sections)
-                    {
-                        <h4>@reportSection.Title</h4>
-                        <table class="mlv-table">
-                            <thead><tr><th>Account</th><th>Amount</th></tr></thead>
-                            <tbody>
-                                @foreach (var row in reportSection.Rows)
-                                {
-                                    <tr><td>@row.Label</td><td class="mlv-mono">@row.Amount.ToString("N2")</td></tr>
-                                }
-                            </tbody>
-                        </table>
-                    }
+                    <div class="accounting-report-statement">
+                        <div class="accounting-report-header">
+                            <div>
+                                <div class="accounting-report-title">@_report.ReportName</div>
+                                <div class="accounting-report-period">@ReportPeriodLabel()</div>
+                            </div>
+                        </div>
+                        @foreach (var reportSection in _report.Sections)
+                        {
+                            <section class="accounting-report-section">
+                                <h4 class="accounting-report-section-title">@reportSection.Title</h4>
+                                <table class="mlv-table accounting-report-table">
+                                    <thead><tr><th>Account</th><th>Amount</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var row in reportSection.Rows)
+                                        {
+                                            <tr><td>@row.Label</td><td class="mlv-mono">@row.Amount.ToString("N2")</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </section>
+                        }
+                    </div>
                 }
             </PanelCard>
         }
@@ -716,6 +725,11 @@
     {
         _report = await Http.GetFromJsonAsync<FinancialReportDto>($"api/v1/accounting/reports/{_reportType}?start={_reportStart:yyyy-MM-dd}&end={_reportEnd:yyyy-MM-dd}");
     }
+
+    private string ReportPeriodLabel() =>
+        _reportType == "balance-sheet"
+            ? $"As of {_reportEnd:dd MMM yyyy}"
+            : $"{_reportStart:dd MMM yyyy} - {_reportEnd:dd MMM yyyy}";
 
     private async Task OpenPeriodAsync(MouseEventArgs _)
     {

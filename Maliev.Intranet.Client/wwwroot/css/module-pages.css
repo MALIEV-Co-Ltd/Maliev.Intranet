@@ -279,6 +279,95 @@
     overflow-wrap: anywhere;
 }
 
+.accounting-report-panel {
+    display: grid;
+    gap: 16px;
+}
+
+.accounting-report-toolbar {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px;
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+    box-shadow: var(--maliev-shadow-ring);
+}
+
+.accounting-report-filters {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.35fr) repeat(2, minmax(150px, 0.8fr));
+    align-items: end;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.accounting-report-field {
+    min-width: 0;
+}
+
+.accounting-report-run-button {
+    min-height: 36px;
+}
+
+.accounting-report-empty {
+    margin-top: 0;
+}
+
+.accounting-report-statement {
+    display: grid;
+    gap: 18px;
+    padding: 16px;
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+    box-shadow: var(--maliev-shadow-ring);
+}
+
+.accounting-report-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--maliev-border-subtle);
+}
+
+.accounting-report-title {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-large);
+    font-weight: 700;
+}
+
+.accounting-report-period {
+    margin-top: 3px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+}
+
+.accounting-report-section {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+
+.accounting-report-section-title {
+    margin: 0;
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-base);
+    font-weight: 700;
+}
+
+.accounting-report-table {
+    margin: 0;
+}
+
+.accounting-report-table th:last-child,
+.accounting-report-table td:last-child {
+    text-align: right;
+}
+
 .mlv-pagination-footer {
     display: flex;
     align-items: center;
@@ -352,6 +441,19 @@ select.mlv-form-select,
     .mlv-toolbar-left,
     .mlv-toolbar-right {
         flex-wrap: wrap;
+    }
+
+    .accounting-report-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .accounting-report-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .accounting-report-run-button {
+        width: 100%;
     }
 
     .mlv-table {
