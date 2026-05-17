@@ -780,6 +780,10 @@ public class ModuleRegressionSourceTests
         Assert.Contains("display: block;", styles, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 clamp(160px, 32vw, 260px);", styles, StringComparison.Ordinal);
         Assert.Contains("gap: 6px;", ExtractCssBlock(mobileStyles, ".topbar-right"), StringComparison.Ordinal);
+        Assert.Contains("width: min(96px, 100%);", ExtractCssBlock(styles, ".topbar-logo-button ::deep img"), StringComparison.Ordinal);
+        Assert.Contains("width: clamp(92px, 17vw, 100px);", ExtractCssBlock(mobileStyles, ".topbar-logo-button"), StringComparison.Ordinal);
+        Assert.DoesNotContain("overflow: hidden;", ExtractCssBlock(mobileStyles, ".topbar-logo-button"), StringComparison.Ordinal);
+        Assert.DoesNotContain("max-width: 86px;", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-right ::deep .topbar-theme-toggle", styles, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 420px)", styles, StringComparison.Ordinal);
         Assert.DoesNotContain("flex-wrap: wrap;", styles, StringComparison.Ordinal);

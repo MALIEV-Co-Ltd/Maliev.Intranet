@@ -25,12 +25,23 @@
 .topbar-logo-button {
     display: inline-grid;
     place-items: center;
+    width: 102px;
     height: 32px;
     padding: 0 2px;
     border: 0;
     border-radius: var(--maliev-radius-xs);
     background: transparent;
     cursor: pointer;
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.topbar-logo-button ::deep img {
+    display: block;
+    width: min(96px, 100%);
+    height: auto;
+    max-height: 22px;
+    object-fit: contain;
 }
 
 .topbar-logo-button:focus-visible {
@@ -740,8 +751,8 @@
     }
 
     .topbar-logo-button {
-        max-width: 86px;
-        overflow: hidden;
+        width: clamp(92px, 17vw, 100px);
+        padding-inline: 0;
     }
 
     .topbar-search {
