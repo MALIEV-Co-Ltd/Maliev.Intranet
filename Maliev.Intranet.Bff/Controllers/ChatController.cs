@@ -51,6 +51,54 @@ public class ChatController(
     }
 
     /// <summary>
+    /// Gets conversation summaries for the authenticated employee.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Chat.SessionsRead, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("conversations")]
+    public async Task<ActionResult<BffChatConversationListResponse>> GetConversations(
+        [FromQuery] string channel = "intranet",
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        var result = await chatbotClient.GetConversationsAsync(channel, page, pageSize, ct);
+
+        if (result == null)
+            return ChatbotFailure("Failed to load chat conversations.");
+
+        return Ok(new BffChatConversationListResponse
+        {
+            Data = result.Data.Select(MapConversationSummary).ToList(),
+            Meta = MapPaginationMeta(result.Meta)
+        });
+    }
+
+    /// <summary>
+    /// Gets ordered messages for one authenticated employee-owned conversation.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Chat.SessionsRead, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("conversations/{sessionId:guid}/messages")]
+    public async Task<ActionResult<BffChatConversationMessagesResponse>> GetConversationMessages(
+        Guid sessionId,
+        CancellationToken ct = default)
+    {
+        var result = await chatbotClient.GetConversationMessagesAsync(sessionId, ct);
+
+        if (result == null)
+            return ChatbotFailure("Failed to load chat conversation messages.");
+
+        return Ok(new BffChatConversationMessagesResponse
+        {
+            SessionId = result.SessionId,
+            Channel = result.Channel,
+            StartTime = result.StartTime,
+            LastActivityAt = result.LastActivityAt,
+            Status = result.Status,
+            Messages = result.Messages.Select(MapConversationMessage).ToList()
+        });
+    }
+
+    /// <summary>
     /// Sends a message in an existing chat session.
     /// </summary>
     [RequirePermission(MalievPermissions.Chat.SessionsCreate, AuthenticationSchemes = "Bearer,Cookies")]
@@ -172,6 +220,47 @@ public class ChatController(
         await chatHubService.SendMessageAsync(request.SessionId.ToString(), response);
 
         return Ok(response);
+    }
+
+    private static BffChatConversationSummary MapConversationSummary(ChatbotConversationSummary summary)
+    {
+        return new BffChatConversationSummary
+        {
+            SessionId = summary.SessionId,
+            Channel = summary.Channel,
+            StartTime = summary.StartTime,
+            LastActivityAt = summary.LastActivityAt,
+            ExpiresAt = summary.ExpiresAt,
+            Language = summary.Language,
+            Status = summary.Status,
+            Preview = summary.Preview,
+            MessageCount = summary.MessageCount
+        };
+    }
+
+    private static BffChatConversationMessage MapConversationMessage(ChatbotConversationMessage message)
+    {
+        return new BffChatConversationMessage
+        {
+            MessageId = message.MessageId,
+            Role = message.Role,
+            Content = message.Content,
+            ContentType = message.ContentType,
+            CreatedAt = message.CreatedAt
+        };
+    }
+
+    private static BffPaginationMeta MapPaginationMeta(ChatbotPaginationMeta meta)
+    {
+        return new BffPaginationMeta
+        {
+            Page = meta.Page,
+            PageSize = meta.PageSize,
+            TotalCount = meta.TotalCount,
+            TotalPages = meta.TotalPages,
+            HasNextPage = meta.HasNextPage,
+            HasPreviousPage = meta.HasPreviousPage
+        };
     }
 
     private static bool IsGenericAction(string text)

@@ -179,6 +179,79 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     }
 
     /// <summary>
+    /// Gets conversation sessions for the authenticated user.
+    /// </summary>
+    public virtual async Task<ChatbotConversationListResponse?> GetConversationsAsync(
+        string channel = "intranet",
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        LastError = null;
+        try
+        {
+            var url = $"/chatbot/v1/sessions?channel={Uri.EscapeDataString(channel)}&page={page}&page_size={pageSize}";
+            var response = await httpClient.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
+                logger.LogError("ChatbotService conversation list failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<ChatbotConversationListResponse>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            LastError = "ChatbotService conversation list timed out.";
+            logger.LogWarning("ChatbotService conversation list timed out.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            logger.LogError(ex, "ChatbotService conversation list failed unexpectedly.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets ordered messages for one authenticated user-owned conversation session.
+    /// </summary>
+    public virtual async Task<ChatbotConversationMessagesResponse?> GetConversationMessagesAsync(
+        Guid sessionId,
+        CancellationToken ct = default)
+    {
+        LastError = null;
+        try
+        {
+            var response = await httpClient.GetAsync($"/chatbot/v1/sessions/{sessionId}/messages", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
+                logger.LogError("ChatbotService conversation messages failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<ChatbotConversationMessagesResponse>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            LastError = "ChatbotService conversation messages timed out.";
+            logger.LogWarning("ChatbotService conversation messages timed out.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            logger.LogError(ex, "ChatbotService conversation messages failed unexpectedly.");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Extracts customer intent (needs customer data, search term, needs history) from a user message.
     /// </summary>
     public virtual async Task<ChatbotCustomerIntentResponse?> ExtractCustomerIntentAsync(string userMessage, CancellationToken ct = default)
@@ -341,6 +414,105 @@ public class ChatbotMessageResponse
     public DateTimeOffset CreatedAt { get; set; }
     /// <summary>Thinking steps from AI agent processing.</summary>
     public List<ChatbotThinkingStep> ThinkingSteps { get; set; } = new();
+}
+
+/// <summary>
+/// Response from ChatbotService conversation history list.
+/// </summary>
+public class ChatbotConversationListResponse
+{
+    /// <summary>Conversation summaries.</summary>
+    public List<ChatbotConversationSummary> Data { get; set; } = [];
+    /// <summary>Pagination metadata.</summary>
+    public ChatbotPaginationMeta Meta { get; set; } = new();
+}
+
+/// <summary>
+/// Conversation summary from ChatbotService.
+/// </summary>
+public class ChatbotConversationSummary
+{
+    /// <summary>Session identifier.</summary>
+    public Guid SessionId { get; set; }
+    /// <summary>User profile identifier that owns the session.</summary>
+    public Guid UserProfileId { get; set; }
+    /// <summary>Conversation channel.</summary>
+    public string Channel { get; set; } = string.Empty;
+    /// <summary>Session start timestamp.</summary>
+    public DateTimeOffset StartTime { get; set; }
+    /// <summary>Latest activity timestamp.</summary>
+    public DateTimeOffset LastActivityAt { get; set; }
+    /// <summary>Session expiration timestamp.</summary>
+    public DateTimeOffset ExpiresAt { get; set; }
+    /// <summary>Language code.</summary>
+    public string Language { get; set; } = string.Empty;
+    /// <summary>Session status.</summary>
+    public string Status { get; set; } = string.Empty;
+    /// <summary>First user message preview.</summary>
+    public string? Preview { get; set; }
+    /// <summary>Number of messages in the session.</summary>
+    public int MessageCount { get; set; }
+}
+
+/// <summary>
+/// Response from ChatbotService conversation messages endpoint.
+/// </summary>
+public class ChatbotConversationMessagesResponse
+{
+    /// <summary>Session identifier.</summary>
+    public Guid SessionId { get; set; }
+    /// <summary>User profile identifier that owns the session.</summary>
+    public Guid UserProfileId { get; set; }
+    /// <summary>Conversation channel.</summary>
+    public string Channel { get; set; } = string.Empty;
+    /// <summary>Session start timestamp.</summary>
+    public DateTimeOffset StartTime { get; set; }
+    /// <summary>Latest activity timestamp.</summary>
+    public DateTimeOffset LastActivityAt { get; set; }
+    /// <summary>Session expiration timestamp.</summary>
+    public DateTimeOffset ExpiresAt { get; set; }
+    /// <summary>Language code.</summary>
+    public string Language { get; set; } = string.Empty;
+    /// <summary>Session status.</summary>
+    public string Status { get; set; } = string.Empty;
+    /// <summary>Ordered messages.</summary>
+    public List<ChatbotConversationMessage> Messages { get; set; } = [];
+}
+
+/// <summary>
+/// Conversation message from ChatbotService.
+/// </summary>
+public class ChatbotConversationMessage
+{
+    /// <summary>Message identifier.</summary>
+    public Guid MessageId { get; set; }
+    /// <summary>Sender role.</summary>
+    public string Role { get; set; } = string.Empty;
+    /// <summary>Message content.</summary>
+    public string Content { get; set; } = string.Empty;
+    /// <summary>Content type.</summary>
+    public string ContentType { get; set; } = string.Empty;
+    /// <summary>Creation timestamp.</summary>
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Pagination metadata from ChatbotService.
+/// </summary>
+public class ChatbotPaginationMeta
+{
+    /// <summary>Page number.</summary>
+    public int Page { get; set; }
+    /// <summary>Page size.</summary>
+    public int PageSize { get; set; }
+    /// <summary>Total count.</summary>
+    public int TotalCount { get; set; }
+    /// <summary>Total page count.</summary>
+    public int TotalPages { get; set; }
+    /// <summary>Whether a next page exists.</summary>
+    public bool HasNextPage { get; set; }
+    /// <summary>Whether a previous page exists.</summary>
+    public bool HasPreviousPage { get; set; }
 }
 
 /// <summary>

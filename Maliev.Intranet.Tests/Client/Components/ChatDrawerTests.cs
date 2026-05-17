@@ -91,6 +91,67 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task ShouldLoadEmployeeConversations_WhenHealthCheckSucceeds()
+    {
+        var sessionId = Guid.NewGuid();
+        var handler = new MockHttpMessageHandler((req, ct) =>
+        {
+            if (req.RequestUri?.PathAndQuery.Contains("/aiprocessing/health", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { canInitiateSession = true })
+                });
+            }
+
+            if (req.RequestUri?.PathAndQuery.Contains("/chat/conversations", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new BffChatConversationListResponse
+                    {
+                        Data =
+                        [
+                            new BffChatConversationSummary
+                            {
+                                SessionId = sessionId,
+                                Preview = "Can you create customer Acme?",
+                                Channel = "intranet",
+                                LastActivityAt = DateTimeOffset.UtcNow,
+                                MessageCount = 2,
+                                Status = "active"
+                            }
+                        ],
+                        Meta = new BffPaginationMeta
+                        {
+                            Page = 1,
+                            PageSize = 20,
+                            TotalCount = 1
+                        }
+                    })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
+        var chatService = new ChatService(client, null!, new CookieProvider());
+
+        await using var testContext = new BunitContext();
+        testContext.Services.AddMudServices();
+        testContext.JSInterop.Mode = JSRuntimeMode.Loose;
+        testContext.Services.AddSingleton(_authMock.Object);
+        testContext.Services.AddSingleton(chatService);
+        testContext.Services.AddSingleton(client);
+        testContext.Render<MudPopoverProvider>();
+
+        var cut = testContext.Render<ChatDrawer>();
+
+        cut.WaitForAssertion(() => Assert.Single(chatService.Conversations), TimeSpan.FromSeconds(5));
+        Assert.Equal("Can you create customer Acme?", chatService.Conversations[0].Preview);
+    }
+
+    [Fact]
     public void ComposerCss_StylesMudPaperRootThroughDeepSelector()
     {
         var css = File.ReadAllText(FindSourceFile("Maliev.Intranet.Client", "Components", "ChatDrawer.razor.css"));
@@ -102,6 +163,7 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
         Assert.Contains("width: 100%;", inputBlock, StringComparison.Ordinal);
         Assert.Contains("min-height: 36px;", inputBlock, StringComparison.Ordinal);
         Assert.Contains(".sidekick-root ::deep .sidekick-composer:focus-within", css, StringComparison.Ordinal);
+        Assert.Contains(".sidekick-title-popover .sidekick-history-entry", css, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -198,6 +260,31 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
 
     private static string FindSourceFile(params string[] relativeParts)
     {
+        var stackSourceFile = new System.Diagnostics.StackTrace(true)
+            .GetFrames()?
+            .Select(frame => frame.GetFileName())
+            .FirstOrDefault(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file));
+        if (!string.IsNullOrWhiteSpace(stackSourceFile))
+        {
+            var sourceRoot = new DirectoryInfo(Path.GetDirectoryName(stackSourceFile)!);
+            while (sourceRoot is not null)
+            {
+                var candidate = Path.Combine(new[] { sourceRoot.FullName }.Concat(relativeParts).ToArray());
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+
+                sourceRoot = sourceRoot.Parent;
+            }
+        }
+
+        var workingDirectoryCandidate = Path.Combine(new[] { Directory.GetCurrentDirectory() }.Concat(relativeParts).ToArray());
+        if (File.Exists(workingDirectoryCandidate))
+        {
+            return workingDirectoryCandidate;
+        }
+
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {

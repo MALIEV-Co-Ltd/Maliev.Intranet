@@ -10,8 +10,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Moq;
 using Maliev.Intranet.Tests.Testing;
+using Moq;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
@@ -71,6 +71,87 @@ public class ChatControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var bffResponse = Assert.IsType<BffChatSessionResponse>(okResult.Value);
         Assert.Equal(response.SessionId, bffResponse.SessionId);
+    }
+
+    [Fact]
+    public async Task GetConversations_ShouldReturnEmployeeConversationSummaries()
+    {
+        var sessionId = Guid.NewGuid();
+        var downstream = new ChatbotConversationListResponse
+        {
+            Data =
+            [
+                new ChatbotConversationSummary
+                {
+                    SessionId = sessionId,
+                    Channel = "intranet",
+                    Preview = "Can you create customer Acme?",
+                    LastActivityAt = DateTimeOffset.Parse("2026-05-17T10:30:00Z"),
+                    MessageCount = 2,
+                    Status = "active"
+                }
+            ],
+            Meta = new ChatbotPaginationMeta
+            {
+                Page = 1,
+                PageSize = 20,
+                TotalCount = 1
+            }
+        };
+
+        _chatbotClientMock
+            .Setup(x => x.GetConversationsAsync("intranet", 1, 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(downstream);
+
+        var result = await _controller.GetConversations("intranet", 1, 20, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var bffResponse = Assert.IsType<BffChatConversationListResponse>(okResult.Value);
+        Assert.Single(bffResponse.Data);
+        Assert.Equal(sessionId, bffResponse.Data[0].SessionId);
+        Assert.Equal("Can you create customer Acme?", bffResponse.Data[0].Preview);
+        Assert.Equal(1, bffResponse.Meta.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetConversationMessages_ShouldReturnConversationMessages()
+    {
+        var sessionId = Guid.NewGuid();
+        var downstream = new ChatbotConversationMessagesResponse
+        {
+            SessionId = sessionId,
+            Channel = "intranet",
+            Messages =
+            [
+                new ChatbotConversationMessage
+                {
+                    MessageId = Guid.NewGuid(),
+                    Role = "user",
+                    Content = "Can you create customer Acme?",
+                    CreatedAt = DateTimeOffset.Parse("2026-05-17T10:30:00Z")
+                },
+                new ChatbotConversationMessage
+                {
+                    MessageId = Guid.NewGuid(),
+                    Role = "assistant",
+                    Content = "I can help with that.",
+                    CreatedAt = DateTimeOffset.Parse("2026-05-17T10:31:00Z")
+                }
+            ]
+        };
+
+        _chatbotClientMock
+            .Setup(x => x.GetConversationMessagesAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(downstream);
+
+        var result = await _controller.GetConversationMessages(sessionId, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var bffResponse = Assert.IsType<BffChatConversationMessagesResponse>(okResult.Value);
+        Assert.Equal(sessionId, bffResponse.SessionId);
+        Assert.Equal(2, bffResponse.Messages.Count);
+        Assert.Equal("user", bffResponse.Messages[0].Role);
+        Assert.Equal("assistant", bffResponse.Messages[1].Role);
     }
 
     [Fact]

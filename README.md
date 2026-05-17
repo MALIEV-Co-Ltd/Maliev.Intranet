@@ -103,7 +103,7 @@ The BFF authorizes operational routes with `[RequirePermission]` before it calls
 | Customer onboarding, document upload, and data mutation | `customer.customers.write` or `customer.profile.write` |
 | Customer search and profile reads | `customer.customers.read` / `customer.customers.list` |
 | AI customer extraction | `prediction.extractions.extract` |
-| Chat session and streaming message APIs | `chat.sessions.create` |
+| Chat session and streaming message APIs | `chat.sessions.create` / `chat.sessions.read` |
 | Customer seed route (`POST /api/v1/Seed/customers` and `/api/seed/customers`) | `customer.customers.write` |
 
 Seed operations are intentionally not public. They use service-account clients to reach CustomerService and CountryService, so the BFF must verify the caller before any downstream seed work starts.

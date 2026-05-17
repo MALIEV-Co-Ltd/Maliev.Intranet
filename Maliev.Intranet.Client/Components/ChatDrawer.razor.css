@@ -78,6 +78,37 @@
     line-height: var(--mud-typography-caption-lineheight);
 }
 
+::deep .sidekick-title-popover .sidekick-history-menu-item {
+    min-width: 280px;
+}
+
+::deep .sidekick-title-popover .sidekick-history-menu-item-active {
+    background: var(--maliev-panel-3);
+}
+
+::deep .sidekick-title-popover .sidekick-history-entry {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--maliev-space-6);
+}
+
+::deep .sidekick-title-popover .sidekick-history-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--maliev-ink);
+    font-weight: 600;
+}
+
+::deep .sidekick-title-popover .sidekick-history-meta {
+    color: var(--maliev-muted);
+    font-size: var(--mud-typography-caption-size);
+    line-height: var(--mud-typography-caption-lineheight);
+}
+
 .sidekick-header-actions,
 .sidekick-composer-actions,
 .sidekick-message-actions {

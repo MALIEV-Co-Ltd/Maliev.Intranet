@@ -76,9 +76,20 @@ public class ChatService : IAsyncDisposable
     public List<ChatMessage> Messages { get; } = new();
 
     /// <summary>
+    /// Gets the conversation summaries available to the current employee.
+    /// </summary>
+    public List<BffChatConversationSummary> Conversations { get; } = new();
+
+    /// <summary>
     /// Gets the unique identifier of the active chat session.
     /// </summary>
     public Guid? SessionId { get; private set; }
+
+    /// <summary>
+    /// Gets the active conversation summary, if the active session is stored in history.
+    /// </summary>
+    public BffChatConversationSummary? ActiveConversation =>
+        SessionId.HasValue ? Conversations.FirstOrDefault(c => c.SessionId == SessionId.Value) : null;
 
     /// <summary>
     /// Gets a value indicating whether a message or session initialization is currently loading.
@@ -139,6 +150,84 @@ public class ChatService : IAsyncDisposable
         Messages.Clear();
         SessionId = null;
         NotifyStateChanged();
+    }
+
+    /// <summary>
+    /// Loads conversation summaries for the authenticated employee.
+    /// </summary>
+    /// <param name="page">The page number.</param>
+    /// <param name="pageSize">The page size.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public async Task LoadConversationsAsync(int page = 1, int pageSize = 20)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/v1/chat/conversations?channel=intranet&page={page}&pageSize={pageSize}");
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<BffChatConversationListResponse>();
+            Conversations.Clear();
+            if (result?.Data is not null)
+            {
+                Conversations.AddRange(result.Data);
+            }
+
+            NotifyStateChanged();
+        }
+        catch
+        {
+            // Conversation history is additive; chat can still work without it.
+        }
+    }
+
+    /// <summary>
+    /// Loads and activates a previous conversation.
+    /// </summary>
+    /// <param name="sessionId">The conversation session ID.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public async Task SelectConversationAsync(Guid sessionId)
+    {
+        IsLoading = true;
+        NotifyStateChanged();
+
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/v1/chat/conversations/{sessionId}/messages");
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<BffChatConversationMessagesResponse>();
+            if (result is null)
+            {
+                return;
+            }
+
+            SessionId = result.SessionId;
+            Messages.Clear();
+            Messages.AddRange(result.Messages.Select(message => new ChatMessage
+            {
+                Text = message.Content,
+                IsUser = message.Role.Equals("user", StringComparison.OrdinalIgnoreCase),
+                Context = _currentContext,
+                Timestamp = message.CreatedAt.LocalDateTime
+            }));
+
+            await JoinSessionGroupAsync();
+        }
+        catch
+        {
+            // Leave the active conversation untouched if history loading fails.
+        }
+        finally
+        {
+            IsLoading = false;
+            NotifyStateChanged();
+        }
     }
 
     /// <summary>
@@ -303,9 +392,11 @@ public class ChatService : IAsyncDisposable
                         placeholder.ThinkingSteps = result.ThinkingSteps;
                     }
 
+                    await LoadConversationsAsync();
                     return result;
                 }
 
+                await LoadConversationsAsync();
                 return result;
             }
 

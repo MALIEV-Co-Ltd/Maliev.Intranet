@@ -29,6 +29,22 @@
                     <MudMenuItem Icon="@Icons.Material.Outlined.AddComment" OnClick="@StartNewConversation">
                         New conversation
                     </MudMenuItem>
+                    @if (ChatService.Conversations.Count > 0)
+                    {
+                        <MudDivider />
+                        @foreach (var conversation in ChatService.Conversations)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Outlined.ChatBubbleOutline"
+                                         Class="@GetConversationMenuItemClass(conversation)"
+                                         OnClick="@(() => SelectConversation(conversation.SessionId))">
+                                <div class="sidekick-history-entry">
+                                    <span class="sidekick-history-title">@GetConversationPreview(conversation)</span>
+                                    <span class="sidekick-history-meta">@FormatConversationTime(conversation.LastActivityAt)</span>
+                                </div>
+                            </MudMenuItem>
+                        }
+                        <MudDivider />
+                    }
                     <MudMenuItem Icon="@Icons.Material.Outlined.TravelExplore" OnClick="@(() => HandleSuggestedAction(GetSummarizePrompt()))">
                         Summarize current page
                     </MudMenuItem>
@@ -290,6 +306,11 @@
         }
 
         await CheckAiAvailability();
+        if (_isAiAvailable)
+        {
+            await ChatService.LoadConversationsAsync();
+        }
+
         await ChatService.ConnectSignalRAsync();
     }
 
@@ -418,11 +439,50 @@
         var firstUserMessage = ChatService.Messages.FirstOrDefault(m => m.IsUser && !string.IsNullOrWhiteSpace(m.Text));
         if (firstUserMessage is null)
         {
-            return "New conversation";
+            return ChatService.ActiveConversation is { } activeConversation
+                ? GetConversationPreview(activeConversation)
+                : "New conversation";
         }
 
         var title = firstUserMessage.Text.Trim();
         return title.Length > 48 ? title[..45] + "..." : title;
+    }
+
+    private string GetConversationPreview(BffChatConversationSummary conversation)
+    {
+        var preview = conversation.Preview;
+        if (string.IsNullOrWhiteSpace(preview))
+        {
+            preview = $"Conversation from {FormatConversationTime(conversation.LastActivityAt)}";
+        }
+
+        preview = preview.Trim();
+        return preview.Length > 48 ? preview[..45] + "..." : preview;
+    }
+
+    private static string FormatConversationTime(DateTimeOffset timestamp)
+    {
+        var local = timestamp.ToLocalTime();
+        var now = DateTimeOffset.Now;
+
+        if (local.Date == now.Date)
+        {
+            return local.ToString("h:mm tt", System.Globalization.CultureInfo.CurrentCulture);
+        }
+
+        if (local.Date == now.Date.AddDays(-1))
+        {
+            return "Yesterday";
+        }
+
+        return local.ToString("MMM d", System.Globalization.CultureInfo.CurrentCulture);
+    }
+
+    private string GetConversationMenuItemClass(BffChatConversationSummary conversation)
+    {
+        return ChatService.SessionId == conversation.SessionId
+            ? "sidekick-history-menu-item sidekick-history-menu-item-active"
+            : "sidekick-history-menu-item";
     }
 
     private string GetSummarizePrompt() => $"Summarize {GetPageName()}";
@@ -574,6 +634,14 @@
         _errorMessage = null;
         _currentInput = "";
         ChatService.StartNewConversation();
+    }
+
+    private async Task SelectConversation(Guid sessionId)
+    {
+        _feedback.Clear();
+        _errorMessage = null;
+        _currentInput = "";
+        await ChatService.SelectConversationAsync(sessionId);
     }
 
     private async Task CopyMessageAsync(string text)

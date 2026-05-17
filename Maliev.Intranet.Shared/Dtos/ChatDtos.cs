@@ -100,6 +100,176 @@ public class BffChatMessageResponse
 }
 
 /// <summary>
+/// Response payload containing a page of chat conversation summaries.
+/// </summary>
+public class BffChatConversationListResponse
+{
+    /// <summary>
+    /// Gets or sets the conversation summaries.
+    /// </summary>
+    public List<BffChatConversationSummary> Data { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the pagination metadata.
+    /// </summary>
+    public BffPaginationMeta Meta { get; set; } = new();
+}
+
+/// <summary>
+/// Response payload containing ordered messages for one chat conversation.
+/// </summary>
+public class BffChatConversationMessagesResponse
+{
+    /// <summary>
+    /// Gets or sets the session ID.
+    /// </summary>
+    public Guid SessionId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the session channel.
+    /// </summary>
+    public string Channel { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the session start timestamp.
+    /// </summary>
+    public DateTimeOffset StartTime { get; set; }
+
+    /// <summary>
+    /// Gets or sets the latest activity timestamp.
+    /// </summary>
+    public DateTimeOffset LastActivityAt { get; set; }
+
+    /// <summary>
+    /// Gets or sets the session status.
+    /// </summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the ordered conversation messages.
+    /// </summary>
+    public List<BffChatConversationMessage> Messages { get; set; } = [];
+}
+
+/// <summary>
+/// Summary of one chat conversation.
+/// </summary>
+public class BffChatConversationSummary
+{
+    /// <summary>
+    /// Gets or sets the session ID.
+    /// </summary>
+    public Guid SessionId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the session channel.
+    /// </summary>
+    public string Channel { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the session start timestamp.
+    /// </summary>
+    public DateTimeOffset StartTime { get; set; }
+
+    /// <summary>
+    /// Gets or sets the latest activity timestamp.
+    /// </summary>
+    public DateTimeOffset LastActivityAt { get; set; }
+
+    /// <summary>
+    /// Gets or sets the session expiration timestamp.
+    /// </summary>
+    public DateTimeOffset ExpiresAt { get; set; }
+
+    /// <summary>
+    /// Gets or sets the session language code.
+    /// </summary>
+    public string Language { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the session status.
+    /// </summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the first user message preview.
+    /// </summary>
+    public string? Preview { get; set; }
+
+    /// <summary>
+    /// Gets or sets the number of messages in the session.
+    /// </summary>
+    public int MessageCount { get; set; }
+}
+
+/// <summary>
+/// Message row in a stored chat conversation.
+/// </summary>
+public class BffChatConversationMessage
+{
+    /// <summary>
+    /// Gets or sets the message ID.
+    /// </summary>
+    public Guid MessageId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the message sender role.
+    /// </summary>
+    public string Role { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the message content.
+    /// </summary>
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the content type.
+    /// </summary>
+    public string ContentType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the message creation timestamp.
+    /// </summary>
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Pagination metadata for chat history responses.
+/// </summary>
+public class BffPaginationMeta
+{
+    /// <summary>
+    /// Gets or sets the current page number.
+    /// </summary>
+    public int Page { get; set; }
+
+    /// <summary>
+    /// Gets or sets the page size.
+    /// </summary>
+    public int PageSize { get; set; }
+
+    /// <summary>
+    /// Gets or sets the total count.
+    /// </summary>
+    public int TotalCount { get; set; }
+
+    /// <summary>
+    /// Gets or sets the total number of pages.
+    /// </summary>
+    public int TotalPages { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a next page exists.
+    /// </summary>
+    public bool HasNextPage { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a previous page exists.
+    /// </summary>
+    public bool HasPreviousPage { get; set; }
+}
+
+/// <summary>
 /// Represents a file or media attachment associated with a chat message.
 /// </summary>
 public class BffChatAttachment

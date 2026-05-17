@@ -140,6 +140,8 @@ public static class MalievPermissions
     {
         /// <summary>Permission to create chat sessions and messages.</summary>
         public const string SessionsCreate = "chat.sessions.create";
+        /// <summary>Permission to read chat session history.</summary>
+        public const string SessionsRead = "chat.sessions.read";
     }
 
     /// <summary>
