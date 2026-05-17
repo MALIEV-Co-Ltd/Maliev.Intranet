@@ -146,11 +146,15 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
             entryDate = request.Date,
             request.Description,
             request.Reference,
+            request.CurrencyCode,
+            request.ExchangeRateToBase,
             lines = request.Lines.Select(line => new
             {
                 line.AccountId,
                 debitAmount = line.Debit,
                 creditAmount = line.Credit,
+                transactionDebitAmount = ResolveTransactionAmount(line.TransactionDebit, line.Debit),
+                transactionCreditAmount = ResolveTransactionAmount(line.TransactionCredit, line.Credit),
                 line.Description,
                 line.Reference
             }).ToList()
@@ -430,6 +434,14 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
 
         public decimal TotalCredit { get; set; }
 
+        public string CurrencyCode { get; set; } = "THB";
+
+        public decimal ExchangeRateToBase { get; set; } = 1m;
+
+        public decimal TransactionTotalDebit { get; set; }
+
+        public decimal TransactionTotalCredit { get; set; }
+
         public string? Reference { get; set; }
 
         public DateTime CreatedAt { get; set; }
@@ -450,6 +462,10 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
             PeriodName = PeriodName,
             TotalDebit = TotalDebit,
             TotalCredit = TotalCredit,
+            CurrencyCode = string.IsNullOrWhiteSpace(CurrencyCode) ? "THB" : CurrencyCode,
+            ExchangeRateToBase = ExchangeRateToBase <= 0m ? 1m : ExchangeRateToBase,
+            TransactionTotalDebit = ResolveTransactionAmount(TransactionTotalDebit, TotalDebit),
+            TransactionTotalCredit = ResolveTransactionAmount(TransactionTotalCredit, TotalCredit),
             Reference = Reference,
             CreatedAt = CreatedAt,
             PostedAt = PostedAt,
@@ -473,6 +489,10 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
 
         public decimal CreditAmount { get; set; }
 
+        public decimal TransactionDebitAmount { get; set; }
+
+        public decimal TransactionCreditAmount { get; set; }
+
         public string? Description { get; set; }
 
         public string? Reference { get; set; }
@@ -486,8 +506,13 @@ public class AccountingServiceClient(HttpClient httpClient) : IAccountingService
             AccountName = AccountName,
             Debit = DebitAmount,
             Credit = CreditAmount,
+            TransactionDebit = ResolveTransactionAmount(TransactionDebitAmount, DebitAmount),
+            TransactionCredit = ResolveTransactionAmount(TransactionCreditAmount, CreditAmount),
             Description = Description ?? string.Empty,
             Reference = Reference
         };
     }
+
+    private static decimal ResolveTransactionAmount(decimal transactionAmount, decimal baseAmount) =>
+        transactionAmount != 0m || baseAmount == 0m ? transactionAmount : baseAmount;
 }

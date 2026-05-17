@@ -56,6 +56,10 @@ public class AccountingServiceClientTests
                     status = "Draft",
                     totalDebit = 100m,
                     totalCredit = 100m,
+                    currencyCode = "USD",
+                    exchangeRateToBase = 36.5m,
+                    transactionTotalDebit = 2.74m,
+                    transactionTotalCredit = 2.74m,
                     createdAt = DateTime.UtcNow,
                     lines = Array.Empty<object>()
                 }
@@ -69,6 +73,9 @@ public class AccountingServiceClientTests
         Assert.NotNull(result);
         Assert.Single(result.Data);
         Assert.Equal(2, result.Meta.CurrentPage);
+        Assert.Equal("USD", result.Data.Single().CurrencyCode);
+        Assert.Equal(36.5m, result.Data.Single().ExchangeRateToBase);
+        Assert.Equal(2.74m, result.Data.Single().TransactionTotalDebit);
     }
 
     [Fact]
@@ -87,8 +94,12 @@ public class AccountingServiceClientTests
                 entryDate = DateTime.UtcNow.Date,
                 description = "Income",
                 status = "Draft",
-                totalDebit = 250m,
-                totalCredit = 250m,
+                totalDebit = 9250m,
+                totalCredit = 9250m,
+                currencyCode = "USD",
+                exchangeRateToBase = 37m,
+                transactionTotalDebit = 250m,
+                transactionTotalCredit = 250m,
                 createdAt = DateTime.UtcNow,
                 lines = Array.Empty<object>()
             });
@@ -100,7 +111,9 @@ public class AccountingServiceClientTests
             Date = new DateTime(2026, 05, 10, 0, 0, 0, DateTimeKind.Utc),
             Description = "Income",
             Reference = "receipt-42",
-            Lines = [new JournalEntryLineDto { AccountId = accountId, Debit = 250m, Reference = "receipt-42" }]
+            CurrencyCode = "USD",
+            ExchangeRateToBase = 37m,
+            Lines = [new JournalEntryLineDto { AccountId = accountId, Debit = 9250m, TransactionDebit = 250m, Reference = "receipt-42" }]
         });
 
         Assert.NotNull(capturedRequest);
@@ -112,8 +125,11 @@ public class AccountingServiceClientTests
         var root = document.RootElement;
         Assert.True(root.TryGetProperty("entryDate", out _));
         Assert.Equal("receipt-42", root.GetProperty("reference").GetString());
+        Assert.Equal("USD", root.GetProperty("currencyCode").GetString());
+        Assert.Equal(37m, root.GetProperty("exchangeRateToBase").GetDecimal());
         Assert.Equal(accountId, root.GetProperty("lines")[0].GetProperty("accountId").GetGuid());
-        Assert.Equal(250m, root.GetProperty("lines")[0].GetProperty("debitAmount").GetDecimal());
+        Assert.Equal(9250m, root.GetProperty("lines")[0].GetProperty("debitAmount").GetDecimal());
+        Assert.Equal(250m, root.GetProperty("lines")[0].GetProperty("transactionDebitAmount").GetDecimal());
         Assert.Equal("receipt-42", root.GetProperty("lines")[0].GetProperty("reference").GetString());
     }
 

@@ -89,6 +89,7 @@
                                 <th>Entry</th>
                                 <th>Status</th>
                                 <th>Description</th>
+                                <th>Currency</th>
                                 <th>Debit</th>
                                 <th>Credit</th>
                                 <th>Date</th>
@@ -102,8 +103,9 @@
                                     <td class="mlv-mono">@entry.EntryNumber</td>
                                     <td><StatusBadge Status="@entry.Status" /></td>
                                     <td>@Display(entry.Description)</td>
-                                    <td class="mlv-mono">@entry.TotalDebit.ToString("N2")</td>
-                                    <td class="mlv-mono">@entry.TotalCredit.ToString("N2")</td>
+                                    <td class="mlv-mono">@DisplayEntryCurrency(entry)</td>
+                                    <td class="mlv-mono">@DisplayEntryAmount(entry, entry.TotalDebit, entry.TransactionTotalDebit)</td>
+                                    <td class="mlv-mono">@DisplayEntryAmount(entry, entry.TotalCredit, entry.TransactionTotalCredit)</td>
                                     <td>@entry.Date.ToString("dd MMM yyyy")</td>
                                     <td>
                                         <SecondaryButton Icon="@Icons.Material.Outlined.DoneAll" Disabled="@(!string.Equals(entry.Status, "Draft", StringComparison.OrdinalIgnoreCase))" OnClick="@(_ => PostJournalEntryAsync(entry.Id))">Post</SecondaryButton>
@@ -133,7 +135,20 @@
                     <FormField Label="Credit account">
                         <select class="mlv-form-input" @bind="_incomeCreditAccountId">@AccountOptions()</select>
                     </FormField>
+                    <FormField Label="Currency">
+                        <select class="mlv-form-input" value="@_incomeForm.CurrencyCode" @onchange="@(args => OnCurrencyChangedAsync(_incomeForm, args.Value?.ToString()))">
+                            @CurrencyOptions()
+                        </select>
+                    </FormField>
                     <FormField Label="Amount"><input type="number" step="0.01" class="mlv-form-input" @bind="_incomeForm.Amount" @bind:event="oninput" /></FormField>
+                    <FormField Label="@($"Rate to {_baseCurrencyCode}")"><input type="number" step="0.000001" class="mlv-form-input" @bind="_incomeForm.ExchangeRateToBase" @bind:event="oninput" /></FormField>
+                    <FormField Label="@($"Book amount ({_baseCurrencyCode})")">
+                        <input class="mlv-form-input" value="@FormatBaseAmount(_incomeForm)" readonly />
+                        @if (!string.IsNullOrWhiteSpace(_incomeForm.CurrencyMessage))
+                        {
+                            <div class="mlv-form-hint">@_incomeForm.CurrencyMessage</div>
+                        }
+                    </FormField>
                     <FormField Label="Transfer slip or receipt">
                         <InputFile class="mlv-form-input" OnChange="@(args => OnDocumentSelected(args, _incomeForm))" />
                         @if (_incomeForm.Document is not null)
@@ -160,7 +175,20 @@
                     <FormField Label="Credit account">
                         <select class="mlv-form-input" @bind="_expenseCreditAccountId">@AccountOptions()</select>
                     </FormField>
+                    <FormField Label="Currency">
+                        <select class="mlv-form-input" value="@_expenseForm.CurrencyCode" @onchange="@(args => OnCurrencyChangedAsync(_expenseForm, args.Value?.ToString()))">
+                            @CurrencyOptions()
+                        </select>
+                    </FormField>
                     <FormField Label="Amount"><input type="number" step="0.01" class="mlv-form-input" @bind="_expenseForm.Amount" @bind:event="oninput" /></FormField>
+                    <FormField Label="@($"Rate to {_baseCurrencyCode}")"><input type="number" step="0.000001" class="mlv-form-input" @bind="_expenseForm.ExchangeRateToBase" @bind:event="oninput" /></FormField>
+                    <FormField Label="@($"Book amount ({_baseCurrencyCode})")">
+                        <input class="mlv-form-input" value="@FormatBaseAmount(_expenseForm)" readonly />
+                        @if (!string.IsNullOrWhiteSpace(_expenseForm.CurrencyMessage))
+                        {
+                            <div class="mlv-form-hint">@_expenseForm.CurrencyMessage</div>
+                        }
+                    </FormField>
                     <FormField Label="Receipt or supplier document">
                         <InputFile class="mlv-form-input" OnChange="@(args => OnDocumentSelected(args, _expenseForm))" />
                         @if (_expenseForm.Document is not null)
@@ -319,6 +347,7 @@
     private List<JournalEntryDto> _journalEntries = [];
     private List<AccountingPeriodDto> _periods = [];
     private List<ChartOfAccountDto> _accounts = [];
+    private List<CurrencyDto> _currencies = [];
     private PaymentStatsDto? _paymentStats;
     private FinancialReportDto? _report;
     private ReconciliationResultDto? _reconciliation;
@@ -339,6 +368,7 @@
     private string _incomeCreditAccountId = string.Empty;
     private string _expenseDebitAccountId = string.Empty;
     private string _expenseCreditAccountId = string.Empty;
+    private string _baseCurrencyCode = "THB";
 
     private bool IsQuickEntryTab => _tab is "Income Entry" or "Expense Entry";
 
@@ -373,8 +403,9 @@
         _loading = true;
         try
         {
-            await Task.WhenAll(LoadInvoicesAsync(), LoadJournalEntriesAsync(), LoadPeriodsAsync(), LoadPaymentStatsAsync(), LoadAccountsAsync());
+            await Task.WhenAll(LoadInvoicesAsync(), LoadJournalEntriesAsync(), LoadPeriodsAsync(), LoadPaymentStatsAsync(), LoadAccountsAsync(), LoadCurrenciesAsync());
             ApplyAccountDefaults();
+            ApplyCurrencyDefaults();
         }
         catch (Exception ex)
         {
@@ -421,6 +452,27 @@
         _accounts = FlattenAccounts(accounts).Where(account => account.IsActive).ToList();
     }
 
+    private async Task LoadCurrenciesAsync()
+    {
+        try
+        {
+            var currencies = await Http.GetFromJsonAsync<List<CurrencyDto>>("api/v1/referenceData/currencies") ?? [];
+            _currencies = currencies
+                .Where(currency => currency.IsActive)
+                .OrderByDescending(currency => currency.IsPrimary)
+                .ThenBy(currency => currency.Code)
+                .ToList();
+            _baseCurrencyCode = NormalizeCurrencyCode(
+                _currencies.FirstOrDefault(currency => currency.IsPrimary)?.Code ?? "THB");
+        }
+        catch (Exception ex)
+        {
+            _currencies = [];
+            _baseCurrencyCode = "THB";
+            Console.WriteLine(ex.Message);
+        }
+    }
+
     private async Task CreateCurrentQuickEntryAsync(MouseEventArgs _)
     {
         if (_tab == "Income Entry") await CreateIncomeAsync();
@@ -451,6 +503,12 @@
             return;
         }
 
+        if (form.ExchangeRateToBase <= 0m)
+        {
+            Snackbar.Add("Enter a valid exchange rate for the selected currency.", Severity.Warning);
+            return;
+        }
+
         var documentReference = await UploadJournalEvidenceAsync(form);
         if (form.Document is not null && string.IsNullOrWhiteSpace(documentReference))
         {
@@ -458,15 +516,19 @@
         }
 
         var reference = CombineReference(form.Reference, documentReference);
+        var currencyCode = NormalizeCurrencyCode(form.CurrencyCode);
+        var bookAmount = ToBaseAmount(form.Amount, form.ExchangeRateToBase);
         var request = new CreateJournalEntryRequest
         {
             Date = form.Date,
             Description = form.Description,
             Reference = reference,
+            CurrencyCode = currencyCode,
+            ExchangeRateToBase = form.ExchangeRateToBase,
             Lines =
             [
-                new JournalEntryLineDto { AccountId = form.DebitAccountId, Debit = form.Amount, Description = form.Description, Reference = reference },
-                new JournalEntryLineDto { AccountId = form.CreditAccountId, Credit = form.Amount, Description = form.Description, Reference = reference }
+                new JournalEntryLineDto { AccountId = form.DebitAccountId, Debit = bookAmount, TransactionDebit = form.Amount, Description = form.Description, Reference = reference },
+                new JournalEntryLineDto { AccountId = form.CreditAccountId, Credit = bookAmount, TransactionCredit = form.Amount, Description = form.Description, Reference = reference }
             ]
         };
 
@@ -479,6 +541,35 @@
             _journalPage = 1;
             await LoadJournalEntriesAsync();
         }
+    }
+
+    private async Task OnCurrencyChangedAsync(QuickJournalForm form, string? currencyCode)
+    {
+        form.CurrencyCode = NormalizeCurrencyCode(currencyCode);
+        form.CurrencyMessage = null;
+
+        if (string.Equals(form.CurrencyCode, _baseCurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            form.ExchangeRateToBase = 1m;
+            return;
+        }
+
+        try
+        {
+            var rate = await Http.GetFromJsonAsync<ExchangeRateResponse>(
+                $"api/v1/referenceData/currencies/rate?from={Uri.EscapeDataString(form.CurrencyCode)}&to={Uri.EscapeDataString(_baseCurrencyCode)}");
+            if (rate?.Rate > 0m)
+            {
+                form.ExchangeRateToBase = rate.Rate;
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+
+        form.CurrencyMessage = $"No live rate found. Enter the {form.CurrencyCode} to {_baseCurrencyCode} rate manually.";
     }
 
     private async Task<string?> UploadJournalEvidenceAsync(QuickJournalForm form)
@@ -560,6 +651,30 @@
 
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 
+    private string DisplayEntryCurrency(JournalEntryDto entry) =>
+        string.IsNullOrWhiteSpace(entry.CurrencyCode) ? _baseCurrencyCode : entry.CurrencyCode;
+
+    private string DisplayEntryAmount(JournalEntryDto entry, decimal baseAmount, decimal transactionAmount)
+    {
+        var currencyCode = DisplayEntryCurrency(entry);
+        var sourceAmount = transactionAmount != 0m || baseAmount == 0m ? transactionAmount : baseAmount;
+        if (string.Equals(currencyCode, _baseCurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{_baseCurrencyCode} {baseAmount:N2}";
+        }
+
+        return $"{currencyCode} {sourceAmount:N2} / {_baseCurrencyCode} {baseAmount:N2}";
+    }
+
+    private static decimal ToBaseAmount(decimal amount, decimal exchangeRateToBase) =>
+        decimal.Round(amount * exchangeRateToBase, 2, MidpointRounding.AwayFromZero);
+
+    private string FormatBaseAmount(QuickJournalForm form) =>
+        $"{ToBaseAmount(form.Amount, form.ExchangeRateToBase):N2}";
+
+    private static string NormalizeCurrencyCode(string? currencyCode) =>
+        string.IsNullOrWhiteSpace(currencyCode) ? "THB" : currencyCode.Trim().ToUpperInvariant();
+
     private bool PrepareAccounts(QuickJournalForm form, string debitAccountId, string creditAccountId)
     {
         if (!Guid.TryParse(debitAccountId, out var debitId) || !Guid.TryParse(creditAccountId, out var creditId))
@@ -579,6 +694,21 @@
         _incomeCreditAccountId = DefaultAccount("Revenue", "Income") ?? _incomeCreditAccountId;
         _expenseDebitAccountId = DefaultAccount("Expense") ?? _expenseDebitAccountId;
         _expenseCreditAccountId = DefaultAccount("Asset", "Liability") ?? _expenseCreditAccountId;
+    }
+
+    private void ApplyCurrencyDefaults()
+    {
+        ApplyCurrencyDefault(_incomeForm);
+        ApplyCurrencyDefault(_expenseForm);
+    }
+
+    private void ApplyCurrencyDefault(QuickJournalForm form)
+    {
+        form.CurrencyCode = string.IsNullOrWhiteSpace(form.CurrencyCode) ? _baseCurrencyCode : NormalizeCurrencyCode(form.CurrencyCode);
+        if (string.Equals(form.CurrencyCode, _baseCurrencyCode, StringComparison.OrdinalIgnoreCase) && form.ExchangeRateToBase <= 0m)
+        {
+            form.ExchangeRateToBase = 1m;
+        }
     }
 
     private IEnumerable<JournalEntryDto> PayrollJournalEntries() =>
@@ -627,6 +757,22 @@
         }
     };
 
+    private RenderFragment CurrencyOptions() => builder =>
+    {
+        var sequence = 0;
+        var currencies = _currencies.Count > 0
+            ? _currencies
+            : [new CurrencyDto { Code = "THB", Name = "Thai Baht", Symbol = "฿", DecimalPlaces = 2, IsActive = true, IsPrimary = true }];
+
+        foreach (var currency in currencies)
+        {
+            builder.OpenElement(sequence++, "option");
+            builder.AddAttribute(sequence++, "value", currency.Code);
+            builder.AddContent(sequence++, $"{currency.Code} - {currency.Name}");
+            builder.CloseElement();
+        }
+    };
+
     private sealed class QuickJournalForm
     {
         public DateTime Date { get; set; } = DateTime.Today;
@@ -640,6 +786,12 @@
         public Guid CreditAccountId { get; set; }
 
         public decimal Amount { get; set; }
+
+        public string CurrencyCode { get; set; } = "THB";
+
+        public decimal ExchangeRateToBase { get; set; } = 1m;
+
+        public string? CurrencyMessage { get; set; }
 
         public IBrowserFile? Document { get; set; }
     }

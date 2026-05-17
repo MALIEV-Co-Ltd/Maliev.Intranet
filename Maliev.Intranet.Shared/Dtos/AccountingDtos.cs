@@ -114,6 +114,26 @@ public sealed record JournalEntryDto
     public decimal TotalCredit { get; set; }
 
     /// <summary>
+    /// The ISO 4217 currency code used by the original transaction.
+    /// </summary>
+    public string CurrencyCode { get; set; } = "THB";
+
+    /// <summary>
+    /// The multiplier from the transaction currency into the accounting base currency.
+    /// </summary>
+    public decimal ExchangeRateToBase { get; set; } = 1m;
+
+    /// <summary>
+    /// The total debit amount in the original transaction currency.
+    /// </summary>
+    public decimal TransactionTotalDebit { get; set; }
+
+    /// <summary>
+    /// The total credit amount in the original transaction currency.
+    /// </summary>
+    public decimal TransactionTotalCredit { get; set; }
+
+    /// <summary>
     /// The current workflow status of the journal entry (e.g., Draft, Posted).
     /// </summary>
     public string Status { get; set; } = string.Empty;
@@ -184,6 +204,34 @@ public sealed record JournalEntryLineDto
     public decimal Credit { get; set; }
 
     /// <summary>
+    /// The debit amount in the original transaction currency.
+    /// </summary>
+    public decimal TransactionDebit { get; set; }
+
+    /// <summary>
+    /// The service-native transaction debit amount.
+    /// </summary>
+    public decimal TransactionDebitAmount
+    {
+        get => TransactionDebit;
+        set => TransactionDebit = value;
+    }
+
+    /// <summary>
+    /// The credit amount in the original transaction currency.
+    /// </summary>
+    public decimal TransactionCredit { get; set; }
+
+    /// <summary>
+    /// The service-native transaction credit amount.
+    /// </summary>
+    public decimal TransactionCreditAmount
+    {
+        get => TransactionCredit;
+        set => TransactionCredit = value;
+    }
+
+    /// <summary>
     /// The service-native credit amount.
     /// </summary>
     public decimal CreditAmount
@@ -233,6 +281,18 @@ public sealed record CreateJournalEntryRequest
     /// An optional reference number for the transaction.
     /// </summary>
     public string? Reference { get; set; }
+
+    /// <summary>
+    /// The ISO 4217 transaction currency code.
+    /// </summary>
+    [StringLength(3, MinimumLength = 3)]
+    public string CurrencyCode { get; set; } = "THB";
+
+    /// <summary>
+    /// The multiplier from the transaction currency into the accounting base currency.
+    /// </summary>
+    [Range(0.00000001, double.MaxValue)]
+    public decimal ExchangeRateToBase { get; set; } = 1m;
 
     /// <summary>
     /// The collection of debit and credit lines comprising the journal entry.
