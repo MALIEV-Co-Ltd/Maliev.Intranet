@@ -8,8 +8,15 @@
 
 <div class="mlv-module-shell">
     <PageHeader Title="Commerce Catalog"
-                Subtitle="Employee-managed storefront products, collections, variants, and media"
-                BackHref="/" />
+                Subtitle="Employee-managed storefront products, variants, media, and publishing status"
+                BackHref="/">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Outlined.Category"
+                   OnClick="OpenCollections">
+            Product collections
+        </MudButton>
+    </PageHeader>
 
     <PageBody>
         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
@@ -24,7 +31,7 @@
         </StatBar>
 
         <MudGrid Spacing="3">
-            <MudItem xs="12" lg="8">
+            <MudItem xs="12">
                 <PanelCard Class="mb-4">
                     <div class="catalog-product-toolbar mb-4">
                         <MudTextField @bind-Value="_query"
@@ -108,35 +115,6 @@
                                       PageSizeChanged="OnPageSizeChanged"
                                       Disabled="@_loadingProducts" />
                 </PanelCard>
-
-            </MudItem>
-
-            <MudItem xs="12" lg="4">
-                <PanelCard>
-                    <MudText Typo="Typo.h6" Class="mb-3">Collections</MudText>
-                    <MudStack Spacing="2">
-                        <MudTextField @bind-Value="_collectionForm.Title" Label="Title" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudTextField @bind-Value="_collectionForm.Handle" Label="Handle" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudTextField @bind-Value="_collectionForm.Description" Label="Description" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudSwitch @bind-Value="_collectionForm.IsPublished" Color="Color.Primary" Label="Published" />
-                        <div class="d-flex gap-2">
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveCollectionAsync">Save collection</MudButton>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="StartNewCollection">New</MudButton>
-                        </div>
-                    </MudStack>
-
-                    <MudDivider Class="my-4" />
-                    @foreach (var collection in _collections)
-                    {
-                        <div class="d-flex align-center justify-space-between gap-2 py-2 border-bottom">
-                            <button type="button" class="mlv-link-button" @onclick="@(() => SelectCollection(collection))">
-                                <span class="fw-semibold">@collection.Title</span>
-                                <span class="text-muted small">@collection.Handle</span>
-                            </button>
-                            <StatusBadge Status="@(collection.IsPublished ? "Published" : "Draft")" />
-                        </div>
-                    }
-                </PanelCard>
             </MudItem>
         </MudGrid>
     </PageBody>
@@ -146,8 +124,6 @@
     private readonly List<CommerceProductSummaryDto> _products = [];
     private readonly List<CommerceCollectionDto> _collections = [];
     private PaginationMeta _meta = new();
-    private CommerceCollectionMutationRequest _collectionForm = new();
-    private Guid? _editingCollectionId;
     private string? _query;
     private string _collectionFilter = string.Empty;
     private bool _loadingProducts = true;
@@ -201,31 +177,6 @@
         }
     }
 
-    private async Task SaveCollectionAsync()
-    {
-        try
-        {
-            HttpResponseMessage response;
-            if (_editingCollectionId.HasValue)
-            {
-                response = await Http.PutAsJsonAsync($"api/v1/commerce/collections/{_editingCollectionId.Value}", _collectionForm);
-            }
-            else
-            {
-                response = await Http.PostAsJsonAsync("api/v1/commerce/collections", _collectionForm);
-            }
-
-            response.EnsureSuccessStatusCode();
-            Snackbar.Add("Collection saved.", Severity.Success);
-            StartNewCollection();
-            await LoadCollectionsAsync();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Unable to save collection: {ex.Message}", Severity.Error);
-        }
-    }
-
     private async Task OnPageChanged(int page)
     {
         _page = page;
@@ -244,27 +195,14 @@
         Navigation.NavigateTo("/commerce/catalog/new");
     }
 
+    private void OpenCollections()
+    {
+        Navigation.NavigateTo("/commerce/collections");
+    }
+
     private void OpenProduct(CommerceProductSummaryDto product)
     {
         Navigation.NavigateTo($"/commerce/catalog/{Uri.EscapeDataString(product.Handle)}");
-    }
-
-    private void StartNewCollection()
-    {
-        _editingCollectionId = null;
-        _collectionForm = new CommerceCollectionMutationRequest();
-    }
-
-    private void SelectCollection(CommerceCollectionDto collection)
-    {
-        _editingCollectionId = collection.Id;
-        _collectionForm = new CommerceCollectionMutationRequest
-        {
-            Handle = collection.Handle,
-            Title = collection.Title,
-            Description = collection.Description,
-            IsPublished = collection.IsPublished
-        };
     }
 
     private static bool IsPublished(CommerceProductSummaryDto product)

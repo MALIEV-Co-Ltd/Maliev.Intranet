@@ -25,7 +25,8 @@ internal static class AppNavigation
         ]),
         new("Commerce", Icons.Material.Outlined.Storefront, null,
         [
-            new("Storefront catalog", "commerce/catalog", Icons.Material.Outlined.Storefront, MalievPermissions.Commerce.ProductsRead, Description: "Products, collections, variants, media"),
+            new("Storefront catalog", "commerce/catalog", Icons.Material.Outlined.Storefront, MalievPermissions.Commerce.ProductsRead, Description: "Products, variants, media"),
+            new("Product collections", "commerce/collections", Icons.Material.Outlined.Category, MalievPermissions.Commerce.CollectionsRead, Description: "Storefront collection groups"),
         ]),
         new("Web", Icons.Material.Outlined.Public, "Website Content",
         [

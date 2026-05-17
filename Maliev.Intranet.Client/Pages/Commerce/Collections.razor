@@ -1,0 +1,326 @@
+@page "/commerce/collections"
+@attribute [RequirePermission(MalievPermissions.Commerce.CollectionsRead)]
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Commerce Collections | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell commerce-collections-shell">
+    <PageHeader Title="Commerce Collections"
+                Subtitle="Storefront collection groups and publishing state"
+                BackHref="/commerce/catalog">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   StartIcon="@Icons.Material.Outlined.Storefront"
+                   OnClick="BackToCatalog">
+            Catalog
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Outlined.Add"
+                   OnClick="StartNewCollection">
+            New collection
+        </MudButton>
+    </PageHeader>
+
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Collections" Value="@_collections.Count.ToString("N0")" />
+            <StatTile Label="Published" Value="@PublishedCount.ToString("N0")" />
+            <StatTile Label="Drafts" Value="@DraftCount.ToString("N0")" />
+            <StatTile Label="Selected" Value="@SelectedCollectionLabel" />
+        </StatBar>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="5">
+                <PanelCard Class="commerce-collection-editor">
+                    <div class="commerce-collection-editor-head">
+                        <div>
+                            <MudText Typo="Typo.h6">@EditorTitle</MudText>
+                            <MudText Typo="Typo.caption">@EditorSubtitle</MudText>
+                        </div>
+                        @if (_editingCollectionId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="StartNewCollection">
+                                Clear
+                            </MudButton>
+                        }
+                    </div>
+
+                    <div class="commerce-collection-form-grid">
+                        <MudTextField @bind-Value="_collectionForm.Title"
+                                      Label="Title"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Required="true"
+                                      Immediate="true" />
+                        <MudTextField @bind-Value="_collectionForm.Handle"
+                                      Label="Handle"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Required="true"
+                                      Immediate="true" />
+                    </div>
+
+                    <MudTextField @bind-Value="_collectionForm.Description"
+                                  Label="Description"
+                                  Lines="4"
+                                  MaxLines="8"
+                                  Counter="500"
+                                  MaxLength="500"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  Class="mt-3" />
+
+                    <div class="commerce-collection-publish-row">
+                        <MudSwitch @bind-Value="_collectionForm.IsPublished"
+                                   Color="Color.Primary"
+                                   Label="@PublishLabel" />
+                        <MudText Typo="Typo.caption">
+                            Storefront visibility state
+                        </MudText>
+                    </div>
+
+                    <div class="commerce-collection-actions">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.Save"
+                                   OnClick="SaveCollectionAsync"
+                                   Disabled="@(!CanSaveCollection)">
+                            Save collection
+                        </MudButton>
+                        @if (_editingCollectionId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
+                                       StartIcon="@Icons.Material.Outlined.Unpublished"
+                                       OnClick="@(() => UnpublishCollectionAsync(_editingCollectionId.Value))"
+                                       Disabled="@(_saving || !_collectionForm.IsPublished)">
+                                Unpublish
+                            </MudButton>
+                        }
+                    </div>
+                </PanelCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="7">
+                <PanelCard Class="commerce-collections-list-panel">
+                    <div class="commerce-collections-list-head">
+                        <div>
+                            <MudText Typo="Typo.h6">Product collections</MudText>
+                            <MudText Typo="Typo.caption">Handles, descriptions, and publishing state</MudText>
+                        </div>
+                        <StatusBadge Status="@($"{_collections.Count:N0} total")" />
+                    </div>
+
+                    @if (_loadingCollections)
+                    {
+                        <div class="commerce-collection-skeletons">
+                            <MudSkeleton Height="64px" Animation="Animation.Wave" />
+                            <MudSkeleton Height="64px" Animation="Animation.Wave" />
+                            <MudSkeleton Height="64px" Animation="Animation.Wave" />
+                        </div>
+                    }
+                    else if (_collections.Count == 0)
+                    {
+                        <div class="commerce-collections-empty">
+                            <MudIcon Icon="@Icons.Material.Outlined.Category" Size="Size.Large" />
+                            <MudText Typo="Typo.body1">No product collections yet.</MudText>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="StartNewCollection">
+                                Create the first collection
+                            </MudButton>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="commerce-collection-list" role="list">
+                            @foreach (var collection in _collections.OrderBy(collection => collection.Title))
+                            {
+                                <div class="@CollectionRowClass(collection)" role="listitem">
+                                    <button type="button" class="commerce-collection-main" @onclick="@(() => SelectCollection(collection))">
+                                        <span class="commerce-collection-title-row">
+                                            <span class="commerce-collection-title">@collection.Title</span>
+                                            <StatusBadge Status="@CollectionStatus(collection)" />
+                                        </span>
+                                        <span class="commerce-collection-handle">@collection.Handle</span>
+                                        <span class="commerce-collection-description">@CollectionDescription(collection)</span>
+                                    </button>
+                                    <div class="commerce-collection-row-actions">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => SelectCollection(collection))" />
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Unpublished"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       Disabled="@(!collection.IsPublished || _saving)"
+                                                       OnClick="@(() => UnpublishCollectionAsync(collection.Id))" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </PanelCard>
+            </MudItem>
+        </MudGrid>
+    </PageBody>
+</div>
+
+@code {
+    private readonly List<CommerceCollectionDto> _collections = [];
+    private CommerceCollectionMutationRequest _collectionForm = new();
+    private Guid? _editingCollectionId;
+    private bool _loadingCollections = true;
+    private bool _saving;
+
+    private int PublishedCount => _collections.Count(collection => collection.IsPublished);
+
+    private int DraftCount => _collections.Count - PublishedCount;
+
+    private string SelectedCollectionLabel => _editingCollectionId.HasValue ? "Editing" : "New";
+
+    private string EditorTitle => _editingCollectionId.HasValue ? "Edit collection" : "New collection";
+
+    private string EditorSubtitle => _editingCollectionId.HasValue
+        ? "Title, handle, description, and publishing state."
+        : "Collection identity and publishing state.";
+
+    private string PublishLabel => _collectionForm.IsPublished ? "Published" : "Draft";
+
+    private bool CanSaveCollection => !_saving
+        && !string.IsNullOrWhiteSpace(_collectionForm.Title)
+        && !string.IsNullOrWhiteSpace(_collectionForm.Handle);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCollectionsAsync();
+    }
+
+    private async Task LoadCollectionsAsync()
+    {
+        _loadingCollections = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<CommerceCollectionDto>>("api/v1/commerce/collections");
+            _collections.Clear();
+            _collections.AddRange(response ?? []);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load Commerce collections: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingCollections = false;
+        }
+    }
+
+    private async Task SaveCollectionAsync()
+    {
+        if (!CanSaveCollection)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (_editingCollectionId.HasValue)
+            {
+                response = await Http.PutAsJsonAsync($"api/v1/commerce/collections/{_editingCollectionId.Value}", _collectionForm);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/v1/commerce/collections", _collectionForm);
+            }
+
+            response.EnsureSuccessStatusCode();
+            var savedCollection = await response.Content.ReadFromJsonAsync<CommerceCollectionDto>();
+            Snackbar.Add("Collection saved.", Severity.Success);
+            await LoadCollectionsAsync();
+
+            if (savedCollection is not null)
+            {
+                SelectCollection(savedCollection);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to save collection: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task UnpublishCollectionAsync(Guid collectionId)
+    {
+        _saving = true;
+        try
+        {
+            using var response = await Http.DeleteAsync($"api/v1/commerce/collections/{collectionId}");
+            response.EnsureSuccessStatusCode();
+            Snackbar.Add("Collection unpublished.", Severity.Success);
+            await LoadCollectionsAsync();
+
+            if (_editingCollectionId == collectionId)
+            {
+                _collectionForm.IsPublished = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to unpublish collection: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void StartNewCollection()
+    {
+        _editingCollectionId = null;
+        _collectionForm = new CommerceCollectionMutationRequest();
+    }
+
+    private void SelectCollection(CommerceCollectionDto collection)
+    {
+        _editingCollectionId = collection.Id;
+        _collectionForm = new CommerceCollectionMutationRequest
+        {
+            Handle = collection.Handle,
+            Title = collection.Title,
+            Description = collection.Description,
+            IsPublished = collection.IsPublished
+        };
+    }
+
+    private void BackToCatalog()
+    {
+        Navigation.NavigateTo("/commerce/catalog");
+    }
+
+    private string CollectionRowClass(CommerceCollectionDto collection)
+    {
+        return _editingCollectionId == collection.Id
+            ? "commerce-collection-row selected"
+            : "commerce-collection-row";
+    }
+
+    private static string CollectionStatus(CommerceCollectionDto collection)
+    {
+        return collection.IsPublished ? "Published" : "Draft";
+    }
+
+    private static string CollectionDescription(CommerceCollectionDto collection)
+    {
+        return string.IsNullOrWhiteSpace(collection.Description)
+            ? "No description set."
+            : collection.Description;
+    }
+}

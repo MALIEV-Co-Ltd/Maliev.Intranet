@@ -664,6 +664,28 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CommerceCatalog_UsesDedicatedCollectionsManagementPage()
+    {
+        var catalog = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var navigation = ReadRepoFile("Maliev.Intranet.Client", "Layout", "AppNavigation.cs");
+
+        Assert.Contains("Navigation.NavigateTo(\"/commerce/collections\")", catalog, StringComparison.Ordinal);
+        Assert.DoesNotContain("SaveCollectionAsync", catalog, StringComparison.Ordinal);
+        Assert.DoesNotContain("_collectionForm", catalog, StringComparison.Ordinal);
+        Assert.DoesNotContain("Save collection", catalog, StringComparison.Ordinal);
+
+        Assert.Contains("@page \"/commerce/collections\"", collections, StringComparison.Ordinal);
+        Assert.Contains("RequirePermission(MalievPermissions.Commerce.CollectionsRead)", collections, StringComparison.Ordinal);
+        Assert.Contains("CommerceCollectionMutationRequest", collections, StringComparison.Ordinal);
+        Assert.Contains("api/v1/commerce/collections", collections, StringComparison.Ordinal);
+        Assert.Contains("SaveCollectionAsync", collections, StringComparison.Ordinal);
+        Assert.Contains("UnpublishCollectionAsync", collections, StringComparison.Ordinal);
+
+        Assert.Contains("new(\"Product collections\", \"commerce/collections\"", navigation, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void IamUserList_UsesPagedBffUsersEndpoint()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserList.razor");
