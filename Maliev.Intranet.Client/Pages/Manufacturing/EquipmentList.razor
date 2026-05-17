@@ -19,10 +19,13 @@
             <StatTile Label="Categories" Value="@_equipment.Select(e => e.Category).Distinct().Count().ToString("N0")" />
         </StatBar>
 
-        <div class="mlv-toolbar">
-            <div class="mlv-toolbar-left">
-                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search equipment..." OnEnter="SearchAsync" />
-                <label class="mlv-filter-field">
+        <div class="mlv-toolbar equipment-filter-toolbar">
+            <div class="mlv-toolbar-left equipment-filter-left">
+                <label class="mlv-filter-field equipment-search-filter">
+                    <span>Search</span>
+                    <SearchBox Class="equipment-search-box" Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search equipment..." OnEnter="SearchAsync" />
+                </label>
+                <label class="mlv-filter-field equipment-status-filter">
                     <span>Status</span>
                     <select value="@(_status ?? string.Empty)" @onchange="OnStatusChanged">
                         <option value="">All</option>
@@ -32,7 +35,7 @@
                         <option value="Decommissioned">Decommissioned</option>
                     </select>
                 </label>
-                <label class="mlv-filter-field">
+                <label class="mlv-filter-field equipment-category-filter">
                     <span>Category</span>
                     <select value="@(_category ?? string.Empty)" @onchange="OnCategoryChanged">
                         <option value="">All</option>

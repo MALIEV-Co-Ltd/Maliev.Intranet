@@ -407,12 +407,22 @@ public class ModuleRegressionSourceTests
     public void EquipmentPages_UseFacilityBackedModulePaginationAndDetailWorkstreams()
     {
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "EquipmentList.razor");
+        var listStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "EquipmentList.razor.css");
         var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "EquipmentDetail.razor");
 
         Assert.Contains("@page \"/mfg/equipment\"", list, StringComparison.Ordinal);
         Assert.Contains("PaginationFooter", list, StringComparison.Ordinal);
         Assert.Contains("api/v1/equipments?{string.Join", list, StringComparison.Ordinal);
         Assert.DoesNotContain("page=1&pageSize=50", list, StringComparison.Ordinal);
+        Assert.Contains("equipment-filter-toolbar", list, StringComparison.Ordinal);
+        Assert.Contains("equipment-filter-left", list, StringComparison.Ordinal);
+        Assert.Contains("equipment-search-filter", list, StringComparison.Ordinal);
+        Assert.Contains("Class=\"equipment-search-box\"", list, StringComparison.Ordinal);
+        Assert.Contains(".equipment-filter-toolbar", listStyles, StringComparison.Ordinal);
+        Assert.Contains("align-items: end;", listStyles, StringComparison.Ordinal);
+        Assert.Contains("::deep .equipment-search-box", listStyles, StringComparison.Ordinal);
+        Assert.Contains("height: 36px;", listStyles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(220px, 1.1fr) repeat(2, minmax(140px, 0.75fr));", listStyles, StringComparison.Ordinal);
         Assert.Contains("/notes", detail, StringComparison.Ordinal);
         Assert.Contains("/maintenance", detail, StringComparison.Ordinal);
         Assert.Contains("/loans", detail, StringComparison.Ordinal);
