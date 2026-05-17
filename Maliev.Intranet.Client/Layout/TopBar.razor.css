@@ -344,7 +344,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
 }
 
@@ -496,6 +496,46 @@
     height: 1px;
     margin: 5px 2px;
     background: var(--maliev-border);
+}
+
+@media (max-width: 1680px) {
+    .topbar-root {
+        gap: 8px;
+        padding-inline: 10px;
+    }
+
+    .topbar-nav {
+        gap: 6px;
+    }
+
+    .topbar-nav ::deep .mud-nav-link {
+        padding-inline: 10px;
+    }
+
+    .topbar-nav ::deep .mud-nav-link.topbar-nav-quote,
+    .topbar-nav ::deep .topbar-nav-quote .mud-nav-link {
+        padding-inline: 12px;
+    }
+
+    .topbar-nav-menu-trigger {
+        padding-inline: 8px;
+    }
+
+    .topbar-profile-info { display: none; }
+
+    .topbar-profile {
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        justify-content: center;
+        padding: 4px;
+        gap: 0;
+    }
+
+    .topbar-profile ::deep .topbar-profile-chevron,
+    .topbar-profile > .mud-icon-root {
+        display: none;
+    }
 }
 
 @media (max-width: 1280px) {

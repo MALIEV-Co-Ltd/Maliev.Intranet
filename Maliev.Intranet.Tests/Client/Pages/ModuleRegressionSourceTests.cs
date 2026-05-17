@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace Maliev.Intranet.Tests.Client.Pages;
@@ -185,27 +186,29 @@ public class ModuleRegressionSourceTests
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
         var overrides = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
         var navMenu = ReadRepoFile("Maliev.Intranet.Client", "Layout", "NavMenu.razor");
+        var appNavigation = ReadRepoFile("Maliev.Intranet.Client", "Layout", "AppNavigation.cs");
 
-        Assert.Contains("private sealed record NavGroup", source, StringComparison.Ordinal);
+        Assert.Contains("AppNavigation.PrimaryGroups", source, StringComparison.Ordinal);
+        Assert.Contains("internal sealed record AppNavGroup", appNavigation, StringComparison.Ordinal);
         Assert.Contains("topbar-nav-menu-trigger", source, StringComparison.Ordinal);
-        Assert.Contains("Storefront catalog", source, StringComparison.Ordinal);
-        Assert.Contains("\"commerce/catalog\"", source, StringComparison.Ordinal);
-        Assert.Contains("new(\"Materials\", \"mfg/materials\"", source, StringComparison.Ordinal);
-        Assert.Contains("new(\"Equipment\", \"mfg/equipment\"", source, StringComparison.Ordinal);
-        Assert.Contains("new(\"Production schedule\", \"mfg/production-schedule\"", source, StringComparison.Ordinal);
-        Assert.Contains("new(\"Suppliers\", \"purchasing/suppliers\"", source, StringComparison.Ordinal);
-        Assert.Contains("new(\"Reference data\", \"admin/reference-data\"", source, StringComparison.Ordinal);
-        Assert.Contains("new(\"System health\", \"admin/system-health\"", source, StringComparison.Ordinal);
-        Assert.Contains("new(\"IAM\", \"iam\"", source, StringComparison.Ordinal);
-        Assert.Contains("new(\"Leave\", \"hr/leave\"", source, StringComparison.Ordinal);
+        Assert.Contains("Storefront catalog", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("\"commerce/catalog\"", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("new(\"Materials\", \"mfg/materials\"", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("new(\"Equipment\", \"mfg/equipment\"", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("new(\"Production schedule\", \"mfg/production-schedule\"", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("new(\"Suppliers\", \"purchasing/suppliers\"", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("new(\"Reference dashboard\", \"admin/reference-data\"", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("new(\"System health\", \"admin/system-health\"", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("new(\"IAM\", \"iam\"", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("new(\"Leave\", \"hr/leave\"", appNavigation, StringComparison.Ordinal);
         Assert.Contains("Navigation.LocationChanged += OnLocationChanged", source, StringComparison.Ordinal);
         Assert.Contains("IsNavGroupActive", source, StringComparison.Ordinal);
         Assert.Contains(".topbar-nav-menu-trigger", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-mobile-nav-group", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-nav-popover", overrides, StringComparison.Ordinal);
-        Assert.Contains("Href=\"admin/reference-data\"", navMenu, StringComparison.Ordinal);
-        Assert.Contains("Href=\"mfg/materials\"", navMenu, StringComparison.Ordinal);
-        Assert.DoesNotContain("href=\"/admin/blog\"", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Href=\"@item.Href\"", navMenu, StringComparison.Ordinal);
+        Assert.Contains("AppNavigation.PrimaryGroups", navMenu, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"/admin/blog\"", appNavigation, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -635,6 +638,7 @@ public class ModuleRegressionSourceTests
         var iconButtonBlock = ExtractCssBlock(source, ".topbar-right ::deep .mud-button-root.mud-icon-button");
 
         Assert.Contains("gap: 8px;", topbarRightBlock, StringComparison.Ordinal);
+        Assert.Contains("flex: 0 0 auto;", topbarRightBlock, StringComparison.Ordinal);
         Assert.Contains("height: 32px;", currencyFieldBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", currencyFieldBlock, StringComparison.Ordinal);
         Assert.Contains(".topbar-root ::deep .topbar-currency-autocomplete .mud-input-adornment", source, StringComparison.Ordinal);
@@ -654,6 +658,7 @@ public class ModuleRegressionSourceTests
         var razor = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
         var searchStyles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "GlobalSearchBox.razor.css");
+        var wideDesktopStyles = styles[styles.IndexOf("@media (max-width: 1680px)", StringComparison.Ordinal)..];
         var mobileStyles = styles[styles.IndexOf("@media (max-width: 1120px)", StringComparison.Ordinal)..];
 
         Assert.Contains("class=\"topbar-spacer\"", razor, StringComparison.Ordinal);
@@ -666,6 +671,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Class=\"topbar-profile-chevron\"", razor, StringComparison.Ordinal);
         Assert.Contains("GetMobileNavClass", razor, StringComparison.Ordinal);
         Assert.Contains("CloseMobileNav", razor, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 1680px)", styles, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: auto;", ExtractCssBlock(styles, ".topbar-nav"), StringComparison.Ordinal);
+        Assert.Contains("flex: 0 0 auto;", ExtractCssBlock(styles, ".topbar-right"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(wideDesktopStyles, ".topbar-profile-info"), StringComparison.Ordinal);
+        Assert.Contains("width: 36px;", ExtractCssBlock(wideDesktopStyles, ".topbar-profile {"), StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 1280px)", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-profile-info { display: none; }", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-profile ::deep .topbar-profile-chevron", styles, StringComparison.Ordinal);
@@ -963,6 +973,7 @@ public class ModuleRegressionSourceTests
             startDirectories.Add(configuredRoot);
         }
 
+        startDirectories.Add(GetSourceDirectory());
         startDirectories.Add(AppContext.BaseDirectory);
         startDirectories.Add(Directory.GetCurrentDirectory());
 
@@ -984,6 +995,8 @@ public class ModuleRegressionSourceTests
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
     }
 
+    private static string GetSourceDirectory([CallerFilePath] string sourceFile = "") => Path.GetDirectoryName(sourceFile) ?? Directory.GetCurrentDirectory();
+
     private static string FindRepoDirectory(string directoryName)
     {
         var startDirectories = new List<string>();
@@ -993,6 +1006,7 @@ public class ModuleRegressionSourceTests
             startDirectories.Add(configuredRoot);
         }
 
+        startDirectories.Add(GetSourceDirectory());
         startDirectories.Add(AppContext.BaseDirectory);
         startDirectories.Add(Directory.GetCurrentDirectory());
 
