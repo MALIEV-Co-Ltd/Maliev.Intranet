@@ -326,7 +326,7 @@
                 @if (_customer.Addresses.Count > 0)
                 {
                     <div class="customer-address-book-grid">
-                        @foreach (var address in _customer.Addresses.OrderByDescending(address => address.IsDefault).ThenBy(address => address.Type).ThenBy(address => AddressName(address, address.Type)))
+                        @foreach (var address in _customer.Addresses.OrderByDescending(IsCanonicalDefaultAddress).ThenBy(address => address.Type).ThenBy(address => AddressName(address, address.Type)))
                         {
                             <article class="customer-address-card">
                                 <div class="customer-address-card-head">
@@ -352,7 +352,7 @@
                                 </div>
 
                                 <div class="customer-address-card-footer">
-                                    @if (address.IsDefault)
+                                    @if (IsCanonicalDefaultAddress(address))
                                     {
                                         <span class="customer-default-chip">Default @address.Type.ToLowerInvariant()</span>
                                     }
@@ -865,13 +865,28 @@
     }
 
     private AddressResponse? BillingAddress =>
-        _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Billing") && address.IsDefault)
+        CanonicalDefaultAddress("Billing")
         ?? _customer?.CompanyBillingAddress
         ?? _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Billing"));
 
     private AddressResponse? ShippingAddress =>
-        _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping") && address.IsDefault)
+        CanonicalDefaultAddress("Shipping")
         ?? _customer?.Addresses.FirstOrDefault(address => IsAddressType(address, "Shipping"));
+
+    private AddressResponse? CanonicalDefaultAddress(string type) =>
+        _customer?.Addresses
+            .Where(address => IsAddressType(address, type) && address.IsDefault)
+            .OrderByDescending(address => address.UpdatedAt)
+            .ThenByDescending(address => address.CreatedAt)
+            .ThenByDescending(address => address.Id)
+            .FirstOrDefault();
+
+    private bool IsCanonicalDefaultAddress(AddressResponse address)
+    {
+        var canonical = CanonicalDefaultAddress(address.Type);
+        return canonical is not null &&
+            (ReferenceEquals(canonical, address) || canonical.Id != Guid.Empty && canonical.Id == address.Id);
+    }
 
     private IReadOnlyList<CustomerActivityResponse> ActivityFeed =>
         _activity.Count > 0

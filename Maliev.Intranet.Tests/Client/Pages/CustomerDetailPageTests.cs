@@ -21,6 +21,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly List<CustomerEmailRequest> _emailRequests = [];
     private readonly List<JsonDocument> _customerUpdatePayloads = [];
     private readonly List<JsonDocument> _addressCreatePayloads = [];
+    private bool _includeDuplicateDefaultBilling;
 
     public CustomerDetailPageTests()
     {
@@ -270,6 +271,25 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
 
         var address = _addressCreatePayloads.Single().RootElement.EnumerateArray().Single();
         Assert.Equal("Receiving Desk", address.GetProperty("recipientName").GetString());
+    }
+
+    [Fact]
+    public void CustomerDetail_AddressBookShowsOnlyOneDefaultPerAddressType()
+    {
+        _includeDuplicateDefaultBilling = true;
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        Assert.Contains("New billing counter", cut.Find(".customer-address-stack").TextContent);
+
+        cut.Find("button[data-tab='addresses']").Click();
+
+        var defaultBillingChips = cut.FindAll(".customer-default-chip")
+            .Where(chip => chip.TextContent.Contains("Default billing", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Single(defaultBillingChips);
+        Assert.Contains("Set default billing", cut.Markup);
     }
 
     [Fact]
@@ -647,6 +667,60 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         if (request.Method == HttpMethod.Get &&
             pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
         {
+            var addresses = new List<AddressResponse>
+            {
+                new()
+                {
+                    Id = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    Type = "Billing",
+                    CountryId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                    Xmin = 101,
+                    IsDefault = true,
+                    RecipientName = "HQ - Billing",
+                    AddressLine1 = "100 Tech Blvd",
+                    AddressLine2 = "Suite 400",
+                    City = "San Jose",
+                    StateProvince = "CA",
+                    PostalCode = "95128",
+                    CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new()
+                {
+                    Id = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                    Type = "Shipping",
+                    CountryId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                    Xmin = 102,
+                    IsDefault = true,
+                    RecipientName = "Manufacturing Dock",
+                    AddressLine1 = "2200 Industrial Pkwy",
+                    City = "Fremont",
+                    StateProvince = "CA",
+                    PostalCode = "94538",
+                    CreatedAt = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAt = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc)
+                }
+            };
+
+            if (_includeDuplicateDefaultBilling)
+            {
+                addresses.Add(new AddressResponse
+                {
+                    Id = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+                    Type = "Billing",
+                    CountryId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                    Xmin = 103,
+                    IsDefault = true,
+                    RecipientName = "New billing counter",
+                    AddressLine1 = "999 New Billing Street",
+                    City = "Bangkok",
+                    StateProvince = "Bangkok",
+                    PostalCode = "10510",
+                    CreatedAt = new DateTime(2026, 5, 17, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAt = new DateTime(2026, 5, 17, 0, 0, 0, DateTimeKind.Utc)
+                });
+            }
+
             return Json(new CustomerDetailDto
             {
                 Id = _customerId,
@@ -669,34 +743,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                 AccountManagerEmployeeId = _accountManagerId,
                 AccountManagerName = "Mia Wong",
                 CreatedByName = "Alex Kim",
-                Addresses =
-                [
-                    new AddressResponse
-                    {
-                        Type = "Billing",
-                        CountryId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
-                        Xmin = 101,
-                        IsDefault = true,
-                        RecipientName = "HQ - Billing",
-                        AddressLine1 = "100 Tech Blvd",
-                        AddressLine2 = "Suite 400",
-                        City = "San Jose",
-                        StateProvince = "CA",
-                        PostalCode = "95128"
-                    },
-                    new AddressResponse
-                    {
-                        Type = "Shipping",
-                        CountryId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
-                        Xmin = 102,
-                        IsDefault = true,
-                        RecipientName = "Manufacturing Dock",
-                        AddressLine1 = "2200 Industrial Pkwy",
-                        City = "Fremont",
-                        StateProvince = "CA",
-                        PostalCode = "94538"
-                    }
-                ],
+                Addresses = addresses,
                 Notes =
                 [
                     new InternalNoteResponse
