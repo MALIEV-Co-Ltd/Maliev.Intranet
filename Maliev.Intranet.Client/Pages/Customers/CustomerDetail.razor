@@ -68,10 +68,10 @@
                         </div>
                     </section>
 
-                    <section class="customer-panel">
+                    <section class="customer-panel customer-account-panel">
                         <SectionTitle Text="Account &amp; billing" />
-                        <div class="customer-form-grid">
-                            <label class="customer-field">
+                        <div class="customer-form-grid customer-account-grid">
+                            <label class="customer-field customer-account-manager-field">
                                 <span>Customer type</span>
                                 <select class="customer-input" @bind="_edit.CustomerType">
                                     <option>Company</option>
@@ -100,7 +100,7 @@
                                     }
                                 </select>
                             </label>
-                            <div class="customer-field customer-payment-terms-field">
+                            <div class="customer-field customer-payment-terms-field customer-account-payment-field">
                                 <span id="payment-terms-label">Payment terms</span>
                                 <div class="customer-payment-term-picker">
                                     <button type="button"

@@ -134,6 +134,21 @@
     cursor: default;
 }
 
+.customer-account-grid {
+    align-items: start;
+    gap: 14px 18px;
+}
+
+.customer-account-grid .customer-input,
+.customer-account-grid .customer-payment-term-trigger {
+    min-height: 42px;
+}
+
+.customer-account-manager-field,
+.customer-account-payment-field {
+    min-width: 0;
+}
+
 .customer-payment-terms-field {
     position: relative;
 }
@@ -158,11 +173,12 @@
 .customer-payment-term-trigger {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 28px;
+    grid-template-columns: minmax(0, 1fr) 32px;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
+    padding: 0 8px 0 0;
     border: 1px solid var(--maliev-border);
-    border-radius: 8px;
+    border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel-2);
     box-sizing: border-box;
     cursor: pointer;
@@ -186,6 +202,37 @@
 .customer-payment-term-chevron {
     justify-self: center;
     color: var(--maliev-muted);
+}
+
+.customer-payment-term-trigger .customer-payment-term-card {
+    min-height: 40px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: var(--maliev-radius-sm);
+    background: transparent;
+    box-shadow: none;
+}
+
+.customer-payment-term-trigger .customer-payment-term-card-head {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+}
+
+.customer-payment-term-trigger .customer-payment-term-card strong,
+.customer-payment-term-trigger .customer-payment-term-card-head span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.customer-payment-term-trigger .customer-payment-term-card-head span {
+    flex: 0 1 auto;
+    max-width: 46%;
+}
+
+.customer-payment-term-trigger .customer-payment-term-card p {
+    display: none;
 }
 
 .customer-payment-term-backdrop {

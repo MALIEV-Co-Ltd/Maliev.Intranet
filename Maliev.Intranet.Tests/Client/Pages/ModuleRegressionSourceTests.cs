@@ -215,12 +215,30 @@ public class ModuleRegressionSourceTests
     [Fact]
     public void CustomerDetail_PaymentTermOptionsStretchToMenuWidth()
     {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor.css");
         var normalizedStyles = styles.ReplaceLineEndings("\n");
+        var accountGridBlock = ExtractCssBlock(styles, ".customer-account-grid");
+        var accountControlBlock = ExtractCssBlock(styles, ".customer-account-grid .customer-input,");
         var pickerBlock = ExtractCssBlock(styles, ".customer-payment-term-picker");
+        var triggerBlock = ExtractCssBlock(styles, "\n.customer-payment-term-trigger {");
+        var triggerCardBlock = ExtractCssBlock(styles, "\n.customer-payment-term-trigger .customer-payment-term-card {");
+        var triggerParagraphBlock = ExtractCssBlock(styles, "\n.customer-payment-term-trigger .customer-payment-term-card p {");
         var menuBlock = ExtractCssBlock(styles, ".customer-payment-term-menu");
 
+        Assert.Contains("customer-panel customer-account-panel", source, StringComparison.Ordinal);
+        Assert.Contains("customer-form-grid customer-account-grid", source, StringComparison.Ordinal);
+        Assert.Contains("customer-field customer-account-manager-field", source, StringComparison.Ordinal);
+        Assert.Contains("customer-field customer-payment-terms-field customer-account-payment-field", source, StringComparison.Ordinal);
+        Assert.Contains("align-items: start;", accountGridBlock, StringComparison.Ordinal);
+        Assert.Contains("min-height: 42px;", accountControlBlock, StringComparison.Ordinal);
         Assert.Contains("width: 100%;", pickerBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr) 32px;", triggerBlock, StringComparison.Ordinal);
+        Assert.Contains("border-radius: var(--maliev-radius-sm);", triggerBlock, StringComparison.Ordinal);
+        Assert.Contains("min-height: 40px;", triggerCardBlock, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: none;", triggerCardBlock, StringComparison.Ordinal);
+        Assert.Contains("display: none;", triggerParagraphBlock, StringComparison.Ordinal);
+        Assert.Contains(".customer-payment-term-trigger .customer-payment-term-card strong,\n.customer-payment-term-trigger .customer-payment-term-card-head span {\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap;", normalizedStyles, StringComparison.Ordinal);
         Assert.Contains("justify-items: stretch;", menuBlock, StringComparison.Ordinal);
         Assert.Contains("box-sizing: border-box;", menuBlock, StringComparison.Ordinal);
         Assert.Contains(".customer-payment-term-option {\n    display: block;\n    box-sizing: border-box;", normalizedStyles, StringComparison.Ordinal);
