@@ -55,6 +55,9 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         Assert.Contains("FDM Printer 01", cut.Markup);
         Assert.Contains("JOB-2001", cut.Markup);
         Assert.Contains("HOLD-4001", cut.Markup);
+        Assert.Contains("Maintenance due", cut.Markup);
+        Assert.Contains("psb-slot-maintenance", cut.Markup);
+        Assert.Contains("> Maintenance</span>", cut.Markup);
         Assert.Contains("psb-slot-locked", cut.Markup);
         Assert.Contains("aria-disabled=\"true\"", cut.Markup);
         Assert.Contains("Move", cut.Markup);
@@ -190,6 +193,19 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
                             QueuePosition = 2,
                             Status = "InProduction",
                             Label = "JOB-LOCKED",
+                            CanMove = false
+                        },
+                        new ProductionScheduleSlotDto
+                        {
+                            SlotId = Guid.Parse("77777777-8888-9999-aaaa-bbbbbbbbbbbb"),
+                            MachineId = "CNC-01",
+                            MachineName = "CNC Mill 01",
+                            Technology = "CNC_MILL",
+                            ScheduledStart = rangeStart.AddDays(2),
+                            ScheduledEnd = rangeStart.AddDays(3),
+                            Status = "Maintenance",
+                            Label = "Maintenance due",
+                            IsMaintenance = true,
                             CanMove = false
                         }
                     ]

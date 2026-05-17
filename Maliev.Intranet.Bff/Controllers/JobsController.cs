@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -244,8 +247,10 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         var rangeFrom = DateTime.SpecifyKind(from ?? DateTime.UtcNow.Date, DateTimeKind.Utc);
         var rangeTo = DateTime.SpecifyKind(to ?? DateTime.UtcNow.Date.AddDays(7), DateTimeKind.Utc);
 
-        var equipment = await facilityClient.GetEquipmentsAsync(status: "Active", pageSize: 200, ct: ct);
-        var machines = equipment?.Items ?? [];
+        var equipment = await facilityClient.GetEquipmentsAsync(pageSize: 200, ct: ct);
+        var machines = (equipment?.Items ?? [])
+            .Where(IsProductionScheduleMachine)
+            .ToList();
         var machineIds = machines.Select(machine => machine.AssetCode).Where(code => !string.IsNullOrWhiteSpace(code)).ToList();
         var technologies = machines.Select(machine => MapEquipmentCategoryToTechnology(machine.Category)).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var scheduleGroups = await client.GetScheduleAsync(rangeFrom, rangeTo, machineIds, technologies, ct);
@@ -322,19 +327,53 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
                 .Select(machine =>
                 {
                     scheduleByMachine.TryGetValue(machine.AssetCode, out var slots);
+                    var mappedSlots = (slots ?? [])
+                        .Select(slot => MapScheduleSlot(machine, slot, currentProjectId: null, partFileNames: null))
+                        .ToList();
+                    mappedSlots.AddRange(BuildMaintenanceSlots(machine, rangeFrom, rangeTo));
+
                     return new ProductionScheduleMachineDto
                     {
                         MachineId = machine.AssetCode,
                         MachineName = machine.Name,
                         Category = machine.Category,
                         Technology = MapEquipmentCategoryToTechnology(machine.Category),
-                        Slots = (slots ?? [])
+                        Slots = mappedSlots
                             .OrderBy(slot => slot.ScheduledStart)
-                            .Select(slot => MapScheduleSlot(machine, slot, currentProjectId: null, partFileNames: null))
+                            .ThenBy(slot => slot.IsMaintenance ? 0 : 1)
                             .ToList()
                     };
                 })
                 .ToList()
+        };
+    }
+
+    private static IEnumerable<ProductionScheduleSlotDto> BuildMaintenanceSlots(
+        EquipmentSummaryDto machine,
+        DateTime rangeFrom,
+        DateTime rangeTo)
+    {
+        if (machine.NextServiceDueDate is not { } dueDate)
+            yield break;
+
+        var scheduledStart = dueDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var scheduledEnd = scheduledStart.AddDays(1);
+        if (scheduledEnd <= rangeFrom || scheduledStart >= rangeTo)
+            yield break;
+
+        yield return new ProductionScheduleSlotDto
+        {
+            SlotId = CreateMaintenanceSlotId(machine.Id, dueDate),
+            MachineId = machine.AssetCode,
+            MachineName = machine.Name,
+            Technology = MapEquipmentCategoryToTechnology(machine.Category),
+            ScheduledStart = scheduledStart,
+            ScheduledEnd = scheduledEnd,
+            Status = "Maintenance",
+            Label = "Maintenance due",
+            FileName = FirstNonEmpty(machine.ModelName, machine.Brand, machine.Name),
+            IsMaintenance = true,
+            CanMove = false
         };
     }
 
@@ -374,6 +413,25 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
             CanMove = slot.IsHold || string.Equals(slot.Status, "Queued", StringComparison.OrdinalIgnoreCase)
         };
     }
+
+    private static bool IsProductionScheduleMachine(EquipmentSummaryDto machine) =>
+        !string.IsNullOrWhiteSpace(machine.AssetCode)
+        && !string.IsNullOrWhiteSpace(MapEquipmentCategoryToTechnology(machine.Category))
+        && !IsTerminalEquipmentStatus(machine.Status);
+
+    private static bool IsTerminalEquipmentStatus(string? status) =>
+        string.Equals(status, "Lost", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(status, "Decommissioned", StringComparison.OrdinalIgnoreCase);
+
+    private static Guid CreateMaintenanceSlotId(Guid equipmentId, DateOnly dueDate)
+    {
+        var source = $"{equipmentId:N}:{dueDate:yyyyMMdd}:maintenance";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(source));
+        return new Guid(hash.AsSpan(0, 16));
+    }
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
 
     private static string MapEquipmentCategoryToTechnology(string? category) => category switch
     {

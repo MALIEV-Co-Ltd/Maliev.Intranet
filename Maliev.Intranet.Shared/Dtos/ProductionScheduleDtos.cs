@@ -98,6 +98,9 @@ public sealed class ProductionScheduleSlotDto
     /// <summary>Gets or sets a value indicating whether this slot is a calculated proposal.</summary>
     public bool IsProposed { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether this slot represents planned equipment maintenance.</summary>
+    public bool IsMaintenance { get; set; }
+
     /// <summary>Gets or sets a value indicating whether this slot belongs to the current project context.</summary>
     public bool IsCurrentProject { get; set; }
 

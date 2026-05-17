@@ -188,6 +188,10 @@
     background: #0f766e;
 }
 
+.psb-legend .maintenance {
+    background: #b45309;
+}
+
 .psb-legend .proposed {
     border-style: dashed;
     border-color: #2563eb;
@@ -436,6 +440,11 @@
     background: #0f766e;
 }
 
+.psb-slot-maintenance {
+    border-color: #92400e;
+    background: #b45309;
+}
+
 .psb-slot-proposed {
     border-color: #2563eb;
     border-style: dashed;
@@ -455,6 +464,11 @@
 .psb-slot-locked {
     background: #94a3b8;
     cursor: not-allowed;
+}
+
+.psb-slot-maintenance.psb-slot-locked {
+    border-color: #92400e;
+    background: #b45309;
 }
 
 .psb-slot-move {

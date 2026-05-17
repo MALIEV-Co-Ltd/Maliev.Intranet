@@ -75,6 +75,7 @@
     <div class="psb-legend" aria-label="Schedule legend">
         <span><i class="job"></i> Job</span>
         <span><i class="hold"></i> Planning hold</span>
+        <span><i class="maintenance"></i> Maintenance</span>
         <span><i class="proposed"></i> Proposed slot</span>
         <span><i class="locked"></i> Locked</span>
         <span><i class="current"></i> Current project</span>
@@ -376,7 +377,7 @@
     private string SlotClass(ProductionScheduleSlotDto slot)
     {
         var classes = new List<string> { "psb-slot" };
-        classes.Add(slot.IsProposed ? "psb-slot-proposed" : slot.IsHold ? "psb-slot-hold" : "psb-slot-job");
+        classes.Add(slot.IsMaintenance ? "psb-slot-maintenance" : slot.IsProposed ? "psb-slot-proposed" : slot.IsHold ? "psb-slot-hold" : "psb-slot-job");
 
         if (slot.IsCurrentProject)
             classes.Add("psb-slot-current-project");
@@ -531,6 +532,9 @@
 
     private static bool IsLocked(ProductionScheduleSlotDto slot)
     {
+        if (slot.IsMaintenance)
+            return true;
+
         if (slot.IsProposed)
             return false;
 
@@ -548,7 +552,7 @@
         FirstNonEmpty(slot.Label, slot.FileName, FormatShortId(slot.JobId), FormatShortId(slot.HoldId), "Slot");
 
     private static string SlotAriaLabel(ProductionScheduleSlotDto slot) =>
-        $"{(slot.IsProposed ? "Proposed slot" : slot.IsHold ? "Planning hold" : "Job")} {SlotLabel(slot)} on {slot.MachineName}";
+        $"{(slot.IsMaintenance ? "Maintenance" : slot.IsProposed ? "Proposed slot" : slot.IsHold ? "Planning hold" : "Job")} {SlotLabel(slot)} on {slot.MachineName}";
 
     private static string FormatSlotTime(ProductionScheduleSlotDto slot) =>
         $"{NormalizeUtc(slot.ScheduledStart).ToLocalTime():MMM d HH:mm} - {NormalizeUtc(slot.ScheduledEnd).ToLocalTime():HH:mm}";

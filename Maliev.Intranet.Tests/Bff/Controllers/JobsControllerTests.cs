@@ -231,6 +231,8 @@ public class JobsControllerTests
         var projectId = Guid.NewGuid();
         var partId = Guid.NewGuid();
         var start = DateTime.UtcNow.Date.AddDays(1);
+        var maintenanceDueDate = DateOnly.FromDateTime(start.AddDays(2));
+        string? capturedFacilityUrl = null;
         string? capturedScheduleUrl = null;
         var jobHandler = new MockHttpMessageHandler((req, _) =>
         {
@@ -266,8 +268,10 @@ public class JobsControllerTests
                 })
             });
         });
-        var facilityHandler = new MockHttpMessageHandler((_, _) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        var facilityHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            capturedFacilityUrl = req.RequestUri!.ToString();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(new FacilityPagedResult<EquipmentSummaryDto>
                 {
@@ -287,14 +291,16 @@ public class JobsControllerTests
                             AssetCode = "MAL-CNC-001",
                             Name = "HAAS VF2",
                             Category = "CncMachine",
-                            Status = "Active"
+                            Status = "UnderMaintenance",
+                            NextServiceDueDate = maintenanceDueDate
                         }
                     ],
                     TotalCount = 2,
                     Page = 1,
                     PageSize = 200
                 })
-            }));
+            });
+        });
         var controller = Make(new JobServiceClient(new HttpClient(jobHandler) { BaseAddress = new Uri("http://test") }));
         var facilityClient = new FacilityServiceClient(new HttpClient(facilityHandler) { BaseAddress = new Uri("http://test") });
 
@@ -305,6 +311,14 @@ public class JobsControllerTests
         Assert.Contains(board.Machines, machine => machine.MachineId == "MAL-FDM-001");
         var cncMachine = Assert.Single(board.Machines, machine => machine.MachineId == "MAL-CNC-001");
         Assert.Contains(cncMachine.Slots, slot => slot.HoldId == holdId && slot.ProjectId == projectId && slot.ProjectPartId == partId);
+        var maintenance = Assert.Single(cncMachine.Slots, slot => slot.IsMaintenance);
+        Assert.Equal("Maintenance due", maintenance.Label);
+        Assert.Equal("Maintenance", maintenance.Status);
+        Assert.False(maintenance.CanMove);
+        Assert.Equal(maintenanceDueDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), maintenance.ScheduledStart);
+        Assert.Equal(maintenanceDueDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), maintenance.ScheduledEnd);
+        Assert.NotNull(capturedFacilityUrl);
+        Assert.DoesNotContain("status=Active", capturedFacilityUrl);
         Assert.Contains("machineIds=MAL-FDM-001", capturedScheduleUrl);
         Assert.Contains("machineIds=MAL-CNC-001", capturedScheduleUrl);
     }

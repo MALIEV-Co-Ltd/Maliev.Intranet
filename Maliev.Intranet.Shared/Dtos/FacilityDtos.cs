@@ -35,6 +35,9 @@ public class EquipmentSummaryDto
     /// <summary>Gets or sets the purchase price in Thai Baht.</summary>
     public decimal? PurchasePriceTHB { get; set; }
 
+    /// <summary>Gets or sets the next scheduled service date for planned maintenance.</summary>
+    public DateOnly? NextServiceDueDate { get; set; }
+
     /// <summary>Gets or sets the timestamp when the equipment record was last updated (UTC).</summary>
     public DateTime UpdatedAt { get; set; }
 }
