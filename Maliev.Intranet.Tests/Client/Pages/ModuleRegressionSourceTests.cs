@@ -430,11 +430,20 @@ public class ModuleRegressionSourceTests
         Assert.Contains("/maintenance", detail, StringComparison.Ordinal);
         Assert.Contains("/loans", detail, StringComparison.Ordinal);
         Assert.Contains("/attachments", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("PanelCard Title=\"Add note\"", detail, StringComparison.Ordinal);
+        Assert.Contains("PanelCard Title=\"Notes\"", detail, StringComparison.Ordinal);
+        Assert.Contains("equipment-note-composer", detail, StringComparison.Ordinal);
+        Assert.Contains("equipment-notes-list", detail, StringComparison.Ordinal);
+        Assert.True(
+            detail.IndexOf("PanelCard Title=\"Notes\"", StringComparison.Ordinal) < detail.IndexOf("PanelCard Title=\"Maintenance\"", StringComparison.Ordinal),
+            "Equipment notes should be grouped with the note composer near the equipment summary instead of being split into a bottom-only history panel.");
         Assert.Contains("<InputFile OnChange=\"OnMaintenanceFilesSelected\" multiple", detail, StringComparison.Ordinal);
         Assert.Contains("MultipartFormDataContent", detail, StringComparison.Ordinal);
         Assert.Contains("maintenance-document-list", detail, StringComparison.Ordinal);
         Assert.Contains("OpenMaintenanceDocumentAsync", detail, StringComparison.Ordinal);
         Assert.Contains("api/v1/equipments/{Id}/maintenance/download-url", detail, StringComparison.Ordinal);
+        Assert.Contains(".equipment-note-composer", detailStyles, StringComparison.Ordinal);
+        Assert.Contains(".equipment-notes-list", detailStyles, StringComparison.Ordinal);
         Assert.Contains(".maintenance-document-list", detailStyles, StringComparison.Ordinal);
         Assert.Contains(".maintenance-file-input", detailStyles, StringComparison.Ordinal);
         Assert.Contains("public List<MaintenanceLogDocumentDto> Documents { get; set; } = [];", facilityDtos, StringComparison.Ordinal);

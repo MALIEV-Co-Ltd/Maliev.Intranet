@@ -46,11 +46,29 @@
                     </dl>
                 </PanelCard>
 
-                <PanelCard Title="Add note">
-                    <textarea class="mlv-form-textarea" @bind="_newNote" @bind:event="oninput" placeholder="Maintenance observation, operating issue, or asset note"></textarea>
-                    <div class="mlv-toolbar mt-3" style="justify-content:flex-end">
-                        <PrimaryButton Icon="@Icons.Material.Outlined.NoteAdd" OnClick="@AddNoteAsync">Add Note</PrimaryButton>
+                <PanelCard Title="Notes">
+                    <div class="equipment-note-composer">
+                        <textarea class="mlv-form-textarea" @bind="_newNote" @bind:event="oninput" placeholder="Maintenance observation, operating issue, or asset note"></textarea>
+                        <div class="mlv-toolbar" style="justify-content:flex-end">
+                            <PrimaryButton Icon="@Icons.Material.Outlined.NoteAdd" OnClick="@AddNoteAsync">Add Note</PrimaryButton>
+                        </div>
                     </div>
+                    @if (_notes.Count > 0)
+                    {
+                        <div class="mlv-list equipment-notes-list">
+                            @foreach (var note in _notes)
+                            {
+                                <div class="mlv-list-row">
+                                    <div>@note.Content</div>
+                                    <div class="mlv-row-sub">@note.CreatedAt.ToString("dd MMM yyyy HH:mm")</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty equipment-note-empty">No notes.</div>
+                    }
                 </PanelCard>
             </div>
 
@@ -180,24 +198,6 @@
                 </PanelCard>
             </div>
 
-            <PanelCard Title="Notes" Class="mt-4">
-                @if (_notes.Count > 0)
-                {
-                    <div class="mlv-list">
-                        @foreach (var note in _notes)
-                        {
-                            <div class="mlv-list-row">
-                                <div>@note.Content</div>
-                                <div class="mlv-row-sub">@note.CreatedAt.ToString("dd MMM yyyy HH:mm")</div>
-                            </div>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <div class="mlv-empty">No notes.</div>
-                }
-            </PanelCard>
         }
     </PageBody>
 </div>
