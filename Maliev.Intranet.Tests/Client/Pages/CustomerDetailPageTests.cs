@@ -1,3 +1,4 @@
+using AngleSharp.Dom;
 using Bunit;
 using Maliev.Intranet.Client.Pages.Customers;
 using Maliev.Intranet.Shared;
@@ -19,6 +20,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly List<string> _requestedPaths = [];
     private readonly List<CustomerEmailRequest> _emailRequests = [];
     private readonly List<JsonDocument> _customerUpdatePayloads = [];
+    private readonly List<JsonDocument> _addressCreatePayloads = [];
 
     public CustomerDetailPageTests()
     {
@@ -238,6 +240,36 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                 path.Contains("United%20States", StringComparison.Ordinal));
             Assert.Contains("Khlong Khoi, Pak Kret, Nonthaburi, Thailand", cut.Markup);
         });
+    }
+
+    [Fact]
+    public void CustomerDetail_AddAddressDefaultsRecipientFromCustomerAndPreservesManualEdit()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='addresses']").Click();
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Add address", StringComparison.Ordinal))
+            .Click();
+
+        IElement ModalInput(int index) => cut.Find(".customer-modal-address")
+            .QuerySelectorAll("input.customer-input")
+            .ToList()[index];
+
+        Assert.Equal("Sarah Chen", ModalInput(0).GetAttribute("value"));
+
+        ModalInput(0).Input("Receiving Desk");
+        ModalInput(1).Input("500 Warehouse Lane");
+        ModalInput(3).Input("Bangkok");
+        ModalInput(5).Input("Bangkok");
+        ModalInput(6).Input("10510");
+        cut.Find(".customer-modal-address .mlv-modal-actions .mlv-button.primary").Click();
+
+        cut.WaitForAssertion(() => Assert.Single(_addressCreatePayloads));
+
+        var address = _addressCreatePayloads.Single().RootElement.EnumerateArray().Single();
+        Assert.Equal("Receiving Desk", address.GetProperty("recipientName").GetString());
     }
 
     [Fact]
@@ -650,6 +682,31 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                 Email = "sarah@axion.io",
                 PaymentTerms = "Net 45",
                 Xmin = 204
+            });
+        }
+
+        if (request.Method == HttpMethod.Post &&
+            pathAndQuery.Equals($"/api/v1/customers/{_customerId}/addresses", StringComparison.Ordinal))
+        {
+            var payload = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? "[]";
+            _addressCreatePayloads.Add(JsonDocument.Parse(payload));
+
+            return Json(new List<AddressResponse>
+            {
+                new()
+                {
+                    Id = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                    OwnerType = "Customer",
+                    OwnerId = _customerId,
+                    Type = "Billing",
+                    IsDefault = true,
+                    RecipientName = "Receiving Desk",
+                    AddressLine1 = "500 Warehouse Lane",
+                    City = "Bangkok",
+                    StateProvince = "Bangkok",
+                    PostalCode = "10510",
+                    CountryId = Guid.Parse("44444444-4444-4444-4444-444444444444")
+                }
             });
         }
 

@@ -1195,7 +1195,9 @@
 
     private Task OpenAddAddressAsync(MouseEventArgs _)
     {
-        _addressEdit = AddressEditModel.Create(_customer?.Addresses.FirstOrDefault()?.CountryId ?? DefaultCountryId());
+        _addressEdit = AddressEditModel.Create(
+            _customer?.Addresses.FirstOrDefault()?.CountryId ?? DefaultCountryId(),
+            DefaultAddressRecipientName());
         ResetAddressLookupState();
         return Task.CompletedTask;
     }
@@ -1837,6 +1839,35 @@
     private static string AddressName(AddressResponse address, string fallback) =>
         string.IsNullOrWhiteSpace(address.RecipientName) ? fallback : address.RecipientName;
 
+    private string DefaultAddressRecipientName()
+    {
+        if (!string.IsNullOrWhiteSpace(_edit?.FullName))
+        {
+            return _edit.FullName.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_customer?.Name))
+        {
+            return _customer.Name.Trim();
+        }
+
+        var nameParts = new[] { _customer?.FirstName, _customer?.LastName }
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .Select(part => part!.Trim());
+        var fullName = string.Join(" ", nameParts);
+        if (!string.IsNullOrWhiteSpace(fullName))
+        {
+            return fullName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_customer?.CompanyName))
+        {
+            return _customer.CompanyName.Trim();
+        }
+
+        return _customer?.Email?.Trim() ?? string.Empty;
+    }
+
     private static IReadOnlyList<string> FormatAddressLines(AddressResponse address)
     {
         var street = string.Join(", ", new[] { address.AddressLine1, address.AddressLine2, address.AddressLine3 }
@@ -2153,8 +2184,9 @@
         public byte[] Version { get; set; } = [];
         public uint Xmin { get; set; }
 
-        public static AddressEditModel Create(Guid countryId) => new()
+        public static AddressEditModel Create(Guid countryId, string recipientName) => new()
         {
+            Label = recipientName,
             CountryId = countryId,
             IsDefault = true
         };
