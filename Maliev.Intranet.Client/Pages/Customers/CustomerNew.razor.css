@@ -8,6 +8,10 @@
 .customer-create-page {
     --customer-field-height: 36px;
     --ai-extraction-surface-min-height: 132px;
+    --ai-dropzone-cyan: #0891b2;
+    --ai-dropzone-blue: #2563eb;
+    --ai-dropzone-violet: #7c3aed;
+    --ai-dropzone-fuchsia: #c026d3;
 }
 
 .customer-create-main,
@@ -99,6 +103,7 @@
     display: grid;
     gap: 0.65rem;
     align-content: start;
+    padding-top: calc(var(--mud-typography-caption-size) + 0.35rem);
 }
 
 ::deep .ai-text-input,
@@ -136,12 +141,6 @@
 ::deep .ai-file-upload .mud-chip,
 .ai-file-column ::deep .mud-chip {
     display: none !important;
-}
-
-.ai-dropzone {
-    min-height: var(--ai-extraction-surface-min-height);
-    justify-content: center;
-    padding: 1rem 1.1rem;
 }
 
 .ai-selected-files {
@@ -497,6 +496,70 @@
     color: var(--maliev-text-muted);
     white-space: normal;
     overflow-wrap: anywhere;
+}
+
+.document-dropzone.ai-dropzone {
+    min-height: var(--ai-extraction-surface-min-height);
+    height: var(--ai-extraction-surface-min-height);
+    justify-content: center;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 1rem 1.2rem;
+    border: 1px dashed color-mix(in oklch, var(--ai-dropzone-cyan) 42%, var(--ai-dropzone-violet));
+    background:
+        linear-gradient(135deg,
+            color-mix(in oklch, var(--ai-dropzone-cyan) 18%, var(--mud-palette-surface)) 0%,
+            color-mix(in oklch, var(--ai-dropzone-blue) 14%, var(--mud-palette-surface)) 42%,
+            color-mix(in oklch, var(--ai-dropzone-violet) 15%, var(--mud-palette-surface)) 72%,
+            color-mix(in oklch, var(--ai-dropzone-fuchsia) 10%, var(--mud-palette-surface)) 100%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in oklch, var(--ai-dropzone-cyan) 18%, transparent),
+        0 10px 24px color-mix(in oklch, var(--ai-dropzone-blue) 10%, transparent);
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.document-dropzone.ai-dropzone:hover,
+.document-dropzone.ai-dropzone:focus-visible {
+    border-color: color-mix(in oklch, var(--ai-dropzone-fuchsia) 46%, var(--ai-dropzone-cyan));
+    background:
+        linear-gradient(135deg,
+            color-mix(in oklch, var(--ai-dropzone-cyan) 24%, var(--mud-palette-surface)) 0%,
+            color-mix(in oklch, var(--ai-dropzone-blue) 18%, var(--mud-palette-surface)) 40%,
+            color-mix(in oklch, var(--ai-dropzone-violet) 20%, var(--mud-palette-surface)) 72%,
+            color-mix(in oklch, var(--ai-dropzone-fuchsia) 15%, var(--mud-palette-surface)) 100%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in oklch, var(--ai-dropzone-fuchsia) 18%, transparent),
+        0 12px 28px color-mix(in oklch, var(--ai-dropzone-violet) 14%, transparent);
+}
+
+.document-dropzone.ai-dropzone:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
+}
+
+.document-dropzone.ai-dropzone .mud-icon-root {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0.45rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--ai-dropzone-cyan), var(--ai-dropzone-violet) 58%, var(--ai-dropzone-fuchsia));
+    color: white;
+    font-size: 1.35rem;
+    box-shadow: 0 8px 20px color-mix(in oklch, var(--ai-dropzone-violet) 24%, transparent);
+}
+
+.document-dropzone.ai-dropzone span {
+    gap: 0.15rem;
+}
+
+.document-dropzone.ai-dropzone strong {
+    color: var(--maliev-text);
+    font-weight: 800;
+}
+
+.document-dropzone.ai-dropzone small {
+    color: color-mix(in oklch, var(--ai-dropzone-blue) 38%, var(--maliev-text-muted));
 }
 
 ::deep .document-file-upload .mud-chipset,
@@ -890,6 +953,10 @@
     .customer-create-layout,
     .ai-intake {
         grid-template-columns: 1fr;
+    }
+
+    .ai-file-column {
+        padding-top: 0;
     }
 
     .customer-create-side {

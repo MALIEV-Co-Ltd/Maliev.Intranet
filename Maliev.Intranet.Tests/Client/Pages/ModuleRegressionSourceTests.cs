@@ -548,6 +548,7 @@ public class ModuleRegressionSourceTests
     {
         var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor.css");
+        var responsiveStyles = styles[styles.IndexOf("@media (max-width: 1100px)", StringComparison.Ordinal)..];
 
         Assert.Contains("<label class=\"ai-text-label\" for=\"customer-extraction-text\">Paste customer text</label>", page, StringComparison.Ordinal);
         Assert.Contains("InputId=\"customer-extraction-text\"", page, StringComparison.Ordinal);
@@ -561,9 +562,18 @@ public class ModuleRegressionSourceTests
         Assert.Contains("gap: 0.75rem;", ExtractCssBlock(styles, ".ai-intake {"), StringComparison.Ordinal);
         Assert.Contains("gap: 0.35rem;", ExtractCssBlock(styles, ".ai-text-column {"), StringComparison.Ordinal);
         Assert.Contains("font-size: var(--mud-typography-caption-size);", ExtractCssBlock(styles, ".ai-text-label"), StringComparison.Ordinal);
+        Assert.Contains("padding-top: calc(var(--mud-typography-caption-size) + 0.35rem);", styles, StringComparison.Ordinal);
         Assert.Contains("min-height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, "::deep .ai-text-input .mud-input {"), StringComparison.Ordinal);
         Assert.Contains("padding: 0.95rem 1rem !important;", ExtractCssBlock(styles, "::deep .ai-text-input textarea.mud-input-slot {"), StringComparison.Ordinal);
-        Assert.Contains("min-height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, ".ai-dropzone"), StringComparison.Ordinal);
+        Assert.Contains("--ai-dropzone-cyan: #0891b2;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);
+        Assert.Contains("--ai-dropzone-fuchsia: #c026d3;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);
+        Assert.Contains("min-height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, ".document-dropzone.ai-dropzone {"), StringComparison.Ordinal);
+        Assert.Contains("height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, ".document-dropzone.ai-dropzone {"), StringComparison.Ordinal);
+        Assert.Contains("var(--ai-dropzone-cyan)", ExtractCssBlock(styles, ".document-dropzone.ai-dropzone {"), StringComparison.Ordinal);
+        Assert.Contains("var(--ai-dropzone-fuchsia)", ExtractCssBlock(styles, ".document-dropzone.ai-dropzone {"), StringComparison.Ordinal);
+        Assert.Contains("background: linear-gradient(135deg, var(--ai-dropzone-cyan), var(--ai-dropzone-violet) 58%, var(--ai-dropzone-fuchsia));", ExtractCssBlock(styles, ".document-dropzone.ai-dropzone .mud-icon-root"), StringComparison.Ordinal);
+        Assert.Contains(".document-dropzone.ai-dropzone:hover,", styles, StringComparison.Ordinal);
+        Assert.Contains("padding-top: 0;", ExtractCssBlock(responsiveStyles, ".ai-file-column {"), StringComparison.Ordinal);
     }
 
     [Fact]
