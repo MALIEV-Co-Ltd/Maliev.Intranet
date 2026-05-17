@@ -325,11 +325,12 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
     /// <summary>
     /// Gets activity history for a customer with pagination or skip/take.
     /// </summary>
-    public virtual async Task<PagedResponse<CustomerActivityResponse>> GetCustomerActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken ct = default)
+    public virtual async Task<PagedResponse<CustomerActivityResponse>> GetCustomerActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, string? search = null, CancellationToken ct = default)
     {
         var url = $"/customer/v1/customers/{id}/history?page={page}&pageSize={pageSize}";
         if (skip.HasValue) url += $"&skip={skip.Value}";
         if (take.HasValue) url += $"&take={take.Value}";
+        if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search.Trim())}";
 
         var response = await httpClient.GetFromJsonAsync<CustomerServicePaginatedResponse<CustomerActivityResponse>>(url, ct);
         if (response == null) return new PagedResponse<CustomerActivityResponse>();

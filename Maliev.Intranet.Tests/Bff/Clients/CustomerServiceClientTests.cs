@@ -72,6 +72,45 @@ public class CustomerServiceClientTests
     }
 
     [Fact]
+    public async Task GetCustomerActivityAsync_WithSearch_ForwardsEscapedSearchQuery()
+    {
+        var customerId = Guid.NewGuid();
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            Assert.Equal($"/customer/v1/customers/{customerId}/history?page=2&pageSize=10&search=internal%20note", request.RequestUri!.PathAndQuery);
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    items = new[]
+                    {
+                        new CustomerActivityResponse
+                        {
+                            Action = "Create",
+                            Description = "Added an internal note",
+                            Timestamp = DateTime.UtcNow
+                        }
+                    },
+                    totalCount = 1,
+                    page = 2,
+                    pageSize = 10,
+                    totalPages = 3
+                })
+            });
+        });
+        var client = new CustomerServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }, new Mock<ILogger<CustomerServiceClient>>().Object);
+
+        var result = await client.GetCustomerActivityAsync(customerId, page: 2, pageSize: 10, search: "internal note");
+
+        Assert.Equal(2, result.Meta.CurrentPage);
+        Assert.Equal(10, result.Meta.PageSize);
+        Assert.Equal(1, result.Meta.TotalItems);
+        Assert.Equal(3, result.Meta.TotalPages);
+        Assert.Single(result.Data);
+    }
+
+    [Fact]
     public async Task CreateCustomerBasicAsync_ShouldWork()
     {
         var request = new CustomerOnboardingRequest

@@ -185,6 +185,41 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CustomerDetail_ActivityTrail_RendersSearchAndPaginationControls()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='activity']").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Audit trail (3)", cut.Markup));
+        Assert.Contains("Search audit trail...", cut.Markup);
+        Assert.Contains("customer-activity-search-button", cut.Markup);
+        Assert.Contains("Rows", cut.Markup);
+        Assert.Contains("1-3 of 3", cut.Markup);
+    }
+
+    [Fact]
+    public void CustomerDetail_ActivityTrail_SearchesHistoryEndpoint()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='activity']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Audit trail (3)", cut.Markup));
+        cut.Find(".customer-activity-search input").Input("profile");
+        cut.Find(".customer-activity-search-button").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedPaths, path => path.Equals($"/api/v1/customers/{_customerId}/history?page=1&pageSize=20&search=profile", StringComparison.Ordinal));
+            Assert.Contains("Customer profile update", cut.Markup);
+            Assert.DoesNotContain("Order Q-2026-098 paid", cut.Markup);
+            Assert.Contains("1-2 of 2", cut.Markup);
+        });
+    }
+
+    [Fact]
     public void CustomerDetail_TabsRenderConsistentDetailSections()
     {
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
@@ -523,35 +558,65 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
 
         if (pathAndQuery.StartsWith($"/api/v1/customers/{_customerId}/history", StringComparison.Ordinal))
         {
+            var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri?.Query ?? string.Empty);
+            var search = query.Get("search");
+            var page = int.TryParse(query.Get("page"), out var parsedPage) ? parsedPage : 1;
+            var pageSize = int.TryParse(query.Get("pageSize"), out var parsedPageSize) ? parsedPageSize : 20;
+            var activity = new List<CustomerActivityResponse>
+            {
+                new()
+                {
+                    Action = "OrderPaid",
+                    Description = "Order Q-2026-098 paid",
+                    ActorName = "System",
+                    Timestamp = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
+                },
+                new()
+                {
+                    Action = "Update",
+                    Description = "Customer profile update: changed companyid from '**db741b8f-67cf-40ba-8db8-5b899ad80001**' to '**efdd1db7-7225-4c40-914f-83dc3af80002**'",
+                    ActorName = "Natthapol Vanasrivilai",
+                    Timestamp = new DateTime(2026, 5, 4, 5, 48, 0, DateTimeKind.Utc),
+                    Details = "{\"CompanyId\":\"efdd1db7-7225-4c40-914f-83dc3af80002\"}"
+                },
+                new()
+                {
+                    Action = "Update",
+                    Description = $"Customer profile update: set accountmanageremployeeid to '**{_accountManagerId}**'",
+                    ActorName = "Natthapol Vanasrivilai",
+                    Timestamp = new DateTime(2026, 5, 6, 3, 29, 0, DateTimeKind.Utc),
+                    Details = $"{{\"AccountManagerEmployeeId\":\"{_accountManagerId}\"}}"
+                }
+            };
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var searchTerm = search.Trim();
+                activity = activity
+                    .Where(item =>
+                        item.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        item.Action.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        item.ActorName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true)
+                    .ToList();
+            }
+
+            var totalCount = activity.Count;
+            var pagedActivity = activity
+                .Skip((Math.Max(1, page) - 1) * Math.Max(1, pageSize))
+                .Take(Math.Max(1, pageSize))
+                .ToList();
+
             return Json(new PagedResponse<CustomerActivityResponse>
             {
-                Data =
-                [
-                    new CustomerActivityResponse
-                    {
-                        Action = "OrderPaid",
-                        Description = "Order Q-2026-098 paid",
-                        ActorName = "System",
-                        Timestamp = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
-                    },
-                    new CustomerActivityResponse
-                    {
-                        Action = "Update",
-                        Description = "Customer profile update: changed companyid from '**db741b8f-67cf-40ba-8db8-5b899ad80001**' to '**efdd1db7-7225-4c40-914f-83dc3af80002**'",
-                        ActorName = "Natthapol Vanasrivilai",
-                        Timestamp = new DateTime(2026, 5, 4, 5, 48, 0, DateTimeKind.Utc),
-                        Details = "{\"CompanyId\":\"efdd1db7-7225-4c40-914f-83dc3af80002\"}"
-                    },
-                    new CustomerActivityResponse
-                    {
-                        Action = "Update",
-                        Description = $"Customer profile update: set accountmanageremployeeid to '**{_accountManagerId}**'",
-                        ActorName = "Natthapol Vanasrivilai",
-                        Timestamp = new DateTime(2026, 5, 6, 3, 29, 0, DateTimeKind.Utc),
-                        Details = $"{{\"AccountManagerEmployeeId\":\"{_accountManagerId}\"}}"
-                    }
-                ],
-                Meta = new PaginationMeta { CurrentPage = 1, PageSize = 8, TotalCount = 3, TotalItems = 3, TotalPages = 1 }
+                Data = pagedActivity,
+                Meta = new PaginationMeta
+                {
+                    CurrentPage = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                    TotalItems = totalCount,
+                    TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling((double)totalCount / Math.Max(1, pageSize))
+                }
             });
         }
 

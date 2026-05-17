@@ -92,6 +92,35 @@ public class CustomersControllerTests
     }
 
     [Fact]
+    public async Task GetHistory_ForwardsPaginationAndSearch()
+    {
+        var customerId = Guid.NewGuid();
+        var response = new PagedResponse<CustomerActivityResponse>();
+        _customerClientMock.Setup(x => x.GetCustomerActivityAsync(
+                customerId,
+                null,
+                null,
+                2,
+                10,
+                "internal note",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+
+        var result = await _controller.GetHistory(customerId, page: 2, pageSize: 10, search: "internal note", ct: CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(response, okResult.Value);
+        _customerClientMock.Verify(x => x.GetCustomerActivityAsync(
+            customerId,
+            null,
+            null,
+            2,
+            10,
+            "internal note",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task GetThaiLocationsMultiField_ForwardsRegistryWireShape()
     {
         var locations = new List<RegistryThaiLocation>

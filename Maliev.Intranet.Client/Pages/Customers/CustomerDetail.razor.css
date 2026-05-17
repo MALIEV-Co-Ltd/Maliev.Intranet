@@ -555,6 +555,23 @@ select.customer-input {
     display: grid;
 }
 
+.customer-activity-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 14px;
+    flex-wrap: wrap;
+}
+
+::deep .customer-activity-search {
+    flex: 1 1 280px;
+    min-width: 220px;
+}
+
+.customer-activity-loading {
+    margin-bottom: 12px;
+}
+
 .customer-activity-list {
     gap: 12px;
 }
@@ -581,6 +598,10 @@ select.customer-input {
 
 .customer-audit-list .customer-activity-item:last-child {
     border-bottom: 0;
+}
+
+::deep .customer-activity-pagination {
+    margin-top: 16px;
 }
 
 .customer-activity-item .mud-icon-root {

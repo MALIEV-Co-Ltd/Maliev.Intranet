@@ -498,7 +498,29 @@
         else if (_activeTab == CustomerDetailTab.Activity)
         {
             <section class="customer-panel customer-tab-panel customer-activity-panel" data-section="activity">
-                <SectionTitle Text="Audit trail" />
+                <SectionTitle Text="@AuditTrailTitle" />
+                <div class="customer-activity-toolbar">
+                    <SearchBox Class="customer-activity-search"
+                               Value="@_activitySearch"
+                               ValueChanged="OnActivitySearchChanged"
+                               Placeholder="Search audit trail..."
+                               OnEnter="SearchActivityAsync" />
+                    <SecondaryButton Class="customer-activity-search-button compact"
+                                     Icon="@Icons.Material.Outlined.Search"
+                                     OnClick="SearchActivityClickedAsync"
+                                     Disabled="@_activityLoading">Search</SecondaryButton>
+                    @if (HasActivitySearch)
+                    {
+                        <SecondaryButton Class="customer-activity-clear-button compact"
+                                         Icon="@Icons.Material.Outlined.Close"
+                                         OnClick="ClearActivitySearchAsync"
+                                         Disabled="@_activityLoading">Clear</SecondaryButton>
+                    }
+                </div>
+                @if (_activityLoading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="customer-activity-loading" />
+                }
                 @if (ActivityFeed.Count > 0)
                 {
                     <div class="customer-audit-list">
@@ -516,7 +538,17 @@
                 }
                 else
                 {
-                    <div class="customer-muted-box">No activity recorded.</div>
+                    <div class="customer-muted-box">@EmptyActivityMessage</div>
+                }
+                @if (HasPagedActivity)
+                {
+                    <PaginationFooter Meta="@_activityMeta"
+                                      CurrentPage="@_activityPage"
+                                      PageSize="@_activityPageSize"
+                                      PageChanged="OnActivityPageChanged"
+                                      PageSizeChanged="OnActivityPageSizeChanged"
+                                      Disabled="@_activityLoading"
+                                      Class="customer-activity-pagination" />
                 }
             </section>
         }
@@ -789,6 +821,7 @@
     private readonly List<ProjectSummaryDto> _projects = [];
     private readonly List<OrderSummaryDto> _orders = [];
     private readonly List<CustomerActivityResponse> _activity = [];
+    private PaginationMeta _activityMeta = new();
     private readonly List<PaymentTermDto> _paymentTerms = [];
     private CustomerDetailTab _activeTab = CustomerDetailTab.Overview;
     private AddressEditModel? _addressEdit;
@@ -800,11 +833,13 @@
     private bool _emailComposerOpen;
     private bool _emailQueued;
     private bool _paymentTermsOpen;
+    private bool _activityLoading;
     private string? _error;
     private string _emailSubject = string.Empty;
     private string _emailBody = string.Empty;
     private string? _emailError;
     private string _newNoteText = string.Empty;
+    private string _activitySearch = string.Empty;
     private const int InternalNoteMaxLength = 5000;
     private string _addressLookupQuery = string.Empty;
     private bool _addressLookupLoading;
@@ -820,6 +855,8 @@
     private string _companyLookupQuery = string.Empty;
     private int _projectTotalCount;
     private int _orderTotalCount;
+    private int _activityPage = 1;
+    private int _activityPageSize = 20;
     private readonly List<CountryDto> _countries = [];
     private readonly List<EmployeeSummaryDto> _accountManagers = [];
     private readonly List<RegistryThaiLocation> _locationMatches = [];
@@ -838,6 +875,11 @@
     private decimal AverageOrderValue => LifetimeOrderCount > 0 && _customer is not null ? _customer.TotalSpent / LifetimeOrderCount : 0m;
     private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
     private string NewProjectHref => $"/sales/projects/new?customerId={Id}";
+    private int ActivityTotalCount => _activityMeta.TotalItems > 0 ? _activityMeta.TotalItems : _activityMeta.TotalCount;
+    private string AuditTrailTitle => $"Audit trail ({ActivityTotalCount:N0})";
+    private bool HasActivitySearch => !string.IsNullOrWhiteSpace(_activitySearch);
+    private bool HasPagedActivity => ActivityTotalCount > 0 || ActivityFeed.Count > 0;
+    private string EmptyActivityMessage => HasActivitySearch ? "No activity matches this search." : "No activity recorded.";
     private string AddressModalTitle => _addressEdit?.Id is null ? "Add address" : "Edit address";
     private string AddressMapElementId => $"customer-address-map-{Id:N}";
     private PaymentTermDto? SelectedPaymentTerm => _edit is null
@@ -898,20 +940,20 @@
             (ReferenceEquals(canonical, address) || canonical.Id != Guid.Empty && canonical.Id == address.Id);
     }
 
-    private IReadOnlyList<CustomerActivityResponse> ActivityFeed =>
-        _activity.Count > 0
-            ? _activity
-            : (_customer?.Notes.OrderByDescending(note => note.CreatedAt)
-                .Select(note => new CustomerActivityResponse
-                {
-                    Action = "Note",
-                    Description = note.NoteText,
-                    ActorName = note.CreatedByName,
-                    Timestamp = note.CreatedAt
-                })
-                .ToList() ?? []);
+    private IReadOnlyList<CustomerActivityResponse> ActivityFeed => _activity;
 
-    private IReadOnlyList<CustomerActivityResponse> RecentActivity => ActivityFeed.Take(5).ToList();
+    private IReadOnlyList<CustomerActivityResponse> NoteActivityFallback =>
+        _customer?.Notes.OrderByDescending(note => note.CreatedAt)
+            .Select(note => new CustomerActivityResponse
+            {
+                Action = "Note",
+                Description = note.NoteText,
+                ActorName = note.CreatedByName,
+                Timestamp = note.CreatedAt
+            })
+            .ToList() ?? [];
+
+    private IReadOnlyList<CustomerActivityResponse> RecentActivity => (_activity.Count > 0 ? _activity : NoteActivityFallback).Take(5).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -998,17 +1040,88 @@
 
     private async Task LoadActivityAsync()
     {
+        _activityLoading = true;
+
         try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>($"api/v1/customers/{Id}/history?page=1&pageSize=20");
+            var response = await Http.GetFromJsonAsync<PagedResponse<CustomerActivityResponse>>(BuildActivityHistoryUrl());
             _activity.Clear();
             _activity.AddRange(response?.Data.OrderByDescending(activity => activity.Timestamp).ToList() ?? []);
+            _activityMeta = response?.Meta ?? new PaginationMeta();
+            _activityMeta.CurrentPage = _activityMeta.CurrentPage == 0 ? _activityPage : _activityMeta.CurrentPage;
+            _activityMeta.PageSize = _activityMeta.PageSize == 0 ? _activityPageSize : _activityMeta.PageSize;
+            _activityMeta.TotalCount = _activityMeta.TotalCount == 0 ? _activity.Count : _activityMeta.TotalCount;
+            _activityMeta.TotalItems = _activityMeta.TotalItems == 0 ? _activityMeta.TotalCount : _activityMeta.TotalItems;
+            _activityMeta.TotalPages = _activityMeta.TotalPages == 0 && _activityMeta.TotalItems > 0
+                ? (int)Math.Ceiling((double)_activityMeta.TotalItems / Math.Max(1, _activityPageSize))
+                : _activityMeta.TotalPages;
         }
         catch (Exception ex)
         {
             Console.WriteLine(ex.Message);
         }
+        finally
+        {
+            _activityLoading = false;
+        }
     }
+
+    private string BuildActivityHistoryUrl()
+    {
+        var parts = new List<string>
+        {
+            $"page={_activityPage}",
+            $"pageSize={_activityPageSize}"
+        };
+
+        if (HasActivitySearch)
+        {
+            parts.Add($"search={Uri.EscapeDataString(_activitySearch.Trim())}");
+        }
+
+        return $"api/v1/customers/{Id}/history?{string.Join("&", parts)}";
+    }
+
+    private Task OnActivitySearchChanged(string? value)
+    {
+        _activitySearch = value ?? string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private async Task SearchActivityAsync()
+    {
+        _activityPage = 1;
+        await LoadActivityAsync();
+    }
+
+    private async Task SearchActivityClickedAsync(MouseEventArgs _) => await SearchActivityAsync();
+
+    private async Task ClearActivitySearchAsync(MouseEventArgs _)
+    {
+        if (!HasActivitySearch)
+        {
+            return;
+        }
+
+        _activitySearch = string.Empty;
+        _activityPage = 1;
+        await LoadActivityAsync();
+    }
+
+    private async Task OnActivityPageChanged(int page)
+    {
+        _activityPage = Math.Max(1, page);
+        await LoadActivityAsync();
+    }
+
+    private async Task OnActivityPageSizeChanged(int pageSize)
+    {
+        _activityPageSize = NormalizeActivityPageSize(pageSize);
+        _activityPage = 1;
+        await LoadActivityAsync();
+    }
+
+    private static int NormalizeActivityPageSize(int pageSize) => pageSize <= 0 ? 20 : pageSize;
 
     private void SelectTab(CustomerDetailTab tab) => _activeTab = tab;
 

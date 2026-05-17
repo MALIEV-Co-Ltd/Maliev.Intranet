@@ -122,9 +122,10 @@ public class CustomersController(
         [FromQuery] int? take = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
+        [FromQuery] string? search = null,
         CancellationToken ct = default)
     {
-        var result = await client.GetCustomerActivityAsync(id, skip, take, page, pageSize, ct);
+        var result = await client.GetCustomerActivityAsync(id, skip, take, page, pageSize, search, ct);
         return Ok(result);
     }
 
