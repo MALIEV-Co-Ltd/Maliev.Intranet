@@ -1,15 +1,18 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+
 using Bunit;
+
 using Maliev.Intranet.Client.Pages.Manufacturing;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
 using MudBlazor.Services;
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
 
 namespace Maliev.Intranet.Tests.Client.Pages;
 
@@ -56,6 +59,35 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         Assert.Contains("aria-disabled=\"true\"", cut.Markup);
         Assert.Contains("Move", cut.Markup);
         Assert.Contains(_requestedRequests, request => request.StartsWith("GET /api/v1/jobs/schedule?from=", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ProductionSchedule_TimelineZoomExpandsQueueFromWheelAndControls()
+    {
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("data-board-zoom=\"100\"", cut.Markup));
+
+        Assert.Contains("aria-label=\"Zoom out schedule timeline\"", cut.Markup);
+        Assert.Contains("aria-label=\"Reset schedule zoom\"", cut.Markup);
+        Assert.Contains("aria-label=\"Zoom in schedule timeline\"", cut.Markup);
+        Assert.Contains("Scroll over the queue to zoom", cut.Markup);
+
+        cut.Find(".production-schedule-board-shell").TriggerEvent("onwheel", new WheelEventArgs { DeltaY = -120 });
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("data-board-zoom=\"125\"", cut.Markup);
+            Assert.Contains("minmax(225px, 275px)", cut.Markup);
+        });
+
+        cut.Find(".production-schedule-board-shell").TriggerEvent("onwheel", new WheelEventArgs { DeltaY = 120 });
+        cut.WaitForAssertion(() => Assert.Contains("data-board-zoom=\"100\"", cut.Markup));
+
+        cut.Find("button[aria-label='Zoom in schedule timeline']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("data-board-zoom=\"125\"", cut.Markup));
+
+        cut.Find("button[aria-label='Reset schedule zoom']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("data-board-zoom=\"100\"", cut.Markup));
     }
 
     [Fact]

@@ -90,8 +90,10 @@
     font-size: var(--maliev-font-small);
 }
 
-.psb-zoom {
+.psb-zoom,
+.psb-scale {
     display: inline-flex;
+    align-items: center;
     min-height: 34px;
     padding: 2px;
     border: 1px solid var(--maliev-border);
@@ -100,6 +102,7 @@
 }
 
 .psb-zoom button,
+.psb-scale button,
 .psb-icon-button {
     border: 0;
     border-radius: var(--maliev-radius-sm);
@@ -113,6 +116,25 @@
 
 .psb-zoom button {
     padding: 0 11px;
+}
+
+.psb-scale button {
+    display: inline-grid;
+    place-items: center;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 8px;
+}
+
+.psb-scale button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.psb-scale-value {
+    min-width: 52px;
+    border-inline: 1px solid var(--maliev-border-subtle) !important;
+    color: var(--maliev-ink) !important;
 }
 
 .psb-zoom button.active {
@@ -130,7 +152,8 @@
 }
 
 .psb-icon-button:hover,
-.psb-zoom button:hover {
+.psb-zoom button:hover,
+.psb-scale button:not(:disabled):hover {
     color: var(--maliev-info);
 }
 
@@ -187,6 +210,7 @@
     border-radius: var(--maliev-radius-md);
     background: var(--maliev-panel);
     scrollbar-gutter: stable both-edges;
+    overscroll-behavior: contain;
 }
 
 .psb-grid-header,
