@@ -349,6 +349,17 @@ public static class MalievPermissions
     }
 
     /// <summary>
+    /// Permissions for MALIEV public website content operations.
+    /// </summary>
+    public static class WebContent
+    {
+        /// <summary>Permission to view public website content operations.</summary>
+        public const string Read = "web.contents.read";
+        /// <summary>Permission to update public website content operations.</summary>
+        public const string Write = "web.contents.update";
+    }
+
+    /// <summary>
     /// Permissions for AI-driven data extraction and analysis services.
     /// </summary>
     public static class Prediction

@@ -14,7 +14,10 @@ public class NavigationTests(BffTestWebApplicationFactory factory) : IClassFixtu
     [InlineData("/customers")]
     [InlineData("/accounting")]
     [InlineData("/purchasing")]
+    [InlineData("/commerce/catalog")]
     [InlineData("/admin")]
+    [InlineData("/admin/web-content")]
+    [InlineData("/admin/reference-data?section=currencies")]
     [InlineData("/iam")]
     public async Task FrontendRoutes_ReturnBlazorShell(string url)
     {

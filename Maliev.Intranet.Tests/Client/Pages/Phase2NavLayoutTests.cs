@@ -110,12 +110,44 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     public void TopBar_ShouldContain_FlatModuleLinks()
     {
         var cut = Render<TopBar>();
+        cut.Find("button.topbar-mobile-menu-button").Click();
+
         Assert.Contains("href=\"customers\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("href=\"accounting\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("href=\"purchasing\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("href=\"admin\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("href=\"iam\"", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sales/customers", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TopBar_ShouldContain_ServiceManagementNavigation()
+    {
+        var cut = Render<TopBar>();
+        cut.Find("button.topbar-mobile-menu-button").Click();
+
+        Assert.Contains("commerce/catalog", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/web-content", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/web-content?section=blog", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("mfg/materials", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/reference-data?section=countries", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/reference-data?section=currencies", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/reference-data?section=registry", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("finance/delivery-notes/new", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/chatbot-instructions", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Sidebar_ShouldUseSharedNavigationCatalog()
+    {
+        var cut = Render<NavMenu>();
+
+        Assert.Contains("commerce/catalog", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/web-content", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/web-content?section=homepage", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin/reference-data?section=exchange-rates", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("purchasing/suppliers", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("hr/profile?tab=preferences", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -232,16 +264,33 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
 
     private static string FindSourceFile(params string[] segments)
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
-        {
-            var candidate = Path.Combine([current.FullName, .. segments]);
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
+        return FindSourceFileCore(segments);
+    }
 
-            current = current.Parent;
+    private static string FindSourceFileCore(
+        string[] segments,
+        [System.Runtime.CompilerServices.CallerFilePath] string callerFilePath = "")
+    {
+        var roots = new[]
+        {
+            AppContext.BaseDirectory,
+            Directory.GetCurrentDirectory(),
+            Path.GetDirectoryName(callerFilePath) ?? string.Empty
+        };
+
+        foreach (var root in roots.Where(root => !string.IsNullOrWhiteSpace(root)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var current = new DirectoryInfo(root);
+            while (current is not null)
+            {
+                var candidate = Path.Combine([current.FullName, .. segments]);
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+
+                current = current.Parent;
+            }
         }
 
         throw new FileNotFoundException("Could not locate source file.", Path.Combine(segments));

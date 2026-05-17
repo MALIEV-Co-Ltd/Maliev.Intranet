@@ -1,0 +1,123 @@
+@page "/admin/web-content"
+@attribute [RequirePermission(MalievPermissions.WebContent.Read)]
+
+<PageTitle>Website Content | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="Website Content"
+                Subtitle="Operational entry points for Maliev.Web content, blog posts, storefront listings, and website AI."
+                BackHref="/admin" />
+
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Public site" Value="Maliev.Web" />
+            <StatTile Label="Content source" Value="Code-backed" />
+            <StatTile Label="Editable consoles" Value="2" />
+            <StatTile Label="Selected area" Value="@SelectedAreaLabel" />
+        </StatBar>
+
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+            Maliev.Web blog and homepage copy are currently shipped from the web app content catalog. Commerce storefront listings and website chatbot prompts already have live management consoles.
+        </MudAlert>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="7">
+                <PanelCard Title="Content Surfaces">
+                    <div class="mlv-list">
+                        @foreach (var surface in _surfaces)
+                        {
+                            <div class="mlv-list-row @(IsSelected(surface.Key) ? "mlv-row-selected" : "")">
+                                <div>
+                                    <div class="mlv-row-main">@surface.Name</div>
+                                    <div class="mlv-row-sub">@surface.Description</div>
+                                </div>
+                                <SecondaryButton Icon="@surface.Icon" Href="@surface.Href">@surface.Action</SecondaryButton>
+                            </div>
+                        }
+                    </div>
+                </PanelCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="5">
+                <PanelCard Title="Current Source of Truth">
+                    <table class="mlv-table">
+                        <tbody>
+                            <tr>
+                                <th>Main website</th>
+                                <td class="mlv-mono">Maliev.Web</td>
+                            </tr>
+                            <tr>
+                                <th>Blog posts</th>
+                                <td class="mlv-mono">Maliev.Web.Client/Content/SiteContent.cs</td>
+                            </tr>
+                            <tr>
+                                <th>Homepage hero copy</th>
+                                <td class="mlv-mono">Maliev.Web.Client/Content/HeroCopyCatalog.cs</td>
+                            </tr>
+                            <tr>
+                                <th>Storefront products</th>
+                                <td class="mlv-mono">Maliev.CommerceService</td>
+                            </tr>
+                            <tr>
+                                <th>Website AI persona</th>
+                                <td class="mlv-mono">Maliev.ChatbotService</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </PanelCard>
+            </MudItem>
+        </MudGrid>
+    </PageBody>
+</div>
+
+@code {
+    private readonly ContentSurface[] _surfaces =
+    [
+        new(
+            "blog",
+            "Blog posts",
+            "Journal cards and /blog article content shown on the public Maliev.Web site.",
+            "admin/web-content?section=blog",
+            Icons.Material.Outlined.Newspaper,
+            "Review"),
+        new(
+            "homepage",
+            "Homepage content",
+            "Hero copy, services, case studies, and homepage article ordering for Maliev.Web.",
+            "admin/web-content?section=homepage",
+            Icons.Material.Outlined.Web,
+            "Review"),
+        new(
+            "storefront",
+            "Storefront catalog",
+            "Live product listings, collections, variants, prices, and media from Maliev.CommerceService.",
+            "commerce/catalog",
+            Icons.Material.Outlined.Storefront,
+            "Open"),
+        new(
+            "chatbot",
+            "Website chatbot",
+            "Mali website persona and topic skill prompts injected by ChatbotService.",
+            "admin/chatbot-instructions",
+            Icons.Material.Outlined.SupportAgent,
+            "Open")
+    ];
+
+    [SupplyParameterFromQuery(Name = "section")]
+    private string? Section { get; set; }
+
+    private string SelectedAreaLabel => _surfaces.FirstOrDefault(surface => IsSelected(surface.Key))?.Name ?? "Overview";
+
+    private bool IsSelected(string key)
+    {
+        return string.Equals(Section, key, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed record ContentSurface(
+        string Key,
+        string Name,
+        string Description,
+        string Href,
+        string Icon,
+        string Action);
+}

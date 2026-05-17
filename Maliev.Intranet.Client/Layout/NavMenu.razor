@@ -28,68 +28,19 @@
     <div class="flex-grow-1 custom-scrollbar" style="overflow-y: auto; overflow-x: hidden; display: block; height: 100%;">
         <MudNavMenu Class="mud-width-full">
             <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Dashboard">Dashboard</MudNavLink>
+            <MudNavLink Href="@AppNavigation.Quote.Href" Match="@AppNavigation.Quote.Match" Icon="@AppNavigation.Quote.Icon"
+                        Style="@NavStyle(AppNavigation.Quote.Permission)">Quote</MudNavLink>
 
-            <!-- Sales & CRM -->
-            <MudNavGroup Title="Sales & CRM" Icon="@Icons.Material.Outlined.Business" Expanded="false">
-                <MudNavLink Href="customers" Icon="@Icons.Material.Outlined.People"
-                            Style="@NavStyle(MalievPermissions.Customer.Read)">Customers</MudNavLink>
-                <MudNavLink Href="sales/projects" Icon="@Icons.Material.Outlined.FolderSpecial"
-                            Style="@NavStyle(MalievPermissions.Project.Read)">Projects</MudNavLink>
-                <MudNavLink Href="commerce/catalog" Icon="@Icons.Material.Outlined.Storefront"
-                            Style="@NavStyle(MalievPermissions.Commerce.ProductsRead)">Commerce Catalog</MudNavLink>
-            </MudNavGroup>
-
-            <!-- Manufacturing -->
-            <MudNavGroup Title="Manufacturing" Icon="@Icons.Material.Outlined.PrecisionManufacturing" Expanded="false">
-                <MudNavLink Href="mfg/materials" Icon="@Icons.Material.Outlined.Inventory"
-                            Style="@NavStyle(MalievPermissions.Material.Read)">Materials</MudNavLink>
-                <MudNavLink Href="mfg/equipment" Icon="@Icons.Material.Outlined.PrecisionManufacturing"
-                            Style="@NavStyle(MalievPermissions.Facility.Read)">Equipment</MudNavLink>
-                <MudNavLink Href="mfg/production-schedule" Icon="@Icons.Material.Outlined.Event"
-                            Style="@NavStyle(MalievPermissions.Job.Read)">Production Schedule</MudNavLink>
-                <MudNavLink Href="purchasing" Icon="@Icons.Material.Outlined.ShoppingBag"
-                            Style="@NavStyle(MalievPermissions.PurchaseOrder.Read)">Procurement</MudNavLink>
-            </MudNavGroup>
-
-            <!-- Purchasing -->
-            <MudNavGroup Title="Purchasing" Icon="@Icons.Material.Outlined.ShoppingBag" Expanded="false">
-                <MudNavLink Href="purchasing" Icon="@Icons.Material.Outlined.ShoppingBag"
-                            Style="@NavStyle(MalievPermissions.PurchaseOrder.Read)">Purchase Orders</MudNavLink>
-                <MudNavLink Href="purchasing/new" Icon="@Icons.Material.Outlined.Inventory2"
-                            Style="@NavStyle(MalievPermissions.PurchaseOrder.Write)">New PO</MudNavLink>
-                <MudNavLink Href="purchasing/suppliers" Icon="@Icons.Material.Outlined.AddBusiness"
-                            Style="@NavStyle(MalievPermissions.Supplier.Read)">Suppliers</MudNavLink>
-            </MudNavGroup>
-
-            <!-- Finance -->
-            <MudNavGroup Title="Finance" Icon="@Icons.Material.Outlined.AccountBalanceWallet" Expanded="false">
-                <MudNavLink Href="accounting" Icon="@Icons.Material.Outlined.Receipt"
-                            Style="@NavStyle(MalievPermissions.Invoice.Read)">Invoices</MudNavLink>
-                <MudNavLink Href="accounting" Icon="@Icons.Material.Outlined.AccountBalance"
-                            Style="@NavStyle(MalievPermissions.Accounting.Read)">Accounting</MudNavLink>
-                <MudNavLink Href="finance/delivery-notes" Icon="@Icons.Material.Outlined.LocalShipping"
-                            Style="@NavStyle(MalievPermissions.Delivery.Read)">Delivery Notes</MudNavLink>
-            </MudNavGroup>
-
-            <!-- HR & People -->
-            <MudNavGroup Title="HR & People" Icon="@Icons.Material.Outlined.Groups" Expanded="false">
-                <MudNavLink Href="hr/profile" Icon="@Icons.Material.Outlined.AccountCircle"
-                            Style="@NavStyle(MalievPermissions.Employee.Read)">My Profile</MudNavLink>
-                <MudNavLink Href="hr/leave" Icon="@Icons.Material.Outlined.EventAvailable"
-                            Style="@NavStyle(MalievPermissions.Leave.Read)">Leave</MudNavLink>
-            </MudNavGroup>
-
-            <!-- Operations -->
-            <MudNavGroup Title="Operations" Icon="@Icons.Material.Outlined.AdminPanelSettings" Expanded="false">
-                <MudNavLink Href="iam" Icon="@Icons.Material.Outlined.Security"
-                            Style="@NavStyle(MalievPermissions.Iam.Manage)">IAM Console</MudNavLink>
-                <MudNavLink Href="admin/system-health" Icon="@Icons.Material.Outlined.HealthAndSafety"
-                            Style="@NavStyle(MalievPermissions.System.HealthRead)">System Health</MudNavLink>
-                <MudNavLink Href="admin/reference-data" Icon="@Icons.Material.Outlined.TravelExplore"
-                            Style="@NavStyle(MalievPermissions.Registry.LocationsRead)">Reference Data</MudNavLink>
-                <MudNavLink Href="admin" Icon="@Icons.Material.Outlined.Settings"
-                            Style="@NavStyle(MalievPermissions.Iam.Manage)">Admin</MudNavLink>
-            </MudNavGroup>
+            @foreach (var group in AppNavigation.PrimaryGroups)
+            {
+                <MudNavGroup Title="@(group.SidebarLabel ?? group.Label)" Icon="@group.Icon" Expanded="false">
+                    @foreach (var item in group.Items)
+                    {
+                        <MudNavLink Href="@item.Href" Match="@item.Match" Icon="@item.Icon"
+                                    Style="@NavStyle(item.Permission)">@item.Label</MudNavLink>
+                    }
+                </MudNavGroup>
+            }
         </MudNavMenu>
     </div>
 
@@ -253,8 +204,8 @@
         return claimParts.Length == requiredParts.Length;
     }
 
-    private string NavStyle(string permission)
-        => HasPermission(permission) ? "" : "opacity: 0.4; pointer-events: none;";
+    private string NavStyle(string? permission)
+        => string.IsNullOrWhiteSpace(permission) || HasPermission(permission) ? "" : "opacity: 0.4; pointer-events: none;";
 
     private void HandleLogout()
     {

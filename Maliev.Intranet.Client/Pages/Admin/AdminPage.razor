@@ -1,5 +1,6 @@
 @page "/admin"
 @inject HttpClient Http
+@inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
 <PageTitle>Admin | MALIEV Intranet</PageTitle>
@@ -17,7 +18,7 @@
             <div class="mlv-segmented">
                 @foreach (var tab in _tabs)
                 {
-                    <button type="button" class="@(_tab == tab ? "active" : "")" @onclick="@(() => _tab = tab)">@tab</button>
+                    <button type="button" class="@(_tab == tab ? "active" : "")" @onclick="@(() => SetTab(tab))">@tab</button>
                 }
             </div>
         </div>
@@ -57,6 +58,13 @@
                         </div>
                         <div class="mlv-list-row">
                             <div>
+                                <div class="mlv-row-main">Website content</div>
+                                <div class="mlv-row-sub">Find the Maliev.Web blog, homepage, service content, storefront, and website chatbot management surfaces.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.Article" Href="/admin/web-content">Open</SecondaryButton>
+                        </div>
+                        <div class="mlv-list-row">
+                            <div>
                                 <div class="mlv-row-main">Reference data</div>
                                 <div class="mlv-row-sub">Review CountryService, CurrencyService, and RegistryService lookup data used by customer workflows.</div>
                             </div>
@@ -83,6 +91,12 @@
         else if (_tab == "Notifications")
         {
             <PanelCard>
+                <div class="mlv-toolbar mb-3">
+                    <div>
+                        <div class="mlv-row-main">Notification templates</div>
+                        <div class="mlv-row-sub">Email and message templates loaded from NotificationService.</div>
+                    </div>
+                </div>
                 @if (_templates.Count > 0)
                 {
                     <table class="mlv-table">
@@ -117,6 +131,14 @@
     private bool _loading = true;
     private string _notificationError = "No notification templates are registered.";
 
+    [SupplyParameterFromQuery(Name = "tab")]
+    private string? RequestedTab { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _tab = NormalizeTab(RequestedTab);
+    }
+
     protected override async Task OnInitializedAsync()
     {
         _loading = true;
@@ -144,5 +166,17 @@
             Snackbar.Add(_notificationError, Severity.Warning);
             Console.WriteLine(ex.Message);
         }
+    }
+
+    private void SetTab(string tab)
+    {
+        _tab = NormalizeTab(tab);
+        Navigation.NavigateTo($"admin?tab={Uri.EscapeDataString(_tab)}", replace: true);
+    }
+
+    private string NormalizeTab(string? tab)
+    {
+        return _tabs.FirstOrDefault(candidate => string.Equals(candidate, tab, StringComparison.OrdinalIgnoreCase))
+            ?? "Operations";
     }
 }

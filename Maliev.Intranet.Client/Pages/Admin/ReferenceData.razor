@@ -1,6 +1,8 @@
 @page "/admin/reference-data"
 @using Maliev.Intranet.Shared.Services
 @attribute [RequirePermission(MalievPermissions.Registry.LocationsRead)]
+@inject HttpClient Http
+@inject NavigationManager Navigation
 @inject IReferenceDataService ReferenceDataService
 @inject ISnackbar Snackbar
 
@@ -35,8 +37,23 @@
                 <StatTile Label="Registry results" Value="@_locations.Count.ToString("N0")" />
             </StatBar>
 
+            <div class="mlv-toolbar mb-4">
+                <div class="mlv-segmented">
+                    @foreach (var navSection in _sections)
+                    {
+                        <button type="button"
+                                class="@(_section == navSection.Key ? "active" : "")"
+                                @onclick="@(() => SetSection(navSection.Key))">
+                            @navSection.Label
+                        </button>
+                    }
+                </div>
+            </div>
+
             <MudGrid Spacing="3">
-                <MudItem xs="12" lg="6">
+                @if (ShouldShow("countries"))
+                {
+                <MudItem xs="12" lg="@PanelWidth">
                     <PanelCard Title="Countries">
                         @if (_countries.Count == 0)
                         {
@@ -64,8 +81,11 @@
                         }
                     </PanelCard>
                 </MudItem>
+                }
 
-                <MudItem xs="12" lg="6">
+                @if (ShouldShow("currencies"))
+                {
+                <MudItem xs="12" lg="@PanelWidth">
                     <PanelCard Title="Currencies">
                         @if (_currencies.Count == 0)
                         {
@@ -95,7 +115,55 @@
                         }
                     </PanelCard>
                 </MudItem>
+                }
 
+                @if (ShouldShow("exchange-rates"))
+                {
+                <MudItem xs="12" lg="@PanelWidth">
+                    <PanelCard Title="Exchange Rates">
+                        <div class="mlv-toolbar">
+                            <MudSelect T="string" @bind-Value="_rateFrom" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 140px;">
+                                @foreach (var currency in _currencies)
+                                {
+                                    <MudSelectItem Value="@currency.Code">@currency.Code @currency.Symbol</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudSelect T="string" @bind-Value="_rateTo" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 140px;">
+                                @foreach (var currency in _currencies)
+                                {
+                                    <MudSelectItem Value="@currency.Code">@currency.Code @currency.Symbol</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Outlined.CurrencyExchange"
+                                       Disabled="@_loadingRate"
+                                       OnClick="LoadExchangeRateAsync">
+                                Check rate
+                            </MudButton>
+                        </div>
+
+                        @if (_loadingRate)
+                        {
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="64px" Animation="Animation.Wave" />
+                        }
+                        else if (_exchangeRate is not null)
+                        {
+                            <div class="mlv-empty text-left">
+                                <strong>1 @_exchangeRate.From = @_exchangeRate.Rate.ToString("N6") @_exchangeRate.To</strong>
+                                <div>Live rate loaded from CurrencyService.</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mlv-empty text-left">Select two currencies to validate CurrencyService exchange-rate data.</div>
+                        }
+                    </PanelCard>
+                </MudItem>
+                }
+
+                @if (ShouldShow("registry"))
+                {
                 <MudItem xs="12">
                     <PanelCard Title="RegistryService Thai Locations">
                         <div class="mlv-toolbar">
@@ -152,6 +220,7 @@
                         }
                     </PanelCard>
                 </MudItem>
+                }
             </MudGrid>
         }
     </PageBody>
@@ -164,8 +233,32 @@
     private List<RegistryThaiLocation> _locations = [];
     private string _locationQuery = string.Empty;
     private string? _locationMessage;
+    private string _section = "overview";
+    private string _rateFrom = "USD";
+    private string _rateTo = "THB";
+    private ExchangeRateResponse? _exchangeRate;
     private bool _loading = true;
     private bool _searchingLocations;
+    private bool _loadingRate;
+
+    private readonly ReferenceDataSection[] _sections =
+    [
+        new("overview", "Overview"),
+        new("countries", "Countries"),
+        new("currencies", "Currencies"),
+        new("exchange-rates", "Exchange rates"),
+        new("registry", "Registry locations"),
+    ];
+
+    [SupplyParameterFromQuery(Name = "section")]
+    private string? RequestedSection { get; set; }
+
+    private int PanelWidth => _section == "overview" ? 6 : 12;
+
+    protected override void OnParametersSet()
+    {
+        _section = NormalizeSection(RequestedSection);
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -193,6 +286,9 @@
                 .ThenBy(currency => currency.Code)
                 .ToList();
             _primaryCurrency = primaryTask.Result;
+            _rateTo = _primaryCurrency?.Code ?? "THB";
+            _rateFrom = _currencies.FirstOrDefault(currency => !string.Equals(currency.Code, _rateTo, StringComparison.OrdinalIgnoreCase))?.Code
+                ?? _rateTo;
         }
         catch (Exception ex)
         {
@@ -253,6 +349,53 @@
         }
     }
 
+    private async Task LoadExchangeRateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_rateFrom) || string.IsNullOrWhiteSpace(_rateTo))
+        {
+            _exchangeRate = null;
+            return;
+        }
+
+        _loadingRate = true;
+        try
+        {
+            var url = $"api/v1/ReferenceData/currencies/rate?from={Uri.EscapeDataString(_rateFrom)}&to={Uri.EscapeDataString(_rateTo)}";
+            _exchangeRate = await Http.GetFromJsonAsync<ExchangeRateResponse>(url);
+        }
+        catch (Exception ex)
+        {
+            _exchangeRate = null;
+            Snackbar.Add("Exchange rate could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loadingRate = false;
+        }
+    }
+
+    private void SetSection(string section)
+    {
+        _section = NormalizeSection(section);
+        var href = _section == "overview"
+            ? "admin/reference-data"
+            : $"admin/reference-data?section={Uri.EscapeDataString(_section)}";
+        Navigation.NavigateTo(href, replace: true);
+    }
+
+    private bool ShouldShow(string section)
+    {
+        return _section == "overview" || string.Equals(_section, section, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string NormalizeSection(string? section)
+    {
+        return _sections.Any(candidate => string.Equals(candidate.Key, section, StringComparison.OrdinalIgnoreCase))
+            ? section!.ToLowerInvariant()
+            : "overview";
+    }
+
     private static string GetCurrencyStatus(CurrencyDto currency)
     {
         if (currency.IsPrimary)
@@ -260,4 +403,6 @@
 
         return currency.IsActive ? "Active" : "Inactive";
     }
+
+    private sealed record ReferenceDataSection(string Key, string Label);
 }

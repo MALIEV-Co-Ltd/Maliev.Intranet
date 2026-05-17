@@ -243,67 +243,8 @@
     private bool _mobileNavOpen;
     private string? _profileJobTitle;
 
-    private sealed record NavItem(
-        string Label,
-        string Href,
-        string Icon,
-        NavLinkMatch Match = NavLinkMatch.Prefix,
-        string? Class = null,
-        string? Description = null);
-
-    private sealed record NavGroup(string Label, string Icon, IReadOnlyList<NavItem> Items);
-
-    private readonly NavItem _quoteNavItem = new(
-        "Quote",
-        "sales/projects/new",
-        Icons.Material.Outlined.ReceiptLong,
-        NavLinkMatch.Prefix,
-        "topbar-nav-quote");
-
-    private readonly IReadOnlyList<NavGroup> _navGroups =
-    [
-        new("Sales", Icons.Material.Outlined.Business,
-        [
-            new("Projects", "sales/projects", Icons.Material.Outlined.FolderSpecial, Description: "Quotes and project history"),
-            new("Customers", "customers", Icons.Material.Outlined.People, Description: "Profiles, addresses, documents"),
-            new("New customer", "customers/new", Icons.Material.Outlined.PersonAdd, Description: "Onboard a customer"),
-        ]),
-        new("Finance", Icons.Material.Outlined.AccountBalanceWallet,
-        [
-            new("Accounting", "accounting", Icons.Material.Outlined.AccountBalance, Description: "Invoices and journal entries"),
-            new("New invoice", "accounting/new", Icons.Material.Outlined.ReceiptLong, Description: "Create an invoice"),
-            new("Delivery notes", "finance/delivery-notes", Icons.Material.Outlined.LocalShipping, Description: "Delivery note workflow"),
-        ]),
-        new("Manufacturing", Icons.Material.Outlined.PrecisionManufacturing,
-        [
-            new("Materials", "mfg/materials", Icons.Material.Outlined.Inventory, Description: "Material catalog and properties"),
-            new("Equipment", "mfg/equipment", Icons.Material.Outlined.PrecisionManufacturing, Description: "Facility-backed equipment"),
-            new("Production schedule", "mfg/production-schedule", Icons.Material.Outlined.Event, Description: "Job planning board"),
-        ]),
-        new("Purchasing", Icons.Material.Outlined.ShoppingBag,
-        [
-            new("Purchase orders", "purchasing", Icons.Material.Outlined.ShoppingBag, Description: "Procurement queue"),
-            new("New PO", "purchasing/new", Icons.Material.Outlined.Inventory2, Description: "Create a purchase order"),
-            new("Suppliers", "purchasing/suppliers", Icons.Material.Outlined.AddBusiness, Description: "Supplier profiles"),
-        ]),
-        new("Commerce", Icons.Material.Outlined.Storefront,
-        [
-            new("Storefront catalog", "commerce/catalog", Icons.Material.Outlined.Storefront, Description: "Products, collections, media"),
-        ]),
-        new("Admin", Icons.Material.Outlined.Settings,
-        [
-            new("Admin hub", "admin", Icons.Material.Outlined.Settings, NavLinkMatch.All, Description: "Operations and notifications"),
-            new("Reference data", "admin/reference-data", Icons.Material.Outlined.TravelExplore, Description: "Countries, currencies, registry"),
-            new("System health", "admin/system-health", Icons.Material.Outlined.HealthAndSafety, Description: "Service liveness and readiness"),
-            new("IAM", "iam", Icons.Material.Outlined.Security, Description: "Users, roles, permissions"),
-            new("New user", "iam/users/new", Icons.Material.Outlined.PersonAdd, Description: "Create employee access"),
-        ]),
-        new("People", Icons.Material.Outlined.Groups,
-        [
-            new("My profile", "hr/profile", Icons.Material.Outlined.AccountCircle, Description: "Employee profile"),
-            new("Leave", "hr/leave", Icons.Material.Outlined.EventAvailable, Description: "Leave requests"),
-        ]),
-    ];
+    private readonly AppNavItem _quoteNavItem = AppNavigation.Quote;
+    private readonly IReadOnlyList<AppNavGroup> _navGroups = AppNavigation.PrimaryGroups;
 
     private string LogoUrl => LayoutService.IsDarkMode
         ? "images/logo-white.svg"
@@ -420,27 +361,38 @@
 
     private void CloseMobileNav() => _mobileNavOpen = false;
 
-    private string GetDesktopNavGroupClass(NavGroup group) =>
+    private string GetDesktopNavGroupClass(AppNavGroup group) =>
         IsNavGroupActive(group) ? "topbar-nav-menu-trigger active" : "topbar-nav-menu-trigger";
 
-    private string GetDesktopMenuItemClass(NavItem item) =>
+    private string GetDesktopMenuItemClass(AppNavItem item) =>
         IsNavItemActive(item) ? "topbar-nav-menu-item active" : "topbar-nav-menu-item";
 
-    private bool IsNavGroupActive(NavGroup group) => group.Items.Any(IsNavItemActive);
+    private bool IsNavGroupActive(AppNavGroup group) => group.Items.Any(IsNavItemActive);
 
-    private bool IsNavItemActive(NavItem item)
+    private bool IsNavItemActive(AppNavItem item)
     {
-        var currentPath = Navigation.ToBaseRelativePath(Navigation.Uri)
-            .Split('?', '#')[0]
+        var currentRelative = Navigation.ToBaseRelativePath(Navigation.Uri)
+            .Split('#')[0]
             .Trim('/');
-        var itemPath = item.Href.Trim('/');
+        var itemRelative = item.Href
+            .TrimStart('/')
+            .Split('#')[0]
+            .Trim('/');
+
+        if (itemRelative.Contains('?'))
+        {
+            return string.Equals(currentRelative, itemRelative, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var currentPath = currentRelative.Split('?', '#')[0].Trim('/');
+        var itemPath = itemRelative.Split('?', '#')[0].Trim('/');
         return item.Match == NavLinkMatch.All
             ? string.Equals(currentPath, itemPath, StringComparison.OrdinalIgnoreCase)
             : string.Equals(currentPath, itemPath, StringComparison.OrdinalIgnoreCase) ||
                 currentPath.StartsWith($"{itemPath}/", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetMobileNavClass(NavItem item) =>
+    private static string GetMobileNavClass(AppNavItem item) =>
         string.IsNullOrWhiteSpace(item.Class) ? "topbar-mobile-nav-link" : $"topbar-mobile-nav-link {item.Class}";
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
