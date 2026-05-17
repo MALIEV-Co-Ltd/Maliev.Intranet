@@ -1019,6 +1019,20 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ProductionSchedule_LoadsCurrentTimeAutoScrollHelper()
+    {
+        var appShell = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
+        var index = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "index.html");
+        var helper = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "production-schedule-board.js");
+
+        Assert.Contains("js/production-schedule-board.js", appShell, StringComparison.Ordinal);
+        Assert.Contains("js/production-schedule-board.js", index, StringComparison.Ordinal);
+        Assert.Contains("malievProductionSchedule.scrollCurrentTimeIntoView", helper, StringComparison.Ordinal);
+        Assert.Contains("desiredViewportLeft", helper, StringComparison.Ordinal);
+        Assert.Contains("board.scrollTo({ left: nextScrollLeft, behavior: 'auto' });", helper, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectNewDelegatedCss_UsesSharedSurfaceTokens()
     {
         var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.css");

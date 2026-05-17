@@ -199,6 +199,29 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         Assert.Contains("data-current-position=\"6.25\"", cut.Markup);
         Assert.Contains("psb-slot-running-now", cut.Markup);
         Assert.Contains("psb-slot-live", cut.Markup);
+        cut.WaitForAssertion(() => Assert.Contains(
+            JSInterop.Invocations,
+            invocation => invocation.Identifier == "malievProductionSchedule.scrollCurrentTimeIntoView"));
+    }
+
+    [Fact]
+    public void ProductionScheduleBoard_LateCurrentTime_RequestsInitialScrollToNowMarker()
+    {
+        var now = new DateTime(2026, 5, 7, 19, 0, 0, DateTimeKind.Utc);
+        _boardRangeStart = now.Date;
+        var board = BuildBoard();
+
+        var cut = Render<ProductionScheduleBoard>(parameters => parameters
+            .Add(component => component.Board, board)
+            .Add(component => component.CurrentTimeUtc, now));
+
+        Assert.Contains("psb-now-overlay", cut.Markup);
+        Assert.Contains("data-current-time=\"2026-05-07T19:00:00.0000000Z\"", cut.Markup);
+        cut.FindAll("button").Single(button => button.TextContent.Trim().Equals("Day", StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains("data-current-position=\"79.167\"", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains(
+            JSInterop.Invocations,
+            invocation => invocation.Identifier == "malievProductionSchedule.scrollCurrentTimeIntoView"));
     }
 
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)

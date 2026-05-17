@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Components.Web
 @using Maliev.Intranet.Shared.Dtos
 @implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 <section class="@BoardClass"
          aria-label="@AriaLabel"
@@ -100,6 +101,7 @@
     else
     {
         <div class="production-schedule-board-shell"
+             @ref="_boardShellElement"
              tabindex="0"
              style="@BoardShellStyle"
              aria-label="Schedule queue. Scroll over the queue to zoom; use scrollbars to pan."
@@ -282,6 +284,9 @@
     private CancellationTokenSource? _clockCts;
     private Task? _clockTask;
     private DateTime _currentTimeUtc = DateTime.UtcNow;
+    private ElementReference _boardShellElement;
+    private string? _pendingNowScrollKey;
+    private string? _lastNowScrollKey;
 
     private string BoardClass => string.Join(
         ' ',
@@ -406,6 +411,19 @@
             _localRangeStart = boardStart;
             _lastBoardRangeStart = boardStart;
         }
+
+        QueueCurrentTimeAutoScroll();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (string.IsNullOrWhiteSpace(_pendingNowScrollKey) || !ShowCurrentTimeMarker || Board is null || VisibleMachines.Count == 0)
+            return;
+
+        var appliedKey = _pendingNowScrollKey;
+        _pendingNowScrollKey = null;
+        await JSRuntime.InvokeVoidAsync("malievProductionSchedule.scrollCurrentTimeIntoView", _boardShellElement);
+        _lastNowScrollKey = appliedKey;
     }
 
     private bool MatchesFilters(ProductionScheduleMachineDto machine)
@@ -590,11 +608,19 @@
     private async Task NavigateRange(int direction)
     {
         _localRangeStart = VisibleRangeStart.AddDays(direction * (_zoom == "Day" ? 1 : 7));
+        QueueCurrentTimeAutoScroll(force: true);
         if (RangeStartChanged.HasDelegate)
             await RangeStartChanged.InvokeAsync(_localRangeStart.Value);
     }
 
-    private void SetZoom(string zoom) => _zoom = zoom;
+    private void SetZoom(string zoom)
+    {
+        if (string.Equals(_zoom, zoom, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _zoom = zoom;
+        QueueCurrentTimeAutoScroll(force: true);
+    }
 
     private string ZoomButtonClass(string zoom) =>
         string.Equals(_zoom, zoom, StringComparison.OrdinalIgnoreCase)
@@ -618,6 +644,20 @@
     }
 
     private void ResetTimelineZoom() => _timelineZoom = TimelineZoomDefault;
+
+    private void QueueCurrentTimeAutoScroll(bool force = false)
+    {
+        if (!ShowCurrentTimeMarker)
+            return;
+
+        var nextKey = $"{VisibleRangeStart:O}|{VisibleRangeEnd:O}|{_zoom}";
+        if (force
+            || (!string.Equals(_pendingNowScrollKey, nextKey, StringComparison.Ordinal)
+                && !string.Equals(_lastNowScrollKey, nextKey, StringComparison.Ordinal)))
+        {
+            _pendingNowScrollKey = nextKey;
+        }
+    }
 
     private int ScaleTimelinePixels(int pixels) =>
         (int)Math.Round(pixels * _timelineZoom, MidpointRounding.AwayFromZero);
