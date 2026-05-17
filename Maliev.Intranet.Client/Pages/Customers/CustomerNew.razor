@@ -742,7 +742,6 @@
             _lastExtractionAttempts = _currentExtractionAttempt;
             await ApplyExtractionAsync(bestResult);
             _lastExtraction = bestResult;
-            Snackbar.Add("Customer fields were autofilled from the highest-confidence AI extraction.", Severity.Success);
         }
         finally
         {

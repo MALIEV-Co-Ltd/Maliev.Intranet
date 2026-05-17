@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Logging;
-using MudBlazor.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
@@ -33,7 +32,7 @@ builder.Services.AddSingleton<FileTypesSettings>(sp =>
 builder.Services.AddSingleton<UploadSettings>(sp =>
     sp.GetRequiredService<IConfiguration>().GetSection("Upload").Get<UploadSettings>()!);
 builder.Services.AddSingleton<IMarkdownService, MarkdownService>();
-builder.Services.AddMudServices();
+builder.Services.AddMalievMudServices();
 
 
 // HttpClient for BFF communication - cookies are handled automatically by the browser

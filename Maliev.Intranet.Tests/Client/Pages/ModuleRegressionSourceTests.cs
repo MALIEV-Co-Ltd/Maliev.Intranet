@@ -134,6 +134,29 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void SnackbarPolicy_UsesNonBlockingDefaultsAndInlineAiExtractionFeedback()
+    {
+        var clientProgram = ReadRepoFile("Maliev.Intranet.Client", "Program.cs");
+        var bffProgram = ReadRepoFile("Maliev.Intranet.Bff", "Program.cs");
+        var snackbarPolicy = ReadRepoFile("Maliev.Intranet.Client", "Services", "MalievMudServices.cs");
+        var mainLayout = ReadRepoFile("Maliev.Intranet.Client", "Layout", "MainLayout.razor");
+        var customerNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor");
+
+        Assert.Contains("builder.Services.AddMalievMudServices();", clientProgram, StringComparison.Ordinal);
+        Assert.Contains("builder.Services.AddMalievMudServices();", bffProgram, StringComparison.Ordinal);
+        Assert.Contains("PositionClass = Defaults.Classes.Position.BottomLeft", snackbarPolicy, StringComparison.Ordinal);
+        Assert.Contains("MaxDisplayedSnackbars = 2", snackbarPolicy, StringComparison.Ordinal);
+        Assert.Contains("PreventDuplicates = true", snackbarPolicy, StringComparison.Ordinal);
+        Assert.Contains("ShowCloseIcon = true", snackbarPolicy, StringComparison.Ordinal);
+        Assert.Contains("VisibleStateDuration = 2600", snackbarPolicy, StringComparison.Ordinal);
+        Assert.Contains("ClearAfterNavigation = true", snackbarPolicy, StringComparison.Ordinal);
+        Assert.Contains("config.VisibleStateDuration = 5000;", mainLayout, StringComparison.Ordinal);
+        Assert.DoesNotContain("config.VisibleStateDuration = 10000;", mainLayout, StringComparison.Ordinal);
+        Assert.Contains("Autofilled from AI extraction", customerNew, StringComparison.Ordinal);
+        Assert.DoesNotContain("Customer fields were autofilled from the highest-confidence AI extraction.", customerNew, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_ExposesRouteBackedServiceNavigation()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");

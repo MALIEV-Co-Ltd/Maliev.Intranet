@@ -6,6 +6,7 @@ using Maliev.Intranet.Bff.Data;
 using Maliev.Intranet.Bff.Extensions;
 using Maliev.Intranet.Bff.Middleware;
 using Maliev.Intranet.Bff.Services;
+using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication;
@@ -16,7 +17,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
-using MudBlazor.Services;
 using StackExchange.Redis;
 using System.Security.Cryptography.X509Certificates;
 
@@ -73,7 +73,7 @@ try
     builder.Services.AddSingleton<Maliev.Intranet.Client.Services.UploadSettings>(sp =>
         sp.GetRequiredService<IConfiguration>().GetSection("Upload").Get<Maliev.Intranet.Client.Services.UploadSettings>()!);
     builder.Services.AddSignalR();
-    builder.Services.AddMudServices();
+    builder.Services.AddMalievMudServices();
     builder.AddStandardCache("IntranetBff");
     builder.Services.AddSingleton<IFileAnalysisStatusService, FileAnalysisStatusService>();
     builder.Services.AddScoped<ISystemHealthProbeService, SystemHealthProbeService>();

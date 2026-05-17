@@ -88,9 +88,9 @@
                     {
                         Snackbar.Add(message, Severity.Info, config =>
                         {
-                            config.VisibleStateDuration = 10000;
-                            config.HideTransitionDuration = 500;
-                            config.ShowTransitionDuration = 500;
+                            config.VisibleStateDuration = 5000;
+                            config.HideTransitionDuration = 120;
+                            config.ShowTransitionDuration = 120;
                         });
                         InvokeAsync(StateHasChanged);
                     });
