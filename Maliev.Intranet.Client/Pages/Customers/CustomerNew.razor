@@ -28,7 +28,14 @@
                             <strong>Extract from text or documents</strong>
                         </span>
                         <span class="ai-intake-toggle-meta">
-                            @GetAiIntakeStatus()
+                            @if (_extracting)
+                            {
+                                <MudProgressCircular Size="Size.Small"
+                                                     Color="Color.Primary"
+                                                     Indeterminate="true"
+                                                     Class="ai-processing-spinner" />
+                            }
+                            <span>@GetAiIntakeStatus()</span>
                             <MudIcon Icon="@(_aiIntakeExpanded ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)" />
                         </span>
                     </button>
@@ -96,6 +103,20 @@
                                     </SecondaryButton>
                                 </div>
                             </div>
+
+                            @if (_extracting)
+                            {
+                                <div class="ai-processing-state" role="status" aria-live="polite">
+                                    <MudProgressCircular Size="Size.Small"
+                                                         Color="Color.Primary"
+                                                         Indeterminate="true"
+                                                         Class="ai-processing-spinner" />
+                                    <span>
+                                        <strong>AI extraction in progress</strong>
+                                        <small>Analyzing customer text and documents. Attempt @_currentExtractionAttempt of @MaxExtractionAttempts.</small>
+                                    </span>
+                                </div>
+                            }
                         </div>
                     }
 

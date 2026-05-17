@@ -606,6 +606,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("MaxLines=\"10\"", page, StringComparison.Ordinal);
         Assert.Contains("Margin=\"Margin.None\"", page, StringComparison.Ordinal);
         Assert.DoesNotContain("Label=\"Paste customer text\"", page, StringComparison.Ordinal);
+        Assert.Contains("role=\"status\" aria-live=\"polite\"", page, StringComparison.Ordinal);
+        Assert.Contains("AI extraction in progress", page, StringComparison.Ordinal);
+        Assert.Contains("Class=\"ai-processing-spinner\"", page, StringComparison.Ordinal);
 
         Assert.Contains("--ai-extraction-surface-min-height: 132px;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(360px, 1fr) minmax(320px, 0.72fr);", ExtractCssBlock(styles, ".ai-intake {"), StringComparison.Ordinal);
@@ -623,6 +626,10 @@ public class ModuleRegressionSourceTests
         Assert.Contains("var(--ai-dropzone-fuchsia)", ExtractCssBlock(styles, ".document-dropzone.ai-dropzone {"), StringComparison.Ordinal);
         Assert.Contains("background: linear-gradient(135deg, var(--ai-dropzone-cyan), var(--ai-dropzone-violet) 58%, var(--ai-dropzone-fuchsia));", ExtractCssBlock(styles, ".document-dropzone.ai-dropzone .mud-icon-root"), StringComparison.Ordinal);
         Assert.Contains(".document-dropzone.ai-dropzone:hover,", styles, StringComparison.Ordinal);
+        Assert.Contains("display: inline-flex;", ExtractCssBlock(styles, ".ai-intake-toggle-meta"), StringComparison.Ordinal);
+        Assert.Contains("grid-column: 1 / -1;", ExtractCssBlock(styles, ".ai-processing-state {"), StringComparison.Ordinal);
+        Assert.Contains("var(--ai-dropzone-violet)", ExtractCssBlock(styles, ".ai-processing-state {"), StringComparison.Ordinal);
+        Assert.Contains("flex: 0 0 auto;", ExtractCssBlock(styles, ".ai-processing-spinner"), StringComparison.Ordinal);
         Assert.Contains("padding-top: 0;", ExtractCssBlock(responsiveStyles, ".ai-file-column {"), StringComparison.Ordinal);
     }
 
