@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 using Bunit;
 using Maliev.Intranet.Client.Components.Project;
 
@@ -31,6 +33,17 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
         Assert.Contains("part-queue-loader--thumb", loader.ClassList);
         Assert.Equal("status", loader.GetAttribute("role"));
         Assert.Equal("Part queued", loader.GetAttribute("aria-label"));
+
+        var stage = cut.Find("svg.part-queue-loader__stage");
+        Assert.Equal("-100 -100 200 200", stage.GetAttribute("viewBox"));
+        Assert.Equal("true", stage.GetAttribute("aria-hidden"));
+
+        var cubies = cut.FindAll("g.part-queue-loader__cubie");
+        Assert.Equal(27, cubies.Count);
+        Assert.Contains("--delay: 0s", cubies.First().GetAttribute("style"), StringComparison.Ordinal);
+        Assert.Contains("--delay: 2.167s", cubies.Last().GetAttribute("style"), StringComparison.Ordinal);
+        Assert.Equal(81, cut.FindAll("polygon.part-queue-loader__face-body").Count);
+        Assert.Equal(81, cut.FindAll("polygon.part-queue-loader__face-sticker").Count);
     }
 
     [Fact]
@@ -54,30 +67,30 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void PartQueueLoaderCss_UsesQueuedThumbnailAnimation()
+    public void PartQueueLoaderCss_UsesGlobeCubeCanvasAnimation()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartQueueLoader.razor.css");
 
         Assert.Contains("background: transparent", source);
         Assert.Contains("color: var(--maliev-ink)", source);
-        Assert.Contains("--queue-size: 55px", source);
-        Assert.Contains("--queue-tile-size: 25px", source);
-        Assert.Contains("width: var(--queue-size)", source);
-        Assert.Contains("height: var(--queue-size)", source);
-        Assert.Contains(".part-queue-loader::before", source);
-        Assert.Contains("conic-gradient(from 90deg", source);
-        Assert.Contains("conic-gradient(from -90deg", source);
-        Assert.Contains("currentColor 0", source);
-        Assert.Contains("background-size: var(--queue-tile-size) var(--queue-tile-size)", source);
-        Assert.Contains("animation: part-queue-loader 1.5s infinite", source);
-        Assert.Contains("@keyframes part-queue-loader", source);
-        Assert.Contains("background-position: 0 0, 0 100%, 100% 100%", source);
-        Assert.Contains("background-position: 100% 0, 0 100%, 100% 100%", source);
-        Assert.Contains("background-position: 100% 0, 0 0, 100% 100%", source);
-        Assert.Contains("background-position: 100% 0, 0 0, 0 100%", source);
-        Assert.Contains("background-position: 100% 100%, 0 0, 0 100%", source);
+        Assert.Contains("--queue-loader-duration: 7.8s", source);
+        Assert.Contains("width: var(--queue-loader-size)", source);
+        Assert.Contains("height: var(--queue-loader-size)", source);
+        Assert.Contains(".part-queue-loader__stage", source);
+        Assert.Contains(".part-queue-loader__cubie", source);
+        Assert.Contains("animation: part-queue-loader-drop var(--queue-loader-duration)", source);
+        Assert.Contains("animation-delay: var(--delay)", source);
+        Assert.Contains("@keyframes part-queue-loader-drop", source);
+        Assert.Contains("transform: translateY(-32px)", source);
+        Assert.Contains("54%", source);
+        Assert.Contains("66%", source);
+        Assert.Contains("100%", source);
+        Assert.Contains(".part-queue-loader__face-sticker--top", source);
+        Assert.Contains(".part-queue-loader__face-sticker--right", source);
+        Assert.Contains(".part-queue-loader__face-sticker--front", source);
         Assert.DoesNotContain("filter: blur", source, StringComparison.Ordinal);
         Assert.DoesNotContain("rotate(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("animation: part-queue-loader 1.5s infinite", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -94,7 +107,7 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
 
     private static string ReadRepoFile(params string[] relativeParts)
     {
-        foreach (var root in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory }.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var root in new[] { GetSourceDirectory(), AppContext.BaseDirectory, Environment.CurrentDirectory }.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             var current = new DirectoryInfo(root);
             while (current is not null)
@@ -109,4 +122,6 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
 
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
     }
+
+    private static string GetSourceDirectory([CallerFilePath] string sourceFile = "") => Path.GetDirectoryName(sourceFile) ?? Environment.CurrentDirectory;
 }

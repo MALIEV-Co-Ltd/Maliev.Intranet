@@ -1,9 +1,134 @@
 @namespace Maliev.Intranet.Client.Components.Project
 
-<div class="part-queue-loader @Class" role="status" aria-label="@Label"></div>
+<div class="part-queue-loader @Class" role="status" aria-label="@Label">
+    <svg class="part-queue-loader__stage" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+        @foreach (var cubie in Cubies)
+        {
+            <g class="part-queue-loader__cubie" style="@cubie.Style">
+                @foreach (var face in cubie.Faces)
+                {
+                    <polygon class="part-queue-loader__face-body" points="@face.BodyPoints" />
+                    <polygon class="part-queue-loader__face-sticker @face.StickerClass" points="@face.StickerPoints" />
+                }
+            </g>
+        }
+    </svg>
+</div>
 
 @code {
     [Parameter] public string? Class { get; set; }
 
     [Parameter] public string Label { get; set; } = "Part queued";
+
+    private const int CubeSize = 3;
+    private const double CubieEdge = 22d;
+    private const double CubieHalf = CubieEdge / 2d;
+    private const double StickerInset = 2d;
+    private const double BuildWindowSeconds = 2.25d;
+    private const double Cos30 = 0.8660254037844386d;
+    private const double Sin30 = 0.5d;
+    private const int CubieCount = CubeSize * CubeSize * CubeSize;
+
+    private static readonly IReadOnlyList<LoaderCubie> Cubies = BuildCubies();
+
+    private static IReadOnlyList<LoaderCubie> BuildCubies()
+    {
+        var cubies = new List<LoaderCubie>(CubieCount);
+        var perDelay = BuildWindowSeconds / CubieCount;
+        var buildIndex = 0;
+
+        for (var row = 0; row < CubeSize; row++)
+        {
+            for (var depth = 0; depth < CubeSize; depth++)
+            {
+                for (var column = 0; column < CubeSize; column++)
+                {
+                    var centerX = (column - 1) * CubieEdge;
+                    var centerY = (row - 1) * CubieEdge;
+                    var centerZ = (depth - 1) * CubieEdge;
+                    var center = Project(centerX, centerY, centerZ);
+                    var delay = buildIndex * perDelay;
+                    var style = FormattableString.Invariant($"--delay: {delay:0.###}s; --cx: {center.X:0.##}px; --cy: {center.Y:0.##}px;");
+
+                    var faces = new[]
+                    {
+                        new LoaderFace(
+                            Points(TopQuad(centerX, centerY, centerZ, CubieHalf)),
+                            Points(TopQuad(centerX, centerY, centerZ, CubieHalf - StickerInset)),
+                            "part-queue-loader__face-sticker--top"),
+                        new LoaderFace(
+                            Points(RightQuad(centerX, centerY, centerZ, CubieHalf)),
+                            Points(RightQuad(centerX, centerY, centerZ, CubieHalf - StickerInset)),
+                            "part-queue-loader__face-sticker--right"),
+                        new LoaderFace(
+                            Points(FrontQuad(centerX, centerY, centerZ, CubieHalf)),
+                            Points(FrontQuad(centerX, centerY, centerZ, CubieHalf - StickerInset)),
+                            "part-queue-loader__face-sticker--front")
+                    };
+
+                    cubies.Add(new LoaderCubie(style, faces));
+                    buildIndex++;
+                }
+            }
+        }
+
+        return cubies;
+    }
+
+    private static Point2D Project(double x, double y, double z) => new((x - z) * Cos30, -y + (x + z) * Sin30);
+
+    private static Point3D[] TopQuad(double centerX, double centerY, double centerZ, double half)
+    {
+        var y = centerY + half;
+
+        return
+        [
+            new(centerX - half, y, centerZ - half),
+            new(centerX + half, y, centerZ - half),
+            new(centerX + half, y, centerZ + half),
+            new(centerX - half, y, centerZ + half)
+        ];
+    }
+
+    private static Point3D[] FrontQuad(double centerX, double centerY, double centerZ, double half)
+    {
+        var z = centerZ + half;
+
+        return
+        [
+            new(centerX - half, centerY - half, z),
+            new(centerX + half, centerY - half, z),
+            new(centerX + half, centerY + half, z),
+            new(centerX - half, centerY + half, z)
+        ];
+    }
+
+    private static Point3D[] RightQuad(double centerX, double centerY, double centerZ, double half)
+    {
+        var x = centerX + half;
+
+        return
+        [
+            new(x, centerY - half, centerZ + half),
+            new(x, centerY - half, centerZ - half),
+            new(x, centerY + half, centerZ - half),
+            new(x, centerY + half, centerZ + half)
+        ];
+    }
+
+    private static string Points(IEnumerable<Point3D> corners) => string.Join(
+        ' ',
+        corners.Select(corner =>
+        {
+            var projected = Project(corner.X, corner.Y, corner.Z);
+            return FormattableString.Invariant($"{projected.X:0.##},{projected.Y:0.##}");
+        }));
+
+    private sealed record LoaderCubie(string Style, IReadOnlyList<LoaderFace> Faces);
+
+    private sealed record LoaderFace(string BodyPoints, string StickerPoints, string StickerClass);
+
+    private readonly record struct Point2D(double X, double Y);
+
+    private readonly record struct Point3D(double X, double Y, double Z);
 }
