@@ -140,44 +140,86 @@
                     @onclick="CloseDetails"></button>
             <div class="qsb-details-popover">
                 <div class="qsb-details-header">
-                    <div class="qsb-zone-label qsb-details-title">
-                        <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
-                        Quote Details
+                    <div class="qsb-details-heading">
+                        <div class="qsb-zone-label qsb-details-title">
+                            <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
+                            Quote Details
+                        </div>
+                        <div class="qsb-details-subtitle">Commercial adjustments</div>
                     </div>
                     <button type="button" class="qsb-details-close" title="Close quote details" @onclick="ToggleDetails">
                         <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
                     </button>
                 </div>
-                <div class="qsb-details-grid">
-                    <MudNumericField T="decimal"
-                                     Label="Shipping"
-                                     Value="@ShippingCost"
-                                     ValueChanged="OnShippingCostChanged"
-                                     Min="0m"
-                                     Immediate="true"
-                                     Variant="Variant.Outlined"
-                                     Margin="Margin.Dense"
-                                     HideSpinButtons="true" />
-                    <MudNumericField T="decimal"
-                                     Label="Discount"
-                                     Value="@ManualDiscountAmount"
-                                     ValueChanged="OnManualDiscountAmountChanged"
-                                     Min="0m"
-                                     Immediate="true"
-                                     Variant="Variant.Outlined"
-                                     Margin="Margin.Dense"
-                                     HideSpinButtons="true" />
+                <div class="qsb-adjustment-grid">
+                    <section class="qsb-adjustment-card qsb-adjustment-card--shipping" aria-label="Shipping adjustment">
+                        <div class="qsb-adjustment-top">
+                            <span class="qsb-adjustment-icon">
+                                <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Small" />
+                            </span>
+                            <span class="qsb-adjustment-copy">
+                                <span class="qsb-adjustment-name">Shipping</span>
+                                <span class="qsb-adjustment-hint">Freight, courier, or delivery charge</span>
+                            </span>
+                        </div>
+                        <div class="qsb-money-entry">
+                            <span class="qsb-money-prefix" aria-hidden="true">@CurrencyService.Symbol</span>
+                            <MudNumericField T="decimal"
+                                             Label="Shipping"
+                                             Value="@ShippingCost"
+                                             ValueChanged="OnShippingCostChanged"
+                                             Min="0m"
+                                             Immediate="true"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             HideSpinButtons="true" />
+                        </div>
+                    </section>
+                    <section class="qsb-adjustment-card qsb-adjustment-card--discount" aria-label="Discount adjustment">
+                        <div class="qsb-adjustment-top">
+                            <span class="qsb-adjustment-icon">
+                                <MudIcon Icon="@Icons.Material.Outlined.Payments" Size="Size.Small" />
+                            </span>
+                            <span class="qsb-adjustment-copy">
+                                <span class="qsb-adjustment-name">Discount</span>
+                                <span class="qsb-adjustment-hint">Manual reduction before VAT</span>
+                            </span>
+                        </div>
+                        <div class="qsb-money-entry">
+                            <span class="qsb-money-prefix" aria-hidden="true">@CurrencyService.Symbol</span>
+                            <MudNumericField T="decimal"
+                                             Label="Discount"
+                                             Value="@ManualDiscountAmount"
+                                             ValueChanged="OnManualDiscountAmountChanged"
+                                             Min="0m"
+                                             Immediate="true"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             HideSpinButtons="true" />
+                        </div>
+                    </section>
                 </div>
-                <MudTextField T="string"
-                              Label="Terms"
-                              Value="@QuotationTerms"
-                              ValueChanged="OnQuotationTermsChanged"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Immediate="true"
-                              Lines="4"
-                              FullWidth="true"
-                              Class="qsb-terms-field" />
+                <section class="qsb-terms-panel" aria-label="Quote terms">
+                    <div class="qsb-terms-heading">
+                        <span class="qsb-adjustment-icon qsb-terms-icon">
+                            <MudIcon Icon="@Icons.Material.Outlined.Description" Size="Size.Small" />
+                        </span>
+                        <span>
+                            <span class="qsb-adjustment-name">Terms</span>
+                            <span class="qsb-adjustment-hint">Payment, validity, and delivery conditions</span>
+                        </span>
+                    </div>
+                    <MudTextField T="string"
+                                  Label="Terms"
+                                  Value="@QuotationTerms"
+                                  ValueChanged="OnQuotationTermsChanged"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  Lines="4"
+                                  FullWidth="true"
+                                  Class="qsb-terms-field" />
+                </section>
             </div>
         }
     </div>
@@ -426,25 +468,45 @@
         right: 16px;
         bottom: calc(100% + 8px);
         z-index: 20;
-        width: min(420px, calc(100vw - 32px));
-        padding: 10px 12px 12px;
-        background: var(--maliev-panel);
-        border: 1px solid var(--maliev-border);
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+        width: min(460px, calc(100vw - 32px));
+        padding: 0;
+        overflow: hidden;
+        background:
+            linear-gradient(180deg, color-mix(in oklch, var(--mud-palette-primary) 8%, var(--maliev-panel)) 0%, var(--maliev-panel) 42%),
+            var(--maliev-panel);
+        border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 24%, var(--maliev-border));
+        border-radius: 8px;
+        box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 0;
     }
 
     .qsb-details-header {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 8px;
+        padding: 12px 14px 10px;
+        border-bottom: 1px solid color-mix(in oklch, var(--mud-palette-primary) 14%, var(--maliev-border));
+    }
+
+    .qsb-details-heading {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
     }
 
     .qsb-details-title {
         margin-bottom: 0;
+    }
+
+    .qsb-details-subtitle {
+        color: var(--maliev-muted);
+        font-size: var(--mud-typography-caption-size);
+        font-weight: 500;
+        letter-spacing: 0;
     }
 
     .qsb-details-close {
@@ -464,10 +526,137 @@
         color: var(--maliev-ink);
     }
 
-    .qsb-details-grid {
+    .qsb-adjustment-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .qsb-adjustment-card,
+    .qsb-terms-panel {
+        border: 1px solid var(--maliev-border);
+        border-radius: 8px;
+        background: color-mix(in oklch, var(--maliev-panel) 92%, white);
+    }
+
+    .qsb-adjustment-card {
+        min-width: 0;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .qsb-adjustment-card--shipping {
+        border-color: color-mix(in oklch, var(--mud-palette-info) 28%, var(--maliev-border));
+        background: color-mix(in oklch, var(--mud-palette-info) 7%, var(--maliev-panel));
+    }
+
+    .qsb-adjustment-card--discount {
+        border-color: color-mix(in oklch, var(--mud-palette-success) 26%, var(--maliev-border));
+        background: color-mix(in oklch, var(--mud-palette-success) 7%, var(--maliev-panel));
+    }
+
+    .qsb-adjustment-top,
+    .qsb-terms-heading {
+        display: flex;
+        align-items: flex-start;
         gap: 8px;
+        min-width: 0;
+    }
+
+    .qsb-adjustment-icon {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        border-radius: 7px;
+        color: var(--mud-palette-primary);
+        background: color-mix(in oklch, var(--mud-palette-primary) 10%, var(--maliev-panel));
+        border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 18%, transparent);
+    }
+
+    .qsb-adjustment-card--shipping .qsb-adjustment-icon {
+        color: var(--mud-palette-info);
+        background: color-mix(in oklch, var(--mud-palette-info) 12%, var(--maliev-panel));
+        border-color: color-mix(in oklch, var(--mud-palette-info) 20%, transparent);
+    }
+
+    .qsb-adjustment-card--discount .qsb-adjustment-icon {
+        color: var(--mud-palette-success);
+        background: color-mix(in oklch, var(--mud-palette-success) 12%, var(--maliev-panel));
+        border-color: color-mix(in oklch, var(--mud-palette-success) 20%, transparent);
+    }
+
+    .qsb-adjustment-copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+    }
+
+    .qsb-adjustment-name {
+        display: block;
+        color: var(--maliev-ink);
+        font-size: var(--mud-typography-body2-size);
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: 0;
+    }
+
+    .qsb-adjustment-hint {
+        display: block;
+        color: var(--maliev-muted);
+        font-size: var(--mud-typography-caption-size);
+        line-height: 1.25;
+        letter-spacing: 0;
+    }
+
+    .qsb-money-entry {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .qsb-money-prefix {
+        height: 40px;
+        min-width: 40px;
+        padding: 0 8px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--maliev-border);
+        border-radius: 6px;
+        background: var(--maliev-panel);
+        color: var(--maliev-ink);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: var(--mud-typography-body2-size);
+        font-weight: 700;
+        letter-spacing: 0;
+    }
+
+    .qsb-money-entry ::deep .mud-input-control {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .qsb-terms-panel {
+        margin: 0 12px 12px;
+        padding: 10px;
+        border-color: color-mix(in oklch, var(--mud-palette-warning) 24%, var(--maliev-border));
+        background: color-mix(in oklch, var(--mud-palette-warning) 7%, var(--maliev-panel));
+    }
+
+    .qsb-terms-heading {
+        margin-bottom: 10px;
+    }
+
+    .qsb-terms-icon {
+        color: var(--mud-palette-warning);
+        background: color-mix(in oklch, var(--mud-palette-warning) 12%, var(--maliev-panel));
+        border-color: color-mix(in oklch, var(--mud-palette-warning) 20%, transparent);
     }
 
     .qsb-details-popover ::deep .mud-input-control {
@@ -480,8 +669,8 @@
     }
 
     .qsb-details-popover ::deep textarea {
-        min-height: 74px !important;
-        line-height: 1.3;
+        min-height: 84px !important;
+        line-height: 1.35;
         resize: vertical;
     }
 
@@ -580,7 +769,7 @@
             margin-top: 8px;
             box-shadow: none;
         }
-        .qsb-details-grid {
+        .qsb-adjustment-grid {
             grid-template-columns: 1fr;
         }
         .qsb-details-popover ::deep textarea {
