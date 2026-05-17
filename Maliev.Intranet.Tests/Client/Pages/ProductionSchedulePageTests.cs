@@ -4,6 +4,7 @@ using System.Text.Json;
 
 using Bunit;
 
+using Maliev.Intranet.Client.Components.Production;
 using Maliev.Intranet.Client.Pages.Manufacturing;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
@@ -180,6 +181,24 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             Assert.Contains("Move slot", cut.Markup);
         });
         Assert.DoesNotContain(_requestedRequests, request => request == $"GET /api/v1/jobs/{_holdId}");
+    }
+
+    [Fact]
+    public void ProductionScheduleBoard_CurrentTimeMarker_RendersWithinVisibleRangeAndHighlightsRunningSlot()
+    {
+        var now = new DateTime(2026, 5, 7, 10, 30, 0, DateTimeKind.Utc);
+        _boardRangeStart = now.Date;
+        var board = BuildBoard();
+
+        var cut = Render<ProductionScheduleBoard>(parameters => parameters
+            .Add(component => component.Board, board)
+            .Add(component => component.CurrentTimeUtc, now));
+
+        Assert.Contains("psb-now-overlay", cut.Markup);
+        Assert.Contains("data-current-time=\"2026-05-07T10:30:00.0000000Z\"", cut.Markup);
+        Assert.Contains("data-current-position=\"6.25\"", cut.Markup);
+        Assert.Contains("psb-slot-running-now", cut.Markup);
+        Assert.Contains("psb-slot-live", cut.Markup);
     }
 
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)

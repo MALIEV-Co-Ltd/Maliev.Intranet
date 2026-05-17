@@ -1,6 +1,7 @@
 @using System.Globalization
 @using Microsoft.AspNetCore.Components.Web
 @using Maliev.Intranet.Shared.Dtos
+@implements IAsyncDisposable
 
 <section class="@BoardClass"
          aria-label="@AriaLabel"
@@ -75,6 +76,7 @@
     <div class="psb-legend" aria-label="Schedule legend">
         <span><i class="job"></i> Job</span>
         <span><i class="hold"></i> Planning hold</span>
+        <span><i class="now"></i> Now</span>
         <span><i class="maintenance"></i> Maintenance</span>
         <span><i class="proposed"></i> Proposed slot</span>
         <span><i class="locked"></i> Locked</span>
@@ -125,6 +127,21 @@
                     }
                 }
             </div>
+
+            @if (ShowCurrentTimeMarker)
+            {
+                <div class="psb-now-overlay"
+                     style="@GridStyle"
+                     aria-label="@CurrentTimeMarkerLabel"
+                     data-current-time="@FormatSlotInstant(CurrentScheduleTimeUtc)"
+                     data-current-position="@CurrentTimePositionPercent.ToString("0.###", CultureInfo.InvariantCulture)">
+                    <div class="psb-now-track">
+                        <div class="psb-now-line" style="@CurrentTimeMarkerStyle">
+                            <span>@CurrentTimeMarkerText</span>
+                        </div>
+                    </div>
+                </div>
+            }
 
             @foreach (var group in MachineGroups)
             {
@@ -187,6 +204,10 @@
                                     {
                                         <span class="psb-slot-move" @onclick:stopPropagation="true" @onclick="@(() => RequestMoveAsync(slot))">Move</span>
                                     }
+                                    @if (SlotContainsCurrentTime(slot))
+                                    {
+                                        <span class="psb-slot-live">Now</span>
+                                    }
                                 </button>
                             }
                         </div>
@@ -237,6 +258,9 @@
     /// <summary>Raised when a slot is dropped onto a concrete board time slot.</summary>
     [Parameter] public EventCallback<ProductionScheduleSlotMoveRequest> SlotDropped { get; set; }
 
+    /// <summary>Gets or sets an override for the current UTC time, intended for deterministic tests.</summary>
+    [Parameter] public DateTime? CurrentTimeUtc { get; set; }
+
     private const int MachineColumnMinWidth = 180;
     private const int MachineColumnMaxWidth = 220;
     private const int DayColumnMinWidth = 180;
@@ -255,6 +279,9 @@
     private decimal _timelineZoom = TimelineZoomDefault;
     private Guid? _selectedSlotId;
     private ProductionScheduleSlotDto? _draggingSlot;
+    private CancellationTokenSource? _clockCts;
+    private Task? _clockTask;
+    private DateTime _currentTimeUtc = DateTime.UtcNow;
 
     private string BoardClass => string.Join(
         ' ',
@@ -280,6 +307,28 @@
     private bool CanZoomOut => _timelineZoom > TimelineZoomMin;
 
     private string BoardShellStyle => $"--psb-board-zoom: {_timelineZoom.ToString("0.##", CultureInfo.InvariantCulture)};";
+
+    private DateTime CurrentScheduleTimeUtc => NormalizeUtc(CurrentTimeUtc ?? _currentTimeUtc);
+
+    private bool ShowCurrentTimeMarker =>
+        CurrentScheduleTimeUtc >= VisibleRangeStart && CurrentScheduleTimeUtc < VisibleRangeEnd;
+
+    private double CurrentTimePositionPercent
+    {
+        get
+        {
+            var rangeMinutes = Math.Max(1, (VisibleRangeEnd - VisibleRangeStart).TotalMinutes);
+            return Math.Clamp((CurrentScheduleTimeUtc - VisibleRangeStart).TotalMinutes / rangeMinutes * 100, 0, 100);
+        }
+    }
+
+    private string CurrentTimeMarkerStyle =>
+        $"--psb-now-left: {CurrentTimePositionPercent.ToString("0.###", CultureInfo.InvariantCulture)}%;";
+
+    private string CurrentTimeMarkerText =>
+        CurrentScheduleTimeUtc.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
+
+    private string CurrentTimeMarkerLabel => $"Current time {CurrentTimeMarkerText}";
 
     private IReadOnlyList<DateTime> VisibleDays => Enumerable
         .Range(0, Math.Max(1, (VisibleRangeEnd.Date - VisibleRangeStart.Date).Days))
@@ -339,6 +388,16 @@
         }
     }
 
+    protected override void OnInitialized()
+    {
+        _currentTimeUtc = DateTime.UtcNow;
+        if (!CurrentTimeUtc.HasValue)
+        {
+            _clockCts = new CancellationTokenSource();
+            _clockTask = RunClockAsync(_clockCts.Token);
+        }
+    }
+
     protected override void OnParametersSet()
     {
         var boardStart = NormalizeUtc(Board?.RangeStart ?? DateTime.UtcNow).Date;
@@ -384,6 +443,9 @@
 
         if (slot.ProjectPartId == SelectedPartId || slot.SlotId == _selectedSlotId)
             classes.Add("psb-slot-selected");
+
+        if (SlotContainsCurrentTime(slot))
+            classes.Add("psb-slot-running-now");
 
         if (IsLocked(slot))
             classes.Add("psb-slot-locked");
@@ -487,6 +549,44 @@
             await OnRefresh.InvokeAsync();
     }
 
+    private async Task RunClockAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                _currentTimeUtc = DateTime.UtcNow;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (_clockCts is not null)
+        {
+            await _clockCts.CancelAsync();
+        }
+
+        if (_clockTask is not null)
+        {
+            try
+            {
+                await _clockTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _clockCts?.Dispose();
+    }
+
     private async Task NavigateRange(int direction)
     {
         _localRangeStart = VisibleRangeStart.AddDays(direction * (_zoom == "Day" ? 1 : 7));
@@ -546,6 +646,15 @@
             || slot.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
             || slot.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
             || slot.Status.Equals("Expired", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool SlotContainsCurrentTime(ProductionScheduleSlotDto slot)
+    {
+        if (slot.IsMaintenance || slot.IsProposed)
+            return false;
+
+        var now = CurrentScheduleTimeUtc;
+        return NormalizeUtc(slot.ScheduledStart) <= now && NormalizeUtc(slot.ScheduledEnd) > now;
     }
 
     private static string SlotLabel(ProductionScheduleSlotDto slot) =>
