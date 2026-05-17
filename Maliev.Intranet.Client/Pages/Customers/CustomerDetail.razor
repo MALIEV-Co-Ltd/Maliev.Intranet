@@ -465,7 +465,9 @@
                               @bind:event="oninput"></textarea>
                     <div class="customer-note-composer-footer">
                         <span class="@NoteCounterClass">@NoteCharacterCount.ToString("N0") / @InternalNoteMaxLength.ToString("N0") characters</span>
-                        <PrimaryButton Class="customer-post-note" OnClick="PostNoteAsync" Disabled="@(!CanPostInternalNote)">Post note</PrimaryButton>
+                        <PrimaryButton Class="customer-post-note" OnClick="PostNoteAsync" Disabled="@(!CanPostInternalNote)">
+                            @(_postingNote ? "Posting..." : "Post note")
+                        </PrimaryButton>
                     </div>
                 </section>
 
@@ -793,6 +795,7 @@
     private CompanyEditModel? _companyEdit;
     private bool _loading = true;
     private bool _saving;
+    private bool _postingNote;
     private bool _sendingEmail;
     private bool _emailComposerOpen;
     private bool _emailQueued;
@@ -852,7 +855,7 @@
     private string EmailConfirmLabel => _sendingEmail ? "Sending..." : _emailQueued ? "Queued" : "Send email";
     private bool EmailConfirmDisabled => _sendingEmail || _emailQueued;
     private int NoteCharacterCount => _newNoteText.Length;
-    private bool CanPostInternalNote => !string.IsNullOrWhiteSpace(_newNoteText) && NoteCharacterCount <= InternalNoteMaxLength;
+    private bool CanPostInternalNote => !_postingNote && !string.IsNullOrWhiteSpace(_newNoteText) && NoteCharacterCount <= InternalNoteMaxLength;
     private string NoteCounterClass => NoteCharacterCount > InternalNoteMaxLength ? "customer-note-counter over-limit" : "customer-note-counter";
     private string AddressLookupStateClass => _addressLookupMessageIsWarning
         ? "customer-address-lookup-state warning"
@@ -1406,24 +1409,26 @@
 
     private async Task PostNoteAsync(MouseEventArgs _)
     {
-        if (_customer is null || !CanPostInternalNote)
+        if (_customer is null || _postingNote || !CanPostInternalNote)
         {
             return;
         }
 
+        var noteText = _newNoteText.Trim();
+        _postingNote = true;
+        await InvokeAsync(StateHasChanged);
         try
         {
             var response = await Http.PostAsJsonAsync($"api/v1/customers/{Id}/notes", new CreateInternalNoteRequest
             {
                 OwnerType = "Customer",
                 OwnerId = Id,
-                NoteText = _newNoteText.Trim()
+                NoteText = noteText
             });
 
             if (response.IsSuccessStatusCode)
             {
                 _newNoteText = string.Empty;
-                Snackbar.Add("Note posted.", Severity.Success);
                 await LoadAsync();
                 _activeTab = CustomerDetailTab.Notes;
             }
@@ -1436,6 +1441,10 @@
         {
             Snackbar.Add("Note could not be posted.", Severity.Warning);
             Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _postingNote = false;
         }
     }
 

@@ -21,6 +21,8 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly List<CustomerEmailRequest> _emailRequests = [];
     private readonly List<JsonDocument> _customerUpdatePayloads = [];
     private readonly List<JsonDocument> _addressCreatePayloads = [];
+    private readonly List<JsonDocument> _noteCreatePayloads = [];
+    private TaskCompletionSource<object?>? _notePostRelease;
     private bool _includeDuplicateDefaultBilling;
     private bool _projectResponseIsEmpty;
 
@@ -421,6 +423,44 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void CustomerDetail_PostNote_DisablesComposerAndIgnoresDuplicateClicksWhilePosting()
+    {
+        _notePostRelease = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='notes']").Click();
+        cut.Find("textarea.customer-internal-note-input").Input("Call customer before releasing drawings.");
+
+        cut.WaitForAssertion(() => Assert.False(cut.Find("button.customer-post-note").HasAttribute("disabled")));
+
+        cut.Find("button.customer-post-note").Click();
+        cut.Find("button.customer-post-note").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Single(_noteCreatePayloads);
+            var postingButton = cut.Find("button.customer-post-note");
+            Assert.True(postingButton.HasAttribute("disabled"));
+            Assert.Contains("Posting...", postingButton.TextContent, StringComparison.Ordinal);
+        });
+
+        _notePostRelease.SetResult(null);
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Single(_noteCreatePayloads);
+            Assert.Contains("0 / 5,000 characters", cut.Markup);
+            Assert.DoesNotContain("Posting...", cut.Markup, StringComparison.Ordinal);
+        });
+
+        var payload = _noteCreatePayloads.Single().RootElement;
+        Assert.Equal("Customer", payload.GetProperty("ownerType").GetString());
+        Assert.Equal(_customerId, payload.GetProperty("ownerId").GetGuid());
+        Assert.Equal("Call customer before releasing drawings.", payload.GetProperty("noteText").GetString());
+    }
+
+    [Fact]
     public void CustomerDetail_InternalNotesUseMultilineTextStyle()
     {
         var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
@@ -798,6 +838,12 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
             });
         }
 
+        if (request.Method == HttpMethod.Post &&
+            pathAndQuery.Equals($"/api/v1/customers/{_customerId}/notes", StringComparison.Ordinal))
+        {
+            return HandleNoteCreateAsync(request);
+        }
+
         if (request.Method == HttpMethod.Patch &&
             pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
         {
@@ -851,4 +897,25 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         {
             Content = JsonContent.Create(body)
         });
+
+    private async Task<HttpResponseMessage> HandleNoteCreateAsync(HttpRequestMessage request)
+    {
+        var payload = await (request.Content?.ReadAsStringAsync() ?? Task.FromResult("{}"));
+        _noteCreatePayloads.Add(JsonDocument.Parse(payload));
+
+        if (_notePostRelease is not null)
+        {
+            await _notePostRelease.Task;
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.Created)
+        {
+            Content = JsonContent.Create(new InternalNoteResponse
+            {
+                NoteText = "Call customer before releasing drawings.",
+                CreatedByName = "Alex Kim",
+                CreatedAt = new DateTime(2026, 5, 17, 10, 30, 0, DateTimeKind.Utc)
+            })
+        };
+    }
 }
