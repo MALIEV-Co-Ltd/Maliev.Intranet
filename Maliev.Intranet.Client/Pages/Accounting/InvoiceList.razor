@@ -13,7 +13,7 @@
     <ModuleHeader Title="Accounting" Subtitle="Invoices, journal entries, reporting, periods, reconciliation, and payroll journal impact.">
         @if (IsQuickEntryTab)
         {
-            <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@CreateCurrentQuickEntryAsync">Post Entry</PrimaryButton>
+            <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" Busy="@IsCurrentQuickEntrySubmitting" BusyLabel="Posting..." OnClick="@CreateCurrentQuickEntryAsync">Post Entry</PrimaryButton>
         }
     </ModuleHeader>
 
@@ -157,8 +157,16 @@
                         }
                     </FormField>
                 </FormGrid>
+                @if (!string.IsNullOrWhiteSpace(_incomeForm.ErrorMessage))
+                {
+                    <div class="mlv-error mt-4" role="alert">@_incomeForm.ErrorMessage</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_incomeForm.StatusMessage))
+                {
+                    <div class="mlv-status mt-4" role="status">@_incomeForm.StatusMessage</div>
+                }
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
-                    <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@(_ => CreateIncomeAsync())">Create income journal</PrimaryButton>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" Busy="@_incomeForm.IsSubmitting" BusyLabel="Creating..." OnClick="@(_ => CreateIncomeAsync())">Create income journal</PrimaryButton>
                 </div>
             </PanelCard>
         }
@@ -197,8 +205,16 @@
                         }
                     </FormField>
                 </FormGrid>
+                @if (!string.IsNullOrWhiteSpace(_expenseForm.ErrorMessage))
+                {
+                    <div class="mlv-error mt-4" role="alert">@_expenseForm.ErrorMessage</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_expenseForm.StatusMessage))
+                {
+                    <div class="mlv-status mt-4" role="status">@_expenseForm.StatusMessage</div>
+                }
                 <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
-                    <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" OnClick="@(_ => CreateExpenseAsync())">Create expense journal</PrimaryButton>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.PostAdd" Busy="@_expenseForm.IsSubmitting" BusyLabel="Creating..." OnClick="@(_ => CreateExpenseAsync())">Create expense journal</PrimaryButton>
                 </div>
             </PanelCard>
         }
@@ -372,6 +388,11 @@
 
     private bool IsQuickEntryTab => _tab is "Income Entry" or "Expense Entry";
 
+    private bool IsCurrentQuickEntrySubmitting =>
+        _tab == "Income Entry"
+            ? _incomeForm.IsSubmitting
+            : _tab == "Expense Entry" && _expenseForm.IsSubmitting;
+
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private void SetTab(string tab) => _tab = tab;
@@ -481,6 +502,12 @@
 
     private async Task CreateIncomeAsync()
     {
+        if (_incomeForm.IsSubmitting)
+        {
+            return;
+        }
+
+        ResetQuickJournalMessages(_incomeForm);
         if (PrepareAccounts(_incomeForm, _incomeDebitAccountId, _incomeCreditAccountId))
         {
             await CreateJournalAsync(_incomeForm, "Income journal created.");
@@ -489,6 +516,12 @@
 
     private async Task CreateExpenseAsync()
     {
+        if (_expenseForm.IsSubmitting)
+        {
+            return;
+        }
+
+        ResetQuickJournalMessages(_expenseForm);
         if (PrepareAccounts(_expenseForm, _expenseDebitAccountId, _expenseCreditAccountId))
         {
             await CreateJournalAsync(_expenseForm, "Expense journal created.");
@@ -497,49 +530,72 @@
 
     private async Task CreateJournalAsync(QuickJournalForm form, string successMessage)
     {
+        if (form.IsSubmitting)
+        {
+            return;
+        }
+
         if (form.Amount <= 0 || form.DebitAccountId == Guid.Empty || form.CreditAccountId == Guid.Empty)
         {
-            Snackbar.Add("Enter debit account, credit account, and amount.", Severity.Warning);
+            SetQuickJournalError(form, "Enter debit account, credit account, and amount.");
             return;
         }
 
         if (form.ExchangeRateToBase <= 0m)
         {
-            Snackbar.Add("Enter a valid exchange rate for the selected currency.", Severity.Warning);
+            SetQuickJournalError(form, "Enter a valid exchange rate for the selected currency.");
             return;
         }
 
-        var documentReference = await UploadJournalEvidenceAsync(form);
-        if (form.Document is not null && string.IsNullOrWhiteSpace(documentReference))
+        form.IsSubmitting = true;
+        form.StatusMessage = form.Document is null ? "Creating journal entry..." : "Uploading document evidence...";
+        try
         {
-            return;
-        }
+            var hadDocument = form.Document is not null;
+            var documentReference = await UploadJournalEvidenceAsync(form);
+            if (hadDocument && string.IsNullOrWhiteSpace(documentReference))
+            {
+                return;
+            }
 
-        var reference = CombineReference(form.Reference, documentReference);
-        var currencyCode = NormalizeCurrencyCode(form.CurrencyCode);
-        var bookAmount = ToBaseAmount(form.Amount, form.ExchangeRateToBase);
-        var request = new CreateJournalEntryRequest
-        {
-            Date = form.Date,
-            Description = form.Description,
-            Reference = reference,
-            CurrencyCode = currencyCode,
-            ExchangeRateToBase = form.ExchangeRateToBase,
-            Lines =
+            form.StatusMessage = "Creating journal entry...";
+            var reference = CombineReference(form.Reference, documentReference);
+            var currencyCode = NormalizeCurrencyCode(form.CurrencyCode);
+            var bookAmount = ToBaseAmount(form.Amount, form.ExchangeRateToBase);
+            var request = new CreateJournalEntryRequest
+            {
+                Date = form.Date,
+                Description = form.Description,
+                Reference = reference,
+                CurrencyCode = currencyCode,
+                ExchangeRateToBase = form.ExchangeRateToBase,
+                Lines =
             [
                 new JournalEntryLineDto { AccountId = form.DebitAccountId, Debit = bookAmount, TransactionDebit = form.Amount, Description = form.Description, Reference = reference },
                 new JournalEntryLineDto { AccountId = form.CreditAccountId, Credit = bookAmount, TransactionCredit = form.Amount, Description = form.Description, Reference = reference }
             ]
-        };
+            };
 
-        var response = await Http.PostAsJsonAsync("api/v1/accounting/journal-entries", request);
-        Snackbar.Add(response.IsSuccessStatusCode ? successMessage : "Journal entry could not be created.", response.IsSuccessStatusCode ? Severity.Success : Severity.Warning);
-        if (response.IsSuccessStatusCode)
-        {
+            using var response = await Http.PostAsJsonAsync("api/v1/accounting/journal-entries", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                SetQuickJournalError(form, await ReadFailureMessageAsync(response, "Journal entry could not be created."));
+                return;
+            }
+
             form.Reference = string.Empty;
             form.Document = null;
+            form.StatusMessage = successMessage;
             _journalPage = 1;
             await LoadJournalEntriesAsync();
+        }
+        catch (Exception ex)
+        {
+            SetQuickJournalError(form, $"Journal entry could not be created: {ex.Message}");
+        }
+        finally
+        {
+            form.IsSubmitting = false;
         }
     }
 
@@ -579,6 +635,12 @@
             return null;
         }
 
+        if (form.Document.Size > MaxAccountingDocumentBytes)
+        {
+            SetQuickJournalError(form, $"Document exceeds the {MaxAccountingDocumentBytes / 1024 / 1024} MB limit.");
+            return null;
+        }
+
         try
         {
             await using var stream = form.Document.OpenReadStream(MaxAccountingDocumentBytes);
@@ -594,16 +656,17 @@
             using var response = await Http.PostAsync($"api/v1/accounting/documents?category={Uri.EscapeDataString(category)}", content);
             if (!response.IsSuccessStatusCode)
             {
-                Snackbar.Add("Document could not be uploaded.", Severity.Warning);
+                SetQuickJournalError(form, await ReadFailureMessageAsync(response, "Document could not be uploaded."));
                 return null;
             }
 
             var upload = await response.Content.ReadFromJsonAsync<BffUploadResponse>();
             return string.IsNullOrWhiteSpace(upload?.UploadId) ? upload?.StoragePath : $"doc:{upload.UploadId}";
         }
-        catch (IOException)
+        catch (Exception ex)
         {
-            Snackbar.Add($"Document exceeds the {MaxAccountingDocumentBytes / 1024 / 1024} MB limit.", Severity.Warning);
+            form.Document = null;
+            SetQuickJournalError(form, $"The selected document could not be read. Choose it again before posting: {ex.Message}");
             return null;
         }
     }
@@ -617,6 +680,26 @@
         return string.IsNullOrWhiteSpace(combined)
             ? null
             : combined.Length <= 100 ? combined : combined[..100];
+    }
+
+    private static async Task<string> ReadFailureMessageAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            var details = (await response.Content.ReadAsStringAsync()).Trim();
+            if (details.Length > 240)
+            {
+                details = $"{details[..240]}...";
+            }
+
+            return string.IsNullOrWhiteSpace(details)
+                ? $"{fallback} ({(int)response.StatusCode})"
+                : $"{fallback} ({(int)response.StatusCode}: {details})";
+        }
+        catch
+        {
+            return fallback;
+        }
     }
 
     private async Task PostJournalEntryAsync(Guid id)
@@ -679,13 +762,25 @@
     {
         if (!Guid.TryParse(debitAccountId, out var debitId) || !Guid.TryParse(creditAccountId, out var creditId))
         {
-            Snackbar.Add("Select valid debit and credit accounts.", Severity.Warning);
+            SetQuickJournalError(form, "Select valid debit and credit accounts.");
             return false;
         }
 
         form.DebitAccountId = debitId;
         form.CreditAccountId = creditId;
         return true;
+    }
+
+    private static void ResetQuickJournalMessages(QuickJournalForm form)
+    {
+        form.ErrorMessage = null;
+        form.StatusMessage = null;
+    }
+
+    private static void SetQuickJournalError(QuickJournalForm form, string message)
+    {
+        form.StatusMessage = null;
+        form.ErrorMessage = message;
     }
 
     private void ApplyAccountDefaults()
@@ -794,8 +889,17 @@
         public string? CurrencyMessage { get; set; }
 
         public IBrowserFile? Document { get; set; }
+
+        public bool IsSubmitting { get; set; }
+
+        public string? StatusMessage { get; set; }
+
+        public string? ErrorMessage { get; set; }
     }
 
-    private static void OnDocumentSelected(InputFileChangeEventArgs args, QuickJournalForm form) =>
+    private static void OnDocumentSelected(InputFileChangeEventArgs args, QuickJournalForm form)
+    {
         form.Document = args.FileCount > 0 ? args.File : null;
+        ResetQuickJournalMessages(form);
+    }
 }

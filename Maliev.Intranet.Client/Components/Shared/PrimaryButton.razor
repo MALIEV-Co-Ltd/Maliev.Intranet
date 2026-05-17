@@ -10,12 +10,23 @@
 }
 else
 {
-    <button class="mlv-button primary @Class" type="@Type" disabled="@Disabled" @onclick="OnClick">
-        @if (!string.IsNullOrWhiteSpace(Icon))
+    <button class="mlv-button primary @Class" type="@Type" disabled="@(Disabled || Busy)" aria-busy="@Busy" @onclick="OnClick">
+        @if (Busy)
+        {
+            <MudProgressCircular Class="mlv-button-spinner" Size="Size.Small" Indeterminate="true" />
+        }
+        else if (!string.IsNullOrWhiteSpace(Icon))
         {
             <MudIcon Icon="@Icon" Size="Size.Small" />
         }
-        <span>@ChildContent</span>
+        @if (Busy && !string.IsNullOrWhiteSpace(BusyLabel))
+        {
+            <span>@BusyLabel</span>
+        }
+        else
+        {
+            <span>@ChildContent</span>
+        }
     </button>
 }
 
@@ -25,6 +36,8 @@ else
     [Parameter] public string? Href { get; set; }
     [Parameter] public string Type { get; set; } = "button";
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? BusyLabel { get; set; }
     [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
     [Parameter] public string? Class { get; set; }
 }

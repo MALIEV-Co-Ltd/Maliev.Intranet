@@ -261,6 +261,24 @@
     font-size: var(--maliev-font-small);
 }
 
+.mlv-status {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-ok-bg);
+    box-shadow: var(--maliev-shadow-ring);
+    color: var(--maliev-ok);
+    font-size: var(--maliev-font-small);
+}
+
+.mlv-form-hint {
+    margin-top: 6px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    overflow-wrap: anywhere;
+}
+
 .mlv-pagination-footer {
     display: flex;
     align-items: center;

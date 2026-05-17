@@ -347,6 +347,10 @@ public class ModuleRegressionSourceTests
         Assert.Contains("OnCurrencyChangedAsync", source, StringComparison.Ordinal);
         Assert.Contains("ExchangeRateToBase", source, StringComparison.Ordinal);
         Assert.Contains("TransactionDebit", source, StringComparison.Ordinal);
+        Assert.Contains("Busy=\"@_incomeForm.IsSubmitting\"", source, StringComparison.Ordinal);
+        Assert.Contains("role=\"alert\"", source, StringComparison.Ordinal);
+        Assert.Contains("ReadFailureMessageAsync", source, StringComparison.Ordinal);
+        Assert.Contains("The selected document could not be read", source, StringComparison.Ordinal);
         Assert.Contains("Payroll journals are produced by CompensationService payroll runs", source, StringComparison.Ordinal);
         Assert.Contains("api/v1/invoices?page={_invoicePage}&pageSize={_pageSize}", source, StringComparison.Ordinal);
         Assert.Contains("api/v1/accounting/journal-entries?page={_journalPage}&pageSize={_pageSize}", source, StringComparison.Ordinal);
