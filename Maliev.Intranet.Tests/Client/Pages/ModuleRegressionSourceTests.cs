@@ -425,6 +425,7 @@ public class ModuleRegressionSourceTests
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialList.razor");
         var listStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialList.razor.css");
         var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor");
+        var detailStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor.css");
 
         Assert.Contains("@page \"/mfg/materials\"", list, StringComparison.Ordinal);
         Assert.Contains("@page \"/mfg/materials/{Id:guid}\"", detail, StringComparison.Ordinal);
@@ -439,10 +440,25 @@ public class ModuleRegressionSourceTests
         Assert.Contains("material-color-dot", detail, StringComparison.Ordinal);
         Assert.Contains("MalievPermissions.Material.Update", detail, StringComparison.Ordinal);
         Assert.Contains("roles.platform.owner", detail, StringComparison.Ordinal);
-        Assert.Contains("Aggregate stock; barcode lots pending", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Aggregate stock; barcode lots pending", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard>", list, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard Title=\"Inventory control\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Profile\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Properties\">", detail, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard Title=\"Stock audit\">", detail, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard Title=\"Inventory label\">", detail, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard Title=\"Suppliers\">", detail, StringComparison.Ordinal);
+        Assert.Contains("BuildCode39Svg", detail, StringComparison.Ordinal);
+        Assert.Contains("RecentTransactions", detail, StringComparison.Ordinal);
+        Assert.Contains("Suppliers", detail, StringComparison.Ordinal);
+        Assert.Contains("CreatePurchaseOrder", detail, StringComparison.Ordinal);
+        Assert.Contains("No count or adjustment history has been returned for this material yet.", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("MaterialService does not currently", detail, StringComparison.Ordinal);
+        Assert.Contains("material-detail-layout", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("material-inventory-status", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("material-barcode-svg", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("material-audit-entry", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("material-supplier-entry", detailStyles, StringComparison.Ordinal);
         Assert.Contains("class=\"mlv-table\"", list, StringComparison.Ordinal);
         Assert.DoesNotContain("<th>Code</th>", list, StringComparison.Ordinal);
         Assert.DoesNotContain("<td class=\"mlv-mono\">@material.SKU</td>", list, StringComparison.Ordinal);

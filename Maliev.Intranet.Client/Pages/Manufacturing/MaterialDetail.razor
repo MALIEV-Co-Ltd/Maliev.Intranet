@@ -1,10 +1,13 @@
 @page "/mfg/materials/{Id:guid}"
 @using System.ComponentModel.DataAnnotations
+@using System.Globalization
 @using System.Security.Claims
+@using System.Text
 @using Maliev.Intranet.Shared
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @inject HttpClient Http
+@inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthStateProvider
 
@@ -42,7 +45,7 @@
         else
         {
             <StatBar Class="mb-4">
-                <StatTile Label="Stock" Value="@($"{_material.QuantityOnHand:N0} {_material.Unit}")" Subtext="Aggregate stock; barcode lots pending" />
+                <StatTile Label="Stock" Value="@($"{_material.QuantityOnHand:N0} {_material.Unit}")" Color="@StockHealthColor" Subtext="@StockHealthText" />
                 <StatTile Label="Unit price" Value="@_material.UnitPrice.ToString("N2")" />
                 <StatTile Label="Processes" Value="">
                     @if (MaterialProcesses.Count == 0)
@@ -78,82 +81,214 @@
 </div>
 
 @code {
-    private RenderFragment MaterialContent => @<div class="mlv-two-column-grid">
-        <PanelCard Title="Profile">
-            @if (_editing && _editModel is not null)
-            {
-                <div class="material-edit-grid">
-                    <label class="material-edit-field">
-                        <span>Name</span>
-                        <input class="material-input" @bind="_editModel.Name" @bind:event="oninput" />
-                        <ValidationMessage For="@(() => _editModel!.Name)" />
-                    </label>
-                    <label class="material-edit-field">
-                        <span>Code</span>
-                        <input class="material-input mlv-mono" @bind="_editModel.SKU" @bind:event="oninput" />
-                        <ValidationMessage For="@(() => _editModel!.SKU)" />
-                    </label>
-                    <label class="material-edit-field">
-                        <span>Unit price</span>
-                        <input class="material-input" type="number" step="0.01" min="0" @bind="_editModel.UnitPrice" @bind:event="oninput" />
-                        <ValidationMessage For="@(() => _editModel!.UnitPrice)" />
-                    </label>
-                    <label class="material-edit-field">
-                        <span>Stock</span>
-                        <input class="material-input" type="number" step="1" min="0" @bind="_editModel.QuantityOnHand" @bind:event="oninput" />
-                        <ValidationMessage For="@(() => _editModel!.QuantityOnHand)" />
-                    </label>
-                    <label class="material-edit-field material-edit-field-wide">
-                        <span>Description</span>
-                        <textarea class="material-input material-textarea" rows="4" @bind="_editModel.Description" @bind:event="oninput"></textarea>
-                        <ValidationMessage For="@(() => _editModel!.Description)" />
-                    </label>
-                </div>
-            }
-            else if (_material is not null)
-            {
-                <dl class="mlv-detail-list">
-                    <dt>Code</dt><dd class="mlv-mono">@_material.SKU</dd>
-                    <dt>Status</dt><dd>@_material.Status</dd>
-                    <dt>Color</dt>
-                    <dd>
-                        @if (_material.Colors.Count == 0)
+    private RenderFragment MaterialContent => @<div class="material-detail-layout">
+        <div class="material-detail-main">
+            <PanelCard Title="Inventory control">
+                @if (_material is not null)
+                {
+                    <div class="material-inventory-status @InventoryStatusClass" role="status" aria-label="@StockHealthText">
+                        <div>
+                            <span class="material-section-eyebrow">Current stock</span>
+                            <strong>@_material.QuantityOnHand.ToString("N0") @_material.Unit</strong>
+                        </div>
+                        <span class="material-inventory-badge">@StockHealthLabel</span>
+                    </div>
+                    <div class="material-stock-grid">
+                        <div class="material-stock-metric">
+                            <span>Reorder point</span>
+                            <strong>@ReorderPointText</strong>
+                        </div>
+                        <div class="material-stock-metric">
+                            <span>Inventory value</span>
+                            <strong>@InventoryValue.ToString("N2")</strong>
+                        </div>
+                        <div class="material-stock-metric">
+                            <span>Supplier links</span>
+                            <strong>@_material.Suppliers.Count.ToString("N0")</strong>
+                        </div>
+                    </div>
+                    <div class="material-action-strip" aria-label="Inventory actions">
+                        @if (_canUpdateMaterial)
                         {
-                            <span>-</span>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.Inventory" Disabled="@_editing" OnClick="@StartEditAsync">Update stock</SecondaryButton>
                         }
-                        else
-                        {
-                            <div class="material-color-list" aria-label="Available colors">
-                                @foreach (var color in _material.Colors)
+                        <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" OnClick="@CreatePurchaseOrder">Order more</PrimaryButton>
+                        <SecondaryButton Icon="@Icons.Material.Outlined.Handshake" Href="/purchasing/suppliers">Supplier Profiles</SecondaryButton>
+                    </div>
+                }
+            </PanelCard>
+
+            <div class="mlv-two-column-grid">
+                <PanelCard Title="Profile">
+                    @if (_editing && _editModel is not null)
+                    {
+                        <div class="material-edit-grid">
+                            <label class="material-edit-field">
+                                <span>Name</span>
+                                <input class="material-input" @bind="_editModel.Name" @bind:event="oninput" />
+                                <ValidationMessage For="@(() => _editModel!.Name)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>Code</span>
+                                <input class="material-input mlv-mono" @bind="_editModel.SKU" @bind:event="oninput" />
+                                <ValidationMessage For="@(() => _editModel!.SKU)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>Unit price</span>
+                                <input class="material-input" type="number" step="0.01" min="0" @bind="_editModel.UnitPrice" @bind:event="oninput" />
+                                <ValidationMessage For="@(() => _editModel!.UnitPrice)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>Stock</span>
+                                <input class="material-input" type="number" step="1" min="0" @bind="_editModel.QuantityOnHand" @bind:event="oninput" />
+                                <ValidationMessage For="@(() => _editModel!.QuantityOnHand)" />
+                            </label>
+                            <label class="material-edit-field material-edit-field-wide">
+                                <span>Description</span>
+                                <textarea class="material-input material-textarea" rows="4" @bind="_editModel.Description" @bind:event="oninput"></textarea>
+                                <ValidationMessage For="@(() => _editModel!.Description)" />
+                            </label>
+                        </div>
+                    }
+                    else if (_material is not null)
+                    {
+                        <dl class="mlv-detail-list">
+                            <dt>Code</dt><dd class="mlv-mono">@_material.SKU</dd>
+                            <dt>Status</dt><dd>@_material.Status</dd>
+                            <dt>Color</dt>
+                            <dd>
+                                @if (_material.Colors.Count == 0)
                                 {
-                                    <span class="material-color-chip" title="@color.Name">
-                                        <span class="material-color-dot" style="@ColorSwatchStyle(color)"></span>
-                                        <span>@color.Name</span>
-                                    </span>
+                                    <span>-</span>
                                 }
+                                else
+                                {
+                                    <div class="material-color-list" aria-label="Available colors">
+                                        @foreach (var color in _material.Colors)
+                                        {
+                                            <span class="material-color-chip" title="@color.Name">
+                                                <span class="material-color-dot" style="@ColorSwatchStyle(color)"></span>
+                                                <span>@color.Name</span>
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                            </dd>
+                            <dt>Description</dt><dd>@(string.IsNullOrWhiteSpace(_material.Description) ? "-" : _material.Description)</dd>
+                        </dl>
+                    }
+                </PanelCard>
+
+                <PanelCard Title="Properties">
+                    @if (_material?.Properties.Count == 0)
+                    {
+                        <div class="mlv-empty">No technical properties.</div>
+                    }
+                    else if (_material is not null)
+                    {
+                        <dl class="mlv-detail-list">
+                            @foreach (var property in _material.Properties)
+                            {
+                                <dt>@property.Key</dt><dd>@property.Value @property.Unit</dd>
+                            }
+                        </dl>
+                    }
+                </PanelCard>
+            </div>
+
+            <PanelCard Title="Stock audit">
+                @if (_material?.RecentTransactions.Count > 0)
+                {
+                    <div class="material-audit-list">
+                        @foreach (var transaction in _material.RecentTransactions.OrderByDescending(transaction => transaction.Timestamp).Take(8))
+                        {
+                            <div class="material-audit-entry">
+                                <div class="material-audit-icon">
+                                    <MudIcon Icon="@GetTransactionIcon(transaction.Type)" Size="Size.Small" />
+                                </div>
+                                <div class="material-audit-body">
+                                    <div class="material-audit-title">
+                                        <strong>@DisplayText(transaction.Type)</strong>
+                                        <span class="@GetTransactionQuantityClass(transaction.Quantity)">@FormatQuantity(transaction.Quantity) @_material.Unit</span>
+                                    </div>
+                                    <div class="material-audit-meta">
+                                        <span>@transaction.Timestamp.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                                        @if (!string.IsNullOrWhiteSpace(transaction.PerformedBy))
+                                        {
+                                            <span>@transaction.PerformedBy</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(transaction.Reference))
+                                        {
+                                            <span>@transaction.Reference</span>
+                                        }
+                                    </div>
+                                </div>
                             </div>
                         }
-                    </dd>
-                    <dt>Description</dt><dd>@(string.IsNullOrWhiteSpace(_material.Description) ? "-" : _material.Description)</dd>
-                </dl>
-            }
-        </PanelCard>
+                    </div>
+                }
+                else
+                {
+                    <div class="material-empty-state">
+                        <MudIcon Icon="@Icons.Material.Outlined.History" Size="Size.Small" />
+                        <div>
+                            <strong>No stock movements recorded</strong>
+                            <span>No count or adjustment history has been returned for this material yet.</span>
+                        </div>
+                    </div>
+                }
+            </PanelCard>
+        </div>
 
-        <PanelCard Title="Properties">
-            @if (_material?.Properties.Count == 0)
-            {
-                <div class="mlv-empty">No technical properties.</div>
-            }
-            else if (_material is not null)
-            {
-                <dl class="mlv-detail-list">
-                    @foreach (var property in _material.Properties)
-                    {
-                        <dt>@property.Key</dt><dd>@property.Value @property.Unit</dd>
-                    }
-                </dl>
-            }
-        </PanelCard>
+        <aside class="material-detail-side" aria-label="Material inventory operations">
+            <PanelCard Title="Inventory label">
+                @if (_material is not null)
+                {
+                    <div class="material-label-panel">
+                        <div class="material-label-heading">
+                            <span>Scan code</span>
+                            <strong>@_material.Name</strong>
+                        </div>
+                        <div class="material-barcode-shell" aria-label="@($"Barcode for {InventoryTrackingCode}")">
+                            @BarcodeSvg
+                        </div>
+                        <code class="material-tracking-code">@InventoryTrackingCode</code>
+                        <SecondaryButton Icon="@Icons.Material.Outlined.OpenInNew" Href="@MaterialRecordHref">Open material record</SecondaryButton>
+                    </div>
+                }
+            </PanelCard>
+
+            <PanelCard Title="Suppliers">
+                @if (_material?.Suppliers.Count > 0)
+                {
+                    <div class="material-supplier-list">
+                        @foreach (var supplier in _material.Suppliers)
+                        {
+                            <div class="material-supplier-entry">
+                                <div>
+                                    <strong>@supplier.Name</strong>
+                                    <span>@DisplaySupplierLocation(supplier)</span>
+                                </div>
+                                <StatusBadge Status="@supplier.Status" />
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="material-empty-state">
+                        <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Small" />
+                        <div>
+                            <strong>No suppliers linked</strong>
+                            <span>Connect supplier profiles to complete the procurement circuit.</span>
+                        </div>
+                    </div>
+                }
+                <div class="material-side-actions">
+                    <SecondaryButton Icon="@Icons.Material.Outlined.Handshake" Href="/purchasing/suppliers">Manage suppliers</SecondaryButton>
+                </div>
+            </PanelCard>
+        </aside>
     </div>;
 
     [Parameter]
@@ -167,10 +302,121 @@
     private bool _editing;
     private bool _canUpdateMaterial;
 
+    private static readonly IReadOnlyDictionary<char, string> Code39Patterns = new Dictionary<char, string>
+    {
+        ['0'] = "nnnwwnwnn",
+        ['1'] = "wnnwnnnnw",
+        ['2'] = "nnwwnnnnw",
+        ['3'] = "wnwwnnnnn",
+        ['4'] = "nnnwwnnnw",
+        ['5'] = "wnnwwnnnn",
+        ['6'] = "nnwwwnnnn",
+        ['7'] = "nnnwnnwnw",
+        ['8'] = "wnnwnnwnn",
+        ['9'] = "nnwwnnwnn",
+        ['A'] = "wnnnnwnnw",
+        ['B'] = "nnwnnwnnw",
+        ['C'] = "wnwnnwnnn",
+        ['D'] = "nnnnwwnnw",
+        ['E'] = "wnnnwwnnn",
+        ['F'] = "nnwnwwnnn",
+        ['G'] = "nnnnnwwnw",
+        ['H'] = "wnnnnwwnn",
+        ['I'] = "nnwnnwwnn",
+        ['J'] = "nnnnwwwnn",
+        ['K'] = "wnnnnnnww",
+        ['L'] = "nnwnnnnww",
+        ['M'] = "wnwnnnnwn",
+        ['N'] = "nnnnwnnww",
+        ['O'] = "wnnnwnnwn",
+        ['P'] = "nnwnwnnwn",
+        ['Q'] = "nnnnnnwww",
+        ['R'] = "wnnnnnwwn",
+        ['S'] = "nnwnnnwwn",
+        ['T'] = "nnnnwnwwn",
+        ['U'] = "wwnnnnnnw",
+        ['V'] = "nwwnnnnnw",
+        ['W'] = "wwwnnnnnn",
+        ['X'] = "nwnnwnnnw",
+        ['Y'] = "wwnnwnnnn",
+        ['Z'] = "nwwnwnnnn",
+        ['-'] = "nwnnnnwnw",
+        ['.'] = "wwnnnnwnn",
+        [' '] = "nwwnnnwnn",
+        ['$'] = "nwnwnwnnn",
+        ['/'] = "nwnwnnnwn",
+        ['+'] = "nwnnnwnwn",
+        ['%'] = "nnnwnwnwn",
+        ['*'] = "nwnnwnwnn"
+    };
+
     private IReadOnlyList<string> MaterialProcesses =>
         _material?.ManufacturingProcesses.Count > 0
             ? _material.ManufacturingProcesses
             : SplitDisplayList(_material?.Category);
+
+    private bool IsActiveMaterial => _material is not null && string.Equals(_material.Status, "Active", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsOutOfStock => _material is { QuantityOnHand: <= 0 } && IsActiveMaterial;
+
+    private bool IsLowStock => _material is not null
+        && IsActiveMaterial
+        && _material.ReorderLevel > 0
+        && _material.QuantityOnHand > 0
+        && _material.QuantityOnHand <= _material.ReorderLevel;
+
+    private decimal InventoryValue => (_material?.QuantityOnHand ?? 0) * (_material?.UnitPrice ?? 0);
+
+    private string StockHealthLabel => _material switch
+    {
+        null => "Unknown",
+        _ when !IsActiveMaterial => "Inactive",
+        _ when IsOutOfStock => "Out of stock",
+        _ when IsLowStock => "Low stock",
+        _ => "Stock ready"
+    };
+
+    private string StockHealthText => _material switch
+    {
+        null => "No material loaded",
+        _ when !IsActiveMaterial => "Inactive material",
+        _ when IsOutOfStock => "No stock available",
+        _ when IsLowStock => $"Low stock. Reorder at {_material.ReorderLevel:N0} {_material.Unit}",
+        _ when _material.ReorderLevel > 0 => $"Healthy. Reorder at {_material.ReorderLevel:N0} {_material.Unit}",
+        _ => "Reorder point not configured"
+    };
+
+    private string StockHealthColor => _material switch
+    {
+        null => "var(--mud-palette-text-secondary)",
+        _ when IsOutOfStock => "var(--mud-palette-error)",
+        _ when IsLowStock => "var(--mud-palette-warning)",
+        _ when !IsActiveMaterial => "var(--mud-palette-text-secondary)",
+        _ => "var(--mud-palette-success)"
+    };
+
+    private string InventoryStatusClass => _material switch
+    {
+        null => "is-muted",
+        _ when IsOutOfStock => "is-critical",
+        _ when IsLowStock => "is-warning",
+        _ when !IsActiveMaterial => "is-muted",
+        _ => "is-ready"
+    };
+
+    private string ReorderPointText => _material is null || _material.ReorderLevel <= 0
+        ? "Not configured"
+        : $"{_material.ReorderLevel:N0} {_material.Unit}";
+
+    private string InventoryTrackingCode => _material is null
+        ? string.Empty
+        : $"MALIEV-MAT-{_material.Id:N}".ToUpperInvariant();
+
+    private string MaterialRecordHref => _material is null
+        ? $"/mfg/materials/{Id}"
+        : $"/mfg/materials/{_material.Id}";
+
+    private MarkupString BarcodeSvg => new(BuildCode39Svg(InventoryTrackingCode));
 
     protected override async Task OnInitializedAsync()
     {
@@ -221,6 +467,17 @@
         _editModel = null;
         _editContext = null;
         return Task.CompletedTask;
+    }
+
+    private void CreatePurchaseOrder()
+    {
+        if (_material is null)
+        {
+            return;
+        }
+
+        var query = $"materialId={Uri.EscapeDataString(_material.Id.ToString())}&materialName={Uri.EscapeDataString(_material.Name)}";
+        Navigation.NavigateTo($"/purchasing/new?{query}");
     }
 
     private async Task SaveMaterialAsync()
@@ -288,6 +545,88 @@
         => string.IsNullOrWhiteSpace(value)
             ? []
             : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private static string DisplayText(string value)
+        => string.IsNullOrWhiteSpace(value)
+            ? "-"
+            : string.Join(" ", value.Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
+
+    private static string DisplaySupplierLocation(SupplierSummaryDto supplier)
+    {
+        var parts = new[] { supplier.City, supplier.Country }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+
+        return parts.Count == 0 ? "Location not set" : string.Join(", ", parts);
+    }
+
+    private static string FormatQuantity(int quantity)
+        => quantity > 0 ? $"+{quantity:N0}" : quantity.ToString("N0");
+
+    private static string GetTransactionQuantityClass(int quantity)
+        => quantity >= 0 ? "material-audit-quantity positive" : "material-audit-quantity negative";
+
+    private static string GetTransactionIcon(string type)
+        => type.Trim().ToLowerInvariant() switch
+        {
+            "receipt" or "purchase" or "count" => Icons.Material.Outlined.AddCircle,
+            "issue" or "usage" or "consume" => Icons.Material.Outlined.RemoveCircle,
+            "transfer" => Icons.Material.Outlined.SwapHoriz,
+            _ => Icons.Material.Outlined.Tune
+        };
+
+    private static string NormalizeCode39(string value)
+    {
+        var normalized = value.ToUpperInvariant();
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
+        {
+            builder.Append(Code39Patterns.ContainsKey(character) && character != '*' ? character : '-');
+        }
+
+        return builder.ToString().Trim('-');
+    }
+
+    private static string BuildCode39Svg(string value)
+    {
+        var normalized = NormalizeCode39(value);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        const int narrow = 2;
+        const int wide = 5;
+        const int gap = 2;
+        const int height = 72;
+        var encoded = $"*{normalized}*";
+        var x = 0;
+        var bars = new StringBuilder();
+
+        foreach (var character in encoded)
+        {
+            var pattern = Code39Patterns[character];
+            for (var index = 0; index < pattern.Length; index++)
+            {
+                var width = pattern[index] == 'w' ? wide : narrow;
+                if (index % 2 == 0)
+                {
+                    bars.Append(CultureInfo.InvariantCulture, $"<rect x=\"{x}\" y=\"0\" width=\"{width}\" height=\"{height}\" />");
+                }
+
+                x += width;
+            }
+
+            x += gap;
+        }
+
+        return $"""
+            <svg class="material-barcode-svg" viewBox="0 0 {x} {height}" role="img" aria-label="Inventory barcode" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+                {bars}
+            </svg>
+            """;
+    }
 
     private static bool HasPermission(ClaimsPrincipal user, string permission)
     {
