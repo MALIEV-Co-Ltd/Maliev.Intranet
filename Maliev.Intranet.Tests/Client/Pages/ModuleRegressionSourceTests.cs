@@ -544,6 +544,29 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerNew_AiExtractionTextInput_UsesBalancedEditorSurface()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor.css");
+
+        Assert.Contains("<label class=\"ai-text-label\" for=\"customer-extraction-text\">Paste customer text</label>", page, StringComparison.Ordinal);
+        Assert.Contains("InputId=\"customer-extraction-text\"", page, StringComparison.Ordinal);
+        Assert.Contains("Sizing=\"InputSizing.Auto\"", page, StringComparison.Ordinal);
+        Assert.Contains("MaxLines=\"10\"", page, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"Margin.None\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label=\"Paste customer text\"", page, StringComparison.Ordinal);
+
+        Assert.Contains("--ai-extraction-surface-min-height: 132px;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(360px, 1fr) minmax(320px, 0.72fr);", ExtractCssBlock(styles, ".ai-intake {"), StringComparison.Ordinal);
+        Assert.Contains("gap: 0.75rem;", ExtractCssBlock(styles, ".ai-intake {"), StringComparison.Ordinal);
+        Assert.Contains("gap: 0.35rem;", ExtractCssBlock(styles, ".ai-text-column {"), StringComparison.Ordinal);
+        Assert.Contains("font-size: var(--mud-typography-caption-size);", ExtractCssBlock(styles, ".ai-text-label"), StringComparison.Ordinal);
+        Assert.Contains("min-height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, "::deep .ai-text-input .mud-input {"), StringComparison.Ordinal);
+        Assert.Contains("padding: 0.95rem 1rem !important;", ExtractCssBlock(styles, "::deep .ai-text-input textarea.mud-input-slot {"), StringComparison.Ordinal);
+        Assert.Contains("min-height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, ".ai-dropzone"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LoginShell_UsesGatewayCardDesignWithoutRouteChanges()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor");

@@ -37,13 +37,18 @@
                     {
                         <div class="ai-intake">
                             <div class="ai-text-column">
+                                <label class="ai-text-label" for="customer-extraction-text">Paste customer text</label>
                                 <MudTextField T="string"
                                               Class="ai-text-input"
-                                              Label="Paste customer text"
+                                              InputId="customer-extraction-text"
                                               Value="@_extractionText"
                                               ValueChanged="@((string value) => _extractionText = value)"
                                               Variant="Variant.Outlined"
-                                              Lines="4"
+                                              Lines="5"
+                                              MaxLines="10"
+                                              Sizing="InputSizing.Auto"
+                                              FullWidth="true"
+                                              Margin="Margin.None"
                                               Immediate="true"
                                               Placeholder="Paste an email signature, business card text, tax invoice details, or customer request..." />
                             </div>
