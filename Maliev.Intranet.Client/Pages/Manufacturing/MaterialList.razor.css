@@ -1,0 +1,128 @@
+.material-stock-row--critical {
+    background: linear-gradient(90deg, color-mix(in oklab, var(--maliev-danger), transparent 94%), transparent 48%);
+}
+
+.material-stock-row--warning {
+    background: linear-gradient(90deg, color-mix(in oklab, var(--maliev-warning), transparent 93%), transparent 48%);
+}
+
+.material-stock-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 180px;
+    padding: 7px 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+}
+
+.material-stock-alert--critical {
+    border-color: color-mix(in oklab, var(--maliev-danger), transparent 55%);
+    background: color-mix(in oklab, var(--maliev-danger), var(--maliev-panel) 92%);
+    color: var(--maliev-danger);
+}
+
+.material-stock-alert--warning {
+    border-color: color-mix(in oklab, var(--maliev-warning), transparent 46%);
+    background: color-mix(in oklab, var(--maliev-warning), var(--maliev-panel) 90%);
+    color: var(--maliev-warn-fg);
+}
+
+.material-stock-alert--ok {
+    color: var(--maliev-muted);
+}
+
+.material-stock-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.material-stock-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.material-stock-quantity {
+    color: var(--maliev-ink);
+    font-family: var(--maliev-font-mono);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.material-stock-label {
+    color: inherit;
+    font-size: var(--maliev-font-nano);
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: normal;
+}
+
+.material-actions-header,
+.material-actions-cell {
+    text-align: right;
+}
+
+.material-row-actions {
+    display: inline-flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.material-action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 6px 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    font-weight: 650;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.material-action-button:hover {
+    border-color: color-mix(in oklab, var(--maliev-info), transparent 42%);
+    background: var(--maliev-info-bg);
+    color: var(--maliev-info);
+}
+
+.material-action-button:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
+}
+
+.material-action-button--restock {
+    border-color: color-mix(in oklab, var(--maliev-warning), transparent 35%);
+    background: var(--maliev-warn-bg);
+    color: var(--maliev-warn-fg);
+}
+
+.material-action-button--restock:hover {
+    border-color: color-mix(in oklab, var(--maliev-danger), transparent 35%);
+    background: color-mix(in oklab, var(--maliev-danger), var(--maliev-panel) 90%);
+    color: var(--maliev-danger);
+}
+
+@media (max-width: 920px) {
+    .material-stock-alert {
+        min-width: 150px;
+    }
+
+    .material-action-button span {
+        display: none;
+    }
+}

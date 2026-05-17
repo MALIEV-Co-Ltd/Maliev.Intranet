@@ -423,6 +423,7 @@ public class ModuleRegressionSourceTests
     public void MaterialPages_UseSharedPageBodySpacing()
     {
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialList.razor");
+        var listStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialList.razor.css");
         var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor");
 
         Assert.Contains("@page \"/mfg/materials\"", list, StringComparison.Ordinal);
@@ -445,6 +446,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains("class=\"mlv-table\"", list, StringComparison.Ordinal);
         Assert.DoesNotContain("<th>Code</th>", list, StringComparison.Ordinal);
         Assert.DoesNotContain("<td class=\"mlv-mono\">@material.SKU</td>", list, StringComparison.Ordinal);
+        Assert.Contains("Stock alerts", list, StringComparison.Ordinal);
+        Assert.Contains("NeedsStockAction", list, StringComparison.Ordinal);
+        Assert.Contains("Order more", list, StringComparison.Ordinal);
+        Assert.Contains("Update stock", list, StringComparison.Ordinal);
+        Assert.Contains("material-stock-alert--critical", listStyles, StringComparison.Ordinal);
+        Assert.Contains("material-stock-alert--warning", listStyles, StringComparison.Ordinal);
         Assert.Contains("class=\"mlv-detail-list\"", detail, StringComparison.Ordinal);
         Assert.DoesNotContain("mlv-stats-grid", list, StringComparison.Ordinal);
         Assert.DoesNotContain("mlv-stats-grid", detail, StringComparison.Ordinal);

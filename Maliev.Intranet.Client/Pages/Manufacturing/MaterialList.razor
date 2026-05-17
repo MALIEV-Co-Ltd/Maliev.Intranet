@@ -16,6 +16,7 @@
             <StatTile Label="Materials" Value="@_meta.TotalItems.ToString("N0")" />
             <StatTile Label="On page" Value="@_materials.Count.ToString("N0")" />
             <StatTile Label="Active" Value="@_materials.Count(IsActive).ToString("N0")" />
+            <StatTile Label="Stock alerts" Value="@StockAlertCount.ToString("N0")" Color="@StockAlertColor" Subtext="@StockAlertSubtext" />
             <StatTile Label="Stock value" Value="@_materials.Sum(m => m.UnitPrice * m.QuantityOnHand).ToString("N2")" />
         </StatBar>
 
@@ -56,17 +57,43 @@
                             <th>Status</th>
                             <th>Stock</th>
                             <th>Unit price</th>
+                            <th class="material-actions-header">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var material in _materials)
                         {
-                            <tr @onclick="@(() => Navigation.NavigateTo($"/mfg/materials/{material.Id}"))">
+                            <tr class="@GetStockRowClass(material)" @onclick="@(() => OpenMaterial(material))">
                                 <td>@material.Name</td>
                                 <td>@(string.IsNullOrWhiteSpace(material.Category) ? "-" : material.Category)</td>
                                 <td><StatusBadge Status="@material.Status" /></td>
-                                <td class="mlv-mono">@material.QuantityOnHand.ToString("N0") @material.Unit</td>
+                                <td>
+                                    <div class="@GetStockIndicatorClass(material)" aria-label="@GetStockAccessibilityLabel(material)">
+                                        <span class="material-stock-icon" aria-hidden="true">
+                                            <MudIcon Icon="@GetStockIcon(material)" Size="Size.Small" />
+                                        </span>
+                                        <span class="material-stock-copy">
+                                            <span class="material-stock-quantity">@material.QuantityOnHand.ToString("N0") @material.Unit</span>
+                                            <span class="material-stock-label">@GetStockLabel(material)</span>
+                                        </span>
+                                    </div>
+                                </td>
                                 <td class="mlv-mono">@material.UnitPrice.ToString("N2")</td>
+                                <td class="material-actions-cell">
+                                    <div class="material-row-actions">
+                                        @if (NeedsStockAction(material))
+                                        {
+                                            <button type="button" class="material-action-button material-action-button--restock" @onclick:stopPropagation="true" @onclick="@(() => CreateRestockOrder(material))">
+                                                <MudIcon Icon="@Icons.Material.Outlined.AddShoppingCart" Size="Size.Small" />
+                                                <span>Order more</span>
+                                            </button>
+                                        }
+                                        <button type="button" class="material-action-button" @onclick:stopPropagation="true" @onclick="@(() => OpenMaterial(material))">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" />
+                                            <span>Update stock</span>
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -92,6 +119,9 @@
     private int _page = 1;
     private int _pageSize = 20;
     private CreateMaterialRequest _newMaterial = new() { Unit = "pcs" };
+    private int StockAlertCount => _materials.Count(NeedsStockAction);
+    private string StockAlertColor => StockAlertCount > 0 ? "var(--maliev-danger)" : "var(--maliev-ok)";
+    private string StockAlertSubtext => StockAlertCount > 0 ? "Needs restock or stock update" : "No active alerts";
 
     protected override async Task OnInitializedAsync()
     {
@@ -199,5 +229,76 @@
     private static bool IsActive(MaterialSummaryDto material)
     {
         return string.Equals(material.Status, "Active", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsOutOfStock(MaterialSummaryDto material)
+    {
+        return IsActive(material) && material.QuantityOnHand <= 0;
+    }
+
+    private static bool IsLowStock(MaterialSummaryDto material)
+    {
+        return IsActive(material) && material.ReorderLevel > 0 && material.QuantityOnHand > 0 && material.QuantityOnHand <= material.ReorderLevel;
+    }
+
+    private static bool NeedsStockAction(MaterialSummaryDto material)
+    {
+        return IsOutOfStock(material) || IsLowStock(material);
+    }
+
+    private static string GetStockRowClass(MaterialSummaryDto material)
+    {
+        return IsOutOfStock(material)
+            ? "material-stock-row material-stock-row--critical"
+            : IsLowStock(material)
+                ? "material-stock-row material-stock-row--warning"
+                : "material-stock-row";
+    }
+
+    private static string GetStockIndicatorClass(MaterialSummaryDto material)
+    {
+        return IsOutOfStock(material)
+            ? "material-stock-alert material-stock-alert--critical"
+            : IsLowStock(material)
+                ? "material-stock-alert material-stock-alert--warning"
+                : "material-stock-alert material-stock-alert--ok";
+    }
+
+    private static string GetStockIcon(MaterialSummaryDto material)
+    {
+        return NeedsStockAction(material) ? Icons.Material.Filled.WarningAmber : Icons.Material.Outlined.Inventory2;
+    }
+
+    private static string GetStockLabel(MaterialSummaryDto material)
+    {
+        if (IsOutOfStock(material))
+        {
+            return "Out of stock";
+        }
+
+        if (IsLowStock(material))
+        {
+            return $"Low stock. Reorder at {material.ReorderLevel:N0} {material.Unit}";
+        }
+
+        return material.ReorderLevel > 0
+            ? $"Healthy. Reorder at {material.ReorderLevel:N0} {material.Unit}"
+            : "Available";
+    }
+
+    private static string GetStockAccessibilityLabel(MaterialSummaryDto material)
+    {
+        return $"{material.Name} stock: {material.QuantityOnHand:N0} {material.Unit}. {GetStockLabel(material)}";
+    }
+
+    private void OpenMaterial(MaterialSummaryDto material)
+    {
+        Navigation.NavigateTo($"/mfg/materials/{material.Id}");
+    }
+
+    private void CreateRestockOrder(MaterialSummaryDto material)
+    {
+        var query = $"materialId={Uri.EscapeDataString(material.Id.ToString())}&materialName={Uri.EscapeDataString(material.Name)}";
+        Navigation.NavigateTo($"/purchasing/new?{query}");
     }
 }
