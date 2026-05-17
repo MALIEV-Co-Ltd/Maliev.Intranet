@@ -622,6 +622,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("_documentPreviewUrl = document.SignedUrl;", page, StringComparison.Ordinal);
         Assert.Contains("ReadPreviewUrlAsync(document.LinkReference)", page, StringComparison.Ordinal);
         Assert.Contains("download-url?fileReference=", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("upload completed.", page, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("MaxItems=\"8\"", page, StringComparison.Ordinal);
         Assert.Contains("ReturnedItemsCountChanged=\"UpdateCompanySuggestionCount\"", page, StringComparison.Ordinal);
         Assert.Contains("<BeforeItemsTemplate>", page, StringComparison.Ordinal);

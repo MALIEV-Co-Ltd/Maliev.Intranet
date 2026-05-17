@@ -1262,7 +1262,6 @@
             }
 
             await PreviewUploadedDocumentAsync(drafts.FirstOrDefault(draft => draft.IsUploaded) ?? drafts[0]);
-            Snackbar.Add($"{category} upload completed.", Severity.Success);
         }
         catch (Exception ex)
         {
