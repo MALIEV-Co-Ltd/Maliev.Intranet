@@ -727,8 +727,28 @@ select.customer-input {
     gap: 10px;
 }
 
+.customer-address-lookup-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.customer-address-lookup-pill {
+    padding: 2px 7px;
+    border: 1px solid color-mix(in oklab, var(--maliev-info), transparent 65%);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--maliev-info), transparent 92%);
+    color: var(--maliev-info);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 700;
+    text-transform: none;
+    white-space: nowrap;
+}
+
 .customer-address-lookup-input {
     min-height: 132px;
+    line-height: 1.45;
 }
 
 .customer-address-search {
@@ -740,11 +760,20 @@ select.customer-input {
     display: flex;
     align-items: center;
     padding: 8px 10px;
-    border: 1px solid color-mix(in oklab, var(--maliev-warning), transparent 70%);
     border-radius: var(--maliev-radius-sm);
-    background: color-mix(in oklab, var(--maliev-warning), transparent 92%);
     color: var(--maliev-ink);
     font-size: var(--maliev-font-small);
+    line-height: 1.4;
+}
+
+.customer-address-lookup-state.warning {
+    border: 1px solid color-mix(in oklab, var(--maliev-warning), transparent 70%);
+    background: color-mix(in oklab, var(--maliev-warning), transparent 92%);
+}
+
+.customer-address-lookup-state.success {
+    border: 1px solid color-mix(in oklab, var(--maliev-success), transparent 70%);
+    background: color-mix(in oklab, var(--maliev-success), transparent 93%);
 }
 
 .customer-suggestion-field {

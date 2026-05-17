@@ -218,7 +218,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("customer-address-form", cut.Markup);
         Assert.Contains("HQ - Billing", cut.Markup);
         Assert.Contains("Recipient name", cut.Markup);
-        Assert.Contains("Address lookup", cut.Markup);
+        Assert.Contains("AI address lookup", cut.Markup);
         Assert.Contains("Country", cut.Markup);
     }
 
@@ -270,6 +270,42 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
 
         var address = _addressCreatePayloads.Single().RootElement.EnumerateArray().Single();
         Assert.Equal("Receiving Desk", address.GetProperty("recipientName").GetString());
+    }
+
+    [Fact]
+    public void CustomerDetail_AddressLookupUsesAiExtractionToPopulateFieldsAndSearchRegistry()
+    {
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find("button[data-tab='addresses']").Click();
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Add address", StringComparison.Ordinal))
+            .Click();
+
+        cut.Find(".customer-address-lookup-input")
+            .Input("253/1744 คลองข่อย ปากเกร็ด นนทบุรี 11120");
+        cut.Find(".customer-address-search").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedPaths, path => path.Equals("/api/v1/AiProcessing/extract-customer", StringComparison.Ordinal));
+            Assert.Contains(_requestedPaths, path =>
+                path.StartsWith("/api/v1/customers/locations/thai/multi", StringComparison.Ordinal) &&
+                path.Contains("postalCode=11120", StringComparison.Ordinal) &&
+                path.Contains("%E0%B8%84%E0%B8%A5%E0%B8%AD%E0%B8%87%E0%B8%82%E0%B9%88%E0%B8%AD%E0%B8%A2", StringComparison.Ordinal));
+            Assert.Contains("AI structured the address and found 1 RegistryService match.", cut.Markup);
+        });
+
+        IElement ModalInput(int index) => cut.Find(".customer-modal-address")
+            .QuerySelectorAll("input.customer-input")
+            .ToList()[index];
+
+        Assert.Equal("253/1744", ModalInput(1).GetAttribute("value"));
+        Assert.Equal("ปากเกร็ด", ModalInput(3).GetAttribute("value"));
+        Assert.Equal("คลองข่อย", ModalInput(4).GetAttribute("value"));
+        Assert.Equal("นนทบุรี", ModalInput(5).GetAttribute("value"));
+        Assert.Equal("11120", ModalInput(6).GetAttribute("value"));
     }
 
     [Fact]
@@ -528,6 +564,26 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                 Latitude = 13.912,
                 Longitude = 100.503,
                 DisplayName = "Khlong Khoi, Pak Kret, Nonthaburi, Thailand"
+            });
+        }
+
+        if (request.Method == HttpMethod.Post &&
+            pathAndQuery.Equals("/api/v1/AiProcessing/extract-customer", StringComparison.Ordinal))
+        {
+            return Json(new ExtractedCustomerDataResponse
+            {
+                Addresses =
+                [
+                    new ExtractedAddress
+                    {
+                        Type = "Billing",
+                        AddressLine1 = "253/1744",
+                        District = "คลองข่อย",
+                        City = "ปากเกร็ด",
+                        StateProvince = "นนทบุรี",
+                        PostalCode = "11120"
+                    }
+                ]
             });
         }
 

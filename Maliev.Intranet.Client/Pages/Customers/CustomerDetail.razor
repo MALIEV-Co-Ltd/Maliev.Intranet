@@ -674,18 +674,21 @@
                 </div>
                 <aside class="customer-address-lookup-panel">
                     <label class="customer-field">
-                        <span>Address lookup</span>
+                        <span class="customer-address-lookup-label">
+                            <span>AI address lookup</span>
+                            <span class="customer-address-lookup-pill">Plain text ok</span>
+                        </span>
                         <textarea class="customer-textarea customer-address-lookup-input"
-                                  placeholder="Paste the full customer address text..."
+                                  placeholder="Paste a full address, tax invoice address, copied map text, or delivery note..."
                                   @bind="_addressLookupQuery"
                                   @bind:event="oninput"></textarea>
                     </label>
                     <button type="button" class="customer-inline-action customer-address-search" @onclick="SearchLocationsAsync" disabled="@_addressLookupLoading">
-                        @(_addressLookupLoading ? "Searching..." : "Search")
+                        @(_addressLookupLoading ? "Structuring..." : "Extract & search")
                     </button>
-                    @if (!string.IsNullOrWhiteSpace(_addressLookupError))
+                    @if (!string.IsNullOrWhiteSpace(_addressLookupMessage))
                     {
-                        <div class="customer-address-lookup-state">@_addressLookupError</div>
+                        <div class="@AddressLookupStateClass">@_addressLookupMessage</div>
                     }
                     @if (_locationMatches.Count > 0)
                     {
@@ -796,7 +799,8 @@
     private const int InternalNoteMaxLength = 5000;
     private string _addressLookupQuery = string.Empty;
     private bool _addressLookupLoading;
-    private string? _addressLookupError;
+    private string? _addressLookupMessage;
+    private bool _addressLookupMessageIsWarning;
     private bool _applyingLocation;
     private bool _addressMapInitialized;
     private bool _addressMapNeedsSavedAddress;
@@ -843,6 +847,9 @@
     private int NoteCharacterCount => _newNoteText.Length;
     private bool CanPostInternalNote => !string.IsNullOrWhiteSpace(_newNoteText) && NoteCharacterCount <= InternalNoteMaxLength;
     private string NoteCounterClass => NoteCharacterCount > InternalNoteMaxLength ? "customer-note-counter over-limit" : "customer-note-counter";
+    private string AddressLookupStateClass => _addressLookupMessageIsWarning
+        ? "customer-address-lookup-state warning"
+        : "customer-address-lookup-state success";
     private string AccountManagerSelectValue
     {
         get => _edit?.AccountManagerEmployeeId?.ToString() ?? string.Empty;
@@ -1221,7 +1228,8 @@
     {
         _addressLookupQuery = string.Empty;
         _addressLookupLoading = false;
-        _addressLookupError = null;
+        _addressLookupMessage = null;
+        _addressLookupMessageIsWarning = false;
         _addressMapLocation = null;
         _activeAddressSuggestionField = null;
         _addressMapInitialized = false;
@@ -1412,50 +1420,85 @@
     private async Task SearchLocationsAsync()
     {
         _locationMatches.Clear();
-        _addressLookupError = null;
-        if (string.IsNullOrWhiteSpace(_addressLookupQuery) || _addressLookupQuery.Trim().Length < 2)
+        _addressLookupMessage = null;
+        _addressLookupMessageIsWarning = false;
+
+        var lookupText = _addressLookupQuery.Trim();
+        if (lookupText.Length < 2)
         {
+            _addressLookupMessage = "Paste a full address or a few searchable address parts first.";
+            _addressLookupMessageIsWarning = true;
             return;
         }
 
         _addressLookupLoading = true;
-        _addressLookupLanguage = DetectAddressLanguage(_addressLookupQuery);
+        _addressLookupLanguage = DetectAddressLanguage(lookupText);
 
         try
         {
-            var extracted = await ExtractAddressFromLookupTextAsync();
-            if (extracted?.Addresses?.FirstOrDefault() is { } address)
+            var extractedAddress = await ExtractAddressFromLookupTextAsync(lookupText);
+            if (extractedAddress is not null)
             {
-                if (address.Location is not null)
+                ApplyExtractedAddressToDraft(extractedAddress);
+                var structuredQuery = BuildExtractedAddressQuery(extractedAddress);
+                if (!string.IsNullOrWhiteSpace(structuredQuery))
                 {
-                    AddLocationMatch(_locationMatches, address.Location);
+                    _addressLookupLanguage = DetectAddressLanguage(structuredQuery);
                 }
 
-                var multiMatches = await SearchLocationsMultiFieldAsync(
-                    address.PostalCode,
-                    address.District,
-                    address.City,
-                    address.StateProvince,
-                    8);
-                AddLocationMatches(_locationMatches, multiMatches);
+                if (extractedAddress.Location is not null)
+                {
+                    AddLocationMatch(_locationMatches, extractedAddress.Location);
+                }
+
+                if (HasRegistrySearchTerms(extractedAddress))
+                {
+                    var multiMatches = await SearchLocationsMultiFieldAsync(
+                        extractedAddress.PostalCode,
+                        extractedAddress.District,
+                        extractedAddress.City,
+                        extractedAddress.StateProvince,
+                        8);
+                    AddLocationMatches(_locationMatches, multiMatches);
+                }
+
+                await GeocodeAddressQueryAsync(string.IsNullOrWhiteSpace(structuredQuery) ? lookupText : structuredQuery);
             }
 
             if (_locationMatches.Count == 0)
             {
-                var query = Uri.EscapeDataString(_addressLookupQuery.Trim());
+                var query = Uri.EscapeDataString(lookupText);
                 var matches = await Http.GetFromJsonAsync<List<RegistryThaiLocation>>($"api/v1/customers/locations/thai?query={query}&limit=8") ?? [];
                 AddLocationMatches(_locationMatches, matches);
+
+                if (_locationMatches.Count == 0)
+                {
+                    await GeocodeAddressQueryAsync(lookupText);
+                }
             }
 
-            if (_locationMatches.Count == 0)
+            if (_locationMatches.Count > 0)
             {
-                _addressLookupError = "No RegistryService address matches found.";
+                var matchLabel = _locationMatches.Count == 1 ? "match" : "matches";
+                _addressLookupMessage = extractedAddress is null
+                    ? $"Found {_locationMatches.Count} RegistryService {matchLabel}."
+                    : $"AI structured the address and found {_locationMatches.Count} RegistryService {matchLabel}.";
+            }
+            else if (extractedAddress is not null && HasAnyExtractedAddressField(extractedAddress))
+            {
+                _addressLookupMessage = "AI filled the address fields, but RegistryService did not return an official match. Review the fields before saving.";
+                _addressLookupMessageIsWarning = true;
+            }
+            else
+            {
+                _addressLookupMessage = "No address could be extracted. Paste a fuller address with district, province, or postal code.";
+                _addressLookupMessageIsWarning = true;
             }
         }
         catch (Exception ex)
         {
-            _addressLookupError = "Address lookup could not be loaded.";
-            Snackbar.Add("Address lookup could not be loaded.", Severity.Warning);
+            _addressLookupMessage = "Address lookup could not be loaded. Try a fuller address or fill the fields manually.";
+            _addressLookupMessageIsWarning = true;
             Console.WriteLine(ex.Message);
         }
         finally
@@ -1464,10 +1507,10 @@
         }
     }
 
-    private async Task<ExtractedCustomerDataResponse?> ExtractAddressFromLookupTextAsync()
+    private async Task<ExtractedAddress?> ExtractAddressFromLookupTextAsync(string lookupText)
     {
         using var form = new MultipartFormDataContent();
-        form.Add(new StringContent(_addressLookupQuery.Trim()), "rawText");
+        form.Add(new StringContent(lookupText), "rawText");
 
         var response = await Http.PostAsync("api/v1/AiProcessing/extract-customer", form);
         if (!response.IsSuccessStatusCode)
@@ -1475,8 +1518,128 @@
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
+        var extracted = await response.Content.ReadFromJsonAsync<ExtractedCustomerDataResponse>();
+        return extracted?.Addresses?.FirstOrDefault(HasAnyExtractedAddressField);
     }
+
+    private void ApplyExtractedAddressToDraft(ExtractedAddress address)
+    {
+        if (_addressEdit is null)
+        {
+            return;
+        }
+
+        var addressType = NormalizeAddressType(address.Type);
+        if (!string.IsNullOrWhiteSpace(addressType))
+        {
+            _addressEdit.Type = addressType;
+        }
+
+        if (!string.IsNullOrWhiteSpace(address.RecipientName))
+        {
+            _addressEdit.Label = address.RecipientName.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(address.AddressLine1))
+        {
+            _addressEdit.AddressLine1 = address.AddressLine1.Trim();
+        }
+
+        var secondaryLine = CombineAddressLines(address.AddressLine2, address.AddressLine3);
+        if (!string.IsNullOrWhiteSpace(secondaryLine))
+        {
+            _addressEdit.AddressLine2 = secondaryLine;
+        }
+
+        if (!string.IsNullOrWhiteSpace(address.District))
+        {
+            _addressEdit.District = address.District.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(address.City))
+        {
+            _addressEdit.City = address.City.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(address.StateProvince))
+        {
+            _addressEdit.StateProvince = address.StateProvince.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(address.PostalCode))
+        {
+            _addressEdit.PostalCode = address.PostalCode.Trim();
+        }
+
+        if (LooksLikeThaiAddress(address))
+        {
+            var thaiCountryId = DefaultCountryId();
+            if (thaiCountryId != Guid.Empty)
+            {
+                _addressEdit.CountryId = thaiCountryId;
+            }
+        }
+    }
+
+    private static bool HasAnyExtractedAddressField(ExtractedAddress address) =>
+        !string.IsNullOrWhiteSpace(address.RecipientName) ||
+        !string.IsNullOrWhiteSpace(address.AddressLine1) ||
+        !string.IsNullOrWhiteSpace(address.AddressLine2) ||
+        !string.IsNullOrWhiteSpace(address.AddressLine3) ||
+        !string.IsNullOrWhiteSpace(address.District) ||
+        !string.IsNullOrWhiteSpace(address.City) ||
+        !string.IsNullOrWhiteSpace(address.StateProvince) ||
+        !string.IsNullOrWhiteSpace(address.PostalCode) ||
+        address.Location is not null;
+
+    private static bool HasRegistrySearchTerms(ExtractedAddress address) =>
+        !string.IsNullOrWhiteSpace(address.PostalCode) ||
+        !string.IsNullOrWhiteSpace(address.District) ||
+        !string.IsNullOrWhiteSpace(address.City) ||
+        !string.IsNullOrWhiteSpace(address.StateProvince);
+
+    private static string BuildExtractedAddressQuery(ExtractedAddress address)
+    {
+        var parts = new[]
+        {
+            address.AddressLine1,
+            address.AddressLine2,
+            address.AddressLine3,
+            address.District,
+            address.City,
+            address.StateProvince,
+            address.PostalCode
+        };
+
+        return string.Join(", ", parts
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .Select(part => part!.Trim()));
+    }
+
+    private static string? NormalizeAddressType(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "billing" or "bill to" => "Billing",
+            "shipping" or "ship to" or "delivery" => "Shipping",
+            "office" or "head office" => "Office",
+            _ => null
+        };
+    }
+
+    private static string CombineAddressLines(params string?[] lines) =>
+        string.Join(", ", lines
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(line => line!.Trim()));
+
+    private static bool LooksLikeThaiAddress(ExtractedAddress address) =>
+        ContainsThai(BuildExtractedAddressQuery(address)) ||
+        address.Location is not null;
 
     private async Task OnAddressFieldInputAsync(AddressField field, string? value)
     {
