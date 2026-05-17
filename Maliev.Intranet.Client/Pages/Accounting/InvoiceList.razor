@@ -330,9 +330,15 @@
                             <span>Open date</span>
                             <input type="date" class="mlv-form-input" @bind="_periodOpenDate" @bind:format="yyyy-MM-dd" />
                         </label>
-                        <label class="mlv-filter-field">
-                            <span>Source system</span>
-                            <input class="mlv-form-input" @bind="_reconciliationSource" @bind:event="oninput" />
+                        <label class="mlv-filter-field accounting-reconciliation-source-field">
+                            <span>Source ledger</span>
+                            <select class="mlv-form-select accounting-reconciliation-source-select" @bind="_reconciliationSource">
+                                @foreach (var source in _reconciliationSources)
+                                {
+                                    <option value="@source.Value">@source.Label</option>
+                                }
+                            </select>
+                            <span class="mlv-form-hint accounting-reconciliation-source-hint">@SelectedReconciliationSourceDescription</span>
                         </label>
                     </div>
                     <PrimaryButton Icon="@Icons.Material.Outlined.LockOpen" OnClick="@OpenPeriodAsync">Open Period</PrimaryButton>
@@ -374,6 +380,14 @@
     private const long MaxAccountingDocumentBytes = 25 * 1024 * 1024;
 
     private readonly string[] _tabs = ["Invoices", "Journal Entries", "Income Entry", "Expense Entry", "Reports", "Periods", "Payroll Journals"];
+    private readonly ReconciliationSourceOption[] _reconciliationSources =
+    [
+        new("Sales", "Sales", "Invoices, receipts, and customer receivables"),
+        new("Procurement", "Procurement", "Supplier invoices and purchasing payables"),
+        new("Inventory", "Inventory", "Stock movements and inventory valuation"),
+        new("Payroll", "Payroll", "CompensationService payroll journal impact"),
+        new("System", "System imports", "Opening balances and administrative imports")
+    ];
     private string _tab = "Invoices";
     private List<InvoiceSummaryDto> _invoices = [];
     private List<JournalEntryDto> _journalEntries = [];
@@ -744,6 +758,10 @@
     private string ReportPdfDownloadName =>
         $"{_reportType}_{_reportStart:yyyyMMdd}_{_reportEnd:yyyyMMdd}.pdf";
 
+    private string SelectedReconciliationSourceDescription =>
+        _reconciliationSources.FirstOrDefault(source => source.Value == _reconciliationSource)?.Description
+        ?? "Choose the subledger source to compare with posted journal entries.";
+
     private async Task OpenPeriodAsync(MouseEventArgs _)
     {
         var response = await Http.PostAsync($"api/v1/accounting/periods/open?date={_periodOpenDate:yyyy-MM-dd}", null);
@@ -894,6 +912,8 @@
             builder.CloseElement();
         }
     };
+
+    private sealed record ReconciliationSourceOption(string Value, string Label, string Description);
 
     private sealed class QuickJournalForm
     {

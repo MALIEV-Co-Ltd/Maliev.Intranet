@@ -224,6 +224,15 @@
     box-shadow: var(--maliev-focus-ring);
 }
 
+.accounting-reconciliation-source-field {
+    min-width: 320px;
+}
+
+.accounting-reconciliation-source-hint {
+    max-width: 340px;
+    margin-top: 0;
+}
+
 .mlv-two-column-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
