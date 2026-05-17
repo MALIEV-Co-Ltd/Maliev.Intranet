@@ -71,6 +71,9 @@ public sealed class CommerceProductDto
     /// <summary>Gets or sets product media.</summary>
     public List<CommerceProductMediaDto> Media { get; set; } = [];
 
+    /// <summary>Gets or sets product bill of materials items.</summary>
+    public List<CommerceProductBomItemDto> BomItems { get; set; } = [];
+
     /// <summary>Gets or sets linked collections.</summary>
     public List<CommerceCollectionSummaryDto> Collections { get; set; } = [];
 }
@@ -121,6 +124,42 @@ public sealed class CommerceProductMediaDto
 
     /// <summary>Gets or sets sort order.</summary>
     public int SortOrder { get; set; }
+}
+
+/// <summary>
+/// Product bill of materials item in the Commerce catalog.
+/// </summary>
+public sealed class CommerceProductBomItemDto
+{
+    /// <summary>Gets or sets the BOM item identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the material, component, or consumable name.</summary>
+    public string ItemName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the item specification, grade, color, size, or supplier reference.</summary>
+    public string? Specification { get; set; }
+
+    /// <summary>Gets or sets the quantity used by one sellable product unit.</summary>
+    public decimal Quantity { get; set; }
+
+    /// <summary>Gets or sets the unit of measure.</summary>
+    public string Unit { get; set; } = "pcs";
+
+    /// <summary>Gets or sets the expected unit cost.</summary>
+    public decimal UnitCost { get; set; }
+
+    /// <summary>Gets or sets the ISO currency code.</summary>
+    public string Currency { get; set; } = "THB";
+
+    /// <summary>Gets or sets the expected line total.</summary>
+    public decimal LineTotal { get; set; }
+
+    /// <summary>Gets or sets the display order.</summary>
+    public int SortOrder { get; set; }
+
+    /// <summary>Gets or sets internal notes about the item.</summary>
+    public string? Notes { get; set; }
 }
 
 /// <summary>
@@ -191,6 +230,9 @@ public class CommerceProductMutationRequest
     /// <summary>Gets or sets media.</summary>
     public List<CommerceProductMediaMutationRequest> Media { get; set; } = [];
 
+    /// <summary>Gets or sets bill of materials items.</summary>
+    public List<CommerceProductBomItemMutationRequest> BomItems { get; set; } = [];
+
     /// <summary>Gets or sets collection handles.</summary>
     public List<string> CollectionHandles { get; set; } = [];
 }
@@ -232,6 +274,36 @@ public sealed class CommerceProductMediaMutationRequest
 
     /// <summary>Gets or sets sort order.</summary>
     public int SortOrder { get; set; }
+}
+
+/// <summary>
+/// Product bill of materials item mutation request.
+/// </summary>
+public sealed class CommerceProductBomItemMutationRequest
+{
+    /// <summary>Gets or sets the material, component, or consumable name.</summary>
+    public string ItemName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the item specification, grade, color, size, or supplier reference.</summary>
+    public string? Specification { get; set; }
+
+    /// <summary>Gets or sets the quantity used by one sellable product unit.</summary>
+    public decimal Quantity { get; set; }
+
+    /// <summary>Gets or sets the unit of measure.</summary>
+    public string Unit { get; set; } = "pcs";
+
+    /// <summary>Gets or sets the expected unit cost.</summary>
+    public decimal UnitCost { get; set; }
+
+    /// <summary>Gets or sets the ISO currency code.</summary>
+    public string Currency { get; set; } = "THB";
+
+    /// <summary>Gets or sets the display order.</summary>
+    public int SortOrder { get; set; }
+
+    /// <summary>Gets or sets internal notes about the item.</summary>
+    public string? Notes { get; set; }
 }
 
 /// <summary>

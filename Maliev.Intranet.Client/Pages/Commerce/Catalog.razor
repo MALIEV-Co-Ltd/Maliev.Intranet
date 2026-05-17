@@ -2,6 +2,7 @@
 @attribute [RequirePermission(MalievPermissions.Commerce.ProductsRead)]
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
 <PageTitle>Commerce Catalog | MALIEV Intranet</PageTitle>
 
@@ -63,12 +64,13 @@
                                     <th>Type</th>
                                     <th>Status</th>
                                     <th>Price</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var product in _products)
                                 {
-                                    <tr class="@SelectedProductRowClass(product)" @onclick="@(() => SelectProductAsync(product))">
+                                    <tr class="catalog-product-row" @onclick="@(() => OpenProduct(product))">
                                         <td>
                                             <div class="d-flex align-center gap-3">
                                                 @if (!string.IsNullOrWhiteSpace(product.ThumbnailUrl))
@@ -88,6 +90,11 @@
                                         <td>@product.ProductType</td>
                                         <td><StatusBadge Status="@product.Status" /></td>
                                         <td class="mlv-mono">@product.StartingPrice.ToString("N2") @product.Currency</td>
+                                        <td>
+                                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" EndIcon="@Icons.Material.Outlined.ArrowForward">
+                                                Manage
+                                            </MudButton>
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
@@ -105,72 +112,6 @@
             </MudItem>
 
             <MudItem xs="12" lg="4">
-                <PanelCard Class="mb-4">
-                    <div class="d-flex align-center justify-space-between mb-3">
-                        <MudText Typo="Typo.h6">@(_editingProductId.HasValue ? "Edit listing" : "New listing")</MudText>
-                        @if (_editingProductId.HasValue)
-                        {
-                            <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Archive" OnClick="ArchiveSelectedProductAsync">Archive</MudButton>
-                        }
-                    </div>
-
-                    <MudStack Spacing="2">
-                        <MudTextField @bind-Value="_productForm.Title" Label="Title" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudTextField @bind-Value="_productForm.Handle" Label="Handle" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudTextField @bind-Value="_productForm.Brand" Label="Brand" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudTextField @bind-Value="_productForm.ProductType" Label="Product type" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudSelect T="string" @bind-Value="_productForm.Status" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense">
-                            <MudSelectItem Value="@("Draft")">Draft</MudSelectItem>
-                            <MudSelectItem Value="@("Published")">Published</MudSelectItem>
-                            <MudSelectItem Value="@("Archived")">Archived</MudSelectItem>
-                        </MudSelect>
-                        <MudTextField @bind-Value="_productForm.Summary" Label="Summary" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudTextField @bind-Value="_productForm.Description" Label="Description / HTML" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                    </MudStack>
-
-                    <MudDivider Class="my-4" />
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">Collections</MudText>
-                    <div class="d-flex flex-wrap gap-2 mb-3">
-                        @foreach (var collection in _collections)
-                        {
-                            <label class="mlv-chip-check">
-                                <input type="checkbox" checked="@IsCollectionSelected(collection.Handle)" @onchange="@(() => ToggleCollection(collection.Handle))" />
-                                <span>@collection.Title</span>
-                            </label>
-                        }
-                    </div>
-
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">Variants</MudText>
-                    @foreach (var variant in _productForm.Variants)
-                    {
-                        <div class="mlv-form-row mb-2">
-                            <MudTextField @bind-Value="variant.Sku" Label="SKU" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                            <MudTextField @bind-Value="variant.Title" Label="Variant" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                            <MudNumericField @bind-Value="variant.PriceAmount" Label="Price" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                            <MudNumericField @bind-Value="variant.InventoryQuantity" Label="Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveVariant(variant))" />
-                        </div>
-                    }
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddVariant">Add variant</MudButton>
-
-                    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Images</MudText>
-                    @foreach (var media in _productForm.Media)
-                    {
-                        <div class="mlv-form-row mb-2">
-                            <MudTextField @bind-Value="media.Url" Label="Image URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                            <MudTextField @bind-Value="media.AltText" Label="Alt text" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                            <MudNumericField @bind-Value="media.SortOrder" Label="Order" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveMedia(media))" />
-                        </div>
-                    }
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.AddPhotoAlternate" OnClick="AddMedia">Add image</MudButton>
-
-                    <div class="d-flex gap-2 mt-4">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveProductAsync" Disabled="@_savingProduct">Save listing</MudButton>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="StartNewProduct">Reset</MudButton>
-                    </div>
-                </PanelCard>
-
                 <PanelCard>
                     <MudText Typo="Typo.h6" Class="mb-3">Collections</MudText>
                     <MudStack Spacing="2">
@@ -205,14 +146,11 @@
     private readonly List<CommerceProductSummaryDto> _products = [];
     private readonly List<CommerceCollectionDto> _collections = [];
     private PaginationMeta _meta = new();
-    private CommerceProductMutationRequest _productForm = NewProductForm();
     private CommerceCollectionMutationRequest _collectionForm = new();
-    private Guid? _editingProductId;
     private Guid? _editingCollectionId;
     private string? _query;
     private string _collectionFilter = string.Empty;
     private bool _loadingProducts = true;
-    private bool _savingProduct;
     private int _page = 1;
     private int _pageSize = 24;
 
@@ -263,102 +201,6 @@
         }
     }
 
-    private async Task SelectProductAsync(CommerceProductSummaryDto product)
-    {
-        try
-        {
-            var detail = await Http.GetFromJsonAsync<CommerceProductDto>($"api/v1/commerce/products/{Uri.EscapeDataString(product.Handle)}");
-            if (detail is null)
-            {
-                return;
-            }
-
-            _editingProductId = detail.Id;
-            _productForm = new CommerceProductMutationRequest
-            {
-                Handle = detail.Handle,
-                Title = detail.Title,
-                Brand = detail.Brand,
-                Summary = detail.Summary,
-                Description = detail.Description,
-                ProductType = detail.ProductType,
-                Status = detail.Status,
-                Variants = detail.Variants.Select(variant => new CommerceProductVariantMutationRequest
-                {
-                    Sku = variant.Sku,
-                    Title = variant.Title,
-                    PriceAmount = variant.PriceAmount,
-                    Currency = variant.Currency,
-                    InventoryQuantity = variant.InventoryQuantity,
-                    OptionValuesJson = variant.OptionValuesJson
-                }).ToList(),
-                Media = detail.Media.Select(media => new CommerceProductMediaMutationRequest
-                {
-                    Url = media.Url,
-                    AltText = media.AltText,
-                    SortOrder = media.SortOrder
-                }).ToList(),
-                CollectionHandles = detail.Collections.Select(collection => collection.Handle).ToList()
-            };
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Unable to load listing: {ex.Message}", Severity.Error);
-        }
-    }
-
-    private async Task SaveProductAsync()
-    {
-        _savingProduct = true;
-        try
-        {
-            HttpResponseMessage response;
-            if (_editingProductId.HasValue)
-            {
-                response = await Http.PatchAsJsonAsync($"api/v1/commerce/products/{_editingProductId.Value}", _productForm);
-            }
-            else
-            {
-                response = await Http.PostAsJsonAsync("api/v1/commerce/products", _productForm);
-            }
-
-            response.EnsureSuccessStatusCode();
-            var saved = await response.Content.ReadFromJsonAsync<CommerceProductDto>();
-            _editingProductId = saved?.Id;
-            Snackbar.Add("Commerce listing saved.", Severity.Success);
-            await LoadProductsAsync();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Unable to save listing: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _savingProduct = false;
-        }
-    }
-
-    private async Task ArchiveSelectedProductAsync()
-    {
-        if (!_editingProductId.HasValue)
-        {
-            return;
-        }
-
-        try
-        {
-            var response = await Http.DeleteAsync($"api/v1/commerce/products/{_editingProductId.Value}");
-            response.EnsureSuccessStatusCode();
-            Snackbar.Add("Commerce listing archived.", Severity.Success);
-            StartNewProduct();
-            await LoadProductsAsync();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Unable to archive listing: {ex.Message}", Severity.Error);
-        }
-    }
-
     private async Task SaveCollectionAsync()
     {
         try
@@ -399,8 +241,12 @@
 
     private void StartNewProduct()
     {
-        _editingProductId = null;
-        _productForm = NewProductForm();
+        Navigation.NavigateTo("/commerce/catalog/new");
+    }
+
+    private void OpenProduct(CommerceProductSummaryDto product)
+    {
+        Navigation.NavigateTo($"/commerce/catalog/{Uri.EscapeDataString(product.Handle)}");
     }
 
     private void StartNewCollection()
@@ -421,48 +267,6 @@
         };
     }
 
-    private void AddVariant()
-    {
-        _productForm.Variants.Add(new CommerceProductVariantMutationRequest { Title = "Default", Currency = "THB", InventoryQuantity = 1 });
-    }
-
-    private void RemoveVariant(CommerceProductVariantMutationRequest variant)
-    {
-        _productForm.Variants.Remove(variant);
-    }
-
-    private void AddMedia()
-    {
-        _productForm.Media.Add(new CommerceProductMediaMutationRequest { SortOrder = _productForm.Media.Count });
-    }
-
-    private void RemoveMedia(CommerceProductMediaMutationRequest media)
-    {
-        _productForm.Media.Remove(media);
-    }
-
-    private bool IsCollectionSelected(string handle)
-    {
-        return _productForm.CollectionHandles.Any(selected => string.Equals(selected, handle, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private void ToggleCollection(string handle)
-    {
-        if (IsCollectionSelected(handle))
-        {
-            _productForm.CollectionHandles.RemoveAll(selected => string.Equals(selected, handle, StringComparison.OrdinalIgnoreCase));
-        }
-        else
-        {
-            _productForm.CollectionHandles.Add(handle);
-        }
-    }
-
-    private string SelectedProductRowClass(CommerceProductSummaryDto product)
-    {
-        return _editingProductId == product.Id ? "mlv-row-selected" : string.Empty;
-    }
-
     private static bool IsPublished(CommerceProductSummaryDto product)
     {
         return string.Equals(product.Status, "Published", StringComparison.OrdinalIgnoreCase);
@@ -471,18 +275,5 @@
     private static bool IsDraft(CommerceProductSummaryDto product)
     {
         return string.Equals(product.Status, "Draft", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static CommerceProductMutationRequest NewProductForm()
-    {
-        return new CommerceProductMutationRequest
-        {
-            ProductType = "Product",
-            Status = "Draft",
-            Variants =
-            [
-                new CommerceProductVariantMutationRequest { Title = "Default", Currency = "THB", InventoryQuantity = 1 }
-            ]
-        };
     }
 }

@@ -1,0 +1,475 @@
+@page "/commerce/catalog/new"
+@page "/commerce/catalog/{Handle}"
+@attribute [RequirePermission(MalievPermissions.Commerce.ProductsRead)]
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitleText | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell commerce-listing-shell">
+    <PageHeader Title="@PageTitleText"
+                Subtitle="Manage storefront product content, variants, media, collections, and bill of materials"
+                BackHref="/commerce/catalog" />
+
+    <PageBody>
+        @if (_loading)
+        {
+            <PanelCard>
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+                <div class="mlv-empty">Loading listing...</div>
+            </PanelCard>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Variants" Value="@_productForm.Variants.Count.ToString("N0")" />
+                <StatTile Label="BOM Items" Value="@_productForm.BomItems.Count.ToString("N0")" />
+                <StatTile Label="BOM Cost" Value="@($"{BomCurrency} {BomTotal:N2}")" />
+                <StatTile Label="Status" Value="@_productForm.Status" />
+            </StatBar>
+
+            <div class="commerce-listing-actions mb-4">
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Outlined.ArrowBack" OnClick="BackToCatalog">
+                    Catalog
+                </MudButton>
+                @if (_editingProductId.HasValue)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Archive" OnClick="ArchiveListingAsync">
+                        Archive
+                    </MudButton>
+                }
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Outlined.PictureAsPdf"
+                           Href="@BomPdfHref"
+                           Target="_blank"
+                           Disabled="@(!CanExportBom)">
+                    Export BOM PDF
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveListingAsync" Disabled="@_saving">
+                    Save listing
+                </MudButton>
+            </div>
+
+            <MudGrid Spacing="3">
+                <MudItem xs="12" lg="7">
+                    <PanelCard Class="mb-4">
+                        <MudText Typo="Typo.h6" Class="mb-3">Listing details</MudText>
+                        <div class="commerce-listing-grid">
+                            <MudTextField @bind-Value="_productForm.Title" Label="Title" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                            <MudTextField @bind-Value="_productForm.Handle" Label="Handle" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                            <MudTextField @bind-Value="_productForm.Brand" Label="Brand" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                            <MudTextField @bind-Value="_productForm.ProductType" Label="Product type" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                            <MudSelect T="string" @bind-Value="_productForm.Status" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                <MudSelectItem Value="@("Draft")">Draft</MudSelectItem>
+                                <MudSelectItem Value="@("Published")">Published</MudSelectItem>
+                                <MudSelectItem Value="@("Archived")">Archived</MudSelectItem>
+                            </MudSelect>
+                        </div>
+                        <MudTextField @bind-Value="_productForm.Summary" Label="Summary" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Class="mt-3" />
+                        <MudTextField @bind-Value="_productForm.Description" Label="Description / HTML" Lines="8" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Class="mt-3" />
+                    </PanelCard>
+
+                    <PanelCard Class="mb-4">
+                        <div class="commerce-section-heading">
+                            <MudText Typo="Typo.h6">Bill of materials</MudText>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddBomItem">Add item</MudButton>
+                        </div>
+
+                        <div class="commerce-bom-table">
+                            <div class="commerce-bom-header">
+                                <span>Item</span>
+                                <span>Specification</span>
+                                <span>Qty</span>
+                                <span>Unit cost</span>
+                                <span>Total</span>
+                                <span></span>
+                            </div>
+
+                            @if (_productForm.BomItems.Count == 0)
+                            {
+                                <div class="commerce-bom-empty">No BOM items yet. Add materials, components, packaging, or consumables used by this listing.</div>
+                            }
+                            else
+                            {
+                                @foreach (var item in _productForm.BomItems.OrderBy(item => item.SortOrder).ToList())
+                                {
+                                    <div class="commerce-bom-row">
+                                        <MudTextField @bind-Value="item.ItemName" Label="Item" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                        <MudTextField @bind-Value="item.Specification" Label="Specification" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                        <div class="commerce-bom-qty">
+                                            <MudNumericField @bind-Value="item.Quantity" Label="Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                            <MudTextField @bind-Value="item.Unit" Label="Unit" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                        </div>
+                                        <div class="commerce-bom-cost">
+                                            <MudNumericField @bind-Value="item.UnitCost" Label="Unit cost" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                            <MudTextField @bind-Value="item.Currency" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                        </div>
+                                        <div class="commerce-bom-line-total">@item.Currency @BomLineTotal(item).ToString("N2")</div>
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveBomItem(item))" />
+                                        <MudTextField @bind-Value="item.Notes" Label="Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Immediate="true" Class="commerce-bom-notes" />
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </PanelCard>
+                </MudItem>
+
+                <MudItem xs="12" lg="5">
+                    <PanelCard Class="mb-4">
+                        <div class="commerce-section-heading">
+                            <MudText Typo="Typo.h6">Collections</MudText>
+                            <MudText Typo="Typo.caption">@_productForm.CollectionHandles.Count selected</MudText>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var collection in _collections)
+                            {
+                                <label class="commerce-chip-check">
+                                    <input type="checkbox" checked="@IsCollectionSelected(collection.Handle)" @onchange="@(() => ToggleCollection(collection.Handle))" />
+                                    <span>@collection.Title</span>
+                                </label>
+                            }
+                        </div>
+                    </PanelCard>
+
+                    <PanelCard Class="mb-4">
+                        <div class="commerce-section-heading">
+                            <MudText Typo="Typo.h6">Variants</MudText>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddVariant">Add variant</MudButton>
+                        </div>
+                        @foreach (var variant in _productForm.Variants)
+                        {
+                            <div class="commerce-variant-row">
+                                <MudTextField @bind-Value="variant.Sku" Label="SKU" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudTextField @bind-Value="variant.Title" Label="Variant" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudNumericField @bind-Value="variant.PriceAmount" Label="Price" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudTextField @bind-Value="variant.Currency" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudNumericField @bind-Value="variant.InventoryQuantity" Label="Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveVariant(variant))" />
+                            </div>
+                        }
+                    </PanelCard>
+
+                    <PanelCard>
+                        <div class="commerce-section-heading">
+                            <MudText Typo="Typo.h6">Media</MudText>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.AddPhotoAlternate" OnClick="AddMedia">Add image</MudButton>
+                        </div>
+                        @if (_productForm.Media.Count == 0)
+                        {
+                            <div class="commerce-bom-empty">No listing media configured.</div>
+                        }
+                        @foreach (var media in _productForm.Media.OrderBy(media => media.SortOrder).ToList())
+                        {
+                            <div class="commerce-media-row">
+                                <MudTextField @bind-Value="media.Url" Label="Image URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudTextField @bind-Value="media.AltText" Label="Alt text" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudNumericField @bind-Value="media.SortOrder" Label="Order" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveMedia(media))" />
+                            </div>
+                        }
+                    </PanelCard>
+                </MudItem>
+            </MudGrid>
+        }
+    </PageBody>
+</div>
+
+@code {
+    /// <summary>Gets or sets the product handle route value.</summary>
+    [Parameter]
+    public string? Handle { get; set; }
+
+    private readonly List<CommerceCollectionDto> _collections = [];
+    private CommerceProductMutationRequest _productForm = NewProductForm();
+    private Guid? _editingProductId;
+    private string? _loadedHandle;
+    private bool _loading = true;
+    private bool _saving;
+
+    private bool IsNewListing => string.IsNullOrWhiteSpace(Handle) || string.Equals(Handle, "new", StringComparison.OrdinalIgnoreCase);
+
+    private string PageTitleText => IsNewListing ? "New Commerce Listing" : _productForm.Title;
+
+    private bool CanExportBom => _editingProductId.HasValue && _productForm.BomItems.Count > 0 && !string.IsNullOrWhiteSpace(_loadedHandle);
+
+    private string BomPdfHref => CanExportBom
+        ? $"api/v1/commerce/products/{Uri.EscapeDataString(_loadedHandle!)}/bom/pdf"
+        : "#";
+
+    private string BomCurrency => _productForm.BomItems.FirstOrDefault()?.Currency ?? _productForm.Variants.FirstOrDefault()?.Currency ?? "THB";
+
+    private decimal BomTotal => _productForm.BomItems.Sum(BomLineTotal);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        try
+        {
+            if (_collections.Count == 0)
+            {
+                await LoadCollectionsAsync();
+            }
+
+            if (IsNewListing)
+            {
+                _editingProductId = null;
+                _loadedHandle = null;
+                _productForm = NewProductForm();
+                return;
+            }
+
+            await LoadProductAsync(Handle!);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadCollectionsAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<CommerceCollectionDto>>("api/v1/commerce/collections");
+            _collections.Clear();
+            _collections.AddRange(response ?? []);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load Commerce collections: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadProductAsync(string handle)
+    {
+        try
+        {
+            var detail = await Http.GetFromJsonAsync<CommerceProductDto>($"api/v1/commerce/products/{Uri.EscapeDataString(handle)}");
+            if (detail is null)
+            {
+                Snackbar.Add("Commerce listing was not found.", Severity.Warning);
+                Navigation.NavigateTo("/commerce/catalog");
+                return;
+            }
+
+            _editingProductId = detail.Id;
+            _loadedHandle = detail.Handle;
+            _productForm = MapProduct(detail);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load listing: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SaveListingAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_productForm.Title) || string.IsNullOrWhiteSpace(_productForm.Handle))
+        {
+            Snackbar.Add("Title and handle are required before saving.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            NormalizeBomSortOrders();
+            NormalizeMediaSortOrders();
+
+            HttpResponseMessage response;
+            if (_editingProductId.HasValue)
+            {
+                response = await Http.PatchAsJsonAsync($"api/v1/commerce/products/{_editingProductId.Value}", _productForm);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/v1/commerce/products", _productForm);
+            }
+
+            response.EnsureSuccessStatusCode();
+            var saved = await response.Content.ReadFromJsonAsync<CommerceProductDto>();
+            if (saved is null)
+            {
+                return;
+            }
+
+            _editingProductId = saved.Id;
+            _loadedHandle = saved.Handle;
+            _productForm = MapProduct(saved);
+            Snackbar.Add("Commerce listing saved.", Severity.Success);
+
+            if (!string.Equals(Handle, saved.Handle, StringComparison.OrdinalIgnoreCase))
+            {
+                Navigation.NavigateTo($"/commerce/catalog/{Uri.EscapeDataString(saved.Handle)}", replace: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to save listing: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void BackToCatalog()
+    {
+        Navigation.NavigateTo("/commerce/catalog");
+    }
+
+    private async Task ArchiveListingAsync()
+    {
+        if (!_editingProductId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/v1/commerce/products/{_editingProductId.Value}");
+            response.EnsureSuccessStatusCode();
+            Snackbar.Add("Commerce listing archived.", Severity.Success);
+            Navigation.NavigateTo("/commerce/catalog");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to archive listing: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void AddVariant()
+    {
+        _productForm.Variants.Add(new CommerceProductVariantMutationRequest { Title = "Default", Currency = "THB", InventoryQuantity = 1 });
+    }
+
+    private void RemoveVariant(CommerceProductVariantMutationRequest variant)
+    {
+        _productForm.Variants.Remove(variant);
+    }
+
+    private void AddMedia()
+    {
+        _productForm.Media.Add(new CommerceProductMediaMutationRequest { SortOrder = _productForm.Media.Count });
+    }
+
+    private void RemoveMedia(CommerceProductMediaMutationRequest media)
+    {
+        _productForm.Media.Remove(media);
+        NormalizeMediaSortOrders();
+    }
+
+    private void AddBomItem()
+    {
+        _productForm.BomItems.Add(new CommerceProductBomItemMutationRequest
+        {
+            ItemName = "New BOM item",
+            Quantity = 1,
+            Unit = "pcs",
+            Currency = BomCurrency,
+            SortOrder = _productForm.BomItems.Count
+        });
+    }
+
+    private void RemoveBomItem(CommerceProductBomItemMutationRequest item)
+    {
+        _productForm.BomItems.Remove(item);
+        NormalizeBomSortOrders();
+    }
+
+    private bool IsCollectionSelected(string handle)
+    {
+        return _productForm.CollectionHandles.Any(selected => string.Equals(selected, handle, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void ToggleCollection(string handle)
+    {
+        if (IsCollectionSelected(handle))
+        {
+            _productForm.CollectionHandles.RemoveAll(selected => string.Equals(selected, handle, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            _productForm.CollectionHandles.Add(handle);
+        }
+    }
+
+    private void NormalizeBomSortOrders()
+    {
+        var items = _productForm.BomItems.OrderBy(item => item.SortOrder).ToList();
+        for (var index = 0; index < items.Count; index++)
+        {
+            items[index].SortOrder = index;
+        }
+    }
+
+    private void NormalizeMediaSortOrders()
+    {
+        var mediaItems = _productForm.Media.OrderBy(media => media.SortOrder).ToList();
+        for (var index = 0; index < mediaItems.Count; index++)
+        {
+            mediaItems[index].SortOrder = index;
+        }
+    }
+
+    private static decimal BomLineTotal(CommerceProductBomItemMutationRequest item)
+    {
+        return decimal.Round(item.Quantity * item.UnitCost, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static CommerceProductMutationRequest MapProduct(CommerceProductDto detail)
+    {
+        return new CommerceProductMutationRequest
+        {
+            Handle = detail.Handle,
+            Title = detail.Title,
+            Brand = detail.Brand,
+            Summary = detail.Summary,
+            Description = detail.Description,
+            ProductType = detail.ProductType,
+            Status = detail.Status,
+            Variants = detail.Variants.Select(variant => new CommerceProductVariantMutationRequest
+            {
+                Sku = variant.Sku,
+                Title = variant.Title,
+                PriceAmount = variant.PriceAmount,
+                Currency = variant.Currency,
+                InventoryQuantity = variant.InventoryQuantity,
+                OptionValuesJson = variant.OptionValuesJson
+            }).ToList(),
+            Media = detail.Media.Select(media => new CommerceProductMediaMutationRequest
+            {
+                Url = media.Url,
+                AltText = media.AltText,
+                SortOrder = media.SortOrder
+            }).ToList(),
+            BomItems = detail.BomItems.OrderBy(item => item.SortOrder).Select(item => new CommerceProductBomItemMutationRequest
+            {
+                ItemName = item.ItemName,
+                Specification = item.Specification,
+                Quantity = item.Quantity,
+                Unit = item.Unit,
+                UnitCost = item.UnitCost,
+                Currency = item.Currency,
+                SortOrder = item.SortOrder,
+                Notes = item.Notes
+            }).ToList(),
+            CollectionHandles = detail.Collections.Select(collection => collection.Handle).ToList()
+        };
+    }
+
+    private static CommerceProductMutationRequest NewProductForm()
+    {
+        return new CommerceProductMutationRequest
+        {
+            ProductType = "Product",
+            Status = "Draft",
+            Variants =
+            [
+                new CommerceProductVariantMutationRequest { Title = "Default", Currency = "THB", InventoryQuantity = 1 }
+            ]
+        };
+    }
+}

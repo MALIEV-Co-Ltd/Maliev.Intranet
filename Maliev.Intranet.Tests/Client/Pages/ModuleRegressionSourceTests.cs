@@ -636,6 +636,34 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CommerceCatalog_UsesDedicatedListingPageWithBomExport()
+    {
+        var catalog = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");
+        var listing = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "CatalogListing.razor");
+        var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "CommerceController.cs");
+        var commerceDtos = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "CommerceDtos.cs");
+        var pdfDtos = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "PdfDataDtos.cs");
+
+        Assert.Contains("Navigation.NavigateTo(\"/commerce/catalog/new\")", catalog, StringComparison.Ordinal);
+        Assert.Contains("Navigation.NavigateTo($\"/commerce/catalog/{Uri.EscapeDataString(product.Handle)}\")", catalog, StringComparison.Ordinal);
+        Assert.DoesNotContain("Edit listing", catalog, StringComparison.Ordinal);
+        Assert.DoesNotContain("_productForm.Title", catalog, StringComparison.Ordinal);
+
+        Assert.Contains("@page \"/commerce/catalog/new\"", listing, StringComparison.Ordinal);
+        Assert.Contains("@page \"/commerce/catalog/{Handle}\"", listing, StringComparison.Ordinal);
+        Assert.Contains("Bill of materials", listing, StringComparison.Ordinal);
+        Assert.Contains("AddBomItem", listing, StringComparison.Ordinal);
+        Assert.Contains("Export BOM PDF", listing, StringComparison.Ordinal);
+        Assert.Contains("BomPdfHref", listing, StringComparison.Ordinal);
+
+        Assert.Contains("List<CommerceProductBomItemDto> BomItems", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("List<CommerceProductBomItemMutationRequest> BomItems", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("PdfDocumentType.CommerceBom", controller, StringComparison.Ordinal);
+        Assert.Contains("products/{handle}/bom/pdf", controller, StringComparison.Ordinal);
+        Assert.Contains("CommerceBomPdfData", pdfDtos, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void IamUserList_UsesPagedBffUsersEndpoint()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserList.razor");

@@ -30,6 +30,7 @@ public class PdfServiceClient(HttpClient httpClient)
             PdfDocumentType.Receipt => "Receipt",
             PdfDocumentType.Report => "Report",
             PdfDocumentType.DeliveryNote => "DeliveryNote",
+            PdfDocumentType.CommerceBom => "CommerceBom",
             _ => documentType.ToString()
         };
 
@@ -67,6 +68,7 @@ public class PdfServiceClient(HttpClient httpClient)
             PdfDocumentType.Receipt => "Receipt",
             PdfDocumentType.Report => "Report",
             PdfDocumentType.DeliveryNote => "DeliveryNote",
+            PdfDocumentType.CommerceBom => "CommerceBom",
             _ => documentType.ToString()
         };
 

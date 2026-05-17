@@ -36,9 +36,12 @@
     width: 56px;
 }
 
-.mlv-row-selected {
-    outline: 2px solid var(--mud-palette-primary);
-    outline-offset: -2px;
+.catalog-product-row {
+    cursor: pointer;
+}
+
+.catalog-product-row:hover {
+    background: var(--mlv-surface-muted, #f3f4f6);
 }
 
 .mlv-chip-check {
