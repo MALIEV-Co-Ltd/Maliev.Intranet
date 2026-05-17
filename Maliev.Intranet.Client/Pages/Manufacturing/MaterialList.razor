@@ -51,7 +51,6 @@
                 <table class="mlv-table">
                     <thead>
                         <tr>
-                            <th>Code</th>
                             <th>Name</th>
                             <th>Category</th>
                             <th>Status</th>
@@ -63,7 +62,6 @@
                         @foreach (var material in _materials)
                         {
                             <tr @onclick="@(() => Navigation.NavigateTo($"/mfg/materials/{material.Id}"))">
-                                <td class="mlv-mono">@material.SKU</td>
                                 <td>@material.Name</td>
                                 <td>@(string.IsNullOrWhiteSpace(material.Category) ? "-" : material.Category)</td>
                                 <td><StatusBadge Status="@material.Status" /></td>

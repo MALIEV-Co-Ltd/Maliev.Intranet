@@ -443,6 +443,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("<PanelCard Title=\"Profile\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Properties\">", detail, StringComparison.Ordinal);
         Assert.Contains("class=\"mlv-table\"", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("<th>Code</th>", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("<td class=\"mlv-mono\">@material.SKU</td>", list, StringComparison.Ordinal);
         Assert.Contains("class=\"mlv-detail-list\"", detail, StringComparison.Ordinal);
         Assert.DoesNotContain("mlv-stats-grid", list, StringComparison.Ordinal);
         Assert.DoesNotContain("mlv-stats-grid", detail, StringComparison.Ordinal);
