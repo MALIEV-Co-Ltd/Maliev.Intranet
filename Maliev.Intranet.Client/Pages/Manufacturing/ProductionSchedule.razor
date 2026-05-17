@@ -1,5 +1,6 @@
 @page "/mfg/production-schedule"
 @using System.Globalization
+@using System.Text.Json
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
@@ -75,9 +76,14 @@
                     <span>Cascade following queued jobs</span>
                 </label>
 
+                @if (!string.IsNullOrWhiteSpace(CurrentMoveMessage))
+                {
+                    <div class="production-move-error" role="alert">@CurrentMoveMessage</div>
+                }
+
                 <footer>
                     <SecondaryButton OnClick="@CancelMoveClickedAsync">Cancel</SecondaryButton>
-                    <PrimaryButton Class="production-move-save" Icon="@Icons.Material.Outlined.Save" Disabled="@_savingMove" OnClick="@SaveMoveClickedAsync">
+                    <PrimaryButton Class="production-move-save" Icon="@Icons.Material.Outlined.Save" Disabled="@(!CanSaveMove)" OnClick="@SaveMoveClickedAsync">
                         @(_savingMove ? "Saving..." : "Save schedule")
                     </PrimaryButton>
                 </footer>
@@ -275,10 +281,39 @@
     private bool _savingMove;
     private string? _error;
     private string? _slotDetailsError;
+    private string? _moveError;
     private DateTime _rangeStartUtc = DateTime.UtcNow.Date;
 
     private IEnumerable<ProductionScheduleMachineDto> MoveMachines => (_board?.Machines ?? Enumerable.Empty<ProductionScheduleMachineDto>())
         .OrderBy(machine => machine.MachineName, StringComparer.OrdinalIgnoreCase);
+
+    private string? MoveValidationMessage
+    {
+        get
+        {
+            if (_moveSlot is null)
+                return null;
+
+            var startUtc = LocalToUtc(_moveStartLocal);
+            var endUtc = LocalToUtc(_moveEndLocal);
+            if (endUtc <= startUtc)
+                return "Schedule end must be after start.";
+
+            if (startUtc <= DateTime.UtcNow)
+                return "Choose a future start time before saving this schedule.";
+
+            if (IsMoveUnchanged(startUtc, endUtc))
+                return "Adjust the start, end, or queue position to save changes.";
+
+            return null;
+        }
+    }
+
+    private string? CurrentMoveMessage => _moveError ?? MoveValidationMessage;
+
+    private bool CanSaveMove => _moveSlot is not null
+        && !_savingMove
+        && string.IsNullOrWhiteSpace(MoveValidationMessage);
 
     protected override async Task OnInitializedAsync()
     {
@@ -357,6 +392,7 @@
         _moveEndLocal = NormalizeUtc(slot.ScheduledEnd).ToLocalTime();
         _moveQueuePosition = slot.QueuePosition > 0 ? slot.QueuePosition : null;
         _moveCascade = true;
+        _moveError = null;
         return Task.CompletedTask;
     }
 
@@ -364,6 +400,7 @@
     {
         _moveSlot = null;
         _savingMove = false;
+        _moveError = null;
     }
 
     private void CloseSlotDetails()
@@ -392,9 +429,23 @@
 
         var startUtc = LocalToUtc(_moveStartLocal);
         var endUtc = LocalToUtc(_moveEndLocal);
+        _moveError = null;
+
+        if (IsMoveUnchanged(startUtc, endUtc))
+        {
+            CloseMovePanel();
+            return;
+        }
+
         if (endUtc <= startUtc)
         {
-            Snackbar.Add("Schedule end must be after start.", Severity.Error);
+            _moveError = "Schedule end must be after start.";
+            return;
+        }
+
+        if (startUtc <= DateTime.UtcNow)
+        {
+            _moveError = "Choose a future start time before saving this schedule.";
             return;
         }
 
@@ -443,8 +494,7 @@
 
             if (!response.IsSuccessStatusCode)
             {
-                var message = await response.Content.ReadAsStringAsync();
-                Snackbar.Add(string.IsNullOrWhiteSpace(message) ? "Schedule could not be updated." : message, Severity.Error);
+                _moveError = await ReadScheduleErrorAsync(response);
                 return;
             }
 
@@ -454,7 +504,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Schedule update error: {ex.Message}", Severity.Error);
+            _moveError = $"Schedule update error: {ex.Message}";
         }
         finally
         {
@@ -462,22 +512,29 @@
         }
     }
 
-    private void OnMoveMachineChanged(ChangeEventArgs e) => _moveMachineId = e.Value?.ToString() ?? string.Empty;
+    private void OnMoveMachineChanged(ChangeEventArgs e)
+    {
+        _moveError = null;
+        _moveMachineId = e.Value?.ToString() ?? string.Empty;
+    }
 
     private void OnMoveStartChanged(ChangeEventArgs e)
     {
+        _moveError = null;
         if (TryParseLocalDateTime(e.Value?.ToString(), out var value))
             _moveStartLocal = value;
     }
 
     private void OnMoveEndChanged(ChangeEventArgs e)
     {
+        _moveError = null;
         if (TryParseLocalDateTime(e.Value?.ToString(), out var value))
             _moveEndLocal = value;
     }
 
     private void OnMoveQueuePositionChanged(ChangeEventArgs e)
     {
+        _moveError = null;
         _moveQueuePosition = int.TryParse(e.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
             ? Math.Max(0, value)
             : null;
@@ -485,6 +542,7 @@
 
     private void OnMoveCascadeChanged(ChangeEventArgs e)
     {
+        _moveError = null;
         _moveCascade = e.Value is bool value && value;
     }
 
@@ -558,6 +616,48 @@
 
     private static string FormatShortId(Guid? id) =>
         id is { } value ? value.ToString("N")[..8].ToUpperInvariant() : "Not linked";
+
+    private bool IsMoveUnchanged(DateTime startUtc, DateTime endUtc)
+    {
+        if (_moveSlot is null)
+            return true;
+
+        var originalQueuePosition = _moveSlot.QueuePosition > 0 ? _moveSlot.QueuePosition : (int?)null;
+        return string.Equals(_moveMachineId, _moveSlot.MachineId, StringComparison.OrdinalIgnoreCase)
+            && SameScheduleInstant(startUtc, _moveSlot.ScheduledStart)
+            && SameScheduleInstant(endUtc, _moveSlot.ScheduledEnd)
+            && _moveQueuePosition == originalQueuePosition;
+    }
+
+    private static bool SameScheduleInstant(DateTime left, DateTime right) =>
+        Math.Abs((NormalizeUtc(left) - NormalizeUtc(right)).TotalSeconds) < 60;
+
+    private static async Task<string> ReadScheduleErrorAsync(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(content))
+            return "Schedule could not be updated.";
+
+        try
+        {
+            using var json = JsonDocument.Parse(content);
+            var root = json.RootElement;
+            if (root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String)
+                return error.GetString() ?? "Schedule could not be updated.";
+            if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+                return detail.GetString() ?? "Schedule could not be updated.";
+            if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+                return title.GetString() ?? "Schedule could not be updated.";
+        }
+        catch (JsonException)
+        {
+            // Fall through to a bounded plain-text response.
+        }
+
+        return content.Length <= 240
+            ? content
+            : string.Concat(content.AsSpan(0, 237), "...");
+    }
 
     private static string FormatDateTimeLocal(DateTime value) =>
         value.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);

@@ -24,6 +24,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     private readonly Guid _holdId = Guid.Parse("44444444-5555-6666-7777-888888888888");
     private readonly List<string> _requestedRequests = [];
     private JsonDocument? _rescheduleRequest;
+    private DateTime? _boardRangeStart;
 
     public ProductionSchedulePageTests()
     {
@@ -107,6 +108,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         Assert.Equal("production-move-machine-lock", machineSelect.GetAttribute("aria-describedby"));
         Assert.Contains("Locked to the selected slot.", cut.Markup);
 
+        cut.Find(".production-move-grid input[type='number']").Input("2");
         cut.Find("button.production-move-save").Click();
 
         cut.WaitForAssertion(() =>
@@ -119,6 +121,23 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         Assert.Equal("CNC-01", root.GetProperty("machineId").GetString());
         Assert.True(root.GetProperty("cascadeFollowingJobs").GetBoolean());
         Assert.Contains(_requestedRequests, request => request.StartsWith("GET /api/v1/jobs/schedule?from=", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ProductionSchedule_MovePastSlot_DisablesSaveAndShowsInlineValidation()
+    {
+        _boardRangeStart = DateTime.UtcNow.Date.AddDays(-1);
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("JOB-2001", cut.Markup));
+        cut.Find($"button[data-job-id='{_jobId}'] .psb-slot-move").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Choose a future start time before saving this schedule.", cut.Markup);
+            Assert.True(cut.Find("button.production-move-save").HasAttribute("disabled"));
+        });
+        Assert.DoesNotContain(_requestedRequests, request => request == $"PATCH /api/v1/jobs/{_jobId}/schedule");
     }
 
     [Fact]
@@ -198,7 +217,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
 
     private ProductionScheduleBoardDto BuildBoard()
     {
-        var rangeStart = new DateTime(2026, 5, 7, 0, 0, 0, DateTimeKind.Utc);
+        var rangeStart = _boardRangeStart ?? DateTime.UtcNow.Date.AddDays(1);
         return new ProductionScheduleBoardDto
         {
             RangeStart = rangeStart,

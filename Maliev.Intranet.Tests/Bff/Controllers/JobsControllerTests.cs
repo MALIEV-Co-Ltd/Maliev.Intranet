@@ -347,4 +347,31 @@ public class JobsControllerTests
             It.Is<object?[]>(args => args.Length == 1),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Reschedule_WhenDownstreamConflict_ShouldForwardErrorBodyAndNotBroadcast()
+    {
+        var controller = Make(MakeClient(new { error = "Scheduled start must be in the future." }, HttpStatusCode.Conflict));
+        var (hub, allProxy) = MockHub();
+
+        var result = await controller.Reschedule(
+            JobId,
+            new RescheduleJobRequest
+            {
+                MachineId = "MAL-FDM-001",
+                ScheduledStartTime = DateTime.UtcNow.AddHours(-2),
+                ScheduledEndTime = DateTime.UtcNow.AddHours(-1),
+                QueuePosition = 1
+            },
+            hub,
+            CancellationToken.None);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal((int)HttpStatusCode.Conflict, content.StatusCode);
+        Assert.Contains("Scheduled start must be in the future.", content.Content);
+        allProxy.Verify(c => c.SendCoreAsync(
+            "ScheduleChanged",
+            It.IsAny<object?[]>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

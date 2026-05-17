@@ -267,6 +267,16 @@
     height: 16px;
 }
 
+.production-move-error {
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--maliev-warning), transparent 55%);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklab, var(--maliev-warning), transparent 90%);
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    line-height: 1.35;
+}
+
 .production-move-panel footer,
 .production-slot-panel footer {
     display: flex;

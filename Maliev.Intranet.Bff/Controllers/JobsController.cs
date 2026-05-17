@@ -275,7 +275,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         CancellationToken ct)
     {
         var response = await client.RescheduleJobAsync(id, request, ct);
-        if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+        if (!response.IsSuccessStatusCode) return await ForwardDownstreamFailureAsync(response, ct);
 
         await hub.Clients.All.SendAsync("ScheduleChanged", new { MachineId = request.MachineId });
         return NoContent();
@@ -298,10 +298,25 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         CancellationToken ct)
     {
         var response = await client.UpdatePlanningHoldAsync(holdId, request, ct);
-        if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+        if (!response.IsSuccessStatusCode) return await ForwardDownstreamFailureAsync(response, ct);
 
         await hub.Clients.All.SendAsync("ScheduleChanged", new { MachineId = request.MachineId });
         return NoContent();
+    }
+
+    private static async Task<IActionResult> ForwardDownstreamFailureAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        var statusCode = (int)response.StatusCode;
+        var content = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(content))
+            return new StatusCodeResult(statusCode);
+
+        return new ContentResult
+        {
+            StatusCode = statusCode,
+            Content = content,
+            ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/json"
+        };
     }
 
     private static ProductionScheduleBoardDto BuildScheduleBoard(
