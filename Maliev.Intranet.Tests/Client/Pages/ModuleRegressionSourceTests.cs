@@ -621,6 +621,21 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CommerceCatalog_SearchToolbarUsesCompactBoundedLayout()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor.css");
+
+        Assert.Contains("catalog-product-toolbar", source, StringComparison.Ordinal);
+        Assert.Contains("Class=\"catalog-product-search\"", source, StringComparison.Ordinal);
+        Assert.Contains("Class=\"catalog-product-filter\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("flex: 1 1 260px", source, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(16rem, 20rem) minmax(14rem, 17rem) auto auto;", styles, StringComparison.Ordinal);
+        Assert.Contains(".catalog-product-toolbar ::deep .mud-input-control", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 620px)", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void IamUserList_UsesPagedBffUsersEndpoint()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserList.razor");
