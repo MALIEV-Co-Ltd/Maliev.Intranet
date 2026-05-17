@@ -11,6 +11,7 @@ using Moq;
 using System.Security.Claims;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 
@@ -22,6 +23,7 @@ namespace Maliev.Intranet.Tests.Client.Pages;
 public class Phase3DashboardTests : BunitContext, IAsyncLifetime
 {
     private readonly Mock<AuthenticationStateProvider> _authMock = new();
+    private readonly MockHttpMessageHandler _httpHandler = new();
 
     public Phase3DashboardTests()
     {
@@ -38,9 +40,9 @@ public class Phase3DashboardTests : BunitContext, IAsyncLifetime
         Services.AddSingleton(authServiceMock.Object);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
+        _httpHandler.HandlerFunc = HandleDefaultRequest;
 
-        var handler = new MockHttpMessageHandler();
-        var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
+        var client = new HttpClient(_httpHandler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);
         Services.AddScoped<BreadcrumbService>();
 
@@ -84,4 +86,104 @@ public class Phase3DashboardTests : BunitContext, IAsyncLifetime
             markup.Contains("Loading operations", StringComparison.OrdinalIgnoreCase),
             "Expected operational dashboard content");
     }
+
+    [Fact]
+    public void Dashboard_ShouldNotRenderFallbackStats_WhileDashboardRequestIsLoading()
+    {
+        var dashboardResponse = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _httpHandler.HandlerFunc = (request, _) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            if (path.Equals("/api/v1/dashboard", StringComparison.OrdinalIgnoreCase))
+            {
+                return dashboardResponse.Task;
+            }
+
+            if (path.Equals("/api/v1/dashboard/action-items", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new DashboardActionItemsDto())
+                });
+            }
+
+            if (path.Equals("/api/v1/orders", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new PagedResponse<OrderSummaryDto>())
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        };
+
+        var cut = Render<Home>();
+
+        Assert.NotEmpty(cut.FindAll(".mud-skeleton"));
+        Assert.DoesNotContain("Project quote workspace ready", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("proxied endpoints", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("recent records", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("open work", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Task<HttpResponseMessage> HandleDefaultRequest(HttpRequestMessage request, CancellationToken _)
+    {
+        var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+        if (path.Equals("/api/v1/dashboard", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(new DashboardViewModel
+            {
+                Widgets =
+                [
+                    new WidgetData
+                    {
+                        Title = "Total Revenue (Today)",
+                        Type = "Stat",
+                        Data = JsonSerializer.SerializeToElement("THB 0"),
+                        SourceService = "test"
+                    },
+                    new WidgetData
+                    {
+                        Title = "Active Orders",
+                        Type = "Stat",
+                        Data = JsonSerializer.SerializeToElement(0),
+                        SourceService = "test"
+                    },
+                    new WidgetData
+                    {
+                        Title = "Pending Quotes",
+                        Type = "Stat",
+                        Data = JsonSerializer.SerializeToElement(0),
+                        SourceService = "test"
+                    },
+                    new WidgetData
+                    {
+                        Title = "Total Headcount",
+                        Type = "Stat",
+                        Data = JsonSerializer.SerializeToElement(1),
+                        SourceService = "test"
+                    }
+                ]
+            });
+        }
+
+        if (path.Equals("/api/v1/dashboard/action-items", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(new DashboardActionItemsDto());
+        }
+
+        if (path.Equals("/api/v1/orders", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(new PagedResponse<OrderSummaryDto>());
+        }
+
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+    }
+
+    private static Task<HttpResponseMessage> Ok<T>(T body) =>
+        Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(body)
+        });
 }

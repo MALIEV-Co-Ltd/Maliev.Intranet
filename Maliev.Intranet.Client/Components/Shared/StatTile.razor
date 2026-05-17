@@ -1,7 +1,11 @@
-<div class="mlv-stat-tile @Class">
+<div class="mlv-stat-tile @Class" aria-busy="@Loading.ToString().ToLowerInvariant()">
     <div class="mlv-stat-label">@Label</div>
     <div class="mlv-stat-value @(ChildContent is null ? null : "content")" style="@ValueStyle">
-        @if (ChildContent is null)
+        @if (Loading)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Text" Width="84px" Height="30px" Animation="Animation.Wave" />
+        }
+        else if (ChildContent is null)
         {
             @Value
         }
@@ -10,7 +14,11 @@
             @ChildContent
         }
     </div>
-    @if (!string.IsNullOrWhiteSpace(Subtext))
+    @if (Loading)
+    {
+        <MudSkeleton Class="mlv-stat-sub-skeleton" SkeletonType="SkeletonType.Text" Width="112px" Height="13px" Animation="Animation.Wave" />
+    }
+    else if (!string.IsNullOrWhiteSpace(Subtext))
     {
         <div class="mlv-stat-sub @TrendClass">
             @if (Trend == true)
@@ -34,6 +42,7 @@
     [Parameter] public bool? Trend { get; set; }
     [Parameter] public string? Color { get; set; }
     [Parameter] public string? Class { get; set; }
+    [Parameter] public bool Loading { get; set; }
 
     private string? ValueStyle => string.IsNullOrWhiteSpace(Color) ? null : $"color:{Color}";
     private string TrendClass => Trend == true ? "up" : Trend == false ? "down" : string.Empty;

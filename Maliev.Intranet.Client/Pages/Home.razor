@@ -20,21 +20,34 @@
             <div class="mlv-error">@_error</div>
         }
 
-        @if (_loading)
-        {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
-        }
-
         <StatBar Class="mb-4">
             @foreach (var tile in DashboardStats)
             {
-                <StatTile Label="@tile.Label" Value="@tile.Value" Subtext="@tile.Subtext" Trend="@tile.Trend" />
+                <StatTile Label="@tile.Label" Value="@tile.Value" Subtext="@tile.Subtext" Trend="@tile.Trend" Loading="@tile.Loading" />
             }
         </StatBar>
 
         <div class="mlv-grid">
             <PanelCard Title="Action items" Class="mlv-span-4">
-                @if (_actionItems?.Categories.Count > 0)
+                @if (_loadingActionItems)
+                {
+                    <div class="mlv-section-skeleton" aria-busy="true">
+                        @for (var row = 0; row < 3; row++)
+                        {
+                            <div class="mlv-list-row">
+                                <div class="mlv-row-title">
+                                    <MudSkeleton SkeletonType="SkeletonType.Circle" Width="20px" Height="20px" Animation="Animation.Wave" />
+                                    <div class="mlv-list-skeleton-copy">
+                                        <MudSkeleton SkeletonType="SkeletonType.Text" Width="190px" Height="16px" Animation="Animation.Wave" />
+                                        <MudSkeleton SkeletonType="SkeletonType.Text" Width="72px" Height="12px" Animation="Animation.Wave" />
+                                    </div>
+                                </div>
+                                <MudSkeleton SkeletonType="SkeletonType.Text" Width="32px" Height="22px" Animation="Animation.Wave" />
+                            </div>
+                        }
+                    </div>
+                }
+                else if (_actionItems?.Categories.Count > 0)
                 {
                     <div class="mlv-list">
                         @foreach (var item in _actionItems.Categories)
@@ -59,7 +72,33 @@
             </PanelCard>
 
             <PanelCard Title="Recent orders" Class="mlv-span-8">
-                @if (_orders.Count > 0)
+                @if (_loadingOrders)
+                {
+                    <table class="mlv-table" aria-busy="true">
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th>Total</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var row = 0; row < 5; row++)
+                            {
+                                <tr>
+                                    <td><MudSkeleton SkeletonType="SkeletonType.Text" Width="82px" Height="16px" Animation="Animation.Wave" /></td>
+                                    <td><MudSkeleton SkeletonType="SkeletonType.Text" Width="148px" Height="16px" Animation="Animation.Wave" /></td>
+                                    <td><MudSkeleton SkeletonType="SkeletonType.Text" Width="76px" Height="16px" Animation="Animation.Wave" /></td>
+                                    <td><MudSkeleton SkeletonType="SkeletonType.Text" Width="70px" Height="16px" Animation="Animation.Wave" /></td>
+                                    <td><MudSkeleton SkeletonType="SkeletonType.Text" Width="92px" Height="16px" Animation="Animation.Wave" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else if (_orders.Count > 0)
                 {
                     <table class="mlv-table">
                         <thead>
@@ -108,31 +147,27 @@
 </div>
 
 @code {
-    private DashboardViewModel? _dashboard;
+    private static readonly DashboardStatDefinition[] StatDefinitions =
+    [
+        new("Revenue", "Total Revenue (Today)"),
+        new("ActiveOrders", "Active Orders"),
+        new("PendingQuotes", "Pending Quotes"),
+        new("Headcount", "Total Headcount")
+    ];
+
+    private readonly List<DashboardStatState> _dashboardStats = StatDefinitions
+        .Select(definition => new DashboardStatState(definition.WidgetKey, definition.Label))
+        .ToList();
+
     private DashboardActionItemsDto? _actionItems;
     private List<OrderSummaryDto> _orders = [];
-    private bool _loading = true;
+    private bool _loadingActionItems = true;
+    private bool _loadingOrders = true;
+    private bool _loadWarningShown;
+    private int _loadGeneration;
     private string? _error;
 
-    private IEnumerable<(string Label, string Value, string? Subtext, bool? Trend)> DashboardStats
-    {
-        get
-        {
-            var widgets = _dashboard?.Widgets ?? [];
-            foreach (var widget in widgets.Where(w => string.Equals(w.Type, "Stat", StringComparison.OrdinalIgnoreCase)).Take(4))
-            {
-                yield return (widget.Title, ReadWidgetValue(widget.Data), FormatTrend(widget.TrendPercent), widget.Trend == "up" ? true : widget.Trend == "down" ? false : null);
-            }
-
-            if (!widgets.Any(w => string.Equals(w.Type, "Stat", StringComparison.OrdinalIgnoreCase)))
-            {
-                yield return ("Orders", _orders.Count.ToString("N0"), "recent records", null);
-                yield return ("Action items", (_actionItems?.Categories.Sum(c => c.Count) ?? 0).ToString("N0"), "open work", null);
-                yield return ("Quotes", "Live", "Project quote workspace ready", true);
-                yield return ("Services", "BFF", "proxied endpoints", null);
-            }
-        }
-    }
+    private IEnumerable<DashboardStatState> DashboardStats => _dashboardStats;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -140,29 +175,110 @@
 
     private async Task LoadAsync()
     {
-        _loading = true;
+        var generation = ++_loadGeneration;
         _error = null;
+        _loadWarningShown = false;
+
+        foreach (var stat in _dashboardStats)
+        {
+            stat.Loading = true;
+        }
+
+        _loadingActionItems = true;
+        _loadingOrders = true;
+        await InvokeAsync(StateHasChanged);
+
+        var tasks = _dashboardStats
+            .Select(stat => LoadStatWidgetAsync(stat, generation))
+            .Append(LoadOrdersAsync(generation))
+            .Append(LoadActionItemsAsync(generation));
+
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task LoadStatWidgetAsync(DashboardStatState stat, int generation)
+    {
         try
         {
-            var dashboardTask = Http.GetFromJsonAsync<DashboardViewModel>("api/v1/dashboard");
-            var ordersTask = Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/v1/orders?pageSize=20&sortBy=createdAt&sortDesc=true");
-            var actionItemsTask = Http.GetFromJsonAsync<DashboardActionItemsDto>("api/v1/dashboard/action-items");
+            var dashboard = await Http.GetFromJsonAsync<DashboardViewModel>($"api/v1/dashboard?widgets={Uri.EscapeDataString(stat.WidgetKey)}");
+            var widget = dashboard?.Widgets.FirstOrDefault(w => string.Equals(w.Type, "Stat", StringComparison.OrdinalIgnoreCase));
 
-            await Task.WhenAll(dashboardTask, ordersTask, actionItemsTask);
-
-            _dashboard = await dashboardTask;
-            _orders = (await ordersTask)?.Data.ToList() ?? [];
-            _actionItems = await actionItemsTask;
+            if (IsCurrent(generation) && widget is not null)
+            {
+                stat.Label = widget.Title;
+                stat.Value = ReadWidgetValue(widget.Data);
+                stat.Subtext = FormatTrend(widget.TrendPercent);
+                stat.Trend = widget.Trend == "up" ? true : widget.Trend == "down" ? false : null;
+            }
         }
         catch (Exception ex)
         {
-            _error = "Some dashboard data could not be loaded.";
-            Snackbar.Add(_error, Severity.Warning);
-            Console.WriteLine(ex.Message);
+            if (IsCurrent(generation))
+            {
+                ReportLoadFailure(ex);
+            }
         }
         finally
         {
-            _loading = false;
+            if (IsCurrent(generation))
+            {
+                stat.Loading = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task LoadOrdersAsync(int generation)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>("api/v1/orders?pageSize=20&sortBy=createdAt&sortDesc=true");
+            if (IsCurrent(generation))
+            {
+                _orders = response?.Data.ToList() ?? [];
+            }
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrent(generation))
+            {
+                ReportLoadFailure(ex);
+            }
+        }
+        finally
+        {
+            if (IsCurrent(generation))
+            {
+                _loadingOrders = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task LoadActionItemsAsync(int generation)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<DashboardActionItemsDto>("api/v1/dashboard/action-items");
+            if (IsCurrent(generation))
+            {
+                _actionItems = response ?? new DashboardActionItemsDto();
+            }
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrent(generation))
+            {
+                ReportLoadFailure(ex);
+            }
+        }
+        finally
+        {
+            if (IsCurrent(generation))
+            {
+                _loadingActionItems = false;
+                await InvokeAsync(StateHasChanged);
+            }
         }
     }
 
@@ -174,6 +290,20 @@
     };
 
     private static string? FormatTrend(double? value) => value.HasValue ? $"{value.Value:N1}%" : null;
+
+    private bool IsCurrent(int generation) => generation == _loadGeneration;
+
+    private void ReportLoadFailure(Exception ex)
+    {
+        _error = "Some dashboard data could not be loaded.";
+        if (!_loadWarningShown)
+        {
+            Snackbar.Add(_error, Severity.Warning);
+            _loadWarningShown = true;
+        }
+
+        Console.WriteLine(ex.Message);
+    }
 
     private static string NormalizeRoute(string route) => route.Replace("/sales/customers", "/customers", StringComparison.OrdinalIgnoreCase);
 
@@ -193,4 +323,16 @@
         "Icons.Material.Outlined.FolderSpecial" => Icons.Material.Outlined.FolderSpecial,
         _ => Icons.Material.Outlined.Info
     };
+
+    private sealed record DashboardStatDefinition(string WidgetKey, string Label);
+
+    private sealed class DashboardStatState(string widgetKey, string label)
+    {
+        public string WidgetKey { get; } = widgetKey;
+        public string Label { get; set; } = label;
+        public string Value { get; set; } = "-";
+        public string? Subtext { get; set; }
+        public bool? Trend { get; set; }
+        public bool Loading { get; set; } = true;
+    }
 }

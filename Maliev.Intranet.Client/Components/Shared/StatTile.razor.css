@@ -42,3 +42,7 @@
 
 .mlv-stat-sub.up { color: var(--maliev-ok); }
 .mlv-stat-sub.down { color: var(--maliev-danger); }
+
+.mlv-stat-sub-skeleton {
+    margin-top: 5px;
+}

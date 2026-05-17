@@ -157,6 +157,17 @@
     border-bottom: 0;
 }
 
+.mlv-section-skeleton {
+    display: grid;
+    gap: 8px;
+}
+
+.mlv-list-skeleton-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
 .mlv-form-input,
 .mlv-form-select,
 .mlv-form-textarea {
