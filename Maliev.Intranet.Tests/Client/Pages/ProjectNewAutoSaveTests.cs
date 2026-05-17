@@ -157,6 +157,48 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectNew_WithCustomerIdQuery_PreloadsSelectedCustomer()
+    {
+        var customerId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            if (path.Equals($"/api/v1/customers/{customerId}", StringComparison.Ordinal))
+            {
+                lock (_sentRequests) { _sentRequests.Add(request); }
+                var customer = new CustomerDetailDto
+                {
+                    Id = customerId,
+                    Name = "Sarah Chen",
+                    Email = "sarah@example.com",
+                    CompanyName = "Maliev Test Company",
+                    Status = "Active",
+                    Segment = "Retail",
+                    Tier = "Bronze",
+                    CreatedAt = new DateTime(2026, 5, 17, 0, 0, 0, DateTimeKind.Utc)
+                };
+                var json = JsonSerializer.Serialize(customer);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+            }
+
+            return await DefaultHandler(request, ct);
+        };
+
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo($"/sales/projects/new?session={Guid.NewGuid()}&customerId={customerId}");
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup), TimeSpan.FromSeconds(5));
+        Assert.Contains(_sentRequests, request =>
+            request.RequestUri?.AbsolutePath.Equals($"/api/v1/customers/{customerId}", StringComparison.Ordinal) == true);
+        Assert.Contains($"customerId={customerId}", navigation.Uri);
+    }
+
+    [Fact]
     public async Task OpenBabylonViewer_WhenViewerUrlAlreadyExists_DoesNotRefreshOrShowError()
     {
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();

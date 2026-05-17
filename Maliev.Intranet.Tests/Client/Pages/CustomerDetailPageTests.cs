@@ -22,6 +22,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly List<JsonDocument> _customerUpdatePayloads = [];
     private readonly List<JsonDocument> _addressCreatePayloads = [];
     private bool _includeDuplicateDefaultBilling;
+    private bool _projectResponseIsEmpty;
 
     public CustomerDetailPageTests()
     {
@@ -117,10 +118,27 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("All projects (1)", cut.Markup);
         Assert.Contains("customer-projects-panel", cut.Markup);
+        Assert.Contains($"/sales/projects/new?customerId={_customerId}", cut.Markup);
+        Assert.Contains("New project", cut.Markup);
         Assert.Contains("PRJ-2026-014", cut.Markup);
         Assert.Contains("Robot arm bracket batch", cut.Markup);
         Assert.Contains("4", cut.Markup);
         Assert.Contains("$9,800", cut.Markup);
+    }
+
+    [Fact]
+    public void CustomerDetail_ProjectsTabShowsStartProjectCtaWhenEmpty()
+    {
+        _projectResponseIsEmpty = true;
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Projects (0)", cut.Markup));
+        cut.Find("button[data-tab='projects']").Click();
+
+        Assert.Contains("All projects (0)", cut.Markup);
+        Assert.Contains("No projects recorded for this customer.", cut.Markup);
+        var links = cut.FindAll($"a[href='/sales/projects/new?customerId={_customerId}']");
+        Assert.Contains(links, link => link.TextContent.Contains("Start project", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -499,6 +517,15 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
 
         if (pathAndQuery.StartsWith("/api/v1/projects", StringComparison.Ordinal))
         {
+            if (_projectResponseIsEmpty)
+            {
+                return Json(new PagedResponse<ProjectSummaryDto>
+                {
+                    Data = [],
+                    Meta = new PaginationMeta { CurrentPage = 1, PageSize = 20, TotalCount = 0, TotalItems = 0, TotalPages = 0 }
+                });
+            }
+
             return Json(new PagedResponse<ProjectSummaryDto>
             {
                 Data =

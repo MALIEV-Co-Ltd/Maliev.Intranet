@@ -117,6 +117,14 @@ public partial class ProjectNew : IAsyncDisposable
     [Inject] private CookieProvider CookieProvider { get; set; } = null!;
     [Inject] private ILogger<ProjectNew> Logger { get; set; } = null!;
 
+    /// <summary>
+    /// Optional customer identifier used to preselect the customer when starting
+    /// a project from a customer record.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "customerId")]
+    public Guid? CustomerId { get; set; }
+
     private bool CanSubmit =>
         !_saving &&
         _selectedCustomer != null &&
@@ -155,15 +163,20 @@ public partial class ProjectNew : IAsyncDisposable
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
         var sessionParam = query["session"];
         var resumeParam = query["resume"];
+        var customerParam = query["customerId"];
+        var requestedCustomerId = CustomerId ?? (Guid.TryParse(customerParam, out var parsedCustomerId)
+            ? parsedCustomerId
+            : (Guid?)null);
 
         if (string.IsNullOrEmpty(sessionParam) || !Guid.TryParse(sessionParam, out _sessionId))
         {
             _sessionId = Guid.NewGuid();
             var resumeFragment = Guid.TryParse(resumeParam, out var resumeId) ? $"&resume={resumeId}" : "";
+            var customerFragment = requestedCustomerId.HasValue ? $"&customerId={requestedCustomerId.Value}" : "";
             // Redirect to URL with session param. In SSR this throws NavigationException (stops execution).
             // In WASM, NavigateTo updates the URL in-place without recreating the component, so we must
             // NOT return — data loading must continue immediately with the newly assigned _sessionId.
-            Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}{resumeFragment}", replace: true);
+            Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}{resumeFragment}{customerFragment}", replace: true);
         }
 
         // ── Load reference data ────────────────────────────────────────
@@ -201,6 +214,11 @@ public partial class ProjectNew : IAsyncDisposable
 
         // ── Server resume: if ?resume={id} or draft has ServerProjectId, hydrate from server ──
         var hasExplicitResume = Guid.TryParse(resumeParam, out var parsedResumeId);
+        if (requestedCustomerId.HasValue && !hasExplicitResume && _selectedCustomer?.Id != requestedCustomerId.Value)
+        {
+            await LoadRequestedCustomerAsync(requestedCustomerId.Value);
+        }
+
         var serverResumeId = hasExplicitResume ? parsedResumeId : _serverProjectId;
         if (serverResumeId.HasValue && (hasExplicitResume || _selectedCustomer == null))
         {
@@ -733,6 +751,40 @@ public partial class ProjectNew : IAsyncDisposable
             await InvokeAsync(() => Snackbar.Add($"Status fetch failed for {part.Name}: {ex.Message}", Severity.Warning));
         }
     }
+
+    private async Task LoadRequestedCustomerAsync(Guid customerId)
+    {
+        try
+        {
+            var customer = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/v1/customers/{customerId}");
+            if (customer is null || customer.Id == Guid.Empty)
+                return;
+
+            await OnCustomerSelected(ToCustomerSummary(customer));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not preload customer {CustomerId} for new project.", customerId);
+        }
+    }
+
+    private static CustomerSummaryDto ToCustomerSummary(CustomerDetailDto customer) => new()
+    {
+        Id = customer.Id,
+        Name = customer.Name,
+        CompanyId = customer.CompanyId,
+        CompanyName = customer.CompanyName,
+        Email = customer.Email,
+        Mobile = customer.Mobile,
+        Extension = customer.Extension,
+        Landline = customer.Landline,
+        CompanyPhone = customer.CompanyPhone,
+        Status = customer.Status,
+        Segment = customer.Segment,
+        Tier = customer.Tier,
+        TotalSpent = customer.TotalSpent,
+        CreatedAt = customer.CreatedAt
+    };
 
     private async Task ApplyAnalysisStatusAsync(PartViewModel part, FileAnalysisStatusDto status)
     {

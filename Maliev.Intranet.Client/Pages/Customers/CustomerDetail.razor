@@ -374,7 +374,10 @@
         else if (_activeTab == CustomerDetailTab.Projects)
         {
             <section class="customer-panel customer-tab-panel customer-projects-panel" data-section="projects">
-                <SectionTitle Text="@($"All projects ({ProjectCount:N0})")" />
+                <div class="customer-section-head">
+                    <SectionTitle Text="@($"All projects ({ProjectCount:N0})")" />
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Add" Href="@NewProjectHref">New project</PrimaryButton>
+                </div>
                 @if (_projects.Count > 0)
                 {
                     <table class="customer-orders-table">
@@ -406,7 +409,10 @@
                 }
                 else
                 {
-                    <div class="customer-muted-box">No projects recorded for this customer.</div>
+                    <div class="customer-muted-box customer-empty-cta">
+                        <span>No projects recorded for this customer.</span>
+                        <PrimaryButton Icon="@Icons.Material.Outlined.Add" Href="@NewProjectHref">Start project</PrimaryButton>
+                    </div>
                 }
             </section>
         }
@@ -828,6 +834,7 @@
     private int LifetimeOrderCount => _orderTotalCount > 0 ? _orderTotalCount : Math.Max(_orders.Count, _customer?.ActiveOrdersCount ?? 0);
     private decimal AverageOrderValue => LifetimeOrderCount > 0 && _customer is not null ? _customer.TotalSpent / LifetimeOrderCount : 0m;
     private string LastOrderText => _orders.Count == 0 ? "-" : FormatDate(_orders.Max(order => order.CreatedAt));
+    private string NewProjectHref => $"/sales/projects/new?customerId={Id}";
     private string AddressModalTitle => _addressEdit?.Id is null ? "Add address" : "Edit address";
     private string AddressMapElementId => $"customer-address-map-{Id:N}";
     private PaymentTermDto? SelectedPaymentTerm => _edit is null

@@ -685,6 +685,10 @@ select.customer-input {
     text-align: center;
 }
 
+.customer-empty-cta {
+    gap: 12px;
+}
+
 .customer-muted-box.compact {
     min-height: 70px;
 }
