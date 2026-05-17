@@ -72,7 +72,7 @@
             @TruncateName(Part.Name)
         </MudText>
         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pmc-meta">
-            @(Part.ProcessCode ?? "No process") · @(Part.MaterialCode ?? "No material")
+            @ProcessDisplayHelper.GetName(Part.ProcessCode) · @(Part.MaterialCode ?? "No material")
         </MudText>
         <div class="mc-bottom">
             @if (Part.PricingLoading)

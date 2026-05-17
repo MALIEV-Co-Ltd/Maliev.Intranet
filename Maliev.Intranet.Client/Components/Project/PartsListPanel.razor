@@ -81,7 +81,7 @@
                         <div class="plp-meta">
                             @if (!string.IsNullOrEmpty(part.ProcessCode))
                             {
-                                <span class="plp-process-badge">@part.ProcessCode.ToUpperInvariant()</span>
+                                <span class="plp-process-badge">@ProcessDisplayHelper.GetName(part.ProcessCode)</span>
                             }
                             <span class="plp-qty">× @part.Quantity</span>
                             @if (part.RequiresDfmAcknowledgement)

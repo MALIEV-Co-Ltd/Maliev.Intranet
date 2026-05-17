@@ -997,18 +997,6 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private static string GetProcessName(string? code) => code?.ToUpperInvariant() switch
-    {
-        "FDM" or "FFF"                     => "FDM",
-        "3D_PRINTING"                      => "3D Print",
-        "SLA" or "SLA_DLP"                 => "SLA",
-        "DLP"                              => "DLP",
-        "SLS" or "SLS_PA"                  => "SLS",
-        "CNC" or "CNC_MILL"               => "CNC Milling",
-        "CNC_TURN"                         => "CNC Turning",
-        "SHEET_METAL" or "SHEET-METAL"     => "Sheet Metal",
-        "INJECTION_MOLDING"                => "Injection Molding",
-        "CASTING" or "DIE_CASTING"         => "Die Casting",
-        _                                  => code?.ToUpperInvariant() ?? "—",
-    };
+    private static string GetProcessName(string? code) =>
+        ProcessDisplayHelper.GetName(code, "—");
 }

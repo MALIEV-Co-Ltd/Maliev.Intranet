@@ -28,6 +28,28 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    public void PartsListPanel_WhenProcessCodeIsMachineCode_RendersHumanProcessName()
+    {
+        var parts = new List<PartViewModel>
+        {
+            new()
+            {
+                Name = "bracket.stl",
+                ProcessCode = "CNC_MILL"
+            }
+        };
+
+        var cut = Render<PartsListPanel>(parameters => parameters
+            .Add(p => p.Title, "Test quote")
+            .Add(p => p.Parts, parts));
+
+        var badge = cut.Find(".plp-process-badge");
+
+        Assert.Equal("CNC Milling", badge.TextContent);
+        Assert.DoesNotContain("CNC_MILL", cut.Markup);
+    }
+
+    [Fact]
     public void PartsListPanel_AwaitingPreviewWithoutThumbnail_ShowsDefaultIndeterminateProgressInsteadOfCustomLoaderOrFallbackIcon()
     {
         var parts = new List<PartViewModel>
