@@ -82,20 +82,198 @@
                 </footer>
             </section>
         }
+
+        @if (_selectedSlot is { } selectedSlot)
+        {
+            <section class="production-slot-panel" aria-label="Planned slot details">
+                <header>
+                    <span>@SlotKind(selectedSlot)</span>
+                    <strong>@SlotTitle(selectedSlot)</strong>
+                    <button type="button" aria-label="Close slot details" @onclick="CloseSlotDetails">
+                        <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                    </button>
+                </header>
+
+                <div class="production-slot-overview">
+                    <div>
+                        <span>Machine</span>
+                        <strong>@FirstNonEmpty(selectedSlot.MachineName, selectedSlot.MachineId)</strong>
+                    </div>
+                    <div>
+                        <span>Scheduled</span>
+                        <strong>@FormatScheduleWindow(selectedSlot)</strong>
+                    </div>
+                    <div>
+                        <span>Process</span>
+                        <strong>@FormatTechnology(selectedSlot.Technology)</strong>
+                    </div>
+                    <div>
+                        <span>Queue</span>
+                        <strong>@FormatQueue(selectedSlot.QueuePosition)</strong>
+                    </div>
+                </div>
+
+                @if (_loadingSlotDetails)
+                {
+                    <div class="production-slot-loading" aria-label="Loading job details">
+                        <MudSkeleton Height="16px" Width="65%" />
+                        <MudSkeleton Height="16px" Width="45%" />
+                        <MudSkeleton Height="16px" Width="80%" />
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_slotDetailsError))
+                {
+                    <div class="production-slot-error">@_slotDetailsError</div>
+                }
+
+                @if (_selectedJobDetail is { } job)
+                {
+                    <div class="production-slot-section">
+                        <div class="production-slot-section-title">
+                            <MudIcon Icon="@Icons.Material.Outlined.Assignment" Size="Size.Small" />
+                            <span>Job information</span>
+                        </div>
+                        <dl class="production-slot-facts">
+                            <div>
+                                <dt>Customer</dt>
+                                <dd>@FirstNonEmpty(job.CustomerName, "Not assigned")</dd>
+                            </div>
+                            <div>
+                                <dt>Order</dt>
+                                <dd>@FormatOrder(job)</dd>
+                            </div>
+                            <div>
+                                <dt>Part</dt>
+                                <dd>@FirstNonEmpty(job.PartDescription, selectedSlot.FileName, "Not described")</dd>
+                            </div>
+                            <div>
+                                <dt>Quantity</dt>
+                                <dd>@FormatQuantity(job.Quantity)</dd>
+                            </div>
+                            <div>
+                                <dt>Status</dt>
+                                <dd>@FirstNonEmpty(job.Status, selectedSlot.Status, "Untracked")</dd>
+                            </div>
+                            <div>
+                                <dt>Priority</dt>
+                                <dd>@FirstNonEmpty(job.Priority, "Normal")</dd>
+                            </div>
+                            <div>
+                                <dt>Material</dt>
+                                <dd>@FirstNonEmpty(job.Material, "Not set")</dd>
+                            </div>
+                            <div>
+                                <dt>Operator</dt>
+                                <dd>@FirstNonEmpty(job.AssignedTo, "Unassigned")</dd>
+                            </div>
+                        </dl>
+                    </div>
+                }
+                else if (!_loadingSlotDetails && selectedSlot.IsHold)
+                {
+                    <div class="production-slot-section">
+                        <div class="production-slot-section-title">
+                            <MudIcon Icon="@Icons.Material.Outlined.PendingActions" Size="Size.Small" />
+                            <span>Planning hold</span>
+                        </div>
+                        <dl class="production-slot-facts">
+                            <div>
+                                <dt>Queued work</dt>
+                                <dd>@FirstNonEmpty(selectedSlot.FileName, "Project part pending")</dd>
+                            </div>
+                            <div>
+                                <dt>Project</dt>
+                                <dd>@FormatShortId(selectedSlot.ProjectId)</dd>
+                            </div>
+                            <div>
+                                <dt>Part</dt>
+                                <dd>@FormatShortId(selectedSlot.ProjectPartId)</dd>
+                            </div>
+                            <div>
+                                <dt>Expires</dt>
+                                <dd>@FormatOptionalDateTime(selectedSlot.ExpiresAt)</dd>
+                            </div>
+                        </dl>
+                    </div>
+                }
+                else if (!_loadingSlotDetails && selectedSlot.IsMaintenance)
+                {
+                    <div class="production-slot-section">
+                        <div class="production-slot-section-title">
+                            <MudIcon Icon="@Icons.Material.Outlined.Build" Size="Size.Small" />
+                            <span>Maintenance block</span>
+                        </div>
+                        <dl class="production-slot-facts">
+                            <div>
+                                <dt>Asset</dt>
+                                <dd>@FirstNonEmpty(selectedSlot.MachineName, selectedSlot.MachineId)</dd>
+                            </div>
+                            <div>
+                                <dt>Status</dt>
+                                <dd>@FirstNonEmpty(selectedSlot.Status, "Maintenance")</dd>
+                            </div>
+                            <div>
+                                <dt>Window</dt>
+                                <dd>@FormatScheduleWindow(selectedSlot)</dd>
+                            </div>
+                            <div>
+                                <dt>Work type</dt>
+                                <dd>Planned equipment maintenance</dd>
+                            </div>
+                        </dl>
+                    </div>
+                }
+
+                <dl class="production-slot-facts production-slot-capacity">
+                    <div>
+                        <dt>Setup</dt>
+                        <dd>@FormatMinutes(selectedSlot.SetupMinutes)</dd>
+                    </div>
+                    <div>
+                        <dt>Production</dt>
+                        <dd>@FormatMinutes(selectedSlot.ProductionMinutes)</dd>
+                    </div>
+                    <div>
+                        <dt>Total</dt>
+                        <dd>@FormatMinutes(selectedSlot.SetupMinutes + selectedSlot.ProductionMinutes)</dd>
+                    </div>
+                    <div>
+                        <dt>File</dt>
+                        <dd>@FirstNonEmpty(selectedSlot.FileName, "Not attached")</dd>
+                    </div>
+                </dl>
+
+                <footer>
+                    @if (selectedSlot.ProjectId.HasValue)
+                    {
+                        <SecondaryButton Icon="@Icons.Material.Outlined.OpenInNew" Href="@ProjectHref(selectedSlot.ProjectId.Value)">View project</SecondaryButton>
+                    }
+                    @if (CanMove(selectedSlot))
+                    {
+                        <PrimaryButton Icon="@Icons.Material.Outlined.EditCalendar" OnClick="@((MouseEventArgs _) => OpenMovePanelAsync(selectedSlot))">Move slot</PrimaryButton>
+                    }
+                </footer>
+            </section>
+        }
     </PageBody>
 </div>
 
 @code {
     private ProductionScheduleBoardDto? _board;
     private ProductionScheduleSlotDto? _moveSlot;
+    private ProductionScheduleSlotDto? _selectedSlot;
+    private JobDetailDto? _selectedJobDetail;
     private string _moveMachineId = string.Empty;
     private DateTime _moveStartLocal;
     private DateTime _moveEndLocal;
     private int? _moveQueuePosition;
     private bool _moveCascade = true;
     private bool _loading = true;
+    private bool _loadingSlotDetails;
     private bool _savingMove;
     private string? _error;
+    private string? _slotDetailsError;
     private DateTime _rangeStartUtc = DateTime.UtcNow.Date;
 
     private IEnumerable<ProductionScheduleMachineDto> MoveMachines => (_board?.Machines ?? Enumerable.Empty<ProductionScheduleMachineDto>())
@@ -139,16 +317,39 @@
         await LoadBoardAsync();
     }
 
-    private Task SelectSlotAsync(ProductionScheduleSlotDto slot)
+    private async Task SelectSlotAsync(ProductionScheduleSlotDto slot)
     {
-        if (_moveSlot?.SlotId == slot.SlotId)
-            CloseMovePanel();
+        CloseMovePanel();
+        _selectedSlot = slot;
+        _selectedJobDetail = null;
+        _slotDetailsError = null;
 
-        return Task.CompletedTask;
+        if (slot.JobId is not Guid jobId)
+            return;
+
+        _loadingSlotDetails = true;
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            var job = await Http.GetFromJsonAsync<JobDetailDto>($"api/v1/jobs/{jobId}");
+            if (_selectedSlot?.SlotId == slot.SlotId)
+                _selectedJobDetail = job;
+        }
+        catch (Exception ex)
+        {
+            if (_selectedSlot?.SlotId == slot.SlotId)
+                _slotDetailsError = $"Job details could not be loaded: {ex.Message}";
+        }
+        finally
+        {
+            if (_selectedSlot?.SlotId == slot.SlotId)
+                _loadingSlotDetails = false;
+        }
     }
 
     private Task OpenMovePanelAsync(ProductionScheduleSlotDto slot)
     {
+        CloseSlotDetails();
         _moveSlot = slot;
         _moveMachineId = slot.MachineId;
         _moveStartLocal = NormalizeUtc(slot.ScheduledStart).ToLocalTime();
@@ -162,6 +363,14 @@
     {
         _moveSlot = null;
         _savingMove = false;
+    }
+
+    private void CloseSlotDetails()
+    {
+        _selectedSlot = null;
+        _selectedJobDetail = null;
+        _slotDetailsError = null;
+        _loadingSlotDetails = false;
     }
 
     private async Task CancelMoveClickedAsync(MouseEventArgs _)
@@ -283,6 +492,71 @@
 
     private static string SlotTitle(ProductionScheduleSlotDto slot) =>
         string.IsNullOrWhiteSpace(slot.Label) ? slot.FileName ?? "Selected slot" : slot.Label;
+
+    private static string SlotKind(ProductionScheduleSlotDto slot) =>
+        slot.IsMaintenance ? "Maintenance" : slot.IsHold ? "Planning hold" : "Job";
+
+    private static bool CanMove(ProductionScheduleSlotDto slot) =>
+        (slot.CanMove || slot.IsProposed)
+        && !slot.IsMaintenance
+        && !slot.Status.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
+        && !slot.Status.Equals("InProduction", StringComparison.OrdinalIgnoreCase)
+        && !slot.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+        && !slot.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+        && !slot.Status.Equals("Expired", StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatScheduleWindow(ProductionScheduleSlotDto slot) =>
+        $"{NormalizeUtc(slot.ScheduledStart).ToLocalTime():MMM d, HH:mm} - {NormalizeUtc(slot.ScheduledEnd).ToLocalTime():HH:mm}";
+
+    private static string FormatOptionalDateTime(DateTime? value) =>
+        value.HasValue ? $"{NormalizeUtc(value.Value).ToLocalTime():MMM d, yyyy HH:mm}" : "Not set";
+
+    private static string FormatQueue(int queuePosition) =>
+        queuePosition > 0 ? $"#{queuePosition}" : "Unpositioned";
+
+    private static string FormatQuantity(int quantity) =>
+        quantity > 0 ? $"{quantity.ToString("N0", CultureInfo.InvariantCulture)} pcs" : "Not set";
+
+    private static string FormatMinutes(int minutes)
+    {
+        if (minutes <= 0)
+            return "Not estimated";
+
+        var hours = minutes / 60;
+        var remainder = minutes % 60;
+        return hours > 0 && remainder > 0
+            ? $"{hours}h {remainder}m"
+            : hours > 0
+                ? $"{hours}h"
+                : $"{remainder}m";
+    }
+
+    private static string FormatOrder(JobDetailDto job) =>
+        FirstNonEmpty(job.OrderNumber, FormatShortId(job.OrderId), "Not linked");
+
+    private static string ProjectHref(Guid projectId) =>
+        $"/sales/projects/{projectId}";
+
+    private static string FormatTechnology(string? technology)
+    {
+        if (string.IsNullOrWhiteSpace(technology))
+            return "Unmapped";
+
+        return technology.Trim().ToUpperInvariant() switch
+        {
+            "FDM" => "3D Printing (FDM)",
+            "SLA" or "SLA_DLP" => "SLA printing",
+            "CNC_MILL" => "CNC milling",
+            "CNC_TURN" => "CNC turning",
+            _ => technology.Replace('_', ' ').Trim()
+        };
+    }
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+    private static string FormatShortId(Guid? id) =>
+        id is { } value ? value.ToString("N")[..8].ToUpperInvariant() : "Not linked";
 
     private static string FormatDateTimeLocal(DateTime value) =>
         value.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);

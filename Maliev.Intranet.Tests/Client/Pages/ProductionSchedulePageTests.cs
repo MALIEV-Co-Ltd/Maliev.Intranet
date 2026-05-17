@@ -116,6 +116,48 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         Assert.Contains(_requestedRequests, request => request.StartsWith("GET /api/v1/jobs/schedule?from=", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void ProductionSchedule_ClickJobSlot_ShowsJobAndOrderDetails()
+    {
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("JOB-2001", cut.Markup));
+        cut.Find($"button[data-job-id='{_jobId}']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Job information", cut.Markup);
+            Assert.Contains("Bangkok Precision Parts", cut.Markup);
+            Assert.Contains("SO-5005", cut.Markup);
+            Assert.Contains("Bracket left machining", cut.Markup);
+            Assert.Contains("12 pcs", cut.Markup);
+            Assert.Contains("CNC milling", cut.Markup);
+            Assert.Contains("CNC Mill 01", cut.Markup);
+            Assert.Contains("bracket-left.stl", cut.Markup);
+            Assert.Contains("View project", cut.Markup);
+        });
+        Assert.Contains(_requestedRequests, request => request == $"GET /api/v1/jobs/{_jobId}");
+    }
+
+    [Fact]
+    public void ProductionSchedule_ClickPlanningHold_ShowsHoldDetailsWithoutJobFetch()
+    {
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("HOLD-4001", cut.Markup));
+        cut.Find($"button[data-hold-id='{_holdId}']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Planning hold", cut.Markup);
+            Assert.Contains("sensor-cover.3mf", cut.Markup);
+            Assert.Contains("Project", cut.Markup);
+            Assert.Contains("Expires", cut.Markup);
+            Assert.Contains("Move slot", cut.Markup);
+        });
+        Assert.DoesNotContain(_requestedRequests, request => request == $"GET /api/v1/jobs/{_holdId}");
+    }
+
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
     {
         var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
@@ -125,6 +167,12 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             && pathAndQuery.StartsWith("/api/v1/jobs/schedule", StringComparison.Ordinal))
         {
             return Json(BuildBoard());
+        }
+
+        if (request.Method == HttpMethod.Get
+            && pathAndQuery.Equals($"/api/v1/jobs/{_jobId}", StringComparison.Ordinal))
+        {
+            return Json(BuildJobDetail());
         }
 
         if (request.Method == HttpMethod.Patch
@@ -244,6 +292,28 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             ]
         };
     }
+
+    private JobDetailDto BuildJobDetail() => new()
+    {
+        Id = _jobId,
+        JobNumber = "JOB-2001",
+        CustomerName = "Bangkok Precision Parts",
+        OrderId = Guid.Parse("88888888-9999-aaaa-bbbb-cccccccccccc"),
+        OrderNumber = "SO-5005",
+        PartDescription = "Bracket left machining",
+        ProcessType = "CNC_MILL",
+        Material = "Aluminum 6061-T6",
+        Priority = "High",
+        Status = "Queued",
+        MachineName = "CNC Mill 01",
+        MachineId = Guid.Parse("99999999-aaaa-bbbb-cccc-dddddddddddd"),
+        Quantity = 12,
+        ScheduledStartTime = new DateTime(2026, 5, 7, 10, 0, 0, DateTimeKind.Utc),
+        ScheduledEndTime = new DateTime(2026, 5, 7, 12, 0, 0, DateTimeKind.Utc),
+        QueuePosition = 1,
+        AssignedTo = "Natt Operator",
+        UpdatedAt = new DateTime(2026, 5, 7, 8, 0, 0, DateTimeKind.Utc)
+    };
 
     private static Task<HttpResponseMessage> Json<T>(T body) =>
         Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
