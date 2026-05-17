@@ -288,12 +288,25 @@
 .mlv-page-size-select {
     height: 30px;
     min-width: 64px;
+    padding-left: 10px;
     border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
     box-shadow: var(--maliev-shadow-ring);
     color: var(--maliev-ink);
     font: inherit;
+}
+
+select.mlv-form-input,
+select.mlv-form-select,
+.mlv-filter-field select,
+.mlv-page-size-select {
+    appearance: none;
+    padding-right: 2.35rem;
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%23657380' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    background-size: 0.9rem;
 }
 
 .mlv-page-size-select:focus {

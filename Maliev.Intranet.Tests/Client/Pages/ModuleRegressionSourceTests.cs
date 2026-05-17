@@ -220,6 +220,7 @@ public class ModuleRegressionSourceTests
         var normalizedStyles = styles.ReplaceLineEndings("\n");
         var accountGridBlock = ExtractCssBlock(styles, ".customer-account-grid");
         var accountControlBlock = ExtractCssBlock(styles, ".customer-account-grid .customer-input,");
+        var selectInputBlock = ExtractCssBlock(styles, "select.customer-input");
         var pickerBlock = ExtractCssBlock(styles, ".customer-payment-term-picker");
         var triggerBlock = ExtractCssBlock(styles, "\n.customer-payment-term-trigger {");
         var triggerCardBlock = ExtractCssBlock(styles, "\n.customer-payment-term-trigger .customer-payment-term-card {");
@@ -237,6 +238,9 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("CreditLimit", source, StringComparison.Ordinal);
         Assert.Contains("align-items: start;", accountGridBlock, StringComparison.Ordinal);
         Assert.Contains("min-height: 42px;", accountControlBlock, StringComparison.Ordinal);
+        Assert.Contains("appearance: none;", selectInputBlock, StringComparison.Ordinal);
+        Assert.Contains("padding-right: 2.4rem;", selectInputBlock, StringComparison.Ordinal);
+        Assert.Contains("background-position: right 0.85rem center;", selectInputBlock, StringComparison.Ordinal);
         Assert.Contains("width: 100%;", pickerBlock, StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(0, 1fr) 32px;", triggerBlock, StringComparison.Ordinal);
         Assert.Contains("border-radius: var(--maliev-radius-sm);", triggerBlock, StringComparison.Ordinal);
@@ -248,6 +252,27 @@ public class ModuleRegressionSourceTests
         Assert.Contains("box-sizing: border-box;", menuBlock, StringComparison.Ordinal);
         Assert.Contains(".customer-payment-term-option {\n    display: block;\n    box-sizing: border-box;", normalizedStyles, StringComparison.Ordinal);
         Assert.Contains(".customer-payment-term-card {\n    display: grid;\n    gap: 8px;\n    width: 100%;\n    min-width: 0;\n    box-sizing: border-box;", normalizedStyles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModulePages_NativeSelectsUseInsetChevronSpacing()
+    {
+        var moduleStyles = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "module-pages.css");
+        var customerNewStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor.css");
+        var sharedSelectBlock = ExtractCssBlock(moduleStyles, "select.mlv-form-input,");
+        var pageSizeSelectBlock = ExtractCssBlock(moduleStyles, ".mlv-page-size-select {");
+        var customerNewSelectBlock = ExtractCssBlock(customerNewStyles, ".customer-create-page select.mlv-form-input,");
+
+        Assert.Contains("padding-left: 10px;", pageSizeSelectBlock, StringComparison.Ordinal);
+        Assert.Contains("select.mlv-form-select,", moduleStyles, StringComparison.Ordinal);
+        Assert.Contains(".mlv-filter-field select,", moduleStyles, StringComparison.Ordinal);
+        Assert.Contains(".mlv-page-size-select {", moduleStyles, StringComparison.Ordinal);
+        Assert.Contains("appearance: none;", sharedSelectBlock, StringComparison.Ordinal);
+        Assert.Contains("padding-right: 2.35rem;", sharedSelectBlock, StringComparison.Ordinal);
+        Assert.Contains("background-position: right 0.85rem center;", sharedSelectBlock, StringComparison.Ordinal);
+        Assert.Contains("background-size: 0.9rem;", sharedSelectBlock, StringComparison.Ordinal);
+        Assert.Contains("padding-right: 2.35rem;", customerNewSelectBlock, StringComparison.Ordinal);
+        Assert.Contains("background-position: right 0.85rem center;", customerNewSelectBlock, StringComparison.Ordinal);
     }
 
     [Fact]
