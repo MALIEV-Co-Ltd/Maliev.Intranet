@@ -155,29 +155,52 @@
 
             @* ── Tolerance ─────────────────────────────────────────────────── *@
             <section class="pcs-section">
+                @{
+                    var toleranceGroups = VisibleToleranceGroups;
+                }
                 <div class="pcs-section-header">
                     <span class="pcs-section-title">Tolerance</span>
                     <div class="pcs-section-meta">
-                        <span class="pcs-section-count">@VisibleTolerances.Count() options</span>
+                        <span class="pcs-section-count">@FormatOptionCount(toleranceGroups.Sum(group => group.Options.Count))</span>
                     </div>
                 </div>
-                <div class="pcs-tol-grid">
-                    @foreach (var tol in VisibleTolerances)
+                <div class="pcs-tolerance-groups">
+                    @foreach (var group in toleranceGroups)
                     {
-                        var active = SelectedTolerance?.Id == tol.Id;
-                        var (tolHead, tolTail) = ToleranceNameHelper.Split(tol.Name);
-                        <button class="pcs-tol-card @(active ? "pcs-tol-card--active" : "")"
-                                @onclick="@(() => OnToleranceChanged(tol))">
-                            <div class="pcs-tol-name">@tolHead</div>
-                            <div class="pcs-tol-grade">@(string.IsNullOrEmpty(tolTail) ? tol.Grade : tolTail)</div>
-                            <div class="pcs-tol-range">@GetToleranceRange(tol)</div>
-                            @if (active)
-                            {
-                                <div class="pcs-tol-check">
-                                    <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:10px;width:10px;height:10px;" />
+                        <div class="pcs-tolerance-group @group.CssClass">
+                            <div class="pcs-tolerance-group-header">
+                                <div>
+                                    <div class="pcs-tolerance-group-title">@group.Title</div>
+                                    <div class="pcs-tolerance-group-standard">@group.Standard</div>
                                 </div>
-                            }
-                        </button>
+                                <span class="pcs-tolerance-group-count">@group.Options.Count</span>
+                            </div>
+                            <div class="pcs-tol-grid">
+                                @foreach (var tol in group.Options)
+                                {
+                                    var active = SelectedTolerance?.Id == tol.Id;
+                                    var (tolHead, tolTail) = ToleranceNameHelper.Split(tol.Name);
+                                    <button class="pcs-tol-card @(active ? "pcs-tol-card--active" : "")"
+                                            @onclick="@(() => OnToleranceChanged(tol))">
+                                        <div class="pcs-tol-name">@tolHead</div>
+                                        <div class="pcs-tol-grade">@(string.IsNullOrEmpty(tolTail) ? tol.Grade : tolTail)</div>
+                                        <div class="pcs-tol-range">@GetToleranceRange(tol)</div>
+                                        @if (active)
+                                        {
+                                            <div class="pcs-tol-check">
+                                                <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:10px;width:10px;height:10px;" />
+                                            </div>
+                                        }
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+                    @if (toleranceGroups.Count == 0)
+                    {
+                        <div class="pcs-tolerance-empty">
+                            No tolerance options available for this process.
+                        </div>
                     }
                 </div>
             </section>
@@ -868,6 +891,82 @@
             }
 
             /* ── Tolerance Grid ─────────────────────────────────────────────────── */
+            .pcs-tolerance-groups {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .pcs-tolerance-group {
+                border: 1px solid var(--maliev-border);
+                border-radius: 6px;
+                padding: 7px;
+                background: var(--maliev-panel);
+            }
+
+            .pcs-tolerance-group--iso {
+                border-color: color-mix(in oklch, var(--mud-palette-primary) 24%, var(--maliev-border));
+                background: color-mix(in oklch, var(--mud-palette-primary) 6%, var(--maliev-panel));
+            }
+
+            .pcs-tolerance-group--it {
+                border-color: color-mix(in oklch, var(--mud-palette-info) 24%, var(--maliev-border));
+                background: color-mix(in oklch, var(--mud-palette-info) 6%, var(--maliev-panel));
+            }
+
+            .pcs-tolerance-group--process {
+                background: var(--maliev-panel-2);
+            }
+
+            .pcs-tolerance-group-header {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 8px;
+                margin-bottom: 6px;
+            }
+
+            .pcs-tolerance-group-title {
+                font-size: var(--mud-typography-caption-size);
+                font-weight: 700;
+                color: var(--maliev-ink);
+                line-height: 1.2;
+                letter-spacing: 0;
+            }
+
+            .pcs-tolerance-group-standard {
+                margin-top: 1px;
+                font-size: var(--mud-typography-caption-size);
+                color: var(--maliev-muted);
+                line-height: 1.2;
+                letter-spacing: 0;
+            }
+
+            .pcs-tolerance-group-count {
+                min-width: 20px;
+                height: 20px;
+                padding: 0 6px;
+                border: 1px solid var(--maliev-border);
+                border-radius: 999px;
+                background: var(--maliev-panel);
+                color: var(--maliev-muted);
+                display: inline-grid;
+                place-items: center;
+                font-size: var(--mud-typography-caption-size);
+                font-weight: 700;
+                line-height: 1;
+                letter-spacing: 0;
+            }
+
+            .pcs-tolerance-empty {
+                border: 1px dashed var(--maliev-border);
+                border-radius: 6px;
+                padding: 10px;
+                color: var(--maliev-muted);
+                font-size: var(--mud-typography-caption-size);
+                letter-spacing: 0;
+            }
+
             .pcs-tol-grid {
                 display: grid;
                 grid-template-columns: repeat(2, 1fr);

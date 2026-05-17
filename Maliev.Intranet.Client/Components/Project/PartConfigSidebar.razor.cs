@@ -212,6 +212,17 @@ public partial class PartConfigSidebar : ComponentBase
     private IReadOnlyList<CatalogToleranceDto> VisibleToleranceList =>
         VisibleTolerances.OrderBy(t => t.SortOrder).ToList();
 
+    private IReadOnlyList<ToleranceOptionGroup> VisibleToleranceGroups =>
+        VisibleToleranceList
+            .GroupBy(GetToleranceGroupKind)
+            .OrderBy(group => GetToleranceGroupSortOrder(group.Key))
+            .Select(group => new ToleranceOptionGroup(
+                GetToleranceGroupTitle(group.Key),
+                GetToleranceGroupStandard(group.Key),
+                GetToleranceGroupCssClass(group.Key),
+                group.OrderBy(t => t.SortOrder).ToList()))
+            .ToList();
+
     private string RootClass =>
         DisplayMode == PartConfigSidebarDisplayMode.Inline
             ? "pcs-root pcs-root--inline"
@@ -612,6 +623,58 @@ public partial class PartConfigSidebar : ComponentBase
             && !combined.Contains("ISO 2768_V", StringComparison.OrdinalIgnoreCase)
             && !combined.Contains("ISO2768_V", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static ToleranceGroupKind GetToleranceGroupKind(CatalogToleranceDto tolerance)
+    {
+        var normalized = NormalizeOptionText($"{tolerance.Code} {tolerance.Name} {tolerance.IsoStandard} {tolerance.Grade}");
+
+        if (normalized.Contains("iso2768", StringComparison.Ordinal)
+            || normalized.Contains("2768", StringComparison.Ordinal))
+            return ToleranceGroupKind.Iso2768;
+
+        if (normalized.Contains("iso286", StringComparison.Ordinal)
+            || normalized.Contains("it6", StringComparison.Ordinal)
+            || normalized.Contains("it7", StringComparison.Ordinal)
+            || normalized.Contains("it8", StringComparison.Ordinal))
+            return ToleranceGroupKind.ItGrade;
+
+        return ToleranceGroupKind.ProcessSpecific;
+    }
+
+    private static int GetToleranceGroupSortOrder(ToleranceGroupKind group) =>
+        group switch
+        {
+            ToleranceGroupKind.Iso2768 => 0,
+            ToleranceGroupKind.ItGrade => 1,
+            _ => 2,
+        };
+
+    private static string GetToleranceGroupTitle(ToleranceGroupKind group) =>
+        group switch
+        {
+            ToleranceGroupKind.Iso2768 => "General tolerances",
+            ToleranceGroupKind.ItGrade => "Fit / precision grades",
+            _ => "Process tolerances",
+        };
+
+    private static string GetToleranceGroupStandard(ToleranceGroupKind group) =>
+        group switch
+        {
+            ToleranceGroupKind.Iso2768 => "ISO 2768",
+            ToleranceGroupKind.ItGrade => "ISO 286 / IT",
+            _ => "Manufacturing process",
+        };
+
+    private static string GetToleranceGroupCssClass(ToleranceGroupKind group) =>
+        group switch
+        {
+            ToleranceGroupKind.Iso2768 => "pcs-tolerance-group--iso",
+            ToleranceGroupKind.ItGrade => "pcs-tolerance-group--it",
+            _ => "pcs-tolerance-group--process",
+        };
+
+    private static string FormatOptionCount(int count) =>
+        count == 1 ? "1 option" : $"{count} options";
 
     private bool IsVisibleProcessOption(ProcessConfigOptionDto option)
     {
@@ -1037,6 +1100,19 @@ public partial class PartConfigSidebar : ComponentBase
     private sealed record InspectionOption(InspectionLevel Level, string Name, string Description, string Icon);
 
     private sealed record PaintColorOption(string Name, string Hex, string Reference);
+
+    private enum ToleranceGroupKind
+    {
+        Iso2768,
+        ItGrade,
+        ProcessSpecific,
+    }
+
+    private sealed record ToleranceOptionGroup(
+        string Title,
+        string Standard,
+        string CssClass,
+        IReadOnlyList<CatalogToleranceDto> Options);
 
     private async Task OnDrawingsChanged(List<DraftProjectAttachmentDto> files)
     {
