@@ -3,7 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
+using Maliev.Intranet.Shared;
 using Maliev.Intranet.Tests.Testing;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -107,6 +109,48 @@ public class AiProcessingControllerTests
         Assert.Equal("/upload/v1/files/by-path/signed-url", downstreamRequest.RequestUri?.AbsolutePath);
         var payload = JsonDocument.Parse(await downstreamRequest.Content!.ReadAsStringAsync()).RootElement;
         Assert.Equal("customers/customer-1/customer.pdf", payload.GetProperty("storagePath").GetString());
+    }
+
+    [Fact]
+    public async Task ExtractSupplierFromDocument_WhenAiReturnsJson_ReturnsSupplierExtraction()
+    {
+        _chatbotClientMock
+            .Setup(client => client.InitiateSessionAsync("intranet", "en", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChatbotSessionResponse
+            {
+                SessionId = Guid.Parse("f660edb5-a9b8-4e46-a92c-b4d54b266466"),
+                Language = "en"
+            });
+
+        _chatbotClientMock
+            .Setup(client => client.SendMessageAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<List<ChatbotAttachment>?>(),
+                "application/json",
+                It.IsAny<object>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChatbotMessageResponse
+            {
+                Content = """
+                    {
+                      "supplier_name": "Thai Metals Supply",
+                      "email": "sales@thai-metals.example",
+                      "phone": "+66 2 555 0101",
+                      "country": "Thailand",
+                      "capabilities": ["CNC", "Anodizing"]
+                    }
+                    """
+            });
+
+        var result = await _controller.ExtractSupplierFromDocument(new FormFileCollection(), "Thai Metals Supply sales@thai-metals.example");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var extracted = Assert.IsType<ExtractedSupplierDataResponse>(ok.Value);
+        Assert.Equal("Thai Metals Supply", extracted.SupplierName);
+        Assert.Equal("sales@thai-metals.example", extracted.Email);
+        Assert.Equal("CNC", extracted.Capabilities[0]);
+        Assert.True(extracted.Confidence > 0);
     }
 
     private static AiProcessingController CreateController(

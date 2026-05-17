@@ -1,4 +1,5 @@
 @page "/purchasing/suppliers"
+@using System.Net.Http.Headers
 @using System.Text.Json
 @using Maliev.Intranet.Shared
 @inject HttpClient Http
@@ -22,7 +23,93 @@
 
         @if (_showCreate)
         {
-            <PanelCard Title="Create supplier" Class="mb-4">
+            <PanelCard Title="Create supplier" Class="mb-4 supplier-create-card">
+                <div class="supplier-intake-grid">
+                    <section class="supplier-ai-panel" aria-label="AI supplier extraction">
+                        <div class="supplier-panel-heading">
+                            <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" Size="Size.Small" />
+                            <div>
+                                <strong>Extract from supplier text or documents</strong>
+                                <span>Paste emails, invoices, registry text, business cards, or upload supplier documents.</span>
+                            </div>
+                        </div>
+                        <ImmediateInputTextArea class="mlv-form-textarea supplier-ai-textarea"
+                                                @bind-Value="_supplierExtractionText"
+                                                placeholder="Paste supplier profile, quotation email, tax invoice, registration text, or contact block..." />
+                        <div class="supplier-file-row">
+                            <InputFile OnChange="OnExtractionFilesSelected" multiple />
+                            @if (_extractionFiles.Count > 0)
+                            {
+                                <span>@_extractionFiles.Count file(s) selected</span>
+                            }
+                        </div>
+                        @if (_extractionFiles.Count > 0)
+                        {
+                            <div class="supplier-file-list">
+                                @foreach (var file in _extractionFiles)
+                                {
+                                    <span><MudIcon Icon="@Icons.Material.Outlined.Description" Size="Size.Small" /> @file.Name <small>@FormatFileSize(file.Size)</small></span>
+                                }
+                            </div>
+                        }
+                        <div class="supplier-intake-actions">
+                            <SecondaryButton Icon="@Icons.Material.Outlined.AutoFixHigh" Disabled="@(_extracting || !CanExtractSupplier)" OnClick="@ExtractSupplierAsync">
+                                @(_extracting ? "Extracting..." : "Extract and autofill")
+                            </SecondaryButton>
+                        </div>
+                        @if (_lastExtraction is not null)
+                        {
+                            <div class="supplier-extraction-summary">
+                                <strong>AI extraction @((_lastExtraction.Confidence * 100).ToString("0"))%</strong>
+                                <span>@GetExtractionSummary()</span>
+                                @if (_lastExtraction.DocumentTypes.Count > 0)
+                                {
+                                    <small>Documents detected: @string.Join(", ", _lastExtraction.DocumentTypes)</small>
+                                }
+                            </div>
+                        }
+                    </section>
+
+                    <section class="supplier-registry-panel" aria-label="Registry company lookup">
+                        <div class="supplier-panel-heading">
+                            <MudIcon Icon="@Icons.Material.Outlined.ManageSearch" Size="Size.Small" />
+                            <div>
+                                <strong>Registry lookup</strong>
+                                <span>Search Thai company registry by name or 13-digit tax ID, then apply the official company profile.</span>
+                            </div>
+                        </div>
+                        <div class="supplier-registry-search">
+                            <ImmediateInputText class="mlv-form-input" @bind-Value="_registryQuery" placeholder="Company name or tax ID" />
+                            <SecondaryButton Icon="@Icons.Material.Outlined.Search" Disabled="@_registrySearching" OnClick="@SearchRegistryAsync">
+                                @(_registrySearching ? "Searching..." : "Search")
+                            </SecondaryButton>
+                        </div>
+                        @if (_registryResults.Count > 0)
+                        {
+                            <div class="supplier-suggestion-header">@_registryResults.Count matched result(s)</div>
+                            <div class="supplier-suggestion-list">
+                                @foreach (var company in _registryResults)
+                                {
+                                    <button type="button" class="supplier-suggestion-card" @onclick="@(() => ApplyRegistryCompany(company))">
+                                        <span>
+                                            <strong>@Display(company.CompanyNameTh)</strong>
+                                            <small>@Display(company.TaxId)</small>
+                                        </span>
+                                        <span>
+                                            <em>Registry</em>
+                                            <small>@Display(company.StatusNameTh)</small>
+                                        </span>
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else if (_registrySearched)
+                        {
+                            <div class="supplier-empty-inline">No registry matches found.</div>
+                        }
+                    </section>
+                </div>
+
                 <FormGrid>
                     <FormField Label="Supplier name"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.Name" /></FormField>
                     <FormField Label="Tax ID"><ImmediateInputText class="mlv-form-input mlv-mono" @bind-Value="_newSupplier.TaxId" /></FormField>
@@ -100,11 +187,21 @@
         City = "Bangkok"
     };
     private string _capabilityText = string.Empty;
+    private string _supplierExtractionText = string.Empty;
+    private string _registryQuery = string.Empty;
+    private readonly List<IBrowserFile> _extractionFiles = [];
+    private readonly List<RegistryCompanyProfile> _registryResults = [];
+    private ExtractedSupplierDataResponse? _lastExtraction;
     private bool _loading = true;
     private bool _saving;
     private bool _showCreate;
+    private bool _extracting;
+    private bool _registrySearching;
+    private bool _registrySearched;
     private int _page = 1;
     private int _pageSize = 20;
+
+    private bool CanExtractSupplier => !string.IsNullOrWhiteSpace(_supplierExtractionText) || _extractionFiles.Count > 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -149,13 +246,155 @@
     private Task ShowCreateAsync(MouseEventArgs _)
     {
         _showCreate = true;
+        if (string.IsNullOrWhiteSpace(_registryQuery))
+        {
+            _registryQuery = _newSupplier.TaxId;
+        }
         return Task.CompletedTask;
     }
 
     private Task HideCreateAsync(MouseEventArgs _)
     {
         _showCreate = false;
+        _lastExtraction = null;
+        _registryResults.Clear();
+        _registrySearched = false;
         return Task.CompletedTask;
+    }
+
+    private void OnExtractionFilesSelected(InputFileChangeEventArgs args)
+    {
+        _extractionFiles.Clear();
+        _extractionFiles.AddRange(args.GetMultipleFiles(10));
+    }
+
+    private async Task ExtractSupplierAsync(MouseEventArgs _)
+    {
+        if (!CanExtractSupplier)
+        {
+            return;
+        }
+
+        _extracting = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            if (!string.IsNullOrWhiteSpace(_supplierExtractionText))
+            {
+                content.Add(new StringContent(_supplierExtractionText), "rawText");
+            }
+
+            foreach (var file in _extractionFiles)
+            {
+                var stream = file.OpenReadStream(10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var response = await Http.PostAsync("api/v1/aiprocessing/extract-supplier", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Supplier information could not be extracted.", Severity.Warning);
+                return;
+            }
+
+            var extracted = await response.Content.ReadFromJsonAsync<ExtractedSupplierDataResponse>();
+            if (extracted is null)
+            {
+                Snackbar.Add("Supplier extraction returned no usable data.", Severity.Warning);
+                return;
+            }
+
+            ApplyExtraction(extracted);
+            _lastExtraction = extracted;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to extract supplier data: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _extracting = false;
+        }
+    }
+
+    private async Task SearchRegistryAsync(MouseEventArgs _)
+    {
+        var query = !string.IsNullOrWhiteSpace(_registryQuery)
+            ? _registryQuery
+            : !string.IsNullOrWhiteSpace(_newSupplier.TaxId)
+                ? _newSupplier.TaxId
+                : _newSupplier.Name;
+
+        if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2)
+        {
+            Snackbar.Add("Enter a company name or tax ID to search the registry.", Severity.Warning);
+            return;
+        }
+
+        _registrySearching = true;
+        _registrySearched = false;
+        try
+        {
+            var matches = await Http.GetFromJsonAsync<List<RegistryCompanyProfile>>(
+                $"api/v1/suppliers/companies/search?query={Uri.EscapeDataString(query.Trim())}&limit=8");
+            _registryResults.Clear();
+            _registryResults.AddRange(matches ?? []);
+            _registrySearched = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Registry lookup failed: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _registrySearching = false;
+        }
+    }
+
+    private void ApplyRegistryCompany(RegistryCompanyProfile company)
+    {
+        _newSupplier.Name = string.IsNullOrWhiteSpace(company.CompanyNameTh) ? _newSupplier.Name : company.CompanyNameTh;
+        _newSupplier.TaxId = string.IsNullOrWhiteSpace(company.TaxId) ? _newSupplier.TaxId : company.TaxId;
+        _registryQuery = _newSupplier.TaxId;
+
+        if (!string.IsNullOrWhiteSpace(company.BusinessObjectives))
+        {
+            var capabilities = SplitDisplayList(_capabilityText).ToList();
+            if (!capabilities.Any(item => string.Equals(item, company.BusinessObjectives, StringComparison.OrdinalIgnoreCase)))
+            {
+                capabilities.Add(company.BusinessObjectives);
+                _capabilityText = string.Join(", ", capabilities);
+            }
+        }
+    }
+
+    private void ApplyExtraction(ExtractedSupplierDataResponse extracted)
+    {
+        SetIfPresent(value => _newSupplier.Name = value, extracted.SupplierName);
+        SetIfPresent(value => _newSupplier.TaxId = value, extracted.TaxId);
+        SetIfPresent(value => _newSupplier.Email = value, extracted.Email);
+        SetIfPresent(value => _newSupplier.Phone = value, extracted.Phone);
+        SetIfPresent(value => _newSupplier.ContactPerson = value, extracted.ContactPerson);
+        SetIfPresent(value => _newSupplier.Country = value, extracted.Country);
+
+        if (extracted.Address is not null)
+        {
+            SetIfPresent(value => _newSupplier.Address = value, ComposeAddress(extracted.Address));
+            SetIfPresent(value => _newSupplier.City = value, extracted.Address.City);
+            SetIfPresent(value => _newSupplier.PostalCode = value, extracted.Address.PostalCode);
+        }
+
+        if (extracted.Capabilities.Count > 0)
+        {
+            _capabilityText = string.Join(", ", extracted.Capabilities.Distinct(StringComparer.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_newSupplier.TaxId))
+        {
+            _registryQuery = _newSupplier.TaxId;
+        }
     }
 
     private async Task CreateSupplierAsync(MouseEventArgs _)
@@ -196,6 +435,9 @@
             Snackbar.Add("Supplier created.", Severity.Success);
             _newSupplier = new CreateSupplierRequest { Country = "Thailand", City = "Bangkok" };
             _capabilityText = string.Empty;
+            _supplierExtractionText = string.Empty;
+            _extractionFiles.Clear();
+            _lastExtraction = null;
             _showCreate = false;
 
             if (supplierId is not null)
@@ -230,6 +472,53 @@
         => string.IsNullOrWhiteSpace(value)
             ? []
             : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private static void SetIfPresent(Action<string> setter, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            setter(value.Trim());
+        }
+    }
+
+    private static string ComposeAddress(ExtractedSupplierAddress address)
+    {
+        return string.Join(", ", new[]
+        {
+            address.AddressLine1,
+            address.District,
+            address.StateProvince
+        }.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim()));
+    }
+
+    private string GetExtractionSummary()
+    {
+        var missing = new List<string>();
+        if (string.IsNullOrWhiteSpace(_newSupplier.Name)) missing.Add("name");
+        if (string.IsNullOrWhiteSpace(_newSupplier.TaxId)) missing.Add("tax ID");
+        if (string.IsNullOrWhiteSpace(_newSupplier.Email)) missing.Add("email");
+        if (string.IsNullOrWhiteSpace(_newSupplier.Address)) missing.Add("address");
+        if (string.IsNullOrWhiteSpace(_newSupplier.City)) missing.Add("city");
+
+        return missing.Count == 0
+            ? "Required supplier fields were filled from the extraction."
+            : $"Needs manual input: {string.Join(", ", missing)}.";
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        if (bytes < 1024 * 1024)
+        {
+            return $"{bytes / 1024d:0.#} KB";
+        }
+
+        return $"{bytes / 1024d / 1024d:0.#} MB";
+    }
 
     private static bool IsActive(SupplierSummaryDto supplier)
     {

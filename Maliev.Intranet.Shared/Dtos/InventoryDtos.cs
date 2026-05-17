@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Maliev.Intranet.Shared;
 
@@ -179,7 +180,36 @@ public class SupplierDetailDto
     public List<string> Capabilities { get; set; } = [];
     /// <summary>The row version used for optimistic concurrency control.</summary>
     public string RowVersion { get; set; } = string.Empty;
+    /// <summary>The current onboarding stage for supplier readiness.</summary>
+    public string OnboardingStage { get; set; } = string.Empty;
+    /// <summary>The supplier compliance and lifecycle documents.</summary>
+    public List<SupplierDocumentDto> Documents { get; set; } = [];
     /// <summary>The date and time when the supplier record was created.</summary>
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Supplier document or certification metadata managed by SupplierService.
+/// </summary>
+public class SupplierDocumentDto
+{
+    /// <summary>The unique identifier for the supplier document metadata.</summary>
+    public Guid Id { get; set; }
+    /// <summary>The document classification from SupplierService.</summary>
+    public string DocumentType { get; set; } = string.Empty;
+    /// <summary>The human-readable document name.</summary>
+    public string DocumentName { get; set; } = string.Empty;
+    /// <summary>The document issue date, when known.</summary>
+    public DateOnly? IssueDate { get; set; }
+    /// <summary>The optional expiration date for lifecycle tracking.</summary>
+    public DateOnly? ExpirationDate { get; set; }
+    /// <summary>The upload service file reference or storage path.</summary>
+    public string? ExternalFileRef { get; set; }
+    /// <summary>Whether the document has expired.</summary>
+    public bool IsExpired { get; set; }
+    /// <summary>Whether the document is within the expiring-soon threshold.</summary>
+    public bool IsExpiringSoon { get; set; }
+    /// <summary>The date and time when the metadata was created.</summary>
     public DateTime CreatedAt { get; set; }
 }
 
@@ -290,6 +320,32 @@ public sealed record CreateSupplierRequest
 }
 
 /// <summary>
+/// Request model for adding a managed document to an existing supplier.
+/// </summary>
+public sealed record CreateSupplierDocumentRequest
+{
+    /// <summary>The SupplierService document classification.</summary>
+    [Required]
+    public string DocumentType { get; set; } = "BusinessLicense";
+
+    /// <summary>The document display name.</summary>
+    [Required]
+    public string DocumentName { get; set; } = string.Empty;
+
+    /// <summary>The document issue date.</summary>
+    public DateOnly IssueDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
+
+    /// <summary>The optional expiration date.</summary>
+    public DateOnly? ExpirationDate { get; set; }
+
+    /// <summary>The external file reference or storage path returned by UploadService.</summary>
+    public string? ExternalFileRef { get; set; }
+
+    /// <summary>Optional lifecycle notes.</summary>
+    public string? Notes { get; set; }
+}
+
+/// <summary>
 /// Request model for updating an existing supplier's details.
 /// </summary>
 public sealed record UpdateSupplierRequest
@@ -316,4 +372,80 @@ public sealed record UpdateSupplierRequest
     public List<string>? Capabilities { get; set; }
     /// <summary>The row version required by SupplierService for optimistic concurrency control.</summary>
     public string? RowVersion { get; set; }
+}
+
+/// <summary>
+/// Response model containing supplier data extracted by AI analysis.
+/// </summary>
+public class ExtractedSupplierDataResponse
+{
+    /// <summary>The extracted supplier company name.</summary>
+    [JsonPropertyName("supplier_name")]
+    public string? SupplierName { get; set; }
+
+    /// <summary>The extracted supplier tax identification number.</summary>
+    [JsonPropertyName("tax_id")]
+    public string? TaxId { get; set; }
+
+    /// <summary>The extracted supplier email address.</summary>
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    /// <summary>The extracted supplier phone number.</summary>
+    [JsonPropertyName("phone")]
+    public string? Phone { get; set; }
+
+    /// <summary>The extracted primary contact person.</summary>
+    [JsonPropertyName("contact_person")]
+    public string? ContactPerson { get; set; }
+
+    /// <summary>The extracted country.</summary>
+    [JsonPropertyName("country")]
+    public string? Country { get; set; }
+
+    /// <summary>The extracted primary address.</summary>
+    [JsonPropertyName("address")]
+    public ExtractedSupplierAddress? Address { get; set; }
+
+    /// <summary>The extracted supplier capabilities.</summary>
+    [JsonPropertyName("capabilities")]
+    public List<string> Capabilities { get; set; } = [];
+
+    /// <summary>The document types inferred from supplied text or files.</summary>
+    [JsonPropertyName("document_types")]
+    public List<string> DocumentTypes { get; set; } = [];
+
+    /// <summary>Overall AI confidence score for the extraction.</summary>
+    [JsonPropertyName("confidence")]
+    public double Confidence { get; set; }
+}
+
+/// <summary>
+/// Supplier address extracted by AI and optionally corrected with registry data.
+/// </summary>
+public class ExtractedSupplierAddress
+{
+    /// <summary>The street-level address or full address line.</summary>
+    [JsonPropertyName("address_line_1")]
+    public string? AddressLine1 { get; set; }
+
+    /// <summary>The sub-district or tambon, when available.</summary>
+    [JsonPropertyName("district")]
+    public string? District { get; set; }
+
+    /// <summary>The district/city value.</summary>
+    [JsonPropertyName("city")]
+    public string? City { get; set; }
+
+    /// <summary>The province or state value.</summary>
+    [JsonPropertyName("state_province")]
+    public string? StateProvince { get; set; }
+
+    /// <summary>The postal code.</summary>
+    [JsonPropertyName("postal_code")]
+    public string? PostalCode { get; set; }
+
+    /// <summary>The matched Thai registry location, if one was resolved.</summary>
+    [JsonPropertyName("location")]
+    public RegistryThaiLocation? Location { get; set; }
 }

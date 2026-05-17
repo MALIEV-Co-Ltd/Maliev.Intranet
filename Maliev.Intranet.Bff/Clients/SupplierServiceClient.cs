@@ -98,6 +98,30 @@ public class SupplierServiceClient(HttpClient httpClient)
         }, ct);
     }
 
+    /// <summary>
+    /// Adds supplier document metadata after an optional UploadService file upload.
+    /// </summary>
+    public async Task<HttpResponseMessage> AddSupplierDocumentAsync(Guid id, CreateSupplierDocumentRequest request, CancellationToken ct = default)
+    {
+        var downstreamRequest = new DownstreamCreateSupplierDocumentRequest(
+            request.DocumentType,
+            request.DocumentName,
+            request.IssueDate,
+            request.ExpirationDate,
+            request.ExternalFileRef,
+            request.Notes);
+
+        return await httpClient.PostAsJsonAsync($"/supplier/v1/suppliers/{id}/certifications", downstreamRequest, ct);
+    }
+
+    /// <summary>
+    /// Deletes supplier document metadata.
+    /// </summary>
+    public async Task<HttpResponseMessage> DeleteSupplierDocumentAsync(Guid supplierId, Guid documentId, CancellationToken ct = default)
+    {
+        return await httpClient.DeleteAsync($"/supplier/v1/suppliers/{supplierId}/certifications/{documentId}", ct);
+    }
+
     private sealed record SupplierListResponse(
         IReadOnlyList<SupplierResponse> Items,
         int TotalCount,
@@ -158,8 +182,10 @@ public class SupplierServiceClient(HttpClient httpClient)
         string? Country,
         string? PostalCode,
         string? Status,
+        string? OnboardingStage,
         string? RowVersion,
         IReadOnlyList<SupplierContactResponse>? Contacts,
+        IReadOnlyList<SupplierDocumentResponse>? Certifications,
         IReadOnlyList<CapabilityResponse>? Capabilities,
         PerformanceSummaryResponse? PerformanceSummary,
         DateTime CreatedAt)
@@ -183,6 +209,8 @@ public class SupplierServiceClient(HttpClient httpClient)
                 ContactPerson = contact?.Name,
                 Capabilities = Capabilities?.Where(capability => capability.IsActive).Select(capability => capability.Name).ToList() ?? [],
                 RowVersion = RowVersion ?? string.Empty,
+                OnboardingStage = OnboardingStage ?? string.Empty,
+                Documents = Certifications?.Select(certification => certification.ToDto()).ToList() ?? [],
                 CreatedAt = CreatedAt
             };
         }
@@ -198,6 +226,34 @@ public class SupplierServiceClient(HttpClient httpClient)
         bool IsActive);
 
     private sealed record PerformanceSummaryResponse(decimal? OverallRating);
+
+    private sealed record SupplierDocumentResponse(
+        Guid Id,
+        string DocumentType,
+        string DocumentName,
+        DateOnly? IssueDate,
+        DateOnly? ExpirationDate,
+        string? ExternalFileRef,
+        bool IsExpired,
+        bool IsExpiringSoon,
+        DateTime CreatedAt)
+    {
+        public SupplierDocumentDto ToDto()
+        {
+            return new SupplierDocumentDto
+            {
+                Id = Id,
+                DocumentType = DocumentType,
+                DocumentName = DocumentName,
+                IssueDate = IssueDate,
+                ExpirationDate = ExpirationDate,
+                ExternalFileRef = ExternalFileRef,
+                IsExpired = IsExpired,
+                IsExpiringSoon = IsExpiringSoon,
+                CreatedAt = CreatedAt
+            };
+        }
+    }
 
     private sealed record DownstreamCreateSupplierRequest(
         [property: JsonPropertyName("companyName")] string CompanyName,
@@ -226,4 +282,12 @@ public class SupplierServiceClient(HttpClient httpClient)
         [property: JsonPropertyName("materialCategoryIds")] IEnumerable<Guid>? MaterialCategoryIds,
         [property: JsonPropertyName("capabilities")] IEnumerable<string>? Capabilities,
         [property: JsonPropertyName("rowVersion")] string RowVersion);
+
+    private sealed record DownstreamCreateSupplierDocumentRequest(
+        [property: JsonPropertyName("documentType")] string DocumentType,
+        [property: JsonPropertyName("documentName")] string DocumentName,
+        [property: JsonPropertyName("issueDate")] DateOnly IssueDate,
+        [property: JsonPropertyName("expirationDate")] DateOnly? ExpirationDate,
+        [property: JsonPropertyName("externalFileRef")] string? ExternalFileRef,
+        [property: JsonPropertyName("notes")] string? Notes);
 }

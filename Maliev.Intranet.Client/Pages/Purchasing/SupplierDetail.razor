@@ -1,7 +1,10 @@
 @page "/purchasing/suppliers/{Id:guid}"
+@using System.Net.Http.Headers
+@using System.Text.Json.Serialization
 @using Maliev.Intranet.Shared
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageTitle>Supplier Profile | MALIEV Intranet</PageTitle>
 
@@ -94,9 +97,91 @@
                 <PanelCard Title="Procurement Controls">
                     <dl class="mlv-detail-list">
                         <dt>Concurrency token</dt><dd class="mlv-mono">@Display(_supplier.RowVersion)</dd>
-                        <dt>Documents</dt><dd>Upload workflow pending supplier document classification.</dd>
+                        <dt>Onboarding</dt><dd>@Display(_supplier.OnboardingStage)</dd>
                         <dt>Payment terms</dt><dd>Commercial supplier terms pending procurement master-data model.</dd>
                     </dl>
+                </PanelCard>
+
+                <PanelCard Title="Supplier Documents" Class="supplier-documents-panel">
+                    <div class="supplier-document-form">
+                        <label class="mlv-form-field">
+                            <span>Document type</span>
+                            <select class="mlv-form-input" @bind="_documentType">
+                                @foreach (var type in SupplierDocumentTypes)
+                                {
+                                    <option value="@type">@GetDocumentTypeLabel(type)</option>
+                                }
+                            </select>
+                        </label>
+                        <label class="mlv-form-field">
+                            <span>Document name</span>
+                            <ImmediateInputText class="mlv-form-input" @bind-Value="_documentName" placeholder="Business license, tax form, ISO certificate..." />
+                        </label>
+                        <label class="mlv-form-field">
+                            <span>Issue date</span>
+                            <input class="mlv-form-input" type="date" value="@_documentIssueDate" @onchange="OnDocumentIssueDateChanged" />
+                        </label>
+                        <label class="mlv-form-field">
+                            <span>Expiration date</span>
+                            <input class="mlv-form-input" type="date" value="@_documentExpirationDate" @onchange="OnDocumentExpirationDateChanged" />
+                        </label>
+                        <label class="mlv-form-field supplier-document-file">
+                            <span>File</span>
+                            <InputFile OnChange="OnDocumentFileSelected" />
+                            @if (_documentFile is not null)
+                            {
+                                <small>@_documentFile.Name - @FormatFileSize(_documentFile.Size)</small>
+                            }
+                        </label>
+                        <label class="mlv-form-field supplier-document-notes">
+                            <span>Notes</span>
+                            <ImmediateInputText class="mlv-form-input" @bind-Value="_documentNotes" placeholder="Verification notes, issuer, policy number..." />
+                        </label>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_documentError))
+                    {
+                        <div class="supplier-document-error">@_documentError</div>
+                    }
+
+                    <div class="mlv-toolbar mt-3" style="justify-content:flex-end">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.UploadFile" Disabled="@_documentUploading" OnClick="@AddDocumentAsync">
+                            @(_documentUploading ? "Uploading..." : "Upload document")
+                        </PrimaryButton>
+                    </div>
+
+                    @if (_supplier.Documents.Count == 0)
+                    {
+                        <div class="supplier-document-empty">
+                            <MudIcon Icon="@Icons.Material.Outlined.FolderOpen" Size="Size.Medium" />
+                            <span>No supplier documents recorded yet.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="supplier-document-list">
+                            @foreach (var document in _supplier.Documents.OrderByDescending(d => d.CreatedAt))
+                            {
+                                <article class="supplier-document-item">
+                                    <span class="supplier-document-icon">
+                                        <MudIcon Icon="@GetDocumentIcon(document.DocumentType)" Size="Size.Small" />
+                                    </span>
+                                    <span class="supplier-document-main">
+                                        <strong>@document.DocumentName</strong>
+                                        <small>@GetDocumentTypeLabel(document.DocumentType) - @GetDocumentStatus(document)</small>
+                                        <span>@FormatDocumentDates(document)</span>
+                                    </span>
+                                    <span class="supplier-document-actions">
+                                        @if (!string.IsNullOrWhiteSpace(document.ExternalFileRef))
+                                        {
+                                            <SecondaryButton Icon="@Icons.Material.Outlined.Visibility" OnClick="@((MouseEventArgs _) => OpenDocumentAsync(document))">Open</SecondaryButton>
+                                        }
+                                        <SecondaryButton Icon="@Icons.Material.Outlined.Delete" Disabled="@_documentUploading" OnClick="@((MouseEventArgs _) => DeleteDocumentAsync(document))">Delete</SecondaryButton>
+                                    </span>
+                                </article>
+                            }
+                        </div>
+                    }
                 </PanelCard>
             </div>
         }
@@ -110,9 +195,28 @@
     private SupplierDetailDto? _supplier;
     private UpdateSupplierRequest _edit = new();
     private string _capabilityText = string.Empty;
+    private static readonly string[] SupplierDocumentTypes =
+    [
+        "BusinessLicense",
+        "TaxForm",
+        "InsuranceCertificate",
+        "QualityCertification",
+        "ISO9001",
+        "ISO14001",
+        "AS9100",
+        "Other"
+    ];
+    private string _documentType = "BusinessLicense";
+    private string _documentName = string.Empty;
+    private string _documentIssueDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
+    private string? _documentExpirationDate;
+    private string? _documentNotes;
+    private string? _documentError;
+    private IBrowserFile? _documentFile;
     private bool _loading = true;
     private bool _saving;
     private bool _editing;
+    private bool _documentUploading;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -219,8 +323,228 @@
             ? []
             : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
+    private void OnDocumentFileSelected(InputFileChangeEventArgs args)
+    {
+        _documentError = null;
+        _documentFile = args.File;
+        if (_documentFile.Size > 10 * 1024 * 1024)
+        {
+            _documentError = "Supplier document exceeds the 10 MB limit.";
+            _documentFile = null;
+        }
+        else if (string.IsNullOrWhiteSpace(_documentName))
+        {
+            _documentName = Path.GetFileNameWithoutExtension(_documentFile.Name);
+        }
+    }
+
+    private void OnDocumentIssueDateChanged(ChangeEventArgs args)
+    {
+        _documentIssueDate = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnDocumentExpirationDateChanged(ChangeEventArgs args)
+    {
+        _documentExpirationDate = args.Value?.ToString();
+    }
+
+    private async Task AddDocumentAsync(MouseEventArgs _)
+    {
+        if (_supplier is null)
+        {
+            return;
+        }
+
+        _documentError = null;
+        if (string.IsNullOrWhiteSpace(_documentType) || string.IsNullOrWhiteSpace(_documentName))
+        {
+            _documentError = "Document type and name are required.";
+            return;
+        }
+
+        if (!DateOnly.TryParse(_documentIssueDate, out var issueDate))
+        {
+            _documentError = "Enter a valid issue date.";
+            return;
+        }
+
+        DateOnly? expirationDate = null;
+        if (!string.IsNullOrWhiteSpace(_documentExpirationDate))
+        {
+            if (!DateOnly.TryParse(_documentExpirationDate, out var parsedExpiration))
+            {
+                _documentError = "Enter a valid expiration date.";
+                return;
+            }
+
+            expirationDate = parsedExpiration;
+        }
+
+        _documentUploading = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(_documentType), "documentType");
+            content.Add(new StringContent(_documentName.Trim()), "documentName");
+            content.Add(new StringContent(issueDate.ToString("yyyy-MM-dd")), "issueDate");
+            if (expirationDate.HasValue)
+            {
+                content.Add(new StringContent(expirationDate.Value.ToString("yyyy-MM-dd")), "expirationDate");
+            }
+
+            if (!string.IsNullOrWhiteSpace(_documentNotes))
+            {
+                content.Add(new StringContent(_documentNotes.Trim()), "notes");
+            }
+
+            if (_documentFile is not null)
+            {
+                var stream = _documentFile.OpenReadStream(10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(string.IsNullOrWhiteSpace(_documentFile.ContentType) ? "application/octet-stream" : _documentFile.ContentType);
+                content.Add(fileContent, "file", _documentFile.Name);
+            }
+
+            var response = await Http.PostAsync($"api/v1/suppliers/{Id}/documents", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _documentError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(_documentError))
+                {
+                    _documentError = "Supplier document could not be saved.";
+                }
+                return;
+            }
+
+            var created = await response.Content.ReadFromJsonAsync<SupplierDocumentDto>();
+            if (created is not null)
+            {
+                _supplier.Documents.Add(created);
+            }
+
+            ResetDocumentForm();
+        }
+        catch (Exception ex)
+        {
+            _documentError = $"Supplier document could not be saved: {ex.Message}";
+        }
+        finally
+        {
+            _documentUploading = false;
+        }
+    }
+
+    private async Task DeleteDocumentAsync(SupplierDocumentDto document)
+    {
+        if (_supplier is null)
+        {
+            return;
+        }
+
+        _documentUploading = true;
+        _documentError = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/v1/suppliers/{Id}/documents/{document.Id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _documentError = "Supplier document could not be deleted.";
+                return;
+            }
+
+            _supplier.Documents.Remove(document);
+        }
+        finally
+        {
+            _documentUploading = false;
+        }
+    }
+
+    private async Task OpenDocumentAsync(SupplierDocumentDto document)
+    {
+        if (string.IsNullOrWhiteSpace(document.ExternalFileRef))
+        {
+            return;
+        }
+
+        var response = await Http.GetFromJsonAsync<DownloadUrlResponse>(
+            $"api/v1/suppliers/{Id}/documents/download-url?fileReference={Uri.EscapeDataString(document.ExternalFileRef)}");
+        if (!string.IsNullOrWhiteSpace(response?.Url))
+        {
+            await JS.InvokeVoidAsync("open", response.Url, "_blank");
+        }
+    }
+
+    private void ResetDocumentForm()
+    {
+        _documentType = "BusinessLicense";
+        _documentName = string.Empty;
+        _documentIssueDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
+        _documentExpirationDate = null;
+        _documentNotes = null;
+        _documentFile = null;
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        if (bytes < 1024 * 1024)
+        {
+            return $"{bytes / 1024d:0.#} KB";
+        }
+
+        return $"{bytes / 1024d / 1024d:0.#} MB";
+    }
+
+    private static string FormatDocumentDates(SupplierDocumentDto document)
+    {
+        var issue = document.IssueDate?.ToString("dd MMM yyyy") ?? "Issue date not set";
+        var expiration = document.ExpirationDate?.ToString("dd MMM yyyy") ?? "No expiration";
+        return $"{issue} -> {expiration}";
+    }
+
+    private static string GetDocumentStatus(SupplierDocumentDto document)
+    {
+        if (document.IsExpired)
+        {
+            return "Expired";
+        }
+
+        return document.IsExpiringSoon ? "Expiring soon" : "Active";
+    }
+
+    private static string GetDocumentTypeLabel(string? value) => value switch
+    {
+        "BusinessLicense" => "Business license",
+        "TaxForm" => "Tax form",
+        "InsuranceCertificate" => "Insurance certificate",
+        "QualityCertification" => "Quality certification",
+        "ISO9001" => "ISO 9001",
+        "ISO14001" => "ISO 14001",
+        "AS9100" => "AS9100",
+        _ => string.IsNullOrWhiteSpace(value) ? "Other" : value
+    };
+
+    private static string GetDocumentIcon(string? documentType) => documentType switch
+    {
+        "TaxForm" => Icons.Material.Outlined.ReceiptLong,
+        "InsuranceCertificate" => Icons.Material.Outlined.VerifiedUser,
+        "QualityCertification" or "ISO9001" or "ISO14001" or "AS9100" => Icons.Material.Outlined.WorkspacePremium,
+        _ => Icons.Material.Outlined.Description
+    };
+
     private static string Display(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private sealed class DownloadUrlResponse
+    {
+        [JsonPropertyName("url")]
+        public string? Url { get; set; }
     }
 }

@@ -266,6 +266,186 @@ public class AiProcessingController(
     }
 
     /// <summary>
+    /// Processes uploaded documents and text to extract supplier onboarding data using AI.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Prediction.Extract)]
+    [HttpPost("extract-supplier")]
+    public async Task<ActionResult<ExtractedSupplierDataResponse>> ExtractSupplierFromDocument(
+        [FromForm] IFormFileCollection files,
+        [FromForm] string? rawText,
+        CancellationToken cancellationToken = default)
+    {
+        if ((files == null || files.Count == 0) && string.IsNullOrWhiteSpace(rawText))
+        {
+            return BadRequest("No files or text provided for processing.");
+        }
+
+        var session = await chatbotClient.InitiateSessionAsync("intranet", "en", cancellationToken);
+        if (session == null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "AI extraction service is currently unavailable.");
+        }
+
+        var attachments = new List<ChatbotAttachment>();
+        if (files != null)
+        {
+            foreach (var file in files)
+            {
+                if (file.Length > 10 * 1024 * 1024)
+                {
+                    return BadRequest($"File '{file.FileName}' exceeds the 10 MB limit.");
+                }
+
+                using var memoryStream = new MemoryStream();
+                await file.OpenReadStream().CopyToAsync(memoryStream, cancellationToken);
+                var base64 = Convert.ToBase64String(memoryStream.ToArray());
+
+                attachments.Add(new ChatbotAttachment
+                {
+                    Type = file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ? "Image" : "PDF",
+                    Url = $"data:{file.ContentType};base64,{base64}",
+                    MimeType = file.ContentType,
+                    SizeBytes = file.Length
+                });
+            }
+        }
+
+        var responseSchema = new
+        {
+            type = "object",
+            properties = new
+            {
+                supplier_name = new { type = "string", description = "Supplier company or legal name." },
+                tax_id = new { type = "string", description = "Tax ID or VAT number, digits only when possible." },
+                email = new { type = "string", description = "Primary supplier email address." },
+                phone = new { type = "string", description = "Primary supplier phone number." },
+                contact_person = new { type = "string", description = "Primary contact person at the supplier." },
+                country = new { type = "string", description = "Supplier country. Use Thailand for Thai addresses." },
+                capabilities = new
+                {
+                    type = "array",
+                    items = new { type = "string" },
+                    description = "Procurement or manufacturing capabilities such as CNC, sheet metal, anodizing, materials, logistics, accounting service."
+                },
+                document_types = new
+                {
+                    type = "array",
+                    items = new { type = "string" },
+                    description = "Supplier document types found, such as BusinessLicense, TaxForm, InsuranceCertificate, QualityCertification, ISO9001, ISO14001, AS9100, or Other."
+                },
+                address = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        address_line_1 = new { type = "string", description = "Street-level address, building, house number, road, moo, soi." },
+                        district = new { type = "string", description = "Sub-district only for Thai addresses." },
+                        city = new { type = "string", description = "District or city." },
+                        state_province = new { type = "string", description = "Province or state." },
+                        postal_code = new { type = "string", description = "Postal code." }
+                    }
+                }
+            }
+        };
+
+        var prompt = $"""
+            Extract supplier onboarding data for MALIEV procurement.
+
+            Use null for fields that are not visible. Keep Thai legal company names in Thai when present.
+            Normalize Thai tax IDs to digits only. For capabilities, infer practical supplier capabilities from the text,
+            but avoid guessing if there is no evidence.
+
+            Text content:
+            {rawText}
+            """;
+
+        var response = await chatbotClient.SendMessageAsync(
+            session.SessionId,
+            prompt,
+            attachments.Count > 0 ? attachments : null,
+            responseMimeType: "application/json",
+            responseSchema: responseSchema,
+            ct: cancellationToken);
+
+        if (response == null || string.IsNullOrWhiteSpace(response.Content))
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, "AI extraction returned no supplier data.");
+        }
+
+        ExtractedSupplierDataResponse? extracted;
+        try
+        {
+            extracted = JsonSerializer.Deserialize<ExtractedSupplierDataResponse>(
+                StripJsonCodeFence(response.Content),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Supplier AI extraction returned invalid JSON: {Content}", response.Content);
+            return StatusCode(StatusCodes.Status502BadGateway, "AI extraction returned data that could not be parsed.");
+        }
+
+        if (extracted == null)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, "AI extraction returned no supplier data.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(extracted.TaxId))
+        {
+            extracted.TaxId = new string(extracted.TaxId.Where(char.IsDigit).ToArray());
+
+            try
+            {
+                var companyProfiles = await registryClient.SearchCompaniesAsync(extracted.TaxId, 1, cancellationToken);
+                if (companyProfiles.Count > 0)
+                {
+                    extracted.SupplierName = companyProfiles[0].CompanyNameTh;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to validate supplier company via Registry for Tax ID {TaxId}", extracted.TaxId);
+            }
+        }
+
+        if (extracted.Address != null)
+        {
+            try
+            {
+                var locations = await registryClient.AutocompleteLocationsMultiFieldAsync(
+                    extracted.Address.PostalCode,
+                    extracted.Address.District,
+                    extracted.Address.City,
+                    extracted.Address.StateProvince,
+                    limit: 3,
+                    cancellationToken);
+
+                if (locations.Count > 0)
+                {
+                    var location = locations[0];
+                    extracted.Address.Location = location;
+                    var useThai = IsThai(extracted.Address.AddressLine1) ||
+                        IsThai(extracted.Address.District) ||
+                        IsThai(extracted.Address.City) ||
+                        IsThai(extracted.Address.StateProvince);
+
+                    extracted.Address.District = useThai ? location.SubDistrictTh : location.SubDistrictEn;
+                    extracted.Address.City = useThai ? location.DistrictTh : location.DistrictEn;
+                    extracted.Address.StateProvince = useThai ? location.ProvinceTh : location.ProvinceEn;
+                    extracted.Address.PostalCode = location.PostalCode;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Registry location resolution failed for supplier extraction.");
+            }
+        }
+
+        extracted.Confidence = ComputeSupplierConfidence(extracted);
+        return Ok(extracted);
+    }
+
+    /// <summary>
     /// Extracts NDA-related dates (expiration, effective, signed) from an uploaded PDF using AI.
     /// </summary>
     /// <param name="file">The NDA PDF file to scan.</param>
@@ -620,7 +800,51 @@ public class AiProcessingController(
     private static bool LooksLikeStoragePath(string fileReference) =>
         fileReference.Contains('/', StringComparison.Ordinal) || fileReference.Contains('\\', StringComparison.Ordinal);
 
+    private static string StripJsonCodeFence(string content)
+    {
+        var trimmed = content.Trim();
+        if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+
+        var firstLineEnd = trimmed.IndexOf('\n', StringComparison.Ordinal);
+        var lastFence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
+        if (firstLineEnd < 0 || lastFence <= firstLineEnd)
+        {
+            return trimmed;
+        }
+
+        return trimmed[(firstLineEnd + 1)..lastFence].Trim();
+    }
+
     private static bool IsThai(string? value) => value?.Any(c => c >= 0x0E00 && c <= 0x0E7F) ?? false;
+
+    private static double ComputeSupplierConfidence(ExtractedSupplierDataResponse data)
+    {
+        var fields = new[]
+        {
+            data.SupplierName,
+            data.TaxId,
+            data.Email,
+            data.Phone,
+            data.ContactPerson,
+            data.Country,
+            data.Address?.AddressLine1,
+            data.Address?.City,
+            data.Address?.StateProvince,
+            data.Address?.PostalCode
+        };
+
+        var filled = fields.Count(field => !string.IsNullOrWhiteSpace(field));
+        var total = fields.Length + 1;
+        if (data.Capabilities.Count > 0)
+        {
+            filled++;
+        }
+
+        return Math.Round((double)filled / total, 2);
+    }
 
     private static double ComputeConfidence(ExtractedCustomerDataResponse data)
     {

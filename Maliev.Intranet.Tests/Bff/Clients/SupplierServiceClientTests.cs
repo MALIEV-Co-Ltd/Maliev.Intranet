@@ -90,6 +90,7 @@ public sealed class SupplierServiceClientTests
                 country = "Thailand",
                 postalCode = "10310",
                 status = "Active",
+                onboardingStage = "DocumentationReview",
                 rowVersion = "42",
                 contacts = new[]
                 {
@@ -98,6 +99,21 @@ public sealed class SupplierServiceClientTests
                         name = "Niran Supplier",
                         email = "sales@thai-metals.example",
                         phoneNumber = "+66 2 555 0101"
+                    }
+                },
+                certifications = new[]
+                {
+                    new
+                    {
+                        id = Guid.Parse("08f47199-6f3d-4d54-bb1c-803af7674231"),
+                        documentType = "BusinessLicense",
+                        documentName = "Business License 2026",
+                        issueDate = "2026-01-01",
+                        expirationDate = "2027-01-01",
+                        externalFileRef = "supplier-documents/license.pdf",
+                        isExpired = false,
+                        isExpiringSoon = false,
+                        createdAt = DateTime.UtcNow
                     }
                 },
                 capabilities = new[]
@@ -124,12 +140,17 @@ public sealed class SupplierServiceClientTests
         Assert.Equal("Thailand", detail.Country);
         Assert.Equal("10310", detail.PostalCode);
         Assert.Equal("42", detail.RowVersion);
+        Assert.Equal("DocumentationReview", detail.OnboardingStage);
         Assert.Equal("Niran Supplier", detail.ContactPerson);
         Assert.Equal("sales@thai-metals.example", detail.Email);
         Assert.Equal("+66 2 555 0101", detail.Phone);
         Assert.Equal(4.5m, detail.Rating);
         var capability = Assert.Single(detail.Capabilities);
         Assert.Equal("CNC", capability);
+        var document = Assert.Single(detail.Documents);
+        Assert.Equal("BusinessLicense", document.DocumentType);
+        Assert.Equal("Business License 2026", document.DocumentName);
+        Assert.Equal("supplier-documents/license.pdf", document.ExternalFileRef);
     }
 
     [Fact]
@@ -177,6 +198,56 @@ public sealed class SupplierServiceClientTests
         Assert.Equal("CNC", root.GetProperty("capabilities")[0].GetString());
         Assert.Equal("Anodizing", root.GetProperty("capabilities")[1].GetString());
         Assert.Equal("42", root.GetProperty("rowVersion").GetString());
+    }
+
+    [Fact]
+    public async Task AddSupplierDocumentAsync_MapsIntranetDocumentToSupplierCertificationContract()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        string? payload = null;
+        var supplierId = Guid.Parse("40543057-6f32-46aa-8022-f28a8a99d490");
+        var client = MakeClient(async request =>
+        {
+            capturedRequest = request;
+            payload = await request.Content!.ReadAsStringAsync();
+            return JsonContent.Create(new
+            {
+                id = Guid.Parse("6472f408-0759-483c-b69a-6c261bb435a2"),
+                documentType = "TaxForm",
+                documentName = "Tax Form 2026",
+                issueDate = "2026-01-01",
+                expirationDate = "2026-12-31",
+                externalFileRef = "supplier-documents/tax-form.pdf",
+                isExpired = false,
+                isExpiringSoon = false,
+                createdAt = DateTime.UtcNow
+            });
+        });
+
+        using var response = await client.AddSupplierDocumentAsync(supplierId, new CreateSupplierDocumentRequest
+        {
+            DocumentType = "TaxForm",
+            DocumentName = "Tax Form 2026",
+            IssueDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2026, 12, 31),
+            ExternalFileRef = "supplier-documents/tax-form.pdf",
+            Notes = "Verified from supplier onboarding"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Post, capturedRequest.Method);
+        Assert.Equal($"/supplier/v1/suppliers/{supplierId}/certifications", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.NotNull(payload);
+
+        using var document = JsonDocument.Parse(payload);
+        var root = document.RootElement;
+        Assert.Equal("TaxForm", root.GetProperty("documentType").GetString());
+        Assert.Equal("Tax Form 2026", root.GetProperty("documentName").GetString());
+        Assert.Equal("2026-01-01", root.GetProperty("issueDate").GetString());
+        Assert.Equal("2026-12-31", root.GetProperty("expirationDate").GetString());
+        Assert.Equal("supplier-documents/tax-form.pdf", root.GetProperty("externalFileRef").GetString());
+        Assert.Equal("Verified from supplier onboarding", root.GetProperty("notes").GetString());
     }
 
     private static SupplierServiceClient MakeClient(Func<HttpRequestMessage, Task<HttpContent>> contentFactory)
