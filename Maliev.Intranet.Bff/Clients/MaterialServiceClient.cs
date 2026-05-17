@@ -49,6 +49,24 @@ public class MaterialServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Retrieves the selectable material color catalog.
+    /// </summary>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The available color options.</returns>
+    public async Task<List<MaterialColorDto>> GetColorsAsync(CancellationToken ct = default)
+    {
+        var response = await httpClient.GetFromJsonAsync<List<MaterialServiceNamedDto>>("/material/v1/reference/colors", ct);
+        return response?
+            .Select(color => new MaterialColorDto
+            {
+                Id = color.Id,
+                Name = color.Name,
+                HexCode = color.HexCode
+            })
+            .ToList() ?? [];
+    }
+
+    /// <summary>
     /// Creates a new material.
     /// </summary>
     /// <param name="request">The creation request.</param>
@@ -98,7 +116,7 @@ public class MaterialServiceClient(HttpClient httpClient)
             StockLevel = request.QuantityOnHand ?? current.StockLevel,
             SupplierId = current.SupplierId,
             ManufacturingProcessIds = current.ManufacturingProcesses.Select(process => process.Id).ToList(),
-            ColorIds = current.AvailableColors.Select(color => color.Id).ToList(),
+            ColorIds = request.ColorIds ?? current.AvailableColors.Select(color => color.Id).ToList(),
             PostProcessingMethodIds = current.PostProcessingMethods.Select(method => method.Id).ToList(),
             MechanicalProperties = current.MechanicalProperties
                 .Select(property => new MaterialServiceMechanicalPropertyRequest

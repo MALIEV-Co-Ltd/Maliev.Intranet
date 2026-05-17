@@ -263,6 +263,8 @@ public sealed record UpdateMaterialRequest
     public string? Status { get; set; }
     /// <summary>The updated unit of measurement.</summary>
     public string? Unit { get; set; }
+    /// <summary>The selected color identifiers for this material; null preserves the existing color links.</summary>
+    public List<Guid>? ColorIds { get; set; }
 }
 
 /// <summary>

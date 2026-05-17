@@ -148,6 +148,41 @@
                                 <textarea class="material-input material-textarea" rows="4" @bind="_editModel.Description" @bind:event="oninput"></textarea>
                                 <ValidationMessage For="@(() => _editModel!.Description)" />
                             </label>
+                            <div class="material-edit-field material-edit-field-wide">
+                                <span>Color options</span>
+                                @if (_colorsLoading)
+                                {
+                                    <div class="material-color-loading">
+                                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="38px" Animation="Animation.Wave" />
+                                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="38px" Animation="Animation.Wave" />
+                                    </div>
+                                }
+                                else if (EditableColorOptions.Count == 0)
+                                {
+                                    <div class="material-empty-state material-color-empty">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Palette" Size="Size.Small" />
+                                        <div>
+                                            <strong>No color options configured</strong>
+                                            <span>Add colors in the material reference catalog before assigning them here.</span>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="material-color-picker" role="group" aria-label="Available color options">
+                                        @foreach (var color in EditableColorOptions)
+                                        {
+                                            <label class="@GetColorOptionClass(color)">
+                                                <input type="checkbox"
+                                                       checked="@IsColorSelected(color.Id)"
+                                                       @onchange="@((ChangeEventArgs eventArgs) => ToggleColorSelection(color.Id, eventArgs.Value))" />
+                                                <span class="material-color-dot" style="@ColorSwatchStyle(color)"></span>
+                                                <span>@color.Name</span>
+                                            </label>
+                                        }
+                                    </div>
+                                }
+                            </div>
                         </div>
                     }
                     else if (_material is not null)
@@ -301,6 +336,8 @@
     private bool _saving;
     private bool _editing;
     private bool _canUpdateMaterial;
+    private bool _colorsLoading;
+    private List<MaterialColorDto> _colorOptions = [];
 
     private static readonly IReadOnlyDictionary<char, string> Code39Patterns = new Dictionary<char, string>
     {
@@ -418,6 +455,24 @@
 
     private MarkupString BarcodeSvg => new(BuildCode39Svg(InventoryTrackingCode));
 
+    private IReadOnlyList<MaterialColorDto> EditableColorOptions
+    {
+        get
+        {
+            var options = new List<MaterialColorDto>();
+            var seen = new HashSet<Guid>();
+            foreach (var color in _colorOptions.Concat(_material?.Colors ?? []))
+            {
+                if (seen.Add(color.Id))
+                {
+                    options.Add(color);
+                }
+            }
+
+            return options;
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
@@ -441,11 +496,11 @@
         }
     }
 
-    private Task StartEditAsync()
+    private async Task StartEditAsync()
     {
         if (_material is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         _editModel = new MaterialEditModel
@@ -454,11 +509,12 @@
             SKU = _material.SKU,
             Description = _material.Description,
             UnitPrice = _material.UnitPrice,
-            QuantityOnHand = _material.QuantityOnHand
+            QuantityOnHand = _material.QuantityOnHand,
+            SelectedColorIds = _material.Colors.Select(color => color.Id).ToList()
         };
         _editContext = new EditContext(_editModel);
         _editing = true;
-        return Task.CompletedTask;
+        await LoadColorOptionsAsync();
     }
 
     private Task CancelEditAsync()
@@ -496,7 +552,8 @@
                 SKU = _editModel.SKU.Trim(),
                 Description = _editModel.Description?.Trim(),
                 UnitPrice = _editModel.UnitPrice,
-                QuantityOnHand = _editModel.QuantityOnHand
+                QuantityOnHand = _editModel.QuantityOnHand,
+                ColorIds = _editModel.SelectedColorIds.ToList()
             };
 
             var response = await Http.PutAsJsonAsync($"api/v1/materials/{Id}", request);
@@ -530,6 +587,54 @@
         var hex = IsHexColor(color.HexCode) ? color.HexCode : "#f5f5f5";
         return $"background:{hex};";
     }
+
+    private async Task LoadColorOptionsAsync()
+    {
+        if (_colorOptions.Count > 0)
+        {
+            return;
+        }
+
+        _colorsLoading = true;
+        try
+        {
+            _colorOptions = await Http.GetFromJsonAsync<List<MaterialColorDto>>("api/v1/materials/reference/colors") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load material colors: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _colorsLoading = false;
+        }
+    }
+
+    private bool IsColorSelected(Guid colorId)
+        => _editModel?.SelectedColorIds.Contains(colorId) == true;
+
+    private void ToggleColorSelection(Guid colorId, object? value)
+    {
+        if (_editModel is null)
+        {
+            return;
+        }
+
+        var selected = value is bool boolValue && boolValue;
+        if (selected && !_editModel.SelectedColorIds.Contains(colorId))
+        {
+            _editModel.SelectedColorIds.Add(colorId);
+        }
+        else if (!selected)
+        {
+            _editModel.SelectedColorIds.Remove(colorId);
+        }
+    }
+
+    private string GetColorOptionClass(MaterialColorDto color)
+        => IsColorSelected(color.Id)
+            ? "material-color-option selected"
+            : "material-color-option";
 
     private static bool IsHexColor(string? value)
     {
@@ -703,5 +808,7 @@
 
         [Range(0, int.MaxValue)]
         public int QuantityOnHand { get; set; }
+
+        public List<Guid> SelectedColorIds { get; set; } = [];
     }
 }

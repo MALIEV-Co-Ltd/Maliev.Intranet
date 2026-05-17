@@ -426,6 +426,9 @@ public class ModuleRegressionSourceTests
         var listStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialList.razor.css");
         var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor");
         var detailStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor.css");
+        var inventoryDtos = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "InventoryDtos.cs");
+        var materialClient = ReadRepoFile("Maliev.Intranet.Bff", "Clients", "MaterialServiceClient.cs");
+        var materialsController = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "MaterialsController.cs");
 
         Assert.Contains("@page \"/mfg/materials\"", list, StringComparison.Ordinal);
         Assert.Contains("@page \"/mfg/materials/{Id:guid}\"", detail, StringComparison.Ordinal);
@@ -459,6 +462,17 @@ public class ModuleRegressionSourceTests
         Assert.Contains("material-barcode-svg", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-audit-entry", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-supplier-entry", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("material-color-picker", detail, StringComparison.Ordinal);
+        Assert.Contains("SelectedColorIds", detail, StringComparison.Ordinal);
+        Assert.Contains("LoadColorOptionsAsync", detail, StringComparison.Ordinal);
+        Assert.Contains("api/v1/materials/reference/colors", detail, StringComparison.Ordinal);
+        Assert.Contains("ToggleColorSelection", detail, StringComparison.Ordinal);
+        Assert.Contains("ColorIds = _editModel.SelectedColorIds.ToList()", detail, StringComparison.Ordinal);
+        Assert.Contains("material-color-option", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("public List<Guid>? ColorIds { get; set; }", inventoryDtos, StringComparison.Ordinal);
+        Assert.Contains("GetColorsAsync", materialClient, StringComparison.Ordinal);
+        Assert.Contains("request.ColorIds ?? current.AvailableColors.Select(color => color.Id).ToList()", materialClient, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"reference/colors\")]", materialsController, StringComparison.Ordinal);
         Assert.Contains("class=\"mlv-table\"", list, StringComparison.Ordinal);
         Assert.DoesNotContain("<th>Code</th>", list, StringComparison.Ordinal);
         Assert.DoesNotContain("<td class=\"mlv-mono\">@material.SKU</td>", list, StringComparison.Ordinal);

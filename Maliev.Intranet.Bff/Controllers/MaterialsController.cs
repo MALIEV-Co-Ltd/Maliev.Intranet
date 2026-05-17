@@ -44,6 +44,18 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves selectable material color options.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The material color catalog.</returns>
+    [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("reference/colors")]
+    public async Task<ActionResult<List<MaterialColorDto>>> GetColors(CancellationToken ct)
+    {
+        return Ok(await client.GetColorsAsync(ct));
+    }
+
+    /// <summary>
     /// Creates a new material.
     /// </summary>
     /// <param name="request">The creation request.</param>
