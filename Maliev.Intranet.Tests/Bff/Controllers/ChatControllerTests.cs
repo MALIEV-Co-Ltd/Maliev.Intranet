@@ -155,6 +155,76 @@ public class ChatControllerTests
     }
 
     [Fact]
+    public async Task GetInstructions_ShouldReturnInstructionProfiles()
+    {
+        var downstream = new List<BffSystemInstructionDto>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Customer Website Assistant",
+                Category = BffSystemInstructionCategory.Core,
+                TopicKey = "website",
+                PersonaDefinition = "Mali website prompt",
+                BusinessConstraints = "Customer-safe only",
+                IsActive = true,
+                Version = 2
+            }
+        };
+
+        _chatbotClientMock
+            .Setup(x => x.GetSystemInstructionsAsync(
+                BffSystemInstructionCategory.Core,
+                "website",
+                true,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(downstream);
+
+        var result = await _controller.GetInstructions(BffSystemInstructionCategory.Core, "website", true, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var bffResponse = Assert.IsAssignableFrom<IReadOnlyList<BffSystemInstructionDto>>(okResult.Value);
+        Assert.Single(bffResponse);
+        Assert.Equal("website", bffResponse[0].TopicKey);
+    }
+
+    [Fact]
+    public async Task UpdateInstruction_ShouldProxyWritablePromptMutation()
+    {
+        var id = Guid.NewGuid();
+        var request = new BffSystemInstructionMutationRequest
+        {
+            Name = "Customer Website Assistant",
+            Category = BffSystemInstructionCategory.Core,
+            TopicKey = "website",
+            PersonaDefinition = "Mali website prompt",
+            BusinessConstraints = "Customer-safe only",
+            IsActive = true
+        };
+
+        _chatbotClientMock
+            .Setup(x => x.UpdateSystemInstructionAsync(id, request, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BffSystemInstructionDto
+            {
+                Id = id,
+                Name = request.Name,
+                Category = request.Category,
+                TopicKey = request.TopicKey,
+                PersonaDefinition = request.PersonaDefinition,
+                BusinessConstraints = request.BusinessConstraints,
+                IsActive = true,
+                Version = 3
+            });
+
+        var result = await _controller.UpdateInstruction(id, request, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var bffResponse = Assert.IsType<BffSystemInstructionDto>(okResult.Value);
+        Assert.Equal(id, bffResponse.Id);
+        Assert.Equal("website", bffResponse.TopicKey);
+    }
+
+    [Fact]
     public async Task SendMessage_ShouldReturnOk()
     {
         var request = new BffChatMessageRequest { SessionId = Guid.NewGuid(), Content = "hi" };

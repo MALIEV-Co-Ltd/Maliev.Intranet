@@ -99,6 +99,60 @@ public class ChatController(
     }
 
     /// <summary>
+    /// Lists configurable chatbot system instructions and topic skill prompts.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Chat.InstructionsRead, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("instructions")]
+    public async Task<ActionResult<IReadOnlyList<BffSystemInstructionDto>>> GetInstructions(
+        [FromQuery] BffSystemInstructionCategory? category = null,
+        [FromQuery] string? topicKey = null,
+        [FromQuery] bool activeOnly = false,
+        CancellationToken ct = default)
+    {
+        var result = await chatbotClient.GetSystemInstructionsAsync(category, topicKey, activeOnly, ct);
+
+        if (result == null)
+            return ChatbotFailure("Failed to load chatbot instructions.");
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Creates a chatbot system instruction or topic skill prompt.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Chat.InstructionsWrite, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("instructions")]
+    public async Task<ActionResult<BffSystemInstructionDto>> CreateInstruction(
+        [FromBody] BffSystemInstructionMutationRequest request,
+        CancellationToken ct = default)
+    {
+        var result = await chatbotClient.CreateSystemInstructionAsync(request, ct);
+
+        if (result == null)
+            return ChatbotFailure("Failed to create chatbot instruction.");
+
+        return Created("api/v1/chat/instructions", result);
+    }
+
+    /// <summary>
+    /// Updates a chatbot system instruction or topic skill prompt.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Chat.InstructionsWrite, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPut("instructions/{id:guid}")]
+    public async Task<ActionResult<BffSystemInstructionDto>> UpdateInstruction(
+        Guid id,
+        [FromBody] BffSystemInstructionMutationRequest request,
+        CancellationToken ct = default)
+    {
+        var result = await chatbotClient.UpdateSystemInstructionAsync(id, request, ct);
+
+        if (result == null)
+            return ChatbotFailure("Failed to update chatbot instruction.");
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Sends a message in an existing chat session.
     /// </summary>
     [RequirePermission(MalievPermissions.Chat.SessionsCreate, AuthenticationSchemes = "Bearer,Cookies")]

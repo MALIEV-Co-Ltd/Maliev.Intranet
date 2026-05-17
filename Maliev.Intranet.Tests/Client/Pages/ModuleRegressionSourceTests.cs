@@ -86,6 +86,24 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void AdminPage_LinksToChatbotInstructionManagement()
+    {
+        var adminPage = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "AdminPage.razor");
+        var instructionPage = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor");
+        var permissions = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "MalievPermissions.cs");
+
+        Assert.Contains("Chatbot instructions", adminPage, StringComparison.Ordinal);
+        Assert.Contains("Href=\"/admin/chatbot-instructions\"", adminPage, StringComparison.Ordinal);
+        Assert.Contains("@page \"/admin/chatbot-instructions\"", instructionPage, StringComparison.Ordinal);
+        Assert.Contains("RequirePermission(MalievPermissions.Chat.InstructionsRead)", instructionPage, StringComparison.Ordinal);
+        Assert.Contains("chatbot.instructions.write", instructionPage, StringComparison.Ordinal);
+        Assert.Contains("InputFile OnChange=\"ImportPromptFileAsync\"", instructionPage, StringComparison.Ordinal);
+        Assert.Contains("Topic entries act as dynamic SKILLS", instructionPage, StringComparison.Ordinal);
+        Assert.Contains("public const string InstructionsRead = \"chatbot.instructions.read\";", permissions, StringComparison.Ordinal);
+        Assert.Contains("public const string InstructionsWrite = \"chatbot.instructions.write\";", permissions, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ClientLoginRoute_IsNotUsedForEmployeeLogin()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor");

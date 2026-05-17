@@ -142,6 +142,10 @@ public static class MalievPermissions
         public const string SessionsCreate = "chat.sessions.create";
         /// <summary>Permission to read chat session history.</summary>
         public const string SessionsRead = "chat.sessions.read";
+        /// <summary>Permission to read chatbot system instructions and skill prompts.</summary>
+        public const string InstructionsRead = "chatbot.instructions.read";
+        /// <summary>Permission to create or update chatbot system instructions and skill prompts.</summary>
+        public const string InstructionsWrite = "chatbot.instructions.write";
     }
 
     /// <summary>

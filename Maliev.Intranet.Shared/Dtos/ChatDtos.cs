@@ -43,6 +43,114 @@ public class BffChatSessionResponse
 }
 
 /// <summary>
+/// Chatbot instruction category used by ChatbotService.
+/// </summary>
+public enum BffSystemInstructionCategory
+{
+    /// <summary>
+    /// Core persona and safety instructions.
+    /// </summary>
+    Core = 1,
+
+    /// <summary>
+    /// Topic-specific skill prompt injected by detected intent.
+    /// </summary>
+    Topic = 2
+}
+
+/// <summary>
+/// A configurable chatbot system instruction or topic skill prompt.
+/// </summary>
+public class BffSystemInstructionDto
+{
+    /// <summary>
+    /// Gets or sets the instruction identifier.
+    /// </summary>
+    public Guid Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets the display name.
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the instruction category.
+    /// </summary>
+    public BffSystemInstructionCategory Category { get; set; }
+
+    /// <summary>
+    /// Gets or sets the profile or topic key.
+    /// </summary>
+    public string? TopicKey { get; set; }
+
+    /// <summary>
+    /// Gets or sets the injection priority for topic prompts.
+    /// </summary>
+    public int Priority { get; set; }
+
+    /// <summary>
+    /// Gets or sets the persona or prompt body.
+    /// </summary>
+    public string PersonaDefinition { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the business constraints and safety rules.
+    /// </summary>
+    public string BusinessConstraints { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this instruction is active.
+    /// </summary>
+    public bool IsActive { get; set; }
+
+    /// <summary>
+    /// Gets or sets the instruction version.
+    /// </summary>
+    public int Version { get; set; }
+}
+
+/// <summary>
+/// Request for creating or updating a chatbot system instruction.
+/// </summary>
+public class BffSystemInstructionMutationRequest
+{
+    /// <summary>
+    /// Gets or sets the display name.
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the instruction category.
+    /// </summary>
+    public BffSystemInstructionCategory Category { get; set; } = BffSystemInstructionCategory.Topic;
+
+    /// <summary>
+    /// Gets or sets the profile or topic key.
+    /// </summary>
+    public string? TopicKey { get; set; }
+
+    /// <summary>
+    /// Gets or sets the injection priority for topic prompts.
+    /// </summary>
+    public int Priority { get; set; } = 10;
+
+    /// <summary>
+    /// Gets or sets the persona or prompt body.
+    /// </summary>
+    public string PersonaDefinition { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the business constraints and safety rules.
+    /// </summary>
+    public string BusinessConstraints { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this instruction is active.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>
 /// Request payload for sending a user message to an active chat session.
 /// </summary>
 public class BffChatMessageRequest

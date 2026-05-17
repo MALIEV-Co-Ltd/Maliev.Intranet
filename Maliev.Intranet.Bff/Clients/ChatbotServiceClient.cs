@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Maliev.Intranet.Shared;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -247,6 +248,133 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
         {
             LastError = ex.Message;
             logger.LogError(ex, "ChatbotService conversation messages failed unexpectedly.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Lists configurable system instructions and skill prompts.
+    /// </summary>
+    public virtual async Task<List<BffSystemInstructionDto>?> GetSystemInstructionsAsync(
+        BffSystemInstructionCategory? category = null,
+        string? topicKey = null,
+        bool activeOnly = false,
+        CancellationToken ct = default)
+    {
+        LastError = null;
+        try
+        {
+            var queryParts = new List<string>
+            {
+                $"activeOnly={activeOnly.ToString().ToLowerInvariant()}",
+                "page=1",
+                "pageSize=100"
+            };
+
+            if (category.HasValue)
+            {
+                queryParts.Add($"category={Uri.EscapeDataString(category.Value.ToString())}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(topicKey))
+            {
+                queryParts.Add($"topicKey={Uri.EscapeDataString(topicKey.Trim())}");
+            }
+
+            var response = await httpClient.GetAsync($"/chatbot/v1/admin/instructions?{string.Join("&", queryParts)}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
+                logger.LogError("ChatbotService instruction list failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<List<BffSystemInstructionDto>>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            LastError = "ChatbotService instruction list timed out.";
+            logger.LogWarning("ChatbotService instruction list timed out.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            logger.LogError(ex, "ChatbotService instruction list failed unexpectedly.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Creates a configurable system instruction or skill prompt.
+    /// </summary>
+    public virtual async Task<BffSystemInstructionDto?> CreateSystemInstructionAsync(
+        BffSystemInstructionMutationRequest request,
+        CancellationToken ct = default)
+    {
+        LastError = null;
+        try
+        {
+            var content = JsonContent.Create(request, options: SnakeCaseOptions);
+            var response = await httpClient.PostAsync("/chatbot/v1/admin/instructions", content, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
+                logger.LogError("ChatbotService instruction create failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<BffSystemInstructionDto>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            LastError = "ChatbotService instruction create timed out.";
+            logger.LogWarning("ChatbotService instruction create timed out.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            logger.LogError(ex, "ChatbotService instruction create failed unexpectedly.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Updates a configurable system instruction or skill prompt.
+    /// </summary>
+    public virtual async Task<BffSystemInstructionDto?> UpdateSystemInstructionAsync(
+        Guid id,
+        BffSystemInstructionMutationRequest request,
+        CancellationToken ct = default)
+    {
+        LastError = null;
+        try
+        {
+            var content = JsonContent.Create(request, options: SnakeCaseOptions);
+            var response = await httpClient.PutAsync($"/chatbot/v1/admin/instructions/{id}", content, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
+                logger.LogError("ChatbotService instruction update failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<BffSystemInstructionDto>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            LastError = "ChatbotService instruction update timed out.";
+            logger.LogWarning("ChatbotService instruction update timed out.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            logger.LogError(ex, "ChatbotService instruction update failed unexpectedly.");
             return null;
         }
     }

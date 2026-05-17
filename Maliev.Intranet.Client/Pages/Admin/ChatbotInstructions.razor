@@ -1,0 +1,434 @@
+@page "/admin/chatbot-instructions"
+@using System.Text.Json
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@attribute [RequirePermission(MalievPermissions.Chat.InstructionsRead)]
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Chatbot Instructions | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="Chatbot Instructions"
+                Subtitle="Configure Mali website persona and backend-injected skill prompts."
+                BackHref="/admin" />
+
+    <PageBody>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+            Website conversations use the <strong>website</strong> core profile for Mali / น้องมะลิ. Topic entries act as dynamic SKILLS that ChatbotService injects when customer intent matches.
+        </MudAlert>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="7">
+                <PanelCard>
+                    <div class="mlv-toolbar">
+                        <MudTextField @bind-Value="_topicFilter"
+                                      Label="Topic/profile key"
+                                      Placeholder="website, materials, quote-prep"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true"
+                                      DebounceInterval="300"
+                                      OnDebounceIntervalElapsed="LoadInstructionsAfterInput"
+                                      Style="min-width: 240px; flex: 1 1 260px;" />
+                        <MudSelect T="string" @bind-Value="_categoryFilter" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 180px;">
+                            <MudSelectItem Value="@string.Empty">All</MudSelectItem>
+                            <MudSelectItem Value="@BffSystemInstructionCategory.Core.ToString()">Core</MudSelectItem>
+                            <MudSelectItem Value="@BffSystemInstructionCategory.Topic.ToString()">Topic skill</MudSelectItem>
+                        </MudSelect>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.Search"
+                                   Disabled="@_loading"
+                                   OnClick="LoadInstructionsAsync">
+                            Apply
+                        </MudButton>
+                    </div>
+
+                    @if (_instructions.Count == 0 && !_loading)
+                    {
+                        <div class="mlv-empty">No chatbot instructions matched the current filters.</div>
+                    }
+                    else
+                    {
+                        <table class="mlv-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Key</th>
+                                    <th>Category</th>
+                                    <th>Status</th>
+                                    <th>Version</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var instruction in _instructions)
+                                {
+                                    <tr class="@SelectedRowClass(instruction)" @onclick="@(() => SelectInstruction(instruction))">
+                                        <td>
+                                            <div class="fw-semibold">@instruction.Name</div>
+                                            <div class="text-muted small">@Preview(instruction.PersonaDefinition)</div>
+                                        </td>
+                                        <td class="mlv-mono">@(instruction.TopicKey ?? "-")</td>
+                                        <td>@CategoryLabel(instruction.Category)</td>
+                                        <td><StatusBadge Status="@(instruction.IsActive ? "Active" : "Inactive")" /></td>
+                                        <td class="mlv-mono">v@instruction.Version</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </PanelCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="5">
+                <PanelCard>
+                    <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
+                        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit instruction" : "New instruction")</MudText>
+                        <div class="d-flex flex-wrap gap-2">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Person" OnClick="StartWebsiteCore">
+                                Website core
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Extension" OnClick="StartTopicSkill">
+                                Skill prompt
+                            </MudButton>
+                        </div>
+                    </div>
+
+                    <MudStack Spacing="2">
+                        <MudTextField @bind-Value="_form.Name" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        <MudSelect T="BffSystemInstructionCategory" @bind-Value="_form.Category" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem Value="@BffSystemInstructionCategory.Core">Core persona</MudSelectItem>
+                            <MudSelectItem Value="@BffSystemInstructionCategory.Topic">Topic skill</MudSelectItem>
+                        </MudSelect>
+                        <MudTextField @bind-Value="_form.TopicKey" Label="Profile or skill key" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        <MudNumericField @bind-Value="_form.Priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        <MudSwitch @bind-Value="_form.IsActive" Color="Color.Primary" Label="Active" />
+
+                        <div class="mlv-empty text-left">
+                            Upload Markdown with frontmatter such as <span class="mlv-mono">topic_key: "website"</span> or paste prompt text directly.
+                            Employees need <span class="mlv-mono">chatbot.instructions.write</span> to save changes.
+                        </div>
+                        <InputFile OnChange="ImportPromptFileAsync" accept=".md,.txt" />
+
+                        <MudTextField @bind-Value="_form.PersonaDefinition"
+                                      Label="System prompt / skill instructions"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Lines="10"
+                                      Immediate="true" />
+                        <MudTextField @bind-Value="_form.BusinessConstraints"
+                                      Label="Business constraints / guardrails"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Lines="7"
+                                      Immediate="true" />
+                    </MudStack>
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.Save"
+                                   Disabled="@_saving"
+                                   OnClick="SaveInstructionAsync">
+                            Save instruction
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="ResetForm">Reset</MudButton>
+                    </div>
+                </PanelCard>
+            </MudItem>
+        </MudGrid>
+    </PageBody>
+</div>
+
+@code {
+    private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+    private List<BffSystemInstructionDto> _instructions = [];
+    private BffSystemInstructionMutationRequest _form = CreateWebsiteCoreForm();
+    private Guid? _editingId;
+    private string _categoryFilter = string.Empty;
+    private string _topicFilter = string.Empty;
+    private bool _loading;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInstructionsAsync();
+        SelectWebsiteInstructionIfPresent();
+    }
+
+    private async Task LoadInstructionsAfterInput(string _)
+    {
+        await LoadInstructionsAsync();
+    }
+
+    private async Task LoadInstructionsAsync()
+    {
+        _loading = true;
+        try
+        {
+            var url = BuildInstructionsUrl();
+            _instructions = await Http.GetFromJsonAsync<List<BffSystemInstructionDto>>(url, _jsonOptions) ?? [];
+        }
+        catch (Exception ex)
+        {
+            _instructions = [];
+            Snackbar.Add("Chatbot instructions could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string BuildInstructionsUrl()
+    {
+        var query = new List<string> { "activeOnly=false" };
+        if (Enum.TryParse<BffSystemInstructionCategory>(_categoryFilter, out var category))
+        {
+            query.Add($"category={Uri.EscapeDataString(category.ToString())}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_topicFilter))
+        {
+            query.Add($"topicKey={Uri.EscapeDataString(_topicFilter.Trim())}");
+        }
+
+        return $"api/v1/chat/instructions?{string.Join("&", query)}";
+    }
+
+    private void SelectWebsiteInstructionIfPresent()
+    {
+        var website = _instructions.FirstOrDefault(instruction =>
+            instruction.Category == BffSystemInstructionCategory.Core &&
+            string.Equals(instruction.TopicKey, "website", StringComparison.OrdinalIgnoreCase));
+
+        if (website is not null)
+        {
+            SelectInstruction(website);
+        }
+    }
+
+    private void SelectInstruction(BffSystemInstructionDto instruction)
+    {
+        _editingId = instruction.Id;
+        _form = new BffSystemInstructionMutationRequest
+        {
+            Name = instruction.Name,
+            Category = instruction.Category,
+            TopicKey = instruction.TopicKey,
+            Priority = instruction.Priority,
+            PersonaDefinition = instruction.PersonaDefinition,
+            BusinessConstraints = instruction.BusinessConstraints,
+            IsActive = instruction.IsActive
+        };
+    }
+
+    private void StartWebsiteCore()
+    {
+        _editingId = null;
+        _form = CreateWebsiteCoreForm();
+    }
+
+    private void StartTopicSkill()
+    {
+        _editingId = null;
+        _form = new BffSystemInstructionMutationRequest
+        {
+            Name = "New customer skill prompt",
+            Category = BffSystemInstructionCategory.Topic,
+            TopicKey = "customer-skill",
+            Priority = 10,
+            PersonaDefinition = "Describe the specialized customer-facing task that Mali should handle.",
+            BusinessConstraints = "Preserve the active core persona, customer-facing scope, and MALIEV safety rules.",
+            IsActive = true
+        };
+    }
+
+    private void ResetForm()
+    {
+        if (_editingId.HasValue)
+        {
+            var selected = _instructions.FirstOrDefault(instruction => instruction.Id == _editingId.Value);
+            if (selected is not null)
+            {
+                SelectInstruction(selected);
+                return;
+            }
+        }
+
+        StartWebsiteCore();
+    }
+
+    private async Task ImportPromptFileAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        await using var stream = file.OpenReadStream(128_000);
+        using var reader = new StreamReader(stream);
+        var content = await reader.ReadToEndAsync();
+        ApplyImportedPrompt(content, Path.GetFileNameWithoutExtension(file.Name));
+        Snackbar.Add("Prompt file loaded into the editor.", Severity.Success);
+    }
+
+    private void ApplyImportedPrompt(string content, string fallbackName)
+    {
+        var normalized = content.ReplaceLineEndings("\n").Trim();
+        var frontmatter = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var body = normalized;
+
+        if (normalized.StartsWith("---\n", StringComparison.Ordinal))
+        {
+            var endIndex = normalized.IndexOf("\n---", 4, StringComparison.Ordinal);
+            if (endIndex > 0)
+            {
+                foreach (var line in normalized[4..endIndex].Split('\n'))
+                {
+                    var separator = line.IndexOf(':');
+                    if (separator <= 0)
+                    {
+                        continue;
+                    }
+
+                    frontmatter[line[..separator].Trim()] = line[(separator + 1)..].Trim().Trim('"');
+                }
+
+                body = normalized[(endIndex + 4)..].Trim();
+            }
+        }
+
+        if (frontmatter.TryGetValue("name", out var name) && !string.IsNullOrWhiteSpace(name))
+        {
+            _form.Name = name.Trim();
+        }
+        else if (!string.IsNullOrWhiteSpace(fallbackName))
+        {
+            _form.Name = fallbackName;
+        }
+
+        if (frontmatter.TryGetValue("category", out var category)
+            && Enum.TryParse<BffSystemInstructionCategory>(category, true, out var parsedCategory))
+        {
+            _form.Category = parsedCategory;
+        }
+
+        if (frontmatter.TryGetValue("topic_key", out var topicKey))
+        {
+            _form.TopicKey = topicKey;
+        }
+
+        if (frontmatter.TryGetValue("priority", out var priorityText) && int.TryParse(priorityText, out var priority))
+        {
+            _form.Priority = priority;
+        }
+
+        if (frontmatter.TryGetValue("is_active", out var activeText) && bool.TryParse(activeText, out var isActive))
+        {
+            _form.IsActive = isActive;
+        }
+
+        var constraintHeading = "## Business Constraints";
+        var constraintIndex = body.IndexOf(constraintHeading, StringComparison.OrdinalIgnoreCase);
+        if (constraintIndex >= 0)
+        {
+            _form.PersonaDefinition = body[..constraintIndex].Trim();
+            _form.BusinessConstraints = body[constraintIndex..].Trim();
+        }
+        else
+        {
+            _form.PersonaDefinition = body;
+            if (string.IsNullOrWhiteSpace(_form.BusinessConstraints))
+            {
+                _form.BusinessConstraints = "Preserve the active core persona, customer-facing scope, and MALIEV safety rules.";
+            }
+        }
+    }
+
+    private async Task SaveInstructionAsync()
+    {
+        if (!ValidateForm())
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response = _editingId.HasValue
+                ? await Http.PutAsJsonAsync($"api/v1/chat/instructions/{_editingId.Value}", _form, _jsonOptions)
+                : await Http.PostAsJsonAsync("api/v1/chat/instructions", _form, _jsonOptions);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Chatbot instruction could not be saved.", Severity.Error);
+                return;
+            }
+
+            var saved = await response.Content.ReadFromJsonAsync<BffSystemInstructionDto>(_jsonOptions);
+            Snackbar.Add("Chatbot instruction saved.", Severity.Success);
+            await LoadInstructionsAsync();
+            if (saved is not null)
+            {
+                SelectInstruction(saved);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Chatbot instruction could not be saved.", Severity.Error);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private bool ValidateForm()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Name)
+            || string.IsNullOrWhiteSpace(_form.TopicKey)
+            || _form.PersonaDefinition.Trim().Length < 10
+            || _form.BusinessConstraints.Trim().Length < 10)
+        {
+            Snackbar.Add("Name, key, prompt, and constraints are required.", Severity.Warning);
+            return false;
+        }
+
+        return true;
+    }
+
+    private string SelectedRowClass(BffSystemInstructionDto instruction)
+    {
+        return instruction.Id == _editingId ? "mlv-row-selected" : string.Empty;
+    }
+
+    private static string CategoryLabel(BffSystemInstructionCategory category)
+    {
+        return category == BffSystemInstructionCategory.Core ? "Core" : "Topic skill";
+    }
+
+    private static string Preview(string text)
+    {
+        var normalized = text.ReplaceLineEndings(" ").Trim();
+        return normalized.Length <= 96 ? normalized : normalized[..96] + "...";
+    }
+
+    private static BffSystemInstructionMutationRequest CreateWebsiteCoreForm()
+    {
+        return new BffSystemInstructionMutationRequest
+        {
+            Name = "Customer Website Assistant",
+            Category = BffSystemInstructionCategory.Core,
+            TopicKey = "website",
+            Priority = 0,
+            PersonaDefinition = "Mali / น้องมะลิ is the customer-facing manufacturing assistant for MALIEV public channels.",
+            BusinessConstraints = "Only answer customer-safe MALIEV manufacturing, material, quote, order, delivery, and support topics.",
+            IsActive = true
+        };
+    }
+}
