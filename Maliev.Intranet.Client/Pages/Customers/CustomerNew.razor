@@ -120,20 +120,60 @@
                         </div>
                     }
 
-                    @if (_lastExtraction != null)
+                    @if (_lastExtraction != null && _showExtractionSummary)
                     {
-                        <div class="extraction-summary expanded">
-                            <div>
-                                <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" />
-                                <span>Autofilled from AI extraction</span>
-                                <strong>@($"{_lastExtraction.Confidence:P0}")</strong>
+                        var extractedItems = GetExtractedSummaryItems();
+                        var missingItems = GetMissingExtractionItems();
+
+                        <div class="extraction-summary" role="status" aria-live="polite">
+                            <div class="extraction-summary-head">
+                                <span class="extraction-summary-icon">
+                                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" />
+                                </span>
+                                <span class="extraction-summary-title">
+                                    <strong>AI extraction review</strong>
+                                    <small>@GetExtractionSummaryText(extractedItems.Count, missingItems.Count)</small>
+                                </span>
+                                <span class="extraction-confidence">@($"{_lastExtraction.Confidence:P0}")</span>
+                                <button type="button"
+                                        class="extraction-summary-dismiss"
+                                        aria-label="Dismiss AI extraction review"
+                                        @onclick="DismissExtractionSummary">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                                </button>
                             </div>
-                            <dl>
-                                <dt>Attempts</dt><dd>@_lastExtractionAttempts of @MaxExtractionAttempts</dd>
-                                <dt>Contact</dt><dd>@FormatPair(_lastExtraction.Email, _lastExtraction.Mobile)</dd>
-                                <dt>Company</dt><dd>@FormatPair(_lastExtraction.CompanyName, _lastExtraction.VatNumber)</dd>
-                                <dt>Addresses</dt><dd>@(_lastExtraction.Addresses?.Count ?? 0)</dd>
-                            </dl>
+
+                            <div class="extraction-summary-grid">
+                                <section>
+                                    <span>Extracted</span>
+                                    <ul>
+                                        @foreach (var item in extractedItems)
+                                        {
+                                            <li>
+                                                <strong>@item.Label</strong>
+                                                <small>@item.Value</small>
+                                            </li>
+                                        }
+                                    </ul>
+                                </section>
+
+                                <section class="extraction-summary-missing">
+                                    <span>Needs input</span>
+                                    @if (missingItems.Count == 0)
+                                    {
+                                        <p>Nothing obvious missing. Review and save when ready.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul>
+                                            @foreach (var item in missingItems)
+                                            {
+                                                <li>@item</li>
+                                            }
+                                        </ul>
+                                    }
+                                </section>
+                            </div>
                         </div>
                     }
                 </PanelCard>
@@ -495,6 +535,8 @@
         Notes
     }
 
+    private sealed record ExtractionSummaryItem(string Label, string Value);
+
     private enum AddressField
     {
         Subdistrict,
@@ -558,6 +600,7 @@
     private bool _extracting;
     private bool _saving;
     private bool _loadingDocumentPreview;
+    private bool _showExtractionSummary;
     private int _currentExtractionAttempt;
     private int _lastExtractionAttempts;
     private string? _error;
@@ -701,6 +744,7 @@
     private async Task ExtractAsync(MouseEventArgs _)
     {
         _extracting = true;
+        _showExtractionSummary = false;
         _error = null;
         _currentExtractionAttempt = 0;
 
@@ -742,6 +786,7 @@
             _lastExtractionAttempts = _currentExtractionAttempt;
             await ApplyExtractionAsync(bestResult);
             _lastExtraction = bestResult;
+            _showExtractionSummary = true;
         }
         finally
         {
@@ -1412,8 +1457,100 @@
 
     private void ToggleAiIntake() => _aiIntakeExpanded = !_aiIntakeExpanded;
 
+    private void DismissExtractionSummary() => _showExtractionSummary = false;
+
     private string GetCreateTabClass(CreateTab tab) =>
         tab == _activeCreateTab ? "active" : string.Empty;
+
+    private static string GetExtractionSummaryText(int fieldCount, int missingCount) =>
+        missingCount == 0
+            ? $"{fieldCount} item{(fieldCount == 1 ? string.Empty : "s")} filled. Review before saving."
+            : $"{fieldCount} item{(fieldCount == 1 ? string.Empty : "s")} filled, {missingCount} need manual input.";
+
+    private List<ExtractionSummaryItem> GetExtractedSummaryItems()
+    {
+        List<ExtractionSummaryItem> items = [];
+
+        var name = GetCustomerName();
+        if (name != "Not named yet")
+        {
+            items.Add(new("Name", name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_onboarding.Customer.Email))
+        {
+            items.Add(new("Email", _onboarding.Customer.Email.Trim()));
+        }
+
+        var phone = FormatPair(_onboarding.Customer.Mobile, _onboarding.Customer.Landline);
+        if (phone != "Not set")
+        {
+            items.Add(new("Phone", phone));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_companyName) || !string.IsNullOrWhiteSpace(_companyTaxId))
+        {
+            items.Add(new("Company", FormatPair(_companyName, _companyTaxId)));
+        }
+
+        var addressCount = _addresses.Count(address => HasAddressContent(address.Request));
+        if (addressCount > 0)
+        {
+            items.Add(new("Addresses", $"{addressCount} address{(addressCount == 1 ? string.Empty : "es")}"));
+        }
+
+        if (_lastExtractionAttempts > 0)
+        {
+            items.Add(new("Attempts", $"{_lastExtractionAttempts} of {MaxExtractionAttempts}"));
+        }
+
+        return items.Count == 0
+            ? [new("Result", "No usable customer fields found")]
+            : items;
+    }
+
+    private List<string> GetMissingExtractionItems()
+    {
+        List<string> missing = [];
+
+        if (string.IsNullOrWhiteSpace(_onboarding.Customer.FirstName))
+        {
+            missing.Add("Customer first name");
+        }
+
+        if (string.IsNullOrWhiteSpace(_onboarding.Customer.LastName))
+        {
+            missing.Add("Customer last name");
+        }
+
+        if (string.IsNullOrWhiteSpace(_onboarding.Customer.Email))
+        {
+            missing.Add("Email address");
+        }
+
+        if (string.IsNullOrWhiteSpace(_onboarding.Customer.Mobile) &&
+            string.IsNullOrWhiteSpace(_onboarding.Customer.Landline))
+        {
+            missing.Add("Phone number");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_companyName) && string.IsNullOrWhiteSpace(_companyTaxId))
+        {
+            missing.Add("Company tax ID");
+        }
+
+        if (_addresses.All(address => !HasAddressContent(address.Request)))
+        {
+            missing.Add("Billing or shipping address");
+        }
+
+        if (_lastExtraction?.Confidence < HighConfidenceThreshold)
+        {
+            missing.Add("Manual review for low confidence");
+        }
+
+        return missing;
+    }
 
     private string GetAiIntakeStatus()
     {

@@ -152,7 +152,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ClearAfterNavigation = true", snackbarPolicy, StringComparison.Ordinal);
         Assert.Contains("config.VisibleStateDuration = 5000;", mainLayout, StringComparison.Ordinal);
         Assert.DoesNotContain("config.VisibleStateDuration = 10000;", mainLayout, StringComparison.Ordinal);
-        Assert.Contains("Autofilled from AI extraction", customerNew, StringComparison.Ordinal);
+        Assert.Contains("AI extraction review", customerNew, StringComparison.Ordinal);
+        Assert.Contains("DismissExtractionSummary", customerNew, StringComparison.Ordinal);
+        Assert.Contains("GetMissingExtractionItems", customerNew, StringComparison.Ordinal);
+        Assert.Contains("Needs input", customerNew, StringComparison.Ordinal);
+        Assert.DoesNotContain("Autofilled from AI extraction", customerNew, StringComparison.Ordinal);
         Assert.DoesNotContain("Customer fields were autofilled from the highest-confidence AI extraction.", customerNew, StringComparison.Ordinal);
     }
 
@@ -632,6 +636,14 @@ public class ModuleRegressionSourceTests
         Assert.Contains("role=\"status\" aria-live=\"polite\"", page, StringComparison.Ordinal);
         Assert.Contains("AI extraction in progress", page, StringComparison.Ordinal);
         Assert.Contains("Class=\"ai-processing-spinner\"", page, StringComparison.Ordinal);
+        Assert.Contains("_showExtractionSummary = false;", page, StringComparison.Ordinal);
+        Assert.Contains("_showExtractionSummary = true;", page, StringComparison.Ordinal);
+        Assert.Contains("class=\"extraction-summary-dismiss\"", page, StringComparison.Ordinal);
+        Assert.Contains("AI extraction review", page, StringComparison.Ordinal);
+        Assert.Contains("Needs input", page, StringComparison.Ordinal);
+        Assert.Contains("GetExtractionSummaryText(extractedItems.Count, missingItems.Count)", page, StringComparison.Ordinal);
+        Assert.Contains("GetExtractedSummaryItems", page, StringComparison.Ordinal);
+        Assert.Contains("GetMissingExtractionItems", page, StringComparison.Ordinal);
 
         Assert.Contains("--ai-extraction-surface-min-height: 132px;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(360px, 1fr) minmax(320px, 0.72fr);", ExtractCssBlock(styles, ".ai-intake {"), StringComparison.Ordinal);
@@ -653,7 +665,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("grid-column: 1 / -1;", ExtractCssBlock(styles, ".ai-processing-state {"), StringComparison.Ordinal);
         Assert.Contains("var(--ai-dropzone-violet)", ExtractCssBlock(styles, ".ai-processing-state {"), StringComparison.Ordinal);
         Assert.Contains("flex: 0 0 auto;", ExtractCssBlock(styles, ".ai-processing-spinner"), StringComparison.Ordinal);
+        Assert.Contains("padding: 0.65rem 0.75rem;", ExtractCssBlock(styles, ".extraction-summary {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);", ExtractCssBlock(styles, ".extraction-summary-grid"), StringComparison.Ordinal);
+        Assert.Contains("width: 1.75rem;", ExtractCssBlock(styles, ".extraction-summary-dismiss"), StringComparison.Ordinal);
         Assert.Contains("padding-top: 0;", ExtractCssBlock(responsiveStyles, ".ai-file-column {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 1fr;", ExtractCssBlock(responsiveStyles, ".extraction-summary-grid"), StringComparison.Ordinal);
     }
 
     [Fact]
