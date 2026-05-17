@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 using Moq;
 using Moq.Protected;
 
@@ -143,6 +145,99 @@ public class EmployeeServiceClientTests
         Assert.Contains("\"preferredName\":\"M\"", json, StringComparison.Ordinal);
         Assert.Contains("\"personalEmail\":\"mia.personal@example.com\"", json, StringComparison.Ordinal);
         Assert.Contains("\"mobilePhone\":\"\\u002B66810000000\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetPreferenceAsync_MapsEmployeeServiceJsonStringPayload()
+    {
+        var principalId = Guid.Parse("12121212-1212-1212-1212-121212121212");
+        var updatedAt = new DateTime(2026, 5, 17, 6, 30, 0, DateTimeKind.Utc);
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(request =>
+                    request.Method == HttpMethod.Get &&
+                    request.RequestUri!.PathAndQuery == "/employee/v1/preferences/intranet-profile"),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    principalId,
+                    scope = "intranet-profile",
+                    preferenceData = "{\"themeMode\":\"dark\",\"compactWorkspace\":true}",
+                    updatedAt
+                })
+            });
+
+        var client = new EmployeeServiceClient(new HttpClient(handler.Object)
+        {
+            BaseAddress = new Uri("http://employee")
+        });
+
+        var result = await client.GetPreferenceAsync("intranet-profile");
+
+        Assert.NotNull(result);
+        Assert.Equal(principalId, result.PrincipalId);
+        Assert.Equal("intranet-profile", result.Scope);
+        Assert.Equal(updatedAt, result.UpdatedAt);
+        Assert.Equal("dark", Assert.IsType<JsonElement>(result.PreferenceData["themeMode"]).GetString());
+        Assert.True(Assert.IsType<JsonElement>(result.PreferenceData["compactWorkspace"]).GetBoolean());
+    }
+
+    [Fact]
+    public async Task UpsertPreferenceAsync_SendsEmployeeServiceJsonStringPayload()
+    {
+        string? json = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(request =>
+                    request.Method == HttpMethod.Put &&
+                    request.RequestUri!.PathAndQuery == "/employee/v1/preferences/intranet-profile"),
+                ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((request, _) =>
+            {
+                json = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            })
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    principalId = Guid.Parse("12121212-1212-1212-1212-121212121212"),
+                    scope = "intranet-profile",
+                    preferenceData = "{\"defaultCurrency\":\"EUR\",\"compactWorkspace\":true}",
+                    updatedAt = new DateTime(2026, 5, 17, 6, 45, 0, DateTimeKind.Utc)
+                })
+            });
+
+        var client = new EmployeeServiceClient(new HttpClient(handler.Object)
+        {
+            BaseAddress = new Uri("http://employee")
+        });
+
+        var result = await client.UpsertPreferenceAsync("intranet-profile", new UpsertPreferenceRequest
+        {
+            Scope = "intranet-profile",
+            PreferenceData = new Dictionary<string, object>
+            {
+                ["defaultCurrency"] = "EUR",
+                ["compactWorkspace"] = true
+            }
+        });
+
+        Assert.NotNull(result);
+        Assert.NotNull(json);
+        using var sentDocument = JsonDocument.Parse(json!);
+        Assert.False(sentDocument.RootElement.TryGetProperty("scope", out _));
+        var preferenceData = sentDocument.RootElement.GetProperty("preferenceData").GetString();
+        Assert.NotNull(preferenceData);
+        using var preferenceDocument = JsonDocument.Parse(preferenceData!);
+        Assert.Equal("EUR", preferenceDocument.RootElement.GetProperty("defaultCurrency").GetString());
+        Assert.True(preferenceDocument.RootElement.GetProperty("compactWorkspace").GetBoolean());
+        Assert.Equal("EUR", Assert.IsType<JsonElement>(result.PreferenceData["defaultCurrency"]).GetString());
     }
 
     [Fact]

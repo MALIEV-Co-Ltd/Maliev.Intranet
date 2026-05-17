@@ -10,6 +10,8 @@ namespace Maliev.Intranet.Bff.Clients;
 /// <param name="httpClient">The HTTP client instance.</param>
 public class EmployeeServiceClient(HttpClient httpClient)
 {
+    private static readonly JsonSerializerOptions PreferenceJsonOptions = new(JsonSerializerDefaults.Web);
+
     /// <summary>
     /// Retrieves a paged list of employees.
     /// </summary>
@@ -144,7 +146,8 @@ public class EmployeeServiceClient(HttpClient httpClient)
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<UserPreferenceDto>(cancellationToken: ct);
+        var downstreamPreference = await response.Content.ReadFromJsonAsync<EmployeePreferenceResponse>(cancellationToken: ct);
+        return MapPreference(downstreamPreference);
     }
 
     /// <summary>
@@ -152,9 +155,15 @@ public class EmployeeServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<UserPreferenceDto?> UpsertPreferenceAsync(string scope, UpsertPreferenceRequest request, CancellationToken ct = default)
     {
-        var response = await httpClient.PutAsJsonAsync($"/employee/v1/preferences/{scope}", request, ct);
+        var downstreamRequest = new EmployeeUpsertPreferenceRequest
+        {
+            PreferenceData = JsonSerializer.Serialize(request.PreferenceData, PreferenceJsonOptions)
+        };
+
+        var response = await httpClient.PutAsJsonAsync($"/employee/v1/preferences/{scope}", downstreamRequest, PreferenceJsonOptions, ct);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<UserPreferenceDto>(cancellationToken: ct);
+        var downstreamPreference = await response.Content.ReadFromJsonAsync<EmployeePreferenceResponse>(cancellationToken: ct);
+        return MapPreference(downstreamPreference);
     }
 
     /// <summary>
@@ -232,5 +241,55 @@ public class EmployeeServiceClient(HttpClient httpClient)
             CreatedAt = profile.CreatedAt ?? DateTime.MinValue,
             UpdatedAt = profile.CreatedAt ?? DateTime.MinValue
         };
+    }
+
+    private static UserPreferenceDto? MapPreference(EmployeePreferenceResponse? preference)
+    {
+        if (preference is null)
+        {
+            return null;
+        }
+
+        return new UserPreferenceDto
+        {
+            PrincipalId = preference.PrincipalId,
+            Scope = preference.Scope,
+            PreferenceData = DeserializePreferenceData(preference.PreferenceData),
+            UpdatedAt = preference.UpdatedAt
+        };
+    }
+
+    private static Dictionary<string, object> DeserializePreferenceData(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            var data = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json, PreferenceJsonOptions);
+            return data?.ToDictionary(pair => pair.Key, pair => (object)pair.Value.Clone()) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private sealed record EmployeeUpsertPreferenceRequest
+    {
+        public string PreferenceData { get; init; } = "{}";
+    }
+
+    private sealed record EmployeePreferenceResponse
+    {
+        public Guid PrincipalId { get; init; }
+
+        public string Scope { get; init; } = string.Empty;
+
+        public string PreferenceData { get; init; } = "{}";
+
+        public DateTime UpdatedAt { get; init; }
     }
 }

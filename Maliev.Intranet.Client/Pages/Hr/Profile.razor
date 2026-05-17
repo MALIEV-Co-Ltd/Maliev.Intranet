@@ -1,8 +1,10 @@
 @page "/hr/profile"
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
-<PageTitle>My Profile | MALIEV Intranet</PageTitle>
+<PageTitle>@(IsPreferencesTab ? "Preferences" : "My Profile") | MALIEV Intranet</PageTitle>
 
 <div class="mlv-module-shell">
     <ModuleHeader Title="My Profile" Subtitle="Employee profile, preferences, and work details.">
@@ -26,6 +28,23 @@
         }
         else if (HasProfile)
         {
+            <nav class="profile-section-tabs" aria-label="Profile sections">
+                <a class="@ProfileTabClass(false)" href="/hr/profile" aria-current="@ProfileTabCurrent(false)">
+                    <MudIcon Icon="@Icons.Material.Outlined.AccountCircle" Size="Size.Small" />
+                    <span>
+                        <strong>Profile</strong>
+                        <small>Employee record</small>
+                    </span>
+                </a>
+                <a class="@ProfileTabClass(true)" href="/hr/profile?tab=preferences" aria-current="@ProfileTabCurrent(true)">
+                    <MudIcon Icon="@Icons.Material.Outlined.Tune" Size="Size.Small" />
+                    <span>
+                        <strong>Preferences</strong>
+                        <small>Personal defaults</small>
+                    </span>
+                </a>
+            </nav>
+
             <StatBar Class="mb-4">
                 <StatTile Label="Status" Value="@DisplayStatus" />
                 <StatTile Label="Department" Value="@DisplayDepartment" />
@@ -33,148 +52,342 @@
                 <StatTile Label="Manager" Value="@DisplayManager" />
             </StatBar>
 
-            <div class="mlv-grid">
-                <div class="mlv-span-7">
-                    <PanelCard Title="Employee details">
-                        <div class="mlv-actions mb-3">
-                            @if (_editing)
-                            {
-                                <SecondaryButton Icon="@Icons.Material.Outlined.Close" OnClick="@CancelEditAsync">Cancel</SecondaryButton>
-                                <PrimaryButton Icon="@Icons.Material.Outlined.Save" OnClick="@SaveProfileAsync" Disabled="@_saving">Save changes</PrimaryButton>
-                            }
-                            else
-                            {
-                                <PrimaryButton Icon="@Icons.Material.Outlined.Edit" OnClick="@StartEditAsync">Edit profile</PrimaryButton>
-                            }
+            @if (IsPreferencesTab)
+            {
+                <div class="profile-preferences-layout">
+                    <section class="profile-preferences-intro" aria-label="Preference storage">
+                        <div class="profile-preferences-icon">
+                            <MudIcon Icon="@Icons.Material.Outlined.Tune" Size="Size.Medium" />
                         </div>
+                        <div>
+                            <h2>Preferences</h2>
+                            <p>These are your employee-specific defaults for the intranet. They are saved under the <strong>@PreferenceScope</strong> scope and follow your login.</p>
+                        </div>
+                        <dl>
+                            <div>
+                                <dt>Configured</dt>
+                                <dd>@PreferenceKeyCount.ToString("N0") keys</dd>
+                            </div>
+                            <div>
+                                <dt>Last saved</dt>
+                                <dd>@PreferenceUpdatedLabel</dd>
+                            </div>
+                        </dl>
+                    </section>
 
-                        @if (_editing)
-                        {
-                            <EditForm Model="@_editModel" class="profile-form">
-                                <DataAnnotationsValidator />
-                                <div class="profile-edit-grid">
-                                    <label class="profile-field">
-                                        <span>Preferred name</span>
-                                        <ImmediateInputText class="profile-input" @bind-Value="_editModel.PreferredName" />
-                                        <ValidationMessage For="@(() => _editModel.PreferredName)" />
-                                    </label>
-                                    <label class="profile-field">
-                                        <span>Personal email</span>
-                                        <ImmediateInputText class="profile-input" type="email" @bind-Value="_editModel.PersonalEmail" />
-                                        <ValidationMessage For="@(() => _editModel.PersonalEmail)" />
-                                    </label>
-                                    <label class="profile-field">
-                                        <span>Mobile phone</span>
-                                        <ImmediateInputText class="profile-input" type="tel" @bind-Value="_editModel.MobilePhone" />
-                                        <ValidationMessage For="@(() => _editModel.MobilePhone)" />
-                                    </label>
-                                </div>
-                            </EditForm>
-                        }
+                    <PanelCard Title="Workspace defaults">
+                        <EditForm Model="@_preferenceModel" OnValidSubmit="@SavePreferencesAsync" class="preferences-form">
+                            <DataAnnotationsValidator />
 
-                        <table class="mlv-table profile-table">
-                            <tbody>
-                                <tr><th>Name</th><td>@DisplayName</td></tr>
-                                <tr><th>Preferred name</th><td>@Display(_selfProfile?.PreferredName)</td></tr>
-                                <tr><th>Email</th><td>@DisplayEmail</td></tr>
-                                <tr><th>Personal email</th><td>@Display(_selfProfile?.PersonalEmail)</td></tr>
-                                <tr><th>Phone</th><td>@DisplayPhone</td></tr>
-                                <tr><th>Location</th><td>@DisplayWorkLocation</td></tr>
-                                <tr><th>Employee type</th><td>@DisplayEmployeeType</td></tr>
-                                <tr><th>Hire date</th><td>@DisplayHireDate</td></tr>
-                            </tbody>
-                        </table>
+                            @if (!string.IsNullOrWhiteSpace(_preferenceError))
+                            {
+                                <div class="preferences-feedback error">@_preferenceError</div>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(_preferenceStatus))
+                            {
+                                <div class="preferences-feedback success">@_preferenceStatus</div>
+                            }
+
+                            <div class="preference-form-grid">
+                                <label class="profile-field">
+                                    <span>Theme</span>
+                                    <select class="profile-input profile-select" name="themeMode" @bind="_preferenceModel.ThemeMode">
+                                        @foreach (var option in ThemeOptions)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="profile-field">
+                                    <span>Start page</span>
+                                    <select class="profile-input profile-select" name="landingPage" @bind="_preferenceModel.LandingPage">
+                                        @foreach (var option in LandingPageOptions)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="profile-field">
+                                    <span>Default currency</span>
+                                    <select class="profile-input profile-select" name="defaultCurrency" @bind="_preferenceModel.DefaultCurrency">
+                                        @foreach (var option in CurrencyOptions)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="profile-field">
+                                    <span>Language</span>
+                                    <select class="profile-input profile-select" name="language" @bind="_preferenceModel.Language">
+                                        @foreach (var option in LanguageOptions)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="profile-field">
+                                    <span>Time zone</span>
+                                    <select class="profile-input profile-select" name="timeZone" @bind="_preferenceModel.TimeZone">
+                                        @foreach (var option in TimeZoneOptions)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="profile-field">
+                                    <span>Date format</span>
+                                    <select class="profile-input profile-select" name="dateFormat" @bind="_preferenceModel.DateFormat">
+                                        @foreach (var option in DateFormatOptions)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
+                                    </select>
+                                </label>
+                            </div>
+
+                            <div class="preference-toggle-grid">
+                                <label class="preference-toggle">
+                                    <input type="checkbox" name="compactWorkspace" @bind="_preferenceModel.CompactWorkspace" />
+                                    <span>
+                                        <strong>Compact workspace</strong>
+                                        <small>Use denser tables and panels where supported.</small>
+                                    </span>
+                                </label>
+                                <label class="preference-toggle">
+                                    <input type="checkbox" name="operationalDigest" @bind="_preferenceModel.OperationalDigest" />
+                                    <span>
+                                        <strong>Operational digest</strong>
+                                        <small>Receive a daily summary for customer, quote, and purchasing activity.</small>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <label class="profile-field profile-field-wide">
+                                <span>Email signature</span>
+                                <ImmediateInputTextArea class="profile-input preferences-signature"
+                                                        maxlength="@MaxEmailSignatureLength"
+                                                        @bind-Value="_preferenceModel.EmailSignature" />
+                                <span class="profile-counter">@SignatureCharacterCount.ToString("N0") / @MaxEmailSignatureLength.ToString("N0")</span>
+                                <ValidationMessage For="@(() => _preferenceModel.EmailSignature)" />
+                            </label>
+
+                            <div class="mlv-actions preferences-actions">
+                                <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@LoadPreferencesAsync" Disabled="@_preferencesSaving">Reload</SecondaryButton>
+                                <PrimaryButton Icon="@Icons.Material.Outlined.Save"
+                                               Type="submit"
+                                               Busy="@_preferencesSaving"
+                                               BusyLabel="Saving...">Save preferences</PrimaryButton>
+                            </div>
+                        </EditForm>
                     </PanelCard>
                 </div>
-                <div class="mlv-span-5">
-                    <PanelCard Title="Preferences">
-                        <div class="mlv-list">
-                            <div class="mlv-list-row">
+            }
+            else
+            {
+                <div class="mlv-grid">
+                    <div class="mlv-span-7">
+                        <PanelCard Title="Employee details">
+                            <div class="mlv-actions mb-3">
+                                @if (_editing)
+                                {
+                                    <SecondaryButton Icon="@Icons.Material.Outlined.Close" OnClick="@CancelEditAsync">Cancel</SecondaryButton>
+                                    <PrimaryButton Icon="@Icons.Material.Outlined.Save" OnClick="@SaveProfileAsync" Disabled="@_saving">Save changes</PrimaryButton>
+                                }
+                                else
+                                {
+                                    <PrimaryButton Icon="@Icons.Material.Outlined.Edit" OnClick="@StartEditAsync">Edit profile</PrimaryButton>
+                                }
+                            </div>
+
+                            @if (_editing)
+                            {
+                                <EditForm Model="@_editModel" class="profile-form">
+                                    <DataAnnotationsValidator />
+                                    <div class="profile-edit-grid">
+                                        <label class="profile-field">
+                                            <span>Preferred name</span>
+                                            <ImmediateInputText class="profile-input" @bind-Value="_editModel.PreferredName" />
+                                            <ValidationMessage For="@(() => _editModel.PreferredName)" />
+                                        </label>
+                                        <label class="profile-field">
+                                            <span>Personal email</span>
+                                            <ImmediateInputText class="profile-input" type="email" @bind-Value="_editModel.PersonalEmail" />
+                                            <ValidationMessage For="@(() => _editModel.PersonalEmail)" />
+                                        </label>
+                                        <label class="profile-field">
+                                            <span>Mobile phone</span>
+                                            <ImmediateInputText class="profile-input" type="tel" @bind-Value="_editModel.MobilePhone" />
+                                            <ValidationMessage For="@(() => _editModel.MobilePhone)" />
+                                        </label>
+                                    </div>
+                                </EditForm>
+                            }
+
+                            <table class="mlv-table profile-table">
+                                <tbody>
+                                    <tr><th>Name</th><td>@DisplayName</td></tr>
+                                    <tr><th>Preferred name</th><td>@Display(_selfProfile?.PreferredName)</td></tr>
+                                    <tr><th>Email</th><td>@DisplayEmail</td></tr>
+                                    <tr><th>Personal email</th><td>@Display(_selfProfile?.PersonalEmail)</td></tr>
+                                    <tr><th>Phone</th><td>@DisplayPhone</td></tr>
+                                    <tr><th>Location</th><td>@DisplayWorkLocation</td></tr>
+                                    <tr><th>Employee type</th><td>@DisplayEmployeeType</td></tr>
+                                    <tr><th>Hire date</th><td>@DisplayHireDate</td></tr>
+                                </tbody>
+                            </table>
+                        </PanelCard>
+                    </div>
+                    <div class="mlv-span-5">
+                        <PanelCard Title="Preferences">
+                            <div class="profile-preference-summary">
                                 <div>
-                                    <div class="mlv-row-main">Profile scope</div>
-                                    <div class="mlv-row-sub">Stored in EmployeeService preferences</div>
+                                    <div class="mlv-row-main">Personal defaults</div>
+                                    <div class="mlv-row-sub">@PreferenceKeyCount.ToString("N0") configured keys</div>
                                 </div>
                                 <StatusBadge Status="@(_preferences is null ? "Missing" : "Ready")" />
                             </div>
-                            <div class="mlv-list-row">
-                                <div>
-                                    <div class="mlv-row-main">Preference keys</div>
-                                    <div class="mlv-row-sub">@((_preferences?.PreferenceData.Count ?? 0).ToString("N0")) configured</div>
+                            <div class="profile-preference-preview">
+                                <span>@DisplayPreference("Default currency", _preferenceModel.DefaultCurrency)</span>
+                                <span>@DisplayPreference("Theme", DisplayPreferenceOption(ThemeOptions, _preferenceModel.ThemeMode))</span>
+                                <span>@DisplayPreference("Time zone", _preferenceModel.TimeZone)</span>
+                            </div>
+                            <PrimaryButton Icon="@Icons.Material.Outlined.Tune" Href="/hr/profile?tab=preferences">Edit preferences</PrimaryButton>
+                        </PanelCard>
+                    </div>
+                    <div class="mlv-span-12">
+                        <PanelCard Title="Teams and documents">
+                            <div class="mlv-grid">
+                                <div class="mlv-span-6">
+                                    @if (ProfileTeams.Count == 0)
+                                    {
+                                        <div class="mlv-empty">No team assignments.</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="mlv-list">
+                                            @foreach (var team in ProfileTeams)
+                                            {
+                                                <div class="mlv-list-row">
+                                                    <div>
+                                                        <div class="mlv-row-main">@team.Name</div>
+                                                        <div class="mlv-row-sub">@team.Role</div>
+                                                    </div>
+                                                    @if (team.IsLead)
+                                                    {
+                                                        <StatusBadge Status="Lead" />
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
                                 </div>
-                                <SecondaryButton Icon="@Icons.Material.Outlined.Tune" OnClick="@LoadPreferencesAsync">Reload</SecondaryButton>
-                            </div>
-                        </div>
-                    </PanelCard>
-                </div>
-                <div class="mlv-span-12">
-                    <PanelCard Title="Teams and documents">
-                        <div class="mlv-grid">
-                            <div class="mlv-span-6">
-                                @if (ProfileTeams.Count == 0)
-                                {
-                                    <div class="mlv-empty">No team assignments.</div>
-                                }
-                                else
-                                {
-                                    <div class="mlv-list">
-                                        @foreach (var team in ProfileTeams)
-                                        {
-                                            <div class="mlv-list-row">
-                                                <div>
-                                                    <div class="mlv-row-main">@team.Name</div>
-                                                    <div class="mlv-row-sub">@team.Role</div>
+                                <div class="mlv-span-6">
+                                    @if (ProfileDocuments.Count == 0)
+                                    {
+                                        <div class="mlv-empty">No employee documents.</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="mlv-list">
+                                            @foreach (var doc in ProfileDocuments)
+                                            {
+                                                <div class="mlv-list-row">
+                                                    <div>
+                                                        <div class="mlv-row-main">@doc.FileName</div>
+                                                        <div class="mlv-row-sub">@doc.DocumentType</div>
+                                                    </div>
+                                                    <span>@doc.UploadedAt.ToString("dd MMM yyyy")</span>
                                                 </div>
-                                                @if (team.IsLead)
-                                                {
-                                                    <StatusBadge Status="Lead" />
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                }
+                                            }
+                                        </div>
+                                    }
+                                </div>
                             </div>
-                            <div class="mlv-span-6">
-                                @if (ProfileDocuments.Count == 0)
-                                {
-                                    <div class="mlv-empty">No employee documents.</div>
-                                }
-                                else
-                                {
-                                    <div class="mlv-list">
-                                        @foreach (var doc in ProfileDocuments)
-                                        {
-                                            <div class="mlv-list-row">
-                                                <div>
-                                                    <div class="mlv-row-main">@doc.FileName</div>
-                                                    <div class="mlv-row-sub">@doc.DocumentType</div>
-                                                </div>
-                                                <span>@doc.UploadedAt.ToString("dd MMM yyyy")</span>
-                                            </div>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    </PanelCard>
+                        </PanelCard>
+                    </div>
                 </div>
-            </div>
+            }
         }
     </PageBody>
 </div>
 
 @code {
-    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
+    private const string PreferenceScope = "intranet-profile";
+    private const int MaxEmailSignatureLength = 500;
+
+    [SupplyParameterFromQuery(Name = "tab")]
+    [Parameter]
+    public string? Tab { get; set; }
+
+    private static readonly IReadOnlyList<PreferenceOption> ThemeOptions =
+    [
+        new("system", "System"),
+        new("light", "Light"),
+        new("dark", "Dark")
+    ];
+
+    private static readonly IReadOnlyList<PreferenceOption> LandingPageOptions =
+    [
+        new("/dashboard", "Dashboard"),
+        new("/sales/projects/new", "Quote workspace"),
+        new("/customers", "Customers"),
+        new("/accounting", "Accounting"),
+        new("/purchasing", "Purchasing"),
+        new("/delivery", "Delivery")
+    ];
+
+    private static readonly IReadOnlyList<PreferenceOption> CurrencyOptions =
+    [
+        new("THB", "THB - Thai baht"),
+        new("USD", "USD - US dollar"),
+        new("EUR", "EUR - Euro"),
+        new("SGD", "SGD - Singapore dollar"),
+        new("JPY", "JPY - Japanese yen"),
+        new("CNY", "CNY - Chinese yuan")
+    ];
+
+    private static readonly IReadOnlyList<PreferenceOption> LanguageOptions =
+    [
+        new("en-TH", "English (Thailand)"),
+        new("th-TH", "Thai"),
+        new("en-US", "English (US)")
+    ];
+
+    private static readonly IReadOnlyList<PreferenceOption> TimeZoneOptions =
+    [
+        new("Asia/Bangkok", "Bangkok"),
+        new("UTC", "UTC"),
+        new("Asia/Singapore", "Singapore"),
+        new("Asia/Tokyo", "Tokyo"),
+        new("Europe/Berlin", "Berlin"),
+        new("America/Los_Angeles", "Los Angeles")
+    ];
+
+    private static readonly IReadOnlyList<PreferenceOption> DateFormatOptions =
+    [
+        new("dd MMM yyyy", "17 May 2026"),
+        new("dd/MM/yyyy", "17/05/2026"),
+        new("yyyy-MM-dd", "2026-05-17"),
+        new("MMM d, yyyy", "May 17, 2026")
+    ];
 
     private EmployeeDetailDto? _profile;
     private EmployeeSelfProfileDto? _selfProfile;
     private UserPreferenceDto? _preferences;
     private UpdateEmployeeSelfProfileRequest _editModel = new();
+    private ProfilePreferenceForm _preferenceModel = new();
     private bool _loading = true;
     private bool _editing;
     private bool _saving;
+    private bool _preferencesSaving;
     private string? _error;
+    private string? _preferenceError;
+    private string? _preferenceStatus;
 
     private bool HasProfile => _profile is not null || _selfProfile is not null;
+    private bool IsPreferencesTab => string.Equals(Tab, "preferences", StringComparison.OrdinalIgnoreCase);
+    private int PreferenceKeyCount => _preferences?.PreferenceData.Count ?? 0;
+    private int SignatureCharacterCount => _preferenceModel.EmailSignature?.Length ?? 0;
     private IReadOnlyList<EmployeeTeamDto> ProfileTeams => _profile?.Teams ?? [];
     private IReadOnlyList<EmployeeDocumentDto> ProfileDocuments => _profile?.Documents ?? [];
     private string SelfProfileName => FirstNonBlank(_selfProfile?.FullName, $"{_selfProfile?.FirstName} {_selfProfile?.LastName}".Trim());
@@ -188,6 +401,9 @@
     private string DisplayStatus => Display(FirstNonBlank(_profile?.Status, _selfProfile?.EmploymentStatus, "Active"));
     private string DisplayEmployeeType => FormatEmployeeType(FirstNonBlank(_profile?.EmployeeType, _selfProfile?.EmploymentType, "FullTime"));
     private string DisplayHireDate => (_profile?.HireDate ?? _selfProfile?.StartDate ?? _selfProfile?.CreatedAt)?.ToString("dd MMM yyyy") ?? "-";
+    private string PreferenceUpdatedLabel => _preferences?.UpdatedAt is { } updatedAt && updatedAt != default
+        ? updatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+        : "Not saved yet";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -197,16 +413,18 @@
     {
         _loading = true;
         _error = null;
+        _preferenceError = null;
         try
         {
             var profileTask = GetOptionalJsonAsync<EmployeeDetailDto>("api/v1/employees/me");
             var selfProfileTask = GetOptionalJsonAsync<EmployeeSelfProfileDto>("api/v1/employees/me/profile");
-            var preferencesTask = GetOptionalJsonAsync<UserPreferenceDto>("api/v1/preferences/intranet-profile");
+            var preferencesTask = GetOptionalJsonAsync<UserPreferenceDto>($"api/v1/preferences/{PreferenceScope}");
             await Task.WhenAll(profileTask, selfProfileTask, preferencesTask);
             _profile = await profileTask;
             _selfProfile = await selfProfileTask;
             _preferences = await preferencesTask;
             ResetEditModel();
+            ResetPreferenceModel();
 
             if (!HasProfile)
             {
@@ -298,18 +516,102 @@
 
     private async Task LoadPreferencesAsync(MouseEventArgs _)
     {
+        _preferenceError = null;
+        _preferenceStatus = null;
         try
         {
-            _preferences = await Http.GetFromJsonAsync<UserPreferenceDto>("api/v1/preferences/intranet-profile");
+            _preferences = await Http.GetFromJsonAsync<UserPreferenceDto>($"api/v1/preferences/{PreferenceScope}");
+            ResetPreferenceModel();
+            _preferenceStatus = "Preferences reloaded.";
         }
         catch (Exception ex)
         {
-            Snackbar.Add("Preferences could not be loaded.", Severity.Warning);
+            _preferenceError = "Preferences could not be loaded.";
             Console.WriteLine(ex.Message);
         }
     }
 
+    private async Task SavePreferencesAsync()
+    {
+        _preferencesSaving = true;
+        _preferenceError = null;
+        _preferenceStatus = null;
+        try
+        {
+            var request = new UpsertPreferenceRequest
+            {
+                Scope = PreferenceScope,
+                PreferenceData = BuildPreferenceData()
+            };
+
+            var response = await Http.PutAsJsonAsync($"api/v1/preferences/{PreferenceScope}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _preferenceError = "Preferences could not be saved.";
+                return;
+            }
+
+            _preferences = await response.Content.ReadFromJsonAsync<UserPreferenceDto>() ?? new UserPreferenceDto
+            {
+                Scope = PreferenceScope,
+                PreferenceData = BuildPreferenceData(),
+                UpdatedAt = DateTime.UtcNow
+            };
+            ResetPreferenceModel();
+            _preferenceStatus = "Preferences saved.";
+        }
+        catch (Exception ex)
+        {
+            _preferenceError = "Preferences could not be saved.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _preferencesSaving = false;
+        }
+    }
+
+    private void ResetPreferenceModel()
+    {
+        var data = _preferences?.PreferenceData ?? [];
+        _preferenceModel = new ProfilePreferenceForm
+        {
+            ThemeMode = GetOptionValue(data, "themeMode", ThemeOptions, "system"),
+            LandingPage = GetOptionValue(data, "landingPage", LandingPageOptions, "/dashboard"),
+            DefaultCurrency = GetOptionValue(data, "defaultCurrency", CurrencyOptions, "THB"),
+            Language = GetOptionValue(data, "language", LanguageOptions, "en-TH"),
+            TimeZone = GetOptionValue(data, "timeZone", TimeZoneOptions, "Asia/Bangkok"),
+            DateFormat = GetOptionValue(data, "dateFormat", DateFormatOptions, "dd MMM yyyy"),
+            CompactWorkspace = GetPreferenceBool(data, "compactWorkspace") ?? false,
+            OperationalDigest = GetPreferenceBool(data, "operationalDigest") ?? true,
+            EmailSignature = GetPreferenceString(data, "emailSignature") ?? string.Empty
+        };
+    }
+
+    private Dictionary<string, object> BuildPreferenceData() => new()
+    {
+        ["themeMode"] = _preferenceModel.ThemeMode,
+        ["landingPage"] = _preferenceModel.LandingPage,
+        ["defaultCurrency"] = _preferenceModel.DefaultCurrency,
+        ["language"] = _preferenceModel.Language,
+        ["timeZone"] = _preferenceModel.TimeZone,
+        ["dateFormat"] = _preferenceModel.DateFormat,
+        ["compactWorkspace"] = _preferenceModel.CompactWorkspace,
+        ["operationalDigest"] = _preferenceModel.OperationalDigest,
+        ["emailSignature"] = _preferenceModel.EmailSignature ?? string.Empty
+    };
+
+    private string ProfileTabClass(bool preferencesTab) =>
+        IsPreferencesTab == preferencesTab ? "profile-section-tab active" : "profile-section-tab";
+
+    private string? ProfileTabCurrent(bool preferencesTab) => IsPreferencesTab == preferencesTab ? "page" : null;
+
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string DisplayPreference(string label, string value) => $"{label}: {Display(value)}";
+
+    private static string DisplayPreferenceOption(IReadOnlyList<PreferenceOption> options, string value) =>
+        options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase))?.Label ?? value;
 
     private static string FormatEmployeeType(string? value)
     {
@@ -324,4 +626,77 @@
 
     private static string FirstNonBlank(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+    private static string GetOptionValue(
+        IReadOnlyDictionary<string, object> data,
+        string key,
+        IReadOnlyList<PreferenceOption> options,
+        string fallback)
+    {
+        var value = GetPreferenceString(data, key);
+        return options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase))?.Value ?? fallback;
+    }
+
+    private static string? GetPreferenceString(IReadOnlyDictionary<string, object> data, string key)
+    {
+        if (!data.TryGetValue(key, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            string text => text,
+            JsonElement { ValueKind: JsonValueKind.String } element => element.GetString(),
+            JsonElement element when element.ValueKind is JsonValueKind.True or JsonValueKind.False or JsonValueKind.Number => element.ToString(),
+            _ => value.ToString()
+        };
+    }
+
+    private static bool? GetPreferenceBool(IReadOnlyDictionary<string, object> data, string key)
+    {
+        if (!data.TryGetValue(key, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            bool state => state,
+            JsonElement { ValueKind: JsonValueKind.True } => true,
+            JsonElement { ValueKind: JsonValueKind.False } => false,
+            string text when bool.TryParse(text, out var state) => state,
+            _ => null
+        };
+    }
+
+    private sealed record PreferenceOption(string Value, string Label);
+
+    private sealed class ProfilePreferenceForm
+    {
+        [Required]
+        public string ThemeMode { get; set; } = "system";
+
+        [Required]
+        public string LandingPage { get; set; } = "/dashboard";
+
+        [Required]
+        public string DefaultCurrency { get; set; } = "THB";
+
+        [Required]
+        public string Language { get; set; } = "en-TH";
+
+        [Required]
+        public string TimeZone { get; set; } = "Asia/Bangkok";
+
+        [Required]
+        public string DateFormat { get; set; } = "dd MMM yyyy";
+
+        public bool CompactWorkspace { get; set; }
+
+        public bool OperationalDigest { get; set; } = true;
+
+        [MaxLength(MaxEmailSignatureLength)]
+        public string? EmailSignature { get; set; }
+    }
 }

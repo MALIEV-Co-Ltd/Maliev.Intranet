@@ -5,6 +5,7 @@ using Maliev.Intranet.Client.Pages.Hr;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
@@ -15,6 +16,7 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
 {
     private readonly List<string> _requestedPaths = [];
     private string? _savedJson;
+    private string? _savedPreferenceJson;
 
     public HrProfilePageTests()
     {
@@ -88,6 +90,46 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
         });
     }
 
+    [Fact]
+    public void Profile_PreferencesQueryTab_RendersPreferenceEditor()
+    {
+        Services.GetRequiredService<NavigationManager>().NavigateTo("http://test/hr/profile?tab=preferences");
+        var cut = Render<Profile>();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Workspace defaults", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Save preferences", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Default currency", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Employee-specific defaults", cut.Markup, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Teams and documents", cut.Markup, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public void Profile_SavePreferences_PutsScopedPreferenceRequest()
+    {
+        Services.GetRequiredService<NavigationManager>().NavigateTo("http://test/hr/profile?tab=preferences");
+        var cut = Render<Profile>();
+
+        cut.WaitForAssertion(() => Assert.Contains("Save preferences", cut.Markup, StringComparison.Ordinal));
+        cut.Find("select[name='defaultCurrency']").Change("EUR");
+        cut.Find("select[name='themeMode']").Change("light");
+        cut.Find("textarea").Input("MALIEV sales");
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Save preferences", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedPaths, path => path.Equals("/api/v1/preferences/intranet-profile", StringComparison.Ordinal));
+            Assert.Contains("\"scope\":\"intranet-profile\"", _savedPreferenceJson, StringComparison.Ordinal);
+            Assert.Contains("\"defaultCurrency\":\"EUR\"", _savedPreferenceJson, StringComparison.Ordinal);
+            Assert.Contains("\"themeMode\":\"light\"", _savedPreferenceJson, StringComparison.Ordinal);
+            Assert.Contains("\"emailSignature\":\"MALIEV sales\"", _savedPreferenceJson, StringComparison.Ordinal);
+            Assert.Contains("Preferences saved.", cut.Markup, StringComparison.Ordinal);
+        });
+    }
+
     private async Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         _requestedPaths.Add(request.RequestUri!.PathAndQuery);
@@ -142,7 +184,14 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
                 Content = JsonContent.Create(new UserPreferenceDto
                 {
                     PrincipalId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
-                    Scope = "intranet-profile"
+                    Scope = "intranet-profile",
+                    PreferenceData = new Dictionary<string, object>
+                    {
+                        ["themeMode"] = "dark",
+                        ["defaultCurrency"] = "USD",
+                        ["timeZone"] = "Asia/Bangkok"
+                    },
+                    UpdatedAt = new DateTime(2026, 5, 17, 6, 30, 0, DateTimeKind.Utc)
                 })
             };
         }
@@ -165,6 +214,32 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
                     MobilePhone = "+66811111111",
                     EmploymentType = "FullTime",
                     EmploymentStatus = "Active"
+                })
+            };
+        }
+
+        if (request.Method == HttpMethod.Put && request.RequestUri.PathAndQuery == "/api/v1/preferences/intranet-profile")
+        {
+            _savedPreferenceJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new UserPreferenceDto
+                {
+                    PrincipalId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                    Scope = "intranet-profile",
+                    PreferenceData = new Dictionary<string, object>
+                    {
+                        ["themeMode"] = "light",
+                        ["landingPage"] = "/dashboard",
+                        ["defaultCurrency"] = "EUR",
+                        ["language"] = "en-TH",
+                        ["timeZone"] = "Asia/Bangkok",
+                        ["dateFormat"] = "dd MMM yyyy",
+                        ["compactWorkspace"] = false,
+                        ["operationalDigest"] = true,
+                        ["emailSignature"] = "MALIEV sales"
+                    },
+                    UpdatedAt = new DateTime(2026, 5, 17, 6, 45, 0, DateTimeKind.Utc)
                 })
             };
         }
