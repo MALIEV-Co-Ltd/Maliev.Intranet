@@ -1,0 +1,263 @@
+@page "/admin/reference-data"
+@using Maliev.Intranet.Shared.Services
+@attribute [RequirePermission(MalievPermissions.Registry.LocationsRead)]
+@inject IReferenceDataService ReferenceDataService
+@inject ISnackbar Snackbar
+
+<PageTitle>Reference Data | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="Reference Data"
+                Subtitle="Countries, currencies, and RegistryService lookup maintenance."
+                BackHref="/admin" />
+
+    <PageBody>
+        @if (_loading)
+        {
+            <MudGrid Spacing="3">
+                <MudItem xs="12" md="4">
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" Animation="Animation.Wave" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" Animation="Animation.Wave" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" Animation="Animation.Wave" />
+                </MudItem>
+            </MudGrid>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Countries" Value="@_countries.Count.ToString("N0")" />
+                <StatTile Label="Currencies" Value="@_currencies.Count.ToString("N0")" />
+                <StatTile Label="Primary currency" Value="@(_primaryCurrency?.Code ?? "Not set")" />
+                <StatTile Label="Registry results" Value="@_locations.Count.ToString("N0")" />
+            </StatBar>
+
+            <MudGrid Spacing="3">
+                <MudItem xs="12" lg="6">
+                    <PanelCard Title="Countries">
+                        @if (_countries.Count == 0)
+                        {
+                            <div class="mlv-empty">Country reference data is unavailable.</div>
+                        }
+                        else
+                        {
+                            <table class="mlv-table">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var country in _countries.Take(24))
+                                    {
+                                        <tr>
+                                            <td class="mlv-mono">@country.Code</td>
+                                            <td>@country.Name</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </PanelCard>
+                </MudItem>
+
+                <MudItem xs="12" lg="6">
+                    <PanelCard Title="Currencies">
+                        @if (_currencies.Count == 0)
+                        {
+                            <div class="mlv-empty">Currency reference data is unavailable.</div>
+                        }
+                        else
+                        {
+                            <table class="mlv-table">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var currency in _currencies.Take(24))
+                                    {
+                                        <tr>
+                                            <td class="mlv-mono">@currency.Code @currency.Symbol</td>
+                                            <td>@currency.Name</td>
+                                            <td><StatusBadge Status="@GetCurrencyStatus(currency)" /></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </PanelCard>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <PanelCard Title="RegistryService Thai Locations">
+                        <div class="mlv-toolbar">
+                            <MudTextField @bind-Value="_locationQuery"
+                                          Label="Search by postcode, district, city, or province"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Immediate="true"
+                                          DebounceInterval="300"
+                                          OnDebounceIntervalElapsed="SearchLocationsAfterInput"
+                                          Style="min-width: 280px; flex: 1 1 320px;" />
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Outlined.Search"
+                                       Disabled="@_searchingLocations"
+                                       OnClick="SearchLocationsAsync">
+                                Search
+                            </MudButton>
+                        </div>
+
+                        @if (_searchingLocations)
+                        {
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" Animation="Animation.Wave" />
+                        }
+                        else if (!string.IsNullOrWhiteSpace(_locationMessage))
+                        {
+                            <div class="mlv-empty">@_locationMessage</div>
+                        }
+                        else if (_locations.Count > 0)
+                        {
+                            <table class="mlv-table">
+                                <thead>
+                                    <tr>
+                                        <th>Postal code</th>
+                                        <th>Thai</th>
+                                        <th>English</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var location in _locations)
+                                    {
+                                        <tr>
+                                            <td class="mlv-mono">@location.PostalCode</td>
+                                            <td>@location.SubDistrictTh, @location.DistrictTh, @location.ProvinceTh</td>
+                                            <td>@location.SubDistrictEn, @location.DistrictEn, @location.ProvinceEn</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="mlv-empty">Search RegistryService locations to validate address reference data.</div>
+                        }
+                    </PanelCard>
+                </MudItem>
+            </MudGrid>
+        }
+    </PageBody>
+</div>
+
+@code {
+    private List<CountryDto> _countries = [];
+    private List<CurrencyDto> _currencies = [];
+    private CurrencyDto? _primaryCurrency;
+    private List<RegistryThaiLocation> _locations = [];
+    private string _locationQuery = string.Empty;
+    private string? _locationMessage;
+    private bool _loading = true;
+    private bool _searchingLocations;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReferenceDataAsync();
+    }
+
+    private async Task LoadReferenceDataAsync()
+    {
+        _loading = true;
+
+        try
+        {
+            var countriesTask = ReferenceDataService.GetCountriesAsync();
+            var currenciesTask = ReferenceDataService.GetCurrenciesAsync();
+            var primaryTask = ReferenceDataService.GetPrimaryCurrencyAsync();
+
+            await Task.WhenAll(countriesTask, currenciesTask, primaryTask);
+
+            _countries = countriesTask.Result
+                .OrderBy(country => country.Name)
+                .ToList();
+            _currencies = currenciesTask.Result
+                .OrderByDescending(currency => currency.IsPrimary)
+                .ThenByDescending(currency => currency.IsActive)
+                .ThenBy(currency => currency.Code)
+                .ToList();
+            _primaryCurrency = primaryTask.Result;
+        }
+        catch (Exception ex)
+        {
+            _countries = [];
+            _currencies = [];
+            _primaryCurrency = null;
+            Snackbar.Add("Reference data could not be loaded.", Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SearchLocationsAfterInput(string _)
+    {
+        if (_locationQuery.Trim().Length < 3)
+        {
+            _locations = [];
+            _locationMessage = null;
+            return;
+        }
+
+        await SearchLocationsAsync();
+    }
+
+    private async Task SearchLocationsAsync()
+    {
+        var query = _locationQuery.Trim();
+        if (query.Length < 2)
+        {
+            _locations = [];
+            _locationMessage = "Enter at least two characters to search RegistryService.";
+            return;
+        }
+
+        _searchingLocations = true;
+        _locationMessage = null;
+
+        try
+        {
+            _locations = await ReferenceDataService.AutocompleteLocationsAsync(query, 12);
+            _locationMessage = _locations.Count == 0
+                ? "No RegistryService locations matched the search."
+                : null;
+        }
+        catch (Exception ex)
+        {
+            _locations = [];
+            _locationMessage = "RegistryService lookup failed.";
+            Snackbar.Add(_locationMessage, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _searchingLocations = false;
+        }
+    }
+
+    private static string GetCurrencyStatus(CurrencyDto currency)
+    {
+        if (currency.IsPrimary)
+            return "Primary";
+
+        return currency.IsActive ? "Active" : "Inactive";
+    }
+}

@@ -41,12 +41,24 @@
 
             <!-- Manufacturing -->
             <MudNavGroup Title="Manufacturing" Icon="@Icons.Material.Outlined.PrecisionManufacturing" Expanded="false">
+                <MudNavLink Href="mfg/materials" Icon="@Icons.Material.Outlined.Inventory"
+                            Style="@NavStyle(MalievPermissions.Material.Read)">Materials</MudNavLink>
                 <MudNavLink Href="mfg/equipment" Icon="@Icons.Material.Outlined.PrecisionManufacturing"
                             Style="@NavStyle(MalievPermissions.Facility.Read)">Equipment</MudNavLink>
                 <MudNavLink Href="mfg/production-schedule" Icon="@Icons.Material.Outlined.Event"
                             Style="@NavStyle(MalievPermissions.Job.Read)">Production Schedule</MudNavLink>
                 <MudNavLink Href="purchasing" Icon="@Icons.Material.Outlined.ShoppingBag"
-                            Style="@NavStyle(MalievPermissions.PurchaseOrder.Read)">Procurement &amp; Suppliers</MudNavLink>
+                            Style="@NavStyle(MalievPermissions.PurchaseOrder.Read)">Procurement</MudNavLink>
+            </MudNavGroup>
+
+            <!-- Purchasing -->
+            <MudNavGroup Title="Purchasing" Icon="@Icons.Material.Outlined.ShoppingBag" Expanded="false">
+                <MudNavLink Href="purchasing" Icon="@Icons.Material.Outlined.ShoppingBag"
+                            Style="@NavStyle(MalievPermissions.PurchaseOrder.Read)">Purchase Orders</MudNavLink>
+                <MudNavLink Href="purchasing/new" Icon="@Icons.Material.Outlined.Inventory2"
+                            Style="@NavStyle(MalievPermissions.PurchaseOrder.Write)">New PO</MudNavLink>
+                <MudNavLink Href="purchasing/suppliers" Icon="@Icons.Material.Outlined.AddBusiness"
+                            Style="@NavStyle(MalievPermissions.Supplier.Read)">Suppliers</MudNavLink>
             </MudNavGroup>
 
             <!-- Finance -->
@@ -73,6 +85,8 @@
                             Style="@NavStyle(MalievPermissions.Iam.Manage)">IAM Console</MudNavLink>
                 <MudNavLink Href="admin/system-health" Icon="@Icons.Material.Outlined.HealthAndSafety"
                             Style="@NavStyle(MalievPermissions.System.HealthRead)">System Health</MudNavLink>
+                <MudNavLink Href="admin/reference-data" Icon="@Icons.Material.Outlined.TravelExplore"
+                            Style="@NavStyle(MalievPermissions.Registry.LocationsRead)">Reference Data</MudNavLink>
                 <MudNavLink Href="admin" Icon="@Icons.Material.Outlined.Settings"
                             Style="@NavStyle(MalievPermissions.Iam.Manage)">Admin</MudNavLink>
             </MudNavGroup>

@@ -483,6 +483,34 @@
     box-shadow: var(--maliev-focus-ring);
 }
 
+.topbar-nav-popover {
+    min-width: 260px;
+    border: 0;
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-card);
+}
+
+.topbar-nav-popover .mud-list {
+    padding: 6px;
+}
+
+.topbar-nav-popover .topbar-nav-menu-item {
+    min-height: 42px;
+    padding: 7px 9px;
+    border-radius: var(--maliev-radius-xs);
+}
+
+.topbar-nav-popover .topbar-nav-menu-item:hover,
+.topbar-nav-popover .topbar-nav-menu-item:focus-visible,
+.topbar-nav-popover .topbar-nav-menu-item.active {
+    background: var(--maliev-panel-3);
+}
+
+.topbar-nav-popover .topbar-nav-menu-item.active .topbar-nav-menu-copy span {
+    color: var(--mud-palette-primary);
+}
+
 /* ── SWITCH / CHECKBOX ────────────────────────────────────────────
    MudSwitch, MudCheckBox
    ──────────────────────────────────────────────────────────────── */

@@ -5,7 +5,7 @@
 <PageTitle>Admin | MALIEV Intranet</PageTitle>
 
 <div class="mlv-module-shell">
-    <ModuleHeader Title="Admin" Subtitle="Platform operations and notification configuration." />
+    <ModuleHeader Title="Admin" Subtitle="Platform operations, service consoles, reference data, and notification configuration." />
 
     <PageBody>
         @if (_loading)
@@ -40,6 +40,34 @@
                                 <div class="mlv-row-sub">Moved to Manufacturing Equipment and backed by FacilityService.</div>
                             </div>
                             <SecondaryButton Icon="@Icons.Material.Outlined.PrecisionManufacturing" Href="/mfg/equipment">Open</SecondaryButton>
+                        </div>
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">Material catalog</div>
+                                <div class="mlv-row-sub">Maintain materials, processes, colors, and mechanical properties from MaterialService.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.Inventory" Href="/mfg/materials">Open</SecondaryButton>
+                        </div>
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">Commerce storefront catalog</div>
+                                <div class="mlv-row-sub">Manage online storefront products, collections, variants, pricing, and media from CommerceService.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.Storefront" Href="/commerce/catalog">Open</SecondaryButton>
+                        </div>
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">Reference data</div>
+                                <div class="mlv-row-sub">Review CountryService, CurrencyService, and RegistryService lookup data used by customer workflows.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.TravelExplore" Href="/admin/reference-data">Open</SecondaryButton>
+                        </div>
+                        <div class="mlv-list-row">
+                            <div>
+                                <div class="mlv-row-main">Supplier profiles</div>
+                                <div class="mlv-row-sub">Manage supplier records used by purchasing and procurement workflows.</div>
+                            </div>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.AddBusiness" Href="/purchasing/suppliers">Open</SecondaryButton>
                         </div>
                     </div>
                 </PanelCard>

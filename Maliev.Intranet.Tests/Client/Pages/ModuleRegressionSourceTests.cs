@@ -134,6 +134,36 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void TopBar_ExposesRouteBackedServiceNavigation()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var overrides = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
+        var navMenu = ReadRepoFile("Maliev.Intranet.Client", "Layout", "NavMenu.razor");
+
+        Assert.Contains("private sealed record NavGroup", source, StringComparison.Ordinal);
+        Assert.Contains("topbar-nav-menu-trigger", source, StringComparison.Ordinal);
+        Assert.Contains("Storefront catalog", source, StringComparison.Ordinal);
+        Assert.Contains("\"commerce/catalog\"", source, StringComparison.Ordinal);
+        Assert.Contains("new(\"Materials\", \"mfg/materials\"", source, StringComparison.Ordinal);
+        Assert.Contains("new(\"Equipment\", \"mfg/equipment\"", source, StringComparison.Ordinal);
+        Assert.Contains("new(\"Production schedule\", \"mfg/production-schedule\"", source, StringComparison.Ordinal);
+        Assert.Contains("new(\"Suppliers\", \"purchasing/suppliers\"", source, StringComparison.Ordinal);
+        Assert.Contains("new(\"Reference data\", \"admin/reference-data\"", source, StringComparison.Ordinal);
+        Assert.Contains("new(\"System health\", \"admin/system-health\"", source, StringComparison.Ordinal);
+        Assert.Contains("new(\"IAM\", \"iam\"", source, StringComparison.Ordinal);
+        Assert.Contains("new(\"Leave\", \"hr/leave\"", source, StringComparison.Ordinal);
+        Assert.Contains("Navigation.LocationChanged += OnLocationChanged", source, StringComparison.Ordinal);
+        Assert.Contains("IsNavGroupActive", source, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav-menu-trigger", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-mobile-nav-group", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav-popover", overrides, StringComparison.Ordinal);
+        Assert.Contains("Href=\"admin/reference-data\"", navMenu, StringComparison.Ordinal);
+        Assert.Contains("Href=\"mfg/materials\"", navMenu, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"/admin/blog\"", source, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ProjectsPage_UsesSharedShellAndQueryBackedPagination()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Projects.razor");
@@ -335,6 +365,26 @@ public class ModuleRegressionSourceTests
         Assert.Contains("\"ServiceHealthCheck-standard\"", bffProgram, StringComparison.Ordinal);
         Assert.Contains("CircuitBreaker.MinimumThroughput = int.MaxValue", bffProgram, StringComparison.Ordinal);
         Assert.DoesNotContain("aspire-liveness", probeService, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminReferenceDataPage_UsesExistingReferenceDataServices()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ReferenceData.razor");
+        var admin = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "AdminPage.razor");
+
+        Assert.Contains("@page \"/admin/reference-data\"", page, StringComparison.Ordinal);
+        Assert.Contains("IReferenceDataService ReferenceDataService", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.GetCountriesAsync()", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.GetCurrenciesAsync()", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.GetPrimaryCurrencyAsync()", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.AutocompleteLocationsAsync(query, 12)", page, StringComparison.Ordinal);
+        Assert.Contains("MudSkeleton", page, StringComparison.Ordinal);
+        Assert.Contains("OnDebounceIntervalElapsed=\"SearchLocationsAfterInput\"", page, StringComparison.Ordinal);
+        Assert.Contains("Href=\"/admin/reference-data\"", admin, StringComparison.Ordinal);
+        Assert.Contains("Href=\"/commerce/catalog\"", admin, StringComparison.Ordinal);
+        Assert.Contains("Href=\"/mfg/materials\"", admin, StringComparison.Ordinal);
+        Assert.DoesNotContain("api/v1/ReferenceData", page, StringComparison.Ordinal);
     }
 
     [Fact]
