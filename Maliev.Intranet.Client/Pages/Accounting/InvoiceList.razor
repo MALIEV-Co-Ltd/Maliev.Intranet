@@ -280,7 +280,14 @@
                             <input type="date" class="mlv-form-input" @bind="_reportEnd" @bind:format="yyyy-MM-dd" />
                         </label>
                     </div>
-                    <PrimaryButton Class="accounting-report-run-button" Icon="@Icons.Material.Outlined.Assessment" OnClick="@LoadReportAsync">Run Report</PrimaryButton>
+                    <div class="accounting-report-actions">
+                        <SecondaryButton Class="accounting-report-pdf-button"
+                                         Icon="@Icons.Material.Outlined.PictureAsPdf"
+                                         Href="@ReportPdfDownloadUrl"
+                                         Download="@ReportPdfDownloadName"
+                                         AriaLabel="Download accounting report as PDF">Download PDF</SecondaryButton>
+                        <PrimaryButton Class="accounting-report-run-button" Icon="@Icons.Material.Outlined.Assessment" OnClick="@LoadReportAsync">Run Report</PrimaryButton>
+                    </div>
                 </div>
                 @if (_report is null)
                 {
@@ -730,6 +737,12 @@
         _reportType == "balance-sheet"
             ? $"As of {_reportEnd:dd MMM yyyy}"
             : $"{_reportStart:dd MMM yyyy} - {_reportEnd:dd MMM yyyy}";
+
+    private string ReportPdfDownloadUrl =>
+        $"api/v1/accounting/reports/{Uri.EscapeDataString(_reportType)}/pdf?start={_reportStart:yyyy-MM-dd}&end={_reportEnd:yyyy-MM-dd}";
+
+    private string ReportPdfDownloadName =>
+        $"{_reportType}_{_reportStart:yyyyMMdd}_{_reportEnd:yyyyMMdd}.pdf";
 
     private async Task OpenPeriodAsync(MouseEventArgs _)
     {

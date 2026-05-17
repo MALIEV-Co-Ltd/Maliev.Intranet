@@ -46,6 +46,9 @@ public class SharedDtoTests
         _ = new JournalEntryDto { EntryNumber = "JE-1" };
         _ = new JournalEntryLineDto { Debit = 10 };
         _ = new FinancialReportDto { ReportName = "Rep" };
+        _ = new FinancialReportPdfData { ReportTitle = "Income Statement" };
+        _ = new FinancialReportPdfSection { SectionTitle = "Revenue" };
+        _ = new FinancialReportPdfLineItem { Description = "4000 - Revenue" };
 
         // Customers
         _ = new CustomerSummaryDto { Name = "Cust" };

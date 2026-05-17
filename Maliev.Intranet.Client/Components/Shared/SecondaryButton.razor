@@ -1,6 +1,6 @@
 @if (!string.IsNullOrWhiteSpace(Href))
 {
-    <a class="mlv-button secondary @Class" href="@Href">
+    <a class="mlv-button secondary @Class" href="@Href" download="@Download" aria-label="@AriaLabel">
         @if (!string.IsNullOrWhiteSpace(Icon))
         {
             <MudIcon Icon="@Icon" Size="Size.Small" />
@@ -27,4 +27,6 @@ else
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
     [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Download { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
 }

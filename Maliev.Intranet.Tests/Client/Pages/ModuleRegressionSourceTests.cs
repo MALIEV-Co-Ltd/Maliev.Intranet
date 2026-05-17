@@ -337,6 +337,7 @@ public class ModuleRegressionSourceTests
     public void AccountingPage_ExposesFinanceWorkstreamsAndServerPagination()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Accounting", "InvoiceList.razor");
+        var moduleStyles = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "module-pages.css");
 
         Assert.Contains("Journal Entries", source, StringComparison.Ordinal);
         Assert.Contains("Income Entry", source, StringComparison.Ordinal);
@@ -353,11 +354,19 @@ public class ModuleRegressionSourceTests
         Assert.Contains("The selected document could not be read", source, StringComparison.Ordinal);
         Assert.Contains("accounting-report-toolbar", source, StringComparison.Ordinal);
         Assert.Contains("accounting-report-statement", source, StringComparison.Ordinal);
+        Assert.Contains("accounting-report-actions", source, StringComparison.Ordinal);
+        Assert.Contains("accounting-report-pdf-button", source, StringComparison.Ordinal);
+        Assert.Contains("Download PDF", source, StringComparison.Ordinal);
+        Assert.Contains("ReportPdfDownloadUrl", source, StringComparison.Ordinal);
+        Assert.Contains("ReportPdfDownloadName", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/accounting/reports/{Uri.EscapeDataString(_reportType)}/pdf", source, StringComparison.Ordinal);
         Assert.Contains("ReportPeriodLabel()", source, StringComparison.Ordinal);
         Assert.Contains("Payroll journals are produced by CompensationService payroll runs", source, StringComparison.Ordinal);
         Assert.Contains("api/v1/invoices?page={_invoicePage}&pageSize={_pageSize}", source, StringComparison.Ordinal);
         Assert.Contains("api/v1/accounting/journal-entries?page={_journalPage}&pageSize={_pageSize}", source, StringComparison.Ordinal);
         Assert.Contains("api/v1/referenceData/currencies/rate?from=", source, StringComparison.Ordinal);
+        Assert.Contains("display: flex;", ExtractCssBlock(moduleStyles, ".accounting-report-actions"), StringComparison.Ordinal);
+        Assert.Contains("min-height: 36px;", ExtractCssBlock(moduleStyles, ".accounting-report-pdf-button"), StringComparison.Ordinal);
         Assert.DoesNotContain("CreatePayrollAsync", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Enter valid debit and credit account IDs", source, StringComparison.Ordinal);
         Assert.DoesNotContain("page=1&pageSize=50", source, StringComparison.Ordinal);

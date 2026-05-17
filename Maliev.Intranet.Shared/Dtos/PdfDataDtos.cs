@@ -31,6 +31,78 @@ public class PdfGenerationResponse
 }
 
 /// <summary>
+/// Data contract for financial report PDF generation.
+/// </summary>
+public class FinancialReportPdfData
+{
+    /// <summary>The title shown on the financial report.</summary>
+    public string ReportTitle { get; set; } = "";
+
+    /// <summary>The stable report number used for audit and reference.</summary>
+    public string ReportNumber { get; set; } = "";
+
+    /// <summary>The date the report was generated.</summary>
+    public DateTime ReportDate { get; set; }
+
+    /// <summary>The first date included in the report period.</summary>
+    public DateTime PeriodStart { get; set; }
+
+    /// <summary>The final date included in the report period.</summary>
+    public DateTime PeriodEnd { get; set; }
+
+    /// <summary>The company name shown on the report header.</summary>
+    public string CompanyName { get; set; } = "";
+
+    /// <summary>The optional company address shown on the report header.</summary>
+    public string? CompanyAddress { get; set; }
+
+    /// <summary>The ordered report sections included in the PDF.</summary>
+    public List<FinancialReportPdfSection> Sections { get; set; } = [];
+
+    /// <summary>The revenue-side total used by the report summary.</summary>
+    public double TotalRevenue { get; set; }
+
+    /// <summary>The expense-side total used by the report summary.</summary>
+    public double TotalExpenses { get; set; }
+
+    /// <summary>The net result used by the report summary.</summary>
+    public double NetProfit { get; set; }
+
+    /// <summary>The ISO currency code for the report amounts.</summary>
+    public string Currency { get; set; } = "THB";
+}
+
+/// <summary>
+/// Section data for a financial report PDF.
+/// </summary>
+public class FinancialReportPdfSection
+{
+    /// <summary>The report section heading.</summary>
+    public string SectionTitle { get; set; } = "";
+
+    /// <summary>The line items contained in this report section.</summary>
+    public List<FinancialReportPdfLineItem> LineItems { get; set; } = [];
+
+    /// <summary>The calculated total for the report section.</summary>
+    public double SectionTotal { get; set; }
+}
+
+/// <summary>
+/// Line item data for a financial report PDF section.
+/// </summary>
+public class FinancialReportPdfLineItem
+{
+    /// <summary>The account or row description shown in the report.</summary>
+    public string Description { get; set; } = "";
+
+    /// <summary>The monetary amount shown for this row.</summary>
+    public double Amount { get; set; }
+
+    /// <summary>Whether the line should receive highlight styling in the PDF.</summary>
+    public bool IsHighlight { get; set; }
+}
+
+/// <summary>
 /// Data contract for Quotation PDF generation.
 /// </summary>
 public class QuotationPdfData

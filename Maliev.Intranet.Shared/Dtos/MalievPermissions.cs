@@ -403,6 +403,15 @@ public static class MalievPermissions
         public const string ReconciliationRun = "accounting.reconciliation.run";
 
         /// <summary>
+        /// Permissions for accounting reports.
+        /// </summary>
+        public static class Reports
+        {
+            /// <summary>Permission to export accounting reports.</summary>
+            public const string Export = "accounting.reports.export";
+        }
+
+        /// <summary>
         /// Permissions for journal entry management.
         /// </summary>
         public static class Journal
