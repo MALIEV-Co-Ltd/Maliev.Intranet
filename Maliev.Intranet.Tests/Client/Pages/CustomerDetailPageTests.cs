@@ -53,6 +53,9 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Contact information", cut.Markup);
         Assert.Contains("Account &amp; billing", cut.Markup);
         Assert.Contains("Account manager", cut.Markup);
+        Assert.Contains("Company branch", cut.Markup);
+        Assert.Contains("Head office / สำนักงานใหญ่", cut.Markup);
+        Assert.DoesNotContain("Credit limit", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Recent projects", cut.Markup);
         Assert.Contains("Recent orders", cut.Markup);
         Assert.Contains("Snapshot", cut.Markup);

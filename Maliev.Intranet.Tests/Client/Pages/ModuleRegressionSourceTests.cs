@@ -230,6 +230,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("customer-form-grid customer-account-grid", source, StringComparison.Ordinal);
         Assert.Contains("customer-field customer-account-manager-field", source, StringComparison.Ordinal);
         Assert.Contains("customer-field customer-payment-terms-field customer-account-payment-field", source, StringComparison.Ordinal);
+        Assert.Contains("<span>Company branch</span>", source, StringComparison.Ordinal);
+        Assert.Contains("value=\"@CompanyBranchLabel\"", source, StringComparison.Ordinal);
+        Assert.Contains("private string CompanyBranchLabel => HasCompany ? \"Head office / สำนักงานใหญ่\" : \"-\";", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Credit limit", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CreditLimit", source, StringComparison.Ordinal);
         Assert.Contains("align-items: start;", accountGridBlock, StringComparison.Ordinal);
         Assert.Contains("min-height: 42px;", accountControlBlock, StringComparison.Ordinal);
         Assert.Contains("width: 100%;", pickerBlock, StringComparison.Ordinal);

@@ -170,8 +170,8 @@
                                 <input class="customer-input" readonly value="@TaxId" />
                             </label>
                             <label class="customer-field">
-                                <span>Credit limit (USD)</span>
-                                <input class="customer-input" readonly value="@CreditLimit" />
+                                <span>Company branch</span>
+                                <input class="customer-input" readonly value="@CompanyBranchLabel" />
                             </label>
                         </div>
                     </section>
@@ -818,7 +818,7 @@
     private bool HasCompany => _customer?.CompanyId is not null || !string.IsNullOrWhiteSpace(_customer?.CompanyName);
     private string AccountManager => ResolveAccountManagerName(_edit?.AccountManagerEmployeeId ?? _customer?.AccountManagerEmployeeId);
     private string TaxId => _customer?.CompanyVatNumber ?? _customer?.CompanyRegistrationNumber ?? "-";
-    private const string CreditLimit = "0";
+    private string CompanyBranchLabel => HasCompany ? "Head office / สำนักงานใหญ่" : "-";
     private string CustomerCode => _customer is null ? "-" : $"C-{_customer.Id.ToString("N")[..8].ToUpperInvariant()}";
     private int ProjectCount => _projectTotalCount > 0 ? _projectTotalCount : _projects.Count;
     private int LifetimeOrderCount => _orderTotalCount > 0 ? _orderTotalCount : Math.Max(_orders.Count, _customer?.ActiveOrdersCount ?? 0);
