@@ -401,75 +401,117 @@
                                     <span>Files upload immediately. Customer documents and NDA documents stay separate until they are linked on create.</span>
                                 </div>
 
-                                <div class="document-grid">
-                                    <div class="document-section">
-                                        <div class="document-section-header">
-                                            <strong>Customer documents</strong>
-                                            <span>@GetUploadedDocumentCount(_customerDocumentUploads)</span>
+                                <div class="documents-workspace">
+                                    <div class="document-library-panel">
+                                        <div class="document-type-tabs" role="tablist" aria-label="Document groups">
+                                            <button type="button"
+                                                    role="tab"
+                                                    aria-selected="@(_activeDocumentPanel == DocumentPanel.Standard)"
+                                                    class="@GetDocumentTabClass(DocumentPanel.Standard)"
+                                                    @onclick="@(() => _activeDocumentPanel = DocumentPanel.Standard)">
+                                                <MudIcon Icon="@Icons.Material.Outlined.Folder" />
+                                                <span>
+                                                    <strong>Standard documents</strong>
+                                                    <small>@GetUploadedDocumentCount(_customerDocumentUploads) uploaded</small>
+                                                </span>
+                                            </button>
+                                            <button type="button"
+                                                    role="tab"
+                                                    aria-selected="@(_activeDocumentPanel == DocumentPanel.Nda)"
+                                                    class="@GetDocumentTabClass(DocumentPanel.Nda)"
+                                                    @onclick="@(() => _activeDocumentPanel = DocumentPanel.Nda)">
+                                                <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
+                                                <span>
+                                                    <strong>NDA documents</strong>
+                                                    <small>@GetUploadedDocumentCount(_ndaDocumentUploads) uploaded</small>
+                                                </span>
+                                            </button>
                                         </div>
-                                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                                       FilesChanged="OnCustomerDocumentsSelected"
-                                                       Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
-                                                       Class="document-file-upload"
-                                                       Hidden="true"
-                                                       MaximumFileCount="20">
-                                            <CustomContent Context="uploadContext">
-                                                <button type="button" class="document-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
-                                                    <MudIcon Icon="@Icons.Material.Outlined.AttachFile" />
-                                                    <span>
-                                                        <strong>Upload standard documents</strong>
-                                                        <small>Contracts, forms, IDs, certificates</small>
-                                                    </span>
-                                                </button>
-                                            </CustomContent>
-                                        </MudFileUpload>
-                                        @DocumentUploadList(_customerDocumentUploads)
+
+                                        @if (_activeDocumentPanel == DocumentPanel.Standard)
+                                        {
+                                            <div class="document-section">
+                                                <div class="document-section-header">
+                                                    <strong>Customer documents</strong>
+                                                    <span>@GetUploadedDocumentCount(_customerDocumentUploads)</span>
+                                                </div>
+                                                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                               FilesChanged="OnCustomerDocumentsSelected"
+                                                               Accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
+                                                               Class="document-file-upload"
+                                                               Hidden="true"
+                                                               MaximumFileCount="20">
+                                                    <CustomContent Context="uploadContext">
+                                                        <button type="button" class="document-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                                            <MudIcon Icon="@Icons.Material.Outlined.AttachFile" />
+                                                            <span>
+                                                                <strong>Upload standard documents</strong>
+                                                                <small>Contracts, forms, IDs, certificates</small>
+                                                            </span>
+                                                        </button>
+                                                    </CustomContent>
+                                                </MudFileUpload>
+                                                @DocumentUploadList(_customerDocumentUploads, DocumentPanel.Standard)
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="document-section nda-document-section">
+                                                <div class="document-section-header">
+                                                    <strong>NDA lifecycle</strong>
+                                                    <span>@GetUploadedDocumentCount(_ndaDocumentUploads)</span>
+                                                </div>
+                                                <div class="nda-lifecycle-grid">
+                                                    <FormField Label="Initial status">
+                                                        <select class="mlv-form-input" @bind="_ndaStatus">
+                                                            <option value="Signed">Signed</option>
+                                                            <option value="Draft">Draft</option>
+                                                        </select>
+                                                    </FormField>
+                                                    <FormField Label="Expiration date">
+                                                        <InputDate class="mlv-form-input" @bind-Value="_ndaExpiresAt" />
+                                                    </FormField>
+                                                </div>
+                                                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                               FilesChanged="OnNdaDocumentsSelected"
+                                                               Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                               Class="document-file-upload"
+                                                               Hidden="true"
+                                                               MaximumFileCount="10">
+                                                    <CustomContent Context="uploadContext">
+                                                        <button type="button" class="document-dropzone nda-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                                                            <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
+                                                            <span>
+                                                                <strong>Upload NDA documents</strong>
+                                                                <small>Signed agreements or legal drafts</small>
+                                                            </span>
+                                                        </button>
+                                                    </CustomContent>
+                                                </MudFileUpload>
+                                                @DocumentUploadList(_ndaDocumentUploads, DocumentPanel.Nda)
+                                            </div>
+                                        }
                                     </div>
 
-                                    <div class="document-section nda-document-section">
-                                        <div class="document-section-header">
-                                            <strong>NDA lifecycle</strong>
-                                            <span>@GetUploadedDocumentCount(_ndaDocumentUploads)</span>
-                                        </div>
-                                        <div class="nda-lifecycle-grid">
-                                            <FormField Label="Initial status">
-                                                <select class="mlv-form-input" @bind="_ndaStatus">
-                                                    <option value="Signed">Signed</option>
-                                                    <option value="Draft">Draft</option>
-                                                </select>
-                                            </FormField>
-                                            <FormField Label="Expiration date">
-                                                <InputDate class="mlv-form-input" @bind-Value="_ndaExpiresAt" />
-                                            </FormField>
-                                        </div>
-                                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                                       FilesChanged="OnNdaDocumentsSelected"
-                                                       Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                                       Class="document-file-upload"
-                                                       Hidden="true"
-                                                       MaximumFileCount="10">
-                                            <CustomContent Context="uploadContext">
-                                                <button type="button" class="document-dropzone nda-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
-                                                    <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
-                                                    <span>
-                                                        <strong>Upload NDA documents</strong>
-                                                        <small>Signed agreements or legal drafts</small>
-                                                    </span>
-                                                </button>
-                                            </CustomContent>
-                                        </MudFileUpload>
-                                        @DocumentUploadList(_ndaDocumentUploads)
-                                    </div>
-                                </div>
-
-                                @if (_previewDocument != null)
-                                {
-                                    <div class="document-preview-panel">
+                                    <div class="document-preview-panel persistent">
                                         <div class="document-preview-header">
-                                            <strong>@_previewDocument.FileName</strong>
-                                            <button type="button" class="address-remove" @onclick="CloseDocumentPreview">Close preview</button>
+                                            <span>
+                                                <small>Document preview</small>
+                                                <strong>@(_previewDocument?.FileName ?? "No document selected")</strong>
+                                            </span>
+                                            @if (_previewDocument != null)
+                                            {
+                                                <button type="button" class="address-remove" @onclick="CloseDocumentPreview">Close preview</button>
+                                            }
                                         </div>
-                                        @if (_loadingDocumentPreview)
+                                        @if (_previewDocument == null)
+                                        {
+                                            <div class="document-preview-empty">
+                                                <MudIcon Icon="@Icons.Material.Outlined.Preview" />
+                                                <span>Select an uploaded document to preview PDFs and images.</span>
+                                            </div>
+                                        }
+                                        else if (_loadingDocumentPreview)
                                         {
                                             <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
                                         }
@@ -486,10 +528,13 @@
                                         }
                                         else
                                         {
-                                            <div class="document-preview-empty">Preview is not available for this file type.</div>
+                                            <div class="document-preview-empty">
+                                                <MudIcon Icon="@Icons.Material.Outlined.VisibilityOff" />
+                                                <span>Preview is not available for this file type.</span>
+                                            </div>
                                         }
                                     </div>
-                                }
+                                </div>
                             }
                             else if (_activeCreateTab == CreateTab.Notes)
                             {
@@ -558,6 +603,12 @@
         Notes
     }
 
+    private enum DocumentPanel
+    {
+        Standard,
+        Nda
+    }
+
     private sealed record ExtractionSummaryItem(string Label, string Value);
 
     private enum AddressField
@@ -593,6 +644,7 @@
     private const int MaxExtractionAttempts = 3;
     private const int CompanySuggestionSearchLimit = 20;
     private CreateTab _activeCreateTab = CreateTab.Contact;
+    private DocumentPanel _activeDocumentPanel = DocumentPanel.Standard;
     private const double HighConfidenceThreshold = 0.9;
     private const string BranchModeHeadOffice = "HeadOffice";
     private const string BranchModeManual = "Manual";
@@ -732,13 +784,23 @@
         builder.CloseComponent();
     };
 
-    private RenderFragment DocumentUploadList(List<UploadedDocumentDraft> documents) => builder =>
+    private RenderFragment DocumentUploadList(List<UploadedDocumentDraft> documents, DocumentPanel panel) => builder =>
     {
         if (documents.Count == 0)
         {
             builder.OpenElement(0, "div");
             builder.AddAttribute(1, "class", "document-upload-empty");
-            builder.AddContent(2, "No files uploaded yet.");
+            builder.OpenComponent<MudIcon>(2);
+            builder.AddAttribute(3, "Icon", panel == DocumentPanel.Nda ? Icons.Material.Outlined.Gavel : Icons.Material.Outlined.FolderOpen);
+            builder.CloseComponent();
+            builder.OpenElement(4, "span");
+            builder.OpenElement(5, "strong");
+            builder.AddContent(6, $"No {GetDocumentPanelTitle(panel).ToLowerInvariant()} uploaded yet");
+            builder.CloseElement();
+            builder.OpenElement(7, "small");
+            builder.AddContent(8, "Files will appear here with status, size, and preview actions.");
+            builder.CloseElement();
+            builder.CloseElement();
             builder.CloseElement();
             return;
         }
@@ -752,6 +814,14 @@
             builder.AddAttribute(sequence++, "type", "button");
             builder.AddAttribute(sequence++, "class", $"document-upload-item{(document == _previewDocument ? " active" : string.Empty)}");
             builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => PreviewUploadedDocumentAsync(document)));
+
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "document-upload-icon");
+            builder.OpenComponent<MudIcon>(sequence++);
+            builder.AddAttribute(sequence++, "Icon", GetDocumentTypeIcon(document));
+            builder.CloseComponent();
+            builder.CloseElement();
+
             builder.OpenElement(sequence++, "span");
             builder.AddAttribute(sequence++, "class", "document-upload-main");
             builder.OpenElement(sequence++, "strong");
@@ -763,6 +833,19 @@
             builder.AddContent(sequence++, FormatDocumentUploadStatus(document));
             builder.CloseElement();
             builder.CloseElement();
+
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "document-upload-meta");
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "document-upload-size");
+            builder.AddContent(sequence++, FormatFileSize(document.FileSize));
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", GetDocumentUploadBadgeClass(document));
+            builder.AddContent(sequence++, GetDocumentUploadBadgeLabel(document));
+            builder.CloseElement();
+            builder.CloseElement();
+
             builder.OpenElement(sequence++, "span");
             builder.AddAttribute(sequence++, "class", "document-upload-state");
             builder.OpenComponent<MudIcon>(sequence++);
@@ -778,11 +861,17 @@
 
     private void RemoveExtractionFile(IBrowserFile file) => _extractionFiles.Remove(file);
 
-    private async Task OnCustomerDocumentsSelected(IReadOnlyList<IBrowserFile> files) =>
+    private async Task OnCustomerDocumentsSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        _activeDocumentPanel = DocumentPanel.Standard;
         await UploadDocumentGroupAsync(files, _customerDocumentUploads, DocumentCategories.General, null, 20);
+    }
 
-    private async Task OnNdaDocumentsSelected(IReadOnlyList<IBrowserFile> files) =>
+    private async Task OnNdaDocumentsSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        _activeDocumentPanel = DocumentPanel.Nda;
         await UploadDocumentGroupAsync(files, _ndaDocumentUploads, DocumentCategories.NDA, "Signed", 10);
+    }
 
     private async Task ExtractAsync(MouseEventArgs _)
     {
@@ -1162,6 +1251,7 @@
                 draft.IsUploading = false;
             }
 
+            await PreviewUploadedDocumentAsync(drafts.FirstOrDefault(draft => draft.IsUploaded) ?? drafts[0]);
             Snackbar.Add($"{category} upload completed.", Severity.Success);
         }
         catch (Exception ex)
@@ -1534,6 +1624,12 @@
     private string GetCreateTabClass(CreateTab tab) =>
         tab == _activeCreateTab ? "active" : string.Empty;
 
+    private string GetDocumentTabClass(DocumentPanel panel) =>
+        panel == _activeDocumentPanel ? "active" : string.Empty;
+
+    private static string GetDocumentPanelTitle(DocumentPanel panel) =>
+        panel == DocumentPanel.Nda ? "NDA documents" : "Standard documents";
+
     private static string GetExtractionSummaryText(int fieldCount, int missingCount) =>
         missingCount == 0
             ? $"{fieldCount} item{(fieldCount == 1 ? string.Empty : "s")} filled. Review before saving."
@@ -1700,7 +1796,7 @@
     {
         if (document.IsUploading)
         {
-            return "Uploading...";
+            return "Uploading to secure storage...";
         }
 
         if (!string.IsNullOrWhiteSpace(document.Error))
@@ -1708,7 +1804,7 @@
             return document.Error;
         }
 
-        return document.IsUploaded ? FormatFileSize(document.FileSize) : "Waiting for upload";
+        return document.IsUploaded ? "Ready for preview and create" : "Waiting for upload";
     }
 
     private static string GetDocumentStatusIcon(UploadedDocumentDraft document)
@@ -1721,6 +1817,43 @@
         return string.IsNullOrWhiteSpace(document.Error)
             ? Icons.Material.Outlined.Visibility
             : Icons.Material.Outlined.ErrorOutline;
+    }
+
+    private static string GetDocumentTypeIcon(UploadedDocumentDraft document)
+    {
+        if (IsPdf(document.MimeType))
+        {
+            return Icons.Material.Outlined.PictureAsPdf;
+        }
+
+        if (document.MimeType.Contains("image", StringComparison.OrdinalIgnoreCase))
+        {
+            return Icons.Material.Outlined.Image;
+        }
+
+        return Icons.Material.Outlined.Description;
+    }
+
+    private static string GetDocumentUploadBadgeClass(UploadedDocumentDraft document)
+    {
+        if (document.IsUploading)
+        {
+            return "document-upload-badge uploading";
+        }
+
+        return string.IsNullOrWhiteSpace(document.Error)
+            ? "document-upload-badge uploaded"
+            : "document-upload-badge error";
+    }
+
+    private static string GetDocumentUploadBadgeLabel(UploadedDocumentDraft document)
+    {
+        if (document.IsUploading)
+        {
+            return "Uploading";
+        }
+
+        return string.IsNullOrWhiteSpace(document.Error) ? "Uploaded" : "Issue";
     }
 
     private async Task PreviewUploadedDocumentAsync(UploadedDocumentDraft document)
