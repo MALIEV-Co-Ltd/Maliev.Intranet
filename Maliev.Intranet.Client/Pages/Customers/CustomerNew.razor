@@ -822,6 +822,7 @@
             builder.OpenElement(sequence++, "button");
             builder.AddAttribute(sequence++, "type", "button");
             builder.AddAttribute(sequence++, "class", $"document-upload-item{(document == _previewDocument ? " active" : string.Empty)}");
+            builder.AddAttribute(sequence++, "aria-label", $"Preview {document.FileName}");
             builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => PreviewUploadedDocumentAsync(document)));
 
             builder.OpenElement(sequence++, "span");
@@ -840,6 +841,10 @@
             builder.OpenElement(sequence++, "small");
             builder.AddAttribute(sequence++, "class", "document-upload-status");
             builder.AddContent(sequence++, FormatDocumentUploadStatus(document));
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "document-upload-type");
+            builder.AddContent(sequence++, GetDocumentTypeLabel(document));
             builder.CloseElement();
             builder.CloseElement();
 
@@ -1846,6 +1851,21 @@
         }
 
         return Icons.Material.Outlined.Description;
+    }
+
+    private static string GetDocumentTypeLabel(UploadedDocumentDraft document)
+    {
+        if (IsPdf(document.MimeType))
+        {
+            return "PDF";
+        }
+
+        if (document.MimeType.Contains("image", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Image";
+        }
+
+        return "Document";
     }
 
     private static string GetDocumentUploadBadgeClass(UploadedDocumentDraft document)

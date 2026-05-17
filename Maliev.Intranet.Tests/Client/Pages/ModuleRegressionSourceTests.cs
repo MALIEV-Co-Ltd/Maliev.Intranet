@@ -630,6 +630,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ReadPreviewUrlAsync(document.LinkReference)", page, StringComparison.Ordinal);
         Assert.Contains("download-url?fileReference=", page, StringComparison.Ordinal);
         Assert.DoesNotContain("upload completed.", page, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"aria-label\", $\"Preview {document.FileName}\"", page, StringComparison.Ordinal);
+        Assert.Contains("\"class\", \"document-upload-type\"", page, StringComparison.Ordinal);
+        Assert.Contains("GetDocumentTypeLabel(document)", page, StringComparison.Ordinal);
         Assert.Contains("MaxItems=\"8\"", page, StringComparison.Ordinal);
         Assert.Contains("ReturnedItemsCountChanged=\"UpdateCompanySuggestionCount\"", page, StringComparison.Ordinal);
         Assert.Contains("<BeforeItemsTemplate>", page, StringComparison.Ordinal);
@@ -670,11 +673,17 @@ public class ModuleRegressionSourceTests
         Assert.Contains("font-family: var(--mud-typography-default-family);", ExtractCssBlock(styles, "::deep .company-suggestion-tax"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(280px, 0.88fr) minmax(340px, 1.12fr);", ExtractCssBlock(styles, ".documents-workspace"), StringComparison.Ordinal);
         Assert.Contains("display: flex;", ExtractCssBlock(styles, ".document-type-tabs"), StringComparison.Ordinal);
+        Assert.Contains("padding: 0.45rem;", ExtractCssBlock(styles, ".document-upload-list"), StringComparison.Ordinal);
+        Assert.Contains("background:", ExtractCssBlock(styles, ".document-upload-list"), StringComparison.Ordinal);
         Assert.Contains("border-left: 3px solid var(--mud-palette-primary);", ExtractCssBlock(styles, ".document-upload-item"), StringComparison.Ordinal);
-        Assert.Contains("grid-template-columns: auto minmax(0, 1fr) auto;", ExtractCssBlock(styles, ".document-upload-item"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 2rem minmax(0, 1fr) auto 2rem;", ExtractCssBlock(styles, ".document-upload-item"), StringComparison.Ordinal);
+        Assert.Contains("min-height: 58px;", ExtractCssBlock(styles, ".document-upload-item"), StringComparison.Ordinal);
         Assert.Contains("min-height: 340px;", ExtractCssBlock(styles, ".document-preview-panel.persistent"), StringComparison.Ordinal);
         Assert.Contains("color: var(--mud-palette-error);", ExtractCssBlock(styles, ".document-preview-empty.error"), StringComparison.Ordinal);
         Assert.Contains("display: inline-flex;", ExtractCssBlock(styles, ".document-upload-size"), StringComparison.Ordinal);
+        Assert.Contains("text-transform: uppercase;", ExtractCssBlock(styles, ".document-upload-type"), StringComparison.Ordinal);
+        Assert.Contains("justify-content: flex-end;", ExtractCssBlock(styles, ".document-upload-meta"), StringComparison.Ordinal);
+        Assert.Contains("width: 2rem;", ExtractCssBlock(styles, ".document-upload-state"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: auto minmax(0, 1fr) auto;", ExtractCssBlock(styles, "::deep .address-suggestion-card"), StringComparison.Ordinal);
         Assert.Contains("border-left: 3px solid var(--mud-palette-secondary);", ExtractCssBlock(styles, "::deep .address-suggestion-card"), StringComparison.Ordinal);
         Assert.Contains("border-radius: 999px;", ExtractCssBlock(styles, "::deep .address-suggestion-marker"), StringComparison.Ordinal);
