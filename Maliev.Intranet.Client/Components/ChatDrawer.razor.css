@@ -331,12 +331,13 @@
     padding-bottom: 72px;
 }
 
-.sidekick-composer {
+.sidekick-root ::deep .sidekick-composer {
     width: min(100%, 780px);
-    min-height: 48px;
-    display: flex;
-    align-items: flex-end;
-    gap: var(--maliev-space-4);
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: end;
+    column-gap: var(--maliev-space-4);
     margin: 0 auto;
     padding: var(--maliev-space-3) var(--maliev-space-3) var(--maliev-space-3) var(--maliev-space-4);
     border-radius: var(--maliev-radius-md);
@@ -345,16 +346,16 @@
     transition: box-shadow 0.16s ease;
 }
 
-.sidekick-composer:focus-within {
+.sidekick-root ::deep .sidekick-composer:focus-within {
     box-shadow: var(--maliev-focus-ring), 0 0 42px rgba(124, 58, 237, 0.12);
 }
 
 .sidekick-composer-input {
-    flex: 1 1 auto;
+    width: 100%;
     min-width: 0;
-    min-height: 32px;
-    max-height: 96px;
-    padding: 7px 0;
+    min-height: 36px;
+    max-height: 132px;
+    padding: var(--maliev-space-2) 0;
     border: 0;
     outline: 0;
     resize: none;
@@ -365,6 +366,11 @@
     font-size: var(--mud-typography-body2-size);
     line-height: var(--mud-typography-body2-lineheight);
     letter-spacing: 0;
+}
+
+.sidekick-composer-actions {
+    flex: 0 0 auto;
+    min-width: max-content;
 }
 
 .sidekick-composer-input::placeholder {

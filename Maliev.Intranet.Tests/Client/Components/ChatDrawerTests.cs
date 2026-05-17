@@ -91,6 +91,20 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ComposerCss_StylesMudPaperRootThroughDeepSelector()
+    {
+        var css = File.ReadAllText(FindSourceFile("Maliev.Intranet.Client", "Components", "ChatDrawer.razor.css"));
+        var composerBlock = ExtractCssBlock(css, ".sidekick-root ::deep .sidekick-composer");
+        var inputBlock = ExtractCssBlock(css, ".sidekick-composer-input");
+
+        Assert.Contains("display: grid;", composerBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: auto minmax(0, 1fr) auto;", composerBlock, StringComparison.Ordinal);
+        Assert.Contains("width: 100%;", inputBlock, StringComparison.Ordinal);
+        Assert.Contains("min-height: 36px;", inputBlock, StringComparison.Ordinal);
+        Assert.Contains(".sidekick-root ::deep .sidekick-composer:focus-within", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SuggestedAction_WithQuotationData_SendsContextAwarePrompt()
     {
         var capturedRequestBody = string.Empty;
@@ -162,5 +176,41 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
         await cut.InvokeAsync(() => cut.Find("button.sidekick-suggested-action").Click());
         cut.WaitForAssertion(() => Assert.Contains("Send reminder for quotation Q-2026-000001", capturedRequestBody), TimeSpan.FromSeconds(5));
         Assert.Contains("Reminder sent successfully for quotation Q-2026-000001", cut.Markup);
+    }
+
+    private static string ExtractCssBlock(string source, string selector)
+    {
+        var selectorIndex = source.IndexOf(selector, StringComparison.Ordinal);
+        if (selectorIndex < 0)
+        {
+            throw new InvalidOperationException($"Expected selector '{selector}' to exist.");
+        }
+
+        var openBraceIndex = source.IndexOf('{', selectorIndex);
+        var closeBraceIndex = source.IndexOf('}', openBraceIndex + 1);
+        if (openBraceIndex < 0 || closeBraceIndex < 0)
+        {
+            throw new InvalidOperationException($"Expected selector '{selector}' to contain a CSS block.");
+        }
+
+        return source.Substring(openBraceIndex + 1, closeBraceIndex - openBraceIndex - 1);
+    }
+
+    private static string FindSourceFile(params string[] relativeParts)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException(
+            $"Could not find source file '{Path.Combine(relativeParts)}' from '{AppContext.BaseDirectory}'.");
     }
 }
