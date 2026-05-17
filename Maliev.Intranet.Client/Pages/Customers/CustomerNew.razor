@@ -464,8 +464,8 @@
                                                 <div class="nda-lifecycle-grid">
                                                     <FormField Label="Initial status">
                                                         <select class="mlv-form-input" @bind="_ndaStatus">
-                                                            <option value="Signed">Signed</option>
                                                             <option value="Draft">Draft</option>
+                                                            <option value="Signed">Signed</option>
                                                         </select>
                                                     </FormField>
                                                     <FormField Label="Expiration date">
@@ -678,7 +678,7 @@
     private string? _selectedCompanyLookupValue;
     private int _companySuggestionCount;
     private DateTime? _ndaExpiresAt;
-    private string _ndaStatus = "Signed";
+    private string _ndaStatus = "Draft";
     private UploadedDocumentDraft? _previewDocument;
     private string? _documentPreviewUrl;
     private string? _documentPreviewError;
@@ -879,7 +879,7 @@
     private async Task OnNdaDocumentsSelected(IReadOnlyList<IBrowserFile> files)
     {
         _activeDocumentPanel = DocumentPanel.Nda;
-        await UploadDocumentGroupAsync(files, _ndaDocumentUploads, DocumentCategories.NDA, "Signed", 10);
+        await UploadDocumentGroupAsync(files, _ndaDocumentUploads, DocumentCategories.NDA, _ndaStatus, 10);
     }
 
     private async Task ExtractAsync(MouseEventArgs _)
@@ -1153,7 +1153,9 @@
             .Select(upload => new CreateDocumentRequest
             {
                 DocumentCategory = upload.Category,
-                DocumentSubType = upload.SubType,
+                DocumentSubType = string.Equals(upload.Category, DocumentCategories.NDA, StringComparison.OrdinalIgnoreCase)
+                    ? _ndaStatus
+                    : upload.SubType,
                 FileReference = upload.LinkReference,
                 FileName = upload.FileName,
                 FileSize = upload.FileSize,

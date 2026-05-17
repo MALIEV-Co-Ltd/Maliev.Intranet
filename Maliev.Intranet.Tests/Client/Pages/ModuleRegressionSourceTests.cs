@@ -612,6 +612,13 @@ public class ModuleRegressionSourceTests
         Assert.Contains("GetDocumentTabClass(DocumentPanel.Nda)", page, StringComparison.Ordinal);
         Assert.Contains("DocumentUploadList(_customerDocumentUploads, DocumentPanel.Standard)", page, StringComparison.Ordinal);
         Assert.Contains("DocumentUploadList(_ndaDocumentUploads, DocumentPanel.Nda)", page, StringComparison.Ordinal);
+        Assert.Contains("private string _ndaStatus = \"Draft\";", page, StringComparison.Ordinal);
+        Assert.True(
+            page.IndexOf("<option value=\"Draft\">Draft</option>", StringComparison.Ordinal)
+                < page.IndexOf("<option value=\"Signed\">Signed</option>", StringComparison.Ordinal),
+            "Expected Draft to be the first selectable NDA lifecycle status.");
+        Assert.Contains("UploadDocumentGroupAsync(files, _ndaDocumentUploads, DocumentCategories.NDA, _ndaStatus, 10)", page, StringComparison.Ordinal);
+        Assert.Contains("DocumentSubType = string.Equals(upload.Category, DocumentCategories.NDA", page, StringComparison.Ordinal);
         Assert.Contains("class=\"document-preview-panel persistent\"", page, StringComparison.Ordinal);
         Assert.Contains("class=\"document-preview-empty error\"", page, StringComparison.Ordinal);
         Assert.Contains("PreviewUploadedDocumentAsync(drafts.FirstOrDefault(draft => draft.IsUploaded) ?? drafts[0])", page, StringComparison.Ordinal);
