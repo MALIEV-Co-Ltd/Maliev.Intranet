@@ -668,6 +668,17 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void MudAlertIconOverride_PreservesTopPaddingForDenseAlerts()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
+
+        Assert.Contains(".mud-alert-icon", styles, StringComparison.Ordinal);
+        Assert.Contains("align-items: flex-start;", styles, StringComparison.Ordinal);
+        Assert.Contains("padding: 2px 0 0;", styles, StringComparison.Ordinal);
+        Assert.Contains("line-height: 1.45;", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CommerceCatalog_UsesDedicatedListingPageWithBomExport()
     {
         var catalog = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");

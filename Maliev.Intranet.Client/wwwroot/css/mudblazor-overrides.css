@@ -393,6 +393,7 @@
    ──────────────────────────────────────────────────────────────── */
 
 .mud-alert {
+    align-items: flex-start;
     padding: 7px 10px;
     border-radius: var(--maliev-radius-sm);
     box-shadow: var(--maliev-shadow-ring);
@@ -400,12 +401,17 @@
 
 .mud-alert-message {
     font-size: var(--mud-typography-caption-size);
+    line-height: 1.45;
 }
 
 .mud-alert-icon {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 auto;
     font-size: var(--maliev-icon-md);
-    padding: 0;
+    justify-content: center;
     margin-right: 8px;
+    padding: 2px 0 0;
 }
 
 /* ── CHIPS ────────────────────────────────────────────────────────
