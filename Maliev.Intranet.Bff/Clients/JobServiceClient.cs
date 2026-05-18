@@ -64,7 +64,8 @@ public class JobServiceClient(HttpClient httpClient)
         var response = await httpClient.GetAsync($"/job/v1/jobs/{id}", ct);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<JobDetailDto>(cancellationToken: ct);
+        var job = await response.Content.ReadFromJsonAsync<JobServiceJobResponse>(cancellationToken: ct);
+        return job?.ToJobDetail();
     }
 
     // ── Status & assignment ───────────────────────────────────────────────────
@@ -287,6 +288,75 @@ public class JobServiceClient(HttpClient httpClient)
         string MachineId,
         List<MachineScheduleItemDto> Schedule);
 
+    private sealed record JobServiceJobResponse
+    {
+        public Guid JobId { get; init; }
+
+        public Guid OrderId { get; init; }
+
+        public Guid OrderItemId { get; init; }
+
+        public Guid? SourceProjectId { get; init; }
+
+        public Guid? SourceProjectPartId { get; init; }
+
+        public Guid MaterialId { get; init; }
+
+        public string? Technology { get; init; }
+
+        public int EstimatedPrintTimeMinutes { get; init; }
+
+        public string? AssignedMachineId { get; init; }
+
+        public int Priority { get; init; }
+
+        public string? Status { get; init; }
+
+        public string? Notes { get; init; }
+
+        public DateTime? StartedAt { get; init; }
+
+        public DateTime? CompletedAt { get; init; }
+
+        public DateTime CreatedAt { get; init; }
+
+        public DateTime UpdatedAt { get; init; }
+
+        public DateTime? ScheduledStartTime { get; init; }
+
+        public DateTime? ScheduledEndTime { get; init; }
+
+        public int QueuePosition { get; init; }
+
+        public JobDetailDto ToJobDetail()
+        {
+            var processType = Technology ?? string.Empty;
+            return new JobDetailDto
+            {
+                Id = JobId,
+                JobNumber = FormatShortId(JobId),
+                CustomerName = string.Empty,
+                OrderId = OrderId == Guid.Empty ? null : OrderId,
+                OrderNumber = OrderId == Guid.Empty ? null : FormatShortId(OrderId),
+                PartDescription = FormatPartDescription(SourceProjectPartId, OrderItemId),
+                ProcessType = processType,
+                Material = MaterialId == Guid.Empty ? null : MaterialId.ToString(),
+                Priority = FormatPriority(Priority),
+                Status = Status ?? string.Empty,
+                MachineName = AssignedMachineId,
+                EstimatedCompletionAt = ScheduledEndTime ?? StartedAt?.AddMinutes(EstimatedPrintTimeMinutes),
+                ProgressPercent = FormatProgressPercent(Status),
+                Quantity = 1,
+                CreatedAt = CreatedAt,
+                ScheduledStartTime = ScheduledStartTime,
+                ScheduledEndTime = ScheduledEndTime,
+                QueuePosition = QueuePosition,
+                Notes = Notes,
+                UpdatedAt = UpdatedAt
+            };
+        }
+    }
+
     private sealed record KanbanBoardResponse(
         List<KanbanJobResponse>? Pending,
         List<KanbanJobResponse>? Queued,
@@ -371,4 +441,36 @@ public class JobServiceClient(HttpClient httpClient)
             };
         }
     }
+
+    private static string FormatShortId(Guid id) =>
+        id.ToString("N")[..8].ToUpperInvariant();
+
+    private static string FormatPartDescription(Guid? sourceProjectPartId, Guid orderItemId)
+    {
+        if (sourceProjectPartId is { } projectPartId && projectPartId != Guid.Empty)
+        {
+            return $"Project part {FormatShortId(projectPartId)}";
+        }
+
+        return orderItemId == Guid.Empty
+            ? string.Empty
+            : $"Order item {FormatShortId(orderItemId)}";
+    }
+
+    private static string FormatPriority(int priority) => priority switch
+    {
+        <= 1 => "Urgent",
+        2 => "High",
+        3 => "Normal",
+        _ => "Low"
+    };
+
+    private static int FormatProgressPercent(string? status) => status?.Trim() switch
+    {
+        "Completed" or "Complete" => 100,
+        "Finishing" or "QualityCheck" or "Packaging" => 80,
+        "InProgress" or "InProduction" => 50,
+        "Queued" => 10,
+        _ => 0
+    };
 }

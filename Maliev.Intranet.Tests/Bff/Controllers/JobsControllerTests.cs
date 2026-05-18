@@ -145,12 +145,91 @@ public class JobsControllerTests
     [Fact]
     public async Task GetById_WhenJobExists_ShouldReturn200()
     {
-        var detail = new JobDetailDto { Id = JobId, JobNumber = "JOB-1042" };
-        var controller = Make(MakeClient(detail));
+        var downstreamJob = new
+        {
+            JobId,
+            OrderId = Guid.Empty,
+            OrderItemId = Guid.Empty,
+            MaterialId = Guid.Empty,
+            Technology = "FDM",
+            EstimatedPrintTimeMinutes = 90,
+            AssignedMachineId = (string?)null,
+            Priority = 3,
+            Status = "Queued",
+            Notes = (string?)null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            ScheduledStartTime = (DateTime?)null,
+            ScheduledEndTime = (DateTime?)null,
+            QueuePosition = 0
+        };
+        var controller = Make(MakeClient(downstreamJob));
         var result = await controller.GetById(JobId, CancellationToken.None);
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<JobDetailDto>(ok.Value);
         Assert.Equal(JobId, dto.Id);
+    }
+
+    [Fact]
+    public async Task GetById_WhenJobServiceReturnsNativeJobDto_ShouldMapDetailFields()
+    {
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var projectPartId = Guid.NewGuid();
+        var scheduledStart = DateTime.UtcNow.AddHours(2);
+        var scheduledEnd = scheduledStart.AddHours(4.5);
+        var downstreamJob = new
+        {
+            JobId,
+            OrderId = orderId,
+            OrderItemId = orderItemId,
+            SourceProjectId = projectId,
+            SourceProjectPartId = projectPartId,
+            MaterialId = materialId,
+            Technology = "CNC_MILL",
+            VolumeCm3 = 12.5m,
+            EstimatedPrintTimeMinutes = 240,
+            AssignedMachineId = "MAL-CNC-001",
+            Priority = 2,
+            Status = "Queued",
+            Notes = "Inspect threaded holes before finishing.",
+            StartedAt = (DateTime?)null,
+            CompletedAt = (DateTime?)null,
+            CreatedAt = scheduledStart.AddDays(-1),
+            UpdatedAt = scheduledStart.AddMinutes(-30),
+            IsOutsourced = false,
+            ScheduledStartTime = scheduledStart,
+            ScheduledEndTime = scheduledEnd,
+            SetupTimeMinutes = 30,
+            QueuePosition = 5
+        };
+        var controller = new JobsController(
+            MakeClient(downstreamJob),
+            MakeOrderClient(Array.Empty<OrderPreviewImageDto>()),
+            MakeUploadClient(new object()));
+
+        var result = await controller.GetById(JobId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<JobDetailDto>(ok.Value);
+        Assert.Equal(JobId, dto.Id);
+        Assert.Equal(JobId.ToString("N")[..8].ToUpperInvariant(), dto.JobNumber);
+        Assert.Equal(orderId, dto.OrderId);
+        Assert.Equal(orderId.ToString("N")[..8].ToUpperInvariant(), dto.OrderNumber);
+        Assert.Equal($"Project part {projectPartId.ToString("N")[..8].ToUpperInvariant()}", dto.PartDescription);
+        Assert.Equal("CNC_MILL", dto.ProcessType);
+        Assert.Equal(materialId.ToString(), dto.Material);
+        Assert.Equal("High", dto.Priority);
+        Assert.Equal("Queued", dto.Status);
+        Assert.Equal("MAL-CNC-001", dto.MachineName);
+        Assert.Equal(1, dto.Quantity);
+        Assert.Equal(scheduledStart, dto.ScheduledStartTime);
+        Assert.Equal(scheduledEnd, dto.ScheduledEndTime);
+        Assert.Equal(scheduledEnd, dto.EstimatedCompletionAt);
+        Assert.Equal(5, dto.QueuePosition);
+        Assert.Equal("Inspect threaded holes before finishing.", dto.Notes);
     }
 
     [Fact]
