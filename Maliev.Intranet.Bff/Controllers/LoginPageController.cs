@@ -11,6 +11,9 @@ namespace Maliev.Intranet.Bff.Controllers;
 [AllowAnonymous]
 public sealed class LoginPageController : Controller
 {
+    private const string InvalidCredentialsMessage = "Invalid credentials. Please try again.";
+    private const string TemporarySignInMessage = "We couldn't complete sign-in right now. Please try again in a moment.";
+
     /// <summary>
     /// Renders the server-owned login page.
     /// </summary>
@@ -46,8 +49,9 @@ public sealed class LoginPageController : Controller
     {
         var encodedReturnUrl = WebUtility.HtmlEncode(returnUrl);
         var encodedGoogleReturnUrl = WebUtility.UrlEncode(returnUrl);
-        var encodedError = WebUtility.HtmlEncode(error ?? string.Empty);
-        var errorHtml = string.IsNullOrWhiteSpace(error)
+        var loginError = ToUserFacingLoginError(error);
+        var encodedError = WebUtility.HtmlEncode(loginError);
+        var errorHtml = string.IsNullOrWhiteSpace(loginError)
             ? string.Empty
             : $"""<div class="error-alert">{encodedError}</div>""";
 
@@ -547,5 +551,27 @@ public sealed class LoginPageController : Controller
 </body>
 </html>
 """;
+    }
+
+    private static string ToUserFacingLoginError(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            return string.Empty;
+        }
+
+        var normalized = WebUtility.HtmlDecode(error).Trim();
+        if (string.Equals(normalized, InvalidCredentialsMessage, StringComparison.Ordinal))
+        {
+            return InvalidCredentialsMessage;
+        }
+
+        if (normalized.Contains("cancel", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("access_denied", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Sign-in was cancelled. Please try again when you're ready.";
+        }
+
+        return TemporarySignInMessage;
     }
 }

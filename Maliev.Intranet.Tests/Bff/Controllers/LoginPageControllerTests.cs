@@ -1,3 +1,4 @@
+using System.Net;
 using Maliev.Intranet.Bff.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -53,5 +54,24 @@ public class LoginPageControllerTests
         Assert.Contains("MALIEV CO., LTD.", content.Content);
         Assert.DoesNotContain("MALIEV INC. Employee systems", content.Content, StringComparison.Ordinal);
         Assert.DoesNotContain(">A</button>", content.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Login_WhenAuthCorrelationFails_ShowsNaturalRetryMessage()
+    {
+        var controller = new LoginPageController
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        var result = controller.Login("/accounting", "Correlation failed.");
+
+        var content = Assert.IsType<ContentResult>(result);
+        var decodedContent = WebUtility.HtmlDecode(content.Content);
+        Assert.Contains("We couldn't complete sign-in right now. Please try again in a moment.", decodedContent);
+        Assert.DoesNotContain("Correlation failed", content.Content, StringComparison.Ordinal);
     }
 }
