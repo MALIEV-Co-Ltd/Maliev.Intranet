@@ -905,7 +905,13 @@ public class ModuleRegressionSourceTests
         Assert.Contains(".topbar-mobile-drawer-backdrop", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-mobile-nav-drawer", styles, StringComparison.Ordinal);
         Assert.Contains("position: fixed;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-drawer"), StringComparison.Ordinal);
-        Assert.Contains("width: min(320px, calc(100vw - 28px));", styles, StringComparison.Ordinal);
+        Assert.Contains("width: min(340px, calc(100vw - 28px));", styles, StringComparison.Ordinal);
+        Assert.Contains("padding: 14px 16px 18px;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-drawer"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 24px minmax(0, 1fr);", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-link"), StringComparison.Ordinal);
+        Assert.Contains("padding: 8px 12px;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-link"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 24px minmax(0, 1fr);", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-group-title"), StringComparison.Ordinal);
+        Assert.Contains("padding: 4px 12px 6px;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-group-title"), StringComparison.Ordinal);
+        Assert.Contains("width: 24px;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-link .mud-icon-root"), StringComparison.Ordinal);
         Assert.Contains("flex-wrap: nowrap;", styles, StringComparison.Ordinal);
         Assert.Contains("display: none;", ExtractCssBlock(compactNavStyles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains(".topbar-search", styles, StringComparison.Ordinal);
