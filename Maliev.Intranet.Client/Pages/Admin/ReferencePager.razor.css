@@ -1,0 +1,38 @@
+.reference-pager {
+    align-items: center;
+    border-top: 1px solid var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+}
+
+.reference-pager-controls {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.reference-pager-controls label {
+    align-items: center;
+    display: flex;
+    gap: 0.4rem;
+}
+
+.reference-pager-controls .mlv-form-input {
+    min-height: 2.25rem;
+    min-width: 5.25rem;
+    padding-block: 0.35rem;
+}
+
+@media (max-width: 640px) {
+    .reference-pager,
+    .reference-pager-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

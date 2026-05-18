@@ -23,6 +23,29 @@ public class CurrencyServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Gets a paginated currency page for reference data management.
+    /// </summary>
+    /// <param name="isActive">Optional active-status filter.</param>
+    /// <param name="pageNumber">The one-based page number.</param>
+    /// <param name="pageSize">The page size.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>A normalized reference data page.</returns>
+    public async Task<ReferenceDataPage<CurrencyDto>> GetCurrencyPageAsync(
+        bool? isActive,
+        int pageNumber,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        var page = Math.Max(1, pageNumber);
+        var size = Math.Clamp(pageSize, 1, 200);
+        var activeQuery = isActive.HasValue ? $"&isActive={isActive.Value.ToString().ToLowerInvariant()}" : string.Empty;
+        var response = await _httpClient.GetFromJsonAsync<CurrencyPaginatedResponse>(
+            $"/currency/v1/currencies?page={page}&pageSize={size}{activeQuery}", ct);
+
+        return response?.ToReferenceDataPage() ?? new ReferenceDataPage<CurrencyDto> { PageNumber = page, PageSize = size };
+    }
+
+    /// <summary>
     /// Gets a currency by its code.
     /// </summary>
     /// <param name="code">The ISO 4217 currency code.</param>
@@ -34,6 +57,14 @@ public class CurrencyServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Gets a currency by its unique identifier using the admin endpoint.
+    /// </summary>
+    public async Task<CurrencyDto?> GetCurrencyByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _httpClient.GetFromJsonAsync<CurrencyDto>($"/currency/v1/admin/currencies/{id}", ct);
+    }
+
+    /// <summary>
     /// Gets the primary currency.
     /// </summary>
     /// <param name="ct">The cancellation token.</param>
@@ -42,6 +73,54 @@ public class CurrencyServiceClient(HttpClient httpClient)
     {
         var currencies = await GetCurrenciesAsync(ct);
         return currencies.FirstOrDefault(c => c.IsPrimary);
+    }
+
+    /// <summary>
+    /// Creates a currency reference record.
+    /// </summary>
+    public async Task<CurrencyDto> CreateCurrencyAsync(CurrencyDto request, CancellationToken ct = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("/currency/v1/admin/currencies", ToCreateRequest(request), ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CurrencyDto>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("CurrencyService returned an empty create response.");
+    }
+
+    /// <summary>
+    /// Updates a currency reference record.
+    /// </summary>
+    public async Task<CurrencyDto> UpdateCurrencyAsync(Guid id, CurrencyDto request, CancellationToken ct = default)
+    {
+        var etag = request.ETag;
+        if (string.IsNullOrWhiteSpace(etag))
+        {
+            etag = (await GetCurrencyByIdAsync(id, ct))?.ETag;
+        }
+
+        if (string.IsNullOrWhiteSpace(etag))
+        {
+            throw new InvalidOperationException("CurrencyService did not provide an ETag for update.");
+        }
+
+        using var message = new HttpRequestMessage(HttpMethod.Put, $"/currency/v1/admin/currencies/{id}")
+        {
+            Content = JsonContent.Create(ToUpdateRequest(request))
+        };
+        message.Headers.TryAddWithoutValidation("If-Match", etag);
+
+        using var response = await _httpClient.SendAsync(message, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CurrencyDto>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("CurrencyService returned an empty update response.");
+    }
+
+    /// <summary>
+    /// Deletes a currency reference record.
+    /// </summary>
+    public async Task DeleteCurrencyAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"/currency/v1/admin/currencies/{id}", ct);
+        response.EnsureSuccessStatusCode();
     }
 
     /// <summary>
@@ -68,6 +147,23 @@ public class CurrencyServiceClient(HttpClient httpClient)
             return null;
         }
     }
+
+    private static object ToCreateRequest(CurrencyDto request) => new
+    {
+        code = request.Code.Trim().ToUpperInvariant(),
+        name = request.Name.Trim(),
+        symbol = request.Symbol.Trim(),
+        decimalPlaces = request.DecimalPlaces,
+        isActive = request.IsActive
+    };
+
+    private static object ToUpdateRequest(CurrencyDto request) => new
+    {
+        name = request.Name.Trim(),
+        symbol = request.Symbol.Trim(),
+        decimalPlaces = request.DecimalPlaces,
+        isActive = request.IsActive
+    };
 }
 
 /// <summary>
@@ -86,4 +182,25 @@ internal class CurrencyPaginatedResponse
 {
     [JsonPropertyName("items")]
     public IEnumerable<CurrencyDto> Data { get; set; } = [];
+
+    [JsonPropertyName("page")]
+    public int Page { get; set; }
+
+    [JsonPropertyName("pageSize")]
+    public int PageSize { get; set; }
+
+    [JsonPropertyName("totalCount")]
+    public int TotalCount { get; set; }
+
+    [JsonPropertyName("totalPages")]
+    public int TotalPages { get; set; }
+
+    public ReferenceDataPage<CurrencyDto> ToReferenceDataPage() => new()
+    {
+        Items = Data.ToList(),
+        PageNumber = Page,
+        PageSize = PageSize,
+        TotalCount = TotalCount,
+        TotalPages = TotalPages
+    };
 }

@@ -1,47 +1,253 @@
-.reference-registry-item,
-.reference-registry-card {
-    max-width: 70rem;
-    width: 100%;
-}
-
-.reference-registry-toolbar {
+.reference-skeleton-panel {
     display: grid;
-    align-items: end;
-    grid-template-columns: minmax(16rem, 26rem) max-content;
-    gap: 0.75rem;
-    margin-bottom: 0.875rem;
+    gap: 0.875rem;
 }
 
-.reference-location-search {
-    min-width: 0;
-    width: 100%;
-}
-
-.reference-registry-toolbar ::deep .mud-input-control,
-.reference-registry-toolbar ::deep .mud-input-control-input-container {
-    min-height: unset;
-}
-
-.reference-registry-toolbar ::deep .mud-input.mud-input-outlined {
+.reference-section-toolbar {
     align-items: center;
-    min-height: 40px;
+    justify-content: flex-start;
 }
 
-.reference-registry-toolbar ::deep .mud-input-slot {
-    min-height: unset;
+.reference-sections {
+    flex-wrap: wrap;
 }
 
-.reference-registry-toolbar ::deep .mud-button-root {
-    min-height: 40px;
+.reference-workbench {
+    display: grid;
+    gap: 1rem;
+}
+
+.reference-management-panel {
+    display: grid;
+    gap: 1rem;
+}
+
+.reference-exchange-panel,
+.reference-registry-card {
+    max-width: 78rem;
+}
+
+.reference-panel-intro {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.reference-panel-intro h3 {
+    font-size: var(--mud-typography-h6-size);
+    font-weight: 700;
+    line-height: var(--mud-typography-h6-lineheight);
+    margin: 0;
+}
+
+.reference-panel-intro p {
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-body2-size);
+    line-height: var(--mud-typography-body2-lineheight);
+    margin: 0.25rem 0 0;
+}
+
+.reference-count-chip {
+    align-items: center;
+    background: var(--mud-palette-surface);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 999px;
+    color: var(--mud-palette-text-secondary);
+    display: inline-flex;
+    min-height: 2rem;
+    padding: 0 0.75rem;
     white-space: nowrap;
 }
 
+.reference-toolbar {
+    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.reference-registry-toolbar {
+    max-width: 54rem;
+}
+
+.reference-search-field,
+.reference-select-field {
+    display: grid;
+    gap: 0.25rem;
+    min-width: min(22rem, 100%);
+}
+
+.reference-search-field {
+    flex: 0 1 28rem;
+}
+
+.reference-select-field {
+    flex: 0 1 16rem;
+}
+
+.reference-search-field > span,
+.reference-select-field > span,
+.reference-check span {
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 600;
+}
+
+.reference-check {
+    align-items: center;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 0.375rem;
+    display: inline-flex;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.75rem;
+}
+
+.reference-check input {
+    inline-size: 1rem;
+    block-size: 1rem;
+}
+
+.reference-inline-message {
+    border: 1px solid var(--mud-palette-success-lighten);
+    border-radius: 0.5rem;
+    color: var(--mud-palette-success-darken);
+    margin-bottom: 1rem;
+    padding: 0.75rem 0.875rem;
+}
+
+.reference-inline-message.is-error {
+    border-color: var(--mud-palette-error-lighten);
+    color: var(--mud-palette-error-darken);
+}
+
+.reference-editor {
+    background: color-mix(in srgb, var(--mud-palette-primary) 5%, var(--mud-palette-surface));
+    border: 1px solid color-mix(in srgb, var(--mud-palette-primary) 28%, var(--mud-palette-lines-default));
+    border-radius: 0.5rem;
+    display: grid;
+    gap: 0.875rem;
+    padding: 0.875rem;
+}
+
+.reference-editor-header,
+.reference-editor-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+}
+
+.reference-editor-header h3 {
+    font-size: var(--mud-typography-subtitle1-size);
+    font-weight: 700;
+    line-height: var(--mud-typography-subtitle1-lineheight);
+    margin: 0;
+}
+
+.reference-form-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reference-span-2 {
+    grid-column: span 2;
+}
+
+.reference-table-shell {
+    overflow-x: auto;
+}
+
+.reference-table {
+    min-width: 52rem;
+}
+
+.reference-table td strong {
+    display: block;
+}
+
+.reference-muted {
+    color: var(--mud-palette-text-secondary);
+    display: block;
+    font-size: var(--mud-typography-caption-size);
+    margin-top: 0.15rem;
+}
+
+.reference-actions-col {
+    text-align: right;
+    width: 12rem;
+}
+
+.reference-row-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.reference-link-button,
+.reference-danger-button {
+    background: transparent;
+    border: 0;
+    border-radius: 0.25rem;
+    color: var(--mud-palette-primary);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    min-height: 2rem;
+    padding: 0 0.35rem;
+}
+
+.reference-danger-button {
+    color: var(--mud-palette-error);
+}
+
+.reference-link-button:disabled,
+.reference-danger-button:disabled {
+    color: var(--mud-palette-action-disabled);
+    cursor: not-allowed;
+}
+
+.reference-rate-result {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 0.5rem;
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.875rem;
+}
+
+.reference-rate-result span {
+    color: var(--mud-palette-text-secondary);
+}
+
 @media (max-width: 760px) {
-    .reference-registry-toolbar {
+    .reference-panel-intro,
+    .reference-toolbar,
+    .reference-editor-header,
+    .reference-editor-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .reference-search-field,
+    .reference-select-field {
+        flex-basis: auto;
+        width: 100%;
+    }
+
+    .reference-form-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .reference-registry-toolbar ::deep .mud-button-root {
+    .reference-span-2 {
+        grid-column: auto;
+    }
+
+    .reference-toolbar .mlv-button {
         width: 100%;
     }
 }

@@ -190,8 +190,35 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view registered facility and site locations.</summary>
         public const string LocationsRead = "registry.locations.read";
+        /// <summary>Permission to create registered facility and site locations.</summary>
+        public const string LocationsCreate = "registry.locations.create";
+        /// <summary>Permission to update registered facility and site locations.</summary>
+        public const string LocationsUpdate = "registry.locations.update";
+        /// <summary>Permission to delete registered facility and site locations.</summary>
+        public const string LocationsDelete = "registry.locations.delete";
         /// <summary>Permission to view registered external companies and partners.</summary>
         public const string CompaniesRead = "registry.companies.read";
+    }
+
+    /// <summary>
+    /// Permissions for country catalog management.
+    /// </summary>
+    public static class Country
+    {
+        /// <summary>Permission to read country details.</summary>
+        public const string CountriesRead = "country.countries.read";
+        /// <summary>Permission to list country reference data.</summary>
+        public const string CountriesList = "country.countries.list";
+        /// <summary>Permission to search country reference data.</summary>
+        public const string CountriesSearch = "country.countries.search";
+        /// <summary>Permission to create country reference records.</summary>
+        public const string CountriesCreate = "country.countries.create";
+        /// <summary>Permission to update country reference records.</summary>
+        public const string CountriesUpdate = "country.countries.update";
+        /// <summary>Permission to soft delete country reference records.</summary>
+        public const string CountriesDelete = "country.countries.delete";
+        /// <summary>Permission to restore country reference records.</summary>
+        public const string CountriesRestore = "country.countries.restore";
     }
 
     /// <summary>
@@ -201,6 +228,14 @@ public static class MalievPermissions
     {
         /// <summary>Permission to view currency metadata.</summary>
         public const string CurrenciesRead = "currency.currencies.read";
+        /// <summary>Permission to create currency metadata.</summary>
+        public const string CurrenciesCreate = "currency.currencies.create";
+        /// <summary>Permission to update currency metadata.</summary>
+        public const string CurrenciesUpdate = "currency.currencies.update";
+        /// <summary>Permission to delete currency metadata.</summary>
+        public const string CurrenciesDelete = "currency.currencies.delete";
+        /// <summary>Permission to activate or deactivate currency metadata.</summary>
+        public const string CurrenciesActivate = "currency.currencies.activate";
         /// <summary>Permission to view exchange rates.</summary>
         public const string RatesRead = "currency.rates.read";
     }

@@ -1,0 +1,62 @@
+@typeparam TItem
+@using Maliev.Intranet.Shared
+
+<div class="reference-pager" aria-label="@($"{Label} pagination")">
+    <span>@PageSummary</span>
+    <div class="reference-pager-controls">
+        <label>
+            <span>Rows</span>
+            <select class="mlv-form-input" value="@PageSize" @onchange="HandlePageSizeChangedAsync">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </label>
+        <button type="button" class="mlv-button secondary" disabled="@(!Page.HasPreviousPage)" @onclick="OnPrevious">Previous</button>
+        <button type="button" class="mlv-button secondary" disabled="@(!Page.HasNextPage)" @onclick="OnNext">Next</button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public ReferenceDataPage<TItem> Page { get; set; } = new();
+
+    [Parameter]
+    public int PageSize { get; set; } = 25;
+
+    [Parameter]
+    public string Label { get; set; } = "records";
+
+    [Parameter]
+    public EventCallback OnPrevious { get; set; }
+
+    [Parameter]
+    public EventCallback OnNext { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnPageSizeChanged { get; set; }
+
+    private string PageSummary
+    {
+        get
+        {
+            if (Page.TotalCount == 0)
+            {
+                return $"No {Label}";
+            }
+
+            var first = ((Math.Max(1, Page.PageNumber) - 1) * Page.PageSize) + 1;
+            var last = Math.Min(Page.TotalCount, first + Page.Items.Count - 1);
+            return $"{first:N0}-{last:N0} of {Page.TotalCount:N0} {Label}";
+        }
+    }
+
+    private async Task HandlePageSizeChangedAsync(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var nextPageSize))
+        {
+            await OnPageSizeChanged.InvokeAsync(nextPageSize);
+        }
+    }
+}

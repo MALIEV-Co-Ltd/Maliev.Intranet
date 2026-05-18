@@ -4,7 +4,6 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IReferenceDataService ReferenceDataService
-@inject ISnackbar Snackbar
 
 <PageTitle>Reference Data | MALIEV Intranet</PageTitle>
 
@@ -17,31 +16,35 @@
         @if (_loading)
         {
             <MudGrid Spacing="3">
-                <MudItem xs="12" md="4">
-                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" Animation="Animation.Wave" />
-                </MudItem>
-                <MudItem xs="12" md="4">
-                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" Animation="Animation.Wave" />
-                </MudItem>
-                <MudItem xs="12" md="4">
-                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" Animation="Animation.Wave" />
-                </MudItem>
+                @for (var i = 0; i < 4; i++)
+                {
+                    <MudItem xs="12" md="3">
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" Animation="Animation.Wave" />
+                    </MudItem>
+                }
             </MudGrid>
+
+            <PanelCard Class="reference-skeleton-panel mt-4">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="36px" Animation="Animation.Wave" />
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="220px" Animation="Animation.Wave" />
+            </PanelCard>
         }
         else
         {
             <StatBar Class="mb-4">
-                <StatTile Label="Countries" Value="@_countries.Count.ToString("N0")" />
-                <StatTile Label="Currencies" Value="@_currencies.Count.ToString("N0")" />
+                <StatTile Label="Countries" Value="@CountryTotalDisplay" />
+                <StatTile Label="Currencies" Value="@CurrencyTotalDisplay" />
                 <StatTile Label="Primary currency" Value="@(_primaryCurrency?.Code ?? "Not set")" />
-                <StatTile Label="Registry results" Value="@_locations.Count.ToString("N0")" />
+                <StatTile Label="Registry addresses" Value="@RegistryTotalDisplay" />
             </StatBar>
 
-            <div class="mlv-toolbar mb-4">
-                <div class="mlv-segmented">
+            <div class="mlv-toolbar mb-4 reference-section-toolbar">
+                <div class="mlv-segmented reference-sections" role="tablist" aria-label="Reference data sections">
                     @foreach (var navSection in _sections)
                     {
                         <button type="button"
+                                role="tab"
+                                aria-selected="@(_section == navSection.Key)"
                                 class="@(_section == navSection.Key ? "active" : "")"
                                 @onclick="@(() => SetSection(navSection.Key))">
                             @navSection.Label
@@ -50,97 +53,303 @@
                 </div>
             </div>
 
-            <MudGrid Spacing="3">
+            @if (!string.IsNullOrWhiteSpace(_statusMessage))
+            {
+                <div class="reference-inline-message @(_statusIsError ? "is-error" : "is-success")" role="status">
+                    @_statusMessage
+                </div>
+            }
+
+            <div class="reference-workbench">
                 @if (ShouldShow("countries"))
                 {
-                <MudItem xs="12" lg="@PanelWidth">
-                    <PanelCard Title="Countries">
-                        @if (_countries.Count == 0)
+                    <PanelCard Title="Countries" Class="reference-management-panel">
+                        <div class="reference-panel-intro">
+                            <div>
+                                <h3>Country catalog</h3>
+                                <p>Manage ISO country records used by customer addresses, supplier profiles, and storefront configuration.</p>
+                            </div>
+                            <span class="reference-count-chip">@_countryPage.TotalCount.ToString("N0") total</span>
+                        </div>
+
+                        <form class="reference-toolbar" @onsubmit="SearchCountriesAsync" @onsubmit:preventDefault>
+                            <label class="reference-search-field">
+                                <span>Search countries</span>
+                                <input class="mlv-form-input"
+                                       placeholder="Name, ISO2, ISO3, region"
+                                       @bind="_countryQuery"
+                                       @bind:event="oninput" />
+                            </label>
+                            <label class="reference-check">
+                                <input type="checkbox" @bind="_includeInactiveCountries" />
+                                <span>Include inactive</span>
+                            </label>
+                            <button type="submit" class="mlv-button secondary" disabled="@_loadingCountries">Search</button>
+                            <button type="button" class="mlv-button primary" @onclick="StartNewCountry">New country</button>
+                        </form>
+
+                        @if (_countryEditorOpen)
                         {
-                            <div class="mlv-empty">Country reference data is unavailable.</div>
+                            <div class="reference-editor" aria-label="Country editor">
+                                <div class="reference-editor-header">
+                                    <h3>@(_editingCountryId.HasValue ? "Edit country" : "New country")</h3>
+                                    <button type="button" class="reference-link-button" @onclick="CancelCountryEdit">Cancel</button>
+                                </div>
+                                <div class="reference-form-grid">
+                                    <label class="mlv-form-field">
+                                        <span>ISO2</span>
+                                        <input class="mlv-form-input mlv-mono" maxlength="2" @bind="_countryForm.Code" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>ISO3</span>
+                                        <input class="mlv-form-input mlv-mono" maxlength="3" @bind="_countryForm.Iso3" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field reference-span-2">
+                                        <span>Name</span>
+                                        <input class="mlv-form-input" @bind="_countryForm.Name" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field reference-span-2">
+                                        <span>Official name</span>
+                                        <input class="mlv-form-input" @bind="_countryForm.OfficialName" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Numeric code</span>
+                                        <input class="mlv-form-input mlv-mono" @bind="_countryForm.NumericCode" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Capital</span>
+                                        <input class="mlv-form-input" @bind="_countryForm.Capital" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Region</span>
+                                        <input class="mlv-form-input" @bind="_countryForm.Region" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Subregion</span>
+                                        <input class="mlv-form-input" @bind="_countryForm.Subregion" @bind:event="oninput" />
+                                    </label>
+                                </div>
+                                <div class="reference-editor-actions">
+                                    <label class="reference-check">
+                                        <input type="checkbox" @bind="_countryForm.IsActive" />
+                                        <span>Active country</span>
+                                    </label>
+                                    <button type="button" class="mlv-button primary" disabled="@_savingCountry" @onclick="SaveCountryAsync">
+                                        @(_savingCountry ? "Saving..." : "Save country")
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        @if (_loadingCountries)
+                        {
+                            <ReferenceTableSkeleton />
                         }
                         else
                         {
-                            <table class="mlv-table">
-                                <thead>
-                                    <tr>
-                                        <th>Code</th>
-                                        <th>Name</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var country in _countries.Take(24))
-                                    {
+                            <div class="reference-table-shell">
+                                <table class="mlv-table reference-table">
+                                    <thead>
                                         <tr>
-                                            <td class="mlv-mono">@country.Code</td>
-                                            <td>@country.Name</td>
+                                            <th>ISO</th>
+                                            <th>Name</th>
+                                            <th>Region</th>
+                                            <th>Status</th>
+                                            <th class="reference-actions-col">Actions</th>
                                         </tr>
-                                    }
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var country in _countryPage.Items)
+                                        {
+                                            <tr>
+                                                <td class="mlv-mono">
+                                                    <strong>@country.Code</strong>
+                                                    @if (!string.IsNullOrWhiteSpace(country.Iso3))
+                                                    {
+                                                        <span class="reference-muted"> / @country.Iso3</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <strong>@country.Name</strong>
+                                                    @if (!string.IsNullOrWhiteSpace(country.OfficialName))
+                                                    {
+                                                        <span class="reference-muted">@country.OfficialName</span>
+                                                    }
+                                                </td>
+                                                <td>@DisplayOrDash(country.Region)</td>
+                                                <td><StatusBadge Status="@(country.IsActive ? "Active" : "Inactive")" /></td>
+                                                <td>
+                                                    <div class="reference-row-actions">
+                                                        <button type="button" class="reference-link-button" @onclick="@(() => EditCountry(country))">Edit</button>
+                                                        @if (country.IsActive)
+                                                        {
+                                                            <button type="button" class="reference-danger-button" @onclick="@(() => DeleteCountryAsync(country))">Disable</button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button type="button" class="reference-link-button" @onclick="@(() => RestoreCountryAsync(country))">Restore</button>
+                                                        }
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <ReferencePager Page="@_countryPage"
+                                            PageSize="@_countryPageSize"
+                                            Label="countries"
+                                            OnPrevious="PreviousCountryPageAsync"
+                                            OnNext="NextCountryPageAsync"
+                                            OnPageSizeChanged="ChangeCountryPageSizeAsync" />
                         }
                     </PanelCard>
-                </MudItem>
                 }
 
                 @if (ShouldShow("currencies"))
                 {
-                <MudItem xs="12" lg="@PanelWidth">
-                    <PanelCard Title="Currencies">
-                        @if (_currencies.Count == 0)
+                    <PanelCard Title="Currencies" Class="reference-management-panel">
+                        <div class="reference-panel-intro">
+                            <div>
+                                <h3>Currency catalog</h3>
+                                <p>Manage ISO currency records and active availability for accounting, quotes, and supplier costs.</p>
+                            </div>
+                            <span class="reference-count-chip">@_currencyPage.TotalCount.ToString("N0") total</span>
+                        </div>
+
+                        <div class="reference-toolbar">
+                            <label class="reference-select-field">
+                                <span>Status</span>
+                                <select class="mlv-form-input" value="@_currencyStatusFilter" @onchange="ChangeCurrencyStatusFilterAsync">
+                                    <option value="all">All currencies</option>
+                                    <option value="active">Active only</option>
+                                    <option value="inactive">Inactive only</option>
+                                </select>
+                            </label>
+                            <button type="button" class="mlv-button primary" @onclick="StartNewCurrency">New currency</button>
+                        </div>
+
+                        @if (_currencyEditorOpen)
                         {
-                            <div class="mlv-empty">Currency reference data is unavailable.</div>
+                            <div class="reference-editor" aria-label="Currency editor">
+                                <div class="reference-editor-header">
+                                    <h3>@(_editingCurrencyId.HasValue ? "Edit currency" : "New currency")</h3>
+                                    <button type="button" class="reference-link-button" @onclick="CancelCurrencyEdit">Cancel</button>
+                                </div>
+                                <div class="reference-form-grid">
+                                    <label class="mlv-form-field">
+                                        <span>Code</span>
+                                        <input class="mlv-form-input mlv-mono"
+                                               maxlength="3"
+                                               disabled="@_editingCurrencyId.HasValue"
+                                               @bind="_currencyForm.Code"
+                                               @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Symbol</span>
+                                        <input class="mlv-form-input" @bind="_currencyForm.Symbol" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field reference-span-2">
+                                        <span>Name</span>
+                                        <input class="mlv-form-input" @bind="_currencyForm.Name" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Decimal places</span>
+                                        <input class="mlv-form-input" type="number" min="0" max="8" @bind="_currencyForm.DecimalPlaces" />
+                                    </label>
+                                </div>
+                                <div class="reference-editor-actions">
+                                    <label class="reference-check">
+                                        <input type="checkbox" @bind="_currencyForm.IsActive" />
+                                        <span>Active currency</span>
+                                    </label>
+                                    <button type="button" class="mlv-button primary" disabled="@_savingCurrency" @onclick="SaveCurrencyAsync">
+                                        @(_savingCurrency ? "Saving..." : "Save currency")
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        @if (_loadingCurrencies)
+                        {
+                            <ReferenceTableSkeleton />
                         }
                         else
                         {
-                            <table class="mlv-table">
-                                <thead>
-                                    <tr>
-                                        <th>Code</th>
-                                        <th>Name</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var currency in _currencies.Take(24))
-                                    {
+                            <div class="reference-table-shell">
+                                <table class="mlv-table reference-table">
+                                    <thead>
                                         <tr>
-                                            <td class="mlv-mono">@currency.Code @currency.Symbol</td>
-                                            <td>@currency.Name</td>
-                                            <td><StatusBadge Status="@GetCurrencyStatus(currency)" /></td>
+                                            <th>Code</th>
+                                            <th>Name</th>
+                                            <th>Decimals</th>
+                                            <th>Status</th>
+                                            <th class="reference-actions-col">Actions</th>
                                         </tr>
-                                    }
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var currency in _currencyPage.Items)
+                                        {
+                                            <tr>
+                                                <td class="mlv-mono"><strong>@currency.Code</strong> @currency.Symbol</td>
+                                                <td>@currency.Name</td>
+                                                <td class="mlv-mono">@currency.DecimalPlaces</td>
+                                                <td>
+                                                    <StatusBadge Status="@GetCurrencyStatus(currency)" />
+                                                </td>
+                                                <td>
+                                                    <div class="reference-row-actions">
+                                                        <button type="button" class="reference-link-button" @onclick="@(() => EditCurrency(currency))">Edit</button>
+                                                        <button type="button" class="reference-danger-button" disabled="@currency.IsPrimary" @onclick="@(() => DeleteCurrencyAsync(currency))">Delete</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <ReferencePager Page="@_currencyPage"
+                                            PageSize="@_currencyPageSize"
+                                            Label="currencies"
+                                            OnPrevious="PreviousCurrencyPageAsync"
+                                            OnNext="NextCurrencyPageAsync"
+                                            OnPageSizeChanged="ChangeCurrencyPageSizeAsync" />
                         }
                     </PanelCard>
-                </MudItem>
                 }
 
                 @if (ShouldShow("exchange-rates"))
                 {
-                <MudItem xs="12" lg="@PanelWidth">
-                    <PanelCard Title="Exchange Rates">
-                        <div class="mlv-toolbar">
-                            <MudSelect T="string" @bind-Value="_rateFrom" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 140px;">
-                                @foreach (var currency in _currencies)
-                                {
-                                    <MudSelectItem Value="@currency.Code">@currency.Code @currency.Symbol</MudSelectItem>
-                                }
-                            </MudSelect>
-                            <MudSelect T="string" @bind-Value="_rateTo" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 140px;">
-                                @foreach (var currency in _currencies)
-                                {
-                                    <MudSelectItem Value="@currency.Code">@currency.Code @currency.Symbol</MudSelectItem>
-                                }
-                            </MudSelect>
-                            <MudButton Variant="Variant.Filled"
-                                       Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Outlined.CurrencyExchange"
-                                       Disabled="@_loadingRate"
-                                       OnClick="LoadExchangeRateAsync">
-                                Check rate
-                            </MudButton>
+                    <PanelCard Title="Exchange Rates" Class="reference-management-panel reference-exchange-panel">
+                        <div class="reference-panel-intro">
+                            <div>
+                                <h3>Exchange-rate check</h3>
+                                <p>Validate live rate data from CurrencyService before updating finance workflows.</p>
+                            </div>
+                        </div>
+
+                        <div class="reference-toolbar">
+                            <label class="reference-select-field">
+                                <span>From</span>
+                                <select class="mlv-form-input" @bind="_rateFrom">
+                                    @foreach (var currency in _currencies)
+                                    {
+                                        <option value="@currency.Code">@currency.Code @currency.Symbol</option>
+                                    }
+                                </select>
+                            </label>
+                            <label class="reference-select-field">
+                                <span>To</span>
+                                <select class="mlv-form-input" @bind="_rateTo">
+                                    @foreach (var currency in _currencies)
+                                    {
+                                        <option value="@currency.Code">@currency.Code @currency.Symbol</option>
+                                    }
+                                </select>
+                            </label>
+                            <button type="button" class="mlv-button primary" disabled="@_loadingRate" @onclick="LoadExchangeRateAsync">
+                                @(_loadingRate ? "Checking..." : "Check rate")
+                            </button>
                         </div>
 
                         @if (_loadingRate)
@@ -149,9 +358,9 @@
                         }
                         else if (_exchangeRate is not null)
                         {
-                            <div class="mlv-empty text-left">
+                            <div class="reference-rate-result">
                                 <strong>1 @_exchangeRate.From = @_exchangeRate.Rate.ToString("N6") @_exchangeRate.To</strong>
-                                <div>Live rate loaded from CurrencyService.</div>
+                                <span>Live rate loaded from CurrencyService.</span>
                             </div>
                         }
                         else
@@ -159,70 +368,120 @@
                             <div class="mlv-empty text-left">Select two currencies to validate CurrencyService exchange-rate data.</div>
                         }
                     </PanelCard>
-                </MudItem>
                 }
 
                 @if (ShouldShow("registry"))
                 {
-                <MudItem xs="12" lg="8" xl="7" Class="reference-registry-item">
-                    <PanelCard Title="RegistryService Thai Locations" Class="reference-registry-card">
-                        <div class="reference-registry-toolbar">
-                            <MudTextField @bind-Value="_locationQuery"
-                                          Class="reference-location-search"
-                                          Label="Search by postcode, district, city, or province"
-                                          Variant="Variant.Outlined"
-                                          Margin="Margin.Dense"
-                                          Immediate="true"
-                                          DebounceInterval="300"
-                                          OnDebounceIntervalElapsed="SearchLocationsAfterInput" />
-                            <MudButton Variant="Variant.Filled"
-                                       Color="Color.Primary"
-                                       Class="reference-location-search-button"
-                                       StartIcon="@Icons.Material.Outlined.Search"
-                                       Disabled="@_searchingLocations"
-                                       OnClick="SearchLocationsAsync">
-                                Search
-                            </MudButton>
+                    <PanelCard Title="RegistryService Thai Locations" Class="reference-management-panel reference-registry-card">
+                        <div class="reference-panel-intro">
+                            <div>
+                                <h3>Thai address registry</h3>
+                                <p>Manage postcode, subdistrict, district, and province data used by address autocomplete.</p>
+                            </div>
+                            <span class="reference-count-chip">@_locationPage.TotalCount.ToString("N0") total</span>
                         </div>
 
-                        @if (_searchingLocations)
+                        <form class="reference-toolbar reference-registry-toolbar" @onsubmit="SearchLocationsAsync" @onsubmit:preventDefault>
+                            <label class="reference-search-field">
+                                <span>Search locations</span>
+                                <input class="mlv-form-input"
+                                       placeholder="Postcode, district, city, province"
+                                       @bind="_locationQuery"
+                                       @bind:event="oninput" />
+                            </label>
+                            <button type="submit" class="mlv-button secondary" disabled="@_loadingLocations">Search</button>
+                            <button type="button" class="mlv-button primary" @onclick="StartNewLocation">New location</button>
+                        </form>
+
+                        @if (_locationEditorOpen)
                         {
-                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" Animation="Animation.Wave" />
+                            <div class="reference-editor" aria-label="Registry location editor">
+                                <div class="reference-editor-header">
+                                    <h3>@(_editingLocationId.HasValue ? "Edit location" : "New location")</h3>
+                                    <button type="button" class="reference-link-button" @onclick="CancelLocationEdit">Cancel</button>
+                                </div>
+                                <div class="reference-form-grid">
+                                    <label class="mlv-form-field">
+                                        <span>Postal code</span>
+                                        <input class="mlv-form-input mlv-mono" maxlength="5" @bind="_locationForm.PostalCode" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Province TH</span>
+                                        <input class="mlv-form-input" @bind="_locationForm.ProvinceTh" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>District TH</span>
+                                        <input class="mlv-form-input" @bind="_locationForm.DistrictTh" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Subdistrict TH</span>
+                                        <input class="mlv-form-input" @bind="_locationForm.SubDistrictTh" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Province EN</span>
+                                        <input class="mlv-form-input" @bind="_locationForm.ProvinceEn" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>District EN</span>
+                                        <input class="mlv-form-input" @bind="_locationForm.DistrictEn" @bind:event="oninput" />
+                                    </label>
+                                    <label class="mlv-form-field">
+                                        <span>Subdistrict EN</span>
+                                        <input class="mlv-form-input" @bind="_locationForm.SubDistrictEn" @bind:event="oninput" />
+                                    </label>
+                                </div>
+                                <div class="reference-editor-actions">
+                                    <button type="button" class="mlv-button primary" disabled="@_savingLocation" @onclick="SaveLocationAsync">
+                                        @(_savingLocation ? "Saving..." : "Save location")
+                                    </button>
+                                </div>
+                            </div>
                         }
-                        else if (!string.IsNullOrWhiteSpace(_locationMessage))
+
+                        @if (_loadingLocations)
                         {
-                            <div class="mlv-empty">@_locationMessage</div>
-                        }
-                        else if (_locations.Count > 0)
-                        {
-                            <table class="mlv-table">
-                                <thead>
-                                    <tr>
-                                        <th>Postal code</th>
-                                        <th>Thai</th>
-                                        <th>English</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var location in _locations)
-                                    {
-                                        <tr>
-                                            <td class="mlv-mono">@location.PostalCode</td>
-                                            <td>@location.SubDistrictTh, @location.DistrictTh, @location.ProvinceTh</td>
-                                            <td>@location.SubDistrictEn, @location.DistrictEn, @location.ProvinceEn</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
+                            <ReferenceTableSkeleton />
                         }
                         else
                         {
-                            <div class="mlv-empty">Search RegistryService locations to validate address reference data.</div>
+                            <div class="reference-table-shell">
+                                <table class="mlv-table reference-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Postal code</th>
+                                            <th>Thai address</th>
+                                            <th>English address</th>
+                                            <th class="reference-actions-col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var location in _locationPage.Items)
+                                        {
+                                            <tr>
+                                                <td class="mlv-mono"><strong>@location.PostalCode</strong></td>
+                                                <td>@location.SubDistrictTh, @location.DistrictTh, @location.ProvinceTh</td>
+                                                <td>@location.SubDistrictEn, @location.DistrictEn, @location.ProvinceEn</td>
+                                                <td>
+                                                    <div class="reference-row-actions">
+                                                        <button type="button" class="reference-link-button" @onclick="@(() => EditLocation(location))">Edit</button>
+                                                        <button type="button" class="reference-danger-button" @onclick="@(() => DeleteLocationAsync(location))">Delete</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <ReferencePager Page="@_locationPage"
+                                            PageSize="@_locationPageSize"
+                                            Label="locations"
+                                            OnPrevious="PreviousLocationPageAsync"
+                                            OnNext="NextLocationPageAsync"
+                                            OnPageSizeChanged="ChangeLocationPageSizeAsync" />
                         }
                     </PanelCard>
-                </MudItem>
                 }
-            </MudGrid>
+            </div>
         }
     </PageBody>
 </div>
@@ -231,16 +490,46 @@
     private List<CountryDto> _countries = [];
     private List<CurrencyDto> _currencies = [];
     private CurrencyDto? _primaryCurrency;
-    private List<RegistryThaiLocation> _locations = [];
+
+    private ReferenceDataPage<CountryDto> _countryPage = new();
+    private ReferenceDataPage<CurrencyDto> _currencyPage = new();
+    private ReferenceDataPage<RegistryThaiLocation> _locationPage = new();
+
+    private CountryDto _countryForm = NewCountryForm();
+    private CurrencyDto _currencyForm = NewCurrencyForm();
+    private RegistryThaiLocation _locationForm = NewLocationForm();
+
+    private Guid? _editingCountryId;
+    private Guid? _editingCurrencyId;
+    private Guid? _editingLocationId;
+
+    private string _countryQuery = string.Empty;
+    private string _currencyStatusFilter = "all";
     private string _locationQuery = string.Empty;
-    private string? _locationMessage;
     private string _section = "overview";
     private string _rateFrom = "USD";
     private string _rateTo = "THB";
+    private string? _statusMessage;
+
+    private int _countryPageSize = 25;
+    private int _currencyPageSize = 25;
+    private int _locationPageSize = 25;
+
     private ExchangeRateResponse? _exchangeRate;
+
+    private bool _includeInactiveCountries = true;
     private bool _loading = true;
-    private bool _searchingLocations;
+    private bool _loadingCountries;
+    private bool _loadingCurrencies;
+    private bool _loadingLocations;
     private bool _loadingRate;
+    private bool _savingCountry;
+    private bool _savingCurrency;
+    private bool _savingLocation;
+    private bool _countryEditorOpen;
+    private bool _currencyEditorOpen;
+    private bool _locationEditorOpen;
+    private bool _statusIsError;
 
     private readonly ReferenceDataSection[] _sections =
     [
@@ -254,7 +543,9 @@
     [SupplyParameterFromQuery(Name = "section")]
     private string? RequestedSection { get; set; }
 
-    private int PanelWidth => _section == "overview" ? 6 : 12;
+    private string CountryTotalDisplay => (_countryPage.TotalCount > 0 ? _countryPage.TotalCount : _countries.Count).ToString("N0");
+    private string CurrencyTotalDisplay => (_currencyPage.TotalCount > 0 ? _currencyPage.TotalCount : _currencies.Count).ToString("N0");
+    private string RegistryTotalDisplay => _locationPage.TotalCount.ToString("N0");
 
     protected override void OnParametersSet()
     {
@@ -269,14 +560,18 @@
     private async Task LoadReferenceDataAsync()
     {
         _loading = true;
+        ClearStatus();
 
         try
         {
             var countriesTask = ReferenceDataService.GetCountriesAsync();
             var currenciesTask = ReferenceDataService.GetCurrenciesAsync();
             var primaryTask = ReferenceDataService.GetPrimaryCurrencyAsync();
+            var countryPageTask = ReferenceDataService.GetCountryPageAsync(_countryQuery, _includeInactiveCountries, 1, _countryPageSize);
+            var currencyPageTask = ReferenceDataService.GetCurrencyPageAsync(GetCurrencyActiveFilter(), 1, _currencyPageSize);
+            var locationPageTask = ReferenceDataService.GetRegistryLocationPageAsync(_locationQuery, 1, _locationPageSize);
 
-            await Task.WhenAll(countriesTask, currenciesTask, primaryTask);
+            await Task.WhenAll(countriesTask, currenciesTask, primaryTask, countryPageTask, currencyPageTask, locationPageTask);
 
             _countries = countriesTask.Result
                 .OrderBy(country => country.Name)
@@ -287,6 +582,9 @@
                 .ThenBy(currency => currency.Code)
                 .ToList();
             _primaryCurrency = primaryTask.Result;
+            _countryPage = countryPageTask.Result;
+            _currencyPage = currencyPageTask.Result;
+            _locationPage = locationPageTask.Result;
             _rateTo = _primaryCurrency?.Code ?? "THB";
             _rateFrom = _currencies.FirstOrDefault(currency => !string.Equals(currency.Code, _rateTo, StringComparison.OrdinalIgnoreCase))?.Code
                 ?? _rateTo;
@@ -296,7 +594,10 @@
             _countries = [];
             _currencies = [];
             _primaryCurrency = null;
-            Snackbar.Add("Reference data could not be loaded.", Severity.Warning);
+            _countryPage = new();
+            _currencyPage = new();
+            _locationPage = new();
+            SetStatus("Reference data could not be loaded. Check the source services and try again.", isError: true);
             Console.WriteLine(ex.Message);
         }
         finally
@@ -305,48 +606,83 @@
         }
     }
 
-    private async Task SearchLocationsAfterInput(string _)
+    private async Task SearchCountriesAsync()
     {
-        if (_locationQuery.Trim().Length < 3)
-        {
-            _locations = [];
-            _locationMessage = null;
-            return;
-        }
-
-        await SearchLocationsAsync();
+        await LoadCountryPageAsync(1);
     }
 
-    private async Task SearchLocationsAsync()
+    private async Task LoadCountryPageAsync(int pageNumber)
     {
-        var query = _locationQuery.Trim();
-        if (query.Length < 2)
-        {
-            _locations = [];
-            _locationMessage = "Enter at least two characters to search RegistryService.";
-            return;
-        }
-
-        _searchingLocations = true;
-        _locationMessage = null;
+        _loadingCountries = true;
+        ClearStatus();
 
         try
         {
-            _locations = await ReferenceDataService.AutocompleteLocationsAsync(query, 12);
-            _locationMessage = _locations.Count == 0
-                ? "No RegistryService locations matched the search."
-                : null;
+            _countryPage = await ReferenceDataService.GetCountryPageAsync(
+                _countryQuery,
+                _includeInactiveCountries,
+                pageNumber,
+                _countryPageSize);
         }
         catch (Exception ex)
         {
-            _locations = [];
-            _locationMessage = "RegistryService lookup failed.";
-            Snackbar.Add(_locationMessage, Severity.Warning);
+            SetStatus("Country records could not be loaded.", isError: true);
             Console.WriteLine(ex.Message);
         }
         finally
         {
-            _searchingLocations = false;
+            _loadingCountries = false;
+        }
+    }
+
+    private async Task SearchLocationsAsync()
+    {
+        await LoadLocationPageAsync(1);
+    }
+
+    private async Task LoadLocationPageAsync(int pageNumber)
+    {
+        _loadingLocations = true;
+        ClearStatus();
+
+        try
+        {
+            _locationPage = await ReferenceDataService.GetRegistryLocationPageAsync(
+                _locationQuery,
+                pageNumber,
+                _locationPageSize);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Registry locations could not be loaded.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loadingLocations = false;
+        }
+    }
+
+    private async Task LoadCurrencyPageAsync(int pageNumber)
+    {
+        _loadingCurrencies = true;
+        ClearStatus();
+
+        try
+        {
+            _currencyPage = await ReferenceDataService.GetCurrencyPageAsync(
+                GetCurrencyActiveFilter(),
+                pageNumber,
+                _currencyPageSize);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Currency records could not be loaded.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loadingCurrencies = false;
         }
     }
 
@@ -359,6 +695,8 @@
         }
 
         _loadingRate = true;
+        ClearStatus();
+
         try
         {
             var url = $"api/v1/ReferenceData/currencies/rate?from={Uri.EscapeDataString(_rateFrom)}&to={Uri.EscapeDataString(_rateTo)}";
@@ -367,13 +705,366 @@
         catch (Exception ex)
         {
             _exchangeRate = null;
-            Snackbar.Add("Exchange rate could not be loaded.", Severity.Warning);
+            SetStatus("Exchange rate could not be loaded.", isError: true);
             Console.WriteLine(ex.Message);
         }
         finally
         {
             _loadingRate = false;
         }
+    }
+
+    private void StartNewCountry()
+    {
+        _editingCountryId = null;
+        _countryForm = NewCountryForm();
+        _countryEditorOpen = true;
+        ClearStatus();
+    }
+
+    private void EditCountry(CountryDto country)
+    {
+        _editingCountryId = country.Id;
+        _countryForm = Clone(country);
+        _countryEditorOpen = true;
+        ClearStatus();
+    }
+
+    private void CancelCountryEdit()
+    {
+        _countryEditorOpen = false;
+        _editingCountryId = null;
+        _countryForm = NewCountryForm();
+    }
+
+    private async Task SaveCountryAsync()
+    {
+        if (!ValidateCountry())
+        {
+            return;
+        }
+
+        _savingCountry = true;
+        ClearStatus();
+
+        try
+        {
+            if (_editingCountryId.HasValue)
+            {
+                await ReferenceDataService.UpdateCountryAsync(_editingCountryId.Value, NormalizeCountry(_countryForm));
+                SetStatus("Country record updated.");
+            }
+            else
+            {
+                await ReferenceDataService.CreateCountryAsync(NormalizeCountry(_countryForm));
+                SetStatus("Country record created.");
+            }
+
+            CancelCountryEdit();
+            await LoadCountryPageAsync(_countryPage.PageNumber);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Country record could not be saved.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _savingCountry = false;
+        }
+    }
+
+    private async Task DeleteCountryAsync(CountryDto country)
+    {
+        ClearStatus();
+
+        try
+        {
+            await ReferenceDataService.DeleteCountryAsync(country.Id);
+            SetStatus("Country record disabled.");
+            await LoadCountryPageAsync(_countryPage.PageNumber);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Country record could not be disabled.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task RestoreCountryAsync(CountryDto country)
+    {
+        ClearStatus();
+
+        try
+        {
+            await ReferenceDataService.RestoreCountryAsync(country.Id);
+            SetStatus("Country record restored.");
+            await LoadCountryPageAsync(_countryPage.PageNumber);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Country record could not be restored.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void StartNewCurrency()
+    {
+        _editingCurrencyId = null;
+        _currencyForm = NewCurrencyForm();
+        _currencyEditorOpen = true;
+        ClearStatus();
+    }
+
+    private void EditCurrency(CurrencyDto currency)
+    {
+        _editingCurrencyId = currency.Id;
+        _currencyForm = Clone(currency);
+        _currencyEditorOpen = true;
+        ClearStatus();
+    }
+
+    private void CancelCurrencyEdit()
+    {
+        _currencyEditorOpen = false;
+        _editingCurrencyId = null;
+        _currencyForm = NewCurrencyForm();
+    }
+
+    private async Task SaveCurrencyAsync()
+    {
+        if (!ValidateCurrency())
+        {
+            return;
+        }
+
+        _savingCurrency = true;
+        ClearStatus();
+
+        try
+        {
+            if (_editingCurrencyId.HasValue)
+            {
+                await ReferenceDataService.UpdateCurrencyAsync(_editingCurrencyId.Value, NormalizeCurrency(_currencyForm));
+                SetStatus("Currency record updated.");
+            }
+            else
+            {
+                await ReferenceDataService.CreateCurrencyAsync(NormalizeCurrency(_currencyForm));
+                SetStatus("Currency record created.");
+            }
+
+            CancelCurrencyEdit();
+            await LoadCurrencyPageAsync(_currencyPage.PageNumber);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Currency record could not be saved.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _savingCurrency = false;
+        }
+    }
+
+    private async Task DeleteCurrencyAsync(CurrencyDto currency)
+    {
+        if (currency.IsPrimary)
+        {
+            SetStatus("The primary currency cannot be deleted from this page.", isError: true);
+            return;
+        }
+
+        ClearStatus();
+
+        try
+        {
+            await ReferenceDataService.DeleteCurrencyAsync(currency.Id);
+            SetStatus("Currency record deleted.");
+            await LoadCurrencyPageAsync(_currencyPage.PageNumber);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Currency record could not be deleted.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void StartNewLocation()
+    {
+        _editingLocationId = null;
+        _locationForm = NewLocationForm();
+        _locationEditorOpen = true;
+        ClearStatus();
+    }
+
+    private void EditLocation(RegistryThaiLocation location)
+    {
+        _editingLocationId = location.Id;
+        _locationForm = Clone(location);
+        _locationEditorOpen = true;
+        ClearStatus();
+    }
+
+    private void CancelLocationEdit()
+    {
+        _locationEditorOpen = false;
+        _editingLocationId = null;
+        _locationForm = NewLocationForm();
+    }
+
+    private async Task SaveLocationAsync()
+    {
+        if (!ValidateLocation())
+        {
+            return;
+        }
+
+        _savingLocation = true;
+        ClearStatus();
+
+        try
+        {
+            if (_editingLocationId.HasValue)
+            {
+                await ReferenceDataService.UpdateRegistryLocationAsync(_editingLocationId.Value, NormalizeLocation(_locationForm));
+                SetStatus("Registry location updated.");
+            }
+            else
+            {
+                await ReferenceDataService.CreateRegistryLocationAsync(NormalizeLocation(_locationForm));
+                SetStatus("Registry location created.");
+            }
+
+            CancelLocationEdit();
+            await LoadLocationPageAsync(_locationPage.PageNumber);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Registry location could not be saved.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _savingLocation = false;
+        }
+    }
+
+    private async Task DeleteLocationAsync(RegistryThaiLocation location)
+    {
+        ClearStatus();
+
+        try
+        {
+            await ReferenceDataService.DeleteRegistryLocationAsync(location.Id);
+            SetStatus("Registry location deleted.");
+            await LoadLocationPageAsync(_locationPage.PageNumber);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Registry location could not be deleted.", isError: true);
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private Task PreviousCountryPageAsync() => LoadCountryPageAsync(Math.Max(1, _countryPage.PageNumber - 1));
+    private Task NextCountryPageAsync() => LoadCountryPageAsync(_countryPage.PageNumber + 1);
+    private Task PreviousCurrencyPageAsync() => LoadCurrencyPageAsync(Math.Max(1, _currencyPage.PageNumber - 1));
+    private Task NextCurrencyPageAsync() => LoadCurrencyPageAsync(_currencyPage.PageNumber + 1);
+    private Task PreviousLocationPageAsync() => LoadLocationPageAsync(Math.Max(1, _locationPage.PageNumber - 1));
+    private Task NextLocationPageAsync() => LoadLocationPageAsync(_locationPage.PageNumber + 1);
+
+    private async Task ChangeCountryPageSizeAsync(int pageSize)
+    {
+        _countryPageSize = pageSize;
+        await LoadCountryPageAsync(1);
+    }
+
+    private async Task ChangeCurrencyPageSizeAsync(int pageSize)
+    {
+        _currencyPageSize = pageSize;
+        await LoadCurrencyPageAsync(1);
+    }
+
+    private async Task ChangeLocationPageSizeAsync(int pageSize)
+    {
+        _locationPageSize = pageSize;
+        await LoadLocationPageAsync(1);
+    }
+
+    private async Task ChangeCurrencyStatusFilterAsync(ChangeEventArgs args)
+    {
+        _currencyStatusFilter = args.Value?.ToString() ?? "all";
+        await LoadCurrencyPageAsync(1);
+    }
+
+    private bool ValidateCountry()
+    {
+        if (string.IsNullOrWhiteSpace(_countryForm.Code) || _countryForm.Code.Trim().Length != 2)
+        {
+            SetStatus("Country ISO2 code must be exactly two letters.", isError: true);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_countryForm.Iso3) || _countryForm.Iso3.Trim().Length != 3)
+        {
+            SetStatus("Country ISO3 code must be exactly three letters.", isError: true);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_countryForm.Name))
+        {
+            SetStatus("Country name is required.", isError: true);
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool ValidateCurrency()
+    {
+        if (string.IsNullOrWhiteSpace(_currencyForm.Code) || _currencyForm.Code.Trim().Length != 3)
+        {
+            SetStatus("Currency code must be exactly three letters.", isError: true);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_currencyForm.Name) || string.IsNullOrWhiteSpace(_currencyForm.Symbol))
+        {
+            SetStatus("Currency name and symbol are required.", isError: true);
+            return false;
+        }
+
+        if (_currencyForm.DecimalPlaces < 0)
+        {
+            SetStatus("Currency decimal places cannot be negative.", isError: true);
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool ValidateLocation()
+    {
+        if (string.IsNullOrWhiteSpace(_locationForm.PostalCode) || _locationForm.PostalCode.Trim().Length != 5)
+        {
+            SetStatus("Postal code must be exactly five digits.", isError: true);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_locationForm.SubDistrictTh)
+            || string.IsNullOrWhiteSpace(_locationForm.DistrictTh)
+            || string.IsNullOrWhiteSpace(_locationForm.ProvinceTh)
+            || string.IsNullOrWhiteSpace(_locationForm.SubDistrictEn)
+            || string.IsNullOrWhiteSpace(_locationForm.DistrictEn)
+            || string.IsNullOrWhiteSpace(_locationForm.ProvinceEn))
+        {
+            SetStatus("Thai and English address components are required.", isError: true);
+            return false;
+        }
+
+        return true;
     }
 
     private void SetSection(string section)
@@ -397,12 +1088,125 @@
             : "overview";
     }
 
+    private bool? GetCurrencyActiveFilter() => _currencyStatusFilter switch
+    {
+        "active" => true,
+        "inactive" => false,
+        _ => null
+    };
+
     private static string GetCurrencyStatus(CurrencyDto currency)
     {
         if (currency.IsPrimary)
+        {
             return "Primary";
+        }
 
         return currency.IsActive ? "Active" : "Inactive";
+    }
+
+    private static string DisplayOrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static CountryDto NewCountryForm() => new() { IsActive = true };
+
+    private static CurrencyDto NewCurrencyForm() => new()
+    {
+        DecimalPlaces = 2,
+        IsActive = true
+    };
+
+    private static RegistryThaiLocation NewLocationForm() => new();
+
+    private static CountryDto Clone(CountryDto source) => new()
+    {
+        Id = source.Id,
+        Code = source.Code,
+        Iso3 = source.Iso3,
+        Name = source.Name,
+        OfficialName = source.OfficialName,
+        NumericCode = source.NumericCode,
+        Capital = source.Capital,
+        Region = source.Region,
+        Subregion = source.Subregion,
+        IsActive = source.IsActive,
+        ETag = source.ETag,
+        LastModifiedUtc = source.LastModifiedUtc
+    };
+
+    private static CurrencyDto Clone(CurrencyDto source) => new()
+    {
+        Id = source.Id,
+        Code = source.Code,
+        Symbol = source.Symbol,
+        Name = source.Name,
+        DecimalPlaces = source.DecimalPlaces,
+        IsActive = source.IsActive,
+        IsPrimary = source.IsPrimary,
+        ETag = source.ETag,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+
+    private static RegistryThaiLocation Clone(RegistryThaiLocation source) => new()
+    {
+        Id = source.Id,
+        PostalCode = source.PostalCode,
+        SubDistrictTh = source.SubDistrictTh,
+        DistrictTh = source.DistrictTh,
+        ProvinceTh = source.ProvinceTh,
+        SubDistrictEn = source.SubDistrictEn,
+        DistrictEn = source.DistrictEn,
+        ProvinceEn = source.ProvinceEn
+    };
+
+    private static CountryDto NormalizeCountry(CountryDto source)
+    {
+        var country = Clone(source);
+        country.Code = country.Code.Trim().ToUpperInvariant();
+        country.Iso3 = country.Iso3?.Trim().ToUpperInvariant();
+        country.Name = country.Name.Trim();
+        country.OfficialName = NullIfWhiteSpace(country.OfficialName);
+        country.NumericCode = NullIfWhiteSpace(country.NumericCode);
+        country.Capital = NullIfWhiteSpace(country.Capital);
+        country.Region = NullIfWhiteSpace(country.Region);
+        country.Subregion = NullIfWhiteSpace(country.Subregion);
+        return country;
+    }
+
+    private static CurrencyDto NormalizeCurrency(CurrencyDto source)
+    {
+        var currency = Clone(source);
+        currency.Code = currency.Code.Trim().ToUpperInvariant();
+        currency.Symbol = currency.Symbol.Trim();
+        currency.Name = currency.Name.Trim();
+        return currency;
+    }
+
+    private static RegistryThaiLocation NormalizeLocation(RegistryThaiLocation source)
+    {
+        var location = Clone(source);
+        location.PostalCode = location.PostalCode.Trim();
+        location.SubDistrictTh = location.SubDistrictTh.Trim();
+        location.DistrictTh = location.DistrictTh.Trim();
+        location.ProvinceTh = location.ProvinceTh.Trim();
+        location.SubDistrictEn = location.SubDistrictEn.Trim();
+        location.DistrictEn = location.DistrictEn.Trim();
+        location.ProvinceEn = location.ProvinceEn.Trim();
+        return location;
+    }
+
+    private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void SetStatus(string message, bool isError = false)
+    {
+        _statusMessage = message;
+        _statusIsError = isError;
+    }
+
+    private void ClearStatus()
+    {
+        _statusMessage = null;
+        _statusIsError = false;
     }
 
     private sealed record ReferenceDataSection(string Key, string Label);

@@ -12,6 +12,7 @@ namespace Maliev.Intranet.Bff.Services;
 public class ReferenceDataService : IReferenceDataService
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly CountryServiceClient _countryClient;
     private readonly RegistryServiceClient _registryClient;
     private readonly CurrencyServiceClient _currencyClient;
     private readonly ILogger<ReferenceDataService> _logger;
@@ -20,16 +21,19 @@ public class ReferenceDataService : IReferenceDataService
     /// Initializes a new instance of the <see cref="ReferenceDataService"/> class.
     /// </summary>
     /// <param name="httpClientFactory">HTTP client factory.</param>
+    /// <param name="countryClient">Country service client.</param>
     /// <param name="registryClient">Registry service client.</param>
     /// <param name="currencyClient">Currency service client.</param>
     /// <param name="logger">Logger instance.</param>
     public ReferenceDataService(
         IHttpClientFactory httpClientFactory,
+        CountryServiceClient countryClient,
         RegistryServiceClient registryClient,
         CurrencyServiceClient currencyClient,
         ILogger<ReferenceDataService> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _countryClient = countryClient;
         _registryClient = registryClient;
         _currencyClient = currencyClient;
         _logger = logger;
@@ -77,6 +81,41 @@ public class ReferenceDataService : IReferenceDataService
     }
 
     /// <summary>
+    /// Gets a paginated country page for reference data management.
+    /// </summary>
+    public Task<ReferenceDataPage<CountryDto>> GetCountryPageAsync(
+        string? query,
+        bool includeInactive = true,
+        int pageNumber = 1,
+        int pageSize = 25,
+        CancellationToken cancellationToken = default)
+        => _countryClient.GetCountryPageAsync(query, includeInactive, pageNumber, pageSize, cancellationToken);
+
+    /// <summary>
+    /// Creates a country reference record.
+    /// </summary>
+    public Task<CountryDto> CreateCountryAsync(CountryDto request, CancellationToken cancellationToken = default)
+        => _countryClient.CreateCountryAsync(request, cancellationToken);
+
+    /// <summary>
+    /// Updates a country reference record.
+    /// </summary>
+    public Task<CountryDto> UpdateCountryAsync(Guid id, CountryDto request, CancellationToken cancellationToken = default)
+        => _countryClient.UpdateCountryAsync(id, request, cancellationToken);
+
+    /// <summary>
+    /// Soft deletes a country reference record.
+    /// </summary>
+    public Task DeleteCountryAsync(Guid id, CancellationToken cancellationToken = default)
+        => _countryClient.DeleteCountryAsync(id, cancellationToken);
+
+    /// <summary>
+    /// Restores a soft-deleted country reference record.
+    /// </summary>
+    public Task RestoreCountryAsync(Guid id, CancellationToken cancellationToken = default)
+        => _countryClient.RestoreCountryAsync(id, cancellationToken);
+
+    /// <summary>
     /// Gets all currencies.
     /// </summary>
     public async Task<List<CurrencyDto>> GetCurrenciesAsync(CancellationToken cancellationToken = default)
@@ -93,6 +132,34 @@ public class ReferenceDataService : IReferenceDataService
             return new List<CurrencyDto>();
         }
     }
+
+    /// <summary>
+    /// Gets a paginated currency page for reference data management.
+    /// </summary>
+    public Task<ReferenceDataPage<CurrencyDto>> GetCurrencyPageAsync(
+        bool? isActive,
+        int pageNumber = 1,
+        int pageSize = 25,
+        CancellationToken cancellationToken = default)
+        => _currencyClient.GetCurrencyPageAsync(isActive, pageNumber, pageSize, cancellationToken);
+
+    /// <summary>
+    /// Creates a currency reference record.
+    /// </summary>
+    public Task<CurrencyDto> CreateCurrencyAsync(CurrencyDto request, CancellationToken cancellationToken = default)
+        => _currencyClient.CreateCurrencyAsync(request, cancellationToken);
+
+    /// <summary>
+    /// Updates a currency reference record.
+    /// </summary>
+    public Task<CurrencyDto> UpdateCurrencyAsync(Guid id, CurrencyDto request, CancellationToken cancellationToken = default)
+        => _currencyClient.UpdateCurrencyAsync(id, request, cancellationToken);
+
+    /// <summary>
+    /// Deletes a currency reference record.
+    /// </summary>
+    public Task DeleteCurrencyAsync(Guid id, CancellationToken cancellationToken = default)
+        => _currencyClient.DeleteCurrencyAsync(id, cancellationToken);
 
     /// <summary>
     /// Gets the primary currency.
@@ -125,6 +192,34 @@ public class ReferenceDataService : IReferenceDataService
             return new List<RegistryThaiLocation>();
         }
     }
+
+    /// <summary>
+    /// Gets a paginated Thai address page for registry data management.
+    /// </summary>
+    public Task<ReferenceDataPage<RegistryThaiLocation>> GetRegistryLocationPageAsync(
+        string? query,
+        int pageNumber = 1,
+        int pageSize = 25,
+        CancellationToken cancellationToken = default)
+        => _registryClient.GetLocationPageAsync(query, pageNumber, pageSize, cancellationToken);
+
+    /// <summary>
+    /// Creates a Thai registry location.
+    /// </summary>
+    public Task<RegistryThaiLocation> CreateRegistryLocationAsync(RegistryThaiLocation request, CancellationToken cancellationToken = default)
+        => _registryClient.CreateLocationAsync(request, cancellationToken);
+
+    /// <summary>
+    /// Updates a Thai registry location.
+    /// </summary>
+    public Task<RegistryThaiLocation> UpdateRegistryLocationAsync(Guid id, RegistryThaiLocation request, CancellationToken cancellationToken = default)
+        => _registryClient.UpdateLocationAsync(id, request, cancellationToken);
+
+    /// <summary>
+    /// Deletes a Thai registry location.
+    /// </summary>
+    public Task DeleteRegistryLocationAsync(Guid id, CancellationToken cancellationToken = default)
+        => _registryClient.DeleteLocationAsync(id, cancellationToken);
 }
 
 /// <summary>

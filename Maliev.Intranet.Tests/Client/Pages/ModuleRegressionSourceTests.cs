@@ -652,26 +652,31 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ReferenceDataService.GetCountriesAsync()", page, StringComparison.Ordinal);
         Assert.Contains("ReferenceDataService.GetCurrenciesAsync()", page, StringComparison.Ordinal);
         Assert.Contains("ReferenceDataService.GetPrimaryCurrencyAsync()", page, StringComparison.Ordinal);
-        Assert.Contains("ReferenceDataService.AutocompleteLocationsAsync(query, 12)", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.GetCountryPageAsync", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.GetCurrencyPageAsync", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.GetRegistryLocationPageAsync", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.CreateCountryAsync", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.UpdateCurrencyAsync", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceDataService.DeleteRegistryLocationAsync", page, StringComparison.Ordinal);
         Assert.Contains("MudSkeleton", page, StringComparison.Ordinal);
-        Assert.Contains("OnDebounceIntervalElapsed=\"SearchLocationsAfterInput\"", page, StringComparison.Ordinal);
-        Assert.Contains("Class=\"reference-registry-item\"", page, StringComparison.Ordinal);
-        Assert.Contains("Class=\"reference-registry-card\"", page, StringComparison.Ordinal);
+        Assert.Contains("ReferenceTableSkeleton", page, StringComparison.Ordinal);
+        Assert.Contains("ReferencePager", page, StringComparison.Ordinal);
+        Assert.Contains("reference-management-panel", page, StringComparison.Ordinal);
         Assert.Contains("reference-registry-toolbar", page, StringComparison.Ordinal);
-        Assert.Contains("Class=\"reference-location-search\"", page, StringComparison.Ordinal);
-        Assert.Contains("Class=\"reference-location-search-button\"", page, StringComparison.Ordinal);
+        Assert.Contains("reference-editor", page, StringComparison.Ordinal);
         Assert.Contains("Href=\"/admin/reference-data\"", admin, StringComparison.Ordinal);
         Assert.Contains("Href=\"/commerce/catalog\"", admin, StringComparison.Ordinal);
         Assert.Contains("Href=\"/mfg/materials\"", admin, StringComparison.Ordinal);
         Assert.DoesNotContain("api/v1/ReferenceData/locations", page, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("flex: 1 1 320px", page, StringComparison.Ordinal);
 
-        Assert.Contains("max-width: 70rem;", ExtractCssBlock(styles, ".reference-registry-item,"), StringComparison.Ordinal);
-        Assert.Contains("grid-template-columns: minmax(16rem, 26rem) max-content;", ExtractCssBlock(styles, ".reference-registry-toolbar {"), StringComparison.Ordinal);
-        Assert.Contains("min-height: 40px;", ExtractCssBlock(styles, ".reference-registry-toolbar ::deep .mud-input.mud-input-outlined"), StringComparison.Ordinal);
-        Assert.Contains("min-height: 40px;", ExtractCssBlock(styles, ".reference-registry-toolbar ::deep .mud-button-root"), StringComparison.Ordinal);
-        Assert.Contains("white-space: nowrap;", ExtractCssBlock(styles, ".reference-registry-toolbar ::deep .mud-button-root"), StringComparison.Ordinal);
-        Assert.Contains("grid-template-columns: minmax(0, 1fr);", ExtractCssBlock(styles, "@media (max-width: 760px)"), StringComparison.Ordinal);
+        Assert.Contains("display: grid;", ExtractCssBlock(styles, ".reference-workbench"), StringComparison.Ordinal);
+        Assert.Contains("max-width: 78rem;", ExtractCssBlock(styles, ".reference-exchange-panel,"), StringComparison.Ordinal);
+        Assert.Contains("flex: 0 1 28rem;", ExtractCssBlock(styles, ".reference-search-field {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: repeat(2, minmax(0, 1fr));", ExtractCssBlock(styles, ".reference-form-grid"), StringComparison.Ordinal);
+        Assert.Contains("overflow-x: auto;", ExtractCssBlock(styles, ".reference-table-shell"), StringComparison.Ordinal);
+        Assert.Contains("font-size: var(--mud-typography-caption-size);", ExtractCssBlock(styles, ".reference-muted"), StringComparison.Ordinal);
+        Assert.Contains("flex-direction: column;", ExtractCssBlock(styles, "@media (max-width: 760px)"), StringComparison.Ordinal);
     }
 
     [Fact]

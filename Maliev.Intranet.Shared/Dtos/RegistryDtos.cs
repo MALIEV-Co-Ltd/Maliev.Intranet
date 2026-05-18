@@ -67,8 +67,36 @@ public class CountryDto
     [JsonPropertyName("iso2")]
     public string Code { get; set; } = string.Empty;
 
+    /// <summary>The ISO 3166-1 alpha-3 code of the country (e.g., "THA", "USA").</summary>
+    [JsonPropertyName("iso3")]
+    public string? Iso3 { get; set; }
+
     /// <summary>The full display name of the country.</summary>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>The official country name, when different from the common name.</summary>
+    public string? OfficialName { get; set; }
+
+    /// <summary>The ISO 3166-1 numeric code.</summary>
+    public string? NumericCode { get; set; }
+
+    /// <summary>The capital city of the country.</summary>
+    public string? Capital { get; set; }
+
+    /// <summary>The geographic region for grouping countries.</summary>
+    public string? Region { get; set; }
+
+    /// <summary>The geographic subregion for grouping countries.</summary>
+    public string? Subregion { get; set; }
+
+    /// <summary>Indicates whether the country record is active.</summary>
+    public bool IsActive { get; set; } = true;
+
+    /// <summary>The optimistic concurrency token returned by CountryService.</summary>
+    public string? ETag { get; set; }
+
+    /// <summary>The UTC timestamp when the country record was last changed.</summary>
+    public DateTime? LastModifiedUtc { get; set; }
 }
 
 /// <summary>
@@ -96,6 +124,43 @@ public class CurrencyDto
 
     /// <summary>Indicates if this currency is the primary or base currency for system-wide accounting.</summary>
     public bool IsPrimary { get; set; }
+
+    /// <summary>The optimistic concurrency token returned by CurrencyService.</summary>
+    public string? ETag { get; set; }
+
+    /// <summary>The UTC timestamp when the currency was created.</summary>
+    public DateTime? CreatedAt { get; set; }
+
+    /// <summary>The UTC timestamp when the currency was last updated.</summary>
+    public DateTime? UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// Paginated reference data returned by management endpoints.
+/// </summary>
+/// <typeparam name="T">The type of reference data item.</typeparam>
+public class ReferenceDataPage<T>
+{
+    /// <summary>The items in the current page.</summary>
+    public List<T> Items { get; set; } = [];
+
+    /// <summary>The one-based page number.</summary>
+    public int PageNumber { get; set; } = 1;
+
+    /// <summary>The number of rows requested per page.</summary>
+    public int PageSize { get; set; } = 25;
+
+    /// <summary>The total number of matching rows.</summary>
+    public int TotalCount { get; set; }
+
+    /// <summary>The total number of pages.</summary>
+    public int TotalPages { get; set; }
+
+    /// <summary>Indicates whether a previous page exists.</summary>
+    public bool HasPreviousPage => PageNumber > 1;
+
+    /// <summary>Indicates whether a next page exists.</summary>
+    public bool HasNextPage => PageNumber < TotalPages;
 }
 
 /// <summary>
