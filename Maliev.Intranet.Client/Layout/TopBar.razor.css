@@ -576,7 +576,7 @@
     }
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1600px) {
     .topbar-logo-divider { display: none; }
 
     .topbar-root {

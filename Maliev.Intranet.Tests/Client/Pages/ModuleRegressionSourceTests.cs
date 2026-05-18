@@ -880,7 +880,7 @@ public class ModuleRegressionSourceTests
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
         var searchStyles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "GlobalSearchBox.razor.css");
         var wideDesktopStyles = styles[styles.IndexOf("@media (max-width: 1680px)", StringComparison.Ordinal)..];
-        var mobileStyles = styles[styles.IndexOf("@media (max-width: 1120px)", StringComparison.Ordinal)..];
+        var compactNavStyles = styles[styles.IndexOf("@media (max-width: 1600px)", StringComparison.Ordinal)..];
 
         Assert.Contains("class=\"topbar-spacer\"", razor, StringComparison.Ordinal);
         Assert.Contains("class=\"topbar-mobile-menu-button\"", razor, StringComparison.Ordinal);
@@ -900,21 +900,21 @@ public class ModuleRegressionSourceTests
         Assert.Contains("@media (max-width: 1280px)", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-profile-info { display: none; }", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-profile ::deep .topbar-profile-chevron", styles, StringComparison.Ordinal);
-        Assert.Contains("@media (max-width: 1120px)", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 1600px)", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-mobile-menu-button", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-mobile-drawer-backdrop", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-mobile-nav-drawer", styles, StringComparison.Ordinal);
-        Assert.Contains("position: fixed;", ExtractCssBlock(mobileStyles, ".topbar-mobile-nav-drawer"), StringComparison.Ordinal);
+        Assert.Contains("position: fixed;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-drawer"), StringComparison.Ordinal);
         Assert.Contains("width: min(320px, calc(100vw - 28px));", styles, StringComparison.Ordinal);
         Assert.Contains("flex-wrap: nowrap;", styles, StringComparison.Ordinal);
-        Assert.Contains("display: none;", ExtractCssBlock(mobileStyles, ".topbar-nav"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(compactNavStyles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains(".topbar-search", styles, StringComparison.Ordinal);
         Assert.Contains("display: block;", styles, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 clamp(160px, 32vw, 260px);", styles, StringComparison.Ordinal);
-        Assert.Contains("gap: 6px;", ExtractCssBlock(mobileStyles, ".topbar-right"), StringComparison.Ordinal);
+        Assert.Contains("gap: 6px;", ExtractCssBlock(compactNavStyles, ".topbar-right"), StringComparison.Ordinal);
         Assert.Contains("width: min(96px, 100%);", ExtractCssBlock(styles, ".topbar-logo-button ::deep img"), StringComparison.Ordinal);
-        Assert.Contains("width: clamp(92px, 17vw, 100px);", ExtractCssBlock(mobileStyles, ".topbar-logo-button"), StringComparison.Ordinal);
-        Assert.DoesNotContain("overflow: hidden;", ExtractCssBlock(mobileStyles, ".topbar-logo-button"), StringComparison.Ordinal);
+        Assert.Contains("width: clamp(92px, 17vw, 100px);", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
+        Assert.DoesNotContain("overflow: hidden;", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
         Assert.DoesNotContain("max-width: 86px;", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-right ::deep .topbar-theme-toggle", styles, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 420px)", styles, StringComparison.Ordinal);
@@ -932,11 +932,14 @@ public class ModuleRegressionSourceTests
         var navBlock = ExtractCssBlock(styles, ".topbar-nav");
         var spacerBlock = ExtractCssBlock(styles, ".topbar-spacer");
         var rightBlock = ExtractCssBlock(styles, ".topbar-right");
+        var compactNavStyles = styles[styles.IndexOf("@media (max-width: 1600px)", StringComparison.Ordinal)..];
 
         Assert.Contains("flex: 1 1 0;", navBlock, StringComparison.Ordinal);
         Assert.Contains("min-width: 0;", navBlock, StringComparison.Ordinal);
         Assert.Contains("max-width: 100%;", navBlock, StringComparison.Ordinal);
         Assert.Contains("overflow-x: auto;", navBlock, StringComparison.Ordinal);
+        Assert.Contains("display: inline-grid;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-menu-button"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(compactNavStyles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains("display: none;", spacerBlock, StringComparison.Ordinal);
         Assert.Contains("flex: 0 0 auto;", spacerBlock, StringComparison.Ordinal);
         Assert.Contains("flex: 0 0 auto;", rightBlock, StringComparison.Ordinal);
