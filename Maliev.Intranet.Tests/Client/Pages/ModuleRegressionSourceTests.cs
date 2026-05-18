@@ -1045,12 +1045,18 @@ public class ModuleRegressionSourceTests
     {
         var profile = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor.css");
+        var overviewGridBlock = ExtractCssBlock(styles, ".profile-overview-grid");
+        var inputBlock = ExtractCssBlock(styles, ".profile-field ::deep input.profile-input");
         var preferenceGridBlock = ExtractCssBlock(styles, ".preference-form-grid");
         var toggleGridBlock = ExtractCssBlock(styles, ".preference-toggle-grid");
         var signatureGridBlock = ExtractCssBlock(styles, ".signature-field-grid");
         var textareaBlock = ExtractCssBlock(styles, ".profile-field ::deep textarea.profile-input");
         var signatureTextareaBlock = ExtractCssBlock(styles, ".profile-field ::deep textarea.preferences-signature");
 
+        Assert.Contains("class=\"mlv-grid profile-overview-grid\"", profile, StringComparison.Ordinal);
+        Assert.Contains("row-gap: 1.35rem;", overviewGridBlock, StringComparison.Ordinal);
+        Assert.Contains("border: 1px solid var(--maliev-border);", inputBlock, StringComparison.Ordinal);
+        Assert.Contains("background: var(--maliev-panel);", inputBlock, StringComparison.Ordinal);
         Assert.Contains("name=\"emailSignature\"", profile, StringComparison.Ordinal);
         Assert.Contains("name=\"shortEmailSignature\"", profile, StringComparison.Ordinal);
         Assert.Contains("BuildDefaultFullEmailSignature", profile, StringComparison.Ordinal);
