@@ -37,7 +37,7 @@
     <nav class="topbar-nav" aria-label="Primary navigation">
         <MudNavLink Href="@_quoteNavItem.Href" Match="@_quoteNavItem.Match" Class="@_quoteNavItem.Class">@_quoteNavItem.Label</MudNavLink>
 
-        @foreach (var group in _navGroups)
+        @foreach (var group in _desktopNavGroups)
         {
             <MudMenu AnchorOrigin="Origin.BottomLeft"
                      TransformOrigin="Origin.TopLeft"
@@ -72,6 +72,49 @@
                 </ChildContent>
             </MudMenu>
         }
+
+        <MudMenu AnchorOrigin="Origin.BottomRight"
+                 TransformOrigin="Origin.TopRight"
+                 Dense="true"
+                 Class="topbar-nav-menu topbar-nav-more-menu"
+                 PopoverClass="topbar-nav-popover topbar-nav-more-popover">
+            <ActivatorContent>
+                <button type="button"
+                        class="@GetDesktopOverflowClass()"
+                        aria-label="More navigation"
+                        @onclick="context.ToggleAsync">
+                    <MudIcon Icon="@Icons.Material.Outlined.Apps" Size="Size.Small" />
+                    <span>More</span>
+                    <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" />
+                </button>
+            </ActivatorContent>
+            <ChildContent>
+                @foreach (var group in _desktopOverflowNavGroups)
+                {
+                    <div class="topbar-nav-more-section" role="presentation">
+                        <div class="topbar-nav-more-section-title">
+                            <MudIcon Icon="@group.Icon" Size="Size.Small" />
+                            <span>@group.Label</span>
+                        </div>
+
+                        @foreach (var item in group.Items)
+                        {
+                            <MudMenuItem Href="@item.Href"
+                                         Icon="@item.Icon"
+                                         Class="@GetDesktopMenuItemClass(item)">
+                                <div class="topbar-nav-menu-copy">
+                                    <span>@item.Label</span>
+                                    @if (!string.IsNullOrWhiteSpace(item.Description))
+                                    {
+                                        <small>@item.Description</small>
+                                    }
+                                </div>
+                            </MudMenuItem>
+                        }
+                    </div>
+                }
+            </ChildContent>
+        </MudMenu>
     </nav>
 
     @if (_mobileNavOpen)
@@ -245,6 +288,8 @@
 
     private readonly AppNavItem _quoteNavItem = AppNavigation.Quote;
     private readonly IReadOnlyList<AppNavGroup> _navGroups = AppNavigation.PrimaryGroups;
+    private readonly IReadOnlyList<AppNavGroup> _desktopNavGroups = AppNavigation.DesktopGroups;
+    private readonly IReadOnlyList<AppNavGroup> _desktopOverflowNavGroups = AppNavigation.DesktopOverflowGroups;
 
     private string LogoUrl => LayoutService.IsDarkMode
         ? "images/logo-white.svg"
@@ -363,6 +408,9 @@
 
     private string GetDesktopNavGroupClass(AppNavGroup group) =>
         IsNavGroupActive(group) ? "topbar-nav-menu-trigger active" : "topbar-nav-menu-trigger";
+
+    private string GetDesktopOverflowClass() =>
+        _desktopOverflowNavGroups.Any(IsNavGroupActive) ? "topbar-nav-menu-trigger topbar-nav-more-trigger active" : "topbar-nav-menu-trigger topbar-nav-more-trigger";
 
     private string GetDesktopMenuItemClass(AppNavItem item) =>
         IsNavItemActive(item) ? "topbar-nav-menu-item active" : "topbar-nav-menu-item";

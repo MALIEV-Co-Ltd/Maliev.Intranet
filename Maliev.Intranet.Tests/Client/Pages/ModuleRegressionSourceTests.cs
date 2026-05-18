@@ -189,8 +189,15 @@ public class ModuleRegressionSourceTests
         var appNavigation = ReadRepoFile("Maliev.Intranet.Client", "Layout", "AppNavigation.cs");
 
         Assert.Contains("AppNavigation.PrimaryGroups", source, StringComparison.Ordinal);
+        Assert.Contains("AppNavigation.DesktopGroups", source, StringComparison.Ordinal);
+        Assert.Contains("AppNavigation.DesktopOverflowGroups", source, StringComparison.Ordinal);
         Assert.Contains("internal sealed record AppNavGroup", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("DesktopGroups", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("DesktopOverflowGroups", appNavigation, StringComparison.Ordinal);
         Assert.Contains("topbar-nav-menu-trigger", source, StringComparison.Ordinal);
+        Assert.Contains("topbar-nav-more-trigger", source, StringComparison.Ordinal);
+        Assert.Contains("topbar-nav-more-popover", source, StringComparison.Ordinal);
+        Assert.Contains("topbar-nav-more-section-title", source, StringComparison.Ordinal);
         Assert.Contains("Storefront catalog", appNavigation, StringComparison.Ordinal);
         Assert.Contains("\"commerce/catalog\"", appNavigation, StringComparison.Ordinal);
         Assert.Contains("new(\"Materials\", \"mfg/materials\"", appNavigation, StringComparison.Ordinal);
@@ -204,8 +211,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Navigation.LocationChanged += OnLocationChanged", source, StringComparison.Ordinal);
         Assert.Contains("IsNavGroupActive", source, StringComparison.Ordinal);
         Assert.Contains(".topbar-nav-menu-trigger", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav-more-trigger", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav-more-section-title", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-mobile-nav-group", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-nav-popover", overrides, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav-more-popover", overrides, StringComparison.Ordinal);
         Assert.Contains("Href=\"@item.Href\"", navMenu, StringComparison.Ordinal);
         Assert.Contains("AppNavigation.PrimaryGroups", navMenu, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"/admin/blog\"", appNavigation, StringComparison.OrdinalIgnoreCase);
@@ -903,8 +913,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("GetMobileNavClass", razor, StringComparison.Ordinal);
         Assert.Contains("CloseMobileNav", razor, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 1680px)", styles, StringComparison.Ordinal);
-        Assert.Contains("overflow-x: auto;", ExtractCssBlock(styles, ".topbar-nav"), StringComparison.Ordinal);
+        Assert.Contains("overflow: visible;", ExtractCssBlock(styles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains("flex: 0 0 auto;", ExtractCssBlock(styles, ".topbar-right"), StringComparison.Ordinal);
+        Assert.Contains("margin-left: auto;", ExtractCssBlock(styles, ".topbar-right"), StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav-more-trigger", styles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-nav-more-popover", ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css"), StringComparison.Ordinal);
         Assert.Contains("display: none;", ExtractCssBlock(wideDesktopStyles, ".topbar-profile-info"), StringComparison.Ordinal);
         Assert.Contains("width: 36px;", ExtractCssBlock(wideDesktopStyles, ".topbar-profile {"), StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 1280px)", styles, StringComparison.Ordinal);
@@ -944,16 +957,28 @@ public class ModuleRegressionSourceTests
     [Fact]
     public void TopBar_DesktopNavigationCannotOverlapSearchAndUtilityControls()
     {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
+        var appNavigation = ReadRepoFile("Maliev.Intranet.Client", "Layout", "AppNavigation.cs");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var overrides = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
         var navBlock = ExtractCssBlock(styles, ".topbar-nav");
         var spacerBlock = ExtractCssBlock(styles, ".topbar-spacer");
         var rightBlock = ExtractCssBlock(styles, ".topbar-right");
         var compactNavStyles = styles[styles.IndexOf("@media (max-width: 1600px)", StringComparison.Ordinal)..];
 
-        Assert.Contains("flex: 1 1 0;", navBlock, StringComparison.Ordinal);
+        Assert.Contains("AppNavigation.DesktopGroups", source, StringComparison.Ordinal);
+        Assert.Contains("AppNavigation.DesktopOverflowGroups", source, StringComparison.Ordinal);
+        Assert.Contains("topbar-nav-more-trigger", source, StringComparison.Ordinal);
+        Assert.Contains("topbar-nav-more-section-title", source, StringComparison.Ordinal);
+        Assert.Contains("DesktopOverflowGroups", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("PrimaryGroups[8]", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("flex: 0 1 auto;", navBlock, StringComparison.Ordinal);
         Assert.Contains("min-width: 0;", navBlock, StringComparison.Ordinal);
         Assert.Contains("max-width: 100%;", navBlock, StringComparison.Ordinal);
-        Assert.Contains("overflow-x: auto;", navBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow: visible;", navBlock, StringComparison.Ordinal);
+        Assert.Contains("margin-left: auto;", rightBlock, StringComparison.Ordinal);
+        Assert.Contains("topbar-nav-more-popover", overrides, StringComparison.Ordinal);
+        Assert.Contains("max-height: min(720px, calc(100vh - 78px));", overrides, StringComparison.Ordinal);
         Assert.Contains("display: inline-grid;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-menu-button"), StringComparison.Ordinal);
         Assert.Contains("display: none;", ExtractCssBlock(compactNavStyles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains("display: none;", spacerBlock, StringComparison.Ordinal);

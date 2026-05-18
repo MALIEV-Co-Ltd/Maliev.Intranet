@@ -82,6 +82,24 @@ internal static class AppNavigation
             new("Leave", "hr/leave", Icons.Material.Outlined.EventAvailable, MalievPermissions.Leave.Read, Description: "Leave requests"),
         ]),
     ];
+
+    public static IReadOnlyList<AppNavGroup> DesktopGroups { get; } =
+    [
+        PrimaryGroups[0],
+        PrimaryGroups[1],
+        PrimaryGroups[3],
+        PrimaryGroups[5],
+    ];
+
+    public static IReadOnlyList<AppNavGroup> DesktopOverflowGroups { get; } =
+    [
+        PrimaryGroups[2],
+        PrimaryGroups[4],
+        PrimaryGroups[6],
+        PrimaryGroups[7],
+        PrimaryGroups[8],
+        PrimaryGroups[9],
+    ];
 }
 
 internal sealed record AppNavGroup(

@@ -501,6 +501,12 @@
     padding: 6px;
 }
 
+.topbar-nav-more-popover {
+    min-width: 310px;
+    max-height: min(720px, calc(100vh - 78px));
+    overflow-y: auto;
+}
+
 .topbar-nav-popover .topbar-nav-menu-item {
     min-height: 42px;
     padding: 7px 9px;

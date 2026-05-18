@@ -83,15 +83,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-width: 0;
     max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
+    overflow: visible;
 }
-
-.topbar-nav::-webkit-scrollbar { display: none; }
 
 .topbar-mobile-drawer-backdrop,
 .topbar-mobile-nav-drawer {
@@ -166,6 +162,49 @@
 
 .topbar-nav-menu-trigger .mud-icon-root {
     flex: 0 0 auto;
+}
+
+.topbar-nav-more-trigger {
+    background: var(--maliev-panel-2);
+    box-shadow: var(--maliev-shadow-ring);
+}
+
+.topbar-nav-more-trigger:hover,
+.topbar-nav-more-trigger:focus-visible,
+.topbar-nav-more-trigger.active {
+    background: var(--maliev-panel-3);
+}
+
+.topbar-nav-more-section {
+    display: grid;
+    gap: 3px;
+    padding: 4px 0;
+}
+
+.topbar-nav-more-section + .topbar-nav-more-section {
+    margin-top: 4px;
+    border-top: 1px solid var(--maliev-border);
+    padding-top: 8px;
+}
+
+.topbar-nav-more-section-title {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 4px 9px;
+    color: var(--maliev-muted-2);
+    font-size: var(--maliev-font-micro);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.topbar-nav-more-section-title .mud-icon-root {
+    width: 22px;
+    height: 22px;
+    color: currentColor;
 }
 
 .topbar-nav-menu-copy {
@@ -360,6 +399,7 @@
     gap: 8px;
     flex: 0 0 auto;
     min-width: 0;
+    margin-left: auto;
 }
 
 .topbar-right ::deep .mud-button-root.mud-icon-button {
