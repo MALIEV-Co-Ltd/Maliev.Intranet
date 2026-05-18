@@ -888,6 +888,23 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void TopBar_DesktopNavigationCannotOverlapSearchAndUtilityControls()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var navBlock = ExtractCssBlock(styles, ".topbar-nav");
+        var spacerBlock = ExtractCssBlock(styles, ".topbar-spacer");
+        var rightBlock = ExtractCssBlock(styles, ".topbar-right");
+
+        Assert.Contains("flex: 1 1 0;", navBlock, StringComparison.Ordinal);
+        Assert.Contains("min-width: 0;", navBlock, StringComparison.Ordinal);
+        Assert.Contains("max-width: 100%;", navBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: auto;", navBlock, StringComparison.Ordinal);
+        Assert.Contains("display: none;", spacerBlock, StringComparison.Ordinal);
+        Assert.Contains("flex: 0 0 auto;", spacerBlock, StringComparison.Ordinal);
+        Assert.Contains("flex: 0 0 auto;", rightBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_QuoteNavigationAction_UsesPrimaryColor()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");

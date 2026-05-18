@@ -83,8 +83,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    flex: 0 1 auto;
+    flex: 1 1 0;
     min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -98,6 +99,7 @@
 }
 
 .topbar-nav ::deep .mud-nav-link {
+    flex: 0 0 auto;
     padding: 6px 12px;
     font-size: var(--maliev-font-base);
     font-weight: 500;
@@ -224,7 +226,8 @@
 }
 
 .topbar-spacer {
-    flex: 1 1 auto;
+    display: none;
+    flex: 0 0 auto;
     min-width: 0;
 }
 
