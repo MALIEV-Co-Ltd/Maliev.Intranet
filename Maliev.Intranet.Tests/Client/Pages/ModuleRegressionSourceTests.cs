@@ -1117,6 +1117,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("js/production-schedule-board.js", appShell, StringComparison.Ordinal);
         Assert.Contains("js/production-schedule-board.js", index, StringComparison.Ordinal);
         Assert.Contains("malievProductionSchedule.scrollCurrentTimeIntoView", helper, StringComparison.Ordinal);
+        Assert.Contains(".psb-time-heading", helper, StringComparison.Ordinal);
+        Assert.Contains("measuredOneHourOffset", helper, StringComparison.Ordinal);
         Assert.Contains("desiredViewportLeft", helper, StringComparison.Ordinal);
         Assert.Contains("board.scrollTo({ left: nextScrollLeft, behavior: 'auto' });", helper, StringComparison.Ordinal);
     }
