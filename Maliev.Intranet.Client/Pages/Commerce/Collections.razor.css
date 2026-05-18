@@ -47,6 +47,22 @@
     gap: 0.75rem;
 }
 
+.commerce-collections-load-error {
+    align-items: center;
+    border: 1px solid color-mix(in oklab, var(--mud-palette-warning), transparent 56%);
+    border-radius: var(--maliev-radius-sm);
+    color: var(--maliev-ink);
+    display: grid;
+    gap: 0.9rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 5.25rem;
+    padding: 1rem;
+}
+
+.commerce-collections-load-error .mud-icon-root {
+    color: var(--mud-palette-warning);
+}
+
 .commerce-collections-empty {
     align-items: center;
     border: 1px dashed var(--maliev-border);
@@ -128,7 +144,8 @@
 
 @media (max-width: 780px) {
     .commerce-collection-form-grid,
-    .commerce-collection-row {
+    .commerce-collection-row,
+    .commerce-collections-load-error {
         grid-template-columns: minmax(0, 1fr);
     }
 

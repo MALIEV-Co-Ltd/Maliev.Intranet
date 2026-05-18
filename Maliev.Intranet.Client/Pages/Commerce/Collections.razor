@@ -123,6 +123,22 @@
                             <MudSkeleton Height="64px" Animation="Animation.Wave" />
                         </div>
                     }
+                    else if (!string.IsNullOrWhiteSpace(_collectionsLoadError))
+                    {
+                        <div class="commerce-collections-load-error" role="alert">
+                            <MudIcon Icon="@Icons.Material.Outlined.CloudOff" Size="Size.Medium" />
+                            <div>
+                                <MudText Typo="Typo.body1">@_collectionsLoadError</MudText>
+                                <MudText Typo="Typo.caption">Check CommerceService status or retry loading the collection list.</MudText>
+                            </div>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Outlined.Refresh"
+                                       OnClick="LoadCollectionsAsync">
+                                Retry
+                            </MudButton>
+                        </div>
+                    }
                     else if (_collections.Count == 0)
                     {
                         <div class="commerce-collections-empty">
@@ -169,9 +185,12 @@
 </div>
 
 @code {
+    private static readonly TimeSpan CollectionsLoadTimeout = TimeSpan.FromSeconds(15);
+
     private readonly List<CommerceCollectionDto> _collections = [];
     private CommerceCollectionMutationRequest _collectionForm = new();
     private Guid? _editingCollectionId;
+    private string? _collectionsLoadError;
     private bool _loadingCollections = true;
     private bool _saving;
 
@@ -201,15 +220,22 @@
     private async Task LoadCollectionsAsync()
     {
         _loadingCollections = true;
+        _collectionsLoadError = null;
+        using var timeout = new CancellationTokenSource(CollectionsLoadTimeout);
+
         try
         {
-            var response = await Http.GetFromJsonAsync<List<CommerceCollectionDto>>("api/v1/commerce/collections");
+            var response = await Http.GetFromJsonAsync<List<CommerceCollectionDto>>("api/v1/commerce/collections", timeout.Token);
             _collections.Clear();
             _collections.AddRange(response ?? []);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
-            Snackbar.Add($"Unable to load Commerce collections: {ex.Message}", Severity.Error);
+            _collectionsLoadError = "Product collections are taking too long to load.";
+        }
+        catch (Exception)
+        {
+            _collectionsLoadError = "Product collections could not be loaded.";
         }
         finally
         {

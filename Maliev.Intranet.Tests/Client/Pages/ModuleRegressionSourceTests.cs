@@ -750,6 +750,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains("RequirePermission(MalievPermissions.Commerce.CollectionsRead)", collections, StringComparison.Ordinal);
         Assert.Contains("CommerceCollectionMutationRequest", collections, StringComparison.Ordinal);
         Assert.Contains("api/v1/commerce/collections", collections, StringComparison.Ordinal);
+        Assert.Contains("CollectionsLoadTimeout", collections, StringComparison.Ordinal);
+        Assert.Contains("CancellationTokenSource(CollectionsLoadTimeout)", collections, StringComparison.Ordinal);
+        Assert.Contains("_collectionsLoadError", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collections-load-error", collections, StringComparison.Ordinal);
+        Assert.Contains("role=\"alert\"", collections, StringComparison.Ordinal);
+        Assert.Contains("OperationCanceledException", collections, StringComparison.Ordinal);
         Assert.Contains("SaveCollectionAsync", collections, StringComparison.Ordinal);
         Assert.Contains("UnpublishCollectionAsync", collections, StringComparison.Ordinal);
 
