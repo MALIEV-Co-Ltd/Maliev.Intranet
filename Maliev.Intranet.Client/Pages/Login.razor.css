@@ -81,6 +81,20 @@
     letter-spacing: 0;
 }
 
+.login-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.34em;
+}
+
+.login-title-logo {
+    display: inline-block;
+    width: auto;
+    height: 0.76em;
+    transform: translateY(0.02em);
+}
+
 .form-subtitle {
     margin: 8px 0 0;
     color: var(--mud-palette-text-secondary);

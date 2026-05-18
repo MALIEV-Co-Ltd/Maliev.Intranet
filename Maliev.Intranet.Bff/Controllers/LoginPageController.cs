@@ -202,6 +202,27 @@ public sealed class LoginPageController : Controller
             line-height: 1.2;
             letter-spacing: 0;
         }
+        .login-title {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.34em;
+        }
+        .login-title-logo {
+            display: inline-block;
+            width: auto;
+            height: 0.76em;
+            transform: translateY(0.02em);
+        }
+        .login-title-logo--dark {
+            display: none;
+        }
+        :root[data-maliev-theme="dark"] .login-title-logo--light {
+            display: none;
+        }
+        :root[data-maliev-theme="dark"] .login-title-logo--dark {
+            display: inline-block;
+        }
         .subtitle {
             margin: 8px 0 0;
             color: var(--maliev-ink-2);
@@ -506,7 +527,11 @@ public sealed class LoginPageController : Controller
             <section class="login-gateway-card" aria-labelledby="login-title">
                 <div class="login-card-heading">
                     <p class="gateway-kicker">Employee gateway</p>
-                    <h1 id="login-title">Sign in to MALIEV</h1>
+                    <h1 id="login-title" class="login-title" aria-label="Sign in to MALIEV">
+                        <span>Sign in to</span>
+                        <img src="/images/logo.svg" alt="" aria-hidden="true" class="login-title-logo login-title-logo--light" />
+                        <img src="/images/logo-white.svg" alt="" aria-hidden="true" class="login-title-logo login-title-logo--dark" />
+                    </h1>
                     <p class="subtitle">Use your employee account to continue to the intranet workspace.</p>
                 </div>
                 {{errorHtml}}

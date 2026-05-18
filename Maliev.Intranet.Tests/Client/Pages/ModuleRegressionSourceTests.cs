@@ -1139,6 +1139,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("/api/v1/auth/login", source, StringComparison.Ordinal);
         Assert.Contains("Sign in with Google", source, StringComparison.Ordinal);
         Assert.Contains("class=\"login-gateway-card\"", source, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Sign in to MALIEV\"", source, StringComparison.Ordinal);
+        Assert.Contains("class=\"form-title login-title\"", source, StringComparison.Ordinal);
+        Assert.Contains("class=\"login-title-logo\"", source, StringComparison.Ordinal);
         Assert.Contains("footer-note-link", source, StringComparison.Ordinal);
         Assert.Contains("MALIEV CO., LTD.", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Support", source, StringComparison.Ordinal);
@@ -1155,6 +1158,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("background: var(--mud-palette-primary);", styles, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", styles, StringComparison.Ordinal);
         Assert.Contains("box-shadow: none;", loginHeaderBlock, StringComparison.Ordinal);
+        Assert.Contains("display: flex;", ExtractCssBlock(styles, ".login-title"), StringComparison.Ordinal);
+        Assert.Contains("height: 0.76em;", ExtractCssBlock(styles, ".login-title-logo"), StringComparison.Ordinal);
         Assert.Contains("background: transparent;", themeToggleBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: none;", themeToggleBlock, StringComparison.Ordinal);
         Assert.Contains(".login-gateway-card", styles, StringComparison.Ordinal);
@@ -1170,7 +1175,10 @@ public class ModuleRegressionSourceTests
         Assert.Contains("family=Geist+Mono:wght@400..600", bffLogin, StringComparison.Ordinal);
         Assert.Contains("Noto+Sans+Thai", bffLogin, StringComparison.Ordinal);
         Assert.Contains("login-gateway-card", bffLogin, StringComparison.Ordinal);
-        Assert.Contains("Sign in to MALIEV", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Sign in to MALIEV\"", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("login-title-logo login-title-logo--light", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("login-title-logo login-title-logo--dark", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Sign in to MALIEV</h1>", bffLogin, StringComparison.Ordinal);
         Assert.Contains("MALIEV CO., LTD.", bffLogin, StringComparison.Ordinal);
         Assert.DoesNotContain("Support", bffLogin, StringComparison.Ordinal);
         Assert.DoesNotContain("System Status", bffLogin, StringComparison.Ordinal);
@@ -1178,6 +1186,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("--maliev-shadow-card", bffLogin, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-bg);", bffLogin, StringComparison.Ordinal);
         Assert.Contains("box-shadow: none;", ExtractCssBlock(bffLogin, ".login-header {"), StringComparison.Ordinal);
+        Assert.Contains("display: flex;", ExtractCssBlock(bffLogin, ".login-title"), StringComparison.Ordinal);
+        Assert.Contains("height: 0.76em;", ExtractCssBlock(bffLogin, ".login-title-logo"), StringComparison.Ordinal);
         Assert.Contains("background: transparent;", bffThemeToggleBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: none;", bffThemeToggleBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("JetBrains+Mono", bffLogin, StringComparison.Ordinal);
