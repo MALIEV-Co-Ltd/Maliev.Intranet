@@ -648,17 +648,18 @@
         position: fixed;
         top: 52px;
         bottom: 0;
-        left: 0;
+        right: 0;
+        left: auto;
         z-index: 2600;
         display: flex;
         box-sizing: border-box;
-        width: min(340px, calc(100vw - 28px));
-        padding: 14px 16px 18px;
-        border-radius: 0 var(--maliev-radius-md) var(--maliev-radius-md) 0;
+        width: min(390px, calc(100vw - 52px));
+        padding: 10px 12px calc(16px + env(safe-area-inset-bottom));
+        border-radius: 0;
         background: var(--maliev-panel);
         box-shadow: var(--maliev-shadow-card);
         flex-direction: column;
-        gap: 12px;
+        gap: 8px;
         overflow-y: auto;
     }
 
@@ -666,8 +667,9 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        min-height: 36px;
-        padding: 0 2px;
+        min-height: 48px;
+        padding: 0 2px 8px 4px;
+        border-bottom: 1px solid var(--maliev-border);
         color: var(--maliev-ink);
         font-size: var(--maliev-font-small);
         font-weight: 700;
@@ -676,11 +678,11 @@
     .topbar-mobile-drawer-close {
         display: inline-grid;
         place-items: center;
-        width: 32px;
-        height: 32px;
+        width: 44px;
+        height: 44px;
         padding: 0;
         border: 0;
-        border-radius: var(--maliev-radius-sm);
+        border-radius: var(--maliev-radius-xs);
         background: transparent;
         color: var(--maliev-muted);
         cursor: pointer;
@@ -700,19 +702,19 @@
     .topbar-mobile-nav-list {
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        padding-bottom: 18px;
+        gap: 8px;
+        padding: 4px 2px 18px;
     }
 
     .topbar-mobile-nav-link {
         display: grid;
-        grid-template-columns: 24px minmax(0, 1fr);
+        grid-template-columns: 28px minmax(0, 1fr);
         align-items: center;
-        column-gap: 10px;
+        column-gap: 12px;
         box-sizing: border-box;
         width: 100%;
-        min-height: 40px;
-        padding: 8px 12px;
+        min-height: 48px;
+        padding: 10px 14px;
         border-radius: var(--maliev-radius-xs);
         color: var(--maliev-muted);
         font-size: var(--maliev-font-base);
@@ -723,8 +725,8 @@
 
     .topbar-mobile-nav-link .mud-icon-root {
         display: inline-flex;
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
         align-items: center;
         justify-content: center;
         flex: 0 0 auto;
@@ -754,19 +756,19 @@
     .topbar-mobile-nav-group {
         display: flex;
         flex-direction: column;
-        gap: 2px;
-        margin-top: 4px;
-        padding: 10px 0 8px;
+        gap: 4px;
+        margin-top: 2px;
+        padding: 12px 0 8px;
         border-top: 1px solid var(--maliev-border);
     }
 
     .topbar-mobile-nav-group-title {
         display: grid;
-        grid-template-columns: 24px minmax(0, 1fr);
+        grid-template-columns: 28px minmax(0, 1fr);
         align-items: center;
-        column-gap: 10px;
-        min-height: 32px;
-        padding: 4px 12px 6px;
+        column-gap: 12px;
+        min-height: 40px;
+        padding: 8px 14px 6px;
         color: var(--maliev-muted-2);
         font-size: var(--maliev-font-micro);
         font-weight: 800;
@@ -776,8 +778,8 @@
 
     .topbar-mobile-nav-group-title .mud-icon-root {
         display: inline-flex;
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
         align-items: center;
         justify-content: center;
         flex: 0 0 auto;
