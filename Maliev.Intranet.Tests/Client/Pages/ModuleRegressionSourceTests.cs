@@ -1045,6 +1045,7 @@ public class ModuleRegressionSourceTests
     {
         var profile = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor.css");
+        var profileFormBlock = ExtractCssBlock(styles, ".profile-form");
         var overviewGridBlock = ExtractCssBlock(styles, ".profile-overview-grid");
         var inputBlock = ExtractCssBlock(styles, ".profile-field ::deep input.profile-input");
         var preferenceGridBlock = ExtractCssBlock(styles, ".preference-form-grid");
@@ -1053,6 +1054,7 @@ public class ModuleRegressionSourceTests
         var textareaBlock = ExtractCssBlock(styles, ".profile-field ::deep textarea.profile-input");
         var signatureTextareaBlock = ExtractCssBlock(styles, ".profile-field ::deep textarea.preferences-signature");
 
+        Assert.Contains("margin-bottom: 1.65rem;", profileFormBlock, StringComparison.Ordinal);
         Assert.Contains("class=\"mlv-grid profile-overview-grid\"", profile, StringComparison.Ordinal);
         Assert.Contains("row-gap: 1.35rem;", overviewGridBlock, StringComparison.Ordinal);
         Assert.Contains("border: 1px solid var(--maliev-border);", inputBlock, StringComparison.Ordinal);
