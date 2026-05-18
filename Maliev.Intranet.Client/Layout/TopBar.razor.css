@@ -707,10 +707,9 @@
     }
 
     .topbar-mobile-nav-link {
-        display: grid;
-        grid-template-columns: 24px minmax(0, 1fr);
+        display: flex;
         align-items: center;
-        column-gap: 10px;
+        gap: 10px;
         box-sizing: border-box;
         width: 100%;
         min-height: 48px;
@@ -729,12 +728,18 @@
         height: 24px;
         align-items: center;
         justify-content: center;
-        flex: 0 0 auto;
+        align-self: center;
+        flex: 0 0 24px;
         color: currentColor;
+        line-height: 1;
     }
 
-    .topbar-mobile-nav-link span {
+    .topbar-mobile-nav-link > span {
+        display: inline-flex;
+        min-height: 24px;
         min-width: 0;
+        align-items: center;
+        line-height: 1.1;
     }
 
     .topbar-mobile-nav-link:hover,
